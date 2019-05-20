@@ -23,7 +23,6 @@ import BasicTypes
 import DynFlags
 import Demand
 import WwLib
-import EtaArityWW
 import Util
 import Outputable
 import FamInstEnv
@@ -559,9 +558,9 @@ splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> 
 splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_res_info
+    stuff <- mkWwBodies dflags fam_envs rhs_called_arity_map rhs_fvs fn_id wrap_dmds use_res_info
     case stuff of
-      Just (work_demands, join_arity, wrap_fn, work_fn) -> do
+      Just (work_demands, join_arity, wrap_fn, work_fn, mk_work_ty) -> do
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
             work_act = case fn_inline_spec of  -- See Note [Worker activation]
@@ -582,8 +581,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't CPR join points])
 
-            work_id  = mkWorkerId work_uniq fn_id (shallowEtaType (exprType work_rhs))
---            work_id    = mkWorkerId work_uniq fn_id (exprType work_rhs)
+            work_id  = mkWorkerId work_uniq fn_id (mk_work_ty (exprType work_rhs))
                         `setIdOccInfo` occInfo fn_info
                                 -- Copy over occurrence info from parent
                                 -- Notably whether it's a loop breaker
@@ -642,6 +640,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
       Nothing -> return [(fn_id, rhs)]
   where
     rhs_fvs         = exprFreeVars rhs
+    rhs_called_arity_map = mkCalledArityMap rhs
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_act          = inl_act fn_inl_prag

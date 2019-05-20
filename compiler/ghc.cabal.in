@@ -183,6 +183,7 @@ Library
         types
         utils
         hieFile
+        workwrap
 
     -- we use an explicit Prelude
     Default-Extensions:
@@ -472,11 +473,12 @@ Library
         StgSyn
         StgFVs
         CallArity
-        EtaArityWW
         DmdAnal
         Exitify
         WorkWrap
         WwLib
+        WwEtaArity
+        WwUnbox
         FamInst
         ClsInst
         Inst

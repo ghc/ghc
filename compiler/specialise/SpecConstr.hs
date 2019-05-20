@@ -29,7 +29,7 @@ import CoreFVs          ( exprsFreeVarsList )
 import CoreMonad
 import Literal          ( litIsLifted )
 import HscTypes         ( ModGuts(..) )
-import WwLib            ( isWorkerSmallEnough, mkWorkerArgs )
+import WwUnbox          ( isWorkerSmallEnough, mkWorkerArgs )
 import DataCon
 import Coercion         hiding( substCo )
 import Rules

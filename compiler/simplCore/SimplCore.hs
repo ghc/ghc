@@ -46,7 +46,6 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
-import EtaArityWW       ( etaArityWW )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import SrcLoc
@@ -122,7 +121,6 @@ getCoreToDo dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
     call_arity    = gopt Opt_CallArity                    dflags
-    eta_arity     = gopt Opt_EtaArity                     dflags
     exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
@@ -266,12 +264,6 @@ getCoreToDo dflags
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
                 -- Don't stop now!
         simpl_phase 0 ["main"] (max max_iter 3),
-
-        runWhen eta_arity $ CoreDoPasses
-            [ CoreDoEtaArity
-            , simpl_phase 0 ["post-eta-arity"] max_iter
-            ],
-            -- This "so far" has been the best place to put this pass
 
         runWhen do_float_in CoreDoFloatInwards,
             -- Run float-inwards immediately before the strictness analyser
@@ -447,9 +439,6 @@ doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 
 doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
-
-doCorePass CoreDoEtaArity            = {-# SCC "EtaArity" #-}
-                                       doPassDU etaArityWW
 
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram

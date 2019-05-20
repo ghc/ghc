@@ -16,7 +16,7 @@ module DmdAnal ( dmdAnalProgram ) where
 import GhcPrelude
 
 import DynFlags
-import WwLib            ( findTypeShape, deepSplitProductType_maybe )
+import WwUnbox          ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
 import CoreSyn
 import CoreSeq          ( seqBinds )

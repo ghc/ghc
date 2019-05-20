@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
+module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs, mkCalledArityMap
              , deepSplitProductType_maybe, findTypeShape
              , isWorkerSmallEnough
  ) where
@@ -15,10 +15,12 @@ module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs
 
 import GhcPrelude
 
+import BasicTypes
+import CoreArity
 import CoreSyn
-import CoreUtils        ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
+import CoreUtils        ( exprType, mkCast )
 import Id
-import IdInfo           ( JoinArity )
+import IdInfo           ( JoinArity, vanillaIdInfo )
 import DataCon
 import Demand
 import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
@@ -26,12 +28,11 @@ import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
 import MkId             ( voidArgId, voidPrimId )
 import TysWiredIn       ( tupleDataCon )
 import TysPrim          ( voidPrimTy )
-import Literal          ( absentLiteralOf, rubbishLit )
+import Literal          ( absentLiteralOf )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
-import Predicate        ( isClassPred )
-import RepType          ( isVoidTy, typePrimRep )
+import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..) )
@@ -44,6 +45,8 @@ import Outputable
 import DynFlags
 import FastString
 import ListSetOps
+
+import qualified Data.Map as F
 
 {-
 ************************************************************************
@@ -118,10 +121,13 @@ type WwResult
   = ([Demand],              -- Demands for worker (value) args
      JoinArity,             -- Number of worker (type OR value) args
      Id -> CoreExpr,        -- Wrapper body, lacking only the worker Id
-     CoreExpr -> CoreExpr)  -- Worker body, lacking the original function rhs
+     CoreExpr -> CoreExpr,  -- Worker body, lacking the original function rhs
+     Type -> Type)          -- By simple examining the worker expression, we
+                            --   cannot recover its type if it is a (~>) type
 
 mkWwBodies :: DynFlags
            -> FamInstEnvs
+           -> F.Map Id Arity -- Called arity map for eta arity w/w
            -> VarSet         -- Free vars of RHS
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
@@ -135,17 +141,18 @@ mkWwBodies :: DynFlags
 -- wrap_fn_str E        = case x of { (a,b) ->
 --                        case a of { (a1,a2) ->
 --                        E a1 a2 b y }}
--- work_fn_str E        = \a1 a2 b y ->
+-- work_fn_str E        = \a2 a2 b y ->
 --                        let a = (a1,a2) in
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
+mkWwBodies dflags fam_envs rhs_called_arity_map rhs_fvs fun_id demands res_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
              <- mkWWargs empty_subst fun_ty demands
+
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
@@ -153,16 +160,31 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty res_info
 
+        ; (useful3, wrap_fn_eta_arity, work_fn_eta_arity, work_ty)
+              <- mkWWetaArity do_eta_arity fun_id
+
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
-              wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
-              worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
-
-        ; if isWorkerSmallEnough dflags work_args
+              wrapper_body = wrap_fn_args
+                           . wrap_fn_eta_arity
+                           . wrap_fn_cpr
+                           . wrap_fn_str
+                           . applyToVars_eta_arity do_eta_arity work_call_args
+                           . Var
+              worker_body = mkLams work_lam_args
+                          . work_fn_str
+                          . work_fn_cpr
+                          . work_fn_eta_arity
+                          . work_fn_args
+        ; if (useful3 && do_eta_arity)
+             || (isWorkerSmallEnough dflags work_args
              && not (too_many_args_for_join_point wrap_args)
-             && ((useful1 && not only_one_void_argument) || useful2)
-          then return (Just (worker_args_dmds, length work_call_args,
-                       wrapper_body, worker_body))
+             && ((useful1 && not only_one_void_argument) || useful2))
+          then return (Just (worker_args_dmds
+                            ,length work_call_args
+                            ,wrapper_body
+                            ,worker_body
+                            ,if do_eta_arity then const work_ty else id))
           else return Nothing
         }
         -- We use an INLINE unconditionally, even if the wrapper turns out to be
@@ -173,6 +195,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
   where
+    do_eta_arity  = eta_arity_condition (gopt Opt_EtaArity dflags) fun_id
     fun_ty        = idType fun_id
     mb_join_arity = isJoinId_maybe fun_id
     has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
@@ -221,12 +244,12 @@ Note [CPR for thunks] in DmdAnal.
 And if something *has* been given the CPR property and we don't w/w, it's
 a disaster, because then the enclosing function might say it has the CPR
 property, but now doesn't and there a cascade of disaster.  A good example
-is #5920.
+is Trac #5920.
 
 Note [Limit w/w arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Guard against high worker arity as it generates a lot of stack traffic.
-A simplified example is #11565#comment:6
+A simplified example is Trac #11565#comment:6
 
 Current strategy is very simple: don't perform w/w transformation at all
 if the result produces a wrapper with arity higher than -fmax-worker-args=.
@@ -266,7 +289,8 @@ add a void argument.  E.g.
 We use the state-token type which generates no code.
 -}
 
-mkWorkerArgs :: DynFlags -> [Var]
+mkWorkerArgs :: DynFlags
+             -> [Var]
              -> Type    -- Type of body
              -> ([Var], -- Lambda bound args
                  [Var]) -- Args at call site
@@ -478,8 +502,6 @@ mkWWargs subst fun_ty demands
       = mkCoreLet (NonRec bndr arg) (k body)    -- Important that arg is fresh!
     apply_or_bind_then k arg fun
       = k $ mkCoreApp (text "mkWWargs") fun arg
-applyToVars :: [Var] -> CoreExpr -> CoreExpr
-applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg :: Unique -> Type -> Demand -> Id
 mk_wrap_arg uniq ty dmd
@@ -488,8 +510,8 @@ mk_wrap_arg uniq ty dmd
 
 {- Note [Freshen WW arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Wen we do a worker/wrapper split, we must not in-scope names as the arguments
-of the worker, else we'll get name capture.  E.g.
+When we do a worker/wrapper split, we must not use in-scope names as the
+arguments of the worker, else we'll get name capture.  E.g.
 
    -- y1 is in scope from further out
    f x = ..y1..
@@ -502,7 +524,7 @@ To avoid this:
 
   * We use a fresh unique for both type-variable and term-variable binders
     Originally we lacked this freshness for type variables, and that led
-    to the very obscure #12562.  (A type variable in the worker shadowed
+    to the very obscure Trac #12562.  (A type variable in the worker shadowed
     an outer term-variable binding.)
 
   * Because of this cloning we have to substitute in the type/kind of the
@@ -525,7 +547,7 @@ To avoid this:
 
 mkWWstr :: DynFlags
         -> FamInstEnvs
-        -> Bool    -- True <=> INLINEABLE pragma on this function defn
+        -> Bool    -- True <=> INLINEABLE pragama on this function defn
                    -- See Note [Do not unpack class dictionaries]
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
@@ -586,9 +608,8 @@ as-yet-un-filled-in pkgState files.
 --        brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
--- See Note [How to do the worker/wrapper split]
 mkWWstr_one :: DynFlags -> FamInstEnvs
-            -> Bool    -- True <=> INLINEABLE pragma on this function defn
+            -> Bool    -- True <=> INLINEABLE pragama on this function defn
                        -- See Note [Do not unpack class dictionaries]
             -> Var
             -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
@@ -596,28 +617,55 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   | isTyVar arg
   = return (False, [arg],  nop_fn, nop_fn)
 
+  -- See Note [Worker-wrapper for bottoming functions]
   | isAbsDmd dmd
   , Just work_fn <- mk_absent_let dflags arg
      -- Absent case.  We can't always handle absence for arbitrary
      -- unlifted types, so we need to choose just the cases we can
-     -- (that's what mk_absent_let does)
+     --- (that's what mk_absent_let does)
   = return (True, [], nop_fn, work_fn)
+
+  -- See Note [Worthy functions for Worker-Wrapper split]
+  | isSeqDmd dmd  -- `seq` demand; evaluate in wrapper in the hope
+                  -- of dropping seqs in the worker
+  = let arg_w_unf = arg `setIdUnfolding` evaldUnfolding
+          -- Tell the worker arg that it's sure to be evaluated
+          -- so that internal seqs can be dropped
+    in return (True, [arg_w_unf], mk_seq_case arg, nop_fn)
+                -- Pass the arg, anyway, even if it is in theory discarded
+                -- Consider
+                --      f x y = x `seq` y
+                -- x gets a (Eval (Poly Abs)) demand, but if we fail to pass it to the worker
+                -- we ABSOLUTELY MUST record that x is evaluated in the wrapper.
+                -- Something like:
+                --      f x y = x `seq` fw y
+                --      fw y = let x{Evald} = error "oops" in (x `seq` y)
+                -- If we don't pin on the "Evald" flag, the seq doesn't disappear, and
+                -- we end up evaluating the absent thunk.
+                -- But the Evald flag is pretty weird, and I worry that it might disappear
+                -- during simplification, so for now I've just nuked this whole case
 
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
   , not (has_inlineable_prag && isClassPred arg_ty)
       -- See Note [Do not unpack class dictionaries]
-  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
+  , Just (data_con, inst_tys, inst_con_arg_tys, co)
+             <- deepSplitProductType_maybe fam_envs arg_ty
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
-  = unbox_one dflags fam_envs arg cs stuff
-
-  | isSeqDmd dmd   -- For seqDmd, splitProdDmd_maybe will return Nothing, but
-                   -- it should behave like <S, U(AAAA)>, for some suitable arity
-  , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
-  , let abs_dmds = map (const absDmd) inst_con_arg_tys
-  = unbox_one dflags fam_envs arg abs_dmds stuff
+  = do { (uniq1:uniqs) <- getUniquesM
+        ; let   unpk_args = zipWith3 mk_ww_arg uniqs inst_con_arg_tys cs
+                unbox_fn  = mkUnpackCase (Var arg) co uniq1
+                                         data_con unpk_args
+                arg_no_unf = zapStableUnfolding arg
+                             -- See Note [Zap unfolding when beta-reducing]
+                             -- in Simplify.hs; and see Trac #13890
+                rebox_fn   = Let (NonRec arg_no_unf con_app)
+                con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
+         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
+         ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
+                           -- Don't pass the arg, rebox instead
 
   | otherwise   -- Other cases
   = return (False, [arg], nop_fn, nop_fn)
@@ -625,237 +673,17 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   where
     arg_ty = idType arg
     dmd    = idDemandInfo arg
-
-unbox_one :: DynFlags -> FamInstEnvs -> Var
-          -> [Demand]
-          -> (DataCon, [Type], [(Type, StrictnessMark)], Coercion)
-          -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-unbox_one dflags fam_envs arg cs
-          (data_con, inst_tys, inst_con_arg_tys, co)
-  = do { (uniq1:uniqs) <- getUniquesM
-        ; let   -- See Note [Add demands for strict constructors]
-                cs'       = addDataConStrictness data_con cs
-                unpk_args = zipWith3 mk_ww_arg uniqs inst_con_arg_tys cs'
-                unbox_fn  = mkUnpackCase (Var arg) co uniq1
-                                         data_con unpk_args
-                arg_no_unf = zapStableUnfolding arg
-                             -- See Note [Zap unfolding when beta-reducing]
-                             -- in Simplify.hs; and see #13890
-                rebox_fn   = Let (NonRec arg_no_unf con_app)
-                con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
-         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
-         ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
-                           -- Don't pass the arg, rebox instead
-  where
     mk_ww_arg uniq ty sub_dmd = setIdDemandInfo (mk_ww_local uniq ty) sub_dmd
 
 ----------------------
 nop_fn :: CoreExpr -> CoreExpr
 nop_fn body = body
 
-addDataConStrictness :: DataCon -> [Demand] -> [Demand]
--- See Note [Add demands for strict constructors]
-addDataConStrictness con ds
-  = ASSERT2( equalLength strs ds, ppr con $$ ppr strs $$ ppr ds )
-    zipWith add ds strs
-  where
-    strs = dataConRepStrictness con
-    add dmd str | isMarkedStrict str = strictifyDmd dmd
-                | otherwise          = dmd
-
-{- Note [How to do the worker/wrapper split]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The worker-wrapper transformation, mkWWstr_one, takes into account
-several possibilities to decide if the function is worthy for
-splitting:
-
-1. If an argument is absent, it would be silly to pass it to
-   the worker.  Hence the isAbsDmd case.  This case must come
-   first because a demand like <S,A> or <B,A> is possible.
-   E.g. <B,A> comes from a function like
-       f x = error "urk"
-   and <S,A> can come from Note [Add demands for strict constructors]
-
-2. If the argument is evaluated strictly, and we can split the
-   product demand (splitProdDmd_maybe), then unbox it and w/w its
-   pieces.  For example
-
-    f :: (Int, Int) -> Int
-    f p = (case p of (a,b) -> a) + 1
-  is split to
-    f :: (Int, Int) -> Int
-    f p = case p of (a,b) -> $wf a
-
-    $wf :: Int -> Int
-    $wf a = a + 1
-
-  and
-    g :: Bool -> (Int, Int) -> Int
-    g c p = case p of (a,b) ->
-               if c then a else b
-  is split to
-   g c p = case p of (a,b) -> $gw c a b
-   $gw c a b = if c then a else b
-
-2a But do /not/ split if the components are not used; that is, the
-   usage is just 'Used' rather than 'UProd'. In this case
-   splitProdDmd_maybe returns Nothing.  Otherwise we risk decomposing
-   a massive tuple which is barely used.  Example:
-
-        f :: ((Int,Int) -> String) -> (Int,Int) -> a
-        f g pr = error (g pr)
-
-        main = print (f fst (1, error "no"))
-
-   Here, f does not take 'pr' apart, and it's stupid to do so.
-   Imagine that it had millions of fields. This actually happened
-   in GHC itself where the tuple was DynFlags
-
-3. A plain 'seqDmd', which is head-strict with usage UHead, can't
-   be split by splitProdDmd_maybe.  But we want it to behave just
-   like U(AAAA) for suitable number of absent demands. So we have
-   a special case for it, with arity coming from the data constructor.
-
-Note [Worker-wrapper for bottoming functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used not to split if the result is bottom.
-[Justification:  there's no efficiency to be gained.]
-
-But it's sometimes bad not to make a wrapper.  Consider
-        fw = \x# -> let x = I# x# in case e of
-                                        p1 -> error_fn x
-                                        p2 -> error_fn x
-                                        p3 -> the real stuff
-The re-boxing code won't go away unless error_fn gets a wrapper too.
-[We don't do reboxing now, but in general it's better to pass an
-unboxed thing to f, and have it reboxed in the error cases....]
-
-Note [Add demands for strict constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this program (due to Roman):
-
-    data X a = X !a
-
-    foo :: X Int -> Int -> Int
-    foo (X a) n = go 0
-     where
-       go i | i < n     = a + go (i+1)
-            | otherwise = 0
-
-We want the worker for 'foo' too look like this:
-
-    $wfoo :: Int# -> Int# -> Int#
-
-with the first argument unboxed, so that it is not eval'd each time
-around the 'go' loop (which would otherwise happen, since 'foo' is not
-strict in 'a').  It is sound for the wrapper to pass an unboxed arg
-because X is strict, so its argument must be evaluated.  And if we
-*don't* pass an unboxed argument, we can't even repair it by adding a
-`seq` thus:
-
-    foo (X a) n = a `seq` go 0
-
-because the seq is discarded (very early) since X is strict!
-
-So here's what we do
-
-* We leave the demand-analysis alone.  The demand on 'a' in the
-  definition of 'foo' is <L, U(U)>; the strictness info is Lazy
-  because foo's body may or may not evaluate 'a'; but the usage info
-  says that 'a' is unpacked and its content is used.
-
-* During worker/wrapper, if we unpack a strict constructor (as we do
-  for 'foo'), we use 'addDataConStrictness' to bump up the strictness on
-  the strict arguments of the data constructor.
-
-* That in turn means that, if the usage info supports doing so
-  (i.e. splitProdDmd_maybe returns Just), we will unpack that argument
-  -- even though the original demand (e.g. on 'a') was lazy.
-
-* What does "bump up the strictness" mean?  Just add a head-strict
-  demand to the strictness!  Even for a demand like <L,A> we can
-  safely turn it into <S,A>; remember case (1) of
-  Note [How to do the worker/wrapper split].
-
-The net effect is that the w/w transformation is more aggressive about
-unpacking the strict arguments of a data constructor, when that
-eagerness is supported by the usage info.
-
-There is the usual danger of reboxing, which as usual we ignore. But
-if X is monomorphic, and has an UNPACK pragma, then this optimisation
-is even more important.  We don't want the wrapper to rebox an unboxed
-argument, and pass an Int to $wfoo!
-
-This works in nested situations like
-
-    data family Bar a
-    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
-    newtype instance Bar Int = Bar Int
-
-    foo :: Bar ((Int, Int), Int) -> Int -> Int
-    foo f k = case f of BarPair x y ->
-              case burble of
-                 True -> case x of
-                           BarPair p q -> ...
-                 False -> ...
-
-The extra eagerness lets us produce a worker of type:
-     $wfoo :: Int# -> Int# -> Int# -> Int -> Int
-     $wfoo p# q# y# = ...
-
-even though the `case x` is only lazily evaluated.
-
---------- Historical note ------------
-We used to add data-con strictness demands when demand analysing case
-expression. However, it was noticed in #15696 that this misses some cases. For
-instance, consider the program (from T10482)
-
-    data family Bar a
-    data instance Bar (a, b) = BarPair !(Bar a) !(Bar b)
-    newtype instance Bar Int = Bar Int
-
-    foo :: Bar ((Int, Int), Int) -> Int -> Int
-    foo f k =
-      case f of
-        BarPair x y -> case burble of
-                          True -> case x of
-                                    BarPair p q -> ...
-                          False -> ...
-
-We really should be able to assume that `p` is already evaluated since it came
-from a strict field of BarPair. This strictness would allow us to produce a
-worker of type:
-
-    $wfoo :: Int# -> Int# -> Int# -> Int -> Int
-    $wfoo p# q# y# = ...
-
-even though the `case x` is only lazily evaluated
-
-Indeed before we fixed #15696 this would happen since we would float the inner
-`case x` through the `case burble` to get:
-
-    foo f k =
-      case f of
-        BarPair x y -> case x of
-                          BarPair p q -> case burble of
-                                          True -> ...
-                                          False -> ...
-
-However, after fixing #15696 this could no longer happen (for the reasons
-discussed in ticket:15696#comment:76). This means that the demand placed on `f`
-would then be significantly weaker (since the False branch of the case on
-`burble` is not strict in `p` or `q`).
-
-Consequently, we now instead account for data-con strictness in mkWWstr_one,
-applying the strictness demands to the final result of DmdAnal. The result is
-that we get the strict demand signature we wanted even if we can't float
-the case on `x` up through the case on `burble`.
-
-
+{-
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 By using unsafeCoerce, it is possible to make the number of demands fail to
-match the number of constructor arguments; this happened in #8037.
+match the number of constructor arguments; this happened in Trac #8037.
 If so, the worker/wrapper split doesn't work right and we get a Core Lint
 bug.  The fix here is simply to decline to do w/w if that happens.
 
@@ -894,10 +722,10 @@ opportunities for optimisation.
 
 Solution: use setCaseBndrEvald when creating
  (A) The arg binders x1,x2 in mkWstr_one
-         See #13077, test T13077
+         See Trac #13077, test T13077
  (B) The result binders r1,r2 in mkWWcpr_help
          See Trace #13077, test T13077a
-         And #13027 comment:20, item (4)
+         And Trac #13027 comment:20, item (4)
 to record that the relevant binder is evaluated.
 
 
@@ -920,13 +748,13 @@ can still be specialised by the type-class specialiser, something like
 BUT if f is strict in the Ord dictionary, we might unpack it, to get
    fw :: (a->a->Bool) -> [a] -> Int# -> a
 and the type-class specialiser can't specialise that.  An example is
-#6056.
+Trac #6056.
 
 But in any other situation a dictionary is just an ordinary value,
 and can be unpacked.  So we track the INLINABLE pragma, and switch
 off the unpacking in mkWWstr_one (see the isClassPred test).
 
-Historical note: #14955 describes how I got this fix wrong
+Historical note: Trac #14955 describes how I got this fix wrong
 the first time.
 -}
 
@@ -1049,10 +877,10 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( True
-                , \ wkr_call -> mkDefaultCase wkr_call arg con_app
+                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
-                                -- Lacking this caused #10658
+                                -- Lacking this caused Trac #10658
                 , arg_ty1 ) }
 
   | otherwise   -- The general case
@@ -1064,11 +892,9 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map fst arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
-             tup_con     = tupleDataCon Unboxed (length arg_tys)
 
        ; return (True
-                , \ wkr_call -> mkSingleAltCase wkr_call wrap_wild
-                                                (DataAlt tup_con) args con_app
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)]
                 , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
@@ -1080,8 +906,8 @@ mkUnpackCase ::  CoreExpr -> Coercion -> Unique -> DataCon -> [Id] -> CoreExpr -
 mkUnpackCase (Tick tickish e) co uniq con args body   -- See Note [Profiling and unpacking]
   = Tick tickish (mkUnpackCase e co uniq con args body)
 mkUnpackCase scrut co uniq boxing_con unpk_args body
-  = mkSingleAltCase casted_scrut bndr
-                    (DataAlt boxing_con) unpk_args body
+  = Case casted_scrut bndr (exprType body)
+         [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
     bndr = mk_ww_local uniq (exprType casted_scrut, MarkedStrict)
@@ -1127,6 +953,148 @@ part of the function (post transformation) anyway.
 
 ************************************************************************
 *                                                                      *
+\subsection{Eta Arity stuff}
+*                                                                      *
+************************************************************************
+
+The etaArity worker wrapper is less a transformation of terms and more a
+transformation on types.
+-}
+
+mkWWetaArity
+  :: Bool
+  -> Id
+  -> UniqSM (Bool,                     -- Is w/w'ing useful?
+             CoreExpr -> CoreExpr,     -- New wrapper
+             CoreExpr -> CoreExpr,     -- New worker
+             Type)                     -- Worker Type
+mkWWetaArity do_eta_arity fun_id
+  | do_eta_arity
+  = return (True, id, id, toDeepFunTildeType ty)
+
+  | otherwise
+  = return (False, id, id, ty)
+  where ty = idType fun_id
+
+eta_arity_condition :: Bool -> Id -> Bool
+eta_arity_condition opt_etaArity fun_id
+  =  opt_etaArity
+  && isId fun_id                        -- * only work on terms
+  && isFunTy ty                         -- * TODO polymorphic version
+  && not (isJoinId fun_id)              -- * do not interfere with join points
+  && not (isFunTildeTy ty)              -- * do not worker/wrapper, things
+                                        --   that are already tildefuns
+  where ty = idType fun_id
+
+
+-- | @applyToVars_eta_arity@ takes into account whether or not the -feta-arity
+-- optimization is enabled. If it is, then we will need to etaExpand all
+-- functions passed to the worker.
+applyToVars_eta_arity
+  :: Bool
+  -> [Var]
+  -> CoreExpr
+  -> CoreExpr
+applyToVars_eta_arity do_eta_arity vars fn
+  | not do_eta_arity
+  = mkVarApps fn vars
+
+  | otherwise
+  = let toExpr v
+          | isId v
+          = etaExpand (demandToCalledWith (idDemandInfo v)) (varToCoreExpr v)
+          | otherwise
+          = varToCoreExpr v
+        vars' = map toExpr vars in
+      mkApps fn vars'
+  where demandToCalledWith :: Demand -> Arity
+        demandToCalledWith dmd =
+          case getUseDmd dmd of
+            Abs           -> 0
+            Use _ use_dmd -> go use_dmd
+          where go :: UseDmd -> Arity
+                go (UCall _ arg_use) = 1 + go arg_use
+                go _                 = 0
+
+mkCalledArityMap :: CoreExpr -> F.Map Id Arity
+mkCalledArityMap e =
+  case e of
+    Var x -> F.singleton x 0
+    Lit _ -> F.empty
+    expr@(App _ _) ->
+      case collectArgs expr of
+        (Var x,args) ->
+          let fm = F.unionsWith max (map mkCalledArityMap args)
+              a  = length args in
+            F.unionWith max (F.singleton x a) fm
+        (_,args) -> F.unionsWith max (map mkCalledArityMap args)
+    Lam _ expr -> mkCalledArityMap expr
+    Let bnds expr ->
+      let fm = F.unionsWith max (map mkCalledArityMap (rhssOfBind bnds)) in
+        F.unionWith max fm (mkCalledArityMap expr)
+    Case expr _ _ alts ->
+      let fm = F.unionsWith max (map mkCalledArityMap (rhssOfAlts alts)) in
+        F.unionWith max fm (mkCalledArityMap expr)
+    Cast expr _ -> mkCalledArityMap expr
+    Tick _ expr -> mkCalledArityMap expr
+    Type _ -> F.empty
+    Coercion _ -> F.empty
+
+{-
+-- | @applyToVarsEta@ takes into account whether or not the -feta-arity
+-- optimization is enabled. If it is, then we will need to etaExpand all
+-- functions passed to the worker.
+applyToVarsEta
+  :: DynFlags
+  -> F.Map Id Arity
+  -> [Var]
+  -> CoreExpr
+  -> CoreExpr
+applyToVarsEta dflags fm vars fn
+  | not (gopt Opt_EtaArity dflags)
+  = foldl (\e a -> App e (varToCoreExpr a)) fn vars
+
+  | otherwise
+  = foldl (\e a -> App e (etaExpand (F.findWithDefault 0 a fm)
+                                    (varToCoreExpr a)))
+          fn
+          vars
+-}
+
+{-
+-- ^ Given an expression and it's name, generate a new expression with a
+-- tilde-lambda type. This is the exact same code, but we have encoded the arity
+-- in the type.
+mkArityWorkerRhs
+  :: Id
+  -> Id
+  -> CoreExpr
+  -> CoreExpr
+mkArityWorkerRhs fn_id work_id rhs
+  = substExprSC (text "eta-worker-subst") subst rhs
+  where init_subst = mkEmptySubst . mkInScopeSet . exprFreeVars $ rhs
+        subst = extendSubstWithVar init_subst fn_id work_id
+
+-- ^ The wrapper does not change the type and will call the newly created worker
+-- function.
+mkArityWrapperRhs
+  :: F.Map Id Arity
+  -> Id
+  -> CoreExpr
+  -> Arity
+  -> UniqSM CoreExpr
+mkArityWrapperRhs fm work_id expr arity = go fm expr arity work_id []
+  where go fm (Lam b e) a w l
+          | isId b = let expr = etaExpand (F.findWithDefault 0 b fm) (Var b) in
+                       Lam b <$> go fm e (a-1) w (expr : l)
+          | otherwise = Lam b <$> go fm e a w (Type (TyVarTy b) : l)
+        go _ _ _ w l = return $ mkApps (Var w) (reverse l)
+-}
+
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Utilities}
 *                                                                      *
 ************************************************************************
@@ -1139,11 +1107,9 @@ The idea is that this binding will never be used; but if it
 buggily is used we'll get a runtime error message.
 
 Coping with absence for *unlifted* types is important; see, for
-example, #4306 and #15627.  In the UnliftedRep case, we can
-use LitRubbish, which we need to apply to the required type.
-For the unlifted types of singleton kind like Float#, Addr#, etc. we
-also find a suitable literal, using Literal.absentLiteralOf.  We don't
-have literals for every primitive type, so the function is partial.
+example, Trac #4306.  For these we find a suitable literal,
+using Literal.absentLiteralOf.  We don't have literals for
+every primitive type, so the function is partial.
 
 Note: I did try the experiment of using an error thunk for unlifted
 things too, relying on the simplifier to drop it as dead code.
@@ -1165,23 +1131,10 @@ But this is fragile
 So absentError is only used for lifted types.
 -}
 
--- | Tries to find a suitable dummy RHS to bind the given absent identifier to.
---
--- If @mk_absent_let _ id == Just wrap@, then @wrap e@ will wrap a let binding
--- for @id@ with that RHS around @e@. Otherwise, there could no suitable RHS be
--- found (currently only happens for bindings of 'VecRep' representation).
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
-  -- The lifted case: Bind 'absentError'
-  -- See Note [Absent errors]
   | not (isUnliftedType arg_ty)
   = Just (Let (NonRec lifted_arg abs_rhs))
-  -- The 'UnliftedRep' (because polymorphic) case: Bind @__RUBBISH \@arg_ty@
-  -- See Note [Absent errors]
-  | [UnliftedRep] <- typePrimRep arg_ty
-  = Just (Let (NonRec arg unlifted_rhs))
-  -- The monomorphic unlifted cases: Bind to some literal, if possible
-  -- See Note [Absent errors]
   | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
@@ -1189,15 +1142,15 @@ mk_absent_let dflags arg
   = Just (Let (NonRec arg (Var voidPrimId)))
   | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
-    Nothing -- Can happen for 'State#' and things of 'VecRep'
+    Nothing
   where
-    lifted_arg   = arg `setIdStrictness` botSig
+    lifted_arg = arg `setIdStrictness` exnSig
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
-    arg_ty       = idType arg
-    abs_rhs      = mkAbsentErrorApp arg_ty msg
-    msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
+    arg_ty     = idType arg
+    abs_rhs    = mkAbsentErrorApp arg_ty msg
+    msg        = showSDoc (gopt_set dflags Opt_SuppressUniques)
                           (ppr arg <+> ppr (idType arg))
               -- We need to suppress uniques here because otherwise they'd
               -- end up in the generated code as strings. This is bad for
@@ -1205,7 +1158,20 @@ mk_absent_let dflags arg
               -- will have different lengths and hence different costs for
               -- the inliner leading to different inlining.
               -- See also Note [Unique Determinism] in Unique
-    unlifted_rhs = mkTyApps (Lit rubbishLit) [arg_ty]
+
+mk_seq_case :: Id -> CoreExpr -> CoreExpr
+mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
+
+sanitiseCaseBndr :: Id -> Id
+-- The argument we are scrutinising has the right type to be
+-- a case binder, so it's convenient to re-use it for that purpose.
+-- But we *must* throw away all its IdInfo.  In particular, the argument
+-- will have demand info on it, and that demand info may be incorrect for
+-- the case binder.  e.g.       case ww_arg of ww_arg { I# x -> ... }
+-- Quite likely ww_arg isn't used in '...'.  The case may get discarded
+-- if the case binder says "I'm demanded".  This happened in a situation
+-- like         (x+y) `seq` ....
+sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_ww_local :: Unique -> (Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says

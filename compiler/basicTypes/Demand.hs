@@ -8,7 +8,7 @@
 {-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
 
 module Demand (
-        StrDmd, UseDmd(..), Count,
+        StrDmd, UseDmd(..), Use(..), Count,
 
         Demand, DmdShell, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,

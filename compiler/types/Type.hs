@@ -31,6 +31,8 @@ module Type (
         splitFunTys, funResultTy, funArgTy, argTy,
         splitFunTildeTy, splitFunTildeTy_maybe, funTildeArgTy, funTildeResultTy,
 
+        toShallowFunTildeType, toDeepFunTildeType,
+
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
@@ -1134,19 +1136,6 @@ applyTysX tvs body_ty arg_tys
     pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
     n_tvs = length tvs
 
-liftFunTildeTys :: Type -> Type
-liftFunTildeTys ty | Just ty' <- coreView ty = liftFunTildeTys ty'
-liftFunTildeTys (TyVarTy v) = TyVarTy v
-liftFunTildeTys (AppTy a b) = AppTy (liftFunTildeTys a) (liftFunTildeTys b)
-liftFunTildeTys (TyConApp k tys) = TyConApp k (map liftFunTildeTys tys)
-liftFunTildeTys (ForAllTy bndr ty) = ForAllTy bndr (liftFunTildeTys ty)
-liftFunTildeTys (FunTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
-liftFunTildeTys (FunTildeTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
-liftFunTildeTys (LitTy l) = LitTy l
-liftFunTildeTys (CastTy ty co) = CastTy (liftFunTildeTys ty) co
-liftFunTildeTys (CoercionTy co) = CoercionTy co
--- TODO: handle coercions in @liftFunTildeTys@
-
 {- Note [Care with kind instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -1173,6 +1162,44 @@ So again we must instantiate.
 
 The same thing happens in ToIface.toIfaceAppArgsX.
 -}
+
+
+{-
+---------------------------------------------------------------------
+                 Extensional Function Types (FunTildeTy)
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-}
+
+liftFunTildeTys :: Type -> Type
+liftFunTildeTys ty | Just ty' <- coreView ty = liftFunTildeTys ty'
+liftFunTildeTys (TyVarTy v) = TyVarTy v
+liftFunTildeTys (AppTy a b) = AppTy (liftFunTildeTys a) (liftFunTildeTys b)
+liftFunTildeTys (TyConApp k tys) = TyConApp k (map liftFunTildeTys tys)
+liftFunTildeTys (ForAllTy bndr ty) = ForAllTy bndr (liftFunTildeTys ty)
+liftFunTildeTys (FunTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
+liftFunTildeTys (FunTildeTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
+liftFunTildeTys (LitTy l) = LitTy l
+liftFunTildeTys (CastTy ty co) = CastTy (liftFunTildeTys ty) co
+liftFunTildeTys (CoercionTy co) = CoercionTy co
+-- TODO: handle coercions in @liftFunTildeTys@
+
+-- | Change the top level arrows of a function into extensional arrows
+-- e.g.  a -> (b -> c) -> d  ==> a ~> (b -> c) ~> d
+toShallowFunTildeType :: Type -> Type
+toShallowFunTildeType (ForAllTy tv body_ty) = ForAllTy tv (toShallowFunTildeType body_ty)
+toShallowFunTildeType (FunTy arg res)       = FunTy arg (toShallowFunTildeType res)
+toShallowFunTildeType (FunTy arg res)       = FunTildeTy arg (toShallowFunTildeType res)
+toShallowFunTildeType ty                    = ty
+
+-- | Change the top level arrows and higher-order functions into extensional
+-- arrows
+-- e.g.  a -> (b -> c) -> d ==> a ~> (b ~> c) ~> d
+toDeepFunTildeType :: Type -> Type
+toDeepFunTildeType (ForAllTy tv body_ty) = ForAllTy tv (toDeepFunTildeType body_ty)
+toDeepFunTildeType (FunTy arg res)       = FunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
+toDeepFunTildeType (FunTildeTy arg res)  = FunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
+toDeepFunTildeType ty                    = ty
+
 
 {-
 ---------------------------------------------------------------------
@@ -1606,6 +1633,7 @@ isPiTy :: Type -> Bool
 isPiTy ty | Just ty' <- coreView ty = isPiTy ty'
 isPiTy (ForAllTy {}) = True
 isPiTy (FunTy {})    = True
+isPiTy (FunTildeTy {}) = True
 isPiTy _             = False
 
 -- | Is this a function?

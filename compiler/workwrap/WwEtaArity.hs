@@ -1,4 +1,4 @@
-module EtaArityWW (etaArityWW, shallowEtaType, deepEtaType) where
+module WwEtaArity (etaArityWW, shallowEtaType, deepEtaType) where
 
 import GhcPrelude
 
@@ -19,12 +19,6 @@ import Outputable
 import MonadUtils
 
 import qualified Data.Map as F
-
-data WWInfo
-  = NoWW
-  | JustUnbox
-  | JustEtaArity
-  | BothUnboxAndEtaArity
 
 {-
 ************************************************************************
