@@ -90,8 +90,7 @@ main = do
 
 data Sync
     = OnDisk   -- | Write generated module to disk
-    | InMemory -- | Only fill targetContents, place an empty dummy module
-               -- on disk though to make Finder shut up though.
+    | InMemory -- | Only fill in targetContents.
 
 ppSync OnDisk   = "D"
 ppSync InMemory = "M"
