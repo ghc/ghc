@@ -505,6 +505,11 @@ data Target
       --
       -- Since GHC version 8.10 modules which require preprocessors such as
       -- Literate Haskell or CPP to run are also supported.
+      --
+      -- If a corresponding source file does not exist on disk this will
+      -- result in a 'SourceError' exception if @targetId = TargetModule _@
+      -- is used. However together with @targetId = TargetFile _@ GHC will
+      -- not complain about the file missing.
     }
 
 data TargetId

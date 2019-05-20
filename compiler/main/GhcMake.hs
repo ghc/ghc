@@ -1968,7 +1968,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         getRootSummary :: Target -> IO (Either ErrMsg ModSummary)
         getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
            = do exists <- liftIO $ doesFileExist file
-                if exists
+                if exists || isJust maybe_buf
                     then Right `fmap` summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
                     else return $ Left $ mkPlainErrMsg dflags noSrcSpan $
