@@ -9,6 +9,10 @@
 # (which defaults to 'local' if not given by --test-env).
 #
 
+import colorsys
+import tempfile
+import webbrowser
+import json
 import argparse
 import re
 import subprocess
@@ -297,20 +301,23 @@ def baseline_commit_log(commit):
     global _baseline_depth_commit_log
     commit = commit_hash(commit)
     if not commit in _baseline_depth_commit_log:
-        n = BaselineSearchDepth
-        output = subprocess.check_output(['git', 'log', '--format=%H', '-n' + str(n), commit]).decode()
-        hashes = list(filter(is_commit_hash, output.split('\n')))
-
-        # We only got 10 results (expecting 75) in a CI pipeline (issue #16662).
-        # It's unclear from the logs what went wrong. Since no exception was
-        # thrown, we can assume the `git log` call above succeeded. The best we
-        # can do for now is improve logging.
-        actualN = len(hashes)
-        if actualN != n:
-            print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
-        _baseline_depth_commit_log[commit] = hashes
+        _baseline_depth_commit_log[commit] = commit_log(commit, BaselineSearchDepth)
 
     return _baseline_depth_commit_log[commit]
+
+def commit_log(commitOrRange, n=None):
+    nArgs = ['-n' + str(n)] if n != None else []
+    output = subprocess.check_output(['git', 'log', '--format=%H'] + nArgs + [commitOrRange]).decode()
+    hashes = list(filter(is_commit_hash, output.split('\n')))
+
+    # We only got 10 results (expecting 75) in a CI pipeline (issue #16662).
+    # It's unclear from the logs what went wrong. Since no exception was
+    # thrown, we can assume the `git log` call above succeeded. The best we
+    # can do for now is improve logging.
+    actualN = len(hashes)
+    if n != None and actualN != n:
+        print("Expected " + str(n) + " hashes, but git gave " + str(actualN) + ":\n" + output)
+    return hashes
 
 # Cache of baseline values. This is a dict of dicts indexed on:
 # (useCiNamespace, commit) -> (test_env, test, metric, way) -> baseline
@@ -492,8 +499,18 @@ def check_stats_change(actual, baseline, tolerance_dev, allowed_perf_changes = {
 
     return (change, result)
 
+def hash_rgb_str(x):
+    res = 10000.0
+    rgb = colorsys.hsv_to_rgb((abs(int(hash(x))) % res)/res, 1.0, 0.9)
+    return "rgb(" + str(int(rgb[0] * 255)) + ", " + str(int(rgb[1] * 255)) + ", " + str(int(rgb[2] * 255)) + ")"
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument("--chart", action='store_true',
+                        help="Chart the results (opens in a browser).")
+    parser.add_argument("--ci", action='store_true',
+                        help="Use ci results. You must fetch these with:\n    " \
+                            + "$ git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf")
     parser.add_argument("--test-env",
                         help="The given test environment to be compared.")
     parser.add_argument("--test-name",
@@ -503,7 +520,7 @@ if __name__ == '__main__':
                         help="Development only. --add-note N commit seed \
                         Adds N fake metrics to the given commit using the random seed.")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
-                        help="The rest of the arguments will be the commits that will be used.")
+                        help="Either a list of single commits or a single commit range (e.g. HEAD~10..HEAD).")
     args = parser.parse_args()
 
     env = 'local'
@@ -517,16 +534,23 @@ if __name__ == '__main__':
     # Main logic of the program when called from the command-line.
     #
 
+    ref = 'perf'
+    if args.ci:
+        ref = 'ci/perf'
+    commits = args.commits
     if args.commits:
-        for c in args.commits:
-            metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c)]
+        # Commit range
+        if len(commits) == 1 and ".." in commits[0]:
+            commits = list(reversed(commit_log(commits[0])))
+        for c in commits:
+            metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c, ref)]
 
     if args.test_env:
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
 
     if args.test_name:
         nameRe = re.compile(args.test_name)
-        metrics = [test for test in metrics if nameRe.search(test.test)]
+        metrics = [test for test in metrics if nameRe.search(test.stat.test)]
 
     if args.add_note:
         def note_gen(n, commit, delta=''):
@@ -546,6 +570,50 @@ if __name__ == '__main__':
             append_perf_stat(note, commit)
 
         note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
+
+    #
+    # Chart
+    #
+    def metricAt(commit, testName):
+        values2 = [float(t.stat.value) for t in metrics if t.commit == commit and t.stat.test == testName]
+        if values2 == []:
+            return None
+        else:
+            return (sum(values2) / len(values2))
+
+    if args.chart:
+        testNames = list(set([test.stat.test for test in metrics]))
+        chartData = {
+                'type': 'line',
+                'data': {
+                    'labels': commits,
+                    'datasets': [{
+                        'label': testName,
+                        'data': [metricAt(commit, testName) for commit in commits],
+
+                        'fill': 'false',
+                        'spanGaps': 'true',
+                        'lineTension': 0,
+                        'backgroundColor': hash_rgb_str(testName),
+                        'borderColor': hash_rgb_str(testName)
+                    } for testName in testNames]
+                },
+                'options': {}
+            }
+
+        file = tempfile.NamedTemporaryFile(mode='w+t', suffix=".html", delete=False)
+        print(\
+            "<html>" + \
+                '<head><script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script></head>' + \
+                '<body><canvas id="myChart"></canvas><script>' + \
+                    "var ctx = document.getElementById('myChart').getContext('2d');" + \
+                    "var chart = new Chart(ctx, \n" + json.dumps(chartData, indent=2) + "\n);" + \
+                '</script></body>' + \
+            "</html>"\
+            , file=file)
+        file.close()
+        webbrowser.get(using='firefox').open(file.name)
+        exit(0)
 
     #
     # String utilities for pretty-printing
