@@ -83,6 +83,7 @@ instance (Typeable k,Typeable a) => Data (Fixed (a :: k)) where
 class HasResolution (a :: k) where
     resolution :: p a -> Integer
 
+-- | For example, @Fixed 1000@ will give you a 'Fixed' with a resolution of 1000.
 instance KnownNat n => HasResolution n where
     resolution _ = natVal (Proxy :: Proxy n)
 
