@@ -113,7 +113,7 @@ import GHC.IORef
 import GHC.MVar
 import GHC.Ptr
 import GHC.Real         ( fromIntegral )
-import GHC.Show         ( Show(..), showString )
+import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
 
