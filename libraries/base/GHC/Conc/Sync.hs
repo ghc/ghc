@@ -145,7 +145,7 @@ This misfeature will hopefully be corrected at a later date.
 
 -- | @since 4.2.0.0
 instance Show ThreadId where
-   showsPrec d t =
+   showsPrec d t = showParen (d >= 11) $
         showString "ThreadId " .
         showsPrec d (getThreadId (id2TSO t))
 
