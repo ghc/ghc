@@ -113,7 +113,7 @@ import GHC.IORef
 import GHC.MVar
 import GHC.Ptr
 import GHC.Real         ( fromIntegral )
-import GHC.Show         ( Show(..), showString )
+import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
 
@@ -145,7 +145,7 @@ This misfeature will hopefully be corrected at a later date.
 
 -- | @since 4.2.0.0
 instance Show ThreadId where
-   showsPrec d t =
+   showsPrec d t = showParen (d >= 11) $
         showString "ThreadId " .
         showsPrec d (getThreadId (id2TSO t))
 
