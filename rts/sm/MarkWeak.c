@@ -205,6 +205,7 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
 
     for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
         next = t->global_link;
+        debugBelch("resurrectUnreachableThreads %p, gen=%d\n", t, gen->no);
 
         // ThreadFinished and ThreadComplete: we have to keep
         // these on the all_threads list until they
@@ -301,6 +302,9 @@ static bool tidyWeakList(generation *gen)
                 continue;
             }
             else {
+                debugTrace(DEBUG_weak,
+                           "weak pointer %p with key %p died at",
+                           w, w->key);
                 last_w = &(w->link);
                 next_w = w->link;
                 continue;
@@ -327,6 +331,8 @@ static void tidyThreadList (generation *gen)
         if (tmp != NULL) {
             t = tmp;
         }
+
+        debugBelch("tidyThreadList(gen=%d): %p => %p\n", gen->no, t, tmp);
 
         ASSERT(get_itbl((StgClosure *)t)->type == TSO);
         next = t->global_link;
