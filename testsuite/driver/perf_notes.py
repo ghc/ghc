@@ -523,13 +523,13 @@ if __name__ == '__main__':
     parser.add_argument("--ci", action='store_true',
                         help="Use ci results. You must fetch these with:\n    " \
                             + "$ git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf")
-    parser.add_argument("test_env",
+    parser.add_argument("--test-env",
                         help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
-    parser.add_argument("test_name",
+    parser.add_argument("--test-name",
                         help="Filters for tests matching the given regular expression.")
-    parser.add_argument("metric",
+    parser.add_argument("--metric",
                         help="Test metric (one of " + str(testing_metrics()) + ").")
-    parser.add_argument("way",
+    parser.add_argument("--way",
                         help="Test way (one of " + str(testing_metrics()) + ").")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
                         help="Either a list of commits or a single commit range (e.g. HEAD~10..HEAD).")
@@ -602,22 +602,22 @@ if __name__ == '__main__':
             return (sum(values2) / len(values2))
 
     if args.chart:
-        testNames = list(set([test.stat.test for test in metrics]))
+        testSeries = list(set([(test.stat.test_env, test.stat.test, test.stat.metric, test.stat.way) for test in metrics]))
         chartData = {
                 'type': 'line',
                 'data': {
                     'labels': commits,
                     'datasets': [{
-                        'label': testName,
-                        'data': [get_commit_metric_value_str_or_none(ref, commit, args.test_env, testName, args.metric, args.way) \
+                        'label': name + "(" + way + ") " + metric + " - " + env,
+                        'data': [get_commit_metric_value_str_or_none(ref, commit, env, name, metric, way) \
                                      for commit in commits],
 
                         'fill': 'false',
                         'spanGaps': 'true',
                         'lineTension': 0,
-                        'backgroundColor': hash_rgb_str(testName),
-                        'borderColor': hash_rgb_str(testName)
-                    } for testName in testNames]
+                        'backgroundColor': hash_rgb_str(name),
+                        'borderColor': hash_rgb_str(name)
+                    } for (env, name, metric, way) in testSeries]
                 },
                 'options': {}
             }
