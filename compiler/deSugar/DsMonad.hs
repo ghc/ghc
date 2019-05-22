@@ -396,11 +396,11 @@ addDictsDs ev_vars
   = updLclEnv (\env -> env { dsl_dicts = unionBags ev_vars (dsl_dicts env) })
 
 -- | Get in-scope term constraints (pm check)
-getTmCsDs :: DsM (Bag SimpleEq)
+getTmCsDs :: DsM (Bag TmVarCt)
 getTmCsDs = do { env <- getLclEnv; return (dsl_tm_cs env) }
 
 -- | Add in-scope term constraints (pm check)
-addTmCsDs :: Bag SimpleEq -> DsM a -> DsM a
+addTmCsDs :: Bag TmVarCt -> DsM a -> DsM a
 addTmCsDs tm_cs
   = updLclEnv (\env -> env { dsl_tm_cs = unionBags tm_cs (dsl_tm_cs env) })
 

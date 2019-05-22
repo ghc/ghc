@@ -25,6 +25,7 @@ module Check (
 import GhcPrelude
 
 import TmOracle
+import PmPpr
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -579,7 +580,7 @@ pmTopNormaliseType_maybe env ty_cs typ
 pmInitialTmTyCs :: PmM Delta
 pmInitialTmTyCs = do
   ty_cs  <- liftD getDictsDs
-  tm_cs  <- map toComplex . bagToList <$> liftD getTmCsDs
+  tm_cs  <- bagToList <$> liftD getTmCsDs
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
       initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
@@ -627,7 +628,7 @@ that we expect.
 pmIsSatisfiable
   :: Delta     -- ^ The ambient term and type constraints
                --   (known to be satisfiable).
-  -> ComplexEq -- ^ The new term constraint.
+  -> TmVarCt      -- ^ The new term constraint.
   -> Bag EvVar -- ^ The new type constraints.
   -> [Type]    -- ^ The strict argument types.
   -> PmM (Maybe Delta)
@@ -653,7 +654,7 @@ pmIsSatisfiable amb_cs new_tm_c new_ty_cs strict_arg_tys = do
 tmTyCsAreSatisfiable
   :: Delta     -- ^ The ambient term and type constraints
                --   (known to be satisfiable).
-  -> ComplexEq -- ^ The new term constraint.
+  -> TmVarCt      -- ^ The new term constraint.
   -> Bag EvVar -- ^ The new type constraints.
   -> PmM (Maybe Delta)
        -- ^ @'Just' delta@ if the constraints (@delta@) are
@@ -1463,7 +1464,7 @@ pmPatType PmFake = pmPatType truePattern
 data InhabitationCandidate =
   InhabitationCandidate
   { ic_val_abs        :: ValAbs
-  , ic_tm_ct          :: ComplexEq
+  , ic_tm_ct          :: TmVarCt
   , ic_ty_cs          :: Bag EvVar
   , ic_strict_arg_tys :: [Type]
   }
@@ -1660,7 +1661,7 @@ mkOneConFull x con = do
       strict_arg_tys = filterByList arg_is_banged arg_tys'
   return $ InhabitationCandidate
            { ic_val_abs        = con_abs
-           , ic_tm_ct          = (PmExprVar (idName x), vaToPmExpr con_abs)
+           , ic_tm_ct          = TVC x (vaToPmExpr con_abs)
            , ic_ty_cs          = listToBag evvars
            , ic_strict_arg_tys = strict_arg_tys
            }
@@ -1678,21 +1679,15 @@ mkGuard pv e = do
      | PmExprOther {} <- expr -> pure PmFake
      | otherwise              -> pure (PmGrd pv expr)
 
--- | Create a term equality of the form: `(False ~ (x ~ lit))`
-mkNegEq :: Id -> PmLit -> ComplexEq
-mkNegEq x l = (falsePmExpr, PmExprVar (idName x) `PmExprEq` PmExprLit l)
-{-# INLINE mkNegEq #-}
-
 -- | Create a term equality of the form: `(x ~ lit)`
-mkPosEq :: Id -> PmLit -> ComplexEq
-mkPosEq x l = (PmExprVar (idName x), PmExprLit l)
+mkPosEq :: Id -> PmLit -> TmVarCt
+mkPosEq x l = TVC x (PmExprLit l)
 {-# INLINE mkPosEq #-}
 
 -- | Create a term equality of the form: `(x ~ x)`
 -- (always discharged by the term oracle)
-mkIdEq :: Id -> ComplexEq
-mkIdEq x = (PmExprVar name, PmExprVar name)
-  where name = idName x
+mkIdEq :: Id -> TmVarCt
+mkIdEq x = TVC x (PmExprVar (idName x))
 {-# INLINE mkIdEq #-}
 
 -- | Generate a variable pattern of a given type
@@ -2059,8 +2054,7 @@ pmcheckHd :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
 
 -- Var
 pmcheckHd (PmVar x) ps guards va (ValVec vva delta)
-  | Just tm_state <- solveOneEq (delta_tm_cs delta)
-                                (PmExprVar (idName x), vaToPmExpr va)
+  | Just tm_state <- solveOneEq (delta_tm_cs delta) (TVC x (vaToPmExpr va))
   = ucon va <$> pmcheckI ps guards (ValVec vva (delta {delta_tm_cs = tm_state}))
   | otherwise = return mempty
 
@@ -2122,7 +2116,8 @@ pmcheckHd (p@(PmLit l)) ps guards (PmVar x) (ValVec vva delta)
                              ValVec vva (delta {delta_tm_cs = tm_state})
           Nothing       -> return mempty
   where
-    us | Just tm_state <- solveOneEq (delta_tm_cs delta) (mkNegEq x l)
+    -- See Note [Refutable shapes] in TmOracle
+    us | Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x (PmAltLit l)
        = [ValVec (PmNLit x [l] : vva) (delta { delta_tm_cs = tm_state })]
        | otherwise = []
 
@@ -2142,7 +2137,8 @@ pmcheckHd (p@(PmLit l)) ps guards
                 (ValVec vva (delta { delta_tm_cs = tm_state }))
   | otherwise = return non_matched
   where
-    us | Just tm_state <- solveOneEq (delta_tm_cs delta) (mkNegEq x l)
+    -- See Note [Refutable shapes] in TmOracle
+    us | Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x (PmAltLit l)
        = [ValVec (PmNLit x (l:lits) : vva) (delta { delta_tm_cs = tm_state })]
        | otherwise = []
 
@@ -2407,22 +2403,22 @@ these constraints.
 genCaseTmCs2 :: Maybe (LHsExpr GhcTc) -- Scrutinee
              -> [Pat GhcTc]           -- LHS       (should have length 1)
              -> [Id]                  -- MatchVars (should have length 1)
-             -> DsM (Bag SimpleEq)
+             -> DsM (Bag TmVarCt)
 genCaseTmCs2 Nothing _ _ = return emptyBag
 genCaseTmCs2 (Just scr) [p] [var] = do
   fam_insts <- dsGetFamInstEnvs
   [e] <- map vaToPmExpr . coercePatVec <$> translatePat fam_insts p
   let scr_e = lhsExprToPmExpr scr
-  return $ listToBag [(var, e), (var, scr_e)]
+  return $ listToBag [(TVC var e), (TVC var scr_e)]
 genCaseTmCs2 _ _ _ = panic "genCaseTmCs2: HsCase"
 
 -- | Generate a simple equality when checking a case expression:
 --     case x of { matches }
 -- When checking matches we record that (x ~ y) where y is the initial
 -- uncovered. All matches will have to satisfy this equality.
-genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> Bag SimpleEq
+genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> Bag TmVarCt
 genCaseTmCs1 Nothing     _    = emptyBag
-genCaseTmCs1 (Just scr) [var] = unitBag (var, lhsExprToPmExpr scr)
+genCaseTmCs1 (Just scr) [var] = unitBag (TVC var (lhsExprToPmExpr scr))
 genCaseTmCs1 _ _              = panic "genCaseTmCs1: HsCase"
 
 {- Note [Literals in PmPat]
@@ -2484,20 +2480,14 @@ isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
 
 instance Outputable ValVec where
   ppr (ValVec vva delta)
-    = let (residual_eqs, subst) = wrapUpTmState (delta_tm_cs delta)
-          vector                = substInValAbs subst vva
-      in  ppr_uncovered (vector, residual_eqs)
+    = let (subst, refuts) = wrapUpTmState (delta_tm_cs delta)
+          vector          = substInValAbs subst vva
+      in  pprUncovered (vector, refuts)
 
 -- | Apply a term substitution to a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
-substInValAbs :: PmVarEnv -> [ValAbs] -> [PmExpr]
+substInValAbs :: TmVarCtEnv -> [ValAbs] -> [PmExpr]
 substInValAbs subst = map (exprDeepLookup subst . vaToPmExpr)
-
--- | Wrap up the term oracle's state once solving is complete. Drop any
--- information about unhandled constraints (involving HsExprs) and flatten
--- (height 1) the substitution.
-wrapUpTmState :: TmState -> ([ComplexEq], PmVarEnv)
-wrapUpTmState (residual, (_, subst)) = (residual, flattenPmVarEnv subst)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
@@ -2538,10 +2528,11 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     maxPatterns = maxUncoveredPatterns dflags
 
     -- Print a single clause (for redundant/with-inaccessible-rhs)
-    pprEqn q txt = pp_context True ctx (text txt) $ \f -> ppr_eqn f kind q
+    pprEqn q txt = pprContext True ctx (text txt) $ \f ->
+      f (pprPats kind (map unLoc q))
 
     -- Print several clauses (for uncovered clauses)
-    pprEqns qs = pp_context False ctx (text "are non-exhaustive") $ \_ ->
+    pprEqns qs = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       case qs of -- See #11245
            [ValVec [] _]
                     -> text "Guards do not cover entire pattern space"
@@ -2552,7 +2543,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
 
     -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
     -- which we only know the type and have no inhabitants at hand)
-    warnEmptyCase ty = pp_context False ctx (text "are non-exhaustive") $ \_ ->
+    warnEmptyCase ty = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
 
 {- Note [Inaccessible warnings for record updates]
@@ -2624,8 +2615,8 @@ exhaustiveWarningFlag (StmtCtxt {}) = Nothing -- Don't warn about incomplete pat
                                        -- incomplete
 
 -- True <==> singular
-pp_context :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
-pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
+pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
+pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
   = vcat [text txt <+> msg,
           sep [ text "In" <+> ppr_match <> char ':'
               , nest 4 (rest_of_msg_fun pref)]]
@@ -2639,86 +2630,9 @@ pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)
 
-ppr_pats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
-ppr_pats kind pats
+pprPats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
+pprPats kind pats
   = sep [sep (map ppr pats), matchSeparator kind, text "..."]
-
-ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> [LPat GhcTc] -> SDoc
-ppr_eqn prefixF kind eqn = prefixF (ppr_pats kind (map unLoc eqn))
-
-ppr_constraint :: (SDoc,[PmLit]) -> SDoc
-ppr_constraint (var, lits) = var <+> text "is not one of"
-                                 <+> braces (pprWithCommas ppr lits)
-
-ppr_uncovered :: ([PmExpr], [ComplexEq]) -> SDoc
-ppr_uncovered (expr_vec, complex)
-  | null cs   = fsep vec -- there are no literal constraints
-  | otherwise = hang (fsep vec) 4 $
-                  text "where" <+> vcat (map ppr_constraint cs)
-  where
-    sdoc_vec = mapM pprPmExprWithParens expr_vec
-    (vec,cs) = runPmPprM sdoc_vec (filterComplex complex)
-
-{- Note [Representation of Term Equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the paper, term constraints always take the form (x ~ e). Of course, a more
-general constraint of the form (e1 ~ e1) can always be transformed to an
-equivalent set of the former constraints, by introducing a fresh, intermediate
-variable: { y ~ e1, y ~ e1 }. Yet, implementing this representation gave rise
-to #11160 (incredibly bad performance for literal pattern matching). Two are
-the main sources of this problem (the actual problem is how these two interact
-with each other):
-
-1. Pattern matching on literals generates twice as many constraints as needed.
-   Consider the following (tests/ghci/should_run/ghcirun004):
-
-    foo :: Int -> Int
-    foo 1    = 0
-    ...
-    foo 5000 = 4999
-
-   The covered and uncovered set *should* look like:
-     U0 = { x |> {} }
-
-     C1  = { 1  |> { x ~ 1 } }
-     U1  = { x  |> { False ~ (x ~ 1) } }
-     ...
-     C10 = { 10 |> { False ~ (x ~ 1), .., False ~ (x ~ 9), x ~ 10 } }
-     U10 = { x  |> { False ~ (x ~ 1), .., False ~ (x ~ 9), False ~ (x ~ 10) } }
-     ...
-
-     If we replace { False ~ (x ~ 1) } with { y ~ False, y ~ (x ~ 1) }
-     we get twice as many constraints. Also note that half of them are just the
-     substitution [x |-> False].
-
-2. The term oracle (`tmOracle` in deSugar/TmOracle) uses equalities of the form
-   (x ~ e) as substitutions [x |-> e]. More specifically, function
-   `extendSubstAndSolve` applies such substitutions in the residual constraints
-   and partitions them in the affected and non-affected ones, which are the new
-   worklist. Essentially, this gives quadradic behaviour on the number of the
-   residual constraints. (This would not be the case if the term oracle used
-   mutable variables but, since we use it to handle disjunctions on value set
-   abstractions (`Union` case), we chose a pure, incremental interface).
-
-Now the problem becomes apparent (e.g. for clause 300):
-  * Set U300 contains 300 substituting constraints [y_i |-> False] and 300
-    constraints that we know that will not reduce (stay in the worklist).
-  * To check for consistency, we apply the substituting constraints ONE BY ONE
-    (since `tmOracle` is called incrementally, it does not have all of them
-    available at once). Hence, we go through the (non-progressing) constraints
-    over and over, achieving over-quadradic behaviour.
-
-If instead we allow constraints of the form (e ~ e),
-  * All uncovered sets Ui contain no substituting constraints and i
-    non-progressing constraints of the form (False ~ (x ~ lit)) so the oracle
-    behaves linearly.
-  * All covered sets Ci contain exactly (i-1) non-progressing constraints and
-    a single substituting constraint. So the term oracle goes through the
-    constraints only once.
-
-The performance improvement becomes even more important when more arguments are
-involved.
--}
 
 -- Debugging Infrastructre
 
@@ -2757,3 +2671,5 @@ pprValAbs ps = hang (text "ValAbs:") 2
 pprValVecDebug :: ValVec -> SDoc
 pprValVecDebug (ValVec vas _d) = text "ValVec" <+>
                                   parens (pprValAbs vas)
+                                  -- <not a haddock> $$ ppr (delta_tm_cs _d)
+                                  -- <not a haddock> $$ ppr (delta_ty_cs _d)
