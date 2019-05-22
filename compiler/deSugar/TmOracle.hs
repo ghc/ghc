@@ -9,12 +9,13 @@ The term equality oracle. The main export of the module is function `tmOracle'.
 module TmOracle (
 
         -- re-exported from PmExpr
-        PmExpr(..), PmLit(..), SimpleEq, ComplexEq, PmVarEnv, falsePmExpr,
-        eqPmLit, filterComplex, isNotPmExprOther, runPmPprM, lhsExprToPmExpr,
-        hsExprToPmExpr, pprPmExprWithParens,
+        PmExpr(..), PmLit(..), PmAltCon(..), SimpleEq, ComplexEq, PmVarEnv,
+        PmRefutEnv, eqPmLit, prepareRefuts, isNotPmExprOther,
+        runPmPprM, lhsExprToPmExpr, hsExprToPmExpr, pprPmExprWithParens,
 
         -- the term oracle
         tmOracle, TmState, initialTmState, solveOneEq, extendSubst, canDiverge,
+        isRefutable, addSolveRefutableAltCon, lookupRefutableAltCons,
 
         -- misc.
         toComplex, exprDeepLookup, pmLitType, flattenPmVarEnv
@@ -33,6 +34,7 @@ import HsLit
 import TcHsSyn
 import MonadUtils
 import Util
+import Maybes
 import Outputable
 
 import NameEnv
@@ -48,18 +50,29 @@ import NameEnv
 -- | The type of substitutions.
 type PmVarEnv = NameEnv PmExpr
 
+exprToAlt :: PmExpr -> Maybe PmAltCon
+-- Note how this deliberately chooses bogus argument types for PmAltConLike.
+-- This is only safe for doing lookup in a 'PmRefutEnv'!
+exprToAlt (PmExprCon cl _) = Just (PmAltConLike cl [])
+exprToAlt (PmExprLit l)    = Just (PmAltLit l)
+exprToAlt _                = Nothing
+
 -- | The environment of the oracle contains
 --     1. A Bool (are there any constraints we cannot handle? (PmExprOther)).
---     2. A substitution we extend with every step and return as a result.
-type TmOracleEnv = (Bool, PmVarEnv)
+--     2. A substitution with solutions we extend with every step and return
+--        as a result.
+--     3. A 'PmRefutEnv' assigning shapes to variables that immediately lead to
+--        a refutation.
+type TmOracleEnv = (Bool, PmVarEnv, PmRefutEnv)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
 canDiverge :: Name -> TmState -> Bool
-canDiverge x (standby, (_unhandled, env))
+canDiverge x (standby, (_unhandled, env, _refuts))
   -- If the variable seems not evaluated, there is a possibility for
-  -- constraint x ~ BOT to be satisfiable.
-  | PmExprVar y <- varDeepLookup env x -- seems not forced
+  -- constraint x ~ BOT to be satisfiable. That's the case when we haven't found
+  -- a solution (i.e. some equivalent literal or constructor) for it yet.
+  | (_, PmExprVar y) <- varDeepLookup env x -- seems not forced
   -- If it is involved (directly or indirectly) in any equality in the
   -- worklist, we can assume that it is already indirectly evaluated,
   -- as a side-effect of equality checking. If not, then we can assume
@@ -78,8 +91,13 @@ varIn x e = case e of
   PmExprVar y    -> x == y
   PmExprCon _ es -> any (x `varIn`) es
   PmExprLit _    -> False
-  PmExprEq e1 e2 -> (x `varIn` e1) || (x `varIn` e2)
   PmExprOther _  -> False
+
+-- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
+-- @x@ and @e@ are completely substituted before!
+isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
+isRefutable x e env
+  = fromMaybe False $ elem <$> exprToAlt e <*> lookup x env
 
 -- | Flatten the DAG (Could be improved in terms of performance.).
 flattenPmVarEnv :: PmVarEnv -> PmVarEnv
@@ -91,14 +109,45 @@ type TmState = ([ComplexEq], TmOracleEnv)
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
-initialTmState = ([], (False, emptyNameEnv))
+initialTmState = ([], (False, emptyNameEnv, []))
 
 -- | Solve a complex equality (top-level).
 solveOneEq :: TmState -> ComplexEq -> Maybe TmState
-solveOneEq solver_env@(_,(_,env)) complex
+solveOneEq solver_env@(_,(_,env,_)) complex
   = solveComplexEq solver_env -- do the actual *merging* with existing state
   $ simplifyComplexEq               -- simplify as much as you can
   $ applySubstComplexEq env complex -- replace everything we already know
+
+-- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
+-- 'TmState' and refute if that leads to a contradiction.
+addSolveRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
+addSolveRefutableAltCon original@(standby, (unhandled, env, refuts)) x nalt
+  = case exprToAlt e of
+      Nothing -> Just extended         -- Not solved yet
+      Just alt                         -- We have a solution
+        | alt == nalt -> Nothing       -- ... which is contradictory
+        | otherwise   -> Just original -- ... which is compatible, rendering the
+                                       --     refutation redundant
+  where
+    (y, e) = varDeepLookup env (idName x)
+    extended = (standby, (unhandled, env, refuts'))
+    refuts' = alterAssoc (Just . (nalt:) . fromMaybe []) y refuts
+
+-- Maybe move this to ListUtils?
+alterAssoc :: Eq a => (Maybe b -> Maybe b) -> a -> [(a, b)] -> [(a, b)]
+alterAssoc f k assocs
+  | Just v <- f mb_entry = (k,v) : assocs'
+  | otherwise            = assocs'
+  where
+    (l, r)   = break ((== k) . fst) assocs
+    mb_entry = snd <$> listToMaybe r
+    assocs'  = l ++ drop 1 r
+
+-- | Return all 'PmAltCon' shapes that are impossible for 'Id' to take, i.e.
+-- would immediately lead to a refutation by the term oracle.
+lookupRefutableAltCons :: Id -> TmState -> [PmAltCon]
+lookupRefutableAltCons x (_, (_, _, refuts))
+  = fromMaybe [] (lookup (idName x) refuts)
 
 -- | Solve a complex equality.
 -- Nothing => definitely unsatisfiable
@@ -106,10 +155,10 @@ solveOneEq solver_env@(_,(_,env)) complex
 --             it to the tmstate; the result may or may not be
 --             satisfiable
 solveComplexEq :: TmState -> ComplexEq -> Maybe TmState
-solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
+solveComplexEq solver_state@(standby, (_unhandled, env, refuts)) eq@(e1, e2) = case eq of
   -- We cannot do a thing about these cases
-  (PmExprOther _,_)            -> Just (standby, (True, env))
-  (_,PmExprOther _)            -> Just (standby, (True, env))
+  (PmExprOther _,_)            -> Just (standby, (True, env, refuts))
+  (_,PmExprOther _)            -> Just (standby, (True, env, refuts))
 
   (PmExprLit l1, PmExprLit l2) -> case eqPmLit l1 l2 of
     -- See Note [Undecidable Equality for Overloaded Literals]
@@ -119,12 +168,6 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   (PmExprCon c1 ts1, PmExprCon c2 ts2)
     | c1 == c2  -> foldlM solveComplexEq solver_state (zip ts1 ts2)
     | otherwise -> Nothing
-  (PmExprCon _ [], PmExprEq t1 t2)
-    | isTruePmExpr e1  -> solveComplexEq solver_state (t1, t2)
-    | isFalsePmExpr e1 -> Just (eq:standby, (unhandled, env))
-  (PmExprEq t1 t2, PmExprCon _ [])
-    | isTruePmExpr e2   -> solveComplexEq solver_state (t1, t2)
-    | isFalsePmExpr e2  -> Just (eq:standby, (unhandled, env))
 
   (PmExprVar x, PmExprVar y)
     | x == y    -> Just solver_state
@@ -133,14 +176,15 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   (PmExprVar x, _) -> extendSubstAndSolve x e2 solver_state
   (_, PmExprVar x) -> extendSubstAndSolve x e1 solver_state
 
-  (PmExprEq _ _, PmExprEq _ _) -> Just (eq:standby, (unhandled, env))
-
   _ -> WARN( True, text "solveComplexEq: Catch all" <+> ppr eq )
-       Just (standby, (True, env)) -- I HATE CATCH-ALLS
+       Just (standby, (True, env, refuts)) -- I HATE CATCH-ALLS
 
 -- | Extend the substitution and solve the (possibly updated) constraints.
 extendSubstAndSolve :: Name -> PmExpr -> TmState -> Maybe TmState
-extendSubstAndSolve x e (standby, (unhandled, env))
+extendSubstAndSolve x e (standby, (unhandled, env, refuts))
+  | isRefutable x e refuts
+  = Nothing
+  | otherwise
   = foldlM solveComplexEq new_incr_state (map simplifyComplexEq changed)
   where
     -- Apply the substitution to the worklist and partition them to the ones
@@ -148,17 +192,17 @@ extendSubstAndSolve x e (standby, (unhandled, env))
     -- had some progress. Careful about performance:
     -- See Note [Representation of Term Equalities] in deSugar/Check.hs
     (changed, unchanged) = partitionWith (substComplexEq x e) standby
-    new_incr_state       = (unchanged, (unhandled, extendNameEnv env x e))
+    new_incr_state       = (unchanged, (unhandled, extendNameEnv env x e, refuts))
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,
 -- `extendSubst` simply extends the substitution, unlike what
 -- `extendSubstAndSolve` does.
 extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e (standby, (unhandled, env))
+extendSubst y e (standby, (unhandled, env, refuts))
   | isNotPmExprOther simpl_e
-  = (standby, (unhandled, extendNameEnv env x simpl_e))
-  | otherwise = (standby, (True, env))
+  = (standby, (unhandled, extendNameEnv env x simpl_e, refuts))
+  | otherwise = (standby, (True, env, refuts))
   where
     x = idName y
     simpl_e = fst $ simplifyPmExpr $ exprDeepLookup env e
@@ -170,73 +214,30 @@ simplifyComplexEq (e1, e2) = (fst $ simplifyPmExpr e1, fst $ simplifyPmExpr e2)
 -- | Simplify an expression. The boolean indicates if there has been any
 -- simplification or if the operation was a no-op.
 simplifyPmExpr :: PmExpr -> (PmExpr, Bool)
--- See Note [Deep equalities]
 simplifyPmExpr e = case e of
   PmExprCon c ts -> case mapAndUnzip simplifyPmExpr ts of
                       (ts', bs) -> (PmExprCon c ts', or bs)
-  PmExprEq t1 t2 -> simplifyEqExpr t1 t2
   _other_expr    -> (e, False) -- the others are terminals
-
--- | Simplify an equality expression. The equality is given in parts.
-simplifyEqExpr :: PmExpr -> PmExpr -> (PmExpr, Bool)
--- See Note [Deep equalities]
-simplifyEqExpr e1 e2 = case (e1, e2) of
-  -- Varables
-  (PmExprVar x, PmExprVar y)
-    | x == y -> (truePmExpr, True)
-
-  -- Literals
-  (PmExprLit l1, PmExprLit l2) -> case eqPmLit l1 l2 of
-    -- See Note [Undecidable Equality for Overloaded Literals]
-    True  -> (truePmExpr,  True)
-    False -> (falsePmExpr, True)
-
-  -- Can potentially be simplified
-  (PmExprEq {}, _) -> case (simplifyPmExpr e1, simplifyPmExpr e2) of
-    ((e1', True ), (e2', _    )) -> simplifyEqExpr e1' e2'
-    ((e1', _    ), (e2', True )) -> simplifyEqExpr e1' e2'
-    ((e1', False), (e2', False)) -> (PmExprEq e1' e2', False) -- cannot progress
-  (_, PmExprEq {}) -> case (simplifyPmExpr e1, simplifyPmExpr e2) of
-    ((e1', True ), (e2', _    )) -> simplifyEqExpr e1' e2'
-    ((e1', _    ), (e2', True )) -> simplifyEqExpr e1' e2'
-    ((e1', False), (e2', False)) -> (PmExprEq e1' e2', False) -- cannot progress
-
-  -- Constructors
-  (PmExprCon c1 ts1, PmExprCon c2 ts2)
-    | c1 == c2 ->
-        let (ts1', bs1) = mapAndUnzip simplifyPmExpr ts1
-            (ts2', bs2) = mapAndUnzip simplifyPmExpr ts2
-            (tss, _bss) = zipWithAndUnzip simplifyEqExpr ts1' ts2'
-            worst_case  = PmExprEq (PmExprCon c1 ts1') (PmExprCon c2 ts2')
-        in  if | not (or bs1 || or bs2) -> (worst_case, False) -- no progress
-               | all isTruePmExpr  tss  -> (truePmExpr, True)
-               | any isFalsePmExpr tss  -> (falsePmExpr, True)
-               | otherwise              -> (worst_case, False)
-    | otherwise -> (falsePmExpr, True)
-
-  -- We cannot do anything about the rest..
-  _other_equality -> (original, False)
-
-  where
-    original = PmExprEq e1 e2 -- reconstruct equality
 
 -- | Apply an (un-flattened) substitution to a simple equality.
 applySubstComplexEq :: PmVarEnv -> ComplexEq -> ComplexEq
 applySubstComplexEq env (e1,e2) = (exprDeepLookup env e1, exprDeepLookup env e2)
 
--- | Apply an (un-flattened) substitution to a variable.
-varDeepLookup :: PmVarEnv -> Name -> PmExpr
-varDeepLookup env x
-  | Just e <- lookupNameEnv env x = exprDeepLookup env e -- go deeper
-  | otherwise                  = PmExprVar x          -- terminal
+-- | Apply an (un-flattened) substitution to a variable and return its
+-- representative in the triangular substitution @env@ and the completely
+-- substituted expression. The latter may just be the representative wrapped
+-- with 'PmExprVar' if we haven't found a solution for it yet.
+varDeepLookup :: PmVarEnv -> Name -> (Name, PmExpr)
+varDeepLookup env x = case lookupNameEnv env x of
+  Just (PmExprVar y) -> varDeepLookup env y
+  Just e             -> (x, exprDeepLookup env e) -- go deeper
+  Nothing            -> (x, PmExprVar x)          -- terminal
 {-# INLINE varDeepLookup #-}
 
 -- | Apply an (un-flattened) substitution to an expression.
 exprDeepLookup :: PmVarEnv -> PmExpr -> PmExpr
-exprDeepLookup env (PmExprVar x)    = varDeepLookup env x
+exprDeepLookup env (PmExprVar x)    = snd (varDeepLookup env x)
 exprDeepLookup env (PmExprCon c es) = PmExprCon c (map (exprDeepLookup env) es)
-exprDeepLookup env (PmExprEq e1 e2) = PmExprEq (exprDeepLookup env e1)
-                                               (exprDeepLookup env e2)
 exprDeepLookup _   other_expr       = other_expr -- PmExprLit, PmExprOther
 
 -- | External interface to the term oracle.
@@ -247,19 +248,3 @@ tmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
 pmLitType :: PmLit -> Type -- should be in PmExpr but gives cyclic imports :(
 pmLitType (PmSLit   lit) = hsLitType   lit
 pmLitType (PmOLit _ lit) = overLitType lit
-
-{- Note [Deep equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Solving nested equalities is the most difficult part. The general strategy
-is the following:
-
-  * Equalities of the form (True ~ (e1 ~ e2)) are transformed to just
-    (e1 ~ e2) and then treated recursively.
-
-  * Equalities of the form (False ~ (e1 ~ e2)) cannot be analyzed unless
-    we know more about the inner equality (e1 ~ e2). That's exactly what
-    `simplifyEqExpr' tries to do: It takes e1 and e2 and either returns
-    truePmExpr, falsePmExpr or (e1' ~ e2') in case it is uncertain. Note
-    that it is not e but rather e', since it may perform some
-    simplifications deeper.
--}
