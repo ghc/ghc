@@ -150,3 +150,4 @@ test('T15957_Fail', normal, compile_fail, ['-Werror -Wall -Wno-missing-signature
 test('T16385', normal, compile_fail, [''])
 test('T16504', normal, compile_fail, [''])
 test('T14548', normal, compile_fail, [''])
+test('T16610', normal, compile_fail, [''])
