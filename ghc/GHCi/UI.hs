@@ -509,7 +509,9 @@ interactiveUI config srcs maybe_exprs = do
                    lastErrorLocations = lastErrLocationsRef,
                    mod_infos          = M.empty,
                    flushStdHandles    = flush,
-                   noBuffering        = nobuffering
+                   noBuffering        = nobuffering,
+                   originalDynFlags   = dflags,
+                   originalInteractiveDynFlags = dflags'
                  }
 
    return ()
@@ -2712,8 +2714,10 @@ setCmd str
          Right wds -> setOptions wds
 
 setiCmd :: GhciMonad m => String -> m ()
-setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
-setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
+setiCmd ""   = do
+  originalDynFlags <- originalDynFlags <$> getGHCiState
+  GHC.getInteractiveDynFlags >>= liftIO . showDynFlags (Just originalDynFlags)
+setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags Nothing
 setiCmd str  =
   case toArgs str of
     Left err -> liftIO (hPutStrLn stderr err)
@@ -2730,12 +2734,15 @@ showOptions show_all
                    then text "none."
                    else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
            ))
-       getDynFlags >>= liftIO . showDynFlags show_all
+       mOrgininalDynFlags <- case show_all of
+         True -> pure Nothing
+         False -> Just . originalDynFlags <$> getGHCiState
+       getDynFlags >>= liftIO . showDynFlags mOrgininalDynFlags
 
 
-showDynFlags :: Bool -> DynFlags -> IO ()
-showDynFlags show_all dflags = do
-  showLanguages' show_all dflags
+showDynFlags :: Maybe DynFlags -> DynFlags -> IO ()
+showDynFlags mDefault_dflags dflags = do
+  showLanguages' mDefault_dflags  dflags
   putStrLn $ showSDoc dflags $
      text "GHCi-specific dynamic flag settings:" $$
          nest 2 (vcat (map (setting "-f" "-fno-" gopt) ghciFlags))
@@ -2753,11 +2760,9 @@ showDynFlags show_all dflags = do
           where name = flagSpecName flag
                 f = flagSpecFlag flag
                 is_on = test f dflags
-                quiet = not show_all && test f default_dflags == is_on
-
-        llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
-        default_dflags = defaultDynFlags (settings dflags) llvmConfig
+                quiet = case mDefault_dflags of
+                  Nothing -> False
+                  Just default_dflags -> test f default_dflags == is_on
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -3039,7 +3044,7 @@ showCmd str = do
               $ hang (text ":show") 6
               $ brackets (fsep $ punctuate (text " |") helpCmds)
 
-showiCmd :: GHC.GhcMonad m => String -> m ()
+showiCmd :: GhciMonad m => String -> m ()
 showiCmd str = do
   case words str of
         ["languages"]  -> showiLanguages -- backwards compat
@@ -3181,13 +3186,20 @@ showPaths = do
       text ("module import search paths:"++if null ipaths then " none" else "") $$
         nest 2 (vcat (map text ipaths))
 
-showLanguages :: GHC.GhcMonad m => m ()
-showLanguages = getDynFlags >>= liftIO . showLanguages' False
+showLanguages :: GhciMonad m => m ()
+showLanguages = do
+  currentDynflags <- getDynFlags
+  originalDynFlags <- originalDynFlags <$> getGHCiState
+  liftIO $ showLanguages' (Just originalDynFlags) currentDynflags
 
-showiLanguages :: GHC.GhcMonad m => m ()
-showiLanguages = GHC.getInteractiveDynFlags >>= liftIO . showLanguages' False
+showiLanguages :: GhciMonad m => m ()
+showiLanguages = do
+  currentDynflags <- GHC.getInteractiveDynFlags
+  originalDynFlags <- originalInteractiveDynFlags <$> getGHCiState
+  liftIO $ showLanguages' (Just originalDynFlags) currentDynflags
 
-showLanguages' :: Bool -> DynFlags -> IO ()
+-- | 'Nothing' means show all, 'Just dflags0'
+showLanguages' :: Maybe DynFlags  -> DynFlags -> IO ()
 showLanguages' show_all dflags =
   putStrLn $ showSDoc dflags $ vcat
      [ text "base language is: " <>
@@ -3195,8 +3207,9 @@ showLanguages' show_all dflags =
            Nothing          -> text "Haskell2010"
            Just Haskell98   -> text "Haskell98"
            Just Haskell2010 -> text "Haskell2010"
-     , (if show_all then text "all active language options:"
-                    else text "with the following modifiers:") $$
+     , (if isNothing show_all
+        then text "all active language options:"
+        else text "with the following modifiers:") $$
           nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
      ]
   where
@@ -3207,15 +3220,15 @@ showLanguages' show_all dflags =
           where name = flagSpecName flag
                 f = flagSpecFlag flag
                 is_on = test f dflags
-                quiet = not show_all && test f default_dflags == is_on
+                quiet = case show_all of
+                  Nothing -> False
+                  Just default_dflags0 -> test f default_dflags == is_on
+                    where
+                      default_dflags = default_dflags0 `lang_set`
+                        case language dflags of
+                          Nothing -> Just Haskell2010
+                          other   -> other
 
-   llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
-   default_dflags =
-       defaultDynFlags (settings dflags) llvmConfig `lang_set`
-         case language dflags of
-           Nothing -> Just Haskell2010
-           other   -> other
 
 showTargets :: GHC.GhcMonad m => m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets

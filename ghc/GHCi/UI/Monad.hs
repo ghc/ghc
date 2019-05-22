@@ -150,8 +150,12 @@ data GHCiState = GHCiState
 
         flushStdHandles :: ForeignHValue,
             -- ^ @hFlush stdout; hFlush stderr@ in the interpreter
-        noBuffering :: ForeignHValue
+        noBuffering :: ForeignHValue,
             -- ^ @hSetBuffering NoBuffering@ for stdin/stdout/stderr
+        originalDynFlags :: DynFlags,
+            -- ^ Original dyn flags so just a diff can be displayed.
+        originalInteractiveDynFlags :: DynFlags
+            -- ^ Original interactive dyn flags so just a diff can be displayed.
      }
 
 type TickArray = Array Int [(GHC.BreakIndex,RealSrcSpan)]
