@@ -16,6 +16,9 @@ module Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
+
+        PlatformMisc(..),
+        IntegerLibrary(..),
 )
 
 where
@@ -160,3 +163,28 @@ osSubsectionsViaSymbols :: OS -> Bool
 osSubsectionsViaSymbols OSDarwin = True
 osSubsectionsViaSymbols _        = False
 
+-- | Platform-specific settings formerly hard-coded in Config.hs.
+--
+-- These should probably be all be triaged whether they can be computed from
+-- other settings or belong in another another place (like 'Platform' above).
+data PlatformMisc = PlatformMisc
+  { -- TODO Recalculate string from richer info?
+    platformMisc_targetPlatformString :: String
+  , platformMisc_integerLibrary       :: String
+  , platformMisc_integerLibraryType   :: IntegerLibrary
+  , platformMisc_ghcWithInterpreter   :: Bool
+  , platformMisc_ghcWithNativeCodeGen :: Bool
+  , platformMisc_ghcWithSMP           :: Bool
+  , platformMisc_ghcRTSWays           :: String
+  , platformMisc_tablesNextToCode     :: Bool
+  , platformMisc_leadingUnderscore    :: Bool
+  , platformMisc_libFFI               :: Bool
+  , platformMisc_ghcThreaded          :: Bool
+  , platformMisc_ghcDebugged          :: Bool
+  , platformMisc_ghcRtsWithLibdw      :: Bool
+  }
+
+data IntegerLibrary
+    = IntegerGMP
+    | IntegerSimple
+    deriving (Read, Show, Eq)
