@@ -1954,7 +1954,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- See Note [-fno-code mode] #8025
        map1 <- if hscTarget dflags == HscNothing
          then enableCodeGenForTH
-           (defaultObjectTarget (settings dflags))
+           (defaultObjectTarget dflags)
            map0
          else if hscTarget dflags == HscInterpreted
            then enableCodeGenForUnboxedTuples
