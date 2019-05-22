@@ -367,19 +367,20 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                     _ -> pprPanic "lookup_final_id" (ppr id)
 
               ; tidy_cls_insts = map (tidyClsInstDFun (lookup_final_id tidy_type_env)) cls_insts
-                -- A DFunId will have a binding in tidy_binds, and so will now be in
-                -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
-                -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
-                -- tidy_cls_insts.  Similarly the Ids inside a PatSyn.
+                -- A DFunId will have a binding in tidy_binds, and so will now
+                -- be in tidy_type_env, with vanilla IdInfo. We want vanilla
+                -- IdInfos in cls_insts so update DFunIds in cls_insts from the
+                -- Ids in tidy_type_env.
 
-                -- Tidy the Ids inside each PatSyn, very similarly to DFunIds
+                -- Tidy the Ids inside each PatSyn, very similarly to DFunIds,
                 -- and then override the PatSyns in the type_env with the new tidy ones
                 -- This is really the only reason we keep mg_patsyns at all; otherwise
-                -- they could just stay in type_env
-              ; tidy_patsyns = map (tidyPatSynIds (lookup_final_id tidy_type_env)) patsyns
-
-              ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
-
+                -- they could just stay in type_env.
+                --
+                -- Note the recursive knot: for Ids in the PatSyns we use
+                -- tidy_type_env, which is extended with tidy_patsyns.
+              ; tidy_patsyns  = map (tidyPatSynIds (lookup_final_id tidy_type_env)) patsyns
+              ; type_env2     = extendTypeEnvWithPatSyns tidy_patsyns type_env1
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
               }
           -- See Note [Grand plan for static forms] in StaticPtrTable.
