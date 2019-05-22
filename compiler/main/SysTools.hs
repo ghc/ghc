@@ -49,6 +49,7 @@ import Platform
 import Util
 import DynFlags
 import Fingerprint
+import ToolSettings
 
 import System.FilePath
 import System.IO
@@ -282,68 +283,82 @@ initSysTools top_dir
        ghcDebugged <- getBooleanSetting "Use Debugging"
        ghcRtsWithLibdw <- getBooleanSetting "RTS expects libdw"
 
-       return $ Settings {
-                    sTargetPlatform = platform,
-                    sTmpDir         = normalise tmpdir,
-                    sGhcUsagePath   = ghc_usage_msg_path,
-                    sGhciUsagePath  = ghci_usage_msg_path,
-                    sToolDir        = mtool_dir,
-                    sTopDir         = top_dir,
-                    sRawSettings    = mySettings,
-                    sExtraGccViaCFlags = words myExtraGccViaCFlags,
-                    sSystemPackageConfig = pkgconfig_path,
-                    sLdSupportsCompactUnwind = ldSupportsCompactUnwind,
-                    sLdSupportsBuildId       = ldSupportsBuildId,
-                    sLdSupportsFilelist      = ldSupportsFilelist,
-                    sLdIsGnuLd               = ldIsGnuLd,
-                    sGccSupportsNoPie        = gccSupportsNoPie,
-                    sProgramName             = "ghc",
-                    sProjectVersion          = cProjectVersion,
-                    sPgm_L   = unlit_path,
-                    sPgm_P   = (cpp_prog, cpp_args),
-                    sPgm_F   = "",
-                    sPgm_c   = (gcc_prog, gcc_args),
-                    sPgm_a   = (as_prog, as_args),
-                    sPgm_l   = (ld_prog, ld_args),
-                    sPgm_dll = (mkdll_prog,mkdll_args),
-                    sPgm_T   = touch_path,
-                    sPgm_windres = windres_path,
-                    sPgm_libtool = libtool_path,
-                    sPgm_ar = ar_path,
-                    sPgm_ranlib = ranlib_path,
-                    sPgm_lo  = (lo_prog,[]),
-                    sPgm_lc  = (lc_prog,[]),
-                    sPgm_lcc = (lcc_prog,[]),
-                    sPgm_i   = iserv_prog,
-                    sOpt_L       = [],
-                    sOpt_P       = [],
-                    sOpt_P_fingerprint = fingerprint0,
-                    sOpt_F       = [],
-                    sOpt_c       = [],
-                    sOpt_cxx     = [],
-                    sOpt_a       = [],
-                    sOpt_l       = [],
-                    sOpt_windres = [],
-                    sOpt_lcc     = [],
-                    sOpt_lo      = [],
-                    sOpt_lc      = [],
-                    sOpt_i       = [],
-                    sPlatformConstants = platformConstants,
+       return $ Settings
+         { sGhcNameVersion = GhcNameVersion
+           { ghcNameVersion_programName = "ghc"
+           , ghcNameVersion_projectVersion = cProjectVersion
+           }
 
-                    sTargetPlatformString = targetPlatformString,
-                    sIntegerLibrary = integerLibrary,
-                    sIntegerLibraryType = integerLibraryType,
-                    sGhcWithInterpreter = ghcWithInterpreter,
-                    sGhcWithNativeCodeGen = ghcWithNativeCodeGen,
-                    sGhcWithSMP = ghcWithSMP,
-                    sGhcRTSWays = ghcRTSWays,
-                    sTablesNextToCode = tablesNextToCode,
-                    sLeadingUnderscore = leadingUnderscore,
-                    sLibFFI = useLibFFI,
-                    sGhcThreaded = ghcThreaded,
-                    sGhcDebugged = ghcDebugged,
-                    sGhcRtsWithLibdw = ghcRtsWithLibdw
-             }
+         , sFileSettings = FileSettings
+           { fileSettings_tmpDir         = normalise tmpdir
+           , fileSettings_ghcUsagePath   = ghc_usage_msg_path
+           , fileSettings_ghciUsagePath  = ghci_usage_msg_path
+           , fileSettings_toolDir        = mtool_dir
+           , fileSettings_topDir         = top_dir
+           , fileSettings_systemPackageConfig = pkgconfig_path
+           }
+
+         , sToolSettings = ToolSettings
+           { toolSettings_ldSupportsCompactUnwind = ldSupportsCompactUnwind
+           , toolSettings_ldSupportsBuildId       = ldSupportsBuildId
+           , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
+           , toolSettings_ldIsGnuLd               = ldIsGnuLd
+           , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
+
+           , toolSettings_pgm_L   = unlit_path
+           , toolSettings_pgm_P   = (cpp_prog, cpp_args)
+           , toolSettings_pgm_F   = ""
+           , toolSettings_pgm_c   = (gcc_prog, gcc_args)
+           , toolSettings_pgm_a   = (as_prog, as_args)
+           , toolSettings_pgm_l   = (ld_prog, ld_args)
+           , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
+           , toolSettings_pgm_T   = touch_path
+           , toolSettings_pgm_windres = windres_path
+           , toolSettings_pgm_libtool = libtool_path
+           , toolSettings_pgm_ar = ar_path
+           , toolSettings_pgm_ranlib = ranlib_path
+           , toolSettings_pgm_lo  = (lo_prog,[])
+           , toolSettings_pgm_lc  = (lc_prog,[])
+           , toolSettings_pgm_lcc = (lcc_prog,[])
+           , toolSettings_pgm_i   = iserv_prog
+           , toolSettings_opt_L       = []
+           , toolSettings_opt_P       = []
+           , toolSettings_opt_P_fingerprint = fingerprint0
+           , toolSettings_opt_F       = []
+           , toolSettings_opt_c       = []
+           , toolSettings_opt_cxx     = []
+           , toolSettings_opt_a       = []
+           , toolSettings_opt_l       = []
+           , toolSettings_opt_windres = []
+           , toolSettings_opt_lcc     = []
+           , toolSettings_opt_lo      = []
+           , toolSettings_opt_lc      = []
+           , toolSettings_opt_i       = []
+
+           , toolSettings_extraGccViaCFlags = words myExtraGccViaCFlags
+           }
+
+         , sTargetPlatform = platform
+         , sPlatformMisc = PlatformMisc
+           { platformMisc_targetPlatformString = targetPlatformString
+           , platformMisc_integerLibrary = integerLibrary
+           , platformMisc_integerLibraryType = integerLibraryType
+           , platformMisc_ghcWithInterpreter = ghcWithInterpreter
+           , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
+           , platformMisc_ghcWithSMP = ghcWithSMP
+           , platformMisc_ghcRTSWays = ghcRTSWays
+           , platformMisc_tablesNextToCode = tablesNextToCode
+           , platformMisc_leadingUnderscore = leadingUnderscore
+           , platformMisc_libFFI = useLibFFI
+           , platformMisc_ghcThreaded = ghcThreaded
+           , platformMisc_ghcDebugged = ghcDebugged
+           , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
+           }
+
+         , sPlatformConstants = platformConstants
+
+         , sRawSettings    = mySettings
+         }
 
 
 {- Note [Windows stack usage]
