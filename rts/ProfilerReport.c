@@ -233,7 +233,7 @@ logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
                 max_src_len - strlen_utf8(cc->srcloc), "");
 
         fprintf(prof_file,
-                " %*" FMT_Int "%11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
+                " %*" FMT_Int " %11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
                 max_id_len, ccs->ccsID, ccs->scc_count,
                 totals.total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)totals.total_prof_ticks * 100.0),
                 totals.total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)totals.total_alloc * 100.0),
