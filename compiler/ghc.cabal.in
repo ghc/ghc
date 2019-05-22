@@ -327,6 +327,7 @@ Library
         MkCore
         PprCore
         PmExpr
+        PmPpr
         TmOracle
         Check
         Coverage
