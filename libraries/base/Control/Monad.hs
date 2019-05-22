@@ -18,7 +18,7 @@ module Control.Monad
     (
     -- * Functor and monad classes
 
-      Functor(fmap)
+      Functor(..)
     , Monad((>>=), (>>), return)
     , MonadFail(fail)
     , MonadPlus(mzero, mplus)

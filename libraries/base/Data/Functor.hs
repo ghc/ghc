@@ -39,8 +39,7 @@
 
 module Data.Functor
     (
-      Functor(fmap),
-      (<$),
+      Functor(..),
       ($>),
       (<$>),
       (<&>),
