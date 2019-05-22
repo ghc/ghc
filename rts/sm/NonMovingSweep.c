@@ -153,6 +153,126 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
     }
 }
 
+/* Must a closure remain on the mutable list?
+ *
+ * A closure must remain if any of the following applies:
+ *
+ *  1. it contains references to a younger generation
+ *  2. it's a mutable closure (e.g. mutable array or MUT_PRIM)
+ */
+static bool is_closure_clean(StgClosure *p)
+{
+    const StgInfoTable *info = get_itbl(p);
+
+#define CLEAN(ptr) (!HEAP_ALLOCED((StgClosure*) ptr) || Bdescr((StgPtr) ptr)->gen == oldest_gen)
+
+    switch (info->type) {
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    {
+        StgMVar *mvar = ((StgMVar *)p);
+        if (!CLEAN(mvar->head)) goto dirty_MVAR;
+        if (!CLEAN(mvar->tail)) goto dirty_MVAR;
+        if (!CLEAN(mvar->value)) goto dirty_MVAR;
+        mvar->header.info = &stg_MVAR_CLEAN_info;
+        return true;
+
+dirty_MVAR:
+        mvar->header.info = &stg_MVAR_DIRTY_info;
+        return false;
+    }
+
+    case TVAR:
+    {
+        StgTVar *tvar = ((StgTVar *)p);
+        if (!CLEAN(tvar->current_value)) goto dirty_TVAR;
+        if (!CLEAN(tvar->first_watch_queue_entry)) goto dirty_TVAR;
+        tvar->header.info = &stg_TVAR_CLEAN_info;
+        return true;
+
+dirty_TVAR:
+        tvar->header.info = &stg_TVAR_DIRTY_info;
+        return false;
+    }
+
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+    {
+        StgPtr end = (StgPtr)((StgThunk *)p)->payload + info->layout.payload.ptrs;
+        for (StgPtr q = (StgPtr)((StgThunk *)p)->payload; q < end; q++) {
+            if (!CLEAN(*q)) return false;
+        }
+        return true;
+    }
+
+    case FUN:
+    case FUN_1_0:                       // hardly worth specialising these guys
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
+    case CONSTR:
+    case CONSTR_NOCAF:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
+    case PRIM:
+    {
+        StgPtr end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+        for (StgPtr q = (StgPtr)((StgClosure *)p)->payload; q < end; q++) {
+            if (!CLEAN(*q)) return false;
+        }
+        return true;
+    }
+
+    case WEAK:
+        return false; // TODO
+
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+        if (!CLEAN(((StgMutVar *)p)->var)) {
+            p->header.info = &stg_MUT_VAR_DIRTY_info;
+            return false;
+        } else {
+            p->header.info = &stg_MUT_VAR_CLEAN_info;
+            return true;
+        }
+
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+
+        if (!CLEAN(bq->bh)) goto dirty_BLOCKING_QUEUE;
+        if (!CLEAN(bq->owner)) goto dirty_BLOCKING_QUEUE;
+        if (!CLEAN(bq->queue)) goto dirty_BLOCKING_QUEUE;
+        if (!CLEAN(bq->link)) goto dirty_BLOCKING_QUEUE;
+        bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+        return true;
+
+dirty_BLOCKING_QUEUE:
+        bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+        return false;
+    }
+
+    case THUNK_SELECTOR:
+        return CLEAN(((StgSelector *) p)->selectee);
+
+    case ARR_WORDS:
+        return true;
+
+    default:
+        // TODO: the rest
+        return false;
+    }
+#undef CLEAN
+}
+
 /* N.B. This happens during the pause so we own all capabilities. */
 void nonmovingSweepMutLists()
 {
@@ -163,7 +283,7 @@ void nonmovingSweepMutLists()
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
             for (StgPtr p = bd->start; p < bd->free; p++) {
                 StgClosure **q = (StgClosure**)p;
-                if (nonmovingIsAlive(*q)) {
+                if (nonmovingIsAlive(*q) && !is_closure_clean(*q)) {
                     recordMutableCap(*q, cap, oldest_gen->no);
                 }
             }
