@@ -87,7 +87,66 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
+        sProgramName,
+        sProjectVersion,
+        sGhcUsagePath,
+        sGhciUsagePath,
+        sToolDir,
+        sTopDir,
+        sTmpDir,
+        sSystemPackageConfig,
+        sLdSupportsCompactUnwind,
+        sLdSupportsBuildId,
+        sLdSupportsFilelist,
+        sLdIsGnuLd,
+        sGccSupportsNoPie,
+        sPgm_L,
+        sPgm_P,
+        sPgm_F,
+        sPgm_c,
+        sPgm_a,
+        sPgm_l,
+        sPgm_dll,
+        sPgm_T,
+        sPgm_windres,
+        sPgm_libtool,
+        sPgm_ar,
+        sPgm_ranlib,
+        sPgm_lo,
+        sPgm_lc,
+        sPgm_lcc,
+        sPgm_i,
+        sOpt_L,
+        sOpt_P,
+        sOpt_P_fingerprint,
+        sOpt_F,
+        sOpt_c,
+        sOpt_cxx,
+        sOpt_a,
+        sOpt_l,
+        sOpt_windres,
+        sOpt_lo,
+        sOpt_lc,
+        sOpt_lcc,
+        sOpt_i,
+        sExtraGccViaCFlags,
+        sTargetPlatformString,
+        sIntegerLibrary,
+        sIntegerLibraryType,
+        sGhcWithInterpreter,
+        sGhcWithNativeCodeGen,
+        sGhcWithSMP,
+        sGhcRTSWays,
+        sTablesNextToCode,
+        sLeadingUnderscore,
+        sLibFFI,
+        sGhcThreaded,
+        sGhcDebugged,
+        sGhcRtsWithLibdw,
         IntegerLibrary(..),
+        GhcNameVersion(..),
+        FileSettings(..),
+        PlatformMisc(..),
         targetPlatform, programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         versionedAppDir,
@@ -198,9 +257,11 @@ import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
+import CliOption
 import CmdLineParser hiding (WarnReason(..))
 import qualified CmdLineParser as Cmd
 import Constants
+import GhcNameVersion
 import Panic
 import qualified PprColour as Col
 import Util
@@ -211,7 +272,11 @@ import SrcLoc
 import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
+import FileSettings
 import Outputable
+import Settings
+import ToolSettings
+
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
@@ -1304,80 +1369,8 @@ type LlvmTargets = [(String, LlvmTarget)]
 type LlvmPasses = [(Int, String)]
 type LlvmConfig = (LlvmTargets, LlvmPasses)
 
-data IntegerLibrary
-    = IntegerGMP
-    | IntegerSimple
-    deriving (Read, Show, Eq)
-
-data Settings = Settings {
-  sTargetPlatform        :: Platform,       -- Filled in by SysTools
-  sGhcUsagePath          :: FilePath,       -- ditto
-  sGhciUsagePath         :: FilePath,       -- ditto
-  sToolDir               :: Maybe FilePath, -- ditto
-  sTopDir                :: FilePath,       -- ditto
-  sTmpDir                :: String,      -- no trailing '/'
-  sProgramName           :: String,
-  sProjectVersion        :: String,
-  -- You shouldn't need to look things up in rawSettings directly.
-  -- They should have their own fields instead.
-  sRawSettings           :: [(String, String)],
-  sExtraGccViaCFlags     :: [String],
-  sSystemPackageConfig   :: FilePath,
-  sLdSupportsCompactUnwind :: Bool,
-  sLdSupportsBuildId       :: Bool,
-  sLdSupportsFilelist      :: Bool,
-  sLdIsGnuLd               :: Bool,
-  sGccSupportsNoPie        :: Bool,
-  -- commands for particular phases
-  sPgm_L                 :: String,
-  sPgm_P                 :: (String,[Option]),
-  sPgm_F                 :: String,
-  sPgm_c                 :: (String,[Option]),
-  sPgm_a                 :: (String,[Option]),
-  sPgm_l                 :: (String,[Option]),
-  sPgm_dll               :: (String,[Option]),
-  sPgm_T                 :: String,
-  sPgm_windres           :: String,
-  sPgm_libtool           :: String,
-  sPgm_ar                :: String,
-  sPgm_ranlib            :: String,
-  sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
-  sPgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
-  sPgm_lcc               :: (String,[Option]), -- LLVM: c compiler
-  sPgm_i                 :: String,
-  -- options for particular phases
-  sOpt_L                 :: [String],
-  sOpt_P                 :: [String],
-  sOpt_P_fingerprint     :: Fingerprint, -- cached Fingerprint of sOpt_P
-                                         -- See Note [Repeated -optP hashing]
-  sOpt_F                 :: [String],
-  sOpt_c                 :: [String],
-  sOpt_cxx               :: [String],
-  sOpt_a                 :: [String],
-  sOpt_l                 :: [String],
-  sOpt_windres           :: [String],
-  sOpt_lo                :: [String], -- LLVM: llvm optimiser
-  sOpt_lc                :: [String], -- LLVM: llc static compiler
-  sOpt_lcc               :: [String], -- LLVM: c compiler
-  sOpt_i                 :: [String], -- iserv options
-
-  sPlatformConstants     :: PlatformConstants,
-
-  -- Formerly Config.hs, target specific
-  sTargetPlatformString :: String, -- TODO Recalculate string from richer info?
-  sIntegerLibrary        :: String,
-  sIntegerLibraryType    :: IntegerLibrary,
-  sGhcWithInterpreter    :: Bool,
-  sGhcWithNativeCodeGen  :: Bool,
-  sGhcWithSMP            :: Bool,
-  sGhcRTSWays            :: String,
-  sTablesNextToCode      :: Bool,
-  sLeadingUnderscore     :: Bool,
-  sLibFFI                :: Bool,
-  sGhcThreaded           :: Bool,
-  sGhcDebugged           :: Bool,
-  sGhcRtsWithLibdw       :: Bool
- }
+-----------------------------------------------------------------------------
+-- Accessessors from 'DynFlags'
 
 targetPlatform :: DynFlags -> Platform
 targetPlatform dflags = sTargetPlatform (settings dflags)
@@ -2671,14 +2664,16 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
-setPgmP   f = let (pgm:args) = words f in alterSettings (\s -> s { sPgm_P   = (pgm, map Option args)})
-addOptl   f = alterSettings (\s -> s { sOpt_l   = f : sOpt_l s})
-addOptc   f = alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})
-addOptcxx f = alterSettings (\s -> s { sOpt_cxx = f : sOpt_cxx s})
-addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s
-                                     , sOpt_P_fingerprint = fingerprintStrings (f : sOpt_P s)
-                                     })
-                                     -- See Note [Repeated -optP hashing]
+setPgmP   f = alterToolSettings (\s -> s { toolSettings_pgm_P   = (pgm, map Option args)})
+  where (pgm:args) = words f
+addOptl   f = alterToolSettings (\s -> s { toolSettings_opt_l   = f : toolSettings_opt_l s})
+addOptc   f = alterToolSettings (\s -> s { toolSettings_opt_c   = f : toolSettings_opt_c s})
+addOptcxx f = alterToolSettings (\s -> s { toolSettings_opt_cxx = f : toolSettings_opt_cxx s})
+addOptP   f = alterToolSettings $ \s -> s
+          { toolSettings_opt_P   = f : toolSettings_opt_P s
+          , toolSettings_opt_P_fingerprint = fingerprintStrings (f : toolSettings_opt_P s)
+          }
+          -- See Note [Repeated -optP hashing]
   where
   fingerprintStrings ss = fingerprintFingerprints $ map fingerprintString ss
 
@@ -2709,27 +2704,6 @@ addHaddockOpts f d = d { haddockOptions = Just f}
 addGhciScript f d = d { ghciScripts = f : ghciScripts d}
 
 setInteractivePrint f d = d { interactivePrint = Just f}
-
--- -----------------------------------------------------------------------------
--- Command-line options
-
--- | When invoking external tools as part of the compilation pipeline, we
--- pass these a sequence of options on the command-line. Rather than
--- just using a list of Strings, we use a type that allows us to distinguish
--- between filepaths and 'other stuff'. The reason for this is that
--- this type gives us a handle on transforming filenames, and filenames only,
--- to whatever format they're expected to be on a particular platform.
-data Option
- = FileOption -- an entry that _contains_ filename(s) / filepaths.
-              String  -- a non-filepath prefix that shouldn't be
-                      -- transformed (e.g., "/out=")
-              String  -- the filepath/filename portion
- | Option     String
- deriving ( Eq )
-
-showOpt :: Option -> String
-showOpt (FileOption pre f) = pre ++ f
-showOpt (Option s)  = s
 
 -----------------------------------------------------------------------------
 -- Setting the optimisation level
@@ -3031,64 +3005,66 @@ dynamic_flags_deps = [
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
   , make_ord_flag defFlag "pgmlo"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lo  = (f,[]) }
   , make_ord_flag defFlag "pgmlc"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_lc  = (f,[]) }
   , make_ord_flag defFlag "pgmi"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_i  =  f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_i   =  f }
   , make_ord_flag defFlag "pgmL"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_L   = f }
   , make_ord_flag defFlag "pgmP"
       (hasArg setPgmP)
   , make_ord_flag defFlag "pgmF"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[]),
-                                              -- Don't pass -no-pie with -pgmc
-                                              -- (see #15319)
-                                              sGccSupportsNoPie = False})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s
+         { toolSettings_pgm_c   = (f,[])
+         , -- Don't pass -no-pie with -pgmc
+           -- (see #15319)
+           toolSettings_ccSupportsNoPie = False
+         }
   , make_ord_flag defFlag "pgms"
       (HasArg (\_ -> addWarn "Object splitting was removed in GHC 8.8"))
   , make_ord_flag defFlag "pgma"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_a   = (f,[]) }
   , make_ord_flag defFlag "pgml"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_l   = (f,[]) }
   , make_ord_flag defFlag "pgmdll"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_dll = (f,[]) }
   , make_ord_flag defFlag "pgmwindres"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_windres = f }
   , make_ord_flag defFlag "pgmlibtool"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_libtool = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_libtool = f }
   , make_ord_flag defFlag "pgmar"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_ar = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ar = f }
   , make_ord_flag defFlag "pgmranlib"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_ranlib = f})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ranlib = f }
 
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
   , make_ord_flag defFlag "optlo"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lo  = f : toolSettings_opt_lo s }
   , make_ord_flag defFlag "optlc"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_lc  = f : toolSettings_opt_lc s }
   , make_ord_flag defFlag "opti"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_i   = f : sOpt_i s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_i   = f : toolSettings_opt_i s }
   , make_ord_flag defFlag "optL"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_L   = f : toolSettings_opt_L s }
   , make_ord_flag defFlag "optP"
       (hasArg addOptP)
   , make_ord_flag defFlag "optF"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_F   = f : toolSettings_opt_F s }
   , make_ord_flag defFlag "optc"
       (hasArg addOptc)
   , make_ord_flag defFlag "optcxx"
       (hasArg addOptcxx)
   , make_ord_flag defFlag "opta"
-      (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_opt_a   = f : toolSettings_opt_a s }
   , make_ord_flag defFlag "optl"
       (hasArg addOptl)
   , make_ord_flag defFlag "optwindres"
-      (hasArg (\f ->
-        alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
+      $ hasArg $ \f ->
+        alterToolSettings $ \s -> s { toolSettings_opt_windres = f : toolSettings_opt_windres s }
 
   , make_ord_flag defGhcFlag "split-objs"
       (NoArg $ addWarn "ignoring -split-objs")
@@ -5110,6 +5086,12 @@ unSetExtensionFlag' f dflags = xopt_unset dflags f
 alterSettings :: (Settings -> Settings) -> DynFlags -> DynFlags
 alterSettings f dflags = dflags { settings = f (settings dflags) }
 
+alterFileSettings :: (FileSettings -> FileSettings) -> DynFlags -> DynFlags
+alterFileSettings = alterSettings . \f settings -> settings { sFileSettings = f (sFileSettings settings) }
+
+alterToolSettings :: (ToolSettings -> ToolSettings) -> DynFlags -> DynFlags
+alterToolSettings = alterSettings . \f settings -> settings { sToolSettings = f (sToolSettings settings) }
+
 --------------------------
 setDumpFlag' :: DumpFlag -> DynP ()
 setDumpFlag' dump_flag
@@ -5545,7 +5527,7 @@ splitPathList s = filter notNull (splitUp s)
 -- tmpDir, where we store temporary files.
 
 setTmpDir :: FilePath -> DynFlags -> DynFlags
-setTmpDir dir = alterSettings (\s -> s { sTmpDir = normalise dir })
+setTmpDir dir = alterFileSettings $ \s -> s { fileSettings_tmpDir = normalise dir }
   -- we used to fix /cygdrive/c/.. on Windows, but this doesn't
   -- seem necessary now --SDM 7/2/2008
 
