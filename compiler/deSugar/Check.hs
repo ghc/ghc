@@ -25,6 +25,7 @@ module Check (
 import GhcPrelude
 
 import TmOracle
+import PmPpr
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -1672,11 +1673,6 @@ mkGuard pv e = do
      | PmExprOther {} <- expr -> pure PmFake
      | otherwise              -> pure (PmGrd pv expr)
 
--- | Create a term equality of the form: `(False ~ (x ~ lit))`
-mkNegEq :: Id -> PmLit -> ComplexEq
-mkNegEq x l = (falsePmExpr, PmExprVar (idName x) `PmExprEq` PmExprLit l)
-{-# INLINE mkNegEq #-}
-
 -- | Create a term equality of the form: `(x ~ lit)`
 mkPosEq :: Id -> PmLit -> ComplexEq
 mkPosEq x l = (PmExprVar (idName x), PmExprLit l)
@@ -2116,7 +2112,8 @@ pmcheckHd (p@(PmLit l)) ps guards (PmVar x) (ValVec vva delta)
                              ValVec vva (delta {delta_tm_cs = tm_state})
           Nothing       -> return mempty
   where
-    us | Just tm_state <- solveOneEq (delta_tm_cs delta) (mkNegEq x l)
+    -- See Note [Refutable shapes] in TmOracle
+    us | Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x (PmAltLit l)
        = [ValVec (PmNLit x [l] : vva) (delta { delta_tm_cs = tm_state })]
        | otherwise = []
 
@@ -2136,7 +2133,8 @@ pmcheckHd (p@(PmLit l)) ps guards
                 (ValVec vva (delta { delta_tm_cs = tm_state }))
   | otherwise = return non_matched
   where
-    us | Just tm_state <- solveOneEq (delta_tm_cs delta) (mkNegEq x l)
+    -- See Note [Refutable shapes] in TmOracle
+    us | Just tm_state <- addSolveRefutableAltCon (delta_tm_cs delta) x (PmAltLit l)
        = [ValVec (PmNLit x (l:lits) : vva) (delta { delta_tm_cs = tm_state })]
        | otherwise = []
 
@@ -2478,20 +2476,14 @@ isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
 
 instance Outputable ValVec where
   ppr (ValVec vva delta)
-    = let (residual_eqs, subst) = wrapUpTmState (delta_tm_cs delta)
-          vector                = substInValAbs subst vva
-      in  ppr_uncovered (vector, residual_eqs)
+    = let (subst, refuts) = wrapUpTmState (delta_tm_cs delta)
+          vector          = substInValAbs subst vva
+      in  pprUncovered (vector, refuts)
 
 -- | Apply a term substitution to a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
 substInValAbs :: PmVarEnv -> [ValAbs] -> [PmExpr]
 substInValAbs subst = map (exprDeepLookup subst . vaToPmExpr)
-
--- | Wrap up the term oracle's state once solving is complete. Drop any
--- information about unhandled constraints (involving HsExprs) and flatten
--- (height 1) the substitution.
-wrapUpTmState :: TmState -> ([ComplexEq], PmVarEnv)
-wrapUpTmState (residual, (_, subst)) = (residual, flattenPmVarEnv subst)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
@@ -2532,10 +2524,11 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     maxPatterns = maxUncoveredPatterns dflags
 
     -- Print a single clause (for redundant/with-inaccessible-rhs)
-    pprEqn q txt = pp_context True ctx (text txt) $ \f -> ppr_eqn f kind q
+    pprEqn q txt = pprContext True ctx (text txt) $ \f ->
+      f (pprPats kind (map unLoc q))
 
     -- Print several clauses (for uncovered clauses)
-    pprEqns qs = pp_context False ctx (text "are non-exhaustive") $ \_ ->
+    pprEqns qs = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       case qs of -- See #11245
            [ValVec [] _]
                     -> text "Guards do not cover entire pattern space"
@@ -2546,7 +2539,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
 
     -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
     -- which we only know the type and have no inhabitants at hand)
-    warnEmptyCase ty = pp_context False ctx (text "are non-exhaustive") $ \_ ->
+    warnEmptyCase ty = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
 
 {- Note [Inaccessible warnings for record updates]
@@ -2618,8 +2611,8 @@ exhaustiveWarningFlag (StmtCtxt {}) = Nothing -- Don't warn about incomplete pat
                                        -- incomplete
 
 -- True <==> singular
-pp_context :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
-pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
+pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
+pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
   = vcat [text txt <+> msg,
           sep [ text "In" <+> ppr_match <> char ':'
               , nest 4 (rest_of_msg_fun pref)]]
@@ -2633,25 +2626,9 @@ pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)
 
-ppr_pats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
-ppr_pats kind pats
+pprPats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
+pprPats kind pats
   = sep [sep (map ppr pats), matchSeparator kind, text "..."]
-
-ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> [LPat GhcTc] -> SDoc
-ppr_eqn prefixF kind eqn = prefixF (ppr_pats kind (map unLoc eqn))
-
-ppr_constraint :: (SDoc,[PmLit]) -> SDoc
-ppr_constraint (var, lits) = var <+> text "is not one of"
-                                 <+> braces (pprWithCommas ppr lits)
-
-ppr_uncovered :: ([PmExpr], [ComplexEq]) -> SDoc
-ppr_uncovered (expr_vec, complex)
-  | null cs   = fsep vec -- there are no literal constraints
-  | otherwise = hang (fsep vec) 4 $
-                  text "where" <+> vcat (map ppr_constraint cs)
-  where
-    sdoc_vec = mapM pprPmExprWithParens expr_vec
-    (vec,cs) = runPmPprM sdoc_vec (filterComplex complex)
 
 {- Note [Representation of Term Equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
