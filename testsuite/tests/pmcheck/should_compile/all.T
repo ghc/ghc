@@ -120,3 +120,5 @@ test('EmptyCase009', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('EmptyCase010', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('PmExprVars', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
