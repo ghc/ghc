@@ -106,7 +106,7 @@ buildGhciLibO root ghcilibPath = do
 
 -- | Return all Haskell and non-Haskell object files for the given 'Context'.
 allObjects :: Context -> Action [FilePath]
-allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
+allObjects context = (++) <$> hsObjects context <*> nonHsObjects context
 
 -- | Return all the non-Haskell object files for the given library context
 -- (object files built from C, C-- and sometimes other things).
@@ -139,10 +139,10 @@ extraObjects context
 -- the given 'Context'.
 libraryObjects :: Context -> Action [FilePath]
 libraryObjects context@Context{..} = do
-    hsObjs   <- hsObjects    context
     noHsObjs <- nonHsObjects context
-    need $ noHsObjs ++ hsObjs
-    return (noHsObjs ++ hsObjs)
+    hsObjs   <- hsObjects    context
+    need $ hsObjs ++ noHsObjs
+    return (hsObjs ++ noHsObjs)
 
 -- | Return extra library targets.
 extraTargets :: Context -> Action [FilePath]
