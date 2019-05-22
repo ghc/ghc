@@ -68,6 +68,7 @@ import PrelNames        ( rOOT_MAIN )
 import BasicTypes       ( pprWarningTxtForMsg, TopLevelFlag(..))
 import SrcLoc
 import Outputable
+import UniqSet          ( uniqSetAny )
 import Util
 import Maybes
 import DynFlags
@@ -1462,7 +1463,9 @@ lookupBindGroupOcc ctxt what rdr_name
       RoleAnnotCtxt ns -> lookup_top (`elemNameSet` ns)
       LocalBindCtxt ns -> lookup_group ns
       ClsDeclCtxt  cls -> lookup_cls_op cls
-      InstDeclCtxt ns  -> lookup_top (`elemNameSet` ns)
+      InstDeclCtxt ns  -> if uniqSetAny isUnboundName ns -- #16610
+                          then return (Right $ mkUnboundNameRdr rdr_name)
+                          else lookup_top (`elemNameSet` ns)
   where
     lookup_cls_op cls
       = lookupSubBndrOcc True cls doc rdr_name
