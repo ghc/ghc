@@ -8,7 +8,8 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
+  pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -354,6 +355,21 @@ idHsWrapper = WpHole
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
+
+-- | Is the wrapper erasable, i.e., will not affect runtime semantics?
+isErasableHsWrapper :: HsWrapper -> Bool
+isErasableHsWrapper = go
+  where
+    go WpHole                  = True
+    go (WpCompose wrap1 wrap2) = go wrap1 && go wrap2
+    -- not so sure about WpFun. But it eta-expands, so...
+    go WpFun{}                 = False
+    go WpCast{}                = True
+    go WpEvLam{}               = False -- case in point
+    go WpEvApp{}               = False
+    go WpTyLam{}               = True
+    go WpTyApp{}               = True
+    go WpLet{}                 = False
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
