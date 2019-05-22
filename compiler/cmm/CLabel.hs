@@ -1162,7 +1162,7 @@ pprCLabel dynFlags (AsmTempLabel u)
   =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
 
 pprCLabel dynFlags (AsmTempDerivedLabel l suf)
- | sGhcWithNativeCodeGen $ settings dynFlags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
    = ptext (asmTempLabelPrefix $ targetPlatform dynFlags)
      <> case l of AsmTempLabel u    -> pprUniqueAlways u
                   LocalBlockLabel u -> pprUniqueAlways u
@@ -1170,15 +1170,15 @@ pprCLabel dynFlags (AsmTempDerivedLabel l suf)
      <> ftext suf
 
 pprCLabel dynFlags (DynamicLinkerLabel info lbl)
- | sGhcWithNativeCodeGen $ settings dynFlags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
    = pprDynamicLinkerAsmLabel (targetPlatform dynFlags) info lbl
 
 pprCLabel dynFlags PicBaseLabel
- | sGhcWithNativeCodeGen $ settings dynFlags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
    = text "1b"
 
 pprCLabel dynFlags (DeadStripPreventer lbl)
- | sGhcWithNativeCodeGen $ settings dynFlags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
    =
    {-
       `lbl` can be temp one but we need to ensure that dsp label will stay
@@ -1190,18 +1190,18 @@ pprCLabel dynFlags (DeadStripPreventer lbl)
    <> pprCLabel dynFlags lbl <> text "_dsp"
 
 pprCLabel dynFlags (StringLitLabel u)
- | sGhcWithNativeCodeGen $ settings dynFlags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dynFlags
   = pprUniqueAlways u <> ptext (sLit "_str")
 
 pprCLabel dynFlags lbl
    = getPprStyle $ \ sty ->
-     if sGhcWithNativeCodeGen (settings dynFlags) && asmStyle sty
+     if platformMisc_ghcWithNativeCodeGen (platformMisc dynFlags) && asmStyle sty
      then maybe_underscore dynFlags $ pprAsmCLbl (targetPlatform dynFlags) lbl
      else pprCLbl lbl
 
 maybe_underscore :: DynFlags -> SDoc -> SDoc
 maybe_underscore dynFlags doc =
-  if sLeadingUnderscore $ settings dynFlags
+  if platformMisc_leadingUnderscore $ platformMisc dynFlags
   then pp_cSEP <> doc
   else doc
 

@@ -155,7 +155,7 @@ outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
           -> Stream IO RawCmmGroup ()
           -> IO ()
 outputAsm dflags this_mod location filenm cmm_stream
- | sGhcWithNativeCodeGen $ settings dflags
+ | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
@@ -226,7 +226,7 @@ outputForeignStubs dflags mod location stubs
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
-              | sLibFFI $ settings dflags = "#include \"ffi.h\"\n"
+              | platformMisc_libFFI $ platformMisc dflags = "#include \"ffi.h\"\n"
               | otherwise = ""
 
         stub_h_file_exists

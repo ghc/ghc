@@ -147,8 +147,9 @@ module DynFlags (
         GhcNameVersion(..),
         FileSettings(..),
         PlatformMisc(..),
-        targetPlatform, programName, projectVersion,
-        ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
+        settings,
+        programName, projectVersion,
+        ghcUsagePath, ghciUsagePath, topDir, tmpDir,
         versionedAppDir,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
@@ -943,7 +944,16 @@ data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
-  settings              :: Settings,
+
+  -- formerly Settings
+  ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
+  fileSettings      :: {-# UNPACK #-} !FileSettings,
+  targetPlatform    :: Platform,       -- Filled in by SysTools
+  toolSettings      :: {-# UNPACK #-} !ToolSettings,
+  platformMisc      :: {-# UNPACK #-} !PlatformMisc,
+  platformConstants :: PlatformConstants,
+  rawSettings       :: [(String, String)],
+
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
     --   by GHC-API users. See Note [The integer library] in PrelNames
@@ -1372,95 +1382,106 @@ type LlvmConfig = (LlvmTargets, LlvmPasses)
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
 
-targetPlatform :: DynFlags -> Platform
-targetPlatform dflags = sTargetPlatform (settings dflags)
+-- | "unbuild" a 'Settings' from a 'DynFlags'. This shouldn't be needed in the
+-- vast majority of code. But GHCi questionably uses this to produce a default
+-- 'DynFlags' from which to compute a flags diff for printing.
+settings :: DynFlags -> Settings
+settings dflags = Settings
+  { sGhcNameVersion = ghcNameVersion dflags
+  , sFileSettings = fileSettings dflags
+  , sTargetPlatform = targetPlatform dflags
+  , sToolSettings = toolSettings dflags
+  , sPlatformMisc = platformMisc dflags
+  , sPlatformConstants = platformConstants dflags
+  , sRawSettings = rawSettings dflags
+  }
+
 programName :: DynFlags -> String
-programName dflags = sProgramName (settings dflags)
+programName dflags = ghcNameVersion_programName $ ghcNameVersion dflags
 projectVersion :: DynFlags -> String
-projectVersion dflags = sProjectVersion (settings dflags)
+projectVersion dflags = ghcNameVersion_projectVersion (ghcNameVersion dflags)
 ghcUsagePath          :: DynFlags -> FilePath
-ghcUsagePath dflags = sGhcUsagePath (settings dflags)
+ghcUsagePath dflags = fileSettings_ghcUsagePath $ fileSettings dflags
 ghciUsagePath         :: DynFlags -> FilePath
-ghciUsagePath dflags = sGhciUsagePath (settings dflags)
+ghciUsagePath dflags = fileSettings_ghciUsagePath $ fileSettings dflags
 toolDir               :: DynFlags -> Maybe FilePath
-toolDir dflags = sToolDir (settings dflags)
+toolDir dflags = fileSettings_toolDir $ fileSettings dflags
 topDir                :: DynFlags -> FilePath
-topDir dflags = sTopDir (settings dflags)
+topDir dflags = fileSettings_topDir $ fileSettings dflags
 tmpDir                :: DynFlags -> String
-tmpDir dflags = sTmpDir (settings dflags)
-rawSettings           :: DynFlags -> [(String, String)]
-rawSettings dflags = sRawSettings (settings dflags)
+tmpDir dflags = fileSettings_tmpDir $ fileSettings dflags
 extraGccViaCFlags     :: DynFlags -> [String]
-extraGccViaCFlags dflags = sExtraGccViaCFlags (settings dflags)
+extraGccViaCFlags dflags = toolSettings_extraGccViaCFlags $ toolSettings dflags
 systemPackageConfig   :: DynFlags -> FilePath
-systemPackageConfig dflags = sSystemPackageConfig (settings dflags)
+systemPackageConfig dflags = fileSettings_systemPackageConfig $ fileSettings dflags
 pgm_L                 :: DynFlags -> String
-pgm_L dflags = sPgm_L (settings dflags)
+pgm_L dflags = toolSettings_pgm_L $ toolSettings dflags
 pgm_P                 :: DynFlags -> (String,[Option])
-pgm_P dflags = sPgm_P (settings dflags)
+pgm_P dflags = toolSettings_pgm_P $ toolSettings dflags
 pgm_F                 :: DynFlags -> String
-pgm_F dflags = sPgm_F (settings dflags)
+pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
 pgm_c                 :: DynFlags -> (String,[Option])
-pgm_c dflags = sPgm_c (settings dflags)
+pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
-pgm_a dflags = sPgm_a (settings dflags)
+pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
 pgm_l                 :: DynFlags -> (String,[Option])
-pgm_l dflags = sPgm_l (settings dflags)
+pgm_l dflags = toolSettings_pgm_l $ toolSettings dflags
 pgm_dll               :: DynFlags -> (String,[Option])
-pgm_dll dflags = sPgm_dll (settings dflags)
+pgm_dll dflags = toolSettings_pgm_dll $ toolSettings dflags
 pgm_T                 :: DynFlags -> String
-pgm_T dflags = sPgm_T (settings dflags)
+pgm_T dflags = toolSettings_pgm_T $ toolSettings dflags
 pgm_windres           :: DynFlags -> String
-pgm_windres dflags = sPgm_windres (settings dflags)
+pgm_windres dflags = toolSettings_pgm_windres $ toolSettings dflags
 pgm_libtool           :: DynFlags -> String
-pgm_libtool dflags = sPgm_libtool (settings dflags)
+pgm_libtool dflags = toolSettings_pgm_libtool $ toolSettings dflags
 pgm_lcc               :: DynFlags -> (String,[Option])
-pgm_lcc dflags = sPgm_lcc (settings dflags)
+pgm_lcc dflags = toolSettings_pgm_lcc $ toolSettings dflags
 pgm_ar                :: DynFlags -> String
-pgm_ar dflags = sPgm_ar (settings dflags)
+pgm_ar dflags = toolSettings_pgm_ar $ toolSettings dflags
 pgm_ranlib            :: DynFlags -> String
-pgm_ranlib dflags = sPgm_ranlib (settings dflags)
+pgm_ranlib dflags = toolSettings_pgm_ranlib $ toolSettings dflags
 pgm_lo                :: DynFlags -> (String,[Option])
-pgm_lo dflags = sPgm_lo (settings dflags)
+pgm_lo dflags = toolSettings_pgm_lo $ toolSettings dflags
 pgm_lc                :: DynFlags -> (String,[Option])
-pgm_lc dflags = sPgm_lc (settings dflags)
+pgm_lc dflags = toolSettings_pgm_lc $ toolSettings dflags
 pgm_i                 :: DynFlags -> String
-pgm_i dflags = sPgm_i (settings dflags)
+pgm_i dflags = toolSettings_pgm_i $ toolSettings dflags
 opt_L                 :: DynFlags -> [String]
-opt_L dflags = sOpt_L (settings dflags)
+opt_L dflags = toolSettings_opt_L $ toolSettings dflags
 opt_P                 :: DynFlags -> [String]
 opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
-            ++ sOpt_P (settings dflags)
+            ++ toolSettings_opt_P (toolSettings dflags)
 
 -- This function packages everything that's needed to fingerprint opt_P
 -- flags. See Note [Repeated -optP hashing].
 opt_P_signature       :: DynFlags -> ([String], Fingerprint)
 opt_P_signature dflags =
   ( concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
-  , sOpt_P_fingerprint (settings dflags))
+  , toolSettings_opt_P_fingerprint $ toolSettings dflags
+  )
 
 opt_F                 :: DynFlags -> [String]
-opt_F dflags = sOpt_F (settings dflags)
+opt_F dflags= toolSettings_opt_F $ toolSettings dflags
 opt_c                 :: DynFlags -> [String]
 opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
-            ++ sOpt_c (settings dflags)
+            ++ toolSettings_opt_c (toolSettings dflags)
 opt_cxx               :: DynFlags -> [String]
-opt_cxx dflags = sOpt_cxx (settings dflags)
+opt_cxx dflags= toolSettings_opt_cxx $ toolSettings dflags
 opt_a                 :: DynFlags -> [String]
-opt_a dflags = sOpt_a (settings dflags)
+opt_a dflags= toolSettings_opt_a $ toolSettings dflags
 opt_l                 :: DynFlags -> [String]
 opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (ways dflags)
-            ++ sOpt_l (settings dflags)
+            ++ toolSettings_opt_l (toolSettings dflags)
 opt_windres           :: DynFlags -> [String]
-opt_windres dflags = sOpt_windres (settings dflags)
+opt_windres dflags= toolSettings_opt_windres $ toolSettings dflags
 opt_lcc                :: DynFlags -> [String]
-opt_lcc dflags = sOpt_lcc (settings dflags)
+opt_lcc dflags= toolSettings_opt_lcc $ toolSettings dflags
 opt_lo                :: DynFlags -> [String]
-opt_lo dflags = sOpt_lo (settings dflags)
+opt_lo dflags= toolSettings_opt_lo $ toolSettings dflags
 opt_lc                :: DynFlags -> [String]
-opt_lc dflags = sOpt_lc (settings dflags)
+opt_lc dflags= toolSettings_opt_lc $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
-opt_i dflags = sOpt_i (settings dflags)
+opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
@@ -1626,18 +1647,19 @@ instance Outputable PackageFlag where
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
 
-defaultHscTarget :: Settings -> HscTarget
-defaultHscTarget = defaultObjectTarget
-
 -- | The 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
-defaultObjectTarget :: Settings -> HscTarget
-defaultObjectTarget settings
-  | platformUnregisterised platform     =  HscC
-  | sGhcWithNativeCodeGen settings      =  HscAsm
-  | otherwise                           =  HscLlvm
-  where
-    platform = sTargetPlatform settings
+
+defaultHscTarget :: Platform -> PlatformMisc -> HscTarget
+defaultHscTarget platform pMisc
+  | platformUnregisterised platform = HscC
+  | platformMisc_ghcWithNativeCodeGen pMisc = HscAsm
+  | otherwise = HscLlvm
+
+defaultObjectTarget :: DynFlags -> HscTarget
+defaultObjectTarget dflags = defaultHscTarget
+  (targetPlatform dflags)
+  (platformMisc dflags)
 
 -- Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
@@ -1646,7 +1668,7 @@ defaultObjectTarget settings
 tablesNextToCode :: DynFlags -> Bool
 tablesNextToCode dflags =
     not (platformUnregisterised $ targetPlatform dflags) &&
-    sTablesNextToCode (settings dflags)
+    platformMisc_tablesNextToCode (platformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -1900,7 +1922,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget mySettings,
+        hscTarget               = defaultHscTarget (sTargetPlatform mySettings) (sPlatformMisc mySettings),
         integerLibrary          = sIntegerLibraryType mySettings,
         verbosity               = 0,
         optLevel                = 0,
@@ -1997,7 +2019,15 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
         splitInfo               = Nothing,
-        settings                = mySettings,
+
+        ghcNameVersion = sGhcNameVersion mySettings,
+        fileSettings = sFileSettings mySettings,
+        toolSettings = sToolSettings mySettings,
+        targetPlatform = sTargetPlatform mySettings,
+        platformMisc = sPlatformMisc mySettings,
+        platformConstants = sPlatformConstants mySettings,
+        rawSettings = sRawSettings mySettings,
+
         llvmTargets             = myLlvmTargets,
         llvmPasses              = myLlvmPasses,
 
@@ -3708,8 +3738,10 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
   , make_ord_flag defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
-  , make_ord_flag defFlag "fobject-code"     (NoArg (setTargetWithSettings
-                                                             defaultHscTarget))
+  , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
+      dflags <- liftEwM getCmdLineState
+      setTarget $ defaultObjectTarget dflags
+
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
   , make_dep_flag defFlag "fno-glasgow-exts"
@@ -5083,14 +5115,11 @@ unSetExtensionFlag' f dflags = xopt_unset dflags f
    --      (except for -fno-glasgow-exts, which is treated specially)
 
 --------------------------
-alterSettings :: (Settings -> Settings) -> DynFlags -> DynFlags
-alterSettings f dflags = dflags { settings = f (settings dflags) }
-
 alterFileSettings :: (FileSettings -> FileSettings) -> DynFlags -> DynFlags
-alterFileSettings = alterSettings . \f settings -> settings { sFileSettings = f (sFileSettings settings) }
+alterFileSettings f dynFlags = dynFlags { fileSettings = f (fileSettings dynFlags) }
 
 alterToolSettings :: (ToolSettings -> ToolSettings) -> DynFlags -> DynFlags
-alterToolSettings = alterSettings . \f settings -> settings { sToolSettings = f (sToolSettings settings) }
+alterToolSettings f dynFlags = dynFlags { toolSettings = f (toolSettings dynFlags) }
 
 --------------------------
 setDumpFlag' :: DumpFlag -> DynP ()
@@ -5397,15 +5426,10 @@ interpretPackageEnv dflags = do
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
 setTarget :: HscTarget -> DynP ()
-setTarget l = setTargetWithSettings (const l)
-
-setTargetWithSettings :: (Settings -> HscTarget) -> DynP ()
-setTargetWithSettings f = upd set
-  where
-   set dfs = let l = f (settings dfs)
-             in if ghcLink dfs /= LinkBinary || isObjectTarget l
-                then dfs{ hscTarget = l }
-                else dfs
+setTarget l = upd $ \ dfs ->
+  if ghcLink dfs /= LinkBinary || isObjectTarget l
+  then dfs{ hscTarget = l }
+  else dfs
 
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
@@ -5594,7 +5618,7 @@ picCCOpts dflags = pieOpts ++ picOpts
     pieOpts
       | gopt Opt_PICExecutable dflags       = ["-pie"]
         -- See Note [No PIE when linking]
-      | sGccSupportsNoPie (settings dflags) = ["-no-pie"]
+      | toolSettings_ccSupportsNoPie (toolSettings dflags) = ["-no-pie"]
       | otherwise                           = []
 
 
@@ -5633,14 +5657,14 @@ compilerInfo dflags
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
-       ("Target platform",             sTargetPlatformString $ settings dflags),
-       ("Have interpreter",            showBool $ sGhcWithInterpreter $ settings dflags),
+       ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
+       ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ sGhcWithNativeCodeGen $ settings dflags),
-       ("Support SMP",                 showBool $ sGhcWithSMP $ settings dflags),
-       ("Tables next to code",         showBool $ sTablesNextToCode $ settings dflags),
-       ("RTS ways",                    sGhcRTSWays $ settings dflags),
-       ("RTS expects libdw",           showBool $ sGhcRtsWithLibdw $ settings dflags),
+       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
+       ("Support SMP",                 showBool $ platformMisc_ghcWithSMP $ platformMisc dflags),
+       ("Tables next to code",         showBool $ platformMisc_tablesNextToCode $ platformMisc dflags),
+       ("RTS ways",                    platformMisc_ghcRTSWays $ platformMisc dflags),
+       ("RTS expects libdw",           showBool $ platformMisc_ghcRtsWithLibdw $ platformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5667,7 +5691,7 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Leading underscore",          showBool $ sLeadingUnderscore $ settings dflags),
+       ("Leading underscore",          showBool $ platformMisc_leadingUnderscore $ platformMisc dflags),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
@@ -5758,7 +5782,7 @@ makeDynFlagsConsistent dflags
       in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if sGhcWithNativeCodeGen $ settings dflags
+    = if platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
            in loop dflags' warn
@@ -5774,7 +5798,7 @@ makeDynFlagsConsistent dflags
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"
  | hscTarget dflags == HscAsm &&
-   not (sGhcWithNativeCodeGen $ settings dflags)
+   not (platformMisc_ghcWithNativeCodeGen $ platformMisc dflags)
       = let dflags' = dflags { hscTarget = HscLlvm }
             warn = "No native code generator, so using LLVM"
         in loop dflags' warn

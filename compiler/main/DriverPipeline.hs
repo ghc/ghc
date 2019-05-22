@@ -59,6 +59,7 @@ import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
 import Platform
 import TcRnTypes
+import ToolSettings
 import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
@@ -373,7 +374,7 @@ link ghcLink dflags
   = lookupHook linkHook l dflags ghcLink dflags
   where
     l LinkInMemory _ _ _
-      = if sGhcWithInterpreter $ settings dflags
+      = if platformMisc_ghcWithInterpreter $ platformMisc dflags
         then -- Not Linking...(demand linker will do the job)
              return Succeeded
         else panicBadLink LinkInMemory
@@ -1605,7 +1606,7 @@ linkBinary = linkBinary' False
 linkBinary' :: Bool -> DynFlags -> [FilePath] -> [InstalledUnitId] -> IO ()
 linkBinary' staticLink dflags o_files dep_packages = do
     let platform = targetPlatform dflags
-        mySettings = settings dflags
+        toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
         output_fn = exeFileName staticLink dflags
 
@@ -1761,7 +1762,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       -- like
                       --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
                       -- on x86.
-                      ++ (if sLdSupportsCompactUnwind mySettings &&
+                      ++ (if toolSettings_ldSupportsCompactUnwind toolSettings' &&
                              not staticLink &&
                              (platformOS platform == OSDarwin) &&
                              case platformArch platform of
@@ -1785,7 +1786,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
-                      ++ (if sLdIsGnuLd mySettings &&
+                      ++ (if toolSettings_ldIsGnuLd toolSettings' &&
                              not (gopt Opt_WholeArchiveHsLibs dflags)
                           then ["-Wl,--gc-sections"]
                           else [])
@@ -1912,7 +1913,7 @@ linkStaticLib dflags o_files dep_packages = do
         <$> (Archive <$> mapM loadObj modules)
         <*> mapM loadAr archives
 
-  if sLdIsGnuLd (settings dflags)
+  if toolSettings_ldIsGnuLd (toolSettings dflags)
     then writeGNUAr output_fn $ afilter (not . isGNUSymdef) ar
     else writeBSDAr output_fn $ afilter (not . isBSDSymdef) ar
 
@@ -2085,15 +2086,15 @@ none of this can be used in that case.
 
 joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
 joinObjectFiles dflags o_files output_fn = do
-  let mySettings = settings dflags
-      ldIsGnuLd = sLdIsGnuLd mySettings
+  let toolSettings' = toolSettings dflags
+      ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       osInfo = platformOS (targetPlatform dflags)
       ld_r args cc = SysTools.runLink dflags ([
                        SysTools.Option "-nostdlib",
                        SysTools.Option "-Wl,-r"
                      ]
                         -- See Note [No PIE while linking] in DynFlags
-                     ++ (if sGccSupportsNoPie mySettings
+                     ++ (if toolSettings_ccSupportsNoPie toolSettings'
                           then [SysTools.Option "-no-pie"]
                           else [])
 
@@ -2124,7 +2125,7 @@ joinObjectFiles dflags o_files output_fn = do
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
-      ld_build_id | sLdSupportsBuildId mySettings = ["-Wl,--build-id=none"]
+      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["-Wl,--build-id=none"]
                   | otherwise                     = []
 
   ccInfo <- getCompilerInfo dflags
@@ -2135,7 +2136,7 @@ joinObjectFiles dflags o_files output_fn = do
           let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
           ld_r [SysTools.FileOption "" script] ccInfo
-     else if sLdSupportsFilelist mySettings
+     else if toolSettings_ldSupportsFilelist toolSettings'
      then do
           filelist <- newTempName dflags TFL_CurrentModule "filelist"
           writeFile filelist $ unlines o_files
