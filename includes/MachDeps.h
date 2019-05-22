@@ -34,7 +34,7 @@
  * configuration from 'targetPlatform :: DynFlags -> Platform'
  * record. A few wrappers are already defined and used throughout GHC:
  *    wORD_SIZE :: DynFlags -> Int
- *    wORD_SIZE dflags = pc_WORD_SIZE (sPlatformConstants (settings dflags))
+ *    wORD_SIZE dflags = pc_WORD_SIZE (platformConstants dflags)
  *
  * Hence we hide these macros from -DSTAGE=1
  */

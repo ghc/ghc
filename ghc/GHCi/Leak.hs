@@ -68,7 +68,7 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
               show (maskTagBits addr))
 
   tagBits
-    | target32Bit (sTargetPlatform (settings dflags)) = 2
+    | target32Bit (targetPlatform dflags) = 2
     | otherwise = 3
 
   maskTagBits :: Ptr a -> Ptr a
