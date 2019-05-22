@@ -12,9 +12,10 @@ module ListSetOps (
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
+        assocAlter,
 
         -- Duplicate handling
-        hasNoDups, removeDups, findDupsEq,
+        hasNoDups, removeDups, findDupsEq, insertNoDup,
         equivClasses,
 
         -- Indexing
@@ -27,6 +28,7 @@ import GhcPrelude
 
 import Outputable
 import Util
+import Maybes (listToMaybe)
 
 import Data.List
 import qualified Data.List.NonEmpty as NE
@@ -103,6 +105,7 @@ assocDefault      :: (Eq a) => b -> Assoc a b -> a -> b
 assocUsing        :: (a -> a -> Bool) -> String -> Assoc a b -> a -> b
 assocMaybe        :: (Eq a) => Assoc a b -> a -> Maybe b
 assocDefaultUsing :: (a -> a -> Bool) -> b -> Assoc a b -> a -> b
+assocAlter        :: (Eq a) => (Maybe b -> Maybe b) -> a -> Assoc a b -> Assoc a b
 
 assocDefaultUsing _  deflt []             _   = deflt
 assocDefaultUsing eq deflt ((k,v) : rest) key
@@ -118,6 +121,14 @@ assocMaybe alist key
   where
     lookup []             = Nothing
     lookup ((tv,ty):rest) = if key == tv then Just ty else lookup rest
+
+assocAlter f k assocs
+  | Just v <- f mb_entry = (k,v) : assocs'
+  | otherwise            = assocs'
+  where
+    (l, r)   = break ((== k) . fst) assocs
+    mb_entry = snd <$> listToMaybe r
+    assocs'  = l ++ drop 1 r
 
 {-
 ************************************************************************
@@ -169,3 +180,8 @@ findDupsEq _  [] = []
 findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
                      | otherwise   = (x :| eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = partition (eq x) xs
+
+insertNoDup :: (Eq a) => a -> [a] -> [a]
+insertNoDup x set
+  | Nothing <- find (== x) set = x:set
+  | otherwise             = set

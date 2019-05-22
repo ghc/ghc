@@ -8,10 +8,9 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), SimpleEq, ComplexEq, toComplex, eqPmLit,
-        truePmExpr, falsePmExpr, isTruePmExpr, isFalsePmExpr, isNotPmExprOther,
-        lhsExprToPmExpr, hsExprToPmExpr, substComplexEq, filterComplex,
-        pprPmExprWithParens, runPmPprM
+        PmExpr(..), PmLit(..), PmAltCon(..), PmRefutEnv, SimpleEq, ComplexEq,
+        toComplex, eqPmLit, isNotPmExprOther, lhsExprToPmExpr, hsExprToPmExpr,
+        substComplexEq, prepareRefuts, pprPmExprWithParens, runPmPprM
     ) where
 
 #include "HsVersions.h"
@@ -26,14 +25,13 @@ import Name
 import NameSet
 import DataCon
 import ConLike
-import TcType (isStringTy)
+import TcType (Type, isStringTy)
 import TysWiredIn
 import Outputable
 import Util
 import SrcLoc
 
 import Data.Maybe (mapMaybe)
-import Data.List (groupBy, sortBy, nubBy)
 import Control.Monad.Trans.State.Lazy
 
 {-
@@ -61,7 +59,6 @@ refer to variables that are otherwise substituted away.
 data PmExpr = PmExprVar   Name
             | PmExprCon   ConLike [PmExpr]
             | PmExprLit   PmLit
-            | PmExprEq    PmExpr PmExpr  -- Syntactic equality
             | PmExprOther (HsExpr GhcTc)  -- Note [PmExprOther in PmExpr]
 
 
@@ -78,6 +75,35 @@ eqPmLit (PmSLit    l1) (PmSLit    l2) = l1 == l2
 eqPmLit (PmOLit b1 l1) (PmOLit b2 l2) = b1 == b2 && l1 == l2
   -- See Note [Undecidable Equality for Overloaded Literals]
 eqPmLit _              _              = False
+
+-- | Represents a match against a 'ConLike' or literal. We mostly use it to
+-- to encode shapes for a variable that immediately lead to a refutation.
+--
+-- See Note [Refutable shapes] in TmOracle.
+data PmAltCon = PmAltConLike ConLike [Type]
+              -- ^ The types are the argument types of the 'ConLike' application
+              | PmAltLit     PmLit
+
+-- | This instance won't compare the argument types of the 'ConLike', as we
+-- carry them for recovering COMPLETE match groups only. The 'PmRefutEnv' below
+-- should never have different 'PmAltConLike's with the same 'ConLike' for the
+-- same variable. See Note [Refutable shapes] in TmOracle.
+instance Eq PmAltCon where
+  PmAltConLike cl1 _ == PmAltConLike cl2 _ = cl1 == cl2
+  PmAltLit l1        == PmAltLit l2        = eqPmLit l1 l2
+  _                  == _                  = False
+
+instance Outputable PmAltCon where
+  ppr (PmAltConLike cl tys) = ppr cl <+> char '@' <> ppr tys
+  ppr (PmAltLit l)          = ppr l
+
+-- | An environment assigning shapes to variables that immediately lead to a
+-- refutation. So, if @x ≁ Just [Bool] ∈ env@, then trying to solve a
+-- 'ComplexEq' like @x ~ Just False@ immediately leads to a contradiction.
+-- Determinism is important since we use this for warning messages.
+--
+-- See Note [Refutable shapes] in TmOracle.
+type PmRefutEnv = [(Name, [PmAltCon])]
 
 {- Note [Undecidable Equality for Overloaded Literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,9 +171,6 @@ impact of this is the following:
        appearance of the warnings and is, in practice safe.
 -}
 
-nubPmLit :: [PmLit] -> [PmLit]
-nubPmLit = nubBy eqPmLit
-
 -- | Term equalities
 type SimpleEq  = (Id, PmExpr) -- We always use this orientation
 type ComplexEq = (PmExpr, PmExpr)
@@ -155,14 +178,6 @@ type ComplexEq = (PmExpr, PmExpr)
 -- | Lift a `SimpleEq` to a `ComplexEq`
 toComplex :: SimpleEq -> ComplexEq
 toComplex (x,e) = (PmExprVar (idName x), e)
-
--- | Expression `True'
-truePmExpr :: PmExpr
-truePmExpr = mkPmExprData trueDataCon []
-
--- | Expression `False'
-falsePmExpr :: PmExpr
-falsePmExpr = mkPmExprData falseDataCon []
 
 -- ----------------------------------------------------------------------------
 -- ** Predicates on PmExpr
@@ -177,28 +192,10 @@ isNegatedPmLit :: PmLit -> Bool
 isNegatedPmLit (PmOLit b _) = b
 isNegatedPmLit _other_lit   = False
 
--- | Check whether a PmExpr is syntactically equal to term `True'.
-isTruePmExpr :: PmExpr -> Bool
-isTruePmExpr (PmExprCon c []) = c == RealDataCon trueDataCon
-isTruePmExpr _other_expr      = False
-
--- | Check whether a PmExpr is syntactically equal to term `False'.
-isFalsePmExpr :: PmExpr -> Bool
-isFalsePmExpr (PmExprCon c []) = c == RealDataCon falseDataCon
-isFalsePmExpr _other_expr      = False
-
 -- | Check whether a PmExpr is syntactically e
 isNilPmExpr :: PmExpr -> Bool
 isNilPmExpr (PmExprCon c _) = c == RealDataCon nilDataCon
 isNilPmExpr _other_expr     = False
-
--- | Check whether a PmExpr is syntactically equal to (x == y).
--- Since (==) is overloaded and can have an arbitrary implementation, we use
--- the PmExprEq constructor to represent only equalities with non-overloaded
--- literals where it coincides with a syntactic equality check.
-isPmExprEq :: PmExpr -> Maybe (PmExpr, PmExpr)
-isPmExprEq (PmExprEq e1 e2) = Just (e1,e2)
-isPmExprEq _other_expr      = Nothing
 
 -- | Check if a DataCon is (:).
 isConsDataCon :: DataCon -> Bool
@@ -216,9 +213,6 @@ substPmExpr x e1 e =
                 | otherwise -> (e, False)
     PmExprCon c ps -> let (ps', bs) = mapAndUnzip (substPmExpr x e1) ps
                       in  (PmExprCon c ps', or bs)
-    PmExprEq ex ey -> let (ex', bx) = substPmExpr x e1 ex
-                          (ey', by) = substPmExpr x e1 ey
-                      in  (PmExprEq ex' ey', bx || by)
     _other_expr    -> (e, False) -- The rest are terminals (We silently ignore
                                  -- Other). See Note [PmExprOther in PmExpr]
 
@@ -341,28 +335,15 @@ Check.hs) to be more precice.
 -}
 
 -- -----------------------------------------------------------------------------
--- ** Transform residual constraints in appropriate form for pretty printing
+-- ** Transform refutations in appropriate form for pretty printing
 
-type PmNegLitCt = (Name, (SDoc, [PmLit]))
+type PmNegLitCt = (Name, (SDoc, [PmAltCon]))
 
-filterComplex :: [ComplexEq] -> [PmNegLitCt]
-filterComplex = zipWith rename nameList . map mkGroup
-              . groupBy name . sortBy order . mapMaybe isNegLitCs
+-- | Call this on a list of negative equalities
+prepareRefuts :: PmRefutEnv -> [PmNegLitCt]
+prepareRefuts = zipWith rename nameList
   where
-    order x y = compare (fst x) (fst y)
-    name  x y = fst x == fst y
-    mkGroup l = (fst (head l), nubPmLit $ map snd l)
     rename new (old, lits) = (old, (new, lits))
-
-    isNegLitCs (e1,e2)
-      | isFalsePmExpr e1, Just (x,y) <- isPmExprEq e2 = isNegLitCs' x y
-      | isFalsePmExpr e2, Just (x,y) <- isPmExprEq e1 = isNegLitCs' x y
-      | otherwise = Nothing
-
-    isNegLitCs' (PmExprVar x) (PmExprLit l) = Just (x, l)
-    isNegLitCs' (PmExprLit l) (PmExprVar x) = Just (x, l)
-    isNegLitCs' _ _             = Nothing
-
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
     nameList :: [SDoc]
     nameList = map text ["p","q","r","s","t"] ++
@@ -370,7 +351,7 @@ filterComplex = zipWith rename nameList . map mkGroup
 
 -- ----------------------------------------------------------------------------
 
-runPmPprM :: PmPprM a -> [PmNegLitCt] -> (a, [(SDoc,[PmLit])])
+runPmPprM :: PmPprM a -> [PmNegLitCt] -> (a, [(SDoc,[PmAltCon])])
 runPmPprM m lit_env = (result, mapMaybe is_used lit_env)
   where
     (result, (_lit_env, used)) = runState m (lit_env, emptyNameSet)
@@ -404,13 +385,11 @@ pprPmExpr (PmExprVar x) = do
 
 pprPmExpr (PmExprCon con args) = pprPmExprCon con args
 pprPmExpr (PmExprLit l)        = return (ppr l)
-pprPmExpr (PmExprEq _ _)       = return underscore -- don't show
 pprPmExpr (PmExprOther _)      = return underscore -- don't show
 
 needsParens :: PmExpr -> Bool
 needsParens (PmExprVar   {}) = False
 needsParens (PmExprLit    l) = isNegatedPmLit l
-needsParens (PmExprEq    {}) = False -- will become a wildcard
 needsParens (PmExprOther {}) = False -- will become a wildcard
 needsParens (PmExprCon (RealDataCon c) es)
   | isTupleDataCon c
