@@ -1,3 +1,4 @@
+#if !defined(arm_HOST_ARCH)
 #include "Rts.h"
 
 // Fallbacks for atomic primops on byte arrays. The builtins used
@@ -418,3 +419,4 @@ hs_atomicwrite64(StgWord x, StgWord64 val)
   while (!__sync_bool_compare_and_swap((StgWord64 *) x, *(StgWord64 *) x, (StgWord64) val));
 #endif
 }
+#endif
