@@ -335,22 +335,22 @@ data ForeignHint
 rEP_CostCentreStack_mem_alloc :: DynFlags -> CmmType
 rEP_CostCentreStack_mem_alloc dflags
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_mem_alloc pc))
-    where pc = sPlatformConstants (settings dflags)
+    where pc = platformConstants dflags
 
 rEP_CostCentreStack_scc_count :: DynFlags -> CmmType
 rEP_CostCentreStack_scc_count dflags
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_scc_count pc))
-    where pc = sPlatformConstants (settings dflags)
+    where pc = platformConstants dflags
 
 rEP_StgEntCounter_allocs :: DynFlags -> CmmType
 rEP_StgEntCounter_allocs dflags
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocs pc))
-    where pc = sPlatformConstants (settings dflags)
+    where pc = platformConstants dflags
 
 rEP_StgEntCounter_allocd :: DynFlags -> CmmType
 rEP_StgEntCounter_allocd dflags
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocd pc))
-    where pc = sPlatformConstants (settings dflags)
+    where pc = platformConstants dflags
 
 -------------------------------------------------------------------------
 {-      Note [Signed vs unsigned]
