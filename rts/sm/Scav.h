@@ -24,6 +24,7 @@ void    scavenge_thunk_srt (const StgInfoTable *info);
 StgPtr  scavenge_mut_arr_ptrs (StgMutArrPtrs *a);
 StgPtr  scavenge_PAP (StgPAP *pap);
 StgPtr  scavenge_AP (StgAP *ap);
+void    scavenge_compact (StgCompactNFData *str);
 
 #if defined(THREADED_RTS)
 void    scavenge_loop1 (void);
@@ -35,6 +36,7 @@ void    scavenge_thunk_srt1 (const StgInfoTable *info);
 StgPtr  scavenge_mut_arr_ptrs1 (StgMutArrPtrs *a);
 StgPtr  scavenge_PAP1 (StgPAP *pap);
 StgPtr  scavenge_AP1 (StgAP *ap);
+void    scavenge_compact1 (StgCompactNFData *str);
 #endif
 
 #include "EndPrivate.h"
