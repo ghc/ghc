@@ -1,3 +1,6 @@
+{-
+Main functions for .hie file generation
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -20,7 +23,6 @@ import BooleanFormula
 import Class                      ( FunDep )
 import CoreUtils                  ( exprType )
 import ConLike                    ( conLikeName )
-import Config                     ( cProjectVersion )
 import Desugar                    ( deSugarExpr )
 import FieldLabel
 import HsSyn
@@ -41,7 +43,6 @@ import HieUtils
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
@@ -97,9 +98,7 @@ mkHieFile ms ts rs = do
   let Just src_file = ml_hs_file $ ms_location ms
   src <- liftIO $ BS.readFile src_file
   return $ HieFile
-      { hie_version = curHieVersion
-      , hie_ghc_version = BSC.pack cProjectVersion
-      , hie_hs_file = src_file
+      { hie_hs_file = src_file
       , hie_module = ms_mod ms
       , hie_types = arr
       , hie_asts = asts'
