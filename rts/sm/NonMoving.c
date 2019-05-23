@@ -728,6 +728,22 @@ static void nonmovingPrepareMark(void)
     oldest_gen->n_large_blocks = 0;
     nonmoving_live_words = 0;
 
+    // Move new compact objects from younger generations to nonmoving_compact_objects
+    for (bdescr *bd = oldest_gen->compact_objects; bd; bd = next) {
+        next = bd->link;
+        bd->flags |= BF_NONMOVING_SWEEPING;
+        dbl_link_onto(bd, &nonmoving_compact_objects);
+    }
+    n_nonmoving_compact_blocks += oldest_gen->n_compact_blocks;
+    oldest_gen->n_compact_blocks = 0;
+    oldest_gen->compact_objects = NULL;
+    // TODO (osa): what about "in import" stuff??
+
+    // Clear compact object mark bits
+    for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+    }
+
     // Clear large object bits
     for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
         bd->flags &= ~BF_MARKED;
@@ -788,6 +804,8 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // N.B. These should have been cleared at the end of the last sweep.
     ASSERT(nonmoving_marked_large_objects == NULL);
     ASSERT(n_nonmoving_marked_large_blocks == 0);
+    ASSERT(nonmoving_marked_compact_objects == NULL);
+    ASSERT(n_nonmoving_marked_compact_blocks == 0);
 
     MarkQueue *mark_queue = stgMallocBytes(sizeof(MarkQueue), "mark queue");
     initMarkQueue(mark_queue);
@@ -1034,6 +1052,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // collect them in a map in mark_queue and we pass it here to sweep large
     // objects
     nonmovingSweepLargeObjects();
+    nonmovingSweepCompactObjects();
     nonmovingSweepStableNameTable();
 
     nonmovingSweep();

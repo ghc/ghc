@@ -337,6 +337,10 @@ nonmovingScavengeOne (StgClosure *q)
         evacuate(&((StgInd *)p)->indirectee);
         break;
 
+    case COMPACT_NFDATA:
+        scavenge_compact((StgCompactNFData*)p);
+        break;
+
     default:
         barf("nonmoving scavenge: unimplemented/strange closure type %d @ %p",
              info->type, p);
