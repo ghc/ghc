@@ -19,6 +19,9 @@ void nonmovingSweepMutLists(void);
 // Remove unmarked entries in oldest generation scavenged_large_objects list
 void nonmovingSweepLargeObjects(void);
 
+// Remove unmarked entries in oldest generation compact_objects list
+void nonmovingSweepCompactObjects(void);
+
 // Remove dead entries in the stable name table
 void nonmovingSweepStableNameTable(void);
 
