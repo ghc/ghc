@@ -128,8 +128,10 @@ typedef struct {
 // The length of MarkQueueBlock.entries
 #define MARK_QUEUE_BLOCK_ENTRIES ((MARK_QUEUE_BLOCKS * BLOCK_SIZE - sizeof(MarkQueueBlock)) / sizeof(MarkQueueEnt))
 
-extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects;
-extern memcount n_nonmoving_large_blocks, n_nonmoving_marked_large_blocks;
+extern bdescr *nonmoving_large_objects, *nonmoving_marked_large_objects,
+              *nonmoving_compact_objects, *nonmoving_marked_compact_objects;
+extern memcount n_nonmoving_large_blocks, n_nonmoving_marked_large_blocks,
+                n_nonmoving_compact_blocks, n_nonmoving_marked_compact_blocks;
 
 extern StgTSO *nonmoving_old_threads;
 extern StgWeak *nonmoving_old_weak_ptr_list;
