@@ -1,3 +1,8 @@
+{-
+Types for the .hie file format are defined here.
+
+For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
+-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -28,6 +33,7 @@ import Control.Applicative        ( (<|>) )
 type Span = RealSrcSpan
 
 -- | Current version of @.hie@ files
+-- Needs to be bumped any time a binary instance changes.
 curHieVersion :: Word8
 curHieVersion = 0
 
@@ -48,13 +54,7 @@ Besides saving compilation cycles, @.hie@ files also offer a more stable
 interface than the GHC API.
 -}
 data HieFile = HieFile
-    { hie_version :: Word8
-    -- ^ version of the HIE format
-
-    , hie_ghc_version :: ByteString
-    -- ^ Version of GHC that produced this file
-
-    , hie_hs_file :: FilePath
+    { hie_hs_file :: FilePath
     -- ^ Initial Haskell source file path
 
     , hie_module :: Module
@@ -74,11 +74,9 @@ data HieFile = HieFile
     , hie_hs_src :: ByteString
     -- ^ Raw bytes of the initial Haskell source
     }
-
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary HieFile where
   put_ bh hf = do
-    put_ bh $ hie_version hf
-    put_ bh $ hie_ghc_version hf
     put_ bh $ hie_hs_file hf
     put_ bh $ hie_module hf
     put_ bh $ hie_types hf
@@ -88,8 +86,6 @@ instance Binary HieFile where
 
   get bh = HieFile
     <$> get bh
-    <*> get bh
-    <*> get bh
     <*> get bh
     <*> get bh
     <*> get bh
@@ -150,6 +146,7 @@ type HieTypeFlat = HieType TypeIndex
 -- | Roughly isomorphic to the original core 'Type'.
 newtype HieTypeFix = Roll (HieType (HieTypeFix))
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (HieType TypeIndex) where
   put_ bh (HTyVarTy n) = do
     putByte bh 0
@@ -202,6 +199,7 @@ instance Binary (HieType TypeIndex) where
 newtype HieArgs a = HieArgs [(Bool,a)]
   deriving (Functor, Foldable, Traversable, Eq)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (HieArgs TypeIndex) where
   put_ bh (HieArgs xs) = put_ bh xs
   get bh = HieArgs <$> get bh
@@ -211,6 +209,7 @@ instance Binary (HieArgs TypeIndex) where
 newtype HieASTs a = HieASTs { getAsts :: (M.Map FastString (HieAST a)) }
   deriving (Functor, Foldable, Traversable)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (HieASTs TypeIndex) where
   put_ bh asts = put_ bh $ M.toAscList $ getAsts asts
   get bh = HieASTs <$> fmap M.fromDistinctAscList (get bh)
@@ -223,6 +222,7 @@ data HieAST a =
     , nodeChildren :: [HieAST a]
     } deriving (Functor, Foldable, Traversable)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (HieAST TypeIndex) where
   put_ bh ast = do
     put_ bh $ nodeInfo ast
@@ -250,6 +250,7 @@ data NodeInfo a = NodeInfo
     -- ^ All the identifiers and their details
     } deriving (Functor, Foldable, Traversable)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (NodeInfo TypeIndex) where
   put_ bh ni = do
     put_ bh $ S.toAscList $ nodeAnnotations ni
@@ -273,6 +274,7 @@ data IdentifierDetails a = IdentifierDetails
   , identInfo :: S.Set ContextInfo
   } deriving (Eq, Functor, Foldable, Traversable)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Outputable a => Outputable (IdentifierDetails a) where
   ppr x = text "IdentifierDetails" <+> ppr (identType x) <+> ppr (identInfo x)
 
@@ -283,6 +285,7 @@ instance Semigroup (IdentifierDetails a) where
 instance Monoid (IdentifierDetails a) where
   mempty = IdentifierDetails Nothing S.empty
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
@@ -340,6 +343,7 @@ data ContextInfo
 instance Outputable ContextInfo where
   ppr = text . show
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0
   put_ bh (IEThing t) = do
@@ -397,6 +401,7 @@ data IEType
   | Export
     deriving (Eq, Enum, Ord, Show)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary IEType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
@@ -409,6 +414,7 @@ data RecFieldContext
   | RecFieldOcc
     deriving (Eq, Enum, Ord, Show)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary RecFieldContext where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
@@ -419,6 +425,7 @@ data BindType
   | InstanceBind
     deriving (Eq, Ord, Show, Enum)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary BindType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
@@ -434,6 +441,7 @@ data DeclType
   | InstDec    -- ^ instance declaration
     deriving (Eq, Ord, Show, Enum)
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary DeclType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
@@ -450,6 +458,7 @@ instance Outputable Scope where
   ppr (LocalScope sp) = text "LocalScope" <+> ppr sp
   ppr ModuleScope = text "ModuleScope"
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary Scope where
   put_ bh NoScope = putByte bh 0
   put_ bh (LocalScope span) = do
@@ -497,6 +506,7 @@ instance Show TyVarScope where
   show (ResolvedScopes sc) = show sc
   show _ = error "UnresolvedScope"
 
+-- | Please remember to bump `curHieVersion` on any modification
 instance Binary TyVarScope where
   put_ bh (ResolvedScopes xs) = do
     putByte bh 0
