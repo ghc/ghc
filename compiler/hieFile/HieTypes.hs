@@ -1,3 +1,8 @@
+{-
+Types for the .hie file format are defined here.
+
+For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
+-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -7,6 +12,7 @@ module HieTypes where
 
 import GhcPrelude
 
+import Config
 import Binary
 import FastString                 ( FastString )
 import IfaceType
@@ -28,8 +34,8 @@ import Control.Applicative        ( (<|>) )
 type Span = RealSrcSpan
 
 -- | Current version of @.hie@ files
-curHieVersion :: Word8
-curHieVersion = 0
+hieVersion :: Integer
+hieVersion = read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 
 {- |
 GHC builds up a wealth of information about Haskell source as it compiles it.
@@ -48,13 +54,7 @@ Besides saving compilation cycles, @.hie@ files also offer a more stable
 interface than the GHC API.
 -}
 data HieFile = HieFile
-    { hie_version :: Word8
-    -- ^ version of the HIE format
-
-    , hie_ghc_version :: ByteString
-    -- ^ Version of GHC that produced this file
-
-    , hie_hs_file :: FilePath
+    { hie_hs_file :: FilePath
     -- ^ Initial Haskell source file path
 
     , hie_module :: Module
@@ -74,11 +74,8 @@ data HieFile = HieFile
     , hie_hs_src :: ByteString
     -- ^ Raw bytes of the initial Haskell source
     }
-
 instance Binary HieFile where
   put_ bh hf = do
-    put_ bh $ hie_version hf
-    put_ bh $ hie_ghc_version hf
     put_ bh $ hie_hs_file hf
     put_ bh $ hie_module hf
     put_ bh $ hie_types hf
@@ -88,8 +85,6 @@ instance Binary HieFile where
 
   get bh = HieFile
     <$> get bh
-    <*> get bh
-    <*> get bh
     <*> get bh
     <*> get bh
     <*> get bh

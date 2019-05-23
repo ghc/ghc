@@ -1,8 +1,11 @@
+{-
+Binary serialization for .hie files.
+-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module HieBin ( readHieFile, writeHieFile, HieName(..), toHieName ) where
+module HieBin ( readHieFile, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieHeader ) where
 
+import Config                     ( cProjectVersion )
 import GhcPrelude
-
 import Binary
 import BinIface                   ( getDictFastString )
 import FastMutInt
@@ -19,11 +22,15 @@ import UniqFM
 
 import qualified Data.Array as A
 import Data.IORef
+import Data.ByteString            ( ByteString )
+import qualified Data.ByteString.Char8 as BSC
 import Data.List                  ( mapAccumR )
-import Data.Word                  ( Word32 )
-import Control.Monad              ( replicateM )
+import Data.Word                  ( Word8, Word32 )
+import Control.Monad              ( replicateM, when )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
+
+import HieTypes
 
 -- | `Name`'s get converted into `HieName`'s before being written into @.hie@
 -- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
@@ -63,9 +70,27 @@ data HieDictionary = HieDictionary
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
-writeHieFile :: Binary a => FilePath -> a -> IO ()
+-- | The header for HIE files - Capital ASCII letters "HIE".
+hieHeader :: [Word8]
+hieHeader = [72,73,69]
+
+hieHeaderLen :: Int
+hieHeaderLen = length hieHeader
+
+ghcVersion :: ByteString
+ghcVersion = BSC.pack cProjectVersion
+
+-- | Write a `HieFile` to the given `FilePath`, with a proper header and
+-- symbol tables for `Name`s and `FastString`s
+writeHieFile :: FilePath -> HieFile -> IO ()
 writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
+
+  -- Write the header: hieHeader followed by the
+  -- hieVersion and the GHC version used to generate this file
+  mapM_ (put_ bh0) hieHeader
+  put_ bh0 hieVersion
+  put_ bh0 ghcVersion
 
   -- remember where the dictionary pointer will go
   dict_p_p <- tellBin bh0
@@ -105,7 +130,7 @@ writeHieFile hie_file_path hiefile = do
   symtab_map'  <- readIORef symtab_map
   putSymbolTable bh symtab_next' symtab_map'
 
-  -- write the dictionary pointer at the fornt of the file
+  -- write the dictionary pointer at the front of the file
   dict_p <- tellBin bh
   putAt bh dict_p_p dict_p
   seekBin bh dict_p
@@ -120,9 +145,37 @@ writeHieFile hie_file_path hiefile = do
   writeBinMem bh hie_file_path
   return ()
 
-readHieFile :: Binary a => NameCache -> FilePath -> IO (a, NameCache)
+data HieFileResult
+  = HieFileResult
+  { hie_file_result_version :: Integer
+  , hie_file_result_ghc_version :: ByteString
+  , hie_file_result :: HieFile
+  }
+
+-- | Read a `HieFile` from a `FilePath`. Can use
+-- an existing `NameCache`.
+readHieFile :: NameCache -> FilePath -> IO (HieFileResult, NameCache)
 readHieFile nc file = do
+
   bh0 <- readBinMem file
+
+  -- Read the header
+  header <- replicateM hieHeaderLen (get bh0)
+  readHieVersion <- get bh0
+  ghcVersion <- (get bh0 :: IO ByteString)
+
+  -- Check if the header is valid
+  when (header /= hieHeader) $
+    panic $ unwords ["readHieFile: headers don't match: Expected"
+                    , show hieHeader
+                    , "but got", show header
+                    ]
+  -- Check if the versions match
+  when (readHieVersion /= hieVersion) $
+    panic $ unwords ["readHieFile: hie file versions don't match: Expected"
+                    , show hieVersion
+                    , "but got", show readHieVersion
+                    ]
 
   dict  <- get_dictionary bh0
 
@@ -138,7 +191,7 @@ readHieFile nc file = do
 
   -- load the actual data
   hiefile <- get bh1
-  return (hiefile, nc')
+  return (HieFileResult hieVersion ghcVersion hiefile, nc')
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
