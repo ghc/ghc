@@ -436,12 +436,22 @@ evacuate_compact (StgPtr p)
     bd = Bdescr((StgPtr)str);
     gen_no = bd->gen_no;
 
+    if (bd->flags & BF_NONMOVING) {
+        // We may have evacuated the block to the nonmoving generation. If so
+        // we need to make sure it is added to the mark queue since the only
+        // reference to it may be from the moving heap.
+        if (major_gc && !deadlock_detect_gc)
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+        return;
+    }
+
     // already evacuated? (we're about to do the same check,
     // but we avoid taking the spin-lock)
     if (bd->flags & BF_EVACUATED) {
         /* Don't forget to set the gct->failed_to_evac flag if we didn't get
          * the desired destination (see comments in evacuate()).
          */
+        debugTrace(DEBUG_compact, "Compact %p already evacuated", str);
         if (gen_no < gct->evac_gen_no) {
             gct->failed_to_evac = true;
             TICK_GC_FAILED_PROMOTION();
@@ -490,9 +500,15 @@ evacuate_compact (StgPtr p)
     // for that - the only code touching the generation of the block is
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
+    if (RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen) {
+        bd->flags |= BF_NONMOVING;
+    }
     initBdescr(bd, new_gen, new_gen->to);
 
     if (str->hash) {
+        // If there is a hash-table for sharing preservation then we need to add
+        // the compact to the scavenging work list to ensure that the hashtable
+        // is scavenged.
         gen_workspace *ws = &gct->gens[new_gen_no];
         bd->link = ws->todo_large_objects;
         ws->todo_large_objects = bd;
@@ -658,13 +674,6 @@ loop:
       // they are not)
       if (bd->flags & BF_COMPACT) {
           evacuate_compact((P_)q);
-
-          // We may have evacuated the block to the nonmoving generation. If so
-          // we need to make sure it is added to the mark queue since the only
-          // reference to it may be from the moving heap.
-          if (major_gc && bd->flags & BF_NONMOVING && !deadlock_detect_gc) {
-              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
-          }
           return;
       }
 
