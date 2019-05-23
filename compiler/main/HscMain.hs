@@ -174,7 +174,7 @@ import Data.Set (Set)
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts )
-import HieBin           ( readHieFile, writeHieFile )
+import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
 #include "HsVersions.h"
@@ -434,7 +434,7 @@ extract_renamed_stuff mod_summary tc_result = do
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
               (file', _) <- readHieFile nc out_file
-              case diffFile hieFile file' of
+              case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do
