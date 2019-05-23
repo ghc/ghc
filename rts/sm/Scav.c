@@ -83,6 +83,7 @@ static void scavenge_large_bitmap (StgPtr p,
 # define scavenge_mut_arr_ptrs(info) scavenge_mut_arr_ptrs1(info)
 # define scavenge_PAP(pap) scavenge_PAP1(pap)
 # define scavenge_AP(ap) scavenge_AP1(ap)
+# define scavenge_compact(str) scavenge_compact1(str)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -167,7 +168,10 @@ evacuate_hash_entry(MapHashData *dat, StgWord key, const void *value)
     SET_GCT(old_gct);
 }
 
-static void
+/* Here we scavenge the sharing-preservation hash-table, which may contain keys
+ * living in from-space.
+ */
+void
 scavenge_compact(StgCompactNFData *str)
 {
     bool saved_eager;
