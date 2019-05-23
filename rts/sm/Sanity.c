@@ -807,9 +807,33 @@ static void checkGeneration (generation *gen,
 #endif
 
     if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+        ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
         ASSERT(countBlocks(nonmoving_large_objects) == n_nonmoving_large_blocks);
         ASSERT(countBlocks(nonmoving_marked_large_objects) == n_nonmoving_marked_large_blocks);
-        ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
+
+        // Compact regions
+        // Accounting here is tricky due to the fact that the CNF allocation
+        // code modifies generation->n_compact_blocks directly. However, most
+        // objects being swept by the nonmoving GC are tracked in
+        // nonmoving_*_compact_objects. Consequently we can only maintain a very loose
+        // sanity invariant here.
+        uint32_t counted_cnf_blocks = 0;
+        counted_cnf_blocks += countCompactBlocks(nonmoving_marked_compact_objects);
+        counted_cnf_blocks += countCompactBlocks(nonmoving_compact_objects);
+        counted_cnf_blocks += countCompactBlocks(oldest_gen->compact_objects);
+
+        uint32_t total_cnf_blocks = 0;
+        total_cnf_blocks += n_nonmoving_compact_blocks + oldest_gen->n_compact_blocks;
+        total_cnf_blocks += n_nonmoving_marked_compact_blocks;
+
+        if (counted_cnf_blocks != total_cnf_blocks) {
+          debugBelch("count(nonmoving_compact_objects = %ld\n", countCompactBlocks(nonmoving_compact_objects));
+          debugBelch("n_nonmoving_compact_blocks = %ld\n", n_nonmoving_compact_blocks);
+          debugBelch("oldest_gen->n_compact_blocks = %ld\n", oldest_gen->n_compact_blocks);
+          debugBelch("count(nonmoving_marked_compact_objects = %ld\n", countCompactBlocks(nonmoving_marked_compact_objects));
+          debugBelch("n_nonmoving_marked_compact_blocks = %ld\n", n_nonmoving_marked_compact_blocks);
+        }
+        ASSERT(counted_cnf_blocks == total_cnf_blocks);
     }
 
     checkHeapChain(gen->blocks);
@@ -906,6 +930,8 @@ findMemoryLeak (void)
         markBlocks(upd_rem_set_block_list);
         markBlocks(nonmoving_large_objects);
         markBlocks(nonmoving_marked_large_objects);
+        markBlocks(nonmoving_compact_objects);
+        markBlocks(nonmoving_marked_compact_objects);
         for (i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
             struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
             markNonMovingSegments(alloc->filled);
@@ -984,17 +1010,19 @@ genBlocks (generation *gen)
         ASSERT(countNonMovingHeap(&nonmovingHeap) == gen->n_blocks);
         ret += countAllocdBlocks(nonmoving_large_objects);
         ret += countAllocdBlocks(nonmoving_marked_large_objects);
+        ret += countAllocdCompactBlocks(nonmoving_compact_objects);
+        ret += countAllocdCompactBlocks(nonmoving_marked_compact_objects);
         ret += countNonMovingHeap(&nonmovingHeap);
         if (current_mark_queue)
             ret += countBlocks(current_mark_queue->blocks);
     } else {
         ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+        ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
+        ASSERT(countCompactBlocks(gen->compact_blocks_in_import) == gen->n_compact_blocks_in_import);
         ret += gen->n_blocks;
     }
 
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
-    ASSERT(countCompactBlocks(gen->compact_objects) == gen->n_compact_blocks);
-    ASSERT(countCompactBlocks(gen->compact_blocks_in_import) == gen->n_compact_blocks_in_import);
 
     ret += gen->n_old_blocks +
         countAllocdBlocks(gen->large_objects) +
