@@ -16,6 +16,7 @@
 #include "Storage.h"
 #include "Trace.h"
 #include "StableName.h"
+#include "CNF.h" // compactFree
 
 // On which list should a particular segment be placed?
 enum SweepResult {
@@ -179,6 +180,21 @@ void nonmovingSweepLargeObjects()
     n_nonmoving_large_blocks = n_nonmoving_marked_large_blocks;
     nonmoving_marked_large_objects = NULL;
     n_nonmoving_marked_large_blocks = 0;
+}
+
+void nonmovingSweepCompactObjects()
+{
+    bdescr *next;
+    ACQUIRE_SM_LOCK;
+    for (bdescr *bd = nonmoving_compact_objects; bd; bd = next) {
+        next = bd->link;
+        compactFree(((StgCompactNFDataBlock*)bd->start)->owner);
+    }
+    RELEASE_SM_LOCK;
+    nonmoving_compact_objects = nonmoving_marked_compact_objects;
+    n_nonmoving_compact_blocks = n_nonmoving_marked_compact_blocks;
+    nonmoving_marked_compact_objects = NULL;
+    n_nonmoving_marked_compact_blocks = 0;
 }
 
 // Helper for nonmovingSweepStableNameTable. Essentially nonmovingIsAlive,
