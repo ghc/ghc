@@ -13,6 +13,35 @@ import Settings.Builders.Common
 import Target
 import Utilities
 
+{- Note [Libffi indicating inputs]
+
+First see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian for an
+explanation of "indicating input". Part of the definition is copied here for
+your convenience:
+
+    change in the vital output -> change in the indicating inputs
+
+In the case of building libffi `vital output = built libffi library files` and
+we can consider the libffi archive file (i.e. the "libffi-tarballs/libffi*.tar.gz"
+file) to be the only indicating input besides the build tools (e.g. make).
+Note building libffi is split into a few rules, but we also expect that:
+
+    no change in the archive file -> no change in the intermediate build artifacts
+
+and so the archive file is still a valid choice of indicating input for
+all libffi rules. Hence we can get away with `need`ing only the archive file and
+don't have to `need` intermediate build artifacts (besides those to trigger
+dependant libffi rules i.e. to generate vital inputs as is noted on the wiki).
+It is then safe to `trackAllow` the libffi build directory as is done in
+`needLibfffiArchive`.
+
+A disadvantage to this approach is that changing the archive file forces a clean
+build of libffi i.e. we cannot incrementally build libffi. This seems like a
+performance issue, but is justified as building libffi is fast and the archive
+file is rarely changed.
+
+-}
+
 -- | Oracle question type. The oracle returns the list of dynamic
 -- libffi library file paths (all but one of which should be symlinks).
 newtype LibffiDynLibs = LibffiDynLibs Stage
@@ -105,13 +134,7 @@ configureEnvironment stage = do
              , return . AddEnv "LDFLAGS" $ unwords ldFlags ++ " -w" ]
 
 -- Need the libffi archive and `trackAllow` all files in the build directory.
--- As all libffi build files are derived from this archive, we can safely
--- `trackAllow` the libffi build dir. I.e the archive file can be seen as a
--- shallow dependency of the libffi build. This is much simpler than working out
--- the dependencies of each rule (within the build dir).
--- This means changing the archive file forces a clean build of libffi. This
--- seems like a performance issue, but is justified as building libffi is fast
--- and the archive file is rarely changed.
+-- See [Libffi indicating inputs].
 needLibfffiArchive :: FilePath -> Action FilePath
 needLibfffiArchive buildPath = do
     top <- topDirectory
