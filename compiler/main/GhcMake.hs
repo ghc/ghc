@@ -48,7 +48,7 @@ import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 import HscMain
 
-import Bag              ( listToBag )
+import Bag              ( unitBag, listToBag, unionManyBags )
 import BasicTypes
 import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
@@ -1912,13 +1912,10 @@ warnUnnecessarySourceImports sccs = do
                  <+> quotes (ppr mod))
 
 
-reportImportErrors :: MonadIO m => [Either ErrMsg b] -> m [b]
+reportImportErrors :: MonadIO m => [Either ErrorMessages b] -> m [b]
 reportImportErrors xs | null errs = return oks
-                      | otherwise = throwManyErrors errs
+                      | otherwise = throwErrors $ unionManyBags errs
   where (errs, oks) = partitionEithers xs
-
-throwManyErrors :: MonadIO m => [ErrMsg] -> m ab
-throwManyErrors errs = liftIO $ throwIO $ mkSrcErr $ listToBag errs
 
 
 -----------------------------------------------------------------------------
@@ -1943,7 +1940,7 @@ downsweep :: HscEnv
           -> Bool               -- True <=> allow multiple targets to have
                                 --          the same module name; this is
                                 --          very useful for ghc -M
-          -> IO [Either ErrMsg ModSummary]
+          -> IO [Either ErrorMessages ModSummary]
                 -- The elts of [ModSummary] all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true
                 -- in which case there can be repeats
@@ -1977,13 +1974,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map :: NodeMap ModSummary
         old_summary_map = mkNodeMap old_summaries
 
-        getRootSummary :: Target -> IO (Either ErrMsg ModSummary)
+        getRootSummary :: Target -> IO (Either ErrorMessages ModSummary)
         getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
            = do exists <- liftIO $ doesFileExist file
                 if exists || isJust maybe_buf
-                    then Right `fmap` summariseFile hsc_env old_summaries file mb_phase
+                    then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ mkPlainErrMsg dflags noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
@@ -1999,7 +1996,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- name, so we have to check that there aren't multiple root files
         -- defining the same module (otherwise the duplicates will be silently
         -- ignored, leading to confusing behaviour).
-        checkDuplicates :: NodeMap [Either ErrMsg ModSummary] -> IO ()
+        checkDuplicates :: NodeMap [Either ErrorMessages ModSummary] -> IO ()
         checkDuplicates root_map
            | allow_dup_roots = return ()
            | null dup_roots  = return ()
@@ -2010,11 +2007,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         loop :: [(Located ModuleName,IsBoot)]
                         -- Work list: process these modules
-             -> NodeMap [Either ErrMsg ModSummary]
+             -> NodeMap [Either ErrorMessages ModSummary]
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO (NodeMap [Either ErrMsg ModSummary])
+             -> IO (NodeMap [Either ErrorMessages ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
         loop ((wanted_mod, is_boot) : ss) done
@@ -2043,8 +2040,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
 enableCodeGenForTH :: HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForTH =
   enableCodeGenWhen condition should_modify TFL_CurrentModule TFL_GhcSession
   where
@@ -2063,8 +2060,8 @@ enableCodeGenForTH =
 -- This is used used in order to load code that uses unboxed tuples
 -- into GHCi while still allowing some code to be interpreted.
 enableCodeGenForUnboxedTuples :: HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForUnboxedTuples =
   enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
   where
@@ -2086,8 +2083,8 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> TempFileLifetime
   -> HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
@@ -2149,7 +2146,7 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
                 new_marked_mods = Set.insert ms_mod marked_mods
             in foldl' go new_marked_mods deps
 
-mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
+mkRootMap :: [ModSummary] -> NodeMap [Either ErrorMessages ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))
                                          [ (msKey s, [Right s]) | s <- summaries ]
                                          Map.empty
@@ -2209,7 +2206,7 @@ summariseFile
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
-        -> IO ModSummary
+        -> IO (Either ErrorMessages ModSummary)
 
 summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
@@ -2244,7 +2241,8 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                   _ <- liftIO $ addHomeModuleToFinder hsc_env
                     (moduleName (ms_mod old_summary)) (ms_location old_summary)
 
-                  return old_summary{ ms_obj_date = obj_timestamp
+                  return $ Right
+                         old_summary{ ms_obj_date = obj_timestamp
                                     , ms_iface_date = hi_timestamp
                                     , ms_hie_date = hie_timestamp }
            else
@@ -2259,7 +2257,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                            Nothing    -> liftIO $ getModificationUTCTime file
                         -- getModificationUTCTime may fail
 
-    new_summary src_timestamp = do
+    new_summary src_timestamp = Right <$> do
         let dflags = hsc_dflags hsc_env
 
         let hsc_src = if isHaskellSigFilename file then HsigFile else HsSrcFile
@@ -2320,7 +2318,7 @@ summariseModule
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
-          -> IO (Maybe (Either ErrMsg ModSummary))      -- Its new summary
+          -> IO (Maybe (Either ErrorMessages ModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 obj_allowed maybe_buf excl_mods
@@ -2529,13 +2527,13 @@ noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
 noModError dflags loc wanted_mod err
   = mkPlainErrMsg dflags loc $ cannotFindModule dflags wanted_mod err
 
-noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrMsg
+noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages
 noHsFileErr dflags loc path
-  = mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
 
-moduleNotFoundErr :: DynFlags -> ModuleName -> ErrMsg
+moduleNotFoundErr :: DynFlags -> ModuleName -> ErrorMessages
 moduleNotFoundErr dflags mod
-  = mkPlainErrMsg dflags noSrcSpan $
+  = unitBag $ mkPlainErrMsg dflags noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: DynFlags -> [ModSummary] -> IO ()
