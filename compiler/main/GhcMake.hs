@@ -13,6 +13,8 @@ module GhcMake(
         depanal,
         load, load', LoadHowMuch(..),
 
+        downsweep,
+
         topSortModuleGraph,
 
         ms_home_srcimps, ms_home_imps,
