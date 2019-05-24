@@ -94,7 +94,7 @@ pprTop :: (Outputable d, Outputable info, Outputable i)
 
 pprTop (CmmProc info lbl live graph)
 
-  = vcat [ ppr lbl <> lparen <> rparen <+> text "// " <+> ppr live
+  = vcat [ ppr lbl <> lparen <> rparen <+> lbrace <+> text "// " <+> ppr live
          , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ ppr graph
          , rbrace ]
