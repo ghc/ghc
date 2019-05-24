@@ -59,3 +59,5 @@ test('T15155',
 
 test('T15155l', when(unregisterised(), skip),
      makefile_test, [])
+
+test('T16449_1', normal, compile, [''])

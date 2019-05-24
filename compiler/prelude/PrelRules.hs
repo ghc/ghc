@@ -467,13 +467,16 @@ shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
 -- Used for shift primops
 --    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
 --    SllOp, SrlOp           :: Word# -> Int# -> Word#
--- See Note [Guarding against silly shifts]
 shiftRule shift_op
   = do { dflags <- getDynFlags
        ; [e1, Lit (LitNumber LitNumInt shift_len _)] <- getArgs
        ; case e1 of
            _ | shift_len == 0
              -> return e1
+             -- See Note [Guarding against silly shifts]
+             | shift_len < 0 || shift_len > wordSizeInBits dflags
+             -> return $ mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
+                           ("Bad shift length " ++ show shift_len)
 
            -- Do the shift at type Integer, but shift length is Int
            Lit (LitNumber nt x t)
