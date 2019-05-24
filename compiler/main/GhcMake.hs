@@ -2224,40 +2224,20 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
                 -- behaviour.
 
                 -- return the cached summary if the source didn't change
-        if ms_hs_date old_summary == src_timestamp &&
-           not (gopt Opt_ForceRecomp (hsc_dflags hsc_env))
-           then do -- update the object-file timestamp
-                  obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-                        || obj_allowed -- bug #1205
-                        then liftIO $ getObjTimestamp location NotBoot
-                        else return Nothing
-                  hi_timestamp <- maybeGetIfaceDate dflags location
-                  let hie_location = ml_hie_file location
-                  hie_timestamp <- modificationTimeIfExists hie_location
-
-                  -- We have to repopulate the Finder's cache because it
-                  -- was flushed before the downsweep.
-                  _ <- liftIO $ addHomeModuleToFinder hsc_env
-                    (moduleName (ms_mod old_summary)) (ms_location old_summary)
-
-                  return $ Right
-                         old_summary{ ms_obj_date = obj_timestamp
-                                    , ms_iface_date = hi_timestamp
-                                    , ms_hie_date = hie_timestamp }
-           else
-                new_summary src_timestamp
+        checkSummaryTimestamp
+            hsc_env dflags obj_allowed NotBoot (new_summary src_fn)
+            old_summary location src_timestamp
 
    | otherwise
    = do src_timestamp <- get_src_timestamp
-        new_summary src_timestamp
+        new_summary src_fn src_timestamp
   where
     get_src_timestamp = case maybe_buf of
                            Just (_,t) -> return t
                            Nothing    -> liftIO $ getModificationUTCTime src_fn
                         -- getModificationUTCTime may fail
 
-    new_summary src_timestamp = fmap Right $ do
+    new_summary src_fn src_timestamp = fmap Right $ do
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
@@ -2290,6 +2270,44 @@ findSummaryBySourceFile summaries file
         [] -> Nothing
         (x:_) -> Just x
 
+checkSummaryTimestamp
+    :: HscEnv -> DynFlags -> Bool -> IsBoot
+    -> (UTCTime -> IO (Either a ModSummary))
+    -> ModSummary -> ModLocation -> UTCTime
+    -> IO (Either a ModSummary)
+checkSummaryTimestamp
+  hsc_env dflags obj_allowed is_boot new_summary
+  old_summary location src_timestamp
+  | ms_hs_date old_summary == src_timestamp &&
+      not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
+           -- update the object-file timestamp
+           obj_timestamp <-
+             if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+                 || obj_allowed -- bug #1205
+                 then liftIO $ getObjTimestamp location is_boot
+                 else return Nothing
+
+           -- We have to repopulate the Finder's cache for file targets
+           -- because the file might not even be on the regular serach path
+           -- and it was likely flushed in depanal. This is not technically
+           -- needed when we're called from sumariseModule but it shouldn't
+           -- hurt.
+           _ <- addHomeModuleToFinder hsc_env
+                  (moduleName (ms_mod old_summary)) location
+
+           hi_timestamp <- maybeGetIfaceDate dflags location
+           hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+
+           return $ Right old_summary
+               { ms_obj_date = obj_timestamp
+               , ms_iface_date = hi_timestamp
+               , ms_hie_date = hie_timestamp
+               }
+
+   | otherwise =
+           -- source changed: re-summarise.
+           new_summary src_timestamp
+
 -- Summarise a module, and pick up source and timestamp.
 summariseModule
           :: HscEnv
@@ -2316,11 +2334,13 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- return the cached summary if it hasn't changed.  If the
                 -- file has disappeared, we need to call the Finder again.
         case maybe_buf of
-           Just (_,t) -> check_timestamp old_summary location src_fn t
+           Just (_,t) ->
+               Just <$> check_timestamp old_summary location src_fn t
            Nothing    -> do
                 m <- tryIO (getModificationUTCTime src_fn)
                 case m of
-                   Right t -> check_timestamp old_summary location src_fn t
+                   Right t ->
+                       Just <$> check_timestamp old_summary location src_fn t
                    Left e | isDoesNotExistError e -> find_it
                           | otherwise             -> ioError e
 
@@ -2328,23 +2348,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   where
     dflags = hsc_dflags hsc_env
 
-    check_timestamp old_summary location src_fn src_timestamp
-        | ms_hs_date old_summary == src_timestamp &&
-          not (gopt Opt_ForceRecomp dflags) = do
-                -- update the object-file timestamp
-                obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-                       || obj_allowed -- bug #1205
-                       then getObjTimestamp location is_boot
-                       else return Nothing
-                hi_timestamp <- maybeGetIfaceDate dflags location
-                hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
-                return (Just (Right old_summary{ ms_obj_date = obj_timestamp
-                                               , ms_iface_date = hi_timestamp
-                                               , ms_hie_date = hie_timestamp }))
-        | otherwise =
-                -- source changed: re-summarise.
-                new_summary location (ms_mod old_summary) src_fn src_timestamp
+    check_timestamp old_summary location src_fn =
+        checkSummaryTimestamp
+          hsc_env dflags obj_allowed is_boot
+          (new_summary location (ms_mod old_summary) src_fn)
+          old_summary location
 
     find_it = do
         found <- findImportedModule hsc_env wanted_mod Nothing
@@ -2352,7 +2360,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
              Found location mod
                 | isJust (ml_hs_file location) ->
                         -- Home package
-                         just_found location mod
+                         Just <$> just_found location mod
 
              _ -> return Nothing
                         -- Not found
@@ -2370,12 +2378,12 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- It might have been deleted since the Finder last found it
         maybe_t <- modificationTimeIfExists src_fn
         case maybe_t of
-          Nothing -> return $ Just $ Left $ noHsFileErr dflags loc src_fn
+          Nothing -> return $ Left $ noHsFileErr dflags loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
 
     new_summary location mod src_fn src_timestamp
-      = fmap Just $ fmap Right $ do
+      = fmap Right $ do
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
