@@ -171,19 +171,15 @@ libffiRules = do
         dynLibFiles <- do
             windows <- windowsHost
             osx     <- osxHost
-            let libffiName'' = libffiName' windows True
-            if windows
-                then
-                    let libffiDll = "lib" ++ libffiName'' ++ ".dll"
-                    in return [libffiPath -/- "inst/bin" -/- libffiDll]
-                else do
-                    let libffiLibPath = libffiPath -/- "inst/lib"
-                    dynLibsRelative <- liftIO $ getDirectoryFilesIO
-                        libffiLibPath
-                        (if osx
-                            then ["lib" ++ libffiName'' ++ ".dylib*"]
-                            else ["lib" ++ libffiName'' ++ ".so*"])
-                    return (fmap (libffiLibPath -/-) dynLibsRelative)
+            let libfilesDir = libffiPath -/-
+                    (if windows then "inst" -/- "bin" else "inst" -/- "lib")
+                libffiName'' = libffiName' windows True
+                dynlibext
+                    | windows   = "dll"
+                    | osx       = "dylib"
+                    | otherwise = "so"
+                filepat = "lib" ++ libffiName'' ++ "*." ++ dynlibext ++ "*"
+            liftIO $ getDirectoryFilesIO "." [libfilesDir -/- filepat]
 
         writeFileLines dynLibMan dynLibFiles
         putSuccess "| Successfully build libffi."
