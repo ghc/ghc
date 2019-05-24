@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, CPP, NondecreasingIndentation, ScopedTypeVariables #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -2158,11 +2158,11 @@ summariseFile
         -> Maybe (StringBuffer,UTCTime)
         -> IO (Either ErrorMessages ModSummary)
 
-summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
+summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,  But we have to look up the summary
         -- by source file, rather than module name as we do in summarise.
-   | Just old_summary <- findSummaryBySourceFile old_summaries file
+   | Just old_summary <- findSummaryBySourceFile old_summaries src_fn
    = do
         let location = ms_location old_summary
             dflags = hsc_dflags hsc_env
@@ -2204,53 +2204,34 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
   where
     get_src_timestamp = case maybe_buf of
                            Just (_,t) -> return t
-                           Nothing    -> liftIO $ getModificationUTCTime file
+                           Nothing    -> liftIO $ getModificationUTCTime src_fn
                         -- getModificationUTCTime may fail
 
-    new_summary src_timestamp = Right <$> do
-        let dflags = hsc_dflags hsc_env
+    new_summary src_timestamp = fmap Right $ do
+        preimps@PreprocessedImports {..}
+            <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
-        let hsc_src = if isHaskellSigFilename file then HsigFile else HsSrcFile
-
-        (dflags', hspp_fn, buf)
-            <- preprocessFile hsc_env file mb_phase maybe_buf
-
-        (srcimps,the_imps, L _ mod_name) <- getImports dflags' buf hspp_fn file
 
         -- Make a ModLocation for this file
-        location <- liftIO $ mkHomeModLocation dflags mod_name file
+        location <- liftIO $ mkHomeModLocation (hsc_dflags hsc_env) pi_mod_name src_fn
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location
 
-        -- when the user asks to load a source file by name, we only
-        -- use an object file if -fobject-code is on.  See #1205.
-        obj_timestamp <-
-            if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-               || obj_allowed -- bug #1205
-                then liftIO $ modificationTimeIfExists (ml_obj_file location)
-                else return Nothing
-
-        hi_timestamp <- maybeGetIfaceDate dflags location
-        hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
-
-        extra_sig_imports <- findExtraSigImports hsc_env hsc_src mod_name
-        required_by_imports <- implicitRequirements hsc_env the_imps
-
-        return (ModSummary { ms_mod = mod,
-                             ms_hsc_src = hsc_src,
-                             ms_location = location,
-                             ms_hspp_file = hspp_fn,
-                             ms_hspp_opts = dflags',
-                             ms_hspp_buf  = Just buf,
-                             ms_parsed_mod = Nothing,
-                             ms_srcimps = srcimps,
-                             ms_textual_imps = the_imps ++ extra_sig_imports ++ required_by_imports,
-                             ms_hs_date = src_timestamp,
-                             ms_iface_date = hi_timestamp,
-                             ms_hie_date = hie_timestamp,
-                             ms_obj_date = obj_timestamp })
+        makeNewModSummary hsc_env $ MakeNewModSummary
+            { nms_src_fn = src_fn
+            , nms_src_timestamp = src_timestamp
+            , nms_is_boot = NotBoot
+            , nms_hsc_src =
+                if isHaskellSigFilename src_fn
+                   then HsigFile
+                   else HsSrcFile
+            , nms_location = location
+            , nms_mod = mod
+            , nms_obj_allowed = obj_allowed
+            , nms_preimps = preimps
+            }
 
 findSummaryBySourceFile :: [ModSummary] -> FilePath -> Maybe ModSummary
 findSummaryBySourceFile summaries file
@@ -2344,11 +2325,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
 
     new_summary location mod src_fn src_timestamp
-      = do
-        -- Preprocess the source file and get its imports
-        -- The dflags' contains the OPTIONS pragmas
-        (dflags', hspp_fn, buf) <- preprocessFile hsc_env src_fn Nothing maybe_buf
-        (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
+      = fmap Just $ fmap Right $ do
+        preimps@PreprocessedImports {..}
+            <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
         -- NB: Despite the fact that is_boot is a top-level parameter, we
         -- don't actually know coming into this function what the HscSource
@@ -2362,57 +2341,90 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 _ | isHaskellSigFilename src_fn -> HsigFile
                   | otherwise -> HsSrcFile
 
-        when (mod_name /= wanted_mod) $
-                throwOneError $ mkPlainErrMsg dflags' mod_loc $
+        when (pi_mod_name /= wanted_mod) $
+                throwOneError $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                               text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr mod_name)
+                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
-        when (hsc_src == HsigFile && isNothing (lookup mod_name (thisUnitIdInsts dflags))) $
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (thisUnitIdInsts dflags))) $
             let suggested_instantiated_with =
                     hcat (punctuate comma $
                         [ ppr k <> text "=" <> ppr v
-                        | (k,v) <- ((mod_name, mkHoleModule mod_name)
+                        | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : thisUnitIdInsts dflags)
                         ])
-            in throwOneError $ mkPlainErrMsg dflags' mod_loc $
-                text "Unexpected signature:" <+> quotes (ppr mod_name)
+            in throwOneError $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+                text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
-                    then parens (text "Try adding" <+> quotes (ppr mod_name)
+                    then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
                             <+> text "to the"
                             <+> quotes (text "signatures")
                             <+> text "field in your Cabal file.")
                     else parens (text "Try passing -instantiated-with=\"" <>
                                  suggested_instantiated_with <> text "\"" $$
-                                text "replacing <" <> ppr mod_name <> text "> as necessary.")
+                                text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
 
-                -- Find the object timestamp, and return the summary
-        obj_timestamp <-
-           if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-              || obj_allowed -- bug #1205
-              then getObjTimestamp location is_boot
-              else return Nothing
+        makeNewModSummary hsc_env $ MakeNewModSummary
+            { nms_src_fn = src_fn
+            , nms_src_timestamp = src_timestamp
+            , nms_is_boot = is_boot
+            , nms_hsc_src = hsc_src
+            , nms_location = location
+            , nms_mod = mod
+            , nms_obj_allowed = obj_allowed
+            , nms_preimps = preimps
+            }
 
-        hi_timestamp <- maybeGetIfaceDate dflags location
-        hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+-- | Convenience named arguments for 'makeNewModSummary' only used to make
+-- code more readable, not exported.
+data MakeNewModSummary
+  = MakeNewModSummary
+      { nms_src_fn :: FilePath
+      , nms_src_timestamp :: UTCTime
+      , nms_is_boot :: IsBoot
+      , nms_hsc_src :: HscSource
+      , nms_location :: ModLocation
+      , nms_mod :: Module
+      , nms_obj_allowed :: Bool
+      , nms_preimps :: PreprocessedImports
+      }
 
-        extra_sig_imports <- findExtraSigImports hsc_env hsc_src mod_name
-        required_by_imports <- implicitRequirements hsc_env the_imps
+makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ModSummary
+makeNewModSummary hsc_env MakeNewModSummary{..} = do
+  let PreprocessedImports{..} = nms_preimps
+  let dflags = hsc_dflags hsc_env
 
-        return (Just (Right (ModSummary { ms_mod       = mod,
-                              ms_hsc_src   = hsc_src,
-                              ms_location  = location,
-                              ms_hspp_file = hspp_fn,
-                              ms_hspp_opts = dflags',
-                              ms_hspp_buf  = Just buf,
-                              ms_parsed_mod = Nothing,
-                              ms_srcimps      = srcimps,
-                              ms_textual_imps = the_imps ++ extra_sig_imports ++ required_by_imports,
-                              ms_hs_date   = src_timestamp,
-                              ms_iface_date = hi_timestamp,
-                              ms_hie_date = hie_timestamp,
-                              ms_obj_date  = obj_timestamp })))
+  -- when the user asks to load a source file by name, we only
+  -- use an object file if -fobject-code is on.  See #1205.
+  obj_timestamp <- liftIO $
+      if isObjectTarget (hscTarget dflags)
+         || nms_obj_allowed -- bug #1205
+          then getObjTimestamp nms_location nms_is_boot
+          else return Nothing
 
+  hi_timestamp <- maybeGetIfaceDate dflags nms_location
+  hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
+
+  extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
+  required_by_imports <- implicitRequirements hsc_env pi_theimps
+
+  return $ ModSummary
+      { ms_mod = nms_mod
+      , ms_hsc_src = nms_hsc_src
+      , ms_location = nms_location
+      , ms_hspp_file = pi_hspp_fn
+      , ms_hspp_opts = pi_local_dflags
+      , ms_hspp_buf  = Just pi_hspp_buf
+      , ms_parsed_mod = Nothing
+      , ms_srcimps = pi_srcimps
+      , ms_textual_imps =
+          pi_theimps ++ extra_sig_imports ++ required_by_imports
+      , ms_hs_date = nms_src_timestamp
+      , ms_iface_date = hi_timestamp
+      , ms_hie_date = hie_timestamp
+      , ms_obj_date = obj_timestamp
+      }
 
 getObjTimestamp :: ModLocation -> IsBoot -> IO (Maybe UTCTime)
 getObjTimestamp location is_boot
@@ -2431,6 +2443,33 @@ preprocessFile hsc_env src_fn mb_phase maybe_buf
             <- preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
         buf <- hGetStringBuffer hspp_fn
         return (dflags', hspp_fn, buf)
+
+data PreprocessedImports
+  = PreprocessedImports
+      { pi_local_dflags :: DynFlags
+      , pi_srcimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_theimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_hspp_fn  :: FilePath
+      , pi_hspp_buf :: StringBuffer
+      , pi_mod_name_loc :: SrcSpan
+      , pi_mod_name :: ModuleName
+      }
+
+-- Preprocess the source file and get its imports
+-- The pi_local_dflags contains the OPTIONS pragmas
+getPreprocessedImports
+    :: HscEnv
+    -> FilePath
+    -> Maybe Phase
+    -> Maybe (StringBuffer, UTCTime)
+    -> IO PreprocessedImports
+getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
+  (pi_local_dflags, pi_hspp_fn)
+      <- preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
+  pi_hscpp_buf <- hGetStringBuffer pi_hspp_fn
+  (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
+      <- getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+  return PreprocessedImports {..}
 
 
 -----------------------------------------------------------------------------
