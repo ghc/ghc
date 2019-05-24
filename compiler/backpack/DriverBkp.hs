@@ -730,7 +730,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          [] -- No exclusions
          case r of
             Nothing -> throwOneError (mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found"))
-            Just (Left err) -> throwOneError err
+            Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 
 -- | Up until now, GHC has assumed a single compilation target per source file.
