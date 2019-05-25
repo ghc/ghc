@@ -3,6 +3,7 @@
 --
 module Platform (
         Platform(..),
+        HasPlatform(..),
         Arch(..),
         OS(..),
         ArmISA(..),
@@ -42,6 +43,8 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
+class HasPlatform c where
+  getPlatform :: c -> Platform
 
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information

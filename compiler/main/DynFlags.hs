@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -------------------------------------------------------------------------------
 --
@@ -254,7 +255,7 @@ import PackageConfig
 import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
+import {-# SOURCE #-} Packages (PackageState, HasPackageState(..), emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CliOption
@@ -273,9 +274,12 @@ import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
 import FileSettings
+import NameSuppress
 import Outputable
+import Outputable.DynFlags
 import Settings
 import ToolSettings
+import TypeSuppress
 
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
@@ -1259,6 +1263,32 @@ data DynFlags = DynFlags {
   cfgWeightInfo         :: CfgWeights
 }
 
+instance HasPprConfig DynFlags where
+  getPprConfig dflags = PprConfig
+    { pprConfig_shouldUseColor = shouldUseColor dflags
+    , pprConfig_useUnicode = useUnicode dflags
+    , pprConfig_useUnicodeSyntax = useUnicodeSyntax dflags
+    , pprConfig_useStarIsType = useStarIsType dflags
+    , pprConfig_shouldUseHexWordLiterals = shouldUseHexWordLiterals dflags
+    , pprConfig_numColumns = pprCols dflags
+    }
+
+instance HasNameSuppress DynFlags where
+  getNameSuppress dflags = NameSuppress
+    { nameSuppress_modulePrefixes = gopt Opt_SuppressModulePrefixes dflags
+    , nameSuppress_uniques = gopt Opt_SuppressUniques dflags
+    }
+
+instance HasTypeSuppress DynFlags where
+  getTypeSuppress dflags = TypeSuppress
+    { typeSuppress_typeApplications = gopt Opt_SuppressTypeApplications dflags
+    , typeSuppress_typeSignatures = gopt Opt_SuppressTypeSignatures dflags
+    , typeSuppress_varKinds = gopt Opt_SuppressVarKinds dflags
+    }
+
+instance HasPackageState DynFlags where
+  getPackageState = pkgState
+
 -- | Edge weights to use when generating a CFG from CMM
 data CfgWeights
     = CFGWeights
@@ -1569,6 +1599,7 @@ data PackageArg =
     | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
   deriving (Eq, Show)
 instance Outputable PackageArg where
+    type OutputableNeedsOfConfig PackageArg = HasPackageState
     ppr (PackageArg pn) = text "package" <+> text pn
     ppr (UnitIdArg uid) = text "unit" <+> ppr uid
 
@@ -1629,6 +1660,7 @@ packageFlagsChanged idflags1 idflags0 =
      , Opt_AutoLinkPackages ]
 
 instance Outputable PackageFlag where
+    type OutputableNeedsOfConfig PackageFlag = HasPackageState
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
 
@@ -2261,6 +2293,7 @@ data OnOff a = On a
   deriving (Eq, Show)
 
 instance Outputable a => Outputable (OnOff a) where
+  type OutputableNeedsOfConfig (OnOff a) = OutputableNeedsOfConfig a
   ppr (On x)  = text "On" <+> ppr x
   ppr (Off x) = text "Off" <+> ppr x
 
