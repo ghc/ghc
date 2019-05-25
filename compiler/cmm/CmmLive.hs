@@ -25,6 +25,7 @@ import Hoopl.Label
 
 import Maybes
 import Outputable
+import Outputable.DynFlags (pprPanic)
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block

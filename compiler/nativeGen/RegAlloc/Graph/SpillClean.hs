@@ -41,6 +41,7 @@ import UniqFM
 import Unique
 import State
 import Outputable
+import PlainPanic (panic)
 import GHC.Platform
 import Hoopl.Collections
 

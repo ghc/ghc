@@ -25,6 +25,7 @@ import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import qualified TrieMap as TM
 import UniqFM
 import Unique

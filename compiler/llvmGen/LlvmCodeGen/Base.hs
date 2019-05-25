@@ -49,6 +49,7 @@ import DynFlags
 import FastString
 import Cmm              hiding ( succ )
 import Outputable as Outp
+import Outputable.DynFlags as Outp
 import GHC.Platform
 import UniqFM
 import Unique

@@ -1,9 +1,11 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Llvm.MetaData where
 
 import GhcPrelude
 
+import DynFlags (DynFlags) -- TODO
 import Llvm.Types
 import Outputable
 
@@ -74,6 +76,7 @@ data MetaExpr = MetaStr !LMString
               deriving (Eq)
 
 instance Outputable MetaExpr where
+  type OutputableNeedsOfConfig MetaExpr = (~) DynFlags -- TODO
   ppr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
   ppr (MetaStr    s ) = char '!' <> doubleQuotes (ftext s)
   ppr (MetaNode   n ) = ppr n

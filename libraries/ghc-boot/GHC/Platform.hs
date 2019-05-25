@@ -46,7 +46,6 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
-
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information
 --      about what instruction set extensions an architecture might support.

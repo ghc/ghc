@@ -27,7 +27,9 @@ import Cmm
 import UniqFM
 import UniqSet
 import Digraph          (flattenSCCs)
+import DynFlags (DynFlags)
 import Outputable
+import Outputable.DynFlags (SDoc, pprPanic)
 import GHC.Platform
 import State
 import CFG
@@ -77,11 +79,15 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --   For each vreg, the number of times it was written to, read from,
 --   and the number of instructions it was live on entry to (lifetime)
 --
-slurpSpillCostInfo :: forall instr statics. (Outputable instr, Instruction instr)
-                   => Platform
-                   -> Maybe CFG
-                   -> LiveCmmDecl statics instr
-                   -> SpillCostInfo
+slurpSpillCostInfo
+  :: forall instr statics
+  . ( Outputable instr, OutputableNeedsOfConfig instr DynFlags
+    , Instruction instr
+    )
+  => Platform
+  -> Maybe CFG
+  -> LiveCmmDecl statics instr
+  -> SpillCostInfo
 
 slurpSpillCostInfo platform cfg cmm
         = execState (countCmm cmm) zeroSpillCostInfo

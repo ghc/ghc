@@ -52,6 +52,8 @@ import Util
 import Digraph
 
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import PlainPanic (panic)
 -- DEBUGGING ONLY
 --import Debug
 --import OrdList

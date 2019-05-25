@@ -61,10 +61,12 @@ import ConLike
 import DataCon
 import TyCon
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import Type
 import SrcLoc
 import Bag -- collect ev vars from pats
-import DynFlags( gopt, GeneralFlag(..) )
+import DynFlags( DynFlags, gopt, GeneralFlag(..) )
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
@@ -505,9 +507,16 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 -}
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p) where
-    ppr = pprPat
+  type OutputableNeedsOfConfig (Pat p) = PairConstraint
+    (PairConstraint
+     (OutputableNeedsOfConfig p)
+     (OutputableBndrIdNeedsOfConfig p))
+    ((~) DynFlags) -- TODO generalize
+  ppr = pprPat
 
-pprPatBndr :: OutputableBndr name => name -> SDoc
+pprPatBndr
+  :: (OutputableBndr name, OutputableBndrNeedsOfConfig' name DynFlags)
+  => name -> SDoc
 pprPatBndr var                  -- Print with type info if -dppr-debug is on
   = getPprStyle $ \ sty ->
     if debugStyle sty then
@@ -516,12 +525,18 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
     else
         pprPrefixOcc var
 
-pprParendLPat :: (OutputableBndrId (GhcPass p))
-              => PprPrec -> LPat (GhcPass p) -> SDoc
+pprParendLPat
+  :: ( OutputableNeedsOfConfig (GhcPass p) DynFlags
+     , OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags
+     )
+  => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
 
-pprParendPat :: (OutputableBndrId (GhcPass p))
-             => PprPrec -> Pat (GhcPass p) -> SDoc
+pprParendPat
+  :: ( OutputableNeedsOfConfig (GhcPass p) DynFlags
+     , OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags
+     )
+  => PprPrec -> Pat (GhcPass p) -> SDoc
 pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
                      if need_parens dflags pat
                      then parens (pprPat pat)
@@ -535,7 +550,11 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
+pprPat
+  :: ( OutputableNeedsOfConfig (GhcPass p) DynFlags
+     , OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags
+     )
+  => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -577,13 +596,20 @@ pprPat (ConPatOut { pat_con = con
 pprPat (XPat x)               = ppr x
 
 
-pprUserCon :: (OutputableBndr con, OutputableBndrId (GhcPass p))
-           => con -> HsConPatDetails (GhcPass p) -> SDoc
+pprUserCon
+  :: ( OutputableBndr con, OutputableBndrNeedsOfConfig' con DynFlags
+     , OutputableNeedsOfConfig (GhcPass p) DynFlags
+     , OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags
+     )
+  => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprConArgs :: (OutputableBndrId (GhcPass p))
-           => HsConPatDetails (GhcPass p) -> SDoc
+pprConArgs
+  :: ( OutputableNeedsOfConfig (GhcPass p) DynFlags
+     , OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags
+     )
+  => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon pats) = fsep (map (pprParendLPat appPrec) pats)
 pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
                                   , pprParendLPat appPrec p2 ]
@@ -591,6 +617,11 @@ pprConArgs (RecCon rpats)   = ppr rpats
 
 instance (Outputable arg)
       => Outputable (HsRecFields p arg) where
+  type OutputableNeedsOfConfig (HsRecFields p arg) = PairConstraint
+    (PairConstraint
+     (OutputableNeedsOfConfig p)
+     (OutputableNeedsOfConfig arg))
+    ((~) DynFlags) -- TODO generalize
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
@@ -600,6 +631,11 @@ instance (Outputable arg)
 
 instance (Outputable p, Outputable arg)
       => Outputable (HsRecField' p arg) where
+  type OutputableNeedsOfConfig (HsRecField' p arg) = PairConstraint
+    (PairConstraint
+     (OutputableNeedsOfConfig p)
+     (OutputableNeedsOfConfig arg))
+    ((~) DynFlags) -- TODO generalize
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)

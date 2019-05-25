@@ -25,6 +25,7 @@ import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )
 import Type
 import Outputable
+import PlainPanic (panic)
 import FastString
 import HsExtension
 
@@ -228,6 +229,7 @@ instance Ord OverLitVal where
 
 -- Instance specific to GhcPs, need the SourceText
 instance p ~ GhcPass pass => Outputable (HsLit p) where
+    type OutputableNeedsOfConfig (HsLit p) = HasPprConfig
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
     ppr (HsCharPrim st c)   = pp_st_suffix st primCharSuffix (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
@@ -244,7 +246,7 @@ instance p ~ GhcPass pass => Outputable (HsLit p) where
     ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
     ppr (XLit x) = ppr x
 
-pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
+pp_st_suffix :: SourceText -> SDoc' r -> SDoc' r -> SDoc' r
 pp_st_suffix NoSourceText         _ doc = doc
 pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 
@@ -266,7 +268,7 @@ instance Outputable OverLitVal where
 -- mainly for too reasons:
 --  * We do not want to expose their internal representation
 --  * The warnings become too messy
-pmPprHsLit :: HsLit (GhcPass x) -> SDoc
+pmPprHsLit :: HsLit (GhcPass x) -> SDoc' r
 pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)

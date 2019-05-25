@@ -1,4 +1,7 @@
-{-# LANGUAGE BangPatterns, RecordWildCards, GADTs #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -33,6 +36,8 @@ import Util
 import DynFlags
 import FastString
 import Outputable hiding ( isEmpty )
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
@@ -229,6 +234,7 @@ data StackMap = StackMap
  }
 
 instance Outputable StackMap where
+  type OutputableNeedsOfConfig StackMap = (~) DynFlags -- TODO
   ppr StackMap{..} =
      text "Sp = " <> int sm_sp $$
      text "sm_args = " <> int sm_args $$

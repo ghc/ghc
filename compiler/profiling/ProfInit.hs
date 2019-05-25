@@ -14,6 +14,7 @@ import CLabel
 import CostCentre
 import DynFlags
 import Outputable
+import Outputable.DynFlags (SDoc)
 import Module
 
 -- -----------------------------------------------------------------------------

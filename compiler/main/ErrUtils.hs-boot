@@ -1,7 +1,8 @@
 module ErrUtils where
 
 import GhcPrelude
-import Outputable (SDoc, PrintUnqualified )
+import Outputable (PrintUnqualified )
+import Outputable.DynFlags (SDoc)
 import SrcLoc (SrcSpan)
 import Json
 import {-# SOURCE #-} DynFlags ( DynFlags, DumpFlag )

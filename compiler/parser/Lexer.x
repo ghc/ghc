@@ -44,6 +44,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -78,6 +79,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
+import Data.Kind
 
 import EnumSet (EnumSet)
 import qualified EnumSet
@@ -95,6 +97,7 @@ import qualified Data.Map as Map
 -- compiler/utils
 import Bag
 import Outputable
+import Outputable.DynFlags
 import StringBuffer
 import FastString
 import UniqFM
@@ -2486,6 +2489,7 @@ mkPStatePure options buf loc =
 -- for each monad: addErrorP vs addErrorPV, getBitP vs getBitPV, and so on.
 --
 class Monad m => MonadP m where
+  type MonadPConfig m :: Type
   -- | Add a non-fatal error. Use this when the parser can produce a result
   --   despite the error.
   --
@@ -2498,13 +2502,13 @@ class Monad m => MonadP m where
   --   to the accumulator and parsing continues. This allows GHC to report
   --   more than one parse error per file.
   --
-  addError :: SrcSpan -> SDoc -> m ()
+  addError :: SrcSpan -> SDoc' (MonadPConfig m) -> m ()
   -- | Add a warning to the accumulator.
   --   Use 'getMessages' to get the accumulated warnings.
-  addWarning :: WarningFlag -> SrcSpan -> SDoc -> m ()
+  addWarning :: WarningFlag -> SrcSpan -> SDoc' (MonadPConfig m) -> m ()
   -- | Add a fatal error. This will be the last error reported by the parser, and
   --   the parser will not produce any result, ending in a 'PFailed' state.
-  addFatalError :: SrcSpan -> SDoc -> m a
+  addFatalError :: SrcSpan -> SDoc' (MonadPConfig m) -> m a
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
   -- | Given a location and a list of AddAnn, apply them all to the location.
@@ -2541,6 +2545,7 @@ appendWarning o option srcspan warning m =
     in (ws', es)
 
 instance MonadP P where
+  type (MonadPConfig P) = DynFlags
   addError srcspan msg
    = P $ \s@PState{messages=m} ->
              POk s{messages=appendError srcspan msg m} ()
@@ -2875,7 +2880,7 @@ alternativeLayoutRuleToken t
              -- the other ITwhere case omitted; general case below covers it
              (_, _, _) -> return t
 
-transitionalAlternativeLayoutWarning :: String -> SDoc
+transitionalAlternativeLayoutWarning :: String -> SDoc' r
 transitionalAlternativeLayoutWarning msg
     = text "transitional layout will not be accepted in the future:"
    $$ text msg
