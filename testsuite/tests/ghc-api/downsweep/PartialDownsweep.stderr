@@ -1,8 +1,3 @@
 == Parse error in export list
-PartialDownsweep: panic! (the 'impossible' happened)
-  (GHC version 8.9.0.20190523:
-	parse error on input ‘!’
-
-
-Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug
-
+== Parse error in import list
+== Parse error in export list with bypass module
