@@ -22,7 +22,8 @@ import DynFlags
 import ErrUtils
 import Maybes     (MaybeT(..),runMaybeT)
 import Util       (charToC)
-import Outputable (text,hcat,SDoc)
+import Outputable (text,hcat,SDoc')
+import Platform   (HasPlatform)
 
 import Control.Monad (when)
 import Data.Binary.Get
@@ -417,7 +418,8 @@ readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
 -- If we add new target platforms, we need to check that the generated words
 -- are 32-bit long, otherwise we need to use platform specific directives to
 -- force 32-bit .int in asWord32.
-makeElfNote :: String -> String -> Word32 -> String -> SDoc
+makeElfNote
+  :: HasPlatform r => String -> String -> Word32 -> String -> SDoc' r
 makeElfNote sectionName noteName typ contents = hcat [
     text "\t.section ",
     text sectionName,
@@ -449,7 +451,7 @@ makeElfNote sectionName noteName typ contents = hcat [
     escape :: String -> String
     escape = concatMap (charToC.fromIntegral.ord)
 
-    asWord32 :: Show a => a -> SDoc
+    asWord32 :: Show a => a -> SDoc' r
     asWord32 x = hcat [
       text "\t.int ",
       text (show x),

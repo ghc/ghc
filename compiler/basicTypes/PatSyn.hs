@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module PatSyn (
         -- * Main data types
@@ -29,11 +30,14 @@ import GhcPrelude
 import Type
 import Name
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import Packages (HasPackageState)
 import Unique
 import Util
 import BasicTypes
 import Var
 import FieldLabel
+import TypeSuppress
 
 import qualified Data.Data as Data
 import Data.Function
@@ -316,6 +320,9 @@ instance NamedThing PatSyn where
     getName = patSynName
 
 instance Outputable PatSyn where
+    type OutputableNeedsOfConfig PatSyn = PairConstraint
+      HasPprConfig
+      (PairConstraint HasNameSuppress HasPackageState)
     ppr = ppr . getName
 
 instance OutputableBndr PatSyn where
@@ -454,7 +461,13 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
     substTyWith (binderVars univ_tvs) inst_tys res_ty
 
 -- | Print the type of a pattern synonym. The foralls are printed explicitly
-pprPatSynType :: PatSyn -> SDoc
+pprPatSynType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PatSyn -> SDoc' r
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
                         , psArgs       = orig_args, psResultTy = orig_res_ty })

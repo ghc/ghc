@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module HsDoc
   ( HsDocString
@@ -30,6 +31,7 @@ import Encoding
 import FastFunctions
 import Name
 import Outputable
+import Packages (HasPackageState)
 import SrcLoc
 
 import Data.ByteString (ByteString)
@@ -84,7 +86,7 @@ unpackHDS = utf8DecodeByteString . hsDocStringToByteString
 hsDocStringToByteString :: HsDocString -> ByteString
 hsDocStringToByteString (HsDocString bs) = bs
 
-ppr_mbDoc :: Maybe LHsDocString -> SDoc
+ppr_mbDoc :: Maybe LHsDocString -> SDoc' r
 ppr_mbDoc (Just doc) = ppr doc
 ppr_mbDoc Nothing    = empty
 
@@ -124,6 +126,9 @@ instance Binary DeclDocMap where
   get bh = DeclDocMap . Map.fromList <$> get bh
 
 instance Outputable DeclDocMap where
+  type OutputableNeedsOfConfig DeclDocMap = PairConstraint
+    HasNameSuppress
+    HasPackageState
   ppr (DeclDocMap m) = vcat (map pprPair (Map.toAscList m))
     where
       pprPair (name, doc) = ppr name Outputable.<> colon $$ nest 2 (ppr doc)
@@ -141,6 +146,9 @@ instance Binary ArgDocMap where
   get bh = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromList <$> get bh
 
 instance Outputable ArgDocMap where
+  type OutputableNeedsOfConfig ArgDocMap = PairConstraint
+    HasNameSuppress
+    HasPackageState
   ppr (ArgDocMap m) = vcat (map pprPair (Map.toAscList m))
     where
       pprPair (name, int_map) =

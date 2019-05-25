@@ -22,16 +22,20 @@ import Data.Maybe
 
 -- | Pretty print a graph in a somewhat human readable format.
 dumpGraph
-        :: (Outputable k, Outputable color)
-        => Graph k cls color -> SDoc
+        :: ( Outputable k, OutputableNeedsOfConfig k r
+           , Outputable color, OutputableNeedsOfConfig color r
+           )
+        => Graph k cls color -> SDoc' r
 
 dumpGraph graph
         =  text "Graph"
         $$ pprUFM (graphMap graph) (vcat . map dumpNode)
 
 dumpNode
-        :: (Outputable k, Outputable color)
-        => Node k cls color -> SDoc
+        :: ( Outputable k, OutputableNeedsOfConfig k r
+           , Outputable color, OutputableNeedsOfConfig color r
+           )
+        => Node k cls color -> SDoc' r
 
 dumpNode node
         =  text "Node " <> ppr (nodeId node)
@@ -59,12 +63,15 @@ dumpNode node
 --      Coalescences get dashed edges.
 dotGraph
         :: ( Uniquable k
-           , Outputable k, Outputable cls, Outputable color)
-        => (color -> SDoc)  -- ^ What graphviz color to use for each node color
+           , Outputable k, OutputableNeedsOfConfig k r
+           , Outputable cls, OutputableNeedsOfConfig cls r
+           , Outputable color, OutputableNeedsOfConfig color r
+           )
+        => (color -> SDoc' r)  -- ^ What graphviz color to use for each node color
                             --  It's usually safe to return X11 style colors here,
                             --  ie "red", "green" etc or a hex triplet #aaff55 etc
         -> Triv k cls color
-        -> Graph k cls color -> SDoc
+        -> Graph k cls color -> SDoc' r
 
 dotGraph colorMap triv graph
  = let  nodes   = nonDetEltsUFM $ graphMap graph
@@ -77,10 +84,13 @@ dotGraph colorMap triv graph
                    , space ])
 
 
-dotNode :: ( Outputable k, Outputable cls, Outputable color)
-        => (color -> SDoc)
+dotNode :: ( Outputable k, OutputableNeedsOfConfig k r
+           , Outputable cls, OutputableNeedsOfConfig cls r
+           , Outputable color, OutputableNeedsOfConfig color r
+           )
+        => (color -> SDoc' r)
         -> Triv k cls color
-        -> Node k cls color -> SDoc
+        -> Node k cls color -> SDoc' r
 
 dotNode colorMap triv node
  = let  name    = ppr $ nodeId node
@@ -135,10 +145,12 @@ dotNode colorMap triv node
 
 dotNodeEdges
         :: ( Uniquable k
-           , Outputable k)
+           , Outputable k
+           , OutputableNeedsOfConfig k r
+           )
         => UniqSet k
         -> Node k cls color
-        -> (UniqSet k, Maybe SDoc)
+        -> (UniqSet k, Maybe (SDoc' r))
 
 dotNodeEdges visited node
         | elementOfUniqSet (nodeId node) visited

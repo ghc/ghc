@@ -10,6 +10,7 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module UniqDSet (
         -- * Unique set type
@@ -135,7 +136,8 @@ getUniqDSet :: UniqDSet a -> UniqDFM a
 getUniqDSet = getUniqDSet'
 
 instance Outputable a => Outputable (UniqDSet a) where
+  type OutputableNeedsOfConfig (UniqDSet a) = OutputableNeedsOfConfig a
   ppr = pprUniqDSet ppr
 
-pprUniqDSet :: (a -> SDoc) -> UniqDSet a -> SDoc
+pprUniqDSet :: (a -> SDoc' r) -> UniqDSet a -> SDoc' r
 pprUniqDSet f = braces . pprWithCommas f . uniqDSetToList

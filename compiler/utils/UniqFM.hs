@@ -22,6 +22,7 @@ of arguments of combining function.
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqFM (
@@ -352,9 +353,10 @@ instance Monoid (UniqFM a) where
 -- Output-ery
 
 instance Outputable a => Outputable (UniqFM a) where
+    type OutputableNeedsOfConfig (UniqFM a) = OutputableNeedsOfConfig a
     ppr ufm = pprUniqFM ppr ufm
 
-pprUniqFM :: (a -> SDoc) -> UniqFM a -> SDoc
+pprUniqFM :: (a -> SDoc' r) -> UniqFM a -> SDoc' r
 pprUniqFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> text ":->" <+> ppr_elt elt
@@ -368,8 +370,8 @@ pprUniqFM ppr_elt ufm
 -- Having this function helps contain the non-determinism created with
 -- nonDetEltsUFM.
 pprUFM :: UniqFM a      -- ^ The things to be pretty printed
-       -> ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
-       -> SDoc          -- ^ 'SDoc' where the things have been pretty
+       -> ([a] -> SDoc' r) -- ^ The pretty printing function to use on the elements
+       -> SDoc' r          -- ^ 'SDoc' where the things have been pretty
                         -- printed
 pprUFM ufm pp = pp (nonDetEltsUFM ufm)
 
@@ -380,14 +382,14 @@ pprUFM ufm pp = pp (nonDetEltsUFM ufm)
 -- nonDetUFMToList.
 pprUFMWithKeys
        :: UniqFM a                -- ^ The things to be pretty printed
-       -> ([(Unique, a)] -> SDoc) -- ^ The pretty printing function to use on the elements
-       -> SDoc                    -- ^ 'SDoc' where the things have been pretty
+       -> ([(Unique, a)] -> SDoc' r) -- ^ The pretty printing function to use on the elements
+       -> SDoc' r                    -- ^ 'SDoc' where the things have been pretty
                                   -- printed
 pprUFMWithKeys ufm pp = pp (nonDetUFMToList ufm)
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
-pluralUFM :: UniqFM a -> SDoc
+pluralUFM :: UniqFM a -> SDoc' r
 pluralUFM ufm
   | sizeUFM ufm == 1 = empty
   | otherwise = char 's'

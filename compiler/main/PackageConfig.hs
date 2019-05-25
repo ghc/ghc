@@ -35,6 +35,8 @@ import GhcPrelude
 import GHC.PackageDb
 import Data.Version
 
+import {-# SOURCE #-} Packages (HasPackageState)
+
 import FastString
 import Outputable
 import Module
@@ -93,7 +95,7 @@ packageNameString pkg = unpackFS str
   where
     PackageName str = packageName pkg
 
-pprPackageConfig :: PackageConfig -> SDoc
+pprPackageConfig :: HasPackageState r => PackageConfig -> SDoc' r
 pprPackageConfig InstalledPackageInfo {..} =
     vcat [
       field "name"                 (ppr packageName),
