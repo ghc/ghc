@@ -1,5 +1,5 @@
 module TcType where
-import Outputable( SDoc )
+import Outputable.DynFlags( SDoc )
 
 data MetaDetails
 
