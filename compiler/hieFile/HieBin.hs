@@ -17,12 +17,14 @@ import Outputable
 import PrelInfo
 import SrcLoc
 import UniqSupply                 ( takeUniqFromSupply )
+import Util                       ( maybeRead )
 import Unique
 import UniqFM
 
 import qualified Data.Array as A
 import Data.IORef
 import Data.ByteString            ( ByteString )
+import qualified Data.ByteString  as BS
 import qualified Data.ByteString.Char8 as BSC
 import Data.List                  ( mapAccumR )
 import Data.Word                  ( Word8, Word32 )
@@ -80,6 +82,11 @@ hieMagicLen = length hieMagic
 ghcVersion :: ByteString
 ghcVersion = BSC.pack cProjectVersion
 
+putBinLine :: BinHandle -> ByteString -> IO ()
+putBinLine bh xs = do
+  mapM_ (putByte bh) $ BS.unpack xs
+  putByte bh 10 -- newline char
+
 -- | Write a `HieFile` to the given `FilePath`, with a proper header and
 -- symbol tables for `Name`s and `FastString`s
 writeHieFile :: FilePath -> HieFile -> IO ()
@@ -88,9 +95,9 @@ writeHieFile hie_file_path hiefile = do
 
   -- Write the header: hieHeader followed by the
   -- hieVersion and the GHC version used to generate this file
-  mapM_ (put_ bh0) hieMagic
-  put_ bh0 hieVersion
-  put_ bh0 ghcVersion
+  mapM_ (putByte bh0) hieMagic
+  putBinLine bh0 $ BSC.pack $ show hieVersion
+  putBinLine bh0 $ ghcVersion
 
   -- remember where the dictionary pointer will go
   dict_p_p <- tellBin bh0
@@ -191,23 +198,37 @@ readHieFile nc file = do
   (hieFile, nc') <- readHieFileContents bh0 nc
   return $ (HieFileResult hieVersion ghcVersion hieFile, nc')
 
+readBinLine :: BinHandle -> IO ByteString
+readBinLine bh = BS.pack . reverse <$> loop []
+  where
+    loop acc = do
+      char <- get bh :: IO Word8
+      if char == 10 -- ASCII newline '\n'
+      then return acc
+      else loop (char : acc)
 
 readHieFileHeader :: FilePath -> BinHandle -> IO HieHeader
 readHieFileHeader file bh0 = do
   -- Read the header
   magic <- replicateM hieMagicLen (get bh0)
-  readHieVersion <- get bh0
-  ghcVersion <- (get bh0 :: IO ByteString)
+  version <- BSC.unpack <$> readBinLine bh0
+  case maybeRead version of
+    Nothing ->
+      panic $ unwords ["readHieFileHeader: hieVersion isn't an Integer:"
+                      , show version
+                      ]
+    Just readHieVersion -> do
+      ghcVersion <- readBinLine bh0
 
-  -- Check if the header is valid
-  when (magic /= hieMagic) $
-    panic $ unwords ["readHieFileHeader: headers don't match for file:"
-                    , file
-                    , "Expected"
-                    , show hieMagic
-                    , "but got", show magic
-                    ]
-  return (readHieVersion, ghcVersion)
+      -- Check if the header is valid
+      when (magic /= hieMagic) $
+        panic $ unwords ["readHieFileHeader: headers don't match for file:"
+                        , file
+                        , "Expected"
+                        , show hieMagic
+                        , "but got", show magic
+                        ]
+      return (readHieVersion, ghcVersion)
 
 readHieFileContents :: BinHandle -> NameCache -> IO (HieFile, NameCache)
 readHieFileContents bh0 nc = do
