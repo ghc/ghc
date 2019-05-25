@@ -64,6 +64,8 @@ import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
 import Ar
+import Bag              ( unitBag )
+import FastString       ( mkFastString )
 
 import Exception
 import System.Directory
@@ -91,8 +93,11 @@ preprocess :: HscEnv
            -> Maybe StringBuffer
            -- ^ optional buffer to use instead of reading input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (DynFlags, FilePath)
+           -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
+  handleSourceError (\err -> return (Left (srcErrorMessages err))) $
+  ghandle handler $
+  fmap Right $
   ASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
   runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
@@ -101,6 +106,11 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
         (Temporary TFL_GhcSession)
         Nothing{-no ModLocation-}
         []{-no foreign objects-}
+  where
+    srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
+    handler (ProgramError msg) = return $ Left $ unitBag $
+        mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
+    handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
 

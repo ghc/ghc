@@ -1,2 +1,4 @@
 A B C
-`t8602.sh' failed in phase `Haskell pre-processor'. (Exit code: 1)
+
+A.hs:1:1: error:
+    `t8602.sh' failed in phase `Haskell pre-processor'. (Exit code: 1)

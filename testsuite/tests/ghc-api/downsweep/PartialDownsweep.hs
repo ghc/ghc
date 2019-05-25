@@ -45,7 +45,8 @@ main = do
   runGhc (Just libdir) $ do
     dflags0 <- getSessionDynFlags
     (dflags1, _, _) <- parseDynamicFlags dflags0 $ map noLoc $
-        [ -- "-v3"
+        [ "-fno-diagnostics-show-caret"
+        -- , "-v3"
         ] ++ args
     _ <- setSessionDynFlags dflags1
 
@@ -65,6 +66,23 @@ main = do
          sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A"]
        )
 
+    go "Parse error in export list with bypass module"
+        [ [ "module A where"
+          , "import B"
+          , "import C"
+          ]
+        , [ "module B !parse_error where"
+          , "import D"
+          ]
+        , [ "module C where"
+          , "import D"
+          ]
+        , [ "module D where"
+          ]
+        ]
+       (\mss -> return $
+           sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "C", "D"]
+       )
     go "Parse error in import list"
         [ [ "module A where"
           , "import B"
@@ -83,23 +101,39 @@ main = do
          sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "B"]
        )
 
-    go "Parse error in export list with bypass module"
+    go "CPP preprocessor error"
+        [ [ "module A where"
+          , "import B"
+          ]
+        , [ "{-# LANGUAGE CPP #-}"
+          , "#elif <- cpp error here"
+          , "module B where"
+          , "import C"
+          ]
+        , [ "module C where"
+          ]
+        ]
+       (\mss -> return $
+         sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A"]
+       )
+
+    go "CPP preprocessor error with bypass"
         [ [ "module A where"
           , "import B"
           , "import C"
           ]
-        , [ "module B !parse_error where"
-          , "import D"
+        , [ "{-# LANGUAGE CPP #-}"
+          , "#elif <- cpp error here"
+          , "module B where"
+          , "import C"
           ]
         , [ "module C where"
-          , "import D"
-          ]
-        , [ "module D where"
           ]
         ]
        (\mss -> return $
-           sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "C", "D"]
+         sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "C"]
        )
+
 
   errored <- readIORef any_failed
   when errored $ exitFailure
@@ -125,5 +159,8 @@ go label mods cnd =
 
 
 writeMod :: [String] -> IO ()
-writeMod src@(head -> stripPrefix "module " -> Just (takeWhile (/=' ') -> mod))
-  = writeFile (mod++".hs") $ unlines src
+writeMod src =
+    writeFile (mod++".hs") $ unlines src
+  where
+    Just modline = find ("module" `isPrefixOf`) src
+    Just (takeWhile (/=' ') -> mod) = stripPrefix "module " modline
