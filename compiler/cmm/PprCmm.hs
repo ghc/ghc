@@ -1,4 +1,9 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ----------------------------------------------------------------------------
@@ -48,6 +53,7 @@ import CmmSwitch
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (SDoc)
 import PprCmmDecl
 import PprCmmExpr
 import Util
@@ -60,40 +66,53 @@ import Hoopl.Graph
 -- Outputable instances
 
 instance Outputable CmmStackInfo where
+    type OutputableNeedsOfConfig CmmStackInfo = (~) DynFlags -- TODO
     ppr = pprStackInfo
 
 instance Outputable CmmTopInfo where
+    type OutputableNeedsOfConfig CmmTopInfo = (~) DynFlags -- TODO
     ppr = pprTopInfo
 
 
 instance Outputable (CmmNode e x) where
+    type OutputableNeedsOfConfig (CmmNode e x) = (~) DynFlags -- TODO
     ppr = pprNode
 
 instance Outputable Convention where
+    type OutputableNeedsOfConfig Convention = (~) DynFlags -- TODO
     ppr = pprConvention
 
 instance Outputable ForeignConvention where
+    type OutputableNeedsOfConfig ForeignConvention = (~) DynFlags -- TODO
     ppr = pprForeignConvention
 
 instance Outputable ForeignTarget where
+    type OutputableNeedsOfConfig ForeignTarget = (~) DynFlags -- TODO
     ppr = pprForeignTarget
 
 instance Outputable CmmReturnInfo where
+    type OutputableNeedsOfConfig CmmReturnInfo = (~) DynFlags -- TODO
     ppr = pprReturnInfo
 
 instance Outputable (Block CmmNode C C) where
+    type OutputableNeedsOfConfig (Block CmmNode C C) = (~) DynFlags -- TODO
     ppr = pprBlock
 instance Outputable (Block CmmNode C O) where
+    type OutputableNeedsOfConfig (Block CmmNode C O) = (~) DynFlags -- TODO
     ppr = pprBlock
 instance Outputable (Block CmmNode O C) where
+    type OutputableNeedsOfConfig (Block CmmNode O C) = (~) DynFlags -- TODO
     ppr = pprBlock
 instance Outputable (Block CmmNode O O) where
+    type OutputableNeedsOfConfig (Block CmmNode O O) = (~) DynFlags -- TODO
     ppr = pprBlock
 
 instance Outputable (Graph CmmNode e x) where
+    type OutputableNeedsOfConfig (Graph CmmNode e x) = (~) DynFlags -- TODO
     ppr = pprGraph
 
 instance Outputable CmmGraph where
+    type OutputableNeedsOfConfig CmmGraph = (~) DynFlags -- TODO
     ppr = pprCmmGraph
 
 ----------------------------------------------------------
@@ -122,15 +141,19 @@ pprBlock block
                        block
                        empty
 
-pprGraph :: Graph CmmNode e x -> SDoc
+pprGraph
+  :: Graph CmmNode e x -> SDoc
 pprGraph GNil = empty
 pprGraph (GUnit block) = ppr block
 pprGraph (GMany entry body exit)
    = text "{"
   $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
   $$ text "}"
-  where pprMaybeO :: Outputable (Block CmmNode e x)
-                  => MaybeO ex (Block CmmNode e x) -> SDoc
+  where pprMaybeO
+          :: ( Outputable (Block CmmNode e x)
+             , OutputableNeedsOfConfig (Block CmmNode e x) DynFlags
+             )
+          => MaybeO ex (Block CmmNode e x) -> SDoc
         pprMaybeO NothingO = empty
         pprMaybeO (JustO block) = ppr block
 

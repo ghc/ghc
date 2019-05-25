@@ -6,7 +6,9 @@
 The @TyCon@ datatype
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TyCon(
         -- * Main TyCon data types
@@ -153,6 +155,9 @@ import CoAxiom
 import PrelNames
 import Maybes
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (assertPanic)
+import Packages (HasPackageState)
 import FastStringEnv
 import FieldLabel
 import Constants
@@ -160,6 +165,7 @@ import Util
 import Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import UniqSet
 import Module
+import TypeSuppress (HasTypeSuppress)
 
 import qualified Data.Data as Data
 
@@ -419,6 +425,7 @@ data TyConBndrVis
   | AnonTCB  AnonArgFlag
 
 instance Outputable TyConBndrVis where
+  type OutputableNeedsOfConfig TyConBndrVis = NoConstraint
   ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
   ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
 
@@ -640,6 +647,7 @@ They fit together like so:
 -}
 
 instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
+  type OutputableNeedsOfConfig (VarBndr tv TyConBndrVis) = OutputableNeedsOfConfig tv
   ppr (Bndr v bi) = ppr_bi bi <+> parens (ppr v)
     where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
@@ -1097,6 +1105,9 @@ data AlgTyConFlav
         -- with R:TList's algTcParent = DataFamInstTyCon T [a] co
 
 instance Outputable AlgTyConFlav where
+    type OutputableNeedsOfConfig AlgTyConFlav = PairConstraint
+        (PairConstraint HasPprConfig HasNameSuppress)
+        (PairConstraint HasPackageState HasTypeSuppress)
     ppr (VanillaAlgTyCon {})        = text "Vanilla ADT"
     ppr (UnboxedAlgTyCon {})        = text "Unboxed ADT"
     ppr (ClassTyCon cls _)          = text "Class parent" <+> ppr cls
@@ -1154,6 +1165,9 @@ data FamTyConFlav
    | BuiltInSynFamTyCon BuiltInSynFamily
 
 instance Outputable FamTyConFlav where
+    type OutputableNeedsOfConfig FamTyConFlav = PairConstraint
+        HasNameSuppress
+        HasPackageState
     ppr (DataFamilyTyCon n) = text "data family" <+> ppr n
     ppr OpenSynFamilyTyCon = text "open type family"
     ppr (ClosedSynFamilyTyCon Nothing) = text "closed type family"
@@ -1438,9 +1452,11 @@ data PrimElemRep
    deriving( Eq, Show )
 
 instance Outputable PrimRep where
+  type OutputableNeedsOfConfig PrimRep = NoConstraint
   ppr r = text (show r)
 
 instance Outputable PrimElemRep where
+  type OutputableNeedsOfConfig PrimElemRep = NoConstraint
   ppr r = text (show r)
 
 isVoidRep :: PrimRep -> Bool
@@ -2514,6 +2530,9 @@ instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
 instance Outputable TyCon where
+  type OutputableNeedsOfConfig TyCon = PairConstraint
+    HasNameSuppress
+    HasPackageState
   -- At the moment a promoted TyCon has the same Name as its
   -- corresponding TyCon, so we add the quote to distinguish it here
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc) <> pp_tc
@@ -2540,6 +2559,7 @@ data TyConFlavour
   deriving Eq
 
 instance Outputable TyConFlavour where
+  type OutputableNeedsOfConfig TyConFlavour = NoConstraint
   ppr = text . go
     where
       go ClassFlavour = "class"
@@ -2611,7 +2631,7 @@ tcFlavourIsOpen BuiltInTypeFlavour      = False
 tcFlavourIsOpen PromotedDataConFlavour  = False
 tcFlavourIsOpen TypeSynonymFlavour      = False
 
-pprPromotionQuote :: TyCon -> SDoc
+pprPromotionQuote :: TyCon -> SDoc' r
 -- Promoted data constructors already have a tick in their OccName
 pprPromotionQuote tc
   = case tc of

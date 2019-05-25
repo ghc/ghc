@@ -104,11 +104,13 @@ import NameSet
 
 -- others:
 import Class
-import Outputable
 import Util
 import SrcLoc
 import Type
 
+import DynFlags (DynFlags)
+import Outputable
+import Outputable.DynFlags (SDoc)
 import Bag
 import Maybes
 import Data.Data        hiding (TyCon,Fixity, Infix)
@@ -2368,7 +2370,12 @@ annProvenanceName_maybe (ValueAnnProvenance (L _ name)) = Just name
 annProvenanceName_maybe (TypeAnnProvenance (L _ name))  = Just name
 annProvenanceName_maybe ModuleAnnProvenance       = Nothing
 
-pprAnnProvenance :: OutputableBndr name => AnnProvenance name -> SDoc
+pprAnnProvenance
+  :: ( OutputableBndr name
+     , OutputableNeedsOfConfig name r
+     , OutputableBndrNeedsOfConfig name r
+     )
+  => AnnProvenance name -> SDoc' r
 pprAnnProvenance ModuleAnnProvenance       = text "ANN module"
 pprAnnProvenance (ValueAnnProvenance (L _ name))
   = text "ANN" <+> ppr name
@@ -2404,6 +2411,11 @@ type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (RoleAnnotDecl p) where
+  type OutputableNeedsOfConfig (RoleAnnotDecl p) = PairConstraint
+         (PairConstraint
+           (OutputableNeedsOfConfig (IdP p))
+           (OutputableBndrNeedsOfConfig (IdP p)))
+         ((~) DynFlags) -- TODO generalize
   ppr (RoleAnnotDecl _ ltycon roles)
     = text "type role" <+> pprPrefixOcc (unLoc ltycon) <+>
       hsep (map (pp_role . unLoc) roles)

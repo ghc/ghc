@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module RepType
   (
@@ -28,6 +29,9 @@ import GhcPrelude
 import BasicTypes (Arity, RepArity)
 import DataCon
 import Outputable
+import Outputable.DynFlags (SDoc, pprPanic)
+import PlainPanic (assertPanic)
+import DynFlags () -- Has* instances
 import PrelNames
 import Coercion
 import TyCon
@@ -240,6 +244,7 @@ data SlotTy = PtrSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
     -- (would not be true on a 128-bit machine)
 
 instance Outputable SlotTy where
+  type OutputableNeedsOfConfig SlotTy = NoConstraint
   ppr PtrSlot    = text "PtrSlot"
   ppr Word64Slot = text "Word64Slot"
   ppr WordSlot   = text "WordSlot"

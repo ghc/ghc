@@ -32,10 +32,14 @@ import Id
 import IdInfo
 import Name
 import Outputable
+import Outputable.DynFlags ( pprPanic )
 import OrdList
+import Panic ( assertPanic )
+import Packages ( HasPackageState )
 import StgSubst
 import StgSyn
 import Type
+import TypeSuppress
 import UniqSupply
 import Util
 import VarEnv
@@ -152,6 +156,9 @@ data FloatLang
   | LiftedBinding OutStgBinding
 
 instance Outputable FloatLang where
+  type OutputableNeedsOfConfig FloatLang = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr StartBindingGroup = char '('
   ppr EndBindingGroup = char ')'
   ppr (PlainTopBinding StgTopStringLit{}) = text "<str>"

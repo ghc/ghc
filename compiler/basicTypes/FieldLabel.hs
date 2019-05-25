@@ -61,6 +61,7 @@ Of course, datatypes with no constructors cannot have any fields.
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module FieldLabel ( FieldLabelString
                   , FieldLabelEnv
@@ -102,6 +103,7 @@ data FieldLbl a = FieldLabel {
 deriving instance Data a => Data (FieldLbl a)
 
 instance Outputable a => Outputable (FieldLbl a) where
+    type OutputableNeedsOfConfig (FieldLbl a) = OutputableNeedsOfConfig a
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
 
 instance Binary a => Binary (FieldLbl a) where

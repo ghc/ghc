@@ -41,6 +41,8 @@ import Format
 
 import Unique
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32

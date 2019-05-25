@@ -3,6 +3,7 @@
 --      by NCGMonad and the register allocators, which are shared
 --      by all architectures.
 --
+{-# LANGUAGE TypeFamilies #-}
 module Reg (
         RegNo,
         Reg(..),
@@ -29,6 +30,7 @@ where
 import GhcPrelude
 
 import Outputable
+import PlainPanic
 import Unique
 import RegClass
 import Data.List
@@ -88,6 +90,7 @@ instance Uniquable VirtualReg where
                 VirtualRegD u   -> u
 
 instance Outputable VirtualReg where
+        type OutputableNeedsOfConfig VirtualReg = NoConstraint
         ppr reg
          = case reg of
                 VirtualRegI  u  -> text "%vI_"   <> pprUniqueAlways u
@@ -156,6 +159,7 @@ instance Uniquable RealReg where
                 RealRegPair r1 r2       -> mkRegPairUnique (r1 * 65536 + r2)
 
 instance Outputable RealReg where
+        type OutputableNeedsOfConfig RealReg = NoConstraint
         ppr reg
          = case reg of
                 RealRegSingle i         -> text "%r"  <> int i
@@ -199,6 +203,7 @@ instance Uniquable Reg where
 --      If you want the architecture specific names, then use the pprReg
 --      function from the appropriate Ppr module.
 instance Outputable Reg where
+        type OutputableNeedsOfConfig Reg = NoConstraint
         ppr reg
          = case reg of
                 RegVirtual vr   -> ppr vr

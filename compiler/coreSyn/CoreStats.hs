@@ -3,6 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2015
 -}
 
+{-# LANGUAGE TypeFamilies #-}
+
 -- | Functions to computing the statistics reflective of the "size"
 -- of a Core expression
 module CoreStats (
@@ -29,6 +31,7 @@ data CoreStats = CS { cs_tm :: !Int    -- Terms
 
 
 instance Outputable CoreStats where
+ type OutputableNeedsOfConfig CoreStats = NoConstraint
  ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3, cs_vb = i4, cs_jb = i5 })
    = braces (sep [text "terms:"     <+> intWithCommas i1 <> comma,
                   text "types:"     <+> intWithCommas i2 <> comma,
