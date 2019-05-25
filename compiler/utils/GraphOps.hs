@@ -22,7 +22,9 @@ import GhcPrelude
 
 import GraphBase
 
+import DynFlags (DynFlags)
 import Outputable
+import Outputable.DynFlags
 import Unique
 import UniqSet
 import UniqFM
@@ -552,7 +554,10 @@ scanGraph match graph
 --      If they don't then throw an error
 --
 validateGraph
-        :: (Uniquable k, Outputable k, Eq color)
+        :: ( Uniquable k, Outputable k
+           , OutputableNeedsOfConfig k DynFlags
+           , Eq color
+           )
         => SDoc                         -- ^ extra debugging info to display on error
         -> Bool                         -- ^ whether this graph is supposed to be colored.
         -> Graph k cls color            -- ^ graph to validate

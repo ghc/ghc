@@ -81,6 +81,7 @@ module Name (
 
 import GhcPrelude
 
+import {-# SOURCE #-} Packages( HasPackageState )
 import {-# SOURCE #-} TyCoRep( TyThing )
 
 import OccName
@@ -90,9 +91,9 @@ import Unique
 import Util
 import Maybes
 import Binary
-import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (pprPanic)
 
 import Control.DeepSeq
 import Data.Data
@@ -523,6 +524,9 @@ instance Binary Name where
 -}
 
 instance Outputable Name where
+    type OutputableNeedsOfConfig Name = PairConstraint
+      HasNameSuppress
+      HasPackageState
     ppr name = pprName name
 
 instance OutputableBndr Name where
@@ -530,7 +534,7 @@ instance OutputableBndr Name where
     pprInfixOcc  = pprInfixName
     pprPrefixOcc = pprPrefixName
 
-pprName :: Name -> SDoc
+pprName :: (HasNameSuppress r, HasPackageState r) => Name -> SDoc' r
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
@@ -540,10 +544,20 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal                -> pprInternal sty uniq occ
 
 -- | Print the string of Name unqualifiedly directly.
-pprNameUnqualified :: Name -> SDoc
+pprNameUnqualified :: Name -> SDoc' r
 pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
-pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
+pprExternal
+  :: ( HasNameSuppress r
+     , HasPackageState r
+     )
+  => PprStyle
+  -> Unique
+  -> Module
+  -> OccName
+  -> Bool
+  -> BuiltInSyntax
+  -> SDoc' r
 pprExternal sty uniq mod occ is_wired is_builtin
   | codeStyle sty = ppr mod <> char '_' <> ppr_z_occ_name occ
         -- In code style, always qualify
@@ -561,12 +575,12 @@ pprExternal sty uniq mod occ is_wired is_builtin
                     _ -> braces (ppr (moduleName mod) <> dot <> ppr_occ_name occ)
             else pprModulePrefix sty mod occ <> ppr_occ_name occ
   where
-    pp_mod = sdocWithDynFlags $ \dflags ->
-             if gopt Opt_SuppressModulePrefixes dflags
+    pp_mod = sdocWithDynFlags $ \cfg ->
+             if nameSuppress_modulePrefixes $ getNameSuppress cfg
              then empty
              else ppr mod <> dot
 
-pprInternal :: PprStyle -> Unique -> OccName -> SDoc
+pprInternal :: HasNameSuppress r => PprStyle -> Unique -> OccName -> SDoc' r
 pprInternal sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
@@ -577,7 +591,7 @@ pprInternal sty uniq occ
   | otherwise      = ppr_occ_name occ   -- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
-pprSystem :: PprStyle -> Unique -> OccName -> SDoc
+pprSystem :: HasNameSuppress r => PprStyle -> Unique -> OccName -> SDoc' r
 pprSystem sty uniq occ
   | codeStyle sty  = pprUniqueAlways uniq
   | debugStyle sty = ppr_occ_name occ <> ppr_underscore_unique uniq
@@ -588,11 +602,13 @@ pprSystem sty uniq occ
                                 -- so print the unique
 
 
-pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
+pprModulePrefix
+  :: (HasNameSuppress r, HasPackageState r)
+  => PprStyle -> Module -> OccName -> SDoc' r
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in HscTypes
-pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
-  if gopt Opt_SuppressModulePrefixes dflags
+pprModulePrefix sty mod occ = sdocWithDynFlags $ \cfg ->
+  if nameSuppress_modulePrefixes $ getNameSuppress cfg
   then empty
   else
     case qualName sty mod occ of              -- See Outputable.QualifyName:
@@ -602,37 +618,37 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
                           <> ppr (moduleName mod) <> dot          -- scope either
       NameUnqual       -> empty                   -- In scope unqualified
 
-pprUnique :: Unique -> SDoc
+pprUnique :: HasNameSuppress r => Unique -> SDoc' r
 -- Print a unique unless we are suppressing them
 pprUnique uniq
-  = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressUniques dflags) $
+  = sdocWithDynFlags $ \cfg ->
+    ppUnless (nameSuppress_uniques $ getNameSuppress cfg) $
     pprUniqueAlways uniq
 
-ppr_underscore_unique :: Unique -> SDoc
+ppr_underscore_unique :: HasNameSuppress r => Unique -> SDoc' r
 -- Print an underscore separating the name from its unique
 -- But suppress it if we aren't printing the uniques anyway
 ppr_underscore_unique uniq
-  = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressUniques dflags) $
+  = sdocWithDynFlags $ \cfg ->
+    ppUnless (nameSuppress_uniques $ getNameSuppress cfg) $
     char '_' <> pprUniqueAlways uniq
 
-ppr_occ_name :: OccName -> SDoc
+ppr_occ_name :: OccName -> SDoc' r
 ppr_occ_name occ = ftext (occNameFS occ)
         -- Don't use pprOccName; instead, just print the string of the OccName;
         -- we print the namespace in the debug stuff above
 
 -- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
 -- cached behind the scenes in the FastString implementation.
-ppr_z_occ_name :: OccName -> SDoc
+ppr_z_occ_name :: OccName -> SDoc' r
 ppr_z_occ_name occ = ztext (zEncodeFS (occNameFS occ))
 
 -- Prints (if mod information is available) "Defined at <loc>" or
 --  "Defined in <mod>" information for a Name.
-pprDefinedAt :: Name -> SDoc
+pprDefinedAt :: (HasPackageState r, HasPprConfig r) => Name -> SDoc' r
 pprDefinedAt name = text "Defined" <+> pprNameDefnLoc name
 
-pprNameDefnLoc :: Name -> SDoc
+pprNameDefnLoc :: (HasPackageState r, HasPprConfig r) => Name -> SDoc' r
 -- Prints "at <loc>" or
 --     or "in <mod>" depending on what info is available
 pprNameDefnLoc name
@@ -690,12 +706,17 @@ getSrcSpan          = nameSrcSpan          . getName
 getOccString        = occNameString        . getOccName
 getOccFS            = occNameFS            . getOccName
 
-pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
+pprInfixName
+  :: ( Outputable a, OutputableNeedsOfConfig a r
+     , NamedThing a
+     )
+  => a
+  -> SDoc' r
 -- See Outputable.pprPrefixVar, pprInfixVar;
 -- add parens or back-quotes as appropriate
 pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
-pprPrefixName :: NamedThing a => a -> SDoc
+pprPrefixName :: (HasNameSuppress r, HasPackageState r) => NamedThing a => a -> SDoc' r
 pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
  where
    name = getName thing

@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module HieTypes where
 
 import GhcPrelude
@@ -13,6 +14,7 @@ import IfaceType
 import Module                     ( ModuleName, Module )
 import Name                       ( Name )
 import Outputable hiding ( (<>) )
+import PlainPanic                 ( panic )
 import SrcLoc                     ( RealSrcSpan )
 import Avail
 
@@ -274,6 +276,7 @@ data IdentifierDetails a = IdentifierDetails
   } deriving (Eq, Functor, Foldable, Traversable)
 
 instance Outputable a => Outputable (IdentifierDetails a) where
+  type OutputableNeedsOfConfig (IdentifierDetails a) = OutputableNeedsOfConfig a
   ppr x = text "IdentifierDetails" <+> ppr (identType x) <+> ppr (identInfo x)
 
 instance Semigroup (IdentifierDetails a) where

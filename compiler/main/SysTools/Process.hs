@@ -15,6 +15,7 @@ import ErrUtils
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags
 import Panic
 import GhcPrelude
 import Util
@@ -323,10 +324,12 @@ breakIntColon xs = case break (':' ==) xs of
                            Just (read ys, zs)
                        _ -> Nothing
 
-data BuildMessage
-  = BuildMsg   !SDoc
-  | BuildError !SrcLoc !SDoc
+data BuildMessage' r
+  = BuildMsg   !(SDoc' r)
+  | BuildError !SrcLoc !(SDoc' r)
   | EOF
+
+type BuildMessage = BuildMessage' DynFlags
 
 -- Divvy up text stream into lines, taking platform dependent
 -- line termination into account.

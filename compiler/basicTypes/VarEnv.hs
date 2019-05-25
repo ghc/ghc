@@ -3,6 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE TypeFamilies #-}
 module VarEnv (
         -- * Var, Id and TyVar environments (maps)
         VarEnv, IdEnv, TyVarEnv, CoVarEnv, TyCoVarEnv,
@@ -85,6 +86,8 @@ import Unique
 import Util
 import Maybes
 import Outputable
+import Outputable.DynFlags (pprPanic, pprTraceDebug, panic)
+import Packages (HasPackageState)
 
 {-
 ************************************************************************
@@ -108,6 +111,9 @@ data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
         -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
+  type OutputableNeedsOfConfig InScopeSet = PairConstraint
+    HasNameSuppress
+    HasPackageState
   ppr (InScope s _) =
     text "InScope" <+>
     braces (fsep (map (ppr . Var.varName) (nonDetEltsUniqSet s)))
