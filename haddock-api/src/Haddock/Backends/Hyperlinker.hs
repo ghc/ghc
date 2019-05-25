@@ -19,7 +19,7 @@ import System.Directory
 import System.FilePath
 
 import HieTypes       ( HieFile(..), HieASTs(..) )
-import HieBin         ( readHieFile )
+import HieBin         ( readHieFile, hie_file_result)
 import Data.Map as M
 import FastString     ( mkFastString )
 import Module         ( Module, moduleName )
@@ -60,7 +60,8 @@ ppHyperlinkedModuleSource srcdir pretty srcs iface = case ifaceHieFile iface of
                 , hie_asts = HieASTs asts
                 , hie_types = types
                 , hie_hs_src = rawSrc
-                } <- fmap fst (readHieFile (initNameCache u []) hfp)
+                } <- (hie_file_result . fst)
+                 <$> (readHieFile (initNameCache u []) hfp)
 
         -- Get the AST and tokens corresponding to the source file we want
         let mast | M.size asts == 1 = snd <$> M.lookupMin asts
