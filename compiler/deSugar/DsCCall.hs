@@ -367,15 +367,15 @@ resultWrapper result_ty
 
 maybeNarrow :: DynFlags -> TyCon -> (CoreExpr -> CoreExpr)
 maybeNarrow dflags tycon
-  | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId platform Narrow8IntOp)) e
-  | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId platform Narrow16IntOp)) e
+  | tycon `hasKey` int8TyConKey   = \e -> App (Var (mkPrimOpId primOpCache Narrow8IntOp)) e
+  | tycon `hasKey` int16TyConKey  = \e -> App (Var (mkPrimOpId primOpCache Narrow16IntOp)) e
   | tycon `hasKey` int32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId platform Narrow32IntOp)) e
+         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId primOpCache Narrow32IntOp)) e
 
-  | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId platform Narrow8WordOp)) e
-  | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId platform Narrow16WordOp)) e
+  | tycon `hasKey` word8TyConKey  = \e -> App (Var (mkPrimOpId primOpCache Narrow8WordOp)) e
+  | tycon `hasKey` word16TyConKey = \e -> App (Var (mkPrimOpId primOpCache Narrow16WordOp)) e
   | tycon `hasKey` word32TyConKey
-         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId platform Narrow32WordOp)) e
+         && wORD_SIZE dflags > 4         = \e -> App (Var (mkPrimOpId primOpCache Narrow32WordOp)) e
   | otherwise                     = id
   where
-    platform = targetPlatform dflags
+    primOpCache = targetPrimOpCache dflags

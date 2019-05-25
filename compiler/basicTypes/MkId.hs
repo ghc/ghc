@@ -55,6 +55,7 @@ import Class
 import NameSet
 import Name
 import PrimOp
+import PrimOp.Cache
 import ForeignCall
 import DataCon
 import Id
@@ -64,7 +65,6 @@ import CoreSyn
 import Unique
 import UniqSupply
 import PrelNames
-import Platform
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
 import Pair
@@ -1156,13 +1156,13 @@ wrapFamInstBody tycon args body
 ************************************************************************
 -}
 
-mkPrimOpId :: Platform -> PrimOp -> Id
-mkPrimOpId platform prim_op
+mkPrimOpId :: PrimOpCache -> PrimOp -> Id
+mkPrimOpId primOpCache prim_op
   = id
   where
-    (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig platform prim_op
+    (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig primOpCache prim_op
     ty   = mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
-    name = mkWiredInName gHC_PRIM (primOpOcc platform prim_op)
+    name = mkWiredInName gHC_PRIM (primOpOcc primOpCache prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info

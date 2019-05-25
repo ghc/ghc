@@ -42,6 +42,7 @@ import TyCon
 import CLabel
 import CmmUtils
 import PrimOp
+import PrimOp.Cache
 import SMRep
 import FastString
 import Outputable
@@ -119,7 +120,7 @@ cgOpApp (StgPrimOp primop) args res_ty = do
 
           | otherwise -> panic "cgPrimop"
           where
-             result_info = getPrimOpResultInfo (targetPlatform dflags) primop
+             result_info = getPrimOpResultInfo (targetPrimOpCache dflags) primop
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args

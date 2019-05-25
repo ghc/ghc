@@ -71,7 +71,7 @@ import TyCon
 import UniqFM
 import Util
 import TcTypeNats ( typeNatTyCons )
-import Platform
+import PrimOp.Cache
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate )
@@ -109,8 +109,8 @@ Note [About wired-in things]
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in PrelNames)
-knownKeyNames :: Platform -> [Name]
-knownKeyNames platform
+knownKeyNames :: PrimOpCache -> [Name]
+knownKeyNames primOpCache
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
   = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
@@ -131,7 +131,7 @@ knownKeyNames platform
              , concatMap wired_tycon_kk_names typeNatTyCons
 
              , map idName wiredInIds
-             , map (idName . primOpId platform) $ allThePrimOps platform
+             , map (idName . primOpId primOpCache) $ allThePrimOps primOpCache
              , basicKnownKeyNames
              , templateHaskellNames
              ]
@@ -189,17 +189,17 @@ knownKeyNamesOkay all_names
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
-lookupKnownKeyName :: Platform -> Unique -> Maybe Name
-lookupKnownKeyName platform u =
-    knownUniqueName u <|> lookupUFM (knownKeysMap platform) u
+lookupKnownKeyName :: PrimOpCache -> Unique -> Maybe Name
+lookupKnownKeyName primOpCache u =
+    knownUniqueName u <|> lookupUFM (knownKeysMap primOpCache) u
 
 -- | Is a 'Name' known-key?
-isKnownKeyName :: Platform -> Name -> Bool
-isKnownKeyName platform n =
-    isJust (knownUniqueName $ nameUnique n) || elemUFM n (knownKeysMap platform)
+isKnownKeyName :: PrimOpCache -> Name -> Bool
+isKnownKeyName primOpCache n =
+    isJust (knownUniqueName $ nameUnique n) || elemUFM n (knownKeysMap primOpCache)
 
-knownKeysMap :: Platform -> UniqFM Name
-knownKeysMap platform = listToUFM [ (nameUnique n, n) | n <- knownKeyNames platform ]
+knownKeysMap :: PrimOpCache -> UniqFM Name
+knownKeysMap primOpCache = listToUFM [ (nameUnique n, n) | n <- knownKeyNames primOpCache ]
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
@@ -229,14 +229,14 @@ sense of them in interface pragmas. It's cool, though they all have
 ************************************************************************
 -}
 
-primOpIds :: Platform -> Array Int Id
+primOpIds :: PrimOpCache -> Array Int Id
 -- A cache of the PrimOp Ids, indexed by PrimOp tag
-primOpIds platform = array (1, maxPrimOpTag)
-    [ (primOpTag op, mkPrimOpId platform op)
-    | op <- allThePrimOps platform ]
+primOpIds primOpCache = array (1, maxPrimOpTag)
+    [ (primOpTag op, mkPrimOpId primOpCache op)
+    | op <- allThePrimOps primOpCache ]
 
-primOpId :: Platform -> PrimOp -> Id
-primOpId platform op = primOpIds platform ! primOpTag op
+primOpId :: PrimOpCache -> PrimOp -> Id
+primOpId primOpCache op = primOpIds primOpCache ! primOpTag op
 
 {-
 ************************************************************************
@@ -249,10 +249,10 @@ GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 -}
 
-ghcPrimExports :: Platform -> [IfaceExport]
-ghcPrimExports platform
+ghcPrimExports :: PrimOpCache -> [IfaceExport]
+ghcPrimExports primOpCache
  = map (avail . idName) ghcPrimIds ++
-   map (avail . idName . primOpId platform) (allThePrimOps platform) ++
+   map (avail . idName . primOpId primOpCache) (allThePrimOps primOpCache) ++
    [ AvailTC n [n] []
    | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
 

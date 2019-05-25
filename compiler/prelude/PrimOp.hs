@@ -12,36 +12,38 @@
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 
 module PrimOp (
-        PrimOp(..), PrimOpVecCat(..), allThePrimOps,
-        primOpType, primOpSig,
-        primOpTag, maxPrimOpTag, primOpOcc,
+        PrimOp(..), PrimOpVecCat(..), PrimOpInfo(..),
+        allThePrimOpsPerPlatform,
+        primOpInfoPerPlatform,
+        primOpStrictness,
+        primOpTag,
+        maxPrimOpTag,
 
         tagToEnumKey,
 
+        primOpInfoOcc, pprPrimOpInfo,
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity,
 
-        getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
-
         PrimCall(..)
     ) where
 
-#include "HsVersions.h"
-
 import GhcPrelude
 import Control.Monad (guard)
+
+-- TODO if/when 'Outputable' / 'SDoc' don't hard-code 'DynFlags', try to break
+-- this cycle.
+import {-# SOURCE #-} PrimOp.Cache ( primOpInfo )
+import {-# SOURCE #-} DynFlags ( targetPrimOpCache )
 
 import TysPrim
 import TysWiredIn
 
 import CmmType
 import Demand
-import DynFlags         ( targetPlatform )
 import OccName          ( OccName, pprOccName, mkVarOccFS )
-import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
 import Type
-import RepType          ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
 import ForeignCall      ( CLabelString )
@@ -84,9 +86,8 @@ instance Ord PrimOp where
                       | otherwise  = GT
 
 instance Outputable PrimOp where
-    -- TODO really should find a better way than 'unsafeGlobalDynFlags'. At
-    -- least it is typically used for pretty-printing.
-    ppr op = sdocWithDynFlags $ \dflags -> pprPrimOp (targetPlatform dflags) op
+    ppr op = sdocWithDynFlags $ \dflags ->
+      pprPrimOpInfo $ primOpInfo (targetPrimOpCache dflags) op
 
 data PrimOpVecCat = IntVec
                   | WordVec
@@ -94,8 +95,8 @@ data PrimOpVecCat = IntVec
 
 -- An @Enum@-derived list would be better; meanwhile... (ToDo)
 
-allThePrimOps :: Platform -> [PrimOp]
-allThePrimOps platform = concat $
+allThePrimOpsPerPlatform :: Platform -> [PrimOp]
+allThePrimOpsPerPlatform platform = concat $
 #include "primop-list.hs-incl"
 
 tagToEnumKey :: Unique
@@ -177,10 +178,10 @@ primOpFixity :: PrimOp -> Maybe Fixity
 else, notably a type, can be constructed) for each @PrimOp@.
 -}
 
-primOpInfo :: Platform -> PrimOp -> PrimOpInfo
-primOpInfo platform = \case
+primOpInfoPerPlatform :: Platform -> PrimOp -> PrimOpInfo
+primOpInfoPerPlatform platform = \case
 #include "primop-primop-info.hs-incl"
-    _ -> error "primOpInfo: unknown primop"
+    _ -> error "primOpInfoPerPlatform: unknown primop"
 
 {-
 Here are a load of comments from the old primOp info:
@@ -542,65 +543,14 @@ primOpCodeSizeForeignCall = 4
 ************************************************************************
 -}
 
-primOpType :: Platform -> PrimOp -> Type  -- you may want to use primOpSig instead
-primOpType platform op
-  = case primOpInfo platform op of
-    Dyadic  _occ ty -> dyadic_fun_ty ty
-    Monadic _occ ty -> monadic_fun_ty ty
-    Compare _occ ty -> compare_fun_ty ty
 
-    GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
+primOpInfoOcc :: PrimOpInfo -> OccName
+primOpInfoOcc = \case
+  Dyadic    occ _     -> occ
+  Monadic   occ _     -> occ
+  Compare   occ _     -> occ
+  GenPrimOp occ _ _ _ -> occ
 
-primOpOcc :: Platform -> PrimOp -> OccName
-primOpOcc platform op = case primOpInfo platform op of
-               Dyadic    occ _     -> occ
-               Monadic   occ _     -> occ
-               Compare   occ _     -> occ
-               GenPrimOp occ _ _ _ -> occ
-
-isComparisonPrimOp :: Platform -> PrimOp -> Bool
-isComparisonPrimOp platform op = case primOpInfo platform op of
-                          Compare {} -> True
-                          _          -> False
-
--- primOpSig is like primOpType but gives the result split apart:
--- (type variables, argument types, result type)
--- It also gives arity, strictness info
-
-primOpSig :: Platform -> PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
-primOpSig platform op
-  = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
-  where
-    arity = length arg_tys
-    (tyvars, arg_tys, res_ty)
-      = case (primOpInfo platform op) of
-        Monadic   _occ ty                    -> ([],     [ty],    ty       )
-        Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
-        Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
-        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
-
-data PrimOpResultInfo
-  = ReturnsPrim     PrimRep
-  | ReturnsAlg      TyCon
-
--- Some PrimOps need not return a manifest primitive or algebraic value
--- (i.e. they might return a polymorphic value).  These PrimOps *must*
--- be out of line, or the code generator won't work.
-
-getPrimOpResultInfo :: Platform -> PrimOp -> PrimOpResultInfo
-getPrimOpResultInfo platform op
-  = case (primOpInfo platform op) of
-      Dyadic  _ ty                        -> ReturnsPrim (typePrimRep1 ty)
-      Monadic _ ty                        -> ReturnsPrim (typePrimRep1 ty)
-      Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
-      GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
-                         | otherwise      -> ReturnsAlg tc
-                         where
-                           tc = tyConAppTyCon ty
-                        -- All primops return a tycon-app result
-                        -- The tycon can be an unboxed tuple or sum, though,
-                        -- which gives rise to a ReturnAlg
 
 {-
 We do not currently make use of whether primops are commutable.
@@ -614,17 +564,10 @@ commutableOp :: PrimOp -> Bool
 #include "primop-commutable.hs-incl"
 -}
 
--- Utils:
-
-dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
-dyadic_fun_ty  ty = mkVisFunTys [ty, ty] ty
-monadic_fun_ty ty = mkVisFunTy  ty ty
-compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
-
 -- Output stuff:
 
-pprPrimOp :: Platform -> PrimOp -> SDoc
-pprPrimOp platform other_op = pprOccName (primOpOcc platform other_op)
+pprPrimOpInfo :: PrimOpInfo -> SDoc
+pprPrimOpInfo = pprOccName . primOpInfoOcc
 
 {-
 ************************************************************************

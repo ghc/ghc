@@ -12,7 +12,7 @@ import Module                     ( Module )
 import Name
 import NameCache
 import Outputable
-import Platform                   ( Platform )
+import PrimOp.Cache               ( PrimOpCache )
 import PrelInfo
 import SrcLoc
 import UniqSupply                 ( takeUniqFromSupply )
@@ -65,8 +65,8 @@ data HieDictionary = HieDictionary
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
-writeHieFile :: Binary a => Platform -> FilePath -> a -> IO ()
-writeHieFile platform hie_file_path hiefile = do
+writeHieFile :: Binary a => PrimOpCache -> FilePath -> a -> IO ()
+writeHieFile primOpCache hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
 
   -- remember where the dictionary pointer will go
@@ -92,8 +92,8 @@ writeHieFile platform hie_file_path hiefile = do
                       hie_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = setUserData bh0 $ newWriteState (putName platform hie_symtab)
-                                           (putName platform hie_symtab)
+  let bh = setUserData bh0 $ newWriteState (putName primOpCache hie_symtab)
+                                           (putName primOpCache hie_symtab)
                                            (putFastString hie_dict)
   put_ bh hiefile
 
@@ -122,8 +122,8 @@ writeHieFile platform hie_file_path hiefile = do
   writeBinMem bh hie_file_path
   return ()
 
-readHieFile :: Binary a => Platform -> NameCache -> FilePath -> IO (a, NameCache)
-readHieFile platform nc file = do
+readHieFile :: Binary a => PrimOpCache -> NameCache -> FilePath -> IO (a, NameCache)
+readHieFile primOpCache nc file = do
   bh0 <- readBinMem file
 
   dict  <- get_dictionary bh0
@@ -154,7 +154,7 @@ readHieFile platform nc file = do
       symtab_p <- get bh1
       data_p'  <- tellBin bh1
       seekBin bh1 symtab_p
-      (nc', symtab) <- getSymbolTable platform bh1 nc
+      (nc', symtab) <- getSymbolTable primOpCache bh1 nc
       seekBin bh1 data_p'
       return (nc', symtab)
 
@@ -178,12 +178,12 @@ putSymbolTable bh next_off symtab = do
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
   mapM_ (putHieName bh) names
 
-getSymbolTable :: Platform -> BinHandle -> NameCache -> IO (NameCache, SymbolTable)
-getSymbolTable platform bh namecache = do
+getSymbolTable :: PrimOpCache -> BinHandle -> NameCache -> IO (NameCache, SymbolTable)
+getSymbolTable primOpCache bh namecache = do
   sz <- get bh
   od_names <- replicateM sz (getHieName bh)
   let arr = A.listArray (0,sz-1) names
-      (namecache', names) = mapAccumR (fromHieName platform) namecache od_names
+      (namecache', names) = mapAccumR (fromHieName primOpCache) namecache od_names
   return (namecache', arr)
 
 getSymTabName :: SymbolTable -> BinHandle -> IO Name
@@ -191,8 +191,8 @@ getSymTabName st bh = do
   i :: Word32 <- get bh
   return $ st A.! (fromIntegral i)
 
-putName :: Platform -> HieSymbolTable -> BinHandle -> Name -> IO ()
-putName platform (HieSymbolTable next ref) bh name = do
+putName :: PrimOpCache -> HieSymbolTable -> BinHandle -> Name -> IO ()
+putName primOpCache (HieSymbolTable next ref) bh name = do
   symmap <- readIORef ref
   case lookupUFM symmap name of
     Just (off, ExternalName mod occ (UnhelpfulSpan _))
@@ -201,14 +201,14 @@ putName platform (HieSymbolTable next ref) bh name = do
       writeIORef ref $! addToUFM symmap name (off, hieName)
       put_ bh (fromIntegral off :: Word32)
     Just (off, LocalName _occ span)
-      | notLocal (toHieName platform name) || nameSrcSpan name /= span -> do
-      writeIORef ref $! addToUFM symmap name (off, toHieName platform name)
+      | notLocal (toHieName primOpCache name) || nameSrcSpan name /= span -> do
+      writeIORef ref $! addToUFM symmap name (off, toHieName primOpCache name)
       put_ bh (fromIntegral off :: Word32)
     Just (off, _) -> put_ bh (fromIntegral off :: Word32)
     Nothing -> do
         off <- readFastMutInt next
         writeFastMutInt next (off+1)
-        writeIORef ref $! addToUFM symmap name (off, toHieName platform name)
+        writeIORef ref $! addToUFM symmap name (off, toHieName primOpCache name)
         put_ bh (fromIntegral off :: Word32)
 
   where
@@ -219,16 +219,17 @@ putName platform (HieSymbolTable next ref) bh name = do
 
 -- ** Converting to and from `HieName`'s
 
-toHieName :: Platform -> Name -> HieName
-toHieName platform name
-  | isKnownKeyName platform name = KnownKeyName (nameUnique name)
+toHieName :: PrimOpCache -> Name -> HieName
+toHieName primOpCache name
+
+  | isKnownKeyName primOpCache name = KnownKeyName (nameUnique name)
   | isExternalName name = ExternalName (nameModule name)
                                        (nameOccName name)
                                        (nameSrcSpan name)
   | otherwise = LocalName (nameOccName name) (nameSrcSpan name)
 
-fromHieName :: Platform -> NameCache -> HieName -> (NameCache, Name)
-fromHieName platform nc = \case
+fromHieName :: PrimOpCache -> NameCache -> HieName -> (NameCache, Name)
+fromHieName primOpCache nc = \case
   ExternalName mod occ span ->
     let cache = nsNames nc
     in case lookupOrigNameCache cache mod occ of
@@ -242,7 +243,7 @@ fromHieName platform nc = \case
     let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
         name       = mkInternalName uniq occ span
     in ( nc{ nsUniqs = us }, name )
-  KnownKeyName u -> case lookupKnownKeyName platform u of
+  KnownKeyName u -> case lookupKnownKeyName primOpCache u of
     Nothing -> pprPanic "fromHieName:unknown known-key unique"
                         (ppr (unpkUnique u))
     Just n -> (nc, n)

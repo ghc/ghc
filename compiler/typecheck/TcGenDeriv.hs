@@ -56,7 +56,7 @@ import PrelNames
 import THNames
 import MkId ( coerceId )
 import PrimOp
-import Platform
+import PrimOp.Cache
 import SrcLoc
 import TyCon
 import TcEnv
@@ -188,8 +188,8 @@ gen_Eq_binds loc tycon = do
                   -- extract tags compare for equality
       = [([a_Pat, b_Pat],
          untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-                    (genPrimOpApp platform (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
-        where platform = targetPlatform dflags
+                    (genPrimOpApp primOpCache (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
+        where primOpCache = targetPrimOpCache dflags
 
 
     aux_binds | no_tag_match_cons = emptyBag
@@ -197,12 +197,12 @@ gen_Eq_binds loc tycon = do
 
     method_binds dflags = unitBag (eq_bind dflags)
     eq_bind dflags = mkFunBindEC 2 loc eq_RDR (const true_Expr)
-                                 (map (pats_etc platform) pat_match_cons
+                                 (map (pats_etc primOpCache) pat_match_cons
                                    ++ fall_through_eqn dflags)
-      where platform = targetPlatform dflags
+      where primOpCache = targetPrimOpCache dflags
 
     ------------------------------------------------------------------
-    pats_etc platform data_con
+    pats_etc primOpCache data_con
       = let
             con1_pat = nlParPat $ nlConVarPat data_con_RDR as_needed
             con2_pat = nlParPat $ nlConVarPat data_con_RDR bs_needed
@@ -221,7 +221,7 @@ gen_Eq_binds loc tycon = do
           -- Using 'foldr1' here ensures that the derived code is correctly
           -- associated. See #10859.
           where
-            nested_eq ty a b = nlHsPar (eq_Expr platform ty (nlHsVar a) (nlHsVar b))
+            nested_eq ty a b = nlHsPar (eq_Expr primOpCache ty (nlHsVar a) (nlHsVar b))
 
 {-
 ************************************************************************
@@ -417,50 +417,50 @@ gen_Ord_binds loc tycon = do
 
     mkInnerRhs dflags op data_con
       | single_con_type
-      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt platform op data_con ]
+      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt primOpCache op data_con ]
 
       | tag == first_tag
-      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt platform op data_con
+      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
       | tag == last_tag
-      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt platform op data_con
+      = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag == first_tag + 1
       = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat first_con)
                                              (gtResult op)
-                                 , mkInnerEqAlt platform op data_con
+                                 , mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
       | tag == last_tag - 1
       = nlHsCase (nlHsVar b_RDR) [ mkHsCaseAlt (nlConWildPat last_con)
                                              (ltResult op)
-                                 , mkInnerEqAlt platform op data_con
+                                 , mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag > last_tag `div` 2  -- lower range is larger
       = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
-        nlHsIf (genPrimOpApp platform (nlHsVar bh_RDR) ltInt_RDR tag_lit)
+        nlHsIf (genPrimOpApp primOpCache (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
-        nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt platform op data_con
+        nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
       = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
-        nlHsIf (genPrimOpApp platform (nlHsVar bh_RDR) gtInt_RDR tag_lit)
+        nlHsIf (genPrimOpApp primOpCache (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
-        nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt platform op data_con
+        nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt primOpCache op data_con
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
-        platform = targetPlatform dflags
+        primOpCache = targetPrimOpCache dflags
         tag     = get_tag data_con
         tag_lit = noLoc (HsLit noExt (HsIntPrim NoSourceText (toInteger tag)))
 
-    mkInnerEqAlt :: Platform -> OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
+    mkInnerEqAlt :: PrimOpCache -> OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
-    mkInnerEqAlt platform op data_con
+    mkInnerEqAlt primOpCache op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR bs_needed) $
-        mkCompareFields platform op (dataConOrigArgTys data_con)
+        mkCompareFields primOpCache op (dataConOrigArgTys data_con)
       where
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
@@ -470,19 +470,19 @@ gen_Ord_binds loc tycon = do
     -- generates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
     mkTagCmp dflags op =
       untag_Expr dflags tycon[(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
-        unliftedOrdOp platform intPrimTy op ah_RDR bh_RDR
+        unliftedOrdOp primOpCache intPrimTy op ah_RDR bh_RDR
       where
-        platform = targetPlatform dflags
+        primOpCache = targetPrimOpCache dflags
 
-mkCompareFields :: Platform -> OrdOp -> [Type] -> LHsExpr GhcPs
+mkCompareFields :: PrimOpCache -> OrdOp -> [Type] -> LHsExpr GhcPs
 -- Generates nested comparisons for (a1,a2...) against (b1,b2,...)
 -- where the ai,bi have the given types
-mkCompareFields platform op tys
+mkCompareFields primOpCache op tys
   = go tys as_RDRs bs_RDRs
   where
     go []   _      _          = eqResult op
     go [ty] (a:_)  (b:_)
-      | isUnliftedType ty     = unliftedOrdOp platform ty op a b
+      | isUnliftedType ty     = unliftedOrdOp primOpCache ty op a b
       | otherwise             = genOpApp (nlHsVar a) (ordMethRdr op) (nlHsVar b)
     go (ty:tys) (a:as) (b:bs) = mk_compare ty a b
                                   (ltResult op)
@@ -495,7 +495,7 @@ mkCompareFields platform op tys
     -- but with suitable special cases for
     mk_compare ty a b lt eq gt
       | isUnliftedType ty
-      = unliftedCompare platform lt_op eq_op a_expr b_expr lt eq gt
+      = unliftedCompare primOpCache lt_op eq_op a_expr b_expr lt eq gt
       | otherwise
       = nlHsCase (nlHsPar (nlHsApp (nlHsApp (nlHsVar compare_RDR) a_expr) b_expr))
           [mkHsCaseAlt (nlNullaryConPat ltTag_RDR) lt,
@@ -506,10 +506,10 @@ mkCompareFields platform op tys
         b_expr = nlHsVar b
         (lt_op, _, eq_op, _, _) = primOrdOps "Ord" ty
 
-unliftedOrdOp :: Platform -> Type -> OrdOp -> RdrName -> RdrName -> LHsExpr GhcPs
-unliftedOrdOp platform ty op a b
+unliftedOrdOp :: PrimOpCache -> Type -> OrdOp -> RdrName -> RdrName -> LHsExpr GhcPs
+unliftedOrdOp primOpCache ty op a b
   = case op of
-       OrdCompare -> unliftedCompare platform
+       OrdCompare -> unliftedCompare primOpCache
            lt_op eq_op a_expr b_expr
            ltTag_Expr eqTag_Expr gtTag_Expr
        OrdLT      -> wrap lt_op
@@ -518,23 +518,23 @@ unliftedOrdOp platform ty op a b
        OrdGT      -> wrap gt_op
   where
    (lt_op, le_op, eq_op, ge_op, gt_op) = primOrdOps "Ord" ty
-   wrap prim_op = genPrimOpApp platform a_expr prim_op b_expr
+   wrap prim_op = genPrimOpApp primOpCache a_expr prim_op b_expr
    a_expr = nlHsVar a
    b_expr = nlHsVar b
 
 unliftedCompare
-  :: Platform
+  :: PrimOpCache
   -> RdrName -> RdrName
   -> LHsExpr GhcPs -> LHsExpr GhcPs   -- What to cmpare
   -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -- Three results
   -> LHsExpr GhcPs
 -- Return (if a < b then lt else if a == b then eq else gt)
-unliftedCompare platform lt_op eq_op a_expr b_expr lt eq gt
-  = nlHsIf (ascribeBool $ genPrimOpApp platform a_expr lt_op b_expr) lt $
+unliftedCompare primOpCache lt_op eq_op a_expr b_expr lt eq gt
+  = nlHsIf (ascribeBool $ genPrimOpApp primOpCache a_expr lt_op b_expr) lt $
                         -- Test (<) first, not (==), because the latter
                         -- is true less often, so putting it first would
                         -- mean more tests (dynamically)
-        nlHsIf (ascribeBool $ genPrimOpApp platform a_expr eq_op b_expr) eq gt
+        nlHsIf (ascribeBool $ genPrimOpApp primOpCache a_expr eq_op b_expr) eq gt
   where
     ascribeBool e = nlExprWithTySig e boolTy
 
@@ -759,8 +759,8 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 -}
 
 gen_Ix_binds
-    :: Platform -> SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Ix_binds platform loc tycon = do
+    :: PrimOpCache -> SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ix_binds primOpCache loc tycon = do
     dflags <- getDynFlags
     return $ if isEnumerationTyCon tycon
       then (enum_ixes dflags, listToBag $ map DerivAuxBind
@@ -792,10 +792,10 @@ gen_Ix_binds platform loc tycon = do
            untag_Expr dflags tycon [(d_RDR, dh_RDR)] (
            let
                 rhs = nlHsVarApps intDataCon_RDR [c_RDR]
-                platform = targetPlatform dflags
+                primOpCache = targetPrimOpCache dflags
            in
            nlHsCase
-             (genOpApp (nlHsVar dh_RDR) (minusInt_RDR platform) (nlHsVar ah_RDR))
+             (genOpApp (nlHsVar dh_RDR) (minusInt_RDR primOpCache) (nlHsVar ah_RDR))
              [mkHsCaseAlt (nlVarPat c_RDR) rhs]
            ))
         )
@@ -809,8 +809,8 @@ gen_Ix_binds platform loc tycon = do
           -- This used to use `if`, which interacts badly with RebindableSyntax.
           -- See #11396.
           nlHsApps and_RDR
-              [ genPrimOpApp platform (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)
-              , genPrimOpApp platform (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR)
+              [ genPrimOpApp primOpCache (nlHsVar ch_RDR) geInt_RDR (nlHsVar ah_RDR)
+              , genPrimOpApp primOpCache (nlHsVar ch_RDR) leInt_RDR (nlHsVar bh_RDR)
               ]
           )))
 
@@ -1951,10 +1951,10 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
 genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
-           nlHsApp (nlHsVar $ tagToEnum_RDR platform) a_Expr)],
+           nlHsApp (nlHsVar $ tagToEnum_RDR primOpCache) a_Expr)],
      L loc (TypeSig noExt [L loc rdr_name] sig_ty))
   where
-    platform = targetPlatform dflags
+    primOpCache = targetPrimOpCache dflags
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
              intTy `mkVisFunTy` mkParentType tycon
@@ -2224,10 +2224,10 @@ and_Expr a b = genOpApp a and_RDR    b
 
 -----------------------------------------------------------------------
 
-eq_Expr :: Platform -> Type -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
-eq_Expr platform ty a b
+eq_Expr :: PrimOpCache -> Type -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+eq_Expr primOpCache ty a b
     | not (isUnliftedType ty) = genOpApp a eq_RDR b
-    | otherwise               = genPrimOpApp platform a prim_eq b
+    | otherwise               = genPrimOpApp primOpCache a prim_eq b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" ty
 
@@ -2302,9 +2302,9 @@ parenify e                   = mkHsPar e
 genOpApp :: LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
 genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 
-genPrimOpApp :: Platform -> LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
-genPrimOpApp platform e1 op e2 = nlHsPar $ nlHsApp
-    (nlHsVar $ tagToEnum_RDR platform)
+genPrimOpApp :: PrimOpCache -> LHsExpr GhcPs -> RdrName -> LHsExpr GhcPs -> LHsExpr GhcPs
+genPrimOpApp primOpCache e1 op e2 = nlHsPar $ nlHsApp
+    (nlHsVar $ tagToEnum_RDR primOpCache)
     (nlHsOpApp e1 op e2)
 
 a_RDR, b_RDR, c_RDR, d_RDR, f_RDR, k_RDR, z_RDR, ah_RDR, bh_RDR, ch_RDR, dh_RDR
@@ -2347,9 +2347,9 @@ d_Pat           = nlVarPat d_RDR
 k_Pat           = nlVarPat k_RDR
 z_Pat           = nlVarPat z_RDR
 
-minusInt_RDR, tagToEnum_RDR :: Platform -> RdrName
-minusInt_RDR  platform = getRdrName (primOpId platform IntSubOp   )
-tagToEnum_RDR platform = getRdrName (primOpId platform TagToEnumOp)
+minusInt_RDR, tagToEnum_RDR :: PrimOpCache -> RdrName
+minusInt_RDR  primOpCache = getRdrName (primOpId primOpCache IntSubOp   )
+tagToEnum_RDR primOpCache = getRdrName (primOpId primOpCache TagToEnumOp)
 
 con2tag_RDR, tag2con_RDR, maxtag_RDR :: DynFlags -> TyCon -> RdrName
 -- Generates Orig s RdrName, for the binding positions

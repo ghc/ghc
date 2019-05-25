@@ -35,6 +35,7 @@ import Id
 import Literal
 import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
+import PrimOp.Cache( PrimOpCache )
 import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
@@ -640,7 +641,7 @@ subsumesPrimOp this that = do
   dflags <- getDynFlags
   [Var primop_id `App` e] <- getArgs
   matchPrimOpId that primop_id
-  return (Var (mkPrimOpId (targetPlatform dflags) this) `App` e)
+  return (Var (mkPrimOpId (targetPrimOpCache dflags) this) `App` e)
 
 subsumedByPrimOp :: PrimOp -> RuleM CoreExpr
 subsumedByPrimOp primop = do
@@ -931,7 +932,7 @@ strengthReduction two_lit add_op = do -- Note [Strength reduction]
               , do [Lit mult_lit, arg] <- getArgs
                    guard (mult_lit == two_lit)
                    return arg ]
-  return $ Var (mkPrimOpId (targetPlatform dflags) add_op) `App` arg `App` arg
+  return $ Var (mkPrimOpId (targetPrimOpCache dflags) add_op) `App` arg `App` arg
 
 -- Note [Strength reduction]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1201,8 +1202,8 @@ builtinRules =
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just n <- return $ exactLog2 d
           dflags <- getDynFlags
-          let platform = targetPlatform dflags
-          return $ Var (mkPrimOpId platform ISraOp) `App` arg `App` mkIntVal dflags n
+          let primOpCache = targetPrimOpCache dflags
+          return $ Var (mkPrimOpId primOpCache ISraOp) `App` arg `App` mkIntVal dflags n
         ],
      mkBasicRule modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
@@ -1211,8 +1212,8 @@ builtinRules =
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just _ <- return $ exactLog2 d
           dflags <- getDynFlags
-          let platform = targetPlatform dflags
-          return $ Var (mkPrimOpId platform AndIOp)
+          let primOpCache = targetPrimOpCache dflags
+          return $ Var (mkPrimOpId primOpCache AndIOp)
             `App` arg `App` mkIntVal dflags (d - 1)
         ]
      ]
@@ -1696,7 +1697,7 @@ match_XToIntegerToX _ _ _ _ _ = Nothing
 match_smallIntegerTo :: PrimOp -> RuleFun
 match_smallIntegerTo primOp dflags _ _ [App (Var x) y]
   | idName x == smallIntegerName
-  = Just $ App (Var (mkPrimOpId (targetPlatform dflags) primOp)) y
+  = Just $ App (Var (mkPrimOpId (targetPrimOpCache dflags) primOp)) y
 match_smallIntegerTo _ _ _ _ _ = Nothing
 
 
@@ -1803,11 +1804,11 @@ numFoldingRules :: PrimOp -> (DynFlags -> PrimOps) -> RuleM CoreExpr
 numFoldingRules op dict = do
   [e1,e2] <- getArgs
   dflags <- getDynFlags
-  let platform = targetPlatform dflags
+  let primOpCache = targetPrimOpCache dflags
   let PrimOps{..} = dict dflags
   if not (gopt Opt_NumConstantFolding dflags)
     then mzero
-    else case mkBinOpApp platform e1 op e2 of
+    else case mkBinOpApp primOpCache e1 op e2 of
      -- R1) +/- simplification
      x    :++: (y :++: v)          -> return $ mkL (x+y)   `add` v
      x    :++: (L y :-: v)         -> return $ mkL (x+y)   `sub` v
@@ -1883,8 +1884,8 @@ numFoldingRules op dict = do
 pattern BinOpApp  :: Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
 pattern BinOpApp  x op y <- OpVal op `App` x `App` y
 
-mkBinOpApp :: Platform -> Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
-mkBinOpApp platform x op y = Var (mkPrimOpId platform op) `App` x `App` y
+mkBinOpApp :: PrimOpCache -> Arg CoreBndr -> PrimOp -> Arg CoreBndr -> CoreExpr
+mkBinOpApp primOpCache x op y = Var (mkPrimOpId primOpCache op) `App` x `App` y
 
 -- | Match a primop
 pattern OpVal   :: PrimOp  -> Arg CoreBndr
@@ -1954,21 +1955,21 @@ data PrimOps = PrimOps
 
 intPrimOps :: DynFlags -> PrimOps
 intPrimOps dflags = PrimOps
-   { add = \x y -> mkBinOpApp platform x IntAddOp y
-   , sub = \x y -> mkBinOpApp platform x IntSubOp y
-   , mul = \x y -> mkBinOpApp platform x IntMulOp y
+   { add = \x y -> mkBinOpApp primOpCache x IntAddOp y
+   , sub = \x y -> mkBinOpApp primOpCache x IntSubOp y
+   , mul = \x y -> mkBinOpApp primOpCache x IntMulOp y
    , mkL = intResult' dflags
    }
-  where platform = targetPlatform dflags
+  where primOpCache = targetPrimOpCache dflags
 
 wordPrimOps :: DynFlags -> PrimOps
 wordPrimOps dflags = PrimOps
-   { add = \x y -> mkBinOpApp platform x WordAddOp y
-   , sub = \x y -> mkBinOpApp platform x WordSubOp y
-   , mul = \x y -> mkBinOpApp platform x WordMulOp y
+   { add = \x y -> mkBinOpApp primOpCache x WordAddOp y
+   , sub = \x y -> mkBinOpApp primOpCache x WordSubOp y
+   , mul = \x y -> mkBinOpApp primOpCache x WordMulOp y
    , mkL = wordResult' dflags
    }
-  where platform = targetPlatform dflags
+  where primOpCache = targetPrimOpCache dflags
 
 
 --------------------------------------------------------
