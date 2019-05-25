@@ -1,15 +1,11 @@
 {-
 Binary serialization for .hie files.
-
-Please remember to bump `curHieVersion` in HieTypes if you change the
-serialization for any of the files here.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
 module HieBin ( readHieFile, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieHeader ) where
 
-import GhcPrelude
-
 import Config                     ( cProjectVersion )
+import GhcPrelude
 import Binary
 import BinIface                   ( getDictFastString )
 import FastMutInt
@@ -74,10 +70,9 @@ data HieDictionary = HieDictionary
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
--- | The header for HIE files - Capital ASCII
--- letters "HIE" followed by the HIE version
+-- | The header for HIE files - Capital ASCII letters "HIE".
 hieHeader :: [Word8]
-hieHeader = [72,73,69,curHieVersion]
+hieHeader = [72,73,69]
 
 hieHeaderLen :: Int
 hieHeaderLen = length hieHeader
@@ -92,8 +87,9 @@ writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
 
   -- Write the header: hieHeader followed by the
-  -- GHC version used to generate this file
+  -- hieVersion and the GHC version used to generate this file
   mapM_ (put_ bh0) hieHeader
+  put_ bh0 hieVersion
   put_ bh0 ghcVersion
 
   -- remember where the dictionary pointer will go
@@ -151,7 +147,7 @@ writeHieFile hie_file_path hiefile = do
 
 data HieFileResult
   = HieFileResult
-  { hie_file_result_version :: Word8
+  { hie_file_result_version :: Integer
   , hie_file_result_ghc_version :: ByteString
   , hie_file_result :: HieFile
   }
@@ -165,6 +161,7 @@ readHieFile nc file = do
 
   -- Read the header
   header <- replicateM hieHeaderLen (get bh0)
+  readHieVersion <- get bh0
   ghcVersion <- (get bh0 :: IO ByteString)
 
   -- Check if the header is valid
@@ -172,6 +169,12 @@ readHieFile nc file = do
     panic $ unwords ["readHieFile: headers don't match: Expected"
                     , show hieHeader
                     , "but got", show header
+                    ]
+  -- Check if the versions match
+  when (readHieVersion /= hieVersion) $
+    panic $ unwords ["readHieFile: hie file versions don't match: Expected"
+                    , show hieVersion
+                    , "but got", show readHieVersion
                     ]
 
   dict  <- get_dictionary bh0
@@ -188,7 +191,7 @@ readHieFile nc file = do
 
   -- load the actual data
   hiefile <- get bh1
-  return (HieFileResult (last header) ghcVersion hiefile, nc')
+  return (HieFileResult hieVersion ghcVersion hiefile, nc')
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
