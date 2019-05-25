@@ -34,7 +34,6 @@ import CmmUtils
 import MkGraph
 import Type
 import RepType
-import TysPrim
 import CLabel
 import SMRep
 import ForeignCall
@@ -50,14 +49,16 @@ import Control.Monad
 -- Code generation for Foreign Calls
 -----------------------------------------------------------------------------
 
--- | emit code for a foreign call, and return the results to the sequel.
---
+-- | Emit code for a foreign call, and return the results to the sequel.
+-- Precondition: the argument types list and the arguments
+-- list have the same length.
 cgForeignCall :: ForeignCall            -- the op
+              -> [StgFArgType]          -- argument types
               -> [StgArg]               -- x,y    arguments
               -> Type                   -- result type
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety)) typs stg_args res_ty
   = do  { dflags <- getDynFlags
         ; let -- in the stdcall calling convention, the symbol needs @size appended
               -- to it, where size is the total number of bytes of arguments.  We
@@ -70,7 +71,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) stg_args res_ty
               -- ToDo: this might not be correct for 64-bit API
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType dflags arg)
                                      (wORD_SIZE dflags)
-        ; cmm_args <- getFCallArgs stg_args
+        ; cmm_args <- getFCallArgs stg_args typs
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
@@ -492,43 +493,62 @@ stack_SP     dflags = closureField dflags (oFFSET_StgStack_sp dflags)
 closureField :: DynFlags -> ByteOff -> ByteOff
 closureField dflags off = off + fixedHdrSize dflags
 
--- -----------------------------------------------------------------------------
+-- Note [Unlifted boxed arguments to foreign calls]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
 -- For certain types passed to foreign calls, we adjust the actual
--- value passed to the call.  For ByteArray#/Array# we pass the
--- address of the actual array, not the address of the heap object.
+-- value passed to the call.  For ByteArray#, Array#, SmallArray#,
+-- and ArrayArray#, we pass the address of the actual array, not
+-- the address of the heap object. We must work from the type to
+-- determine the offset. But where should the type come from? There
+-- are two available options. We could use the types of the actual
+-- values that the foreign call has been applied to, or we could
+-- use the types present in the foreign function's type. Prior to
+-- GHC 8.10, we used the former strategy since it's a little more
+-- simple. However, in the comments of
+-- https://gitlab.haskell.org/ghc/ghc/merge_requests/939, it was
+-- found that this leads to bad behavior in the presence
+-- of unsafeCoerce#. For example, if a ByteArray# argument was
+-- unsafely coerced from a value of type Any prior to being passed
+-- to a foreign call, StgCmmForeign.add_shim might see the type Any
+-- (instead of ByteArray#) and fail to apply the offset that the
+-- user expected for ByteArray# objects. This means that there is
+--
+-- To avoid this bad behavior, we adopt the second strategy: use
+-- the types present in the foreign function's type.
+-- In CoreToStg.collectStgFArgTypes, we convert the foreign function's
+-- type to a list of StgFArgType. Then, in StgCmmForeign.add_shim,
+-- we interpret these as numeric offsets.
 
-getFCallArgs :: [StgArg] -> FCode [(CmmExpr, ForeignHint)]
+getFCallArgs :: [StgArg] -> [StgFArgType] -> FCode [(CmmExpr, ForeignHint)]
 -- (a) Drop void args
 -- (b) Add foreign-call shim code
 -- It's (b) that makes this differ from getNonVoidArgAmodes
-
-getFCallArgs args
-  = do  { mb_cmms <- mapM get args
+-- Precondition: args and typs have the same length
+-- See Note [Unlifted boxed arguments to foreign calls]
+getFCallArgs args typs
+  = do  { when (typlen /= arglen) $
+          panic ("getFCallArgs: " ++ show typlen ++ " " ++ show arglen)
+        ; mb_cmms <- mapM get (zip args typs)
         ; return (catMaybes mb_cmms) }
   where
-    get arg | null arg_reps
-            = return Nothing
-            | otherwise
-            = do { cmm <- getArgAmode (NonVoid arg)
-                 ; dflags <- getDynFlags
-                 ; return (Just (add_shim dflags arg_ty cmm, hint)) }
-            where
-              arg_ty   = stgArgType arg
-              arg_reps = typePrimRep arg_ty
-              hint     = typeForeignHint arg_ty
+    arglen = length args
+    typlen = length typs
+    get (arg,typ)
+      | null arg_reps
+      = return Nothing
+      | otherwise
+      = do { cmm <- getArgAmode (NonVoid arg)
+           ; dflags <- getDynFlags
+           ; return (Just (add_shim dflags typ cmm, hint)) }
+      where
+        arg_ty   = stgArgType arg
+        arg_reps = typePrimRep arg_ty
+        hint     = typeForeignHint arg_ty
 
-add_shim :: DynFlags -> Type -> CmmExpr -> CmmExpr
-add_shim dflags arg_ty expr
-  | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
-  = cmmOffsetB dflags expr (arrPtrsHdrSize dflags)
-
-  | tycon == smallArrayPrimTyCon || tycon == smallMutableArrayPrimTyCon
-  = cmmOffsetB dflags expr (smallArrPtrsHdrSize dflags)
-
-  | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
-  = cmmOffsetB dflags expr (arrWordsHdrSize dflags)
-
-  | otherwise = expr
-  where
-    tycon           = tyConAppTyCon (unwrapType arg_ty)
-        -- should be a tycon app, since this is a foreign call
+add_shim :: DynFlags -> StgFArgType -> CmmExpr -> CmmExpr
+add_shim dflags ty expr = case ty of
+  StgPlainType -> expr
+  StgArrayType -> cmmOffsetB dflags expr (arrPtrsHdrSize dflags)
+  StgSmallArrayType -> cmmOffsetB dflags expr (smallArrPtrsHdrSize dflags)
+  StgByteArrayType -> cmmOffsetB dflags expr (arrWordsHdrSize dflags)

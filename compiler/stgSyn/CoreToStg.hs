@@ -44,6 +44,8 @@ import FastString
 import Util
 import DynFlags
 import ForeignCall
+import TysPrim
+import TyCoRep
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
 import SrcLoc           ( mkGeneralSrcSpan )
@@ -523,26 +525,28 @@ coreToStgApp _ f args ticks = do
 
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
-                DataConWorkId dc
-                  | saturated    -> StgConApp dc args'
-                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+          DataConWorkId dc
+            | saturated    -> StgConApp dc args'
+                (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
-                -- Some primitive operator that might be implemented as a library call.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+          -- Some primitive operator that might be implemented as a library call.
+          PrimOpId op      -> ASSERT( saturated )
+            StgOpApp (StgPrimOp op) args' res_ty
 
-                -- A call to some primitive Cmm function.
-                FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
-                                          PrimCallConv _))
-                                 -> ASSERT( saturated )
-                                    StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
+          -- A call to some primitive Cmm function.
+          FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
+                                    PrimCallConv _))
+                           -> ASSERT( saturated )
+            StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
 
-                -- A regular foreign call.
-                FCallId call     -> ASSERT( saturated )
-                                    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+          -- A regular foreign call.
+          FCallId call     -> ASSERT( saturated )
+            StgOpApp (StgFCallOp call typs (idUnique f)) args' res_ty
+            where
+            typs = collectStgFArgTypes (idType f)
 
-                TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
-                _other           -> StgApp f args'
+          TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
+          _other           -> StgApp f args'
 
         tapp = foldr StgTick app (ticks ++ ticks')
 
@@ -750,6 +754,19 @@ mkStgRhs bndr rhs
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
 
+typeToStgFArgType :: Type -> StgFArgType
+typeToStgFArgType typ
+  | tycon == arrayPrimTyCon = StgArrayType
+  | tycon == mutableArrayPrimTyCon = StgArrayType
+  | tycon == smallArrayPrimTyCon = StgSmallArrayType
+  | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
+  | tycon == byteArrayPrimTyCon = StgByteArrayType
+  | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
+  | otherwise = StgPlainType
+  where
+  -- should be a tycon app, since this is a foreign call
+  tycon = tyConAppTyCon (unwrapType typ)
+
   {-
     SDM: disabled.  Eval/Apply can't handle functions with arity zero very
     well; and making these into simple non-updatable thunks breaks other
@@ -899,6 +916,23 @@ getAllCAFsCC this_mod =
 
 filterStgBinders :: [Var] -> [Var]
 filterStgBinders bndrs = filter isId bndrs
+
+-- From a function, extract information needed to determine
+-- the offset of each argument when used as a C FFI argument.
+-- See Note [Unlifted boxed arguments to foreign calls]
+collectStgFArgTypes :: Type -> [StgFArgType]
+collectStgFArgTypes = go [] 
+  where
+    -- Skip foralls
+    go bs (ForAllTy _ res) = go bs res
+    go bs (AppTy{}) = reverse bs
+    go bs (TyConApp{}) = reverse bs
+    go bs (LitTy{}) = reverse bs
+    go bs (TyVarTy{}) = reverse bs
+    go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
+    go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
+    go bs (FunTy {ft_arg = arg, ft_res=res}) =
+      go (typeToStgFArgType arg:bs) res
 
 myCollectBinders :: Expr Var -> ([Var], Expr Var)
 myCollectBinders expr

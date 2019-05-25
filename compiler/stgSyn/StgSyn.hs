@@ -44,7 +44,7 @@ module StgSyn (
         OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
 
         -- StgOp
-        StgOp(..),
+        StgOp(..), StgFArgType(..),
 
         -- utils
         topStgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
@@ -669,6 +669,12 @@ isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
 
+data StgFArgType
+  = StgPlainType
+  | StgArrayType
+  | StgSmallArrayType
+  | StgByteArrayType
+
 {-
 ************************************************************************
 *                                                                      *
@@ -686,7 +692,7 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Unique
+  | StgFCallOp ForeignCall [StgFArgType] Unique 
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
         -- typedef for foreign-export-dynamic
@@ -860,7 +866,7 @@ pprStgAlt indent (con, params, expr)
 pprStgOp :: StgOp -> SDoc
 pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgPrimCallOp op)= ppr op
-pprStgOp (StgFCallOp op _) = ppr op
+pprStgOp (StgFCallOp op _ _) = ppr op
 
 instance Outputable AltType where
   ppr PolyAlt         = text "Polymorphic"
