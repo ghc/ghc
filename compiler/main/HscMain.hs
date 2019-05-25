@@ -188,10 +188,10 @@ import HieDebug         ( diffFile, validateScopes )
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    let platform = targetPlatform dflags
+    let primOpCache = targetPrimOpCache dflags
     eps_var <- newIORef initExternalPackageState
     us      <- mkSplitUniqSupply 'r'
-    nc_var  <- newIORef $ initNameCache us $ knownKeyNames platform
+    nc_var  <- newIORef $ initNameCache us $ knownKeyNames primOpCache
     fc_var  <- newIORef emptyInstalledModuleEnv
     iserv_mvar <- newMVar Nothing
     emptyDynLinker <- uninitializedLinker
@@ -420,8 +420,8 @@ extract_renamed_stuff mod_summary tc_result = do
         -- enables the option which keeps the renamed source.
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
-            platform = targetPlatform dflags
-        liftIO $ writeHieFile platform out_file hieFile
+            primOpCache = targetPrimOpCache dflags
+        liftIO $ writeHieFile primOpCache out_file hieFile
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
@@ -435,8 +435,8 @@ extract_renamed_stuff mod_summary tc_result = do
                     mapM_ (putMsg dflags) xs
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
-              (file', _) <- readHieFile platform nc out_file
-              case diffFile platform hieFile file' of
+              (file', _) <- readHieFile primOpCache nc out_file
+              case diffFile primOpCache hieFile file' of
                 [] ->
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do

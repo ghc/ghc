@@ -50,7 +50,8 @@ import TcRnMonad
 import Constants
 import PrelNames
 import PrelInfo
-import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
+import PrimOp   ( primOpFixity )
+import PrimOp.Cache ( PrimOpCache, allThePrimOps, primOpOcc )
 import MkId     ( seqId )
 import TysPrim  ( funTyConName )
 import Rules
@@ -77,7 +78,6 @@ import Hooks
 import FieldLabel
 import RnModIface
 import UniqDSet
-import Platform
 import Plugins
 
 import Control.Monad
@@ -906,12 +906,12 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                            ppr mod <> semi],
                      nest 4 (text "reason:" <+> doc_str)])
 
-       let platform = targetPlatform dflags
+       let primOpCache = targetPrimOpCache dflags
        -- Check for GHC.Prim, and return its static interface
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
-               iface <- getHooked ghcPrimIfaceHook $ ghcPrimIface platform
+               iface <- getHooked ghcPrimIfaceHook $ ghcPrimIface primOpCache
                return (Succeeded (iface,
                                    "<built in interface for GHC.Prim>"))
            else do
@@ -1040,10 +1040,10 @@ initExternalPackageState
 *********************************************************
 -}
 
-ghcPrimIface :: Platform -> ModIface
-ghcPrimIface platform
+ghcPrimIface :: PrimOpCache -> ModIface
+ghcPrimIface primOpCache
   = (emptyModIface gHC_PRIM) {
-        mi_exports  = ghcPrimExports platform,
+        mi_exports  = ghcPrimExports primOpCache,
         mi_decls    = [],
         mi_fixities = fixities,
         mi_fix_fn  = mkIfaceFixCache fixities
@@ -1053,8 +1053,8 @@ ghcPrimIface platform
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : (occName funTyConName, funTyFixity)  -- trac #10145
-             : mapMaybe mkFixity (allThePrimOps platform)
-    mkFixity op = (,) (primOpOcc platform op) <$> primOpFixity op
+             : mapMaybe mkFixity (allThePrimOps primOpCache)
+    mkFixity op = (,) (primOpOcc primOpCache op) <$> primOpFixity op
 
 {-
 *********************************************************

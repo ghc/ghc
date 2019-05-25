@@ -13,7 +13,7 @@ import Type
 import DataCon
 import Name
 import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
-import Platform
+import PrimOp.Cache
 import PrelNames ( gHC_ERR )
 import Id
 import VarSet
@@ -595,7 +595,7 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -> TcM (TidyEnv, SDoc)
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   do { dflags <- getDynFlags
-     ; let platform = targetPlatform dflags
+     ; let primOpCache = targetPrimOpCache dflags
      ; rdr_env <- getGlobalRdrEnv
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
@@ -616,7 +616,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
            locals = removeBindingShadowing $
                       map IdHFCand lclBinds ++ map GreHFCand lcl
            globals = map GreHFCand gbl
-           syntax = map NameHFCand $ builtIns platform
+           syntax = map NameHFCand $ builtIns primOpCache
            to_check = locals ++ syntax ++ globals
      ; (searchDiscards, subs) <-
         tcFilterHoleFits findVLimit implics relevantCts (hole_ty, []) to_check
@@ -674,8 +674,8 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
     hole_lvl = ctLocLevel $ ctEvLoc $ ctEvidence ct
 
     -- BuiltInSyntax names like (:) and []
-    builtIns :: Platform -> [Name]
-    builtIns platform = filter isBuiltInSyntax $ knownKeyNames platform
+    builtIns :: PrimOpCache -> [Name]
+    builtIns primOpCache = filter isBuiltInSyntax $ knownKeyNames primOpCache
 
     -- We make a refinement type by adding a new type variable in front
     -- of the type of t h hole, going from e.g. [Integer] -> Integer
