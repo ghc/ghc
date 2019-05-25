@@ -4,6 +4,7 @@
 -- (c) The University of Glasgow 2006
 -- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 --
+{-# LANGUAGE TypeFamilies #-}
 module Annotations (
         -- * Main Annotation data types
         Annotation(..), AnnPayload,
@@ -23,6 +24,7 @@ import Binary
 import Module           ( Module )
 import Name
 import Outputable
+import Packages ( HasPackageState )
 import GHC.Serialized
 import UniqFM
 import Unique
@@ -68,6 +70,9 @@ instance Uniquable name => Uniquable (AnnTarget name) where
     -- deriveUnique prevents OccName uniques clashing with NamedTarget
 
 instance Outputable name => Outputable (AnnTarget name) where
+    type OutputableNeedsOfConfig (AnnTarget name) = PairConstraint
+      (OutputableNeedsOfConfig name)
+      HasPackageState
     ppr (NamedTarget nm) = text "Named target" <+> ppr nm
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
 
@@ -85,7 +90,10 @@ instance Binary name => Binary (AnnTarget name) where
             _ -> liftM ModuleTarget $ get bh
 
 instance Outputable Annotation where
-    ppr ann = ppr (ann_target ann)
+     type OutputableNeedsOfConfig Annotation = PairConstraint
+       HasNameSuppress
+       HasPackageState
+     ppr ann = ppr (ann_target ann)
 
 -- | A collection of annotations
 -- Can't use a type synonym or we hit bug #2412 due to source import

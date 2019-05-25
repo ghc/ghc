@@ -30,7 +30,7 @@ module Panic (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Outputable (SDoc, showSDocUnsafe)
+import {-# SOURCE #-} Outputable.DynFlags (SDoc, showSDocUnsafe)
 import PlainPanic
 
 import Exception

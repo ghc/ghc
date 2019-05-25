@@ -1,13 +1,11 @@
+{-# LANGUAGE TypeFamilies #-}
+
 {-
 A simple homogeneous pair type with useful Functor, Applicative, and
 Traversable instances.
 -}
 
-{-# LANGUAGE CPP #-}
-
 module Pair ( Pair(..), unPair, toPair, swap, pLiftFst, pLiftSnd ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -42,6 +40,7 @@ instance (Semi.Semigroup a, Monoid a) => Monoid (Pair a) where
   mappend = (Semi.<>)
 
 instance Outputable a => Outputable (Pair a) where
+  type OutputableNeedsOfConfig (Pair a) = OutputableNeedsOfConfig a
   ppr (Pair a b) = ppr a <+> char '~' <+> ppr b
 
 unPair :: Pair a -> (a,a)

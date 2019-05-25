@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wall #-}
 
 -- Like 'UniqFM', these are maps for keys which are Uniquable.
@@ -69,6 +70,9 @@ instance Monoid (UniqMap k a) where
     mappend = (Semi.<>)
 
 instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
+    type OutputableNeedsOfConfig (UniqMap k a) = PairConstraint
+        (OutputableNeedsOfConfig k)
+        (OutputableNeedsOfConfig a)
     ppr (UniqMap m) =
         brackets $ fsep $ punctuate comma $
         [ ppr k <+> text "->" <+> ppr v

@@ -17,6 +17,7 @@ is not deterministic.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqDFM (
@@ -397,16 +398,17 @@ alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList
 -- Output-ery
 
 instance Outputable a => Outputable (UniqDFM a) where
+    type OutputableNeedsOfConfig (UniqDFM a) = OutputableNeedsOfConfig a
     ppr ufm = pprUniqDFM ppr ufm
 
-pprUniqDFM :: (a -> SDoc) -> UniqDFM a -> SDoc
+pprUniqDFM :: (a -> SDoc' r) -> UniqDFM a -> SDoc' r
 pprUniqDFM ppr_elt ufm
   = brackets $ fsep $ punctuate comma $
     [ ppr uq <+> text ":->" <+> ppr_elt elt
     | (uq, elt) <- udfmToList ufm ]
 
 pprUDFM :: UniqDFM a    -- ^ The things to be pretty printed
-       -> ([a] -> SDoc) -- ^ The pretty printing function to use on the elements
-       -> SDoc          -- ^ 'SDoc' where the things have been pretty
+       -> ([a] -> SDoc' r) -- ^ The pretty printing function to use on the elements
+       -> SDoc' r          -- ^ 'SDoc' where the things have been pretty
                         -- printed
 pprUDFM ufm pp = pp (eltsUDFM ufm)
