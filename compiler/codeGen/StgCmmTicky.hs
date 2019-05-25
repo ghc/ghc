@@ -124,6 +124,8 @@ import Id
 import BasicTypes
 import FastString
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import Util
 
 import DynFlags

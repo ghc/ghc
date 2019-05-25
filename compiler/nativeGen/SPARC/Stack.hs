@@ -16,6 +16,7 @@ import SPARC.Imm
 
 import DynFlags
 import Outputable
+import Outputable.DynFlags (pprPanic)
 
 -- | Get an AddrMode relative to the address in sp.
 --      This gives us a stack relative addressing mode for volatile

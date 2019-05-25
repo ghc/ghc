@@ -28,6 +28,8 @@ import Cmm
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import GHC.Platform
 import FileCleanup
 

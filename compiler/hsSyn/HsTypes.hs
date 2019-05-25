@@ -79,7 +79,7 @@ import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 import HsExtension
 
 import Id ( Id )
-import Name( Name )
+import Name( Name, HasNameSuppress )
 import RdrName ( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
@@ -89,9 +89,12 @@ import HsDoc
 import BasicTypes
 import SrcLoc
 import Outputable
+import Packages ( HasPackageState )
+import Panic ( assertPanic )
 import FastString
 import Maybes( isJust )
 import Util ( count, debugIsOn )
+import TypeSuppress ( HasTypeSuppress )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -475,9 +478,11 @@ hsIPNameFS :: HsIPName -> FastString
 hsIPNameFS (HsIPName n) = n
 
 instance Outputable HsIPName where
+    type OutputableNeedsOfConfig HsIPName = NoConstraint
     ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters
 
 instance OutputableBndr HsIPName where
+    type OutputableBndrNeedsOfConfig HsIPName = NoConstraint
     pprBndr _ n   = ppr n         -- Simple for now
     pprInfixOcc  n = ppr n
     pprPrefixOcc n = ppr n
@@ -703,6 +708,9 @@ data NewHsTypeX
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
 instance Outputable NewHsTypeX where
+  type OutputableNeedsOfConfig NewHsTypeX = PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState)
   ppr (NHsCoreTy ty) = ppr ty
 
 type instance XForAllTy        (GhcPass _) = NoExtField
@@ -896,6 +904,11 @@ type instance XXConDeclField (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ConDeclField p) where
+  type OutputableNeedsOfConfig (ConDeclField p) = PairConstraint
+      (PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState))
+      (OutputableBndrIdNeedsOfConfig p)
   ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
   ppr (XConDeclField x) = ppr x
 
@@ -910,6 +923,9 @@ data HsConDetails arg rec
 
 instance (Outputable arg, Outputable rec)
          => Outputable (HsConDetails arg rec) where
+  type OutputableNeedsOfConfig (HsConDetails arg rec) = PairConstraint
+    (OutputableNeedsOfConfig arg)
+    (OutputableNeedsOfConfig rec)
   ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
@@ -1183,6 +1199,9 @@ numVisibleArgs = count is_vis
 type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
+  type OutputableNeedsOfConfig (HsArg tm ty) = PairConstraint
+    (OutputableNeedsOfConfig tm)
+    (OutputableNeedsOfConfig ty)
   ppr (HsValArg tm)    = ppr tm
   ppr (HsTypeArg _ ty) = char '@' <> ppr ty
   ppr (HsArgPar sp)    = text "HsArgPar"  <+> ppr sp
@@ -1362,6 +1381,7 @@ type instance XCFieldOcc GhcTc = Id
 type instance XXFieldOcc (GhcPass _) = NoExtCon
 
 instance Outputable (FieldOcc pass) where
+  type OutputableNeedsOfConfig (FieldOcc pass) = PairConstraint HasNameSuppress HasPackageState
   ppr = ppr . rdrNameFieldOcc
 
 mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
@@ -1396,9 +1416,11 @@ type instance XAmbiguous GhcTc = Id
 type instance XXAmbiguousFieldOcc (GhcPass _) = NoExtCon
 
 instance p ~ GhcPass pass => Outputable (AmbiguousFieldOcc p) where
+  type OutputableNeedsOfConfig (AmbiguousFieldOcc p) = PairConstraint HasNameSuppress HasPackageState
   ppr = ppr . rdrNameAmbiguousFieldOcc
 
 instance p ~ GhcPass pass => OutputableBndr (AmbiguousFieldOcc p) where
+  type OutputableBndrNeedsOfConfig (AmbiguousFieldOcc p) = NoConstraint
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
@@ -1435,40 +1457,65 @@ ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
 -}
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsType p) where
+    type OutputableNeedsOfConfig (HsType p) = PairConstraint
+      (PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr ty = pprHsType ty
 
 instance Outputable HsTyLit where
+    type OutputableNeedsOfConfig HsTyLit = (PairConstraint HasPprConfig HasTypeSuppress)
     ppr = ppr_tylit
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (LHsQTyVars p) where
+    type OutputableNeedsOfConfig (LHsQTyVars p) = PairConstraint
+      (PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
     ppr (XLHsQTyVars x) = ppr x
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsTyVarBndr p) where
+    type OutputableNeedsOfConfig (HsTyVarBndr p) = PairConstraint
+      (PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
     ppr (XTyVarBndr n)      = ppr n
 
-instance (p ~ GhcPass pass,Outputable thing)
+instance (p ~ GhcPass pass, Outputable thing)
        => Outputable (HsImplicitBndrs p thing) where
+    type OutputableNeedsOfConfig (HsImplicitBndrs p thing) = OutputableNeedsOfConfig thing
     ppr (HsIB { hsib_body = ty }) = ppr ty
     ppr (XHsImplicitBndrs x) = ppr x
 
-instance (p ~ GhcPass pass,Outputable thing)
+instance (p ~ GhcPass pass, Outputable thing)
        => Outputable (HsWildCardBndrs p thing) where
+    type OutputableNeedsOfConfig (HsWildCardBndrs p thing) = OutputableNeedsOfConfig thing
     ppr (HsWC { hswc_body = ty }) = ppr ty
     ppr (XHsWildCardBndrs x) = ppr x
 
-pprAnonWildCard :: SDoc
+pprAnonWildCard :: SDoc' r
 pprAnonWildCard = char '_'
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
-pprHsForAll :: (OutputableBndrId (GhcPass p))
-            => ForallVisFlag -> [LHsTyVarBndr (GhcPass p)]
-            -> LHsContext (GhcPass p) -> SDoc
+pprHsForAll
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ForallVisFlag -> [LHsTyVarBndr (GhcPass p)]
+  -> LHsContext (GhcPass p) -> SDoc' r
 pprHsForAll = pprHsForAllExtra Nothing
 
 -- | Version of 'pprHsForAll' that can also print an extra-constraints
@@ -1478,10 +1525,17 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- function for this is needed, as the extra-constraints wildcard is removed
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
-                 => Maybe SrcSpan -> ForallVisFlag
-                 -> [LHsTyVarBndr (GhcPass p)]
-                 -> LHsContext (GhcPass p) -> SDoc
+pprHsForAllExtra
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Maybe SrcSpan -> ForallVisFlag
+  -> [LHsTyVarBndr (GhcPass p)]
+  -> LHsContext (GhcPass p) -> SDoc' r
 pprHsForAllExtra extra fvf qtvs cxt
   = pp_forall <+> pprLHsContextExtra (isJust extra) cxt
   where
@@ -1492,28 +1546,49 @@ pprHsForAllExtra extra fvf qtvs cxt
 
 -- | Version of 'pprHsForAll' or 'pprHsForAllExtra' that will always print
 -- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
-pprHsExplicitForAll :: (OutputableBndrId (GhcPass p))
-                    => ForallVisFlag
-                    -> Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
+pprHsExplicitForAll
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ForallVisFlag
+  -> Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc' r
 pprHsExplicitForAll fvf (Just qtvs) = forAllLit <+> interppSP qtvs
                                                  <> ppr_forall_separator fvf
 pprHsExplicitForAll _   Nothing     = empty
 
 -- | Prints an arrow for visible @forall@s (e.g., @forall a ->@) and a dot for
 -- invisible @forall@s (e.g., @forall a.@).
-ppr_forall_separator :: ForallVisFlag -> SDoc
+ppr_forall_separator :: HasPprConfig r => ForallVisFlag -> SDoc' r
 ppr_forall_separator ForallVis   = space <> arrow
 ppr_forall_separator ForallInvis = dot
 
-pprLHsContext :: (OutputableBndrId (GhcPass p))
-              => LHsContext (GhcPass p) -> SDoc
+pprLHsContext
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => LHsContext (GhcPass p) -> SDoc' r
 pprLHsContext lctxt
   | null (unLoc lctxt) = empty
   | otherwise          = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
-pprLHsContextAlways :: (OutputableBndrId (GhcPass p))
-                    => LHsContext (GhcPass p) -> SDoc
+pprLHsContextAlways
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => LHsContext (GhcPass p) -> SDoc' r
 pprLHsContextAlways (L _ ctxt)
   = case ctxt of
       []       -> parens empty             <+> darrow
@@ -1521,8 +1596,15 @@ pprLHsContextAlways (L _ ctxt)
       _        -> parens (interpp'SP ctxt) <+> darrow
 
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
-pprLHsContextExtra :: (OutputableBndrId (GhcPass p))
-                   => Bool -> LHsContext (GhcPass p) -> SDoc
+pprLHsContextExtra
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Bool -> LHsContext (GhcPass p) -> SDoc' r
 pprLHsContextExtra show_extra lctxt@(L _ ctxt)
   | not show_extra = pprLHsContext lctxt
   | null ctxt      = char '_' <+> darrow
@@ -1530,8 +1612,15 @@ pprLHsContextExtra show_extra lctxt@(L _ ctxt)
   where
     ctxt' = map ppr ctxt ++ [char '_']
 
-pprConDeclFields :: (OutputableBndrId (GhcPass p))
-                 => [LConDeclField (GhcPass p)] -> SDoc
+pprConDeclFields
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [LConDeclField (GhcPass p)] -> SDoc' r
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
     ppr_fld (L _ (ConDeclField { cd_fld_names = ns, cd_fld_type = ty,
@@ -1556,13 +1645,37 @@ seems like the Right Thing anyway.)
 
 -- Printing works more-or-less as for Types
 
-pprHsType :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
+pprHsType
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => HsType (GhcPass p) -> SDoc' r
 pprHsType ty = ppr_mono_ty ty
 
-ppr_mono_lty :: (OutputableBndrId (GhcPass p)) => LHsType (GhcPass p) -> SDoc
+ppr_mono_lty
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => LHsType (GhcPass p) -> SDoc' r
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
+ppr_mono_ty
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => HsType (GhcPass p) -> SDoc' r
 ppr_mono_ty (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty })
   = sep [pprHsForAll fvf tvs noLHsContext, ppr_mono_lty ty]
 
@@ -1619,8 +1732,15 @@ ppr_mono_ty (HsDocTy _ ty doc)
 ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
-ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+ppr_fun_ty
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc' r
 ppr_fun_ty ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
@@ -1628,7 +1748,7 @@ ppr_fun_ty ty1 ty2
     sep [p1, arrow <+> p2]
 
 --------------------------
-ppr_tylit :: HsTyLit -> SDoc
+ppr_tylit :: HsTyLit -> SDoc' r
 ppr_tylit (HsNumTy _ i) = integer i
 ppr_tylit (HsStrTy _ s) = text (show s)
 
@@ -1662,7 +1782,7 @@ hsTypeNeedsParens p = go
     go (HsDocTy _ (L _ t) _) = go t
     go (XHsType{})           = False
 
-maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
+maybeAddSpace :: [LHsType pass] -> SDoc' r -> SDoc' r
 -- See Note [Printing promoted type constructors]
 -- in IfaceType.  This code implements the same
 -- logic for printing HsType

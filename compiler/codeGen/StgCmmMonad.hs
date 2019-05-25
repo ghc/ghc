@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -77,7 +78,12 @@ import BasicTypes( ConTagZ )
 import Unique
 import UniqSupply
 import FastString
+import NameSuppress
 import Outputable
+import PlainPanic (panic)
+import Packages ( HasPackageState )
+import GHC.Platform.Lens
+import TypeSuppress
 import Util
 
 import Control.Monad
@@ -178,6 +184,13 @@ data CgIdInfo
         }
 
 instance Outputable CgIdInfo where
+  type OutputableNeedsOfConfig CgIdInfo = PairConstraint
+    (PairConstraint
+      (PairConstraint HasPlatform HasPlatformConstants)
+      HasPlatformMisc)
+    (PairConstraint
+      (PairConstraint HasPprConfig HasTypeSuppress)
+      (PairConstraint HasNameSuppress HasPackageState))
   ppr (CgIdInfo { cg_id = id, cg_loc = loc })
     = ppr id <+> text "-->" <+> ppr loc
 
@@ -196,6 +209,9 @@ data Sequel
                         -- allocating primOp)
 
 instance Outputable Sequel where
+    type OutputableNeedsOfConfig Sequel = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr Return = text "Return"
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 

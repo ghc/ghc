@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Clean out unneeded spill\/reload instructions.
 --
@@ -41,6 +42,7 @@ import UniqFM
 import Unique
 import State
 import Outputable
+import PlainPanic (panic)
 import GHC.Platform
 import Hoopl.Collections
 
@@ -518,6 +520,7 @@ instance Uniquable Store where
 
 
 instance Outputable Store where
+        type OutputableNeedsOfConfig Store = NoConstraint
         ppr (SSlot i)   = text "slot" <> int i
         ppr (SReg  r)   = ppr r
 

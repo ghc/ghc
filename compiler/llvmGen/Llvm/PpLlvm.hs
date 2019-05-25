@@ -33,6 +33,7 @@ import Llvm.Types
 
 import Data.List ( intersperse )
 import Outputable
+import Outputable.DynFlags ( SDoc, showSDoc )
 import Unique
 import FastString ( sLit )
 

@@ -30,5 +30,6 @@ isUnboxedSumCon :: DataCon -> Bool
 instance Eq DataCon
 instance Uniquable DataCon
 instance NamedThing DataCon
+
 instance Outputable DataCon
 instance OutputableBndr DataCon

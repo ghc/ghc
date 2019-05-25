@@ -24,6 +24,7 @@ import GhcPrelude
 
 import Cmm
 import Outputable
+import Outputable.DynFlags (pprPanic, sorry)
 
 -- It looks very like the old MachRep, but it's now of purely local
 -- significance, here in the native code generator.  You can change it

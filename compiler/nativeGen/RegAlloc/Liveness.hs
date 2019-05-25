@@ -49,8 +49,13 @@ import Cmm hiding (RegSet, emptyRegSet)
 import Digraph
 import DynFlags
 import MonadUtils
+import NameSuppress
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import Packages ( HasPackageState )
+import PlainPanic (panic)
 import GHC.Platform
+import GHC.Platform.Lens
 import UniqSet
 import UniqFM
 import UniqSupply
@@ -189,6 +194,8 @@ type LiveBasicBlock instr
 instance Outputable instr
       => Outputable (InstrSR instr) where
 
+        type OutputableNeedsOfConfig (InstrSR instr) = OutputableNeedsOfConfig instr
+
         ppr (Instr realInstr)
            = ppr realInstr
 
@@ -211,6 +218,8 @@ instance Outputable instr
 instance Outputable instr
       => Outputable (LiveInstr instr) where
 
+        type OutputableNeedsOfConfig (LiveInstr instr) = OutputableNeedsOfConfig instr
+
         ppr (LiveInstr instr Nothing)
          = ppr instr
 
@@ -223,13 +232,16 @@ instance Outputable instr
                         , pprRegs (text "# w_dying: ") (liveDieWrite live) ]
                     $+$ space)
 
-         where  pprRegs :: SDoc -> RegSet -> SDoc
+         where  pprRegs :: SDoc' r -> RegSet -> SDoc' r
                 pprRegs name regs
                  | isEmptyUniqSet regs  = empty
                  | otherwise            = name <>
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
 instance Outputable LiveInfo where
+    type OutputableNeedsOfConfig LiveInfo = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint (PairConstraint HasNameSuppress HasPackageState) HasPprConfig)
     ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
         =  (ppr mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
@@ -480,16 +492,19 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (Outputable statics, Outputable instr, Instruction instr)
-        => DynFlags
-        -> LiveCmmDecl statics instr
-        -> NatCmmDecl statics instr
+  :: forall statics instr
+  .  ( Outputable statics, OutputableNeedsOfConfig statics DynFlags
+     , Outputable instr, OutputableNeedsOfConfig instr DynFlags
+     , Instruction instr
+     )
+  => DynFlags
+  -> LiveCmmDecl statics instr
+  -> NatCmmDecl statics instr
 
 stripLive dflags live
         = stripCmm live
 
- where  stripCmm :: (Outputable statics, Outputable instr, Instruction instr)
-                 => LiveCmmDecl statics instr -> NatCmmDecl statics instr
+ where  stripCmm :: LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
          = let  final_blocks    = flattenSCCs sccs
@@ -639,15 +654,17 @@ patchRegsLiveInstr patchF li
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
 
 cmmTopLiveness
-        :: (Outputable instr, Instruction instr)
-        => Maybe CFG -> Platform
-        -> NatCmmDecl statics instr
-        -> UniqSM (LiveCmmDecl statics instr)
+  :: ( Outputable instr, OutputableNeedsOfConfig instr DynFlags
+     , Instruction instr
+     )
+  => Maybe CFG -> Platform
+  -> NatCmmDecl statics instr
+  -> UniqSM (LiveCmmDecl statics instr)
 cmmTopLiveness cfg platform cmm
         = regLiveness platform $ natCmmTopToLive cfg cmm
 
 natCmmTopToLive
-        :: (Instruction instr, Outputable instr)
+        :: Instruction instr
         => Maybe CFG -> NatCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
@@ -716,7 +733,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 
         sccs = stronglyConnCompG g2
 
-        getOutEdges :: Instruction instr => [instr] -> [BlockId]
+        getOutEdges :: [instr] -> [BlockId]
         getOutEdges instrs = concat $ map jumpDestsOfInstr instrs
 
         -- This is truly ugly, but I don't see a good alternative.
@@ -733,10 +750,12 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 --
 
 regLiveness
-        :: (Outputable instr, Instruction instr)
-        => Platform
-        -> LiveCmmDecl statics instr
-        -> UniqSM (LiveCmmDecl statics instr)
+  :: ( Outputable instr, OutputableNeedsOfConfig instr DynFlags
+     , Instruction instr
+     )
+  => Platform
+  -> LiveCmmDecl statics instr
+  -> UniqSM (LiveCmmDecl statics instr)
 
 regLiveness _ (CmmData i d)
         = return $ CmmData i d
@@ -816,13 +835,18 @@ reverseBlocksInTops top
 --  want for the next pass.
 --
 computeLiveness
-        :: (Outputable instr, Instruction instr)
-        => Platform
-        -> [SCC (LiveBasicBlock instr)]
-        -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
-                                                -- which are "dead after this instruction".
-               BlockMap RegSet)                 -- blocks annotated with set of live registers
-                                                -- on entry to the block.
+  :: ( Outputable instr, OutputableNeedsOfConfig instr DynFlags
+     , Instruction instr
+     )
+  => Platform
+  -> [SCC (LiveBasicBlock instr)]
+  -> ( [SCC (LiveBasicBlock instr)]
+       -- ^ instructions annotated with list of registers
+       -- which are "dead after this instruction".
+     ,  BlockMap RegSet
+       -- ^ blocks annotated with set of live registers
+       -- on entry to the block.
+     )
 
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of

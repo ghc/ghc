@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, RecordWildCards, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- Package configuration information: essentially the interface to Cabal, with
@@ -34,6 +38,8 @@ import GhcPrelude
 
 import GHC.PackageDb
 import Data.Version
+
+import {-# SOURCE #-} Packages (HasPackageState)
 
 import FastString
 import Outputable
@@ -75,9 +81,11 @@ instance Uniquable PackageName where
   getUnique (PackageName n) = getUnique n
 
 instance Outputable SourcePackageId where
+  type OutputableNeedsOfConfig SourcePackageId = NoConstraint
   ppr (SourcePackageId str) = ftext str
 
 instance Outputable PackageName where
+  type OutputableNeedsOfConfig PackageName = NoConstraint
   ppr (PackageName str) = ftext str
 
 defaultPackageConfig :: PackageConfig
@@ -93,7 +101,7 @@ packageNameString pkg = unpackFS str
   where
     PackageName str = packageName pkg
 
-pprPackageConfig :: PackageConfig -> SDoc
+pprPackageConfig :: HasPackageState r => PackageConfig -> SDoc' r
 pprPackageConfig InstalledPackageInfo {..} =
     vcat [
       field "name"                 (ppr packageName),

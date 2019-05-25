@@ -24,7 +24,7 @@ import Cmm
 import DynFlags
 import Util
 
-import Outputable
+import PlainPanic (panic)
 import GHC.Platform
 
 import Data.Bits

@@ -7,7 +7,9 @@
 The bits common to TcInstDcls and TcDeriv.
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
@@ -44,11 +46,16 @@ import Name
 import NameSet
 import Unify
 import Outputable
+import Outputable.DynFlags ( assertPprPanic )
+import PlainPanic ( assertPanic )
+import Packages ( HasPackageState )
 import ErrUtils
 import BasicTypes
+import TypeSuppress
 import UniqDFM
 import Util
 import Id
+
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
 
@@ -211,9 +218,16 @@ instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
 instance Outputable ClsInst where
+   type OutputableNeedsOfConfig ClsInst = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
    ppr = pprInstance
 
-pprInstance :: ClsInst -> SDoc
+pprInstance
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => ClsInst -> SDoc' r
 -- Prints the ClsInst as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
@@ -221,12 +235,24 @@ pprInstance ispec
                , whenPprDebug (ppr (is_dfun ispec)) ])
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
-pprInstanceHdr :: ClsInst -> SDoc
+pprInstanceHdr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => ClsInst -> SDoc' r
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
   = text "instance" <+> ppr flag <+> pprSigmaType (idType dfun)
 
-pprInstances :: [ClsInst] -> SDoc
+pprInstances
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => [ClsInst] -> SDoc' r
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
 instanceHead :: ClsInst -> ([TyVar], Class, [Type])
@@ -409,6 +435,7 @@ newtype ClsInstEnv
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
+  type OutputableNeedsOfConfig ClsInstEnv = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (ClsIE is) = pprInstances is
 
 -- INVARIANTS:

@@ -15,6 +15,7 @@ types that
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module BasicTypes(
         Version, bumpVersion, initialVersion,
@@ -113,6 +114,7 @@ import GhcPrelude
 
 import FastString
 import Outputable
+import PlainPanic
 import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
@@ -134,6 +136,7 @@ pickLR CLeft  (l,_) = l
 pickLR CRight (_,r) = r
 
 instance Outputable LeftOrRight where
+  type OutputableNeedsOfConfig LeftOrRight = NoConstraint
   ppr CLeft    = text "Left"
   ppr CRight   = text "Right"
 
@@ -229,7 +232,8 @@ alignmentOf x = case x .&. 7 of
   _ -> Alignment 1
 
 instance Outputable Alignment where
-  ppr (Alignment m) = ppr m
+   type OutputableNeedsOfConfig Alignment = NoConstraint
+   ppr (Alignment m) = ppr m
 {-
 ************************************************************************
 *                                                                      *
@@ -268,12 +272,13 @@ worstOneShot OneShotLam    os            = os
 bestOneShot NoOneShotInfo os         = os
 bestOneShot OneShotLam    _          = OneShotLam
 
-pprOneShotInfo :: OneShotInfo -> SDoc
+pprOneShotInfo :: OneShotInfo -> SDoc' r
 pprOneShotInfo NoOneShotInfo = empty
 pprOneShotInfo OneShotLam    = text "OneShot"
 
 instance Outputable OneShotInfo where
-    ppr = pprOneShotInfo
+   type OutputableNeedsOfConfig OneShotInfo = NoConstraint
+   ppr = pprOneShotInfo
 
 {-
 ************************************************************************
@@ -288,6 +293,7 @@ data SwapFlag
   | IsSwapped   -- Args are: expected, actual
 
 instance Outputable SwapFlag where
+  type OutputableNeedsOfConfig SwapFlag = NoConstraint
   ppr IsSwapped  = text "Is-swapped"
   ppr NotSwapped = text "Not-swapped"
 
@@ -333,6 +339,7 @@ data FunctionOrData = IsFunction | IsData
     deriving (Eq, Ord, Data)
 
 instance Outputable FunctionOrData where
+    type OutputableNeedsOfConfig FunctionOrData = NoConstraint
     ppr IsFunction = text "(function)"
     ppr IsData     = text "(data)"
 
@@ -372,6 +379,7 @@ instance Eq StringLiteral where
   (StringLiteral _ a) == (StringLiteral _ b) = a == b
 
 instance Outputable StringLiteral where
+  type OutputableNeedsOfConfig StringLiteral = NoConstraint
   ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
 
 -- | Warning Text
@@ -384,6 +392,7 @@ data WarningTxt = WarningTxt (Located SourceText)
     deriving (Eq, Data)
 
 instance Outputable WarningTxt where
+    type OutputableNeedsOfConfig WarningTxt = NoConstraint
     ppr (WarningTxt    lsrc ws)
       = case unLoc lsrc of
           NoSourceText   -> pp_ws ws
@@ -394,7 +403,7 @@ instance Outputable WarningTxt where
           NoSourceText   -> pp_ws ds
           SourceText src -> text src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [Located StringLiteral] -> SDoc
+pp_ws :: [Located StringLiteral] -> SDoc' r
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
@@ -402,7 +411,7 @@ pp_ws ws
     <+> text "]"
 
 
-pprWarningTxtForMsg :: WarningTxt -> SDoc
+pprWarningTxtForMsg :: WarningTxt -> SDoc' r
 pprWarningTxtForMsg (WarningTxt    _ ws)
                      = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
 pprWarningTxtForMsg (DeprecatedTxt _ ds)
@@ -419,7 +428,7 @@ pprWarningTxtForMsg (DeprecatedTxt _ ds)
 
 type RuleName = FastString
 
-pprRuleName :: RuleName -> SDoc
+pprRuleName :: RuleName -> SDoc' r
 pprRuleName rn = doubleQuotes (ftext rn)
 
 {-
@@ -436,6 +445,7 @@ data Fixity = Fixity SourceText Int FixityDirection
   deriving Data
 
 instance Outputable Fixity where
+    type OutputableNeedsOfConfig Fixity = NoConstraint
     ppr (Fixity _ prec dir) = hcat [ppr dir, space, int prec]
 
 instance Eq Fixity where -- Used to determine if two fixities conflict
@@ -446,6 +456,7 @@ data FixityDirection = InfixL | InfixR | InfixN
                      deriving (Eq, Data)
 
 instance Outputable FixityDirection where
+    type OutputableNeedsOfConfig FixityDirection = NoConstraint
     ppr InfixL = text "infixl"
     ppr InfixR = text "infixr"
     ppr InfixN = text "infix"
@@ -495,6 +506,7 @@ compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
 data LexicalFixity = Prefix | Infix deriving (Data,Eq)
 
 instance Outputable LexicalFixity where
+  type OutputableNeedsOfConfig LexicalFixity = NoConstraint
   ppr Prefix = text "Prefix"
   ppr Infix  = text "Infix"
 
@@ -519,6 +531,7 @@ isTopLevel TopLevel     = True
 isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
+  type OutputableNeedsOfConfig TopLevelFlag = NoConstraint
   ppr TopLevel    = text "<TopLevel>"
   ppr NotTopLevel = text "<NotTopLevel>"
 
@@ -540,6 +553,7 @@ isBoxed Boxed   = True
 isBoxed Unboxed = False
 
 instance Outputable Boxity where
+  type OutputableNeedsOfConfig Boxity = NoConstraint
   ppr Boxed   = text "Boxed"
   ppr Unboxed = text "Unboxed"
 
@@ -569,6 +583,7 @@ boolToRecFlag True  = Recursive
 boolToRecFlag False = NonRecursive
 
 instance Outputable RecFlag where
+  type OutputableNeedsOfConfig RecFlag = NoConstraint
   ppr Recursive    = text "Recursive"
   ppr NonRecursive = text "NonRecursive"
 
@@ -589,6 +604,7 @@ isGenerated Generated = True
 isGenerated FromSource = False
 
 instance Outputable Origin where
+  type OutputableNeedsOfConfig Origin = NoConstraint
   ppr FromSource  = text "FromSource"
   ppr Generated   = text "Generated"
 
@@ -701,16 +717,18 @@ data OverlapMode  -- See Note [Rules for instance lookup] in InstEnv
 
 
 instance Outputable OverlapFlag where
+   type OutputableNeedsOfConfig OverlapFlag = NoConstraint
    ppr flag = ppr (overlapMode flag) <+> pprSafeOverlap (isSafeOverlap flag)
 
 instance Outputable OverlapMode where
+   type OutputableNeedsOfConfig OverlapMode = NoConstraint
    ppr (NoOverlap    _) = empty
    ppr (Overlappable _) = text "[overlappable]"
    ppr (Overlapping  _) = text "[overlapping]"
    ppr (Overlaps     _) = text "[overlap ok]"
    ppr (Incoherent   _) = text "[incoherent]"
 
-pprSafeOverlap :: Bool -> SDoc
+pprSafeOverlap :: Bool -> SDoc' r
 pprSafeOverlap True  = text "[safe]"
 pprSafeOverlap False = empty
 
@@ -735,7 +753,7 @@ funPrec = PprPrec 2 -- Function args; no parens for constructor apps
 opPrec  = PprPrec 2 -- Infix operator
 appPrec = PprPrec 3 -- Constructor args; no parens for atomic
 
-maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
+maybeParen :: PprPrec -> PprPrec -> SDoc' r -> SDoc' r
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise              = parens pretty
@@ -743,7 +761,7 @@ maybeParen ctxt_prec inner_prec pretty
 {- Note [Precedence in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Many pretty-printing functions have type
-    ppr_ty :: PprPrec -> Type -> SDoc
+    ppr_ty :: PprPrec -> Type -> SDoc' r
 
 The PprPrec gives the binding strength of the context.  For example, in
    T ty1 ty2
@@ -797,7 +815,7 @@ boxityTupleSort :: Boxity -> TupleSort
 boxityTupleSort Boxed   = BoxedTuple
 boxityTupleSort Unboxed = UnboxedTuple
 
-tupleParens :: TupleSort -> SDoc -> SDoc
+tupleParens :: TupleSort -> SDoc' r -> SDoc' r
 tupleParens BoxedTuple      p = parens p
 tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
@@ -812,15 +830,15 @@ tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
 ************************************************************************
 -}
 
-sumParens :: SDoc -> SDoc
+sumParens :: SDoc' r -> SDoc' r
 sumParens p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 
 -- | Pretty print an alternative in an unboxed sum e.g. "| a | |".
-pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use
+pprAlternative :: (a -> SDoc' r) -- ^ The pretty printing function to use
                -> a           -- ^ The things to be pretty printed
                -> ConTag      -- ^ Alternative (one-based)
                -> Arity       -- ^ Arity
-               -> SDoc        -- ^ 'SDoc' where the alternative havs been pretty
+               -> SDoc' r        -- ^ 'SDoc' where the alternative havs been pretty
                               -- printed and finally packed into a paragraph.
 pprAlternative pp x alt arity =
     fsep (replicate (alt - 1) vbar ++ [pp x] ++ replicate (arity - alt) vbar)
@@ -963,6 +981,7 @@ isAlwaysTailCalled occ
                              NoTailCallInfo     -> False
 
 instance Outputable TailCallInfo where
+  type OutputableNeedsOfConfig TailCallInfo = NoConstraint
   ppr (AlwaysTailCalled ar) = sep [ text "Tail", int ar ]
   ppr _                     = empty
 
@@ -994,6 +1013,7 @@ zapFragileOcc (OneOcc {}) = noOccInfo
 zapFragileOcc occ         = zapOccTailCallInfo occ
 
 instance Outputable OccInfo where
+  type OutputableNeedsOfConfig OccInfo = NoConstraint
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr (ManyOccs tails)     = pprShortTailCallInfo tails
   ppr IAmDead              = text "Dead"
@@ -1013,7 +1033,7 @@ instance Outputable OccInfo where
                   | otherwise = empty
           pp_tail             = pprShortTailCallInfo tail_info
 
-pprShortTailCallInfo :: TailCallInfo -> SDoc
+pprShortTailCallInfo :: TailCallInfo -> SDoc' r
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
 pprShortTailCallInfo NoTailCallInfo        = empty
 
@@ -1066,6 +1086,7 @@ data DefMethSpec ty
   | GenericDM ty  -- Default method given with code of this type
 
 instance Outputable (DefMethSpec ty) where
+  type OutputableNeedsOfConfig (DefMethSpec ty) = NoConstraint
   ppr VanillaDM      = text "{- Has default method -}"
   ppr (GenericDM {}) = text "{- Has generic default method -}"
 
@@ -1080,6 +1101,7 @@ instance Outputable (DefMethSpec ty) where
 data SuccessFlag = Succeeded | Failed
 
 instance Outputable SuccessFlag where
+    type OutputableNeedsOfConfig SuccessFlag = NoConstraint
     ppr Succeeded = text "Succeeded"
     ppr Failed    = text "Failed"
 
@@ -1163,11 +1185,12 @@ data SourceText = SourceText String
                 deriving (Data, Show, Eq )
 
 instance Outputable SourceText where
+  type OutputableNeedsOfConfig SourceText = NoConstraint
   ppr (SourceText s) = text "SourceText" <+> text s
   ppr NoSourceText   = text "NoSourceText"
 
 -- | Special combinator for showing string literals.
-pprWithSourceText :: SourceText -> SDoc -> SDoc
+pprWithSourceText :: SourceText -> SDoc' r -> SDoc' r
 pprWithSourceText NoSourceText     d = d
 pprWithSourceText (SourceText src) _ = text src
 
@@ -1191,6 +1214,7 @@ data CompilerPhase
   | InitialPhase    -- The first phase -- number = infinity!
 
 instance Outputable CompilerPhase where
+   type OutputableNeedsOfConfig CompilerPhase = NoConstraint
    ppr (Phase n)    = int n
    ppr InitialPhase = text "InitialPhase"
 
@@ -1390,33 +1414,37 @@ setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
 instance Outputable Activation where
+   type OutputableNeedsOfConfig Activation = NoConstraint
    ppr AlwaysActive       = empty
    ppr NeverActive        = brackets (text "~")
    ppr (ActiveBefore _ n) = brackets (char '~' <> int n)
    ppr (ActiveAfter  _ n) = brackets (int n)
 
 instance Outputable RuleMatchInfo where
+   type OutputableNeedsOfConfig RuleMatchInfo = NoConstraint
    ppr ConLike = text "CONLIKE"
    ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
+   type OutputableNeedsOfConfig InlineSpec = NoConstraint
    ppr Inline       = text "INLINE"
    ppr NoInline     = text "NOINLINE"
    ppr Inlinable    = text "INLINABLE"
    ppr NoUserInline = text "NOUSERINLINE" -- what is better?
 
 instance Outputable InlinePragma where
+  type OutputableNeedsOfConfig InlinePragma = NoConstraint
   ppr = pprInline
 
-pprInline :: InlinePragma -> SDoc
+pprInline :: InlinePragma -> SDoc' r
 pprInline = pprInline' True
 
-pprInlineDebug :: InlinePragma -> SDoc
+pprInlineDebug :: InlinePragma -> SDoc' r
 pprInlineDebug = pprInline' False
 
 pprInline' :: Bool           -- True <=> do not display the inl_inline field
            -> InlinePragma
-           -> SDoc
+           -> SDoc' r
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info
@@ -1559,6 +1587,7 @@ instance Ord IntegralLit where
   compare = compare `on` il_value
 
 instance Outputable IntegralLit where
+  type OutputableNeedsOfConfig IntegralLit = NoConstraint
   ppr (IL (SourceText src) _ _) = text src
   ppr (IL NoSourceText _ value) = text (show value)
 
@@ -1569,6 +1598,7 @@ instance Ord FractionalLit where
   compare = compare `on` fl_value
 
 instance Outputable FractionalLit where
+  type OutputableNeedsOfConfig FractionalLit= NoConstraint
   ppr f = pprWithSourceText (fl_text f) (rational (fl_value f))
 
 {-
@@ -1598,6 +1628,7 @@ instance Ord IntWithInf where
   compare (Int a)  (Int b)  = a `compare` b
 
 instance Outputable IntWithInf where
+  type OutputableNeedsOfConfig IntWithInf = NoConstraint
   ppr Infinity = char '∞'
   ppr (Int n)  = int n
 

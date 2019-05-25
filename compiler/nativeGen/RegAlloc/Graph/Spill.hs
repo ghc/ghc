@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 
 -- | When there aren't enough registers to hold all the vregs we have to spill
 --   some of those vregs to slots on the stack. This module is used modify the
@@ -23,6 +24,7 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Outputable
+import PlainPanic (panic)
 import GHC.Platform
 
 import Data.List
@@ -377,6 +379,7 @@ makeSpillStats s
 
 
 instance Outputable SpillStats where
- ppr stats
+    type OutputableNeedsOfConfig SpillStats = NoConstraint
+    ppr stats
         = pprUFM (spillStoreLoad stats)
                  (vcat . map (\(r, s, l) -> ppr r <+> int s <+> int l))

@@ -36,8 +36,9 @@ import BlockId
 import CLabel
 import CmmMachOp
 import CmmType
-import DynFlags
-import Outputable (panic)
+import PlainPanic (panic)
+import PlatformConstants
+import GHC.Platform.Lens
 import Unique
 
 import Data.Set (Set)
@@ -209,7 +210,7 @@ data CmmLit
                      -- of bytes used
   deriving Eq
 
-cmmExprType :: DynFlags -> CmmExpr -> CmmType
+cmmExprType :: HasPlatformConstants cfg => cfg -> CmmExpr -> CmmType
 cmmExprType dflags (CmmLit lit)        = cmmLitType dflags lit
 cmmExprType _      (CmmLoad _ rep)     = rep
 cmmExprType dflags (CmmReg reg)        = cmmRegType dflags reg
@@ -219,7 +220,7 @@ cmmExprType dflags (CmmStackSlot _ _)  = bWord dflags -- an address
 -- Careful though: what is stored at the stack slot may be bigger than
 -- an address
 
-cmmLitType :: DynFlags -> CmmLit -> CmmType
+cmmLitType :: HasPlatformConstants cfg => cfg -> CmmLit -> CmmType
 cmmLitType _      (CmmInt _ width)     = cmmBits  width
 cmmLitType _      (CmmFloat _ width)   = cmmFloat width
 cmmLitType _      (CmmVec [])          = panic "cmmLitType: CmmVec []"
@@ -233,12 +234,12 @@ cmmLitType _      (CmmLabelDiffOff _ _ _ width) = cmmBits width
 cmmLitType dflags (CmmBlock _)         = bWord dflags
 cmmLitType dflags (CmmHighStackMark)   = bWord dflags
 
-cmmLabelType :: DynFlags -> CLabel -> CmmType
+cmmLabelType :: HasPlatformConstants cfg => cfg -> CLabel -> CmmType
 cmmLabelType dflags lbl
  | isGcPtrLabel lbl = gcWord dflags
  | otherwise        = bWord dflags
 
-cmmExprWidth :: DynFlags -> CmmExpr -> Width
+cmmExprWidth :: HasPlatformConstants cfg => cfg -> CmmExpr -> Width
 cmmExprWidth dflags e = typeWidth (cmmExprType dflags e)
 
 -- | Returns an alignment in bytes of a CmmExpr when it's a statically
@@ -278,11 +279,11 @@ instance Ord LocalReg where
 instance Uniquable LocalReg where
   getUnique (LocalReg uniq _) = uniq
 
-cmmRegType :: DynFlags -> CmmReg -> CmmType
+cmmRegType :: HasPlatformConstants cfg => cfg -> CmmReg -> CmmType
 cmmRegType _      (CmmLocal  reg) = localRegType reg
 cmmRegType dflags (CmmGlobal reg) = globalRegType dflags reg
 
-cmmRegWidth :: DynFlags -> CmmReg -> Width
+cmmRegWidth :: HasPlatformConstants cfg => cfg -> CmmReg -> Width
 cmmRegWidth dflags = typeWidth . cmmRegType dflags
 
 localRegType :: LocalReg -> CmmType
@@ -327,17 +328,29 @@ sizeRegSet       = Set.size
 regSetToList     = Set.toList
 
 class Ord r => UserOfRegs r a where
-  foldRegsUsed :: DynFlags -> (b -> r -> b) -> b -> a -> b
+  foldRegsUsed
+    :: (HasPlatform cfg, HasPlatformConstants cfg)
+    => cfg -> (b -> r -> b) -> b -> a -> b
 
-foldLocalRegsUsed :: UserOfRegs LocalReg a
-                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+foldLocalRegsUsed 
+  :: ( UserOfRegs LocalReg a
+     , HasPlatform cfg
+     , HasPlatformConstants cfg
+     ) 
+  => cfg -> (b -> LocalReg -> b) -> b -> a -> b
 foldLocalRegsUsed = foldRegsUsed
 
 class Ord r => DefinerOfRegs r a where
-  foldRegsDefd :: DynFlags -> (b -> r -> b) -> b -> a -> b
+  foldRegsDefd
+    :: (HasPlatform cfg, HasPlatformConstants cfg)
+    => cfg -> (b -> r -> b) -> b -> a -> b
 
-foldLocalRegsDefd :: DefinerOfRegs LocalReg a
-                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+foldLocalRegsDefd
+  :: ( DefinerOfRegs LocalReg a
+     , HasPlatform cfg
+     , HasPlatformConstants cfg
+     ) 
+  => cfg -> (b -> LocalReg -> b) -> b -> a -> b
 foldLocalRegsDefd = foldRegsDefd
 
 instance UserOfRegs LocalReg CmmReg where
@@ -590,7 +603,7 @@ cccsReg = CmmGlobal CCCS
 node :: GlobalReg
 node = VanillaReg 1 VGcPtr
 
-globalRegType :: DynFlags -> GlobalReg -> CmmType
+globalRegType :: HasPlatformConstants cfg => cfg -> GlobalReg -> CmmType
 globalRegType dflags (VanillaReg _ VGcPtr)    = gcWord dflags
 globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
 globalRegType _      (FloatReg _)      = cmmFloat W32

@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -30,8 +31,14 @@ import Cmm
 import CmmUtils
 import CoreSyn
 import FastString      ( nilFS, mkFastString )
+import GHC.Platform.Lens ( HasPlatform, HasPlatformMisc )
 import Module
+import NameSuppress
 import Outputable
+import Outputable.DynFlags ( pprPanic )
+import Packages ( HasPackageState )
+import PlatformConstants ( HasPlatformConstants )
+import PlainPanic ( panic )
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
 import Util            ( seqList )
@@ -72,6 +79,9 @@ dblIsEntry :: DebugBlock -> Bool
 dblIsEntry blk = dblProcedure blk == dblLabel blk
 
 instance Outputable DebugBlock where
+  type OutputableNeedsOfConfig DebugBlock = PairConstraint
+    (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+    (PairConstraint HasNameSuppress HasPackageState)
   ppr blk = (if dblProcedure blk == dblLabel blk
              then text "proc "
              else if dblHasInfoTbl blk
@@ -486,6 +496,9 @@ LOC this information will end up in is Y.
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
 instance Outputable UnwindPoint where
+  type OutputableNeedsOfConfig UnwindPoint = PairConstraint
+    (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+    (PairConstraint HasNameSuppress HasPackageState)
   ppr (UnwindPoint lbl uws) =
       braces $ ppr lbl<>colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
@@ -510,6 +523,9 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 deriving (Eq)
 
 instance Outputable UnwindExpr where
+  type OutputableNeedsOfConfig UnwindExpr = PairConstraint
+    (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+    (PairConstraint HasNameSuppress HasPackageState)
   pprPrec _ (UwConst i)     = ppr i
   pprPrec _ (UwReg g 0)     = ppr g
   pprPrec p (UwReg g x)     = pprPrec p (UwPlus (UwReg g 0) (UwConst x))

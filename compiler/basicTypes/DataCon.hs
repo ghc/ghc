@@ -5,7 +5,9 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module DataCon (
         -- * Main data types
@@ -76,6 +78,9 @@ import PrelNames
 import Var
 import VarSet( emptyVarSet )
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (assertPanic, panic)
+import Packages (HasPackageState)
 import Util
 import BasicTypes
 import FastString
@@ -83,6 +88,7 @@ import Module
 import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
+import TypeSuppress
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
@@ -714,6 +720,9 @@ filterEqSpec eq_spec
     not_in_eq_spec var = all (not . (== var) . eqSpecTyVar) eq_spec
 
 instance Outputable EqSpec where
+  type OutputableNeedsOfConfig EqSpec = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (EqSpec tv ty) = ppr (tv, ty)
 
 {- Note [Bangs on data constructor arguments]
@@ -791,9 +800,13 @@ instance NamedThing DataCon where
     getName = dcName
 
 instance Outputable DataCon where
+    type OutputableNeedsOfConfig DataCon = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      HasPackageState
     ppr con = ppr (dataConName con)
 
 instance OutputableBndr DataCon where
+    type OutputableBndrNeedsOfConfig DataCon = NoConstraint
     pprInfixOcc con = pprInfixName (dataConName con)
     pprPrefixOcc con = pprPrefixName (dataConName con)
 
@@ -804,25 +817,32 @@ instance Data.Data DataCon where
     dataTypeOf _ = mkNoRepType "DataCon"
 
 instance Outputable HsSrcBang where
+    type OutputableNeedsOfConfig HsSrcBang = NoConstraint
     ppr (HsSrcBang _ prag mark) = ppr prag <+> ppr mark
 
 instance Outputable HsImplBang where
+    type OutputableNeedsOfConfig HsImplBang = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
     ppr HsLazy                  = text "Lazy"
     ppr (HsUnpack Nothing)      = text "Unpacked"
     ppr (HsUnpack (Just co))    = text "Unpacked" <> parens (ppr co)
     ppr HsStrict                = text "StrictNotUnpacked"
 
 instance Outputable SrcStrictness where
+    type OutputableNeedsOfConfig SrcStrictness = NoConstraint
     ppr SrcLazy     = char '~'
     ppr SrcStrict   = char '!'
     ppr NoSrcStrict = empty
 
 instance Outputable SrcUnpackedness where
+    type OutputableNeedsOfConfig SrcUnpackedness = NoConstraint
     ppr SrcUnpack   = text "{-# UNPACK #-}"
     ppr SrcNoUnpack = text "{-# NOUNPACK #-}"
     ppr NoSrcUnpack = empty
 
 instance Outputable StrictnessMark where
+    type OutputableNeedsOfConfig StrictnessMark = NoConstraint
     ppr MarkedStrict    = text "!"
     ppr NotMarkedStrict = empty
 

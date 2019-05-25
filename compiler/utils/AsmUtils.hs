@@ -9,11 +9,14 @@ module AsmUtils
 import GhcPrelude
 
 import GHC.Platform
+import GHC.Platform.Lens
 import Outputable
 
 -- | Generate a section type (e.g. @\@progbits@). See #13937.
-sectionType :: String -- ^ section type
-            -> SDoc   -- ^ pretty assembler fragment
+sectionType
+  :: HasPlatform r
+  => String -- ^ section type
+  -> SDoc' r -- ^ pretty assembler fragment
 sectionType ty = sdocWithPlatform $ \platform ->
     case platformArch platform of
       ArchARM{} -> char '%' <> text ty

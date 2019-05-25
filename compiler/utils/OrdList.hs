@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1993-1998
@@ -20,6 +21,7 @@ module OrdList (
 import GhcPrelude
 
 import Outputable
+import PlainPanic
 
 import qualified Data.Semigroup as Semigroup
 
@@ -38,6 +40,7 @@ data OrdList a
   deriving (Functor)
 
 instance Outputable a => Outputable (OrdList a) where
+  type OutputableNeedsOfConfig (OrdList a) = OutputableNeedsOfConfig a
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
 
 instance Semigroup (OrdList a) where

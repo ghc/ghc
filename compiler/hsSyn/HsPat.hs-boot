@@ -9,10 +9,21 @@
 module HsPat where
 
 import Outputable
-import HsExtension      ( OutputableBndrId, GhcPass )
+import HsExtension
+  ( OutputableBndrId, OutputableBndrIdNeedsOfConfig
+  , GhcPass )
 
 type role Pat nominal
 data Pat (i :: *)
 type LPat i = Pat i
 
+-- sadly will also provide default instance, breaking the no type familes in
+-- hs-boot rule.
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p)
+
+-- Used to work around missing type family
+pprPat
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     )
+  => Pat (GhcPass p) -> SDoc' r

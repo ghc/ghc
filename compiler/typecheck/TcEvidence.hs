@@ -1,11 +1,15 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcEvidence (
 
   -- HsWrapper
-  HsWrapper(..),
+  HsWrapper'(..),
+  HsWrapper,
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
@@ -60,12 +64,15 @@ import Type
 import TyCon
 import DataCon( DataCon, dataConWrapId )
 import Class( Class )
+import Packages ( HasPackageState )
 import PrelNames
-import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
 import VarSet
 import Name
 import Pair
+import CoreDebugSuppress
+import TypeSuppress
+import Lens
 
 import CoreSyn
 import Class ( classSCSelId )
@@ -76,6 +83,8 @@ import Util
 import Bag
 import qualified Data.Data as Data
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (panic)
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
@@ -185,16 +194,18 @@ tcCoToMCo = coToMCo
 ************************************************************************
 -}
 
-data HsWrapper
+type HsWrapper = HsWrapper' ()
+
+data HsWrapper' r
   = WpHole                      -- The identity coercion
 
-  | WpCompose HsWrapper HsWrapper
+  | WpCompose (HsWrapper' r) (HsWrapper' r)
        -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
        --
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType SDoc
+  | WpFun (HsWrapper' r) (HsWrapper' r) TcType (SDoc' r)
        -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -224,7 +235,7 @@ data HsWrapper
 
 -- Cannot derive Data instance because SDoc is not Data (it stores a function).
 -- So we do it manually:
-instance Data.Data HsWrapper where
+instance Data.Typeable r => Data.Data (HsWrapper' r) where
   gfoldl _ z WpHole             = z WpHole
   gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
   gfoldl k z (WpFun a1 a2 a3 _) = z wpFunEmpty `k` a1 `k` a2 `k` a3
@@ -280,7 +291,7 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: HsWrapper' r -> HsWrapper' r -> TcType -> HsWrapper' r
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -292,7 +303,7 @@ mkWpFun :: HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
-        -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
+        -> SDoc' ()  -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  _ = WpHole
 mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
@@ -495,6 +506,11 @@ filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
   = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
 
 instance Outputable EvBindMap where
+  type OutputableNeedsOfConfig EvBindMap = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (EvBindMap m) = ppr m
 
 -----------------
@@ -895,21 +911,35 @@ can just squeeze by.  Here's how.
 ************************************************************************
 -}
 
-instance Outputable HsWrapper where
+instance ( HasPprConfig r
+         , HasNameSuppress r
+         , HasPackageState r
+         , HasTypeSuppress r
+         , HasCoreDebugSuppress r
+         ) => Outputable (HsWrapper' r) where
+  type OutputableNeedsOfConfig (HsWrapper' r) = (~) r
   ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))
 
-pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
+pprHsWrapper
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     )
+  => HsWrapper' r -> (Bool -> SDoc' r) -> SDoc' r
 -- With -fprint-typechecker-elaboration, print the wrapper
 --   otherwise just print what's inside
 -- The pp_thing_inside function takes Bool to say whether
 --    it's in a position that needs parens for a non-atomic thing
 pprHsWrapper wrap pp_thing_inside
   = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags
+    if typeSuppress_printTypecheckerElaboration $ view typeSuppress dflags
     then help pp_thing_inside wrap False
     else pp_thing_inside False
   where
-    help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
+    help :: (Bool -> SDoc' r) -> HsWrapper' r -> Bool -> SDoc' r
     -- True  <=> appears in function application position
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
@@ -924,19 +954,36 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
     help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
 
-pprLamBndr :: Id -> SDoc
+pprLamBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     )
+  => Id -> SDoc' r
 pprLamBndr v = pprBndr LambdaBind v
 
-add_parens, no_parens :: SDoc -> Bool -> SDoc
+add_parens, no_parens :: SDoc' r -> Bool -> SDoc' r
 add_parens d True  = parens d
 add_parens d False = d
 no_parens d _ = d
 
 instance Outputable TcEvBinds where
+  type OutputableNeedsOfConfig TcEvBinds = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (TcEvBinds v) = ppr v
   ppr (EvBinds bs)  = text "EvBinds" <> braces (vcat (map ppr (bagToList bs)))
 
 instance Outputable EvBindsVar where
+  type OutputableNeedsOfConfig EvBindsVar = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (EvBindsVar { ebv_uniq = u })
      = text "EvBindsVar" <> angleBrackets (ppr u)
   ppr (CoEvBindsVar { ebv_uniq = u })
@@ -946,14 +993,25 @@ instance Uniquable EvBindsVar where
   getUnique = ebv_uniq
 
 instance Outputable EvBind where
+  type OutputableNeedsOfConfig EvBind = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })
      = sep [ pp_gw <+> ppr v
-           , nest 2 $ equals <+> ppr e ]
+           , nest 2 $ equals <+> ppr e
+           ]
      where
        pp_gw = brackets (if is_given then char 'G' else char 'W')
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
+  type OutputableNeedsOfConfig EvTerm = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (EvExpr e)         = ppr e
   ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
@@ -961,12 +1019,22 @@ instance Outputable EvTerm where
            2 (ppr bs $$ ppr w)   -- Not very pretty
 
 instance Outputable EvCallStack where
+  type OutputableNeedsOfConfig EvCallStack = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr EvCsEmpty
     = text "[]"
   ppr (EvCsPushCall name loc tm)
     = ppr (name,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
+  type OutputableNeedsOfConfig EvTypeable = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint
+      (PairConstraint HasPackageState HasTypeSuppress)
+      HasCoreDebugSuppress)
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
   ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)

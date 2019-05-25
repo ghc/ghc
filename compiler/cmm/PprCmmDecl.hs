@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -45,6 +47,10 @@ import Cmm
 
 import DynFlags
 import Outputable
+import Outputable.DynFlags (printForC)
+import Packages ( HasPackageState )
+import GHC.Platform.Lens
+import NameSuppress
 import FastString
 
 import Data.List
@@ -53,44 +59,98 @@ import System.IO
 import qualified Data.ByteString as BS
 
 
-pprCmms :: (Outputable info, Outputable g)
-        => [GenCmmGroup CmmStatics info g] -> SDoc
+pprCmms
+  :: ( Outputable info, OutputableNeedsOfConfig info r
+     , Outputable g, OutputableNeedsOfConfig g r
+     , HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => [GenCmmGroup CmmStatics info g] -> SDoc' r
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ text "-------------------" $$ space
 
-writeCmms :: (Outputable info, Outputable g)
-          => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
+writeCmms
+  :: ( Outputable info, OutputableNeedsOfConfig info DynFlags
+     , Outputable g, OutputableNeedsOfConfig g DynFlags
+     )
+  => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
 writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
 instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
+    type OutputableNeedsOfConfig (GenCmmDecl d info i) = PairConstraint
+      (PairConstraint
+        (OutputableNeedsOfConfig d)
+        (PairConstraint
+          (OutputableNeedsOfConfig info)
+          (OutputableNeedsOfConfig i)))
+      (PairConstraint
+        (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+        (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState)))
     ppr t = pprTop t
 
 instance Outputable CmmStatics where
+    type OutputableNeedsOfConfig CmmStatics = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr = pprStatics
 
 instance Outputable CmmStatic where
+    type OutputableNeedsOfConfig CmmStatic = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr = pprStatic
 
 instance Outputable CmmInfoTable where
+    type OutputableNeedsOfConfig CmmInfoTable = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr = pprInfoTable
 
 
 -----------------------------------------------------------------------------
 
-pprCmmGroup :: (Outputable d, Outputable info, Outputable g)
-            => GenCmmGroup d info g -> SDoc
+pprCmmGroup
+  :: ( Outputable d
+     , Outputable info
+     , Outputable g
+     , OutputableNeedsOfConfig d r
+     , OutputableNeedsOfConfig info r
+     , OutputableNeedsOfConfig g r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => GenCmmGroup d info g -> SDoc' r
 pprCmmGroup tops
     = vcat $ intersperse blankLine $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop :: (Outputable d, Outputable info, Outputable i)
-       => GenCmmDecl d info i -> SDoc
+pprTop
+  :: ( Outputable d
+     , Outputable info
+     , Outputable i
+     , OutputableNeedsOfConfig d r
+     , OutputableNeedsOfConfig info r
+     , OutputableNeedsOfConfig i r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => GenCmmDecl d info i -> SDoc' r
 
 pprTop (CmmProc info lbl live graph)
 
@@ -111,7 +171,14 @@ pprTop (CmmData section ds) =
 -- --------------------------------------------------------------------------
 -- Info tables.
 
-pprInfoTable :: CmmInfoTable -> SDoc
+pprInfoTable
+  :: ( HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmInfoTable -> SDoc' r
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = srt })
@@ -125,8 +192,9 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
+  type OutputableNeedsOfConfig ForeignHint = HasPprConfig
   ppr NoHint     = empty
-  ppr SignedHint = quotes(text "signed")
+  ppr SignedHint = quotes (text "signed")
 --  ppr AddrHint   = quotes(text "address")
 -- Temp Jan08
   ppr AddrHint   = (text "PtrHint")
@@ -136,10 +204,26 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
-pprStatics :: CmmStatics -> SDoc
+pprStatics
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmStatics -> SDoc' r
 pprStatics (Statics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
-pprStatic :: CmmStatic -> SDoc
+pprStatic
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmStatic -> SDoc' r
 pprStatic s = case s of
     CmmStaticLit lit   -> nest 4 $ text "const" <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
@@ -148,13 +232,20 @@ pprStatic s = case s of
 -- --------------------------------------------------------------------------
 -- data sections
 --
-pprSection :: Section -> SDoc
+pprSection
+  :: ( HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => Section -> SDoc' r
 pprSection (Section t suffix) =
   section <+> doubleQuotes (pprSectionType t <+> char '.' <+> ppr suffix)
   where
     section = text "section"
 
-pprSectionType :: SectionType -> SDoc
+pprSectionType :: SectionType -> SDoc' r
 pprSectionType s = doubleQuotes (ptext t)
  where
   t = case s of

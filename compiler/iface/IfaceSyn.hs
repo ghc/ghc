@@ -4,6 +4,10 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE RankNTypes #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -46,7 +50,6 @@ import GhcPrelude
 import IfaceType
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
-import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
 import Demand
 import Class
 import FieldLabel
@@ -59,6 +62,9 @@ import ForeignCall
 import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
 import Outputable
+import Outputable.DynFlags ( pprPanic )
+import Panic ( panic )
+import Packages ( HasPackageState )
 import Module
 import SrcLoc
 import Fingerprint
@@ -66,9 +72,11 @@ import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
 import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
+import TypeSuppress
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import Lens
 
 import Control.Monad
 import System.IO.Unsafe
@@ -317,6 +325,9 @@ type IfaceAnnTarget = AnnTarget OccName
 data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
 
 instance Outputable IfaceCompleteMatch where
+  type OutputableNeedsOfConfig IfaceCompleteMatch = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfaceCompleteMatch cls ty) = text "COMPLETE" <> colon <+> ppr cls
                                                     <+> dcolon <+> ppr ty
 
@@ -575,10 +586,16 @@ that are incompatible with it.
 ************************************************************************
 -}
 
-pprAxBranch :: SDoc -> BranchIndex -> IfaceAxBranch -> SDoc
+pprAxBranch
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => SDoc' r -> BranchIndex -> IfaceAxBranch -> SDoc' r
 -- The TyCon might be local (just an OccName), or this might
 -- be a branch for an imported TyCon, so it would be an ExtName
--- So it's easier to take an SDoc here
+-- So it's easier to take an SDoc' r here
 --
 -- This function is used
 --    to print interface files,
@@ -586,14 +603,15 @@ pprAxBranch :: SDoc -> BranchIndex -> IfaceAxBranch -> SDoc
 --    in :info F for GHCi, which goes via toConToIfaceDecl on the family tycon
 -- For user error messages we use Coercion.pprCoAxiom and friends
 pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
-                                     , ifaxbCoVars = _cvs
+                                     , ifaxbCoVars = cvs
                                      , ifaxbLHS = pat_tys
                                      , ifaxbRHS = rhs
                                      , ifaxbIncomps = incomps })
-  = WARN( not (null _cvs), pp_tc $$ ppr _cvs )
-    hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
+  = hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 4 maybe_incomps
+    $+$
+    nest 4 maybe_cvs
   where
     -- See Note [Printing foralls in type family instances] in IfaceType
     ppr_binders = maybe_index <+>
@@ -603,15 +621,23 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
     -- See Note [Displaying axiom incompatibilities]
     maybe_index
       = sdocWithDynFlags $ \dflags ->
-        ppWhen (gopt Opt_PrintAxiomIncomps dflags) $
+        ppWhen (typeSuppress_printAxiomIncomps $ view typeSuppress dflags) $
           text "{-" <+> (text "#" <> ppr idx) <+> text "-}"
     maybe_incomps
       = sdocWithDynFlags $ \dflags ->
-        ppWhen (gopt Opt_PrintAxiomIncomps dflags && notNull incomps) $
+        ppWhen (typeSuppress_printAxiomIncomps (view typeSuppress dflags) && notNull incomps) $
           text "--" <+> text "incompatible with:"
           <+> pprWithCommas (\incomp -> text "#" <> ppr incomp) incomps
+    -- XXX(@Ericson2314) This used to be a warning, but warning within pretty
+    -- printing functions is annoying to type-check due to inducing a `DynFlags
+    -- ~ r` constraint, and kind of dubvious anyways.
+    maybe_cvs = ppUnless (null cvs) $ parens $
+      text "--" <+> text "constraint vars, which should not be here:" <+> ppr cvs
 
 instance Outputable IfaceAnnotation where
+  type OutputableNeedsOfConfig IfaceAnnotation = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
 
 instance NamedThing IfaceClassOp where
@@ -633,6 +659,9 @@ instance HasOccName IfaceDecl where
   occName = getOccName
 
 instance Outputable IfaceDecl where
+  type OutputableNeedsOfConfig IfaceDecl = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprIfaceDecl showToIface
 
 {-
@@ -644,18 +673,18 @@ filtering of method signatures. Instead we just check if anything at all is
 filtered and hide it in that case.
 -}
 
-data ShowSub
+data ShowSub r
   = ShowSub
-      { ss_how_much :: ShowHowMuch
+      { ss_how_much :: ShowHowMuch r
       , ss_forall :: ShowForAllFlag }
 
 -- See Note [Printing IfaceDecl binders]
 -- The alternative pretty printer referred to in the note.
-newtype AltPpr = AltPpr (Maybe (OccName -> SDoc))
+newtype AltPpr r = AltPpr (Maybe (OccName -> SDoc' r))
 
-data ShowHowMuch
-  = ShowHeader AltPpr -- ^Header information only, not rhs
-  | ShowSome [OccName] AltPpr
+data ShowHowMuch r
+  = ShowHeader (AltPpr r) -- ^ Header information only, not rhs
+  | ShowSome [OccName] (AltPpr r)
   -- ^ Show only some sub-components. Specifically,
   --
   -- [@[]@] Print all sub-components.
@@ -678,39 +707,42 @@ When printing an interface file (--show-iface), we want to print
 everything unqualified, so we can just print the OccName directly.
 -}
 
-instance Outputable ShowHowMuch where
+instance ( HasPprConfig r
+         , HasNameSuppress r
+         ) => Outputable (ShowHowMuch r) where
+  type OutputableNeedsOfConfig (ShowHowMuch r) = ((~) r)
   ppr (ShowHeader _)    = text "ShowHeader"
   ppr ShowIface         = text "ShowIface"
   ppr (ShowSome occs _) = text "ShowSome" <+> ppr occs
 
-showToHeader :: ShowSub
+showToHeader :: ShowSub r
 showToHeader = ShowSub { ss_how_much = ShowHeader $ AltPpr Nothing
                        , ss_forall = ShowForAllWhen }
 
-showToIface :: ShowSub
+showToIface :: ShowSub r
 showToIface = ShowSub { ss_how_much = ShowIface
                       , ss_forall = ShowForAllWhen }
 
-ppShowIface :: ShowSub -> SDoc -> SDoc
+ppShowIface :: ShowSub r -> SDoc' r -> SDoc' r
 ppShowIface (ShowSub { ss_how_much = ShowIface }) doc = doc
 ppShowIface _                                     _   = Outputable.empty
 
 -- show if all sub-components or the complete interface is shown
-ppShowAllSubs :: ShowSub -> SDoc -> SDoc -- Note [Minimal complete definition]
+ppShowAllSubs :: ShowSub r -> SDoc' r -> SDoc' r -- Note [Minimal complete definition]
 ppShowAllSubs (ShowSub { ss_how_much = ShowSome [] _ }) doc = doc
 ppShowAllSubs (ShowSub { ss_how_much = ShowIface })     doc = doc
 ppShowAllSubs _                                         _   = Outputable.empty
 
-ppShowRhs :: ShowSub -> SDoc -> SDoc
+ppShowRhs :: ShowSub r -> SDoc' r -> SDoc' r
 ppShowRhs (ShowSub { ss_how_much = ShowHeader _ }) _   = Outputable.empty
 ppShowRhs _                                        doc = doc
 
-showSub :: HasOccName n => ShowSub -> n -> Bool
+showSub :: HasOccName n => ShowSub r -> n -> Bool
 showSub (ShowSub { ss_how_much = ShowHeader _ })     _     = False
 showSub (ShowSub { ss_how_much = ShowSome (n:_) _ }) thing = n == occName thing
 showSub (ShowSub { ss_how_much = _ })              _     = True
 
-ppr_trim :: [Maybe SDoc] -> [SDoc]
+ppr_trim :: [Maybe (SDoc' r)] -> [SDoc' r]
 -- Collapse a group of Nothings to a single "..."
 ppr_trim xs
   = snd (foldr go (False, []) xs)
@@ -723,14 +755,25 @@ isIfaceDataInstance :: IfaceTyConParent -> Bool
 isIfaceDataInstance IfNoParent = False
 isIfaceDataInstance _          = True
 
-pprClassRoles :: ShowSub -> IfaceTopBndr -> [IfaceTyConBinder] -> [Role] -> SDoc
+pprClassRoles
+  :: ( HasNameSuppress r
+     , HasTypeSuppress r
+     )
+  => ShowSub r -> IfaceTopBndr -> [IfaceTyConBinder] -> [Role] -> SDoc' r
 pprClassRoles ss clas binders roles =
     pprRoles (== Nominal)
              (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
              binders
              roles
 
-pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
+pprIfaceDecl
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowSub r -> IfaceDecl -> SDoc' r
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
 pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
@@ -750,7 +793,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
   where
     is_data_instance = isIfaceDataInstance parent
     -- See Note [Printing foralls in type family instances] in IfaceType
-    pp_data_inst_forall :: SDoc
+    pp_data_inst_forall :: SDoc' r
     pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
 
     forall_bndrs :: [IfaceForAllBndr]
@@ -758,7 +801,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
-    pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
+    pp_cons    = ppr_trim (map show_con cons) :: [SDoc' r]
     pp_kind
       | isIfaceLiftedTypeKind kind = empty
       | otherwise = dcolon <+> ppr kind
@@ -825,17 +868,17 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
       asocs = ppr_trim $ map maybeShowAssoc ats
       dsigs = ppr_trim $ map maybeShowSig sigs
 
-      maybeShowAssoc :: IfaceAT -> Maybe SDoc
+      maybeShowAssoc :: IfaceAT -> Maybe (SDoc' r)
       maybeShowAssoc asc@(IfaceAT d _)
         | showSub ss d = Just $ pprIfaceAT ss asc
         | otherwise    = Nothing
 
-      maybeShowSig :: IfaceClassOp -> Maybe SDoc
+      maybeShowSig :: IfaceClassOp -> Maybe (SDoc' r)
       maybeShowSig sg
         | showSub ss sg = Just $  pprIfaceClassOp ss sg
         | otherwise     = Nothing
 
-      pprMinDef :: BooleanFormula IfLclName -> SDoc
+      pprMinDef :: BooleanFormula IfLclName -> SDoc' r
       pprMinDef minDef = ppUnless (isTrue minDef) $ -- hide empty definitions
         text "{-# MINIMAL" <+>
         pprBooleanFormula
@@ -934,27 +977,33 @@ pprIfaceDecl _ (IfaceAxiom { ifName = name, ifTyCon = tycon
   = hang (text "axiom" <+> ppr name <+> dcolon)
        2 (vcat $ unzipWith (pprAxBranch (ppr tycon)) $ zip [0..] branches)
 
-pprCType :: Maybe CType -> SDoc
+pprCType :: Maybe CType -> SDoc' r
 pprCType Nothing      = Outputable.empty
 pprCType (Just cType) = text "C type:" <+> ppr cType
 
 -- if, for each role, suppress_if role is True, then suppress the role
 -- output
-pprRoles :: (Role -> Bool) -> SDoc -> [IfaceTyConBinder]
-         -> [Role] -> SDoc
+pprRoles
+  :: HasTypeSuppress r 
+  => (Role -> Bool) -> SDoc' r -> [IfaceTyConBinder]
+  -> [Role] -> SDoc' r
 pprRoles suppress_if tyCon bndrs roles
   = sdocWithDynFlags $ \dflags ->
       let froles = suppressIfaceInvisibles dflags bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
-pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
+pprInfixIfDeclBndr
+  :: HasNameSuppress r
+  => ShowHowMuch r -> OccName -> SDoc' r
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
   = pprInfixVar (isSymOcc name) (ppr_bndr name)
 pprInfixIfDeclBndr _ name
   = pprInfixVar (isSymOcc name) (ppr name)
 
-pprPrefixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
+pprPrefixIfDeclBndr
+  :: HasNameSuppress r
+  => ShowHowMuch r -> OccName -> SDoc' r
 pprPrefixIfDeclBndr (ShowHeader (AltPpr (Just ppr_bndr))) name
   = parenSymOcc name (ppr_bndr name)
 pprPrefixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
@@ -963,9 +1012,18 @@ pprPrefixIfDeclBndr _ name
   = parenSymOcc name (ppr name)
 
 instance Outputable IfaceClassOp where
+   type OutputableNeedsOfConfig IfaceClassOp = PairConstraint
+     (PairConstraint HasPprConfig HasNameSuppress)
+     (PairConstraint HasTypeSuppress HasPackageState)
    ppr = pprIfaceClassOp showToIface
 
-pprIfaceClassOp :: ShowSub -> IfaceClassOp -> SDoc
+pprIfaceClassOp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowSub r -> IfaceClassOp -> SDoc' r
 pprIfaceClassOp ss (IfaceClassOp n ty dm)
   = pp_sig n ty $$ generic_dm
   where
@@ -979,9 +1037,18 @@ pprIfaceClassOp ss (IfaceClassOp n ty dm)
      <+> pprIfaceSigmaType ShowForAllWhen ty
 
 instance Outputable IfaceAT where
+   type OutputableNeedsOfConfig IfaceAT = PairConstraint
+     (PairConstraint HasPprConfig HasNameSuppress)
+     (PairConstraint HasTypeSuppress HasPackageState)
    ppr = pprIfaceAT showToIface
 
-pprIfaceAT :: ShowSub -> IfaceAT -> SDoc
+pprIfaceAT
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowSub r -> IfaceAT -> SDoc' r
 pprIfaceAT ss (IfaceAT d mb_def)
   = vcat [ pprIfaceDecl ss d
          , case mb_def of
@@ -990,18 +1057,35 @@ pprIfaceAT ss (IfaceAT d mb_def)
                           text "Default:" <+> ppr rhs ]
 
 instance Outputable IfaceTyConParent where
+  type OutputableNeedsOfConfig IfaceTyConParent = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr p = pprIfaceTyConParent p
 
-pprIfaceTyConParent :: IfaceTyConParent -> SDoc
+pprIfaceTyConParent
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceTyConParent -> SDoc' r
 pprIfaceTyConParent IfNoParent
   = Outputable.empty
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = pprIfaceTypeApp topPrec tc tys
 
-pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
-                 -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
-                 -> Maybe IfaceKind
-                 -> SDoc
+pprIfaceDeclHead
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceContext
+  -> ShowSub r
+  -> Name
+  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
+  -> Maybe IfaceKind
+  -> SDoc' r
 pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
@@ -1009,11 +1093,20 @@ pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
           <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
 
-pprIfaceConDecl :: ShowSub -> Bool
-                -> IfaceTopBndr
-                -> [IfaceTyConBinder]
-                -> IfaceTyConParent
-                -> IfaceConDecl -> SDoc
+pprIfaceConDecl
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowSub r
+  -> Bool
+  -> IfaceTopBndr
+  -> [IfaceTyConBinder]
+  -> IfaceTyConParent
+  -> IfaceConDecl
+  -> SDoc' r
 pprIfaceConDecl ss gadt_style tycon tc_binders parent
         (IfCon { ifConName = name, ifConInfix = is_infix,
                  ifConUserTvBinders = user_tvbs,
@@ -1061,7 +1154,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>
                                pprParendIfaceCoercion co
 
-    pprFieldArgTy, pprArgTy :: (IfaceBang, IfaceType) -> SDoc
+    pprFieldArgTy, pprArgTy :: (IfaceBang, IfaceType) -> SDoc' r
     -- If using record syntax, the only reason one would need to parenthesize
     -- a compound field type is if it's preceded by a bang pattern.
     pprFieldArgTy (bang, ty) = ppr_arg_ty (bang_prec bang) bang ty
@@ -1072,7 +1165,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- 2. The field type is preceded with a bang pattern.
     pprArgTy (bang, ty) = ppr_arg_ty (max gadt_prec (bang_prec bang)) bang ty
 
-    ppr_arg_ty :: PprPrec -> IfaceBang -> IfaceType -> SDoc
+    ppr_arg_ty :: PprPrec -> IfaceBang -> IfaceType -> SDoc' r
     ppr_arg_ty prec bang ty = ppr_bang bang <> pprPrecIfaceType prec ty
 
     -- If we're displaying the fields GADT-style, e.g.,
@@ -1105,16 +1198,16 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     bang_prec IfUnpack     = appPrec
     bang_prec IfUnpackCo{} = appPrec
 
-    pp_args :: [SDoc] -- No records, e.g., `  Maybe a  ->  Int -> ...` or
+    pp_args :: [SDoc' r] -- No records, e.g., `  Maybe a  ->  Int -> ...` or
                       --                   `!(Maybe a) -> !Int -> ...`
     pp_args = map pprArgTy tys_w_strs
 
-    pp_field_args :: SDoc -- Records, e.g., { x ::   Maybe a,  y ::  Int } or
+    pp_field_args :: SDoc' r -- Records, e.g., { x ::   Maybe a,  y ::  Int } or
                           --                { x :: !(Maybe a), y :: !Int }
     pp_field_args = braces $ sep $ punctuate comma $ ppr_trim $
                     zipWith maybe_show_label fields tys_w_strs
 
-    maybe_show_label :: FieldLabel -> (IfaceBang, IfaceType) -> Maybe SDoc
+    maybe_show_label :: FieldLabel -> (IfaceBang, IfaceType) -> Maybe (SDoc' r)
     maybe_show_label lbl bty
       | showSub ss sel = Just (pprPrefixIfDeclBndr how_much occ
                                 <+> dcolon <+> pprFieldArgTy bty)
@@ -1123,7 +1216,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
         sel = flSelector lbl
         occ = mkVarOccFS (flLabel lbl)
 
-    mk_user_con_res_ty :: IfaceEqSpec -> SDoc
+    mk_user_con_res_ty :: IfaceEqSpec -> SDoc' r
     -- See Note [Result type of a data family GADT]
     mk_user_con_res_ty eq_spec
       | IfDataInstance _ tc tys <- parent
@@ -1156,6 +1249,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
              (mk_tc_app_args tc_bndrs)
 
 instance Outputable IfaceRule where
+  type OutputableNeedsOfConfig IfaceRule = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                    ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
                    ifRuleOrph = orph })
@@ -1169,6 +1265,9 @@ instance Outputable IfaceRule where
       pp_foralls = ppUnless (null bndrs) $ forAllLit <+> pprIfaceBndrs bndrs <> dot
 
 instance Outputable IfaceClsInst where
+  type OutputableNeedsOfConfig IfaceClsInst = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
                     , ifInstCls = cls, ifInstTys = mb_tcs
                     , ifInstOrph = orph })
@@ -1178,6 +1277,9 @@ instance Outputable IfaceClsInst where
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
+  type OutputableNeedsOfConfig IfaceFamInst = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                     , ifFamInstAxiom = tycon_ax, ifFamInstOrph = orph })
     = hang (text "family instance"
@@ -1185,7 +1287,11 @@ instance Outputable IfaceFamInst where
               <+> ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
          2 (equals <+> ppr tycon_ax)
 
-ppr_rough :: Maybe IfaceTyCon -> SDoc
+ppr_rough
+  :: ( HasNameSuppress r
+     , HasPackageState r
+     )
+  => Maybe IfaceTyCon -> SDoc' r
 ppr_rough Nothing   = dot
 ppr_rough (Just tc) = ppr tc
 
@@ -1215,19 +1321,34 @@ universal type variables.
 -}
 
 instance Outputable IfaceExpr where
+    type OutputableNeedsOfConfig IfaceExpr = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
     ppr e = pprIfaceExpr noParens e
 
-noParens :: SDoc -> SDoc
+noParens :: SDoc' r -> SDoc' r
 noParens pp = pp
 
-pprParendIfaceExpr :: IfaceExpr -> SDoc
+pprParendIfaceExpr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceExpr -> SDoc' r
 pprParendIfaceExpr = pprIfaceExpr parens
 
 -- | Pretty Print an IfaceExpre
 --
 -- The first argument should be a function that adds parens in context that need
 -- an atomic value (e.g. function args)
-pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
+pprIfaceExpr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => (SDoc' r -> SDoc' r) -> IfaceExpr -> SDoc' r
 
 pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
@@ -1284,20 +1405,40 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
 pprIfaceExpr add_par (IfaceTick tickish e)
   = add_par (pprIfaceTickish tickish <+> pprIfaceExpr noParens e)
 
-ppr_alt :: (IfaceConAlt, [IfLclName], IfaceExpr) -> SDoc
+ppr_alt
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => (IfaceConAlt, [IfLclName], IfaceExpr) -> SDoc' r
 ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
                          arrow <+> pprIfaceExpr noParens rhs]
 
-ppr_con_bs :: IfaceConAlt -> [IfLclName] -> SDoc
+ppr_con_bs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceConAlt -> [IfLclName] -> SDoc' r
 ppr_con_bs con bs = ppr con <+> hsep (map ppr bs)
 
-ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
+ppr_bind
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => (IfaceLetBndr, IfaceExpr) -> SDoc' r
 ppr_bind (IfLetBndr b ty info ji, rhs)
   = sep [hang (ppr b <+> dcolon <+> ppr ty) 2 (ppr ji <+> ppr info),
          equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
-pprIfaceTickish :: IfaceTickish -> SDoc
+pprIfaceTickish
+  :: HasPackageState r
+  => IfaceTickish -> SDoc' r
 pprIfaceTickish (IfaceHpcTick m ix)
   = braces (text "tick" <+> ppr m <+> ppr ix)
 pprIfaceTickish (IfaceSCC cc tick scope)
@@ -1306,19 +1447,31 @@ pprIfaceTickish (IfaceSource src _names)
   = braces (pprUserRealSpan True src)
 
 ------------------
-pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
+pprIfaceApp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceExpr -> [SDoc' r] -> SDoc' r
 pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun $
                                           nest 2 (pprParendIfaceExpr arg) : args
 pprIfaceApp fun                args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
 instance Outputable IfaceConAlt where
+    type OutputableNeedsOfConfig IfaceConAlt = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
     ppr IfaceDefault      = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
 
 ------------------
 instance Outputable IfaceIdDetails where
+  type OutputableNeedsOfConfig IfaceIdDetails = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr IfVanillaId       = Outputable.empty
   ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
                           <+> if b
@@ -1327,11 +1480,17 @@ instance Outputable IfaceIdDetails where
   ppr IfDFunId          = text "DFunId"
 
 instance Outputable IfaceIdInfo where
+  type OutputableNeedsOfConfig IfaceIdInfo = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr NoInfo       = Outputable.empty
   ppr (HasInfo is) = text "{-" <+> pprWithCommas ppr is
                      <+> text "-}"
 
 instance Outputable IfaceInfoItem where
+  type OutputableNeedsOfConfig IfaceInfoItem = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (HsUnfold lb unf)     = text "Unfolding"
                               <> ppWhen lb (text "(loop-breaker)")
                               <> colon <+> ppr unf
@@ -1342,10 +1501,14 @@ instance Outputable IfaceInfoItem where
   ppr HsLevity              = text "Never levity-polymorphic"
 
 instance Outputable IfaceJoinInfo where
+  type OutputableNeedsOfConfig IfaceJoinInfo = NoConstraint
   ppr IfaceNotJoinPoint   = empty
   ppr (IfaceJoinPoint ar) = angleBrackets (text "join" <+> ppr ar)
 
 instance Outputable IfaceUnfolding where
+  type OutputableNeedsOfConfig IfaceUnfolding = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
   ppr (IfCoreUnfold s e)   = (if s
                                 then text "<stable>"

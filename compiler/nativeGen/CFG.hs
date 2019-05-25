@@ -52,6 +52,8 @@ import Util
 import Digraph
 
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import PlainPanic (panic)
 -- DEBUGGING ONLY
 --import Debug
 --import OrdList
@@ -71,6 +73,7 @@ newtype EdgeWeight
   deriving (Eq,Ord,Enum,Num,Real,Integral)
 
 instance Outputable EdgeWeight where
+  type OutputableNeedsOfConfig EdgeWeight = NoConstraint
   ppr (EdgeWeight w) = ppr w
 
 type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
@@ -104,6 +107,7 @@ instance Ord CfgEdge where
     = GT
 
 instance Outputable CfgEdge where
+  type OutputableNeedsOfConfig CfgEdge = NoConstraint
   ppr (CfgEdge from1 to1 edgeInfo)
     = parens (ppr from1 <+> text "-(" <> ppr edgeInfo <> text ")->" <+> ppr to1)
 
@@ -125,6 +129,7 @@ data EdgeInfo
   } deriving (Eq)
 
 instance Outputable EdgeInfo where
+  type OutputableNeedsOfConfig EdgeInfo = NoConstraint
   ppr edgeInfo = text "weight:" <+> ppr (edgeWeight edgeInfo)
 
 -- Allow specialization

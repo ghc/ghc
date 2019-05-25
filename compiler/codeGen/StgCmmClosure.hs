@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -87,6 +89,10 @@ import TyCon
 import RepType
 import BasicTypes
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import Packages ( HasPackageState )
+import PlainPanic (assertPanic, panic)
+import GHC.Platform.Lens
 import DynFlags
 import Util
 
@@ -112,6 +118,9 @@ data CgLoc
         -- and branch to the block id
 
 instance Outputable CgLoc where
+  type OutputableNeedsOfConfig CgLoc = PairConstraint
+    (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+    (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
   ppr (CmmLoc e)    = text "cmm" <+> ppr e
   ppr (LneLoc b rs) = text "lne" <+> ppr b <+> ppr rs
 
@@ -137,6 +146,7 @@ fromNonVoid :: NonVoid a -> a
 fromNonVoid (NonVoid a) = a
 
 instance (Outputable a) => Outputable (NonVoid a) where
+  type OutputableNeedsOfConfig (NonVoid a) = OutputableNeedsOfConfig a
   ppr (NonVoid a) = ppr a
 
 nonVoidIds :: [Id] -> [NonVoid Id]

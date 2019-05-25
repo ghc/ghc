@@ -20,6 +20,7 @@ import Cmm
 
 import FastString
 import Outputable
+import Outputable.DynFlags (SDoc, showSDoc)
 import Unique
 
 -- ----------------------------------------------------------------------------

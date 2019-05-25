@@ -31,7 +31,12 @@ import StgSyn
 import qualified StgCmmArgRep
 import qualified StgCmmClosure
 import qualified StgCmmLayout
+import CoreDebugSuppress
+import NameSuppress
+import TypeSuppress
 import Outputable
+import Outputable.DynFlags (SDoc, pprPanic)
+import Packages ( HasPackageState )
 import Util
 import VarSet
 
@@ -160,6 +165,11 @@ binderInfoOccursAsArg BoringBinder{}     = Nothing
 binderInfoOccursAsArg (BindsClosure _ b) = Just b
 
 instance Outputable Skeleton where
+  type OutputableNeedsOfConfig Skeleton = PairConstraint
+    (PairConstraint HasPprConfig HasPackageState)
+    (PairConstraint
+     (PairConstraint HasNameSuppress HasTypeSuppress)
+     HasCoreDebugSuppress)
   ppr NilSk = text ""
   ppr (AltSk l r) = vcat
     [ text "{ " <+> ppr l
@@ -187,9 +197,13 @@ instance Outputable Skeleton where
         | otherwise = 'ω'
 
 instance Outputable BinderInfo where
+  type OutputableNeedsOfConfig BinderInfo = PairConstraint
+    (PairConstraint HasPprConfig HasPackageState)
+    (PairConstraint HasNameSuppress HasTypeSuppress)
   ppr = ppr . binderInfoBndr
 
 instance OutputableBndr BinderInfo where
+  type OutputableBndrNeedsOfConfig BinderInfo = HasCoreDebugSuppress
   pprBndr b = pprBndr b . binderInfoBndr
   pprPrefixOcc = pprPrefixOcc . binderInfoBndr
   pprInfixOcc = pprInfixOcc . binderInfoBndr

@@ -10,6 +10,7 @@ import Id
 import VarEnv
 import Control.Monad.Trans.State.Strict
 import Outputable
+import Outputable.DynFlags (assertPprPanic, warnPprTrace)
 import Util
 
 -- | A renaming substitution from 'Id's to 'Id's. Like 'RnEnv2', but not

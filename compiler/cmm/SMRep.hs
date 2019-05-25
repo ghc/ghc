@@ -3,7 +3,9 @@
 --
 -- Storage manager representation of closures
 
-{-# LANGUAGE CPP,GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module SMRep (
         -- * Words and bytes
@@ -49,6 +51,7 @@ import GhcPrelude
 import BasicTypes( ConTagZ )
 import DynFlags
 import Outputable
+import PlainPanic
 import GHC.Platform
 import FastString
 
@@ -111,6 +114,7 @@ toStgWord dflags i
       PW8 -> StgWord (fromInteger i)
 
 instance Outputable StgWord where
+    type OutputableNeedsOfConfig StgWord = NoConstraint
     ppr (StgWord i) = integer (toInteger i)
 
 --
@@ -132,6 +136,7 @@ toStgHalfWord dflags i
       PW8 -> StgHalfWord (fromInteger i :: Word32)
 
 instance Outputable StgHalfWord where
+    type OutputableNeedsOfConfig StgHalfWord = NoConstraint
     ppr (StgHalfWord w) = integer (toInteger w)
 
 -- | Half word size in bytes
@@ -517,16 +522,18 @@ as non-Caffy, and the others as potentially Caffy.
 -}
 
 instance Outputable ClosureTypeInfo where
+   type OutputableNeedsOfConfig ClosureTypeInfo = NoConstraint
    ppr = pprTypeInfo
 
 instance Outputable SMRep where
+   type OutputableNeedsOfConfig SMRep = NoConstraint
    ppr (HeapRep static ps nps tyinfo)
      = hang (header <+> lbrace) 2 (ppr tyinfo <+> rbrace)
      where
        header = text "HeapRep"
                 <+> if static then text "static" else empty
                 <+> pp_n "ptrs" ps <+> pp_n "nonptrs" nps
-       pp_n :: String -> Int -> SDoc
+       pp_n :: String -> Int -> SDoc' r
        pp_n _ 0 = empty
        pp_n s n = int n <+> text s
 
@@ -541,10 +548,11 @@ instance Outputable SMRep where
    ppr (RTSRep ty rep) = text "tag:" <> ppr ty <+> ppr rep
 
 instance Outputable ArgDescr where
+  type OutputableNeedsOfConfig ArgDescr = NoConstraint
   ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
   ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
 
-pprTypeInfo :: ClosureTypeInfo -> SDoc
+pprTypeInfo :: ClosureTypeInfo -> SDoc' r
 pprTypeInfo (Constr tag descr)
   = text "Con" <+>
     braces (sep [ text "tag:" <+> ppr tag
