@@ -32,17 +32,21 @@ import HsBinds
 -- others:
 import TcEvidence
 import CoreSyn
-import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
+import DynFlags ( DynFlags )
 import Name
 import NameSet
 import RdrName  ( GlobalRdrEnv )
 import BasicTypes
 import ConLike
+import Lens
 import SrcLoc
 import Util
 import Outputable
+import Outputable.DynFlags (SDoc, assertPanic, assertPprPanic, pprPanic)
+import Panic (panic)
 import FastString
 import Type
+import TypeSuppress
 import TcType (TcType)
 import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 
@@ -136,12 +140,15 @@ mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLoc name
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (SyntaxExpr p) where
+  type OutputableNeedsOfConfig (SyntaxExpr p) = PairConstraint
+    (OutputableBndrIdNeedsOfConfig p)
+    ((~) DynFlags) -- TODO generalize
   ppr (SyntaxExpr { syn_expr      = expr
                   , syn_arg_wraps = arg_wraps
                   , syn_res_wrap  = res_wrap })
     = sdocWithDynFlags $ \ dflags ->
       getPprStyle $ \s ->
-      if debugStyle s || gopt Opt_PrintExplicitCoercions dflags
+      if debugStyle s || typeSuppress_printExplicitCoercions (view typeSuppress dflags)
       then ppr expr <> braces (pprWithCommas ppr arg_wraps)
                     <> braces (ppr res_wrap)
       else ppr expr
@@ -207,6 +214,7 @@ data UnboundVar
   deriving Data
 
 instance Outputable UnboundVar where
+    type OutputableNeedsOfConfig UnboundVar = HasNameSuppress
     ppr (OutOfScope occ _) = text "OutOfScope" <> parens (ppr occ)
     ppr (TrueExprHole occ) = text "ExprHole"   <> parens (ppr occ)
 
@@ -844,15 +852,26 @@ RenamedSource, so this allows a simple mapping to be used based on the location.
 -}
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p) where
+    type OutputableNeedsOfConfig (HsExpr p) = PairConstraint
+      (OutputableBndrIdNeedsOfConfig p)
+      ((~) DynFlags) -- TODO generalize
     ppr expr = pprExpr expr
 
 -----------------------
 -- pprExpr, pprLExpr, pprBinds call pprDeeper;
 -- the underscore versions do not
-pprLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc
+pprLExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => LHsExpr (GhcPass p) -> SDoc
 pprLExpr (L _ e) = pprExpr e
 
-pprExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc
+pprExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsExpr (GhcPass p) -> SDoc
 pprExpr e | isAtomicHsExpr e || isQuietHsExpr e =            ppr_expr e
           | otherwise                           = pprDeeper (ppr_expr e)
 
@@ -867,16 +886,29 @@ isQuietHsExpr (HsAppType {})    = True
 isQuietHsExpr (OpApp {})        = True
 isQuietHsExpr _ = False
 
-pprBinds :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
-         => HsLocalBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
+pprBinds
+  :: ( OutputableBndrId (GhcPass idL)
+     , OutputableBndrId (GhcPass idR)
+     , OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags -- TODO generalize
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     )
+  => HsLocalBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprBinds b = pprDeeper (ppr b)
 
 -----------------------
-ppr_lexpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc
+ppr_lexpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => LHsExpr (GhcPass p) -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
-ppr_expr :: forall p. (OutputableBndrId (GhcPass p))
-         => HsExpr (GhcPass p) -> SDoc
+ppr_expr
+  :: forall p
+  .  ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsExpr (GhcPass p) -> SDoc
 ppr_expr (HsVar _ (L _ v))  = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv)= pprPrefixOcc (unboundVarOcc uv)
 ppr_expr (HsConLikeOut _ c) = pprPrefixOcc c
@@ -1061,7 +1093,11 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
 
-ppr_infix_expr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> Maybe SDoc
+ppr_infix_expr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v)) = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)= Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)    = Just (pprInfixOcc f)
@@ -1069,10 +1105,13 @@ ppr_infix_expr (HsUnboundVar _ h@TrueExprHole{}) = Just (pprInfixOcc (unboundVar
 ppr_infix_expr (HsWrap _ _ e)    = ppr_infix_expr e
 ppr_infix_expr _                 = Nothing
 
-ppr_apps :: (OutputableBndrId (GhcPass p))
-         => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
-         -> SDoc
+ppr_apps
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsExpr (GhcPass p)
+  -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
+  -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
 ppr_apps (HsAppType _ (L _ fun) arg)    args
@@ -1101,19 +1140,28 @@ fixities should do the job, except in debug mode (-dppr-debug) so we
 can see the structure of the parse tree.
 -}
 
-pprDebugParendExpr :: (OutputableBndrId (GhcPass p))
-                   => PprPrec -> LHsExpr (GhcPass p) -> SDoc
+pprDebugParendExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => PprPrec -> LHsExpr (GhcPass p) -> SDoc
 pprDebugParendExpr p expr
   = getPprStyle (\sty ->
     if debugStyle sty then pprParendLExpr p expr
                       else pprLExpr      expr)
 
-pprParendLExpr :: (OutputableBndrId (GhcPass p))
-               => PprPrec -> LHsExpr (GhcPass p) -> SDoc
+pprParendLExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => PprPrec -> LHsExpr (GhcPass p) -> SDoc
 pprParendLExpr p (L _ e) = pprParendExpr p e
 
-pprParendExpr :: (OutputableBndrId (GhcPass p))
-              => PprPrec -> HsExpr (GhcPass p) -> SDoc
+pprParendExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => PprPrec -> HsExpr (GhcPass p) -> SDoc
 pprParendExpr p expr
   | hsExprNeedsParens p expr = parens (pprExpr expr)
   | otherwise                = pprExpr expr
@@ -1349,15 +1397,26 @@ type instance XCmdTop  GhcTc = CmdTopTc
 type instance XXCmdTop (GhcPass _) = NoExtCon
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p) where
+    type OutputableNeedsOfConfig (HsCmd p) = PairConstraint
+      (OutputableBndrIdNeedsOfConfig p)
+      ((~) DynFlags) -- TODO generalize
     ppr cmd = pprCmd cmd
 
 -----------------------
 -- pprCmd and pprLCmd call pprDeeper;
 -- the underscore versions do not
-pprLCmd :: (OutputableBndrId (GhcPass p)) => LHsCmd (GhcPass p) -> SDoc
-pprLCmd (L _ c) = pprCmd c
+pprLCmd
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => LHsCmd (GhcPass p) -> SDoc
+pprLCmd c = pprCmd (unLoc c)
 
-pprCmd :: (OutputableBndrId (GhcPass p)) => HsCmd (GhcPass p) -> SDoc
+pprCmd
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsCmd (GhcPass p) -> SDoc
 pprCmd c | isQuietHsCmd c =            ppr_cmd c
          | otherwise      = pprDeeper (ppr_cmd c)
 
@@ -1371,10 +1430,19 @@ isQuietHsCmd (HsCmdApp {}) = True
 isQuietHsCmd _ = False
 
 -----------------------
-ppr_lcmd :: (OutputableBndrId (GhcPass p)) => LHsCmd (GhcPass p) -> SDoc
+ppr_lcmd
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => LHsCmd (GhcPass p) -> SDoc
 ppr_lcmd c = ppr_cmd (unLoc c)
 
-ppr_cmd :: forall p. (OutputableBndrId (GhcPass p)) => HsCmd (GhcPass p) -> SDoc
+ppr_cmd
+  :: forall p
+  .  ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsCmd (GhcPass p) -> SDoc
 ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp _ c e)
@@ -1436,12 +1504,19 @@ ppr_cmd (HsCmdArrForm _ op _ _ args)
          4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
 ppr_cmd (XCmd x) = ppr x
 
-pprCmdArg :: (OutputableBndrId (GhcPass p)) => HsCmdTop (GhcPass p) -> SDoc
+pprCmdArg
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsCmdTop (GhcPass p) -> SDoc
 pprCmdArg (HsCmdTop _ cmd)
   = ppr_lcmd cmd
 pprCmdArg (XCmdTop x) = ppr x
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmdTop p) where
+    type OutputableNeedsOfConfig (HsCmdTop p) = PairConstraint
+      (OutputableBndrIdNeedsOfConfig p)
+      ((~) DynFlags) -- TODO generalize
     ppr = pprCmdArg
 
 {-
@@ -1519,6 +1594,11 @@ type instance XXMatch (GhcPass _) b = NoExtCon
 
 instance (idR ~ GhcPass pr, OutputableBndrId idR, Outputable body)
             => Outputable (Match idR body) where
+  type OutputableNeedsOfConfig (Match idR body) = PairConstraint
+    (PairConstraint
+      (OutputableBndrIdNeedsOfConfig idR)
+      (OutputableNeedsOfConfig body))
+    ((~) DynFlags) -- TODO generalize
   ppr = pprMatch
 
 {-
@@ -1623,29 +1703,50 @@ type instance XXGRHS (GhcPass _) b = NoExtCon
 
 -- We know the list must have at least one @Match@ in it.
 
-pprMatches :: (OutputableBndrId (GhcPass idR), Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => MatchGroup (GhcPass idR) body -> SDoc
 pprMatches MG { mg_alts = matches }
     = vcat (map pprMatch (map unLoc (unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
 pprMatches (XMatchGroup x) = ppr x
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndrId (GhcPass idR), Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => MatchGroup (GhcPass idR) body -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprPatBind :: forall bndr p body. (OutputableBndrId (GhcPass bndr),
-                                   OutputableBndrId (GhcPass p),
-                                   Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+pprPatBind
+  :: forall bndr p body
+  .  ( OutputableBndrId (GhcPass bndr)
+     , OutputableBndrId (GhcPass p)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass bndr) DynFlags -- TODO generalize
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
 pprPatBind pat (grhss)
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (IdP (GhcPass p))) grhss)]
 
-pprMatch :: (OutputableBndrId (GhcPass idR), Outputable body)
-         => Match (GhcPass idR) body -> SDoc
+pprMatch
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => Match (GhcPass idR) body -> SDoc
 pprMatch match
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
@@ -1682,8 +1783,13 @@ pprMatch match
     (pat1:pats1) = m_pats match
     (pat2:pats2) = pats1
 
-pprGRHSs :: (OutputableBndrId (GhcPass idR), Outputable body)
-         => HsMatchContext idL -> GRHSs (GhcPass idR) body -> SDoc
+pprGRHSs
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => HsMatchContext idL -> GRHSs (GhcPass idR) body -> SDoc
 pprGRHSs ctxt (GRHSs _ grhss (L _ binds))
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
@@ -1692,8 +1798,13 @@ pprGRHSs ctxt (GRHSs _ grhss (L _ binds))
       (text "where" $$ nest 4 (pprBinds binds))
 pprGRHSs _ (XGRHSs x) = ppr x
 
-pprGRHS :: (OutputableBndrId (GhcPass idR), Outputable body)
-        => HsMatchContext idL -> GRHS (GhcPass idR) body -> SDoc
+pprGRHS
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => HsMatchContext idL -> GRHS (GhcPass idR) body -> SDoc
 pprGRHS ctxt (GRHS _ [] body)
  =  pp_rhs ctxt body
 
@@ -1702,7 +1813,11 @@ pprGRHS ctxt (GRHS _ guards body)
 
 pprGRHS _ (XGRHS x) = ppr x
 
-pp_rhs :: Outputable body => HsMatchContext idL -> body -> SDoc
+pp_rhs
+  :: ( Outputable body
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => HsMatchContext idL -> body -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 
 {-
@@ -2124,6 +2239,13 @@ that we can pretty-print it correctly.
 instance (Outputable (StmtLR idL idL (LHsExpr idL)),
           Outputable (XXParStmtBlock idL idR))
         => Outputable (ParStmtBlock idL idR) where
+  type OutputableNeedsOfConfig (ParStmtBlock idL idR) = PairConstraint
+    (PairConstraint
+      (OutputableBndrIdNeedsOfConfig idL)
+      (OutputableBndrIdNeedsOfConfig idR))
+    (PairConstraint
+      (OutputableNeedsOfConfig (XXParStmtBlock idL idR))
+      ((~) DynFlags)) -- TODO generalize
   ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
   ppr (XParStmtBlock x)          = ppr x
 
@@ -2131,12 +2253,25 @@ instance (idL ~ GhcPass pl,idR ~ GhcPass pr,
           OutputableBndrId idL, OutputableBndrId idR,
           Outputable body)
          => Outputable (StmtLR idL idR body) where
+    type OutputableNeedsOfConfig (StmtLR idL idR body) = PairConstraint
+      (PairConstraint
+        (OutputableBndrIdNeedsOfConfig idL)
+        (OutputableBndrIdNeedsOfConfig idR))
+      (PairConstraint
+        (OutputableNeedsOfConfig body)
+        ((~) DynFlags)) -- TODO generalize
     ppr stmt = pprStmt stmt
 
-pprStmt :: forall idL idR body . (OutputableBndrId (GhcPass idL),
-                                  OutputableBndrId (GhcPass idR),
-                                  Outputable body)
-        => (StmtLR (GhcPass idL) (GhcPass idR) body) -> SDoc
+pprStmt
+  :: forall idL idR body
+  .  ( OutputableBndrId (GhcPass idL)
+     , OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags -- TODO generalize
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => (StmtLR (GhcPass idL) (GhcPass idR) body) -> SDoc
 pprStmt (LastStmt _ expr ret_stripped _)
   = whenPprDebug (text "[last]") <+>
        (if ret_stripped then text "return" else empty) <+>
@@ -2213,26 +2348,42 @@ pprStmt (ApplicativeStmt _ args mb_join)
 
 pprStmt (XStmtLR x) = ppr x
 
-pprTransformStmt :: (OutputableBndrId (GhcPass p))
-                 => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
-                 -> Maybe (LHsExpr (GhcPass p)) -> SDoc
+pprTransformStmt
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
+  -> Maybe (LHsExpr (GhcPass p)) -> SDoc
 pprTransformStmt bndrs using by
   = sep [ text "then" <+> whenPprDebug (braces (ppr bndrs))
         , nest 2 (ppr using)
         , nest 2 (pprBy by)]
 
-pprTransStmt :: Outputable body => Maybe body -> body -> TransForm -> SDoc
+pprTransStmt
+  :: ( Outputable body
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => Maybe body -> body -> TransForm -> SDoc
 pprTransStmt by using ThenForm
   = sep [ text "then", nest 2 (ppr using), nest 2 (pprBy by)]
 pprTransStmt by using GroupForm
   = sep [ text "then group", nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
 
-pprBy :: Outputable body => Maybe body -> SDoc
+pprBy
+  :: ( Outputable body
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => Maybe body -> SDoc
 pprBy Nothing  = empty
 pprBy (Just e) = text "by" <+> ppr e
 
-pprDo :: (OutputableBndrId (GhcPass p), Outputable body)
-      => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
+pprDo
+  :: ( OutputableBndrId (GhcPass p)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
 pprDo DoExpr        stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
@@ -2241,14 +2392,25 @@ pprDo ListComp      stmts = brackets    $ pprComp stmts
 pprDo MonadComp     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR),
-                 Outputable body)
-             => [LStmtLR (GhcPass idL) (GhcPass idR) body] -> SDoc
+ppr_do_stmts
+  :: ( OutputableBndrId (GhcPass idL)
+     , OutputableBndrId (GhcPass idR)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags -- TODO generalize
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => [LStmtLR (GhcPass idL) (GhcPass idR) body] -> SDoc
 -- Print a bunch of do stmts
 ppr_do_stmts stmts = pprDeeperList vcat (map ppr stmts)
 
-pprComp :: (OutputableBndrId (GhcPass p), Outputable body)
-        => [LStmt (GhcPass p) body] -> SDoc
+pprComp
+  :: ( OutputableBndrId (GhcPass p)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => [LStmt (GhcPass p) body] -> SDoc
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | Just (initStmts, L _ (LastStmt _ body _ _)) <- snocView quals
   = if null initStmts
@@ -2262,8 +2424,13 @@ pprComp quals     -- Prints:  body | qual1, ..., qualn
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
-pprQuals :: (OutputableBndrId (GhcPass p), Outputable body)
-         => [LStmt (GhcPass p) body] -> SDoc
+pprQuals
+  :: ( OutputableBndrId (GhcPass p)
+     , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => [LStmt (GhcPass p) body] -> SDoc
 -- Show list comprehension qualifiers separated by commas
 pprQuals quals = interpp'SP quals
 
@@ -2454,29 +2621,48 @@ sense, although I hate to add another constructor to HsExpr.
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsSplicedThing p) where
+  type OutputableNeedsOfConfig (HsSplicedThing p) = PairConstraint
+    (OutputableBndrIdNeedsOfConfig p)
+    ((~) DynFlags) -- TODO generalize
   ppr (HsSplicedExpr e) = ppr_expr e
   ppr (HsSplicedTy   t) = ppr t
   ppr (HsSplicedPat  p) = ppr p
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
+  type OutputableNeedsOfConfig (HsSplice p) = PairConstraint
+    (OutputableBndrIdNeedsOfConfig p)
+    ((~) DynFlags) -- TODO generalize
   ppr s = pprSplice s
 
-pprPendingSplice :: (OutputableBndrId (GhcPass p))
-                 => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
+pprPendingSplice
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
 pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
 
-pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
+pprSpliceDecl
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 pprSpliceDecl e@HsQuasiQuote{} _ = pprSplice e
 pprSpliceDecl e ExplicitSplice   = text "$(" <> ppr_splice_decl e <> text ")"
 pprSpliceDecl e ImplicitSplice   = ppr_splice_decl e
 
-ppr_splice_decl :: (OutputableBndrId (GhcPass p))
-                => HsSplice (GhcPass p) -> SDoc
+ppr_splice_decl
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsSplice (GhcPass p) -> SDoc
 ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
-pprSplice :: (OutputableBndrId (GhcPass p)) => HsSplice (GhcPass p) -> SDoc
+pprSplice
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsSplice (GhcPass p) -> SDoc
 pprSplice (HsTypedSplice _ HasParens  n e)
   = ppr_splice (text "$$(") n e (text ")")
 pprSplice (HsTypedSplice _ HasDollar n e)
@@ -2494,13 +2680,20 @@ pprSplice (HsSpliced _ _ thing)         = ppr thing
 pprSplice (HsSplicedT {})               = text "Unevaluated typed splice"
 pprSplice (XSplice x)                   = ppr x
 
-ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
+ppr_quasi
+  :: ( OutputableBndr p
+     , OutputableBndrNeedsOfConfig' p DynFlags -- TODO generalize
+     )
+  => p -> p -> FastString -> SDoc
 ppr_quasi n quoter quote = whenPprDebug (brackets (ppr n)) <>
                            char '[' <> ppr quoter <> vbar <>
                            ppr quote <> text "|]"
 
-ppr_splice :: (OutputableBndrId (GhcPass p))
-           => SDoc -> (IdP (GhcPass p)) -> LHsExpr (GhcPass p) -> SDoc -> SDoc
+ppr_splice
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => SDoc -> (IdP (GhcPass p)) -> LHsExpr (GhcPass p) -> SDoc -> SDoc
 ppr_splice herald n e trail
     = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
@@ -2531,10 +2724,17 @@ isTypedBracket _           = False
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
           => Outputable (HsBracket p) where
+  type OutputableNeedsOfConfig (HsBracket p) = PairConstraint
+    (OutputableBndrIdNeedsOfConfig p)
+    ((~) DynFlags) -- TODO generalize
   ppr = pprHsBracket
 
 
-pprHsBracket :: (OutputableBndrId (GhcPass p)) => HsBracket (GhcPass p) -> SDoc
+pprHsBracket
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags -- TODO generalize
+     )
+  => HsBracket (GhcPass p) -> SDoc
 pprHsBracket (ExpBr _ e)   = thBrackets empty (ppr e)
 pprHsBracket (PatBr _ p)   = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBrG _ gp) = thBrackets (char 'd') (ppr gp)
@@ -2555,9 +2755,11 @@ thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
 
 instance Outputable PendingRnSplice where
+  type OutputableNeedsOfConfig PendingRnSplice = (~) DynFlags -- TODO generalize
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
 
 instance Outputable PendingTcSplice where
+  type OutputableNeedsOfConfig PendingTcSplice = (~) DynFlags -- TODO generalize
   ppr (PendingTcSplice n e) = pprPendingSplice n e
 
 {-
@@ -2582,6 +2784,9 @@ data ArithSeqInfo id
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
          => Outputable (ArithSeqInfo p) where
+    type OutputableNeedsOfConfig (ArithSeqInfo p) = PairConstraint
+      (OutputableBndrIdNeedsOfConfig p)
+      ((~) DynFlags) -- TODO generalize
     ppr (From e1)             = hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
     ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
@@ -2633,7 +2838,10 @@ data HsMatchContext id -- Not an extensible tag
   deriving Functor
 deriving instance (Data id) => Data (HsMatchContext id)
 
-instance OutputableBndr id => Outputable (HsMatchContext id) where
+instance (OutputableBndr id) => Outputable (HsMatchContext id) where
+  type OutputableNeedsOfConfig (HsMatchContext id) = PairConstraint
+    (OutputableBndrNeedsOfConfig' id)
+    ((~) DynFlags) -- TODO generalize
   ppr m@(FunRhs{})          = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
@@ -2708,8 +2916,13 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (NameOrRdrName id),Outputable id)
-                => HsMatchContext id -> SDoc
+pprMatchContext
+  :: ( Outputable id
+     , Outputable (NameOrRdrName id)
+     , OutputableNeedsOfConfig id DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig (NameOrRdrName id) DynFlags -- TODO generalize
+     )
+  => HsMatchContext id -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
   | otherwise    = text "a"  <+> pprMatchContextNoun ctxt
@@ -2718,8 +2931,13 @@ pprMatchContext ctxt
     want_an ProcExpr    = True
     want_an _           = False
 
-pprMatchContextNoun :: (Outputable (NameOrRdrName id),Outputable id)
-                    => HsMatchContext id -> SDoc
+pprMatchContextNoun
+  :: ( Outputable id
+     , Outputable (NameOrRdrName id)
+     , OutputableNeedsOfConfig id DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig (NameOrRdrName id) DynFlags -- TODO generalize
+     )
+  => HsMatchContext id -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=L _ fun})
                                     = text "equation for"
                                       <+> quotes (ppr fun)
@@ -2737,9 +2955,13 @@ pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable id,
-                                    Outputable (NameOrRdrName id))
-                                => HsStmtContext id -> SDoc
+pprAStmtContext, pprStmtContext
+  :: ( Outputable id
+     , Outputable (NameOrRdrName id)
+     , OutputableNeedsOfConfig id DynFlags -- TODO generalizes
+     , OutputableNeedsOfConfig (NameOrRdrName id) DynFlags -- TODO generalize
+     )
+  => HsStmtContext id -> SDoc
 pprAStmtContext ctxt = article <+> pprStmtContext ctxt
   where
     pp_an = text "an"
@@ -2771,13 +2993,19 @@ pprStmtContext (TransStmtCtxt c) =
   ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
              (pprStmtContext c)
 
-instance (Outputable p, Outputable (NameOrRdrName p))
-      => Outputable (HsStmtContext p) where
+instance (Outputable id, Outputable (NameOrRdrName id))
+      => Outputable (HsStmtContext id) where
+    type OutputableNeedsOfConfig (HsStmtContext id) = PairConstraint
+           (PairConstraint
+             (OutputableNeedsOfConfig id)
+             (OutputableNeedsOfConfig (NameOrRdrName id)))
+           ((~) DynFlags) -- TODO generalize
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
-matchContextErrString :: Outputable id
-                      => HsMatchContext id -> SDoc
+matchContextErrString
+  :: (Outputable id, OutputableNeedsOfConfig id DynFlags)
+  => HsMatchContext id -> SDoc
 matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
@@ -2799,21 +3027,31 @@ matchContextErrString (StmtCtxt MDoExpr)           = text "'mdo' block"
 matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
 matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
 
-pprMatchInCtxt :: (OutputableBndrId (GhcPass idR),
-                   -- TODO:AZ these constraints do not make sense
-                 Outputable (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR)))),
-                 Outputable body)
-               => Match (GhcPass idR) body -> SDoc
+pprMatchInCtxt
+  :: ( OutputableBndrId (GhcPass idR)
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+       -- TODO:AZ these constraints do not make sense
+     , Outputable (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR))))
+     , Outputable body
+     , OutputableNeedsOfConfig (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR)))) DynFlags -- TODO generalize
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => Match (GhcPass idR) body -> SDoc
 pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
                                         <> colon)
                              4 (pprMatch match)
 
-pprStmtInCtxt :: (OutputableBndrId (GhcPass idL),
-                  OutputableBndrId (GhcPass idR),
-                  Outputable body)
-              => HsStmtContext (IdP (GhcPass idL))
-              -> StmtLR (GhcPass idL) (GhcPass idR) body
-              -> SDoc
+pprStmtInCtxt
+  :: ( OutputableBndrId (GhcPass idL)
+     , OutputableBndrId (GhcPass idR)
+     , OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags -- TODO generalize
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags -- TODO generalize
+     , Outputable body
+     , OutputableNeedsOfConfig body DynFlags -- TODO generalize
+     )
+  => HsStmtContext (IdP (GhcPass idL))
+  -> StmtLR (GhcPass idL) (GhcPass idR) body
+  -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)
   | isComprehensionContext ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (text "In the expression:") 2 (ppr e)

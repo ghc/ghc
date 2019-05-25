@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ApiAnnotation (
   getAnnotation, getAndRemoveAnnotation,
@@ -300,6 +301,7 @@ data AnnKeywordId
     deriving (Eq, Ord, Data, Show)
 
 instance Outputable AnnKeywordId where
+  type OutputableNeedsOfConfig AnnKeywordId = NoConstraint
   ppr x = text (show x)
 
 -- ---------------------------------------------------------------------
@@ -318,6 +320,7 @@ data AnnotationComment =
 -- defined in Lexer.x and bringing it in here would create a loop
 
 instance Outputable AnnotationComment where
+  type OutputableNeedsOfConfig AnnotationComment = NoConstraint
   ppr x = text (show x)
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',

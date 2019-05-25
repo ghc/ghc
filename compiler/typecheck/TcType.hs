@@ -15,7 +15,11 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcType (
   --------------------------------
@@ -224,8 +228,12 @@ import Util
 import Maybes
 import ListSetOps ( getNth, findDupsEq )
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import PlainPanic (assertPanic)
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
+import TypeSuppress
+import Packages (HasPackageState)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
@@ -386,10 +394,14 @@ type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
 
 instance Outputable ExpType where
+  type OutputableNeedsOfConfig ExpType = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (Check ty) = text "Check" <> braces (ppr ty)
   ppr (Infer ir) = ppr ir
 
 instance Outputable InferResult where
+  type OutputableNeedsOfConfig InferResult = NoConstraint
   ppr (IR { ir_uniq = u, ir_lvl = lvl
           , ir_inst = inst })
     = text "Infer" <> braces (ppr u <> comma <> ppr lvl <+> ppr inst)
@@ -526,9 +538,10 @@ superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely disti
                   -- topTcLevel works in the places that vanillaSkolemTv is used
 
 instance Outputable TcTyVarDetails where
+  type OutputableNeedsOfConfig TcTyVarDetails = NoConstraint
   ppr = pprTcTyVarDetails
 
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc' r
 -- For debugging
 pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
 pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
@@ -561,10 +574,14 @@ data MetaInfo
                    -- See Note [The flattening story] in TcFlatten
 
 instance Outputable MetaDetails where
+  type OutputableNeedsOfConfig MetaDetails = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
 instance Outputable MetaInfo where
+  type OutputableNeedsOfConfig MetaInfo = NoConstraint
   ppr TauTv         = text "tau"
   ppr TyVarTv       = text "tyv"
   ppr FlatMetaTv    = text "fmv"
@@ -825,6 +842,7 @@ tcTypeLevel ty
       | otherwise = lvl
 
 instance Outputable TcLevel where
+  type OutputableNeedsOfConfig TcLevel = NoConstraint
   ppr (TcLevel us) = ppr us
 
 promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar

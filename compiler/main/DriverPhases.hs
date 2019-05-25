@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --  $Id: DriverPhases.hs,v 1.38 2005/05/17 11:01:59 simonmar Exp $
@@ -44,6 +45,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} DynFlags
 import Outputable
+import PlainPanic
 import GHC.Platform
 import System.FilePath
 import Binary
@@ -152,6 +154,7 @@ data Phase
   deriving (Eq, Show)
 
 instance Outputable Phase where
+    type OutputableNeedsOfConfig Phase = NoConstraint
     ppr p = text (show p)
 
 anyHsc :: Phase

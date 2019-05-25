@@ -19,6 +19,8 @@ import CoAxiom
 import VarSet
 import VarEnv
 import Outputable
+import Outputable.DynFlags ( assertPprPanic, pprPanic, warnPprTrace )
+import PlainPanic ( assertPanic)
 import FamInstEnv ( flattenTys )
 import Pair
 import ListSetOps ( getNth )

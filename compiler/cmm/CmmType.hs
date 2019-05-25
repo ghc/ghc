@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module CmmType
     ( CmmType   -- Abstract
     , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
@@ -34,6 +35,8 @@ import GhcPrelude
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic
 
 import Data.Word
 import Data.Int
@@ -60,9 +63,11 @@ data CmmCat                -- "Category" (not exported)
         -- See Note [Signed vs unsigned] at the end
 
 instance Outputable CmmType where
+  type OutputableNeedsOfConfig CmmType = NoConstraint
   ppr (CmmType cat wid) = ppr cat <> ppr (widthInBits wid)
 
 instance Outputable CmmCat where
+  type OutputableNeedsOfConfig CmmCat = NoConstraint
   ppr FloatCat       = text "F"
   ppr GcPtrCat       = text "P"
   ppr BitsCat        = text "I"
@@ -172,6 +177,7 @@ data Width   = W8 | W16 | W32 | W64
              deriving (Eq, Ord, Show)
 
 instance Outputable Width where
+   type OutputableNeedsOfConfig Width = NoConstraint
    ppr rep = ptext (mrStr rep)
 
 mrStr :: Width -> PtrString

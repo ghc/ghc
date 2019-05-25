@@ -32,6 +32,7 @@ import qualified StgCmmArgRep
 import qualified StgCmmClosure
 import qualified StgCmmLayout
 import Outputable
+import Outputable.DynFlags (SDoc, pprPanic)
 import Util
 import VarSet
 
@@ -160,6 +161,7 @@ binderInfoOccursAsArg BoringBinder{}     = Nothing
 binderInfoOccursAsArg (BindsClosure _ b) = Just b
 
 instance Outputable Skeleton where
+  type OutputableNeedsOfConfig Skeleton = (~) DynFlags --TODO
   ppr NilSk = text ""
   ppr (AltSk l r) = vcat
     [ text "{ " <+> ppr l
@@ -187,9 +189,11 @@ instance Outputable Skeleton where
         | otherwise = 'ω'
 
 instance Outputable BinderInfo where
+  type OutputableNeedsOfConfig BinderInfo = (~) DynFlags --TODO
   ppr = ppr . binderInfoBndr
 
 instance OutputableBndr BinderInfo where
+  type OutputableBndrNeedsOfConfig BinderInfo = NoConstraint
   pprBndr b = pprBndr b . binderInfoBndr
   pprPrefixOcc = pprPrefixOcc . binderInfoBndr
   pprInfixOcc = pprInfixOcc . binderInfoBndr

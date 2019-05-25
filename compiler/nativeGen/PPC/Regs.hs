@@ -63,6 +63,8 @@ import Unique
 import CodeGen.Platform
 import DynFlags
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import GHC.Platform
 
 import Data.Word        ( Word8, Word16, Word32, Word64 )

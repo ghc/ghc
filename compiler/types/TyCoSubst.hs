@@ -6,6 +6,7 @@ Type and Coercion - friends' interface
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Substitution into types and coercions.
 module TyCoSubst
@@ -67,17 +68,22 @@ import TyCoRep
 import TyCoFVs
 import TyCoPpr
 
+import Packages ( HasPackageState )
 import Var
 import VarSet
 import VarEnv
 
+import NameSuppress
+import Outputable
+import Outputable.DynFlags ( assertPprPanic, pprPanic )
+import Panic ( assertPanic )
 import Pair
+import TypeSuppress
 import Util
 import UniqSupply
 import Unique
 import UniqFM
 import UniqSet
-import Outputable
 
 import Data.List
 
@@ -458,6 +464,9 @@ zipCoEnv cvs cos
   = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
 
 instance Outputable TCvSubst where
+  type OutputableNeedsOfConfig TCvSubst = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (TCvSubst ins tenv cenv)
     = brackets $ sep[ text "TCvSubst",
                       nest 2 (text "In scope:" <+> ppr ins),

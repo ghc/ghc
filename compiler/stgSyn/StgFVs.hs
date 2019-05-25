@@ -11,6 +11,7 @@ import Id
 import VarSet
 import CoreSyn    ( Tickish(Breakpoint) )
 import Outputable
+import Outputable.DynFlags ( pprPanic )
 import Util
 
 import Data.Maybe ( mapMaybe )

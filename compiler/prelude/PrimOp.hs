@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- The default is a bit too low for the quite large primOpInfo definition
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
@@ -48,6 +49,8 @@ import SrcLoc           ( wiredInSrcSpan )
 import ForeignCall      ( CLabelString )
 import Unique           ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import Outputable
+import Packages         ( HasPackageState )
+import NameSuppress     ( HasNameSuppress )
 import FastString
 import Module           ( UnitId )
 
@@ -84,6 +87,7 @@ instance Ord PrimOp where
                       | otherwise  = GT
 
 instance Outputable PrimOp where
+    type OutputableNeedsOfConfig PrimOp = PairConstraint HasNameSuppress HasPackageState
     ppr op = pprPrimOp op
 
 data PrimOpVecCat = IntVec
@@ -682,7 +686,7 @@ compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
 
 -- Output stuff:
 
-pprPrimOp  :: PrimOp -> SDoc
+pprPrimOp  :: (HasNameSuppress r, HasPackageState r) => PrimOp -> SDoc' r
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
 
 {-
@@ -696,5 +700,6 @@ pprPrimOp other_op = pprOccName (primOpOcc other_op)
 data PrimCall = PrimCall CLabelString UnitId
 
 instance Outputable PrimCall where
+  type OutputableNeedsOfConfig PrimCall = HasPackageState
   ppr (PrimCall lbl pkgId)
         = text "__primcall" <+> ppr pkgId <+> ppr lbl

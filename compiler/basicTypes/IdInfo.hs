@@ -10,6 +10,7 @@ Haskell. [WDP 94/11])
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module IdInfo (
         -- * The IdDetails type
@@ -97,6 +98,9 @@ import PatSyn
 import Type
 import ForeignCall
 import Outputable
+import Outputable.DynFlags (assertPprPanic)
+import Packages (HasPackageState)
+import Panic (panic)
 import Module
 import Demand
 import Util
@@ -171,6 +175,9 @@ data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
   -- /instance/ 'TyCon' not the family 'TyCon'
 
 instance Outputable RecSelParent where
+  type OutputableNeedsOfConfig RecSelParent = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    HasPackageState
   ppr p = case p of
             RecSelData ty_con -> ppr ty_con
             RecSelPatSyn ps   -> ppr ps
@@ -190,9 +197,10 @@ isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity
 isJoinIdDetails_maybe _                   = Nothing
 
 instance Outputable IdDetails where
+    type OutputableNeedsOfConfig IdDetails = NoConstraint
     ppr = pprIdDetails
 
-pprIdDetails :: IdDetails -> SDoc
+pprIdDetails :: IdDetails -> SDoc' r
 pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
@@ -351,7 +359,7 @@ type ArityInfo = Arity
 unknownArity :: Arity
 unknownArity = 0
 
-ppArityInfo :: Int -> SDoc
+ppArityInfo :: Int -> SDoc' r
 ppArityInfo 0 = empty
 ppArityInfo n = hsep [text "Arity", int n]
 
@@ -384,7 +392,7 @@ type InlinePragInfo = InlinePragma
 ************************************************************************
 -}
 
-pprStrictness :: StrictSig -> SDoc
+pprStrictness :: StrictSig -> SDoc' r
 pprStrictness sig = ppr sig
 
 {-
@@ -480,9 +488,10 @@ mayHaveCafRefs  MayHaveCafRefs = True
 mayHaveCafRefs _               = False
 
 instance Outputable CafInfo where
+   type OutputableNeedsOfConfig CafInfo = NoConstraint
    ppr = ppCafInfo
 
-ppCafInfo :: CafInfo -> SDoc
+ppCafInfo :: CafInfo -> SDoc' r
 ppCafInfo NoCafRefs = text "NoCafRefs"
 ppCafInfo MayHaveCafRefs = empty
 
@@ -590,6 +599,7 @@ data TickBoxOp
    = TickBox Module {-# UNPACK #-} !TickBoxId
 
 instance Outputable TickBoxOp where
+    type OutputableNeedsOfConfig TickBoxOp = HasPackageState
     ppr (TickBox mod n)         = text "tick" <+> ppr (mod,n)
 
 {-
@@ -617,6 +627,7 @@ data LevityInfo = NoLevityInfo  -- always safe
   deriving Eq
 
 instance Outputable LevityInfo where
+  type OutputableNeedsOfConfig LevityInfo = NoConstraint
   ppr NoLevityInfo           = text "NoLevityInfo"
   ppr NeverLevityPolymorphic = text "NeverLevityPolymorphic"
 

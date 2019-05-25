@@ -21,7 +21,12 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TyCoRep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
@@ -96,8 +101,12 @@ import CoAxiom
 import BasicTypes ( LeftOrRight(..), pickLR )
 import PrelNames
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import Packages (HasPackageState)
+import Panic (assertPanic)
 import FastString
 import Util
+import TypeSuppress
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
@@ -137,6 +146,9 @@ data TyThing
   | ACoAxiom (CoAxiom Branched)
 
 instance Outputable TyThing where
+  type OutputableNeedsOfConfig TyThing = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprShortTyThing
 
 instance NamedThing TyThing where       -- Can't put this with the type
@@ -145,12 +157,18 @@ instance NamedThing TyThing where       -- Can't put this with the type
   getName (ACoAxiom cc) = getName cc
   getName (AConLike cl) = conLikeName cl
 
-pprShortTyThing :: TyThing -> SDoc
+pprShortTyThing
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyThing -> SDoc' r
 -- c.f. PprTyThing.pprTyThing, which prints all the details
 pprShortTyThing thing
   = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
-pprTyThingCategory :: TyThing -> SDoc
+pprTyThingCategory :: TyThing -> SDoc' r
 pprTyThingCategory = text . capitalise . tyThingCategory
 
 tyThingCategory :: TyThing -> String
@@ -238,6 +256,9 @@ data Type
   deriving Data.Data
 
 instance Outputable Type where
+  type OutputableNeedsOfConfig Type = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprType
 
 -- NOTE:  Other parts of the code assume that type literals do not contain
@@ -248,6 +269,7 @@ data TyLit
   deriving (Eq, Ord, Data.Data)
 
 instance Outputable TyLit where
+   type OutputableNeedsOfConfig TyLit = NoConstraint
    ppr = pprTyLit
 
 {- Note [Function types]
@@ -637,6 +659,9 @@ data TyCoBinder
   deriving Data.Data
 
 instance Outputable TyCoBinder where
+  type OutputableNeedsOfConfig TyCoBinder = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
   ppr (Named (Bndr v Specified)) = char '@' <> ppr v
@@ -1163,6 +1188,9 @@ type CoercionP = Coercion       -- always phantom
 type KindCoercion = CoercionN   -- always nominal
 
 instance Outputable Coercion where
+  type OutputableNeedsOfConfig Coercion = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprCo
 
 -- | A semantically more meaningful type to represent what may or may not be a
@@ -1177,6 +1205,9 @@ type MCoercionR = MCoercion
 type MCoercionN = MCoercion
 
 instance Outputable MCoercion where
+  type OutputableNeedsOfConfig MCoercion = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr MRefl    = text "MRefl"
   ppr (MCo co) = text "MCo" <+> ppr co
 
@@ -1570,6 +1601,7 @@ data UnivCoProvenance
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
+  type OutputableNeedsOfConfig UnivCoProvenance = NoConstraint
   ppr UnsafeCoerceProv   = text "(unsafeCoerce#)"
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
@@ -1596,6 +1628,9 @@ instance Data.Data CoercionHole where
   dataTypeOf _ = mkNoRepType "CoercionHole"
 
 instance Outputable CoercionHole where
+  type OutputableNeedsOfConfig CoercionHole = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
 

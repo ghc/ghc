@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ConLike (
           ConLike(..)
@@ -35,6 +36,7 @@ import Unique
 import Util
 import Name
 import BasicTypes
+import Packages (HasPackageState)
 import TyCoRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
@@ -80,10 +82,14 @@ instance NamedThing ConLike where
     getName (PatSynCon ps)   = getName ps
 
 instance Outputable ConLike where
+    type OutputableNeedsOfConfig ConLike = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      HasPackageState
     ppr (RealDataCon dc) = ppr dc
     ppr (PatSynCon ps) = ppr ps
 
 instance OutputableBndr ConLike where
+    type OutputableBndrNeedsOfConfig ConLike = NoConstraint
     pprInfixOcc (RealDataCon dc) = pprInfixOcc dc
     pprInfixOcc (PatSynCon ps) = pprInfixOcc ps
     pprPrefixOcc (RealDataCon dc) = pprPrefixOcc dc

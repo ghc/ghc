@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 -- | An architecture independent description of a register's class.
 module RegClass
         ( RegClass (..) )
@@ -27,6 +29,7 @@ instance Uniquable RegClass where
     getUnique RcDouble  = mkRegClassUnique 2
 
 instance Outputable RegClass where
+    type OutputableNeedsOfConfig RegClass = NoConstraint
     ppr RcInteger       = Outputable.text "I"
     ppr RcFloat         = Outputable.text "F"
     ppr RcDouble        = Outputable.text "D"

@@ -5,7 +5,11 @@
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Demand (
         StrDmd, UseDmd(..), Count,
@@ -65,6 +69,8 @@ import GhcPrelude
 
 import DynFlags
 import Outputable
+import Outputable.DynFlags (warnPprTrace)
+import PlainPanic (panic)
 import Var ( Var )
 import VarEnv
 import UniqFM
@@ -96,6 +102,9 @@ getUseDmd = ud
 
 -- Pretty-printing
 instance (Outputable s, Outputable u) => Outputable (JointDmd s u) where
+  type OutputableNeedsOfConfig (JointDmd s u) = PairConstraint
+    (OutputableNeedsOfConfig s)
+    (OutputableNeedsOfConfig u)
   ppr (JD {sd = s, ud = u}) = angleBrackets (ppr s <> char ',' <> ppr u)
 
 -- Well-formedness preserving constructors for the joint domain
@@ -237,12 +246,14 @@ isHyperStr _              = False
 
 -- Pretty-printing
 instance Outputable StrDmd where
+  type OutputableNeedsOfConfig StrDmd = NoConstraint
   ppr HyperStr      = char 'B'
   ppr (SCall s)     = char 'C' <> parens (ppr s)
   ppr HeadStr       = char 'S'
   ppr (SProd sx)    = char 'S' <> parens (hcat (map ppr sx))
 
 instance Outputable ArgStr where
+  type OutputableNeedsOfConfig ArgStr = NoConstraint
   ppr (Str s) = ppr s
   ppr Lazy    = char 'L'
 
@@ -377,17 +388,20 @@ data Count = One | Many
 
 -- Pretty-printing
 instance Outputable ArgUse where
+  type OutputableNeedsOfConfig ArgUse = NoConstraint
   ppr Abs           = char 'A'
   ppr (Use Many a)   = ppr a
   ppr (Use One  a)   = char '1' <> char '*' <> ppr a
 
 instance Outputable UseDmd where
+  type OutputableNeedsOfConfig UseDmd = NoConstraint
   ppr Used           = char 'U'
   ppr (UCall c a)    = char 'C' <> ppr c <> parens (ppr a)
   ppr UHead          = char 'H'
   ppr (UProd as)     = char 'U' <> parens (hcat (punctuate (char ',') (map ppr as)))
 
 instance Outputable Count where
+  type OutputableNeedsOfConfig Count = NoConstraint
   ppr One  = char '1'
   ppr Many = text ""
 
@@ -805,6 +819,7 @@ data TypeShape = TsFun TypeShape
                | TsUnk
 
 instance Outputable TypeShape where
+  type OutputableNeedsOfConfig TypeShape = NoConstraint
   ppr TsUnk        = text "TsUnk"
   ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
@@ -961,10 +976,12 @@ bothDmdResult r (Dunno {}) = r
 -- (See Note [Default demand on free variables] for why)
 
 instance Outputable r => Outputable (Termination r) where
+  type OutputableNeedsOfConfig (Termination r) = OutputableNeedsOfConfig r
   ppr Diverges      = char 'b'
   ppr (Dunno c)     = ppr c
 
 instance Outputable CPRResult where
+  type OutputableNeedsOfConfig CPRResult = NoConstraint
   ppr NoCPR        = empty
   ppr (RetSum n)   = char 'm' <> int n
   ppr RetProd      = char 'm'
@@ -1183,6 +1200,7 @@ bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
             (r1 `bothDmdResult` t2)
 
 instance Outputable DmdType where
+  type OutputableNeedsOfConfig DmdType = NoConstraint
   ppr (DmdType fv ds res)
     = hsep [hcat (map ppr ds) <> ppr res,
             if null fv_elts then empty
@@ -1629,10 +1647,11 @@ newtype StrictSig = StrictSig DmdType
                   deriving( Eq )
 
 instance Outputable StrictSig where
+   type OutputableNeedsOfConfig StrictSig = NoConstraint
    ppr (StrictSig ty) = ppr ty
 
 -- Used for printing top-level strictness pragmas in interface files
-pprIfaceStrictSig :: StrictSig -> SDoc
+pprIfaceStrictSig :: StrictSig -> SDoc' r
 pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
   = hcat (map ppr dmds) <> ppr res
 

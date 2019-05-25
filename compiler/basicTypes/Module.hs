@@ -11,6 +11,7 @@ the keys.
 
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Module
     (
@@ -170,7 +171,14 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} DynFlags (DynFlags)
-import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigMap, getPackageConfigMap, displayInstalledUnitId)
+import {-# SOURCE #-} Packages
+  ( componentIdString
+  , improveUnitId
+  , PackageConfigMap
+  , HasPackageState
+  , getPackageConfigMap
+  , displayInstalledUnitId
+  )
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -277,6 +285,7 @@ data ModLocation
   } deriving Show
 
 instance Outputable ModLocation where
+   type OutputableNeedsOfConfig ModLocation = NoConstraint
    ppr = text . show
 
 {-
@@ -336,6 +345,7 @@ instance Ord ModuleName where
   nm1 `compare` nm2 = stableModuleNameCmp nm1 nm2
 
 instance Outputable ModuleName where
+  type OutputableNeedsOfConfig ModuleName = NoConstraint
   ppr = pprModuleName
 
 instance Binary ModuleName where
@@ -359,7 +369,7 @@ stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
 -- ^ Compares module names lexically, rather than by their 'Unique's
 stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
 
-pprModuleName :: ModuleName -> SDoc
+pprModuleName :: ModuleName -> SDoc' r
 pprModuleName (ModuleName nm) =
     getPprStyle $ \ sty ->
     if codeStyle sty
@@ -442,6 +452,7 @@ instance Uniquable Module where
   getUnique (Module p n) = getUnique (unitIdFS p `appendFS` moduleNameFS n)
 
 instance Outputable Module where
+  type OutputableNeedsOfConfig Module = HasPackageState
   ppr = pprModule
 
 instance Binary Module where
@@ -468,7 +479,7 @@ stableModuleCmp (Module p1 n1) (Module p2 n2)
 mkModule :: UnitId -> ModuleName -> Module
 mkModule = Module
 
-pprModule :: Module -> SDoc
+pprModule :: HasPackageState r => Module -> SDoc' r
 pprModule mod@(Module p n)  = getPprStyle doc
  where
   doc sty
@@ -525,6 +536,7 @@ instance Uniquable ComponentId where
   getUnique (ComponentId n) = getUnique n
 
 instance Outputable ComponentId where
+  type OutputableNeedsOfConfig ComponentId = HasPackageState
   ppr cid@(ComponentId fs) =
     getPprStyle $ \sty ->
     sdocWithDynFlags $ \dflags ->
@@ -651,6 +663,7 @@ data IndefModule = IndefModule {
     } deriving (Eq, Ord)
 
 instance Outputable IndefModule where
+  type OutputableNeedsOfConfig IndefModule = HasPackageState
   ppr (IndefModule uid m) =
     ppr uid <> char ':' <> ppr m
 
@@ -696,6 +709,7 @@ instance Uniquable InstalledUnitId where
     getUnique = installedUnitIdKey
 
 instance Outputable InstalledUnitId where
+    type OutputableNeedsOfConfig InstalledUnitId = HasPackageState
     ppr uid@(InstalledUnitId fs) =
         getPprStyle $ \sty ->
         sdocWithDynFlags $ \dflags ->
@@ -716,6 +730,7 @@ installedUnitIdString :: InstalledUnitId -> String
 installedUnitIdString = unpackFS . installedUnitIdFS
 
 instance Outputable IndefUnitId where
+    type OutputableNeedsOfConfig IndefUnitId = HasPackageState
     ppr uid =
       -- getPprStyle $ \sty ->
       ppr cid <>
@@ -738,6 +753,7 @@ data InstalledModule = InstalledModule {
   deriving (Eq, Ord)
 
 instance Outputable InstalledModule where
+  type OutputableNeedsOfConfig InstalledModule = HasPackageState
   ppr (InstalledModule p n) =
     ppr p <> char ':' <> pprModuleName n
 
@@ -769,6 +785,7 @@ newtype DefUnitId = DefUnitId { unDefUnitId :: InstalledUnitId }
     deriving (Eq, Ord)
 
 instance Outputable DefUnitId where
+    type OutputableNeedsOfConfig DefUnitId = HasPackageState
     ppr (DefUnitId uid) = ppr uid
 
 instance Binary DefUnitId where
@@ -865,7 +882,7 @@ newUnitId :: ComponentId -> [(ModuleName, Module)] -> UnitId
 newUnitId cid [] = newSimpleUnitId cid -- TODO: this indicates some latent bug...
 newUnitId cid insts = IndefiniteUnitId $ newIndefUnitId cid insts
 
-pprUnitId :: UnitId -> SDoc
+pprUnitId :: HasPackageState r => UnitId -> SDoc' r
 pprUnitId (DefiniteUnitId uid) = ppr uid
 pprUnitId (IndefiniteUnitId uid) = ppr uid
 
@@ -892,6 +909,7 @@ stableUnitIdCmp :: UnitId -> UnitId -> Ordering
 stableUnitIdCmp p1 p2 = unitIdFS p1 `compare` unitIdFS p2
 
 instance Outputable UnitId where
+   type OutputableNeedsOfConfig UnitId = HasPackageState
    ppr pk = pprUnitId pk
 
 -- Performance: would prefer to have a NameCache like thing
