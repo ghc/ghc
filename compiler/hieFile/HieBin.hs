@@ -2,7 +2,7 @@
 Binary serialization for .hie files.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
-module HieBin ( readHieFile, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieHeader ) where
+module HieBin ( readHieFile, readHieFileWithVersion, HieHeader, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieMagic) where
 
 import Config                     ( cProjectVersion )
 import GhcPrelude
@@ -71,11 +71,11 @@ initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
 -- | The header for HIE files - Capital ASCII letters "HIE".
-hieHeader :: [Word8]
-hieHeader = [72,73,69]
+hieMagic :: [Word8]
+hieMagic = [72,73,69]
 
-hieHeaderLen :: Int
-hieHeaderLen = length hieHeader
+hieMagicLen :: Int
+hieMagicLen = length hieMagic
 
 ghcVersion :: ByteString
 ghcVersion = BSC.pack cProjectVersion
@@ -88,7 +88,7 @@ writeHieFile hie_file_path hiefile = do
 
   -- Write the header: hieHeader followed by the
   -- hieVersion and the GHC version used to generate this file
-  mapM_ (put_ bh0) hieHeader
+  mapM_ (put_ bh0) hieMagic
   put_ bh0 hieVersion
   put_ bh0 ghcVersion
 
@@ -152,6 +152,25 @@ data HieFileResult
   , hie_file_result :: HieFile
   }
 
+type HieHeader = (Integer, ByteString)
+
+-- | Read a `HieFile` from a `FilePath`. Can use
+-- an existing `NameCache`. Allows you to specify
+-- which versions of hieFile to attempt to read.
+-- `Left` case returns the failing header versions.
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader (HieFileResult, NameCache))
+readHieFileWithVersion readVersion nc file = do
+  bh0 <- readBinMem file
+
+  (hieVersion, ghcVersion) <- readHieFileHeader file bh0
+
+  if readVersion (hieVersion, ghcVersion)
+  then do
+    (hieFile, nc') <- readHieFileContents bh0 nc
+    return $ Right (HieFileResult hieVersion ghcVersion hieFile, nc')
+  else return $ Left (hieVersion, ghcVersion)
+
+
 -- | Read a `HieFile` from a `FilePath`. Can use
 -- an existing `NameCache`.
 readHieFile :: NameCache -> FilePath -> IO (HieFileResult, NameCache)
@@ -159,23 +178,39 @@ readHieFile nc file = do
 
   bh0 <- readBinMem file
 
+  (readHieVersion, ghcVersion) <- readHieFileHeader file bh0
+
+  -- Check if the versions match
+  when (readHieVersion /= hieVersion) $
+    panic $ unwords ["readHieFile: hie file versions don't match for file:"
+                    , file
+                    , "Expected"
+                    , show hieVersion
+                    , "but got", show readHieVersion
+                    ]
+  (hieFile, nc') <- readHieFileContents bh0 nc
+  return $ (HieFileResult hieVersion ghcVersion hieFile, nc')
+
+
+readHieFileHeader :: FilePath -> BinHandle -> IO HieHeader
+readHieFileHeader file bh0 = do
   -- Read the header
-  header <- replicateM hieHeaderLen (get bh0)
+  magic <- replicateM hieMagicLen (get bh0)
   readHieVersion <- get bh0
   ghcVersion <- (get bh0 :: IO ByteString)
 
   -- Check if the header is valid
-  when (header /= hieHeader) $
-    panic $ unwords ["readHieFile: headers don't match: Expected"
-                    , show hieHeader
-                    , "but got", show header
+  when (magic /= hieMagic) $
+    panic $ unwords ["readHieFileHeader: headers don't match for file:"
+                    , file
+                    , "Expected"
+                    , show hieMagic
+                    , "but got", show magic
                     ]
-  -- Check if the versions match
-  when (readHieVersion /= hieVersion) $
-    panic $ unwords ["readHieFile: hie file versions don't match: Expected"
-                    , show hieVersion
-                    , "but got", show readHieVersion
-                    ]
+  return (readHieVersion, ghcVersion)
+
+readHieFileContents :: BinHandle -> NameCache -> IO (HieFile, NameCache)
+readHieFileContents bh0 nc = do
 
   dict  <- get_dictionary bh0
 
@@ -191,7 +226,7 @@ readHieFile nc file = do
 
   -- load the actual data
   hiefile <- get bh1
-  return (HieFileResult hieVersion ghcVersion hiefile, nc')
+  return (hiefile, nc')
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle
