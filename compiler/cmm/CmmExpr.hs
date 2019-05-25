@@ -38,7 +38,7 @@ import CLabel
 import CmmMachOp
 import CmmType
 import DynFlags
-import Outputable (panic)
+import PlainPanic (panic)
 import Unique
 
 import Data.Set (Set)

@@ -6,7 +6,9 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+
 module CmmLint (
     cmmLint, cmmLintGraph
   ) where
@@ -23,6 +25,7 @@ import CmmLive
 import CmmSwitch (switchTargetsToList)
 import PprCmm ()
 import Outputable
+import Outputable.DynFlags (SDoc)
 import DynFlags
 
 import Control.Monad (ap)
@@ -35,14 +38,19 @@ import Control.Monad (ap)
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: (Outputable d, Outputable h)
-        => DynFlags -> GenCmmGroup d h CmmGraph -> Maybe SDoc
+cmmLint
+  :: ( Outputable d, OutputableNeedsOfConfig d DynFlags
+     , Outputable h, OutputableNeedsOfConfig h DynFlags
+     )
+  => DynFlags -> GenCmmGroup d h CmmGraph -> Maybe SDoc
 cmmLint dflags tops = runCmmLint dflags (mapM_ (lintCmmDecl dflags)) tops
 
 cmmLintGraph :: DynFlags -> CmmGraph -> Maybe SDoc
 cmmLintGraph dflags g = runCmmLint dflags (lintCmmGraph dflags) g
 
-runCmmLint :: Outputable a => DynFlags -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint
+  :: (Outputable a, OutputableNeedsOfConfig a r)
+  => r -> (a -> CmmLint' r b) -> a -> Maybe (SDoc' r)
 runCmmLint dflags l p =
    case unCL (l p) dflags of
      Left err -> Just (vcat [text "Cmm lint error:",
@@ -214,22 +222,25 @@ checkCond _ expr
 -- -----------------------------------------------------------------------------
 -- CmmLint monad
 
--- just a basic error monad:
+-- TODO get rid of double 'r' reader
 
-newtype CmmLint a = CmmLint { unCL :: DynFlags -> Either SDoc a }
+-- | Just a basic error monad:
+newtype CmmLint' r a = CmmLint { unCL :: r -> Either (SDoc' r) a }
     deriving (Functor)
 
-instance Applicative CmmLint where
+type CmmLint = CmmLint' DynFlags
+
+instance Applicative (CmmLint' r) where
       pure a = CmmLint (\_ -> Right a)
       (<*>) = ap
 
-instance Monad CmmLint where
+instance Monad (CmmLint' r) where
   CmmLint m >>= k = CmmLint $ \dflags ->
                                 case m dflags of
                                 Left e -> Left e
                                 Right a -> unCL (k a) dflags
 
-instance HasDynFlags CmmLint where
+instance HasDynFlags (CmmLint' DynFlags) where
     getDynFlags = CmmLint (\dflags -> Right dflags)
 
 cmmLintErr :: SDoc -> CmmLint a

@@ -25,7 +25,7 @@ import Hoopl.Graph
 import CmmUtils
 import CLabel
 import DynFlags
-import Outputable
+import PlainPanic (panic)
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers

@@ -53,6 +53,8 @@ import UniqSupply
 import MonadUtils
 import Util
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import Panic (panic)
 
 import Data.ByteString (ByteString)
 import Data.Bits

@@ -80,6 +80,7 @@ import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
 import Outputable
+import PlainPanic (assertPanic)
 import FV
 
 {-

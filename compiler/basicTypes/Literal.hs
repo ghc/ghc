@@ -5,7 +5,10 @@
 \section[Literal]{@Literal@: literals}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Literal
         (
@@ -56,6 +59,8 @@ import PrelNames
 import Type
 import TyCon
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (panic)
 import FastString
 import BasicTypes
 import Binary
@@ -267,6 +272,7 @@ instance Binary Literal where
                     return (LitRubbish)
 
 instance Outputable Literal where
+    type OutputableNeedsOfConfig Literal = HasPprConfig
     ppr lit = pprLiteral (\d -> d) lit
 
 instance Eq Literal where
@@ -714,7 +720,7 @@ litTag (LitRubbish)       = 8
 * See Note [Printing of literals in Core]
 -}
 
-pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
+pprLiteral :: HasPprConfig r => (SDoc' r -> SDoc' r) -> Literal -> SDoc' r
 pprLiteral _       (LitChar c)     = pprPrimChar c
 pprLiteral _       (LitString s)   = pprHsBytes s
 pprLiteral _       (LitNullAddr)   = text "__NULL"
@@ -735,7 +741,7 @@ pprLiteral add_par (LitLabel l mb fod) =
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
 pprLiteral _       (LitRubbish)     = text "__RUBBISH"
 
-pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
+pprIntegerVal :: (SDoc' r -> SDoc' r) -> Integer -> SDoc' r
 -- See Note [Printing of literals in Core].
 pprIntegerVal add_par i | i < 0     = add_par (integer i)
                         | otherwise = integer i

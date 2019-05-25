@@ -151,7 +151,7 @@ data MachOp
   | MO_AlignmentCheck Int Width
   deriving (Eq, Show)
 
-pprMachOp :: MachOp -> SDoc
+pprMachOp :: MachOp -> SDoc' r
 pprMachOp mo = text (show mo)
 
 
@@ -648,7 +648,7 @@ data AtomicMachOp =
     | AMO_Xor
       deriving (Eq, Show)
 
-pprCallishMachOp :: CallishMachOp -> SDoc
+pprCallishMachOp :: CallishMachOp -> SDoc' r
 pprCallishMachOp mo = text (show mo)
 
 callishMachOpHints :: CallishMachOp -> ([ForeignHint], [ForeignHint])

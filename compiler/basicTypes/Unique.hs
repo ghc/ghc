@@ -75,6 +75,7 @@ import GhcPrelude
 import BasicTypes
 import FastString
 import Outputable
+import Outputable.DynFlags (assertPanic)
 import Util
 
 -- just for implementing a fast [0,61) -> Char function
@@ -292,7 +293,7 @@ finish_show 't' u _pp_u | u < 26
     [chr (ord 'a' + u)]
 finish_show tag _ pp_u = tag : pp_u
 
-pprUniqueAlways :: Unique -> SDoc
+pprUniqueAlways :: Unique -> SDoc' r
 -- The "always" means regardless of -dsuppress-uniques
 -- It replaces the old pprUnique to remind callers that
 -- they should consider whether they want to consult

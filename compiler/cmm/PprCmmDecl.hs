@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -45,6 +47,7 @@ import Cmm
 
 import DynFlags
 import Outputable
+import Outputable.DynFlags (SDoc, printForC)
 import FastString
 
 import Data.List
@@ -53,44 +56,74 @@ import System.IO
 import qualified Data.ByteString as BS
 
 
-pprCmms :: (Outputable info, Outputable g)
-        => [GenCmmGroup CmmStatics info g] -> SDoc
+pprCmms
+  :: ( Outputable info, OutputableNeedsOfConfig info DynFlags
+     , Outputable g, OutputableNeedsOfConfig g DynFlags
+     )
+  => [GenCmmGroup CmmStatics info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ text "-------------------" $$ space
 
-writeCmms :: (Outputable info, Outputable g)
-          => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
+writeCmms
+  :: ( Outputable info, OutputableNeedsOfConfig info DynFlags
+     , Outputable g, OutputableNeedsOfConfig g DynFlags
+     )
+  => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
 writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
 instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
+    type OutputableNeedsOfConfig (GenCmmDecl d info i) = PairConstraint
+      (PairConstraint
+       (OutputableNeedsOfConfig d)
+       (OutputableNeedsOfConfig info))
+      (PairConstraint
+       (OutputableNeedsOfConfig i)
+       ((~) DynFlags)) -- TODO
     ppr t = pprTop t
 
 instance Outputable CmmStatics where
+    type OutputableNeedsOfConfig CmmStatics = (~) DynFlags -- TODO
     ppr = pprStatics
 
 instance Outputable CmmStatic where
+    type OutputableNeedsOfConfig CmmStatic = (~) DynFlags -- TODO
     ppr = pprStatic
 
 instance Outputable CmmInfoTable where
+    type OutputableNeedsOfConfig CmmInfoTable = (~) DynFlags -- TODO
     ppr = pprInfoTable
 
 
 -----------------------------------------------------------------------------
 
-pprCmmGroup :: (Outputable d, Outputable info, Outputable g)
-            => GenCmmGroup d info g -> SDoc
+pprCmmGroup
+  :: ( Outputable d
+     , Outputable info
+     , Outputable g
+     , OutputableNeedsOfConfig d DynFlags
+     , OutputableNeedsOfConfig info DynFlags
+     , OutputableNeedsOfConfig g DynFlags
+     )
+  => GenCmmGroup d info g -> SDoc
 pprCmmGroup tops
     = vcat $ intersperse blankLine $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop :: (Outputable d, Outputable info, Outputable i)
-       => GenCmmDecl d info i -> SDoc
+pprTop
+  :: ( Outputable d
+     , Outputable info
+     , Outputable i
+     , OutputableNeedsOfConfig d DynFlags
+     , OutputableNeedsOfConfig info DynFlags
+     , OutputableNeedsOfConfig i DynFlags
+     )
+  => GenCmmDecl d info i -> SDoc
 
 pprTop (CmmProc info lbl live graph)
 
@@ -125,6 +158,7 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
+  type OutputableNeedsOfConfig ForeignHint = (~) DynFlags -- TODO
   ppr NoHint     = empty
   ppr SignedHint = quotes(text "signed")
 --  ppr AddrHint   = quotes(text "address")

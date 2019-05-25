@@ -35,6 +35,8 @@ import GhcPrelude
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic
 
 import Data.Word
 import Data.Int

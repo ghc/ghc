@@ -23,6 +23,7 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Outputable
+import PlainPanic (panic)
 import GHC.Platform
 
 import Data.List

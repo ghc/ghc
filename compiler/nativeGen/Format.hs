@@ -26,6 +26,7 @@ import GhcPrelude
 
 import Cmm
 import Outputable
+import Outputable.DynFlags (pprPanic, sorry)
 
 
 -- Note [GHC's data format representations]

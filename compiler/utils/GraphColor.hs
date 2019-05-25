@@ -22,6 +22,8 @@ import Unique
 import UniqFM
 import UniqSet
 import Outputable
+import Outputable.DynFlags
+import DynFlags (DynFlags)
 
 import Data.Maybe
 import Data.List
@@ -37,7 +39,10 @@ import Data.List
 colorGraph
         :: ( Uniquable  k, Uniquable cls,  Uniquable  color
            , Eq cls, Ord k
-           , Outputable k, Outputable cls, Outputable color)
+           , Outputable k, OutputableNeedsOfConfig k DynFlags
+           , Outputable cls, OutputableNeedsOfConfig cls DynFlags
+           , Outputable color, OutputableNeedsOfConfig color DynFlags
+           )
         => Bool                         -- ^ whether to do iterative coalescing
         -> Int                          -- ^ how many times we've tried to color this graph so far.
         -> UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
@@ -252,7 +257,8 @@ colorScan_spill iterative triv spill graph
 
 assignColors
         :: ( Uniquable k, Uniquable cls, Uniquable color
-           , Outputable cls)
+           , Outputable cls, OutputableNeedsOfConfig cls DynFlags
+           )
         => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> [k]                          -- ^ nodes to assign a color to.
@@ -290,7 +296,8 @@ assignColors colors graph ks
 --
 selectColor
         :: ( Uniquable k, Uniquable cls, Uniquable color
-           , Outputable cls)
+           , Outputable cls, OutputableNeedsOfConfig cls DynFlags
+           )
         => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> k                            -- ^ key of the node to select a color for.

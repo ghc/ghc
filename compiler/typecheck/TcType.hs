@@ -15,7 +15,11 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcType (
   --------------------------------
@@ -221,8 +225,12 @@ import Util
 import Maybes
 import ListSetOps ( getNth, findDupsEq )
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import PlainPanic (assertPanic)
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
+import TypeSuppress
+import Packages (HasPackageState)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
@@ -383,6 +391,9 @@ type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType
 
 instance Outputable ExpType where
+  type OutputableNeedsOfConfig ExpType = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (Check ty) = text "Check" <> braces (ppr ty)
   ppr (Infer ir) = ppr ir
 
@@ -525,7 +536,7 @@ superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely disti
 instance Outputable TcTyVarDetails where
   ppr = pprTcTyVarDetails
 
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc' r
 -- For debugging
 pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
 pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
@@ -558,6 +569,9 @@ data MetaInfo
                    -- See Note [The flattening story] in TcFlatten
 
 instance Outputable MetaDetails where
+  type OutputableNeedsOfConfig MetaDetails = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 

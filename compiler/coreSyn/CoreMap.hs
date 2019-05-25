@@ -54,6 +54,7 @@ import qualified Data.IntMap as IntMap
 import VarEnv
 import NameEnv
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import Control.Monad( (>=>) )
 
 {-
@@ -262,6 +263,7 @@ emptyCoreMap :: CoreMap a
 emptyCoreMap = emptyTM
 
 instance Outputable a => Outputable (CoreMap a) where
+  type OutputableNeedsOfConfig (CoreMap a) = OutputableNeedsOfConfig a
   ppr m = text "CoreMap elts" <+> ppr (foldTM (:) m [])
 
 -------------------------
@@ -535,6 +537,9 @@ instance Eq (DeBruijn Type) where
 
 instance {-# OVERLAPPING #-}
          Outputable a => Outputable (TypeMapG a) where
+  type OutputableNeedsOfConfig (TypeMapG a) = PairConstraint
+    (OutputableNeedsOfConfig a)
+    (OutputableNeedsOfConfig (TypeMapX a))
   ppr m = text "TypeMap elts" <+> ppr (foldTM (:) m [])
 
 emptyT :: TypeMapX a

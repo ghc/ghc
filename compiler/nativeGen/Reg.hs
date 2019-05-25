@@ -29,6 +29,7 @@ where
 import GhcPrelude
 
 import Outputable
+import PlainPanic
 import Unique
 import RegClass
 import Data.List

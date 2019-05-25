@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 ----------------------------------------------------------------------------
 --
 -- Pretty-printing of common Cmm types
@@ -43,6 +45,7 @@ import GhcPrelude
 import CmmExpr
 
 import Outputable
+import Outputable.DynFlags (SDoc, pprTrace)
 import DynFlags
 
 import Data.Maybe
@@ -51,21 +54,27 @@ import Numeric ( fromRat )
 -----------------------------------------------------------------------------
 
 instance Outputable CmmExpr where
+    type OutputableNeedsOfConfig CmmExpr = (~) DynFlags -- TODO generalize
     ppr e = pprExpr e
 
 instance Outputable CmmReg where
+    type OutputableNeedsOfConfig CmmReg = (~) DynFlags -- TODO generalize
     ppr e = pprReg e
 
 instance Outputable CmmLit where
+    type OutputableNeedsOfConfig CmmLit = (~) DynFlags -- TODO generalize
     ppr l = pprLit l
 
 instance Outputable LocalReg where
+    type OutputableNeedsOfConfig LocalReg = (~) DynFlags -- TODO generalize
     ppr e = pprLocalReg e
 
 instance Outputable Area where
+    type OutputableNeedsOfConfig Area = (~) DynFlags -- TODO generalize
     ppr e = pprArea e
 
 instance Outputable GlobalReg where
+    type OutputableNeedsOfConfig GlobalReg = (~) DynFlags -- TODO generalize
     ppr e = pprGlobalReg e
 
 -- --------------------------------------------------------------------------

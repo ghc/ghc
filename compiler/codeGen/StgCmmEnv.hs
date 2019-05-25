@@ -41,6 +41,8 @@ import Id
 import MkGraph
 import Name
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (assertPanic)
 import StgSyn
 import Type
 import TysPrim

@@ -27,8 +27,10 @@ import Hoopl.Collections
 import DynFlags
 import FastString
 import ForeignCall
-import Outputable hiding (panic, pprPanic)
-import qualified Outputable
+import Outputable
+import Outputable.DynFlags (SDoc, assertPanic, showSDoc)
+import qualified Outputable.DynFlags
+import qualified PlainPanic
 import GHC.Platform
 import OrdList
 import UniqSupply
@@ -1953,10 +1955,10 @@ toIWord dflags = mkIntLit (llvmWord dflags)
 
 -- | Error functions
 panic :: String -> a
-panic s = Outputable.panic $ "LlvmCodeGen.CodeGen." ++ s
+panic s = PlainPanic.panic $ "LlvmCodeGen.CodeGen." ++ s
 
 pprPanic :: String -> SDoc -> a
-pprPanic s d = Outputable.pprPanic ("LlvmCodeGen.CodeGen." ++ s) d
+pprPanic s d = Outputable.DynFlags.pprPanic ("LlvmCodeGen.CodeGen." ++ s) d
 
 
 -- | Returns TBAA meta data by unique

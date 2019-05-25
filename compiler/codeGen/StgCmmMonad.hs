@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -78,6 +79,7 @@ import Unique
 import UniqSupply
 import FastString
 import Outputable
+import PlainPanic (panic)
 import Util
 
 import Control.Monad
@@ -178,6 +180,7 @@ data CgIdInfo
         }
 
 instance Outputable CgIdInfo where
+  type OutputableNeedsOfConfig CgIdInfo = (~) DynFlags --TODO
   ppr (CgIdInfo { cg_id = id, cg_loc = loc })
     = ppr id <+> text "-->" <+> ppr loc
 
@@ -196,6 +199,7 @@ data Sequel
                         -- allocating primOp)
 
 instance Outputable Sequel where
+    type OutputableNeedsOfConfig Sequel = (~) DynFlags --TODO
     ppr Return = text "Return"
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 

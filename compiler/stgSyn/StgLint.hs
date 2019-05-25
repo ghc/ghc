@@ -44,28 +44,38 @@ import StgSyn
 import DynFlags
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel )
+import CoreDebugSuppress
 import CostCentre       ( isCurrentCCS )
 import Id               ( Id, idType, isJoinId, idName )
 import VarSet
 import DataCon
 import CoreSyn          ( AltCon(..) )
 import Name             ( getSrcLoc, nameIsLocalOrFrom )
+import NameSuppress
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
-import Type
+import Packages         ( HasPackageState )
 import RepType
 import SrcLoc
 import Outputable
+import Outputable.DynFlags (defaultDumpStyle)
+import StgDebugSuppress
+import Type
+import TypeSuppress
 import Module           ( Module )
 import qualified ErrUtils as Err
 import Control.Applicative ((<|>))
 import Control.Monad
 
-lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
+lintStgTopBindings :: forall pass
+                   .  ( OutputablePass pass
+                      , OutputablePassNeedsOfConfig pass DynFlags
+                      , BinderP pass ~ Id
+                      )
                    => DynFlags
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
                    -> String -- ^ who produced the STG?
-                   -> [GenStgTopBinding a]
+                   -> [GenStgTopBinding pass]
                    -> IO ()
 
 lintStgTopBindings dflags this_mod unarised whodunnit binds
@@ -88,7 +98,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
     -- bindings in dependency order (so we may see a use before its definition).
     top_level_binds = mkVarSet (bindersOfTopBinds binds)
 
-    lint_binds :: [GenStgTopBinding a] -> LintM ()
+    lint_binds :: [GenStgTopBinding pass] -> LintM ()
 
     lint_binds [] = return ()
     lint_binds (bind:binds) = do
@@ -107,8 +117,11 @@ lintStgVar :: Id -> LintM ()
 lintStgVar id = checkInScope id
 
 lintStgBinds
-    :: (OutputablePass a, BinderP a ~ Id)
-    => TopLevelFlag -> GenStgBinding a -> LintM [Id] -- Returns the binders
+  :: ( OutputablePass pass
+     , OutputablePassNeedsOfConfig pass DynFlags
+     , BinderP pass ~ Id
+     )
+  => TopLevelFlag -> GenStgBinding pass -> LintM [Id] -- Returns the binders
 lintStgBinds top_lvl (StgNonRec binder rhs) = do
     lint_binds_help top_lvl (binder,rhs)
     return [binder]
@@ -121,9 +134,12 @@ lintStgBinds top_lvl (StgRec pairs)
     binders = [b | (b,_) <- pairs]
 
 lint_binds_help
-    :: (OutputablePass a, BinderP a ~ Id)
+    :: ( OutputablePass pass
+       , OutputablePassNeedsOfConfig pass DynFlags
+       , BinderP pass ~ Id
+       )
     => TopLevelFlag
-    -> (Id, GenStgRhs a)
+    -> (Id, GenStgRhs pass)
     -> LintM ()
 lint_binds_help top_lvl (binder, rhs)
   = addLoc (RhsOf binder) $ do
@@ -136,9 +152,12 @@ lint_binds_help top_lvl (binder, rhs)
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.
 checkNoCurrentCCS
-    :: (OutputablePass a, BinderP a ~ Id)
-    => GenStgRhs a
-    -> LintM ()
+  :: ( OutputablePass pass
+     , OutputablePassNeedsOfConfig pass DynFlags
+     , BinderP pass ~ Id
+     )
+  => GenStgRhs pass
+  -> LintM ()
 checkNoCurrentCCS rhs@(StgRhsClosure _ ccs _ _ _)
   | isCurrentCCS ccs
   = addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ ppr rhs)
@@ -148,7 +167,12 @@ checkNoCurrentCCS rhs@(StgRhsCon ccs _ _)
 checkNoCurrentCCS _
   = return ()
 
-lintStgRhs :: (OutputablePass a, BinderP a ~ Id) => GenStgRhs a -> LintM ()
+lintStgRhs
+  :: ( OutputablePass pass
+     , OutputablePassNeedsOfConfig pass DynFlags
+     , BinderP pass ~ Id
+     )
+  => GenStgRhs pass -> LintM ()
 
 lintStgRhs (StgRhsClosure _ _ _ [] expr)
   = lintStgExpr expr
@@ -165,7 +189,11 @@ lintStgRhs rhs@(StgRhsCon _ con args) = do
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
-lintStgExpr :: (OutputablePass a, BinderP a ~ Id) => GenStgExpr a -> LintM ()
+lintStgExpr ::
+  ( OutputablePass pass
+  , OutputablePassNeedsOfConfig pass DynFlags
+  , BinderP pass ~ Id
+  ) => GenStgExpr pass -> LintM ()
 
 lintStgExpr (StgLit _) = return ()
 
@@ -211,8 +239,11 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 
 lintAlt
-    :: (OutputablePass a, BinderP a ~ Id)
-    => (AltCon, [Id], GenStgExpr a) -> LintM ()
+    :: ( OutputablePass pass
+       , OutputablePassNeedsOfConfig pass DynFlags
+       , BinderP pass ~ Id
+       )
+    => (AltCon, [Id], GenStgExpr pass) -> LintM ()
 
 lintAlt (DEFAULT, _, rhs) =
     lintStgExpr rhs
@@ -270,7 +301,13 @@ data LintLocInfo
   | LambdaBodyOf [Id]   -- The lambda-binder
   | BodyOfLetRec [Id]   -- One of the binders
 
-dumpLoc :: LintLocInfo -> (SrcSpan, SDoc)
+dumpLoc
+  :: ( HasPprConfig r
+     , HasPackageState r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     )
+  => LintLocInfo -> (SrcSpan, SDoc' r)
 dumpLoc (RhsOf v) =
   (srcLocSpan (getSrcLoc v), text " [RHS of " <> pp_binders [v] <> char ']' )
 dumpLoc (LambdaBodyOf bs) =
@@ -280,7 +317,13 @@ dumpLoc (BodyOfLetRec bs) =
   (srcLocSpan (getSrcLoc (head bs)), text " [in body of letrec with binders " <> pp_binders bs <> char ']' )
 
 
-pp_binders :: [Id] -> SDoc
+pp_binders
+  :: ( HasPprConfig r
+     , HasPackageState r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     )
+  => [Id] -> SDoc' r
 pp_binders bs
   = sep (punctuate comma (map pp_binder bs))
   where
@@ -388,7 +431,17 @@ checkInScope id = LintM $ \mod _lf loc scope errs
     else
         ((), errs)
 
-mkUnliftedTyMsg :: OutputablePass a => Id -> GenStgRhs a -> SDoc
+mkUnliftedTyMsg
+  :: ( OutputablePass pass
+     , HasPprConfig r
+     , HasPackageState r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     , HasStgDebugSuppress r
+     , OutputablePassNeedsOfConfig pass r
+     )
+  => Id -> GenStgRhs pass -> SDoc' r
 mkUnliftedTyMsg binder rhs
   = (text "Let(rec) binder" <+> quotes (ppr binder) <+>
      text "has unlifted type" <+> quotes (ppr (idType binder)))
