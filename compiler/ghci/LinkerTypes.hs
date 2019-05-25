@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE TypeFamilies #-}
 module LinkerTypes (
       DynLinker(..),
       PersistentLinkerState(..),
@@ -22,13 +23,15 @@ import Control.Concurrent.MVar ( MVar )
 import Module                  ( InstalledUnitId, Module )
 import ByteCodeTypes           ( ItblEnv, CompiledByteCode )
 import Outputable
+import Packages                ( HasPackageState )
 import Var                     ( Id )
 import GHC.Fingerprint.Type    ( Fingerprint )
 import NameEnv                 ( NameEnv )
-import Name                    ( Name )
+import Name                    ( Name, HasNameSuppress )
+import TypeSuppress            ( HasTypeSuppress )
 import GHCi.RemoteTypes        ( ForeignHValue )
 
-type ClosureEnv = NameEnv (Name, ForeignHValue) 
+type ClosureEnv = NameEnv (Name, ForeignHValue)
 
 newtype DynLinker =
   DynLinker { dl_mpls :: MVar (Maybe PersistentLinkerState) }
@@ -81,6 +84,9 @@ data Linkable = LM {
  }
 
 instance Outputable Linkable where
+  type OutputableNeedsOfConfig Linkable = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (LM when_made mod unlinkeds)
      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod)
        $$ nest 3 (ppr unlinkeds)
@@ -98,6 +104,9 @@ data Unlinked
                        -- StaticPtrTable.
 
 instance Outputable Unlinked where
+  type OutputableNeedsOfConfig Unlinked =PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (DotO path)   = text "DotO" <+> text path
   ppr (DotA path)   = text "DotA" <+> text path
   ppr (DotDLL path) = text "DotDLL" <+> text path
@@ -108,5 +117,7 @@ instance Outputable Unlinked where
 data SptEntry = SptEntry Id Fingerprint
 
 instance Outputable SptEntry where
+  type OutputableNeedsOfConfig SptEntry = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
-

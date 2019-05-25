@@ -95,6 +95,7 @@ import GhcPrelude
 import Util
 import Json
 import Outputable
+import PlainPanic
 import FastString
 
 import Control.DeepSeq
@@ -186,6 +187,7 @@ sortLocated :: HasSrcSpan a => [a] -> [a]
 sortLocated things = sortBy (comparing getLoc) things
 
 instance Outputable RealSrcLoc where
+    type OutputableNeedsOfConfig RealSrcLoc = NoConstraint
     ppr (SrcLoc src_path src_line src_col)
       = hcat [ pprFastFilePath src_path <> colon
              , int src_line <> colon
@@ -202,6 +204,7 @@ instance Outputable RealSrcLoc where
 --                  char '\"', pprFastFilePath src_path, text " #-}"]
 
 instance Outputable SrcLoc where
+    type OutputableNeedsOfConfig SrcLoc = NoConstraint
     ppr (RealSrcLoc l) = ppr l
     ppr (UnhelpfulLoc s)  = ftext s
 
@@ -487,11 +490,11 @@ instance Outputable SrcSpan where
 --           UnhelpfulSpan _ -> panic "Outputable UnhelpfulSpan"
 --           RealSrcSpan s -> ppr s
 
-pprUserSpan :: Bool -> SrcSpan -> SDoc
+pprUserSpan :: Bool -> SrcSpan -> SDoc' r
 pprUserSpan _         (UnhelpfulSpan s) = ftext s
 pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
 
-pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
+pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc' r
 pprUserRealSpan show_path span@(RealSrcSpan' src_path line col _ _)
   | isPointRealSpan span
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
@@ -566,6 +569,9 @@ cmpLocated :: (HasSrcSpan a , Ord (SrcSpanLess a)) => a -> a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
+  type OutputableNeedsOfConfig (GenLocated l e) = PairConstraint
+    (OutputableNeedsOfConfig l)
+    (OutputableNeedsOfConfig e)
   ppr (L l e) = -- TODO: We can't do this since Located was refactored into
                 -- GenLocated:
                 -- Print spans without the file name etc

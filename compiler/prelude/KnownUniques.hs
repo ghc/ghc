@@ -34,6 +34,8 @@ import DataCon
 import Id
 import BasicTypes
 import Outputable
+import Outputable.DynFlags (assertPanic, pprPanic)
+import PlainPanic (panic)
 import Unique
 import Name
 import Util

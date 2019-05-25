@@ -10,7 +10,7 @@
 module HsExpr where
 
 import SrcLoc     ( Located )
-import Outputable ( SDoc, Outputable )
+import Outputable ( SDoc', Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
 import HsExtension ( OutputableBndrId, GhcPass )
@@ -33,19 +33,28 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p)
 
 type LHsExpr a = Located (HsExpr a)
 
-pprLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc
+pprLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc' r
 
-pprExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc
+pprExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc' r
 
-pprSplice :: (OutputableBndrId (GhcPass p)) => HsSplice (GhcPass p) -> SDoc
+pprSplice :: (OutputableBndrId (GhcPass p)) => HsSplice (GhcPass p) -> SDoc' r
 
 pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
+          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc' r
 
-pprPatBind :: forall bndr p body. (OutputableBndrId (GhcPass bndr),
-                                   OutputableBndrId (GhcPass p),
-                                   Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+pprPatBind
+  :: forall bndr p body r
+  .  ( OutputableBndrId (GhcPass bndr)
+     , OutputableBndrId (GhcPass p)
+     , Outputable body
+     )
+  => LPat (GhcPass bndr)
+  -> GRHSs (GhcPass p) body
+  -> SDoc' r
 
-pprFunBind :: (OutputableBndrId (GhcPass idR), Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind
+  :: ( OutputableBndrId (GhcPass idR)
+     , Outputable body
+     )
+  => MatchGroup (GhcPass idR) body
+  -> SDoc' r

@@ -1,5 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
-             DeriveTraversable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 --------------------------------------------------------------------------------
 -- | Boolean formulas without quantifiers and without negation.
@@ -198,10 +201,12 @@ memberClauseAtoms x c = x `elementOfUniqSet` clauseAtoms c
 
 -- Pretty print a BooleanFormula,
 -- using the arguments as pretty printers for Var, And and Or respectively
-pprBooleanFormula' :: (Rational -> a -> SDoc)
-                   -> (Rational -> [SDoc] -> SDoc)
-                   -> (Rational -> [SDoc] -> SDoc)
-                   -> Rational -> BooleanFormula a -> SDoc
+pprBooleanFormula'
+  :: HasPprConfig r
+  => (Rational -> a -> SDoc' r)
+  -> (Rational -> [SDoc' r] -> SDoc' r)
+  -> (Rational -> [SDoc' r] -> SDoc' r)
+  -> Rational -> BooleanFormula a -> SDoc' r
 pprBooleanFormula' pprVar pprAnd pprOr = go
   where
   go p (Var x)  = pprVar p x
@@ -212,14 +217,24 @@ pprBooleanFormula' pprVar pprAnd pprOr = go
   go p (Parens x) = go p (unLoc x)
 
 -- Pretty print in source syntax, "a | b | c,d,e"
-pprBooleanFormula :: (Rational -> a -> SDoc) -> Rational -> BooleanFormula a -> SDoc
+pprBooleanFormula
+  :: HasPprConfig r
+  => (Rational -> a -> SDoc' r)
+  -> Rational
+  -> BooleanFormula a
+  -> SDoc' r
 pprBooleanFormula pprVar = pprBooleanFormula' pprVar pprAnd pprOr
   where
   pprAnd p = cparen (p > 3) . fsep . punctuate comma
   pprOr  p = cparen (p > 2) . fsep . intersperse vbar
 
 -- Pretty print human in readable format, "either `a' or `b' or (`c', `d' and `e')"?
-pprBooleanFormulaNice :: Outputable a => BooleanFormula a -> SDoc
+pprBooleanFormulaNice
+  :: ( HasPprConfig r
+     , OutputableBndr a, OutputableNeedsOfConfig a r
+     )
+  => BooleanFormula a
+  -> SDoc' r
 pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   where
   pprVar _ = quotes . ppr
@@ -230,10 +245,16 @@ pprBooleanFormulaNice = pprBooleanFormula' pprVar pprAnd pprOr 0
   pprOr p xs = cparen (p > 1) $ text "either" <+> sep (intersperse (text "or") xs)
 
 instance (OutputableBndr a) => Outputable (BooleanFormula a) where
+  type OutputableNeedsOfConfig (BooleanFormula a) = PairConstraint
+    HasPprConfig
+    (OutputableNeedsOfConfig a)
   ppr = pprBooleanFormulaNormal
 
-pprBooleanFormulaNormal :: (OutputableBndr a)
-                        => BooleanFormula a -> SDoc
+pprBooleanFormulaNormal
+  :: ( HasPprConfig r
+     , OutputableBndr a, OutputableNeedsOfConfig a r
+     )
+  => BooleanFormula a -> SDoc' r
 pprBooleanFormulaNormal = go
   where
     go (Var x)    = pprPrefixOcc x

@@ -8,9 +8,12 @@ module EnumSet
     , toList
     , fromList
     , empty
+    , alterF
     ) where
 
 import GhcPrelude
+
+import Data.Bool (bool)
 
 import qualified Data.IntSet as IntSet
 
@@ -33,3 +36,15 @@ fromList = EnumSet . IntSet.fromList . map fromEnum
 
 empty :: EnumSet a
 empty = EnumSet IntSet.empty
+
+-- Adapted from lens. Underling IntSet function should go in containers.
+alterF
+  :: (Enum a, Functor f)
+  => (Bool -> f Bool)
+  -> a
+  -> (EnumSet a)
+  -> f (EnumSet a)
+alterF f k m = flip fmap (f mv) $ \r -> case r of
+  False -> bool m (delete k m) mv
+  True -> insert k m
+  where mv = member k m
