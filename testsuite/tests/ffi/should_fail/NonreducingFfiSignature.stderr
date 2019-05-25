@@ -1,0 +1,6 @@
+NonreducingFfiSignature.hs:12:1:
+     Unacceptable result type in foreign declaration:
+        ‘Foo Int’ cannot be marshalled in a foreign call
+     When checking declaration:
+        foreign import ccall safe "math.h pow" c_pow
+          :: CDouble -> CDouble -> Foo Int
