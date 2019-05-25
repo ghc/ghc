@@ -531,7 +531,7 @@ data HsExpr p
 
   | HsOptionsLocal
                 (XOptionsLocal p)
-                [Located String]      -- compiler options               
+                [Located String]      -- compiler options
                 (LHsExpr p)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
@@ -1078,7 +1078,7 @@ ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
 ppr_expr (HsOptionsLocal _ src expr)
   = sep [ text "{-# OPTIONS_LOCAL" <+> (fsep . map (text . unLoc) $ src) <+> text "#-}",
           ppr expr ]
-          
+
 ppr_expr (HsWrap _ co_fn e)
   = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                              else pprExpr e)
