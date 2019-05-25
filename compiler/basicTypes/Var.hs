@@ -50,9 +50,7 @@ module Var (
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
-        idInfo, idDetails,
         lazySetIdInfo, setIdDetails, globaliseId,
-        setIdExported, setIdNotExported,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -68,14 +66,13 @@ module Var (
         VarBndr(..), TyCoVarBinder, TyVarBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
-        mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
 
         -- ** Taking 'TyVar's apart
-        tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
+        tyVarName, tyVarKind, setTcTyVarDetails,
 
         -- ** Modifying 'TyVar's
         setTyVarName, setTyVarUnique, setTyVarKind, updateTyVarKind,
@@ -99,8 +96,6 @@ import Unique ( Uniquable, Unique, getKey, getUnique
               , mkUniqueGrimily, nonDetCmpUnique )
 import Util
 import Binary
-import DynFlags
-import Outputable
 
 import Data.Data
 
@@ -296,29 +291,6 @@ A LocalId is
 After CoreTidy, top-level LocalIds are turned into GlobalIds
 -}
 
-instance Outputable Var where
-  ppr var = sdocWithDynFlags $ \dflags ->
-            getPprStyle $ \ppr_style ->
-            if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
-                          dcolon <+> pprKind (tyVarKind var))
-               |  otherwise
-                 -> ppr (varName var) <> ppr_debug var ppr_style
-
-ppr_debug :: Var -> PprStyle -> SDoc
-ppr_debug (TyVar {}) sty
-  | debugStyle sty = brackets (text "tv")
-ppr_debug (TcTyVar {tc_tv_details = d}) sty
-  | dumpStyle sty || debugStyle sty = brackets (pprTcTyVarDetails d)
-ppr_debug (Id { idScope = s, id_details = d }) sty
-  | debugStyle sty = brackets (ppr_id_scope s <> pprIdDetails d)
-ppr_debug _ _ = empty
-
-ppr_id_scope :: IdScope -> SDoc
-ppr_id_scope GlobalId              = text "gid"
-ppr_id_scope (LocalId Exported)    = text "lidx"
-ppr_id_scope (LocalId NotExported) = text "lid"
-
 instance NamedThing Var where
   getName = varName
 
@@ -408,11 +380,6 @@ sameVis Required _        = False
 sameVis _        Required = False
 sameVis _        _        = True
 
-instance Outputable ArgFlag where
-  ppr Required  = text "[req]"
-  ppr Specified = text "[spec]"
-  ppr Inferred  = text "[infrd]"
-
 instance Binary ArgFlag where
   put_ bh Required  = putByte bh 0
   put_ bh Specified = putByte bh 1
@@ -438,10 +405,6 @@ data AnonArgFlag
               --   The argument is invisible in source code.
   deriving (Eq, Ord, Data)
 
-instance Outputable AnonArgFlag where
-  ppr VisArg   = text "[vis]"
-  ppr InvisArg = text "[invis]"
-
 instance Binary AnonArgFlag where
   put_ bh VisArg   = putByte bh 0
   put_ bh InvisArg = putByte bh 1
@@ -460,11 +423,6 @@ data ForallVisFlag
   = ForallVis   -- ^ A visible @forall@ (with an arrow)
   | ForallInvis -- ^ An invisible @forall@ (with a dot)
   deriving (Eq, Ord, Data)
-
-instance Outputable ForallVisFlag where
-  ppr f = text $ case f of
-                   ForallVis   -> "ForallVis"
-                   ForallInvis -> "ForallInvis"
 
 -- | Convert an 'ArgFlag' to its corresponding 'ForallVisFlag'.
 argToForallVisFlag :: ArgFlag -> ForallVisFlag
@@ -538,29 +496,12 @@ binderType (Bndr tv _) = varType tv
 mkTyCoVarBinder :: ArgFlag -> TyCoVar -> TyCoVarBinder
 mkTyCoVarBinder vis var = Bndr var vis
 
--- | Make a named binder
--- 'var' should be a type variable
-mkTyVarBinder :: ArgFlag -> TyVar -> TyVarBinder
-mkTyVarBinder vis var
-  = ASSERT( isTyVar var )
-    Bndr var vis
-
 -- | Make many named binders
 mkTyCoVarBinders :: ArgFlag -> [TyCoVar] -> [TyCoVarBinder]
 mkTyCoVarBinders vis = map (mkTyCoVarBinder vis)
 
--- | Make many named binders
--- Input vars should be type variables
-mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
-mkTyVarBinders vis = map (mkTyVarBinder vis)
-
 isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
-
-instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
-  ppr (Bndr v Required)  = ppr v
-  ppr (Bndr v Specified) = char '@' <> ppr v
-  ppr (Bndr v Inferred)  = braces (ppr v)
 
 instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
   put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
@@ -616,12 +557,6 @@ mkTcTyVar name kind details
                 tc_tv_details = details
         }
 
-tcTyVarDetails :: TyVar -> TcTyVarDetails
--- See Note [TcTyVars in the typechecker] in TcType
-tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
-tcTyVarDetails (TyVar {})                            = vanillaSkolemTv
-tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
-
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }
 
@@ -632,14 +567,6 @@ setTcTyVarDetails tv details = tv { tc_tv_details = details }
 *                                                                      *
 ************************************************************************
 -}
-
-idInfo :: HasDebugCallStack => Id -> IdInfo
-idInfo (Id { id_info = info }) = info
-idInfo other                   = pprPanic "idInfo" (ppr other)
-
-idDetails :: Id -> IdDetails
-idDetails (Id { id_details = details }) = details
-idDetails other                         = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
@@ -679,18 +606,6 @@ setIdDetails id details = id { id_details = details }
 globaliseId :: Id -> Id
 -- ^ If it's a local, make it global
 globaliseId id = id { idScope = GlobalId }
-
-setIdExported :: Id -> Id
--- ^ Exports the given local 'Id'. Can also be called on global 'Id's, such as data constructors
--- and class operations, which are born as global 'Id's and automatically exported
-setIdExported id@(Id { idScope = LocalId {} }) = id { idScope = LocalId Exported }
-setIdExported id@(Id { idScope = GlobalId })   = id
-setIdExported tv                               = pprPanic "setIdExported" (ppr tv)
-
-setIdNotExported :: Id -> Id
--- ^ We can only do this to LocalIds
-setIdNotExported id = ASSERT( isLocalId id )
-                      id { idScope = LocalId NotExported }
 
 {-
 ************************************************************************

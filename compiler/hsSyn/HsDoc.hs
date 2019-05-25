@@ -29,6 +29,7 @@ import Binary
 import Encoding
 import FastFunctions
 import Name
+import Name.Ppr
 import Outputable
 import SrcLoc
 

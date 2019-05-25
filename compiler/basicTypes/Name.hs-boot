@@ -1,5 +1,5 @@
-module Name where
+module Name ( Name ) where
 
 import GhcPrelude ()
 
-data Name
+import {-# SOURCE #-} Name.Internal

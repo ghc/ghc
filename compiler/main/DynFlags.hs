@@ -264,6 +264,7 @@ import qualified CmdLineParser as Cmd
 import Constants
 import GhcNameVersion
 import Panic
+import PrimOp
 import qualified PprColour as Col
 import Util
 import Maybes

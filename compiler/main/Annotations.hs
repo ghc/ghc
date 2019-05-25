@@ -22,6 +22,7 @@ import GhcPrelude
 import Binary
 import Module           ( Module )
 import Name
+import Name.Ppr
 import Outputable
 import GHC.Serialized
 import UniqFM

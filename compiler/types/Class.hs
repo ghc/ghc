@@ -28,6 +28,7 @@ import GhcPrelude
 import {-# SOURCE #-} TyCon     ( TyCon )
 import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
 import Var
+import Var.Ppr
 import Name
 import BasicTypes
 import Unique

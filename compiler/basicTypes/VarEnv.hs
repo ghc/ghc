@@ -52,19 +52,18 @@ module VarEnv (
         emptyInScopeSet, mkInScopeSet, delInScopeSet,
         extendInScopeSet, extendInScopeSetList, extendInScopeSetSet,
         getInScopeVars, lookupInScope, lookupInScope_Directly,
-        unionInScope, elemInScopeSet, uniqAway,
+        unionInScope, elemInScopeSet,
         varSetInScope,
 
         -- * The RnEnv2 type
         RnEnv2,
 
         -- ** Operations on RnEnv2s
-        mkRnEnv2, rnBndr2, rnBndrs2, rnBndr2_var,
+        mkRnEnv2,
         rnOccL, rnOccR, inRnEnvL, inRnEnvR, rnOccL_maybe, rnOccR_maybe,
-        rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, rnSwap,
+        nukeRnEnvL, nukeRnEnvR, rnSwap,
         delBndrL, delBndrR, delBndrsL, delBndrsR,
         addRnInScopeSet,
-        rnEtaL, rnEtaR,
         rnInScope, rnInScopeSet, lookupRnInScope,
         rnEnvL, rnEnvR,
 
@@ -106,15 +105,6 @@ data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
         -- The Int is a kind of hash-value used by uniqAway
         -- For example, it might be the size of the set
         -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
-
-instance Outputable InScopeSet where
-  ppr (InScope s _) =
-    text "InScope" <+>
-    braces (fsep (map (ppr . Var.varName) (nonDetEltsUniqSet s)))
-                      -- It's OK to use nonDetEltsUniqSet here because it's
-                      -- only for pretty printing
-                      -- In-scope sets get big, and with -dppr-debug
-                      -- the output is overwhelming
 
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet 1
@@ -159,34 +149,6 @@ unionInScope (InScope s1 _) (InScope s2 n2)
 
 varSetInScope :: VarSet -> InScopeSet -> Bool
 varSetInScope vars (InScope s1 _) = vars `subVarSet` s1
-
--- | @uniqAway in_scope v@ finds a unique that is not used in the
--- in-scope set, and gives that to v.
-uniqAway :: InScopeSet -> Var -> Var
--- It starts with v's current unique, of course, in the hope that it won't
--- have to change, and thereafter uses a combination of that and the hash-code
--- found in the in-scope set
-uniqAway in_scope var
-  | var `elemInScopeSet` in_scope = uniqAway' in_scope var      -- Make a new one
-  | otherwise                     = var                         -- Nothing to do
-
-uniqAway' :: InScopeSet -> Var -> Var
--- This one *always* makes up a new variable
-uniqAway' (InScope set n) var
-  = try 1
-  where
-    orig_unique = getUnique var
-    try k
-          | debugIsOn && (k > 1000)
-          = pprPanic "uniqAway loop:" msg
-          | uniq `elemVarSetByKey` set = try (k + 1)
-          | k > 3
-          = pprTraceDebug "uniqAway:" msg
-            setVarUnique var uniq
-          | otherwise = setVarUnique var uniq
-          where
-            msg  = ppr k <+> text "tries" <+> ppr var <+> int n
-            uniq = deriveUnique orig_unique (n * k)
 
 {-
 ************************************************************************
@@ -257,78 +219,6 @@ rnEnvL = envL
 -- | Retrieve the right mapping
 rnEnvR :: RnEnv2 -> VarEnv Var
 rnEnvR = envR
-
-rnBndrs2 :: RnEnv2 -> [Var] -> [Var] -> RnEnv2
--- ^ Applies 'rnBndr2' to several variables: the two variable lists must be of equal length
-rnBndrs2 env bsL bsR = foldl2 rnBndr2 env bsL bsR
-
-rnBndr2 :: RnEnv2 -> Var -> Var -> RnEnv2
--- ^ @rnBndr2 env bL bR@ goes under a binder @bL@ in the Left term,
---                       and binder @bR@ in the Right term.
--- It finds a new binder, @new_b@,
--- and returns an environment mapping @bL -> new_b@ and @bR -> new_b@
-rnBndr2 env bL bR = fst $ rnBndr2_var env bL bR
-
-rnBndr2_var :: RnEnv2 -> Var -> Var -> (RnEnv2, Var)
--- ^ Similar to 'rnBndr2' but returns the new variable as well as the
--- new environment
-rnBndr2_var (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
-  = (RV2 { envL            = extendVarEnv envL bL new_b   -- See Note
-         , envR            = extendVarEnv envR bR new_b   -- [Rebinding]
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
-  where
-        -- Find a new binder not in scope in either term
-    new_b | not (bL `elemInScopeSet` in_scope) = bL
-          | not (bR `elemInScopeSet` in_scope) = bR
-          | otherwise                          = uniqAway' in_scope bL
-
-        -- Note [Rebinding]
-        -- If the new var is the same as the old one, note that
-        -- the extendVarEnv *deletes* any current renaming
-        -- E.g.   (\x. \x. ...)  ~  (\y. \z. ...)
-        --
-        --   Inside \x  \y      { [x->y], [y->y],       {y} }
-        --       \x  \z         { [x->x], [y->y, z->x], {y,x} }
-
-rnBndrL :: RnEnv2 -> Var -> (RnEnv2, Var)
--- ^ Similar to 'rnBndr2' but used when there's a binder on the left
--- side only.
-rnBndrL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
-  = (RV2 { envL     = extendVarEnv envL bL new_b
-         , envR     = envR
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
-  where
-    new_b = uniqAway in_scope bL
-
-rnBndrR :: RnEnv2 -> Var -> (RnEnv2, Var)
--- ^ Similar to 'rnBndr2' but used when there's a binder on the right
--- side only.
-rnBndrR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
-  = (RV2 { envR     = extendVarEnv envR bR new_b
-         , envL     = envL
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
-  where
-    new_b = uniqAway in_scope bR
-
-rnEtaL :: RnEnv2 -> Var -> (RnEnv2, Var)
--- ^ Similar to 'rnBndrL' but used for eta expansion
--- See Note [Eta expansion]
-rnEtaL (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL
-  = (RV2 { envL     = extendVarEnv envL bL new_b
-         , envR     = extendVarEnv envR new_b new_b     -- Note [Eta expansion]
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
-  where
-    new_b = uniqAway in_scope bL
-
-rnEtaR :: RnEnv2 -> Var -> (RnEnv2, Var)
--- ^ Similar to 'rnBndr2' but used for eta expansion
--- See Note [Eta expansion]
-rnEtaR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
-  = (RV2 { envL     = extendVarEnv envL new_b new_b     -- Note [Eta expansion]
-         , envR     = extendVarEnv envR bR new_b
-         , in_scope = extendInScopeSet in_scope new_b }, new_b)
-  where
-    new_b = uniqAway in_scope bR
 
 delBndrL, delBndrR :: RnEnv2 -> Var -> RnEnv2
 delBndrL rn@(RV2 { envL = env, in_scope = in_scope }) v

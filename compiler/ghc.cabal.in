@@ -422,6 +422,7 @@ Library
         PrelNames
         PrelRules
         PrimOp
+        PrimOpCache
         ToolSettings
         TysPrim
         TysWiredIn

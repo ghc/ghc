@@ -38,6 +38,7 @@ import FastString
 import Name
 import Unique
 import Var
+import Var.Ppr
 import Util
 import Binary
 import Pair

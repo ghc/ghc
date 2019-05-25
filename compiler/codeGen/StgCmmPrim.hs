@@ -42,6 +42,7 @@ import TyCon
 import CLabel
 import CmmUtils
 import PrimOp
+import PrimOpCache
 import SMRep
 import FastString
 import Outputable
