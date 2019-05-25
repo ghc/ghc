@@ -6,6 +6,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- #name_types#
@@ -97,18 +98,22 @@ module OccName (
         tidyOccName, avoidClashesOccEnv,
 
         -- FsEnv
-        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
+        FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv,
+
+        -- Config and Constraint for pretty printing
+        NameSuppress(..),
+        HasNameSuppress(..)
     ) where
 
 import GhcPrelude
 
 import Util
 import Unique
-import DynFlags
 import UniqFM
 import UniqSet
 import FastString
 import FastStringEnv
+import NameSuppress
 import Outputable
 import Lexeme
 import Binary
@@ -189,17 +194,17 @@ isValNameSpace DataName = True
 isValNameSpace VarName  = True
 isValNameSpace _        = False
 
-pprNameSpace :: NameSpace -> SDoc
+pprNameSpace :: NameSpace -> SDoc' r
 pprNameSpace DataName  = text "data constructor"
 pprNameSpace VarName   = text "variable"
 pprNameSpace TvName    = text "type variable"
 pprNameSpace TcClsName = text "type constructor or class"
 
-pprNonVarNameSpace :: NameSpace -> SDoc
+pprNonVarNameSpace :: NameSpace -> SDoc' r
 pprNonVarNameSpace VarName = empty
 pprNonVarNameSpace ns = pprNameSpace ns
 
-pprNameSpaceBrief :: NameSpace -> SDoc
+pprNameSpaceBrief :: NameSpace -> SDoc' r
 pprNameSpaceBrief DataName  = char 'd'
 pprNameSpaceBrief VarName   = char 'v'
 pprNameSpaceBrief TvName    = text "tv"
@@ -261,6 +266,7 @@ instance NFData OccName where
 -}
 
 instance Outputable OccName where
+    type OutputableNeedsOfConfig OccName = HasNameSuppress
     ppr = pprOccName
 
 instance OutputableBndr OccName where
@@ -268,7 +274,7 @@ instance OutputableBndr OccName where
     pprInfixOcc n = pprInfixVar (isSymOcc n) (ppr n)
     pprPrefixOcc n = pprPrefixVar (isSymOcc n) (ppr n)
 
-pprOccName :: OccName -> SDoc
+pprOccName :: HasNameSuppress r => OccName -> SDoc' r
 pprOccName (OccName sp occ)
   = getPprStyle $ \ sty ->
     if codeStyle sty
@@ -278,8 +284,8 @@ pprOccName (OccName sp occ)
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
                  | otherwise      = empty
 
-    pp_occ = sdocWithDynFlags $ \dflags ->
-             if gopt Opt_SuppressUniques dflags
+    pp_occ = sdocWithDynFlags $ \cfg ->
+             if nameSuppress_uniques $ getNameSuppress cfg
              then text (strip_th_unique (unpackFS occ))
              else ftext occ
 
@@ -435,9 +441,10 @@ filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
 
 instance Outputable a => Outputable (OccEnv a) where
+    type OutputableNeedsOfConfig (OccEnv a) = OutputableNeedsOfConfig a
     ppr x = pprOccEnv ppr x
 
-pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
+pprOccEnv :: (a -> SDoc' r) -> OccEnv a -> SDoc' r
 pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
 
 type OccSet = UniqSet OccName
@@ -521,7 +528,7 @@ isSymOcc (OccName VarName s)   = isLexSym s
 isSymOcc (OccName TvName s)    = isLexSym s
 -- Pretty inefficient!
 
-parenSymOcc :: OccName -> SDoc -> SDoc
+parenSymOcc :: OccName -> SDoc' r -> SDoc' r
 -- ^ Wrap parens around an operator
 parenSymOcc occ doc | isSymOcc occ = parens doc
                     | otherwise    = doc

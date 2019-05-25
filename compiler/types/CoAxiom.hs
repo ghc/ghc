@@ -1,7 +1,14 @@
 -- (c) The University of Glasgow 2012
 
-{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures,
-             ScopedTypeVariables, StandaloneDeriving, RoleAnnotations #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -34,6 +41,8 @@ import GhcPrelude
 import {-# SOURCE #-} TyCoRep ( Type, pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
+import Panic (assertPanic, panic)
+import Packages (HasPackageState )
 import FastString
 import Name
 import Unique
@@ -447,6 +456,9 @@ instance Uniquable (CoAxiom br) where
     getUnique = co_ax_unique
 
 instance Outputable (CoAxiom br) where
+    type OutputableNeedsOfConfig (CoAxiom br) = PairConstraint
+      HasNameSuppress
+      HasPackageState
     ppr = ppr . getName
 
 instance NamedThing (CoAxiom br) where

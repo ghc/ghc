@@ -24,6 +24,7 @@ import BasicTypes       ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import FieldLabel       ( FieldLbl(..) )
 
 import Outputable
+import PlainPanic
 import FastString
 import SrcLoc
 import HsExtension
@@ -125,8 +126,9 @@ simpleImportDecl mn = ImportDecl {
       ideclHiding    = Nothing
     }
 
-instance (p ~ GhcPass pass,OutputableBndrId p)
+instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ImportDecl p) where
+    type OutputableNeedsOfConfig (ImportDecl p) = OutputableNeedsOfConfig (IdP p)
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
@@ -322,7 +324,8 @@ replaceWrappedName (IEType    (L l _)) n = IEType    (L l n)
 replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-instance (p ~ GhcPass pass,OutputableBndrId p) => Outputable (IE p) where
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IE p) where
+    type OutputableNeedsOfConfig (IE p) = OutputableNeedsOfConfig (IdP p)
     ppr (IEVar       _     var) = ppr (unLoc var)
     ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
     ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
@@ -354,11 +357,18 @@ instance (OutputableBndr name) => OutputableBndr (IEWrappedName name) where
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
 instance (OutputableBndr name) => Outputable (IEWrappedName name) where
+  type OutputableNeedsOfConfig (IEWrappedName name) = OutputableNeedsOfConfig name
   ppr (IEName    n) = pprPrefixOcc (unLoc n)
   ppr (IEPattern n) = text "pattern" <+> pprPrefixOcc (unLoc n)
   ppr (IEType    n) = text "type"    <+> pprPrefixOcc (unLoc n)
 
-pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
+pprImpExp
+  :: ( OutputableNeedsOfConfig name r
+     , HasOccName name
+     , OutputableBndr name
+     )
+  => name
+  -> SDoc' r
 pprImpExp name = type_pref <+> pprPrefixOcc name
     where
     occ = occName name

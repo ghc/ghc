@@ -3,7 +3,9 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- #name_types#
@@ -81,6 +83,8 @@ import SrcLoc
 import FastString
 import FieldLabel
 import Outputable
+import Outputable.DynFlags
+import Packages ( HasPackageState )
 import Unique
 import UniqFM
 import UniqSet
@@ -273,6 +277,9 @@ isExact_maybe _         = Nothing
 -}
 
 instance Outputable RdrName where
+    type OutputableNeedsOfConfig RdrName = PairConstraint
+      HasNameSuppress
+      HasPackageState
     ppr (Exact name)   = ppr name
     ppr (Unqual occ)   = ppr occ
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
@@ -349,6 +356,9 @@ data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
 instance Outputable LocalRdrEnv where
+  type OutputableNeedsOfConfig LocalRdrEnv = PairConstraint
+    HasNameSuppress
+    HasPackageState
   ppr (LRE {lre_env = env, lre_in_scope = ns})
     = hang (text "LocalRdrEnv {")
          2 (vcat [ text "env =" <+> pprOccEnv ppr_elt env
@@ -475,6 +485,9 @@ data Parent = NoParent
             deriving (Eq, Data)
 
 instance Outputable Parent where
+   type OutputableNeedsOfConfig Parent = PairConstraint
+      HasNameSuppress
+      HasPackageState
    ppr NoParent        = empty
    ppr (ParentIs n)    = text "parent:" <> ppr n
    ppr (FldParent n f) = text "fldparent:"
@@ -759,10 +772,17 @@ globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
 globalRdrEnvElts env = foldOccEnv (++) [] env
 
 instance Outputable GlobalRdrElt where
+  type OutputableNeedsOfConfig GlobalRdrElt = PairConstraint
+    HasNameSuppress
+    (PairConstraint
+      HasPackageState
+      HasPprConfig)
   ppr gre = hang (ppr (gre_name gre) <+> ppr (gre_par gre))
                2 (pprNameProvenance gre)
 
-pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
+pprGlobalRdrEnv
+  :: (HasNameSuppress r, HasPackageState r, HasPprConfig r)
+  => Bool -> GlobalRdrEnv -> SDoc' r
 pprGlobalRdrEnv locals_only env
   = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (ptext (sLit "(locals only)"))
              <+> lbrace
@@ -1286,7 +1306,9 @@ isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False
 isExplicitItem (ImpSome {is_explicit = exp}) = exp
 
-pprNameProvenance :: GlobalRdrElt -> SDoc
+pprNameProvenance
+  :: (HasNameSuppress r, HasPackageState r, HasPprConfig r)
+  => GlobalRdrElt -> SDoc' r
 -- ^ Print out one place where the name was define/imported
 -- (With -dppr-debug, print them all)
 pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
@@ -1300,7 +1322,9 @@ pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
-ppr_defn_site :: ImportSpec -> Name -> SDoc
+ppr_defn_site
+  :: (HasNameSuppress r, HasPackageState r, HasPprConfig r)
+  => ImportSpec -> Name -> SDoc' r
 ppr_defn_site imp_spec name
   | same_module && not (isGoodSrcSpan loc)
   = empty              -- Nothing interesting to say
@@ -1316,6 +1340,9 @@ ppr_defn_site imp_spec name
 
 
 instance Outputable ImportSpec where
+   type OutputableNeedsOfConfig ImportSpec = PairConstraint
+      HasNameSuppress
+      HasPprConfig
    ppr imp_spec
      = text "imported" <+> qual
         <+> text "from" <+> quotes (ppr (importSpecModule imp_spec))
@@ -1324,7 +1351,7 @@ instance Outputable ImportSpec where
        qual | is_qual (is_decl imp_spec) = text "qualified"
             | otherwise                  = empty
 
-pprLoc :: SrcSpan -> SDoc
+pprLoc :: SrcSpan -> SDoc' r
 pprLoc (RealSrcSpan s)    = text "at" <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
 
@@ -1374,7 +1401,9 @@ pprLoc (UnhelpfulSpan {}) = empty
 -- Unicode variant, the resulting SDoc will contain a helpful suggestion.
 -- Otherwise it is empty.
 --
-starInfo :: Bool -> RdrName -> SDoc
+starInfo
+  :: (HasNameSuppress r, HasPackageState r, HasPprConfig r)
+  => Bool -> RdrName -> SDoc' r
 starInfo star_is_type rdr_name =
   -- One might ask: if can use sdocWithDynFlags here, why bother to take
   -- star_is_type as input? Why not refactor?

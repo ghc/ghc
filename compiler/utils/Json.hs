@@ -18,7 +18,7 @@ data JsonDoc where
 
 
 -- This is simple and slow as it is only used for error reporting
-renderJSON :: JsonDoc -> SDoc
+renderJSON :: JsonDoc -> SDoc' r
 renderJSON d =
   case d of
     JSNull -> text "null"
@@ -28,7 +28,7 @@ renderJSON d =
     JSArray as -> brackets $ pprList renderJSON as
     JSObject fs -> braces $ pprList renderField fs
   where
-    renderField :: (String, JsonDoc) -> SDoc
+    renderField :: (String, JsonDoc) -> SDoc' r
     renderField (s, j) = doubleQuotes (text s) <>  colon <+> renderJSON j
 
     pprList pp xs = hcat (punctuate comma (map pp xs))
