@@ -1091,7 +1091,7 @@ Note [Detecting forced eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have levity polymorphic function arguments. See
 Note [Levity polymorphism invariants] in CoreSyn. But we *can* have
-functions that take levity polymorphism arguments, as long as these
+functions that take levity polymorphic arguments, as long as these
 functions are eta-reduced. (See #12708 for an example.)
 
 However, we absolutely cannot do this for functions that have no

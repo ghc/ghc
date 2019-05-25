@@ -2007,11 +2007,11 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
     level = m_level `orElse` TypeLevel
 
     occurs_check_error
-      | Just act_tv <- tcGetTyVar_maybe act
-      , act_tv `elemVarSet` tyCoVarsOfType exp
+      | Just tv <- tcGetTyVar_maybe ty1
+      , tv `elemVarSet` tyCoVarsOfType ty2
       = True
-      | Just exp_tv <- tcGetTyVar_maybe exp
-      , exp_tv `elemVarSet` tyCoVarsOfType act
+      | Just tv <- tcGetTyVar_maybe ty2
+      , tv `elemVarSet` tyCoVarsOfType ty1
       = True
       | otherwise
       = False

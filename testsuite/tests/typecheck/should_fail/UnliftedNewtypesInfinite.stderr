@@ -1,11 +1,6 @@
-UnliftedNewtypesInfinite.hs:9:15:
-     Kind unification on the result kind a newtype is not yet
-      sophisticated enough to handle non-reflexive coercions
-      between a (possibly inferred) kind signature and a newtype
-      field kind. If this is the result of using a type family in
-      the kind, please open a bug report.
-      Alternatively, this newtype may have been defined recursively
-      in such a way that its inferred kind is infinite. Such
-      newtypes are rejected since they are unrepresentable.
-     In the definition of data constructor ‘FooC’
+
+UnliftedNewtypesInfinite.hs:9:15: error:
+    • Occurs check: cannot construct the infinite kind:
+        t0 ~ 'GHC.Types.TupleRep '[ 'GHC.Types.IntRep, t0]
+    • In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’

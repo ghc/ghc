@@ -71,7 +71,7 @@ import DynFlags
 import Unique
 import ConLike( ConLike(..) )
 import BasicTypes
-import TcEvidence (isTcReflCo,isTcGReflMCo,tcCoToMCo)
+import TcEvidence
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1138,7 +1138,9 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
                , dd_ctxt = (dL->L _ [])
                , dd_ND = new_or_data } <- defn
   = do { tyCon <- kcLookupTcTyCon name
-       ; mapM_ (wrapLocM_ (kcConDecl new_or_data (tyConResKind tyCon))) cons
+         -- See Note [Implementation of UnliftedNewtypes] STEP 2
+       ; (_, final_res_kind) <- etaExpandAlgTyCon (tyConBinders tyCon) (tyConResKind tyCon)
+       ; mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
        }
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
     -- This must be a GADT-style decl,
@@ -1152,7 +1154,6 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
                , dd_ND = new_or_data } <- defn
   = bindTyClTyVars name $ \ _ _ ->
     do { _ <- tcHsContext ctxt
-         -- See Note [Implementation of UnliftedNewtypes]
        ; tyCon <- kcLookupTcTyCon name
        ; mapM_ (wrapLocM_ (kcConDecl new_or_data (tyConResKind tyCon))) cons
        }
@@ -1187,43 +1188,24 @@ kcTyClDecl (XTyClDecl _)                            = panic "kcTyClDecl"
 
 -------------------
 
--- This unifies the kind of the type of the sole field in data constructor
--- with an expected kind given in the type constructor's kind signature.
--- If no kind signature is given and UnliftedNewtypes is enabled, this
--- result kind will be an unsolved metavar. See Note [Difficult Newtype Kinds].
--- If the newtype has more than one field, we don't bother doing anything
--- since that construction will be snagged by a validity check elsewhere.
-unifyNewtypeKind ::
-     [TcType] -- arguments inside data constructor
-  -> Kind -- result kind of corresponding type constructor
-  -> TcM ()
-unifyNewtypeKind [typ] res_kind =
-  do { traceTc "unifyNewtypeKind" (ppr res_kind)
-     ; coercion <- unifyKind Nothing res_kind (typeKind typ)
-     ; if isTcReflCo coercion
-         then pure ()
-         else difficultUnliftedNewtype
-     }
-unifyNewtypeKind _ _ = pure ()
-
-difficultUnliftedNewtype :: TcM a
-difficultUnliftedNewtype = failWithTc $ vcat
-  [ text "Kind unification on the result kind a newtype is not yet"
-  , text "sophisticated enough to handle non-reflexive coercions"
-  , text "between a (possibly inferred) kind signature and a newtype"
-  , text "field kind. If this is the result of using a type family in"
-  , text "the kind, please open a bug report."
-  , text "Alternatively, this newtype may have been defined recursively"
-  , text "in such a way that its inferred kind is infinite. Such"
-  , text "newtypes are rejected since they are unrepresentable."
-  ]
+-- | Unify the kind of the first type provided with the newtype's kind. If there
+-- is more than one type provided, do nothing: the newtype is in error, and this
+-- will be caught in validity checking (which will give a better error than we can
+-- here.)
+unifyNewtypeKind :: [LHsType GhcRn]   -- user-written argument types, should be just 1
+                 -> [TcType]          -- type-checked argument types, should be just 1
+                 -> TcKind            -- expected kind of newtype
+                 -> TcM MCoercion     -- co :: arg_ki ~ res_ki
+unifyNewtypeKind [hs_ty] [tc_ty] ki
+  = do { traceTc "unifyNewtypeKind" (ppr hs_ty $$ ppr tc_ty $$ ppr ki)
+       ; tcCoToMCo <$> unifyKind (Just (unLoc hs_ty)) (typeKind tc_ty) ki }
+unifyNewtypeKind _ _ _ = return MRefl
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
 -- declared with data or newtype, and we need to know the result kind of
--- this type. See Note [Implementation of UnliftedNewtypes] and
--- see Note [Deciding the kind of a newtype] for a discussion of how
--- how these two arguments are used.
+-- this type. See Note [Implementation of UnliftedNewtypes] for why
+-- we need the first two arguments.
 kcConDecl ::
      NewOrData -- Was the corresponding type declared with data or newtype?
   -> Kind -- The result kind of the corresponding type constructor
@@ -1235,16 +1217,16 @@ kcConDecl new_or_data res_kind (ConDeclH98
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
-    do { let arg_tys = hsConDeclArgTys args
+    do { let arg_tys = map getBangType $ hsConDeclArgTys args
        ; _ <- tcHsMbContext ex_ctxt
        ; traceTc "kcConDecl {" (ppr name $$ ppr args)
-       ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
+       ; arg_tc_tys <- mapM tcHsOpenType arg_tys
        ; traceTc "kcConDecl }" (ppr name)
-         -- See Note [Deciding the kind of a newtype]
-         -- and also Note [Unify newtype kind regression]
+         -- See Note [Implementation of UnliftedNewtypes], STEP 2
        ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
        ; when (unlifted_newtypes && new_or_data == NewType) $
-           unifyNewtypeKind arg_tc_tys res_kind
+           discardResult $
+           unifyNewtypeKind arg_tys arg_tc_tys res_kind
          -- We don't need to check the telescope here, because that's
          -- done in tcConDecl
        }
@@ -1267,12 +1249,13 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) (hsConDeclArgTys args)
-         -- See Note [Deciding the kind of a newtype]
-         -- and also Note [Unify newtype kind regression]
+       ; let arg_tys = hsConDeclArgTys args
+       ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
+         -- See Note [Implementation of UnliftedNewtypes], STEP 2
        ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
        ; when (unlifted_newtypes && new_or_data == NewType) $
-           unifyNewtypeKind arg_tc_tys res_kind
+           discardResult $
+           unifyNewtypeKind arg_tys arg_tc_tys res_kind
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _) = panic "kcConDecl"
@@ -1294,45 +1277,6 @@ mappings:
 
 APromotionErr is only used for DataCons, and only used during type checking
 in tcTyClGroup.
-
-Note [Deciding the kind of a newtype]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In kcConDecl, the first argument tells us whether or not something
-is a newtype. The second argument tells us the
-result kind of the corresponding type constructor. For data, this is
-always @TYPE LiftedRep@, but for newtypes (when UnliftedNewtypes is
-enabled), we may see something like @TYPE IntRep@ or @TYPE r0@
-(with an unsolved metavar). If we are dealing with a newtype, we
-unify the type constructor's result kind with the kind of the type
-of the data constructor's sole field. So, if a user had written:
-
-  newtype Foo = FooC Int#
-
-Then kcConDecl would unify the kind of Foo (previously an unsolved
-variable) with the kind of @Int#@. If the user had alternatively written
-
-  newtype Foo :: TYPE 'IntRep where
-    FooC :: Int# -> Foo
-
-Then Foo would have a CUSK, and the series of functions leading up to
-kcConDecl (kcLTyClDecl > kcTyClDecl > kcConDecl) would never have been
-called. In this case, the check that the field type `Int#` and the
-newtype `Foo` have matching kinds happens over in tcConDecl.
-See Note [Kind-checking the field in a newtype] for a discussion of
-this and see Note [Implementation of UnliftedNewtypes] for how all
-the pieces fit together.
-
-Note [Unify newtype kind regression]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In unusual cases involving typechecking more esoteric newtypes,
-unifyNewtypeKind can regress typechecking. That is, it can reject
-a newtype data constructor that should have been accepted.
-See T15801.hs for an example of something that fails when
-UnliftedNewtypes is enabled. Consequently, we guard calls to
-unifyNewtypeKind behind the UnliftedNewtypes flag since the check
-is only ever neccessary when this extension is enabled.
-This means that the type checker still rejects some well-typed programs
-but that it only affects users who enable UnliftedNewtypes.
 
 Note [Kind-checking for GADTs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1470,81 +1414,76 @@ Expected behavior of UnliftedNewtypes:
 * Discussion: https://github.com/ghc-proposals/ghc-proposals/pull/98
 
 What follows is a high-level overview of the implementation of the
-proposal. There is not that much additional work the typechecker performs
-when UnliftedNewtypes is enabled. The bulk of the changes show up in
-done in functions transitively called by kcTyClGroup. This function
-has two paths for kind-checking type constructors. One path is for
-type constructors without CUSKs (the cusk_decls identifier) and one
-is for type constructors without CUSKs (no_cusk_decls). For type
-constructors with CUSKs, UnliftedNewtypes changes very little. The
-only difference is that the result kind is allowed to be something
-like `TYPE r` (for any `r`) instead of just `TYPE 'LiftedRep`. For
-type constructors without CUSKs, it's more interesting. We have to
-look at the newtype's field to figure out the kind of the corresponding
-type constructor. After all the type-constructor kind-checking is
-finished (e.g. the call to kcTyClGroup in tcTyClDecls returns), we
-still must check the data constructors themselves. For newtypes with
-CUSKs, we haven't done any data-constructor type-checking yet, and
-we need to make sure that the field's type's kind matches the result
-kind given in the data declaration's kind signature.
+proposal.
 
-Let's get into the specifics a little more. In TcTyClsDecls, there
-are several places that UnliftedNewtypes touches:
+STEP 1: Getting the initial kind, as done by getInitialKind. We have
+two sub-cases (assuming we have a newtype and -XUnliftedNewtypes is enabled):
+
+* With a CUSK: no change in kind-checking; the tycon is given the kind
+  the user writes, whatever it may be.
+
+* Without a CUSK: If there is no kind signature, the tycon is given
+  a kind `TYPE r`, for a fresh unification variable `r`.
+
+STEP 2: Kind-checking, as done by kcTyClDecl. This step is skipped for CUSKs.
+The key function here is kcConDecl, which looks at an individual constructor
+declaration. In the unlifted-newtypes case (i.e., -XUnliftedNewtypes and,
+indeed, we are processing a newtype), we call unifyNewtypeKind, which is a
+thin wrapper around unifyKind, unfiying the kind of the one argument and the
+kind of the newtype tycon.
+
+Note that, in the GADT case, we might have a kind signature with arrows
+(newtype XYZ a b :: Type -> Type where ...). We want only the final
+component of the kind for checking in kcConDecl, so we call etaExpandAlgTyCon
+in kcTyClDecl.
+
+STEP 3: Type-checking (desugaring), as done by tcTyClDecl. The key function
+here is tcConDecl. Once again, we must call unifyNewtypeKind, for two reasons:
+
+  A. It is possible that a GADT has a CUSK. (Note that this is *not*
+     possible for H98 types. Recall that CUSK types don't go through
+     kcTyClDecl, so we might not have done this kind check.
+  B. We need to produce the coercion to put on the argument type
+     if the kinds are different (for both H98 and GADT).
+
+Example of (B):
+
+type family F a where
+  F Int = LiftedRep
+
+newtype N :: TYPE (F Int) where
+  MkN :: Int -> N
+
+We really need to have the argument to MkN be (Int |> TYPE (sym axF)), where
+axF :: F Int ~ LiftedRep. That way, the argument kind is the same as the
+newtype kind, which is the principal correctness condition for newtypes.
+This call to unifyNewtypeKind is what produces that coercion.
+
+Note that this is possible in the H98 case only for a data family, because
+the H98 syntax doesn't permit a kind signature on the newtype itself.
+
 
 1. In tcFamDecl1, we suppress a tcIsLiftedTypeKind check if
    UnliftedNewtypes is on. This allows us to write things like:
      data family Foo :: TYPE 'IntRep
-2. In getInitialKind, if UnliftedNewtypes is on and a newtype is written
-   without a kind signature, we give it result kind `TYPE a0` instead of
-   `TYPE 'LiftedRep`. The metavar is solved later in kcConDecl when we
-   see what is in the data constructor. Recall that getInitialKind is
-   called by getInitialKinds which is called by kcTyClGroup to assign
-   kinds to all top-level data declarations.
-   This step and step 1 are similar. Step 1 focuses on data families
-   and this one focuses on normal data types. But the change needed
-   for normal data types is more complicated. When there is no kind
-   signature, we can end up with a metavar that is later solved by
-   unification. By contrast, with data families, this cannot happen.
-   That is, we can write this:
-     newtype Foo = FooC ...
-   And the field will dictate Foo's kind. But since data families are
-   open, there is no analogous process for inferring their kinds. A
-   data family without a kind signature is always assigned result kind
-   `Type`, regardless or whether or not `UnliftedNewtypes` is enabled.
-3. In kcTyClDecl, we pull the result kind from the type constructor
-   and feed it into kcConDecl.
-4. In kcConDecl, we unify this result kind with the kind of the type of
-   the field. See Note [Deciding the kind of a newtype]. The function
-   responsible for this is unifyNewtypeKind. Here, we only accept
-   unifications that result in reflexive coercions. This limits what
-   can be done with using type families in kinds. If anyone ever wants
-   to work on improving this, go for it!
-5. In tcConDecl, for matches on ConDeclGADT, there's some code that just
-   calls tcHsLiftedType when UnliftedNewtypes is not on. But, when
-   UnliftedNewtypes is on, we make two changes. Firstly, we weaken this
-   check to tcHsOpenType. Secondly, we unify this kind of the type of
-   the sole field in this data constructor with the kind of res_ty.
-   We have the same reflexive-coercions-only limitation that we do
-   in kcConDecl. But, here we give the solver a chance to wack insoluble
-   coercions before we fail with the obscure message that
-   difficultUnliftedNewtype offers. Letting the solver finish first
-   gives us gives the user much better error messages in certain
-   common cases (see UnliftedNewtypesMismatchedKind in the test suite).
-   See Note [Kind-checking the field type].
 
-That's it. The unification mentioned in the fourth bullet point is the
-only real work going on. The other steps just set things up for it.
-In TcInstDcls, we see a few other places where UnliftedNewtypes affects
-typechecking:
+2. In a newtype instance (with -XUnliftedNewtypes), if the user does
+   not write a kind signature, we want to allow the possibility that
+   the kind is not Type, so we use newOpenTypeKind instead of liftedTypeKind.
+   This is done in tcDataFamHeader in TcInstDcls. Example:
 
-* In tcDataFamInstDecl, there is a tcIsLiftedTypeKind check that gets
-  weakened to tcIsRuntimeTypeKind when UnliftedNewtypes is on.
-* In tcDataFamHeader, we infer a data instance's result kind from
-  its data family's result kind when UnliftedNewtypes is on.
-  See Note [Unlifted newtype instance without kind signature].
-  This ends up causing a small redundant check to occur later
-  (checkExpectedKindX is guaranteed to get the same kind for
-  its last two arguments).
+       data family Bar (a :: RuntimeRep) :: TYPE a
+       newtype instance Bar 'IntRep = BarIntC Int#
+       newtype instance Bar 'WordRep :: TYPE 'WordRep where
+         BarWordC :: Word# -> Bar 'WordRep
+
+   The data instance corresponding to IntRep does not specify a kind signature,
+   so tc_kind_sig just returns `TYPE r0` (where `r0` is a fresh metavariable).
+   The data instance corresponding to WordRep does have a kind signature, so
+   we use that kind signature.
+
+3. A data family and its newtype instance may be declared with slightly
+   different kinds. See Note [Unifying data family kinds] in TcInstDcls.
 
 There's also a change in the renamer:
 
@@ -1912,8 +1851,8 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   --   Type or a kind-variable
   -- For the latter, consider
   --   data family D a :: forall k. Type -> k
-  -- When UnliftedNewtypes is enabled, we drop this restriction
-  -- on the return kind. See Note [Implementation of UnliftedNewtypes].
+  -- When UnliftedNewtypes is enabled, we loosen this restriction
+  -- on the return kind. See Note [Implementation of UnliftedNewtypes], wrinkle (1).
   ; let (_, final_res_kind) = splitPiTys res_kind
   ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
   ; checkTc
@@ -2097,6 +2036,7 @@ tcDataDefn roles_info
                               tycon
                               new_or_data
                               final_bndrs
+                              final_res_kind
                               res_ty
                               cons
              ; tc_rhs    <- mk_tc_rhs hsc_src tycon data_cons
@@ -2510,27 +2450,26 @@ consUseGadtSyntax _                                = False
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: KnotTied TyCon -> NewOrData -> [KnotTied TyConBinder]
+tcConDecls :: KnotTied TyCon -> NewOrData
+           -> [TyConBinder] -> TcKind   -- binders and result kind of tycon
            -> KnotTied Type -> [LConDecl GhcRn] -> TcM [DataCon]
-  -- Why both the tycon tyvars and binders? Because the tyvars
-  -- have all the names and the binders have the visibilities.
-tcConDecls rep_tycon new_or_data tmpl_bndrs res_tmpl
+tcConDecls rep_tycon new_or_data tmpl_bndrs res_kind res_tmpl
   = concatMapM $ addLocM $
     tcConDecl rep_tycon (mkTyConTagMap rep_tycon)
-              tmpl_bndrs res_tmpl new_or_data
+              tmpl_bndrs res_kind res_tmpl new_or_data
     -- It's important that we pay for tag allocation here, once per TyCon,
     -- See Note [Constructor tag allocation], fixes #14657
 
 tcConDecl :: KnotTied TyCon          -- Representation tycon. Knot-tied!
           -> NameEnv ConTag
-          -> [KnotTied TyConBinder] -> KnotTied Type
-                 -- Return type template (with its template tyvars)
-                 --    (tvs, T tys), where T is the family TyCon
+          -> [TyConBinder] -> TcKind   -- tycon binders and result kind
+          -> KnotTied Type
+                 -- Return type template (T tys), where T is the family TyCon
           -> NewOrData
           -> ConDecl GhcRn
           -> TcM [DataCon]
 
-tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl _
+tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
           (ConDeclH98 { con_name = name
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
@@ -2546,7 +2485,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl _
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts))
+       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+       ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts, kind_mco))
            <- pushTcLevelM_                             $
               solveEqualities                           $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
@@ -2554,17 +2494,23 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl _
                  ; btys <- tcConArgs hs_args
                  ; field_lbls <- lookupConstructorFields (unLoc name)
                  ; let (arg_tys, stricts) = unzip btys
-                 ; return (ctxt, arg_tys, field_lbls, stricts)
+                 ; kind_mco <-
+                   if unlifted_newtypes && new_or_data == NewType
+                     then unifyNewtypeKind (hsConDeclArgTys hs_args)
+                                           arg_tys res_kind
+                     else return MRefl
+                 ; return (ctxt, arg_tys, field_lbls, stricts, kind_mco)
                  }
 
          -- exp_tvs have explicit, user-written binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
+       ; let final_arg_tys = map (`mkCastTyMCo` kind_mco) arg_tys
        ; kvs <- kindGeneralize (mkSpecForAllTys (binderVars tmpl_bndrs) $
                                 mkSpecForAllTys exp_tvs $
                                 mkPhiTy ctxt $
-                                mkVisFunTys arg_tys $
+                                mkVisFunTys final_arg_tys $
                                 unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
@@ -2576,7 +2522,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl _
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrs kvs
        ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
-       ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
+       ; arg_tys         <- zonkTcTypesToTypesX ze final_arg_tys
        ; ctxt            <- zonkTcTypesToTypesX ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
@@ -2610,7 +2556,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl _
        ; mapM buildOneDataCon [name]
        }
 
-tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
+tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
+  -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
+  -- the res_kind by typechecking the result type.
           (ConDeclGADT { con_names = names
                        , con_qvars = qtvs
                        , con_mb_cxt = cxt, con_args = hs_args
@@ -2622,7 +2570,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
        ; let ((dL->L _ name) : _) = names
 
        ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts, mco)))
+       ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts, kind_mco)))
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
                                   -- want an error cascade
@@ -2631,43 +2579,29 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
                  ; let (arg_tys, stricts) = unzip btys
-                   -- See Note [Kind-checking the field type]
-                 ; (res_ty, mco) <-
+                 ; (res_ty, res_ki) <- tcLHsType hs_res_ty
+                   -- See Note [Implementation of unlifted newtypes]
+                 ; kind_mco <-
                    if unlifted_newtypes && new_or_data == NewType
-                     then do
-                       { res_ty <- tcHsOpenType hs_res_ty
-                       ; case (arg_tys,hsConDetailsArgs hs_args) of
-                           ([arg_ty],[hs_arg]) -> do
-                             { co <- unifyKind (Just (unLoc hs_arg))
-                                 (typeKind arg_ty) (typeKind res_ty)
-                             ; pure (res_ty, tcCoToMCo co)
-                             }
-                           -- When a newtype has multiple fields, we pretend
-                           -- that everything was ok. There's a validity
-                           -- check that gets this later anyway. In the test
-                           -- suite, see UnliftedNewtypesMultiFieldGadt.
-                           _ -> pure (res_ty, MRefl)
-                       }
-                     else do
-                       { res_ty <- tcHsLiftedType hs_res_ty
-                       ; pure (res_ty, MRefl)
-                       }
+                     then unifyNewtypeKind (hsConDeclArgTys hs_args)
+                                           arg_tys res_ki
+                     else return MRefl
                  ; field_lbls <- lookupConstructorFields name
-                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts, mco)
+                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts, kind_mco)
                  }
-       ; unless (isTcGReflMCo mco) difficultUnliftedNewtype
        ; imp_tvs <- zonkAndScopedSort imp_tvs
-       ; let user_tvs = imp_tvs ++ exp_tvs
+       ; let user_tvs      = imp_tvs ++ exp_tvs
+             final_arg_tys = map (`mkCastTyMCo` kind_mco) arg_tys
 
        ; tkvs <- kindGeneralize (mkSpecForAllTys user_tvs $
                                  mkPhiTy ctxt $
-                                 mkVisFunTys arg_tys $
+                                 mkVisFunTys final_arg_tys $
                                  res_ty)
 
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
-       ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
+       ; arg_tys <- zonkTcTypesToTypesX ze final_arg_tys
        ; ctxt    <- zonkTcTypesToTypesX ze ctxt
        ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
@@ -2710,36 +2644,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
-tcConDecl _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _)
+tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _)
   = panic "tcConDecl"
-tcConDecl _ _ _ _ _ (XConDecl _) = panic "tcConDecl"
-
-{-
-Note [Kind-checking the field type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In tcConDecl, we have a kind-check on a datatype's sole field when all
-three of these happen:
-
-* UnliftedNewtypes: The extension must be enabled
-* Newtype: The data type has to declared with newtype, not with data
-* ConDeclGADT: This one is less obvious. We only do this check when
-    working with newtype declarations using GADT syntax. Why? Newtype
-    declarations using H98 syntax cannot possibly have a CUSK.
-    Consequently, such a newtype's field will have already been
-    kind-checked by kcConDecl when the type-constructor-kind-checking
-    kcLTyClDecl is called on all non-cusk type constructors.
-
-We pull the field's type out of arg_tys. We grab the HsType from
-hs_args to improve the error message in the event of a unification
-that results in an insoluble coercion. We smuggle the coercion (mco)
-out through solveEqualities and then fail if it isn't a reflexible
-coercion. This gives the solver a chance to fail with a good error
-message (see UnliftedNewtypesMismatchedKind in the test suite) if
-the coercion is insoluble. If it's insoluble but not reflexive, then
-we fail with a confusing error message with difficultUnliftedNewtype.
-See Note [Implementation of UnliftedNewtypes] for how all the pieces
-fit together.
--}
+tcConDecl _ _ _ _ _ _ (XConDecl _) = panic "tcConDecl"
 
 tcConIsInfixH98 :: Name
              -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])
@@ -2846,11 +2753,10 @@ errors reported in one pass.  See #7175, and #10836.
 rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result type; e.g.
                                   -- data instance T [a] b c ...
                                   --      gives template ([a,b,c], T [a] b c)
-                                  -- Type must be of kind *!
             -> [TyVar]            -- The constructor's inferred type variables
             -> [TyVar]            -- The constructor's user-written, specified
                                   -- type variables
-            -> KnotTied Type      -- res_ty type must be of kind *
+            -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
                 [TyVar],          -- The constructor's rejigged, user-written,
@@ -2879,9 +2785,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- So we return ( [a,b,z], [x,y]
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
-  | Just subst <- ASSERT( isLiftedTypeKind (tcTypeKind res_ty) )
-                  ASSERT( isLiftedTypeKind (tcTypeKind res_tmpl) )
-                  tcMatchTy res_tmpl res_ty
+  | Just subst <- tcMatchTy res_tmpl res_ty
   = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
         (arg_subst, substed_ex_tvs) = substTyVarBndrs kind_subst raw_ex_tvs

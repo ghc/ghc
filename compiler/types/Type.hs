@@ -58,7 +58,8 @@ module Type (
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
-        mkCastTy, mkCoercionTy, splitCastTy_maybe,
+        mkCastTy, mkCastTyMCo, mkCoercionTy, splitCastTy_maybe,
+        discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
 
@@ -1271,12 +1272,24 @@ mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
 
 mkCastTy ty co = CastTy ty co
 
+-- | Cast a type by an 'MCoercion'.
+mkCastTyMCo :: Type -> MCoercion -> Type
+mkCastTyMCo ty MRefl    = ty
+mkCastTyMCo ty (MCo co) = mkCastTy ty co
+
 tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 -- Return the tyConBinders in TyCoBinder form
 tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (varType tv)
+
+-- | Drop the cast on a type, if any. If there is no
+-- cast, just return the original type. This is rarely what
+-- you want.
+discardCast :: Type -> Type
+discardCast (CastTy ty _) = ty
+discardCast ty            = ty
 
 {-
 --------------------------------------------------------------------
