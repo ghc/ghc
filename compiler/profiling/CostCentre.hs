@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 module CostCentre (
         CostCentre(..), CcName, CCFlavour(..),
                 -- All abstract except to friend: ParseIface.y
@@ -28,6 +29,7 @@ import Name
 import Module
 import Unique
 import Outputable
+import Packages (HasPackageState)
 import SrcLoc
 import FastString
 import Util
@@ -230,6 +232,7 @@ mkSingletonCCS cc = SingletonCCS cc
 -- expression.
 
 instance Outputable CostCentreStack where
+  type OutputableNeedsOfConfig CostCentreStack = HasPackageState
   ppr CurrentCCS        = text "CCCS"
   ppr DontCareCCS       = text "CCS_DONT_CARE"
   ppr (SingletonCCS cc) = ppr cc <> text "_ccs"
@@ -250,13 +253,14 @@ instance Outputable CostCentreStack where
 -- by costCentreName.
 
 instance Outputable CostCentre where
+  type OutputableNeedsOfConfig CostCentre = HasPackageState
   ppr cc = getPprStyle $ \ sty ->
            if codeStyle sty
            then ppCostCentreLbl cc
            else text (costCentreUserName cc)
 
 -- Printing in Core
-pprCostCentreCore :: CostCentre -> SDoc
+pprCostCentreCore :: HasPackageState r => CostCentre -> SDoc' r
 pprCostCentreCore (AllCafsCC {cc_mod = m})
   = text "__sccC" <+> braces (ppr m)
 pprCostCentreCore (NormalCC {cc_flavour = flavour, cc_name = n,
@@ -268,31 +272,31 @@ pprCostCentreCore (NormalCC {cc_flavour = flavour, cc_name = n,
     ])
 
 -- ^ Print a flavour in Core
-pprFlavourCore :: CCFlavour -> SDoc
+pprFlavourCore :: CCFlavour -> SDoc' r
 pprFlavourCore CafCC = text "__C"
 pprFlavourCore f     = pprIdxCore $ flavourIndex f
 
 -- ^ Print a flavour's index in Core
-pprIdxCore :: Int -> SDoc
+pprIdxCore :: Int -> SDoc' r
 pprIdxCore 0 = empty
 pprIdxCore idx = whenPprDebug $ ppr idx
 
 -- Printing as a C label
-ppCostCentreLbl :: CostCentre -> SDoc
+ppCostCentreLbl :: HasPackageState r => CostCentre -> SDoc' r
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_flavour = f, cc_name = n, cc_mod = m})
   = ppr m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
         ppFlavourLblComponent f <> text "_cc"
 
 -- ^ Print the flavour component of a C label
-ppFlavourLblComponent :: CCFlavour -> SDoc
+ppFlavourLblComponent :: CCFlavour -> SDoc' r
 ppFlavourLblComponent CafCC = text "CAF"
 ppFlavourLblComponent (ExprCC i) = text "EXPR" <> ppIdxLblComponent i
 ppFlavourLblComponent (DeclCC i) = text "DECL" <> ppIdxLblComponent i
 ppFlavourLblComponent (HpcCC i) = text "HPC" <> ppIdxLblComponent i
 
 -- ^ Print the flavour index component of a C label
-ppIdxLblComponent :: CostCentreIndex -> SDoc
+ppIdxLblComponent :: CostCentreIndex -> SDoc' r
 ppIdxLblComponent n =
   case unCostCentreIndex n of
     0 -> empty

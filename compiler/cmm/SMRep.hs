@@ -49,6 +49,7 @@ import GhcPrelude
 import BasicTypes( ConTagZ )
 import DynFlags
 import Outputable
+import PlainPanic
 import Platform
 import FastString
 
@@ -526,7 +527,7 @@ instance Outputable SMRep where
        header = text "HeapRep"
                 <+> if static then text "static" else empty
                 <+> pp_n "ptrs" ps <+> pp_n "nonptrs" nps
-       pp_n :: String -> Int -> SDoc
+       pp_n :: String -> Int -> SDoc' r
        pp_n _ 0 = empty
        pp_n s n = int n <+> text s
 
@@ -544,7 +545,7 @@ instance Outputable ArgDescr where
   ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
   ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
 
-pprTypeInfo :: ClosureTypeInfo -> SDoc
+pprTypeInfo :: ClosureTypeInfo -> SDoc' r
 pprTypeInfo (Constr tag descr)
   = text "Con" <+>
     braces (sep [ text "tag:" <+> ppr tag

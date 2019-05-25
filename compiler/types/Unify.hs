@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Unify (
         tcMatchTy, tcMatchTyKi,
@@ -521,6 +522,7 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
     kis2 = map typeKind tys2
 
 instance Outputable a => Outputable (UnifyResultM a) where
+  type OutputableNeedsOfConfig (UnifyResultM a) = OutputableNeedsOfConfig a
   ppr SurelyApart    = text "SurelyApart"
   ppr (Unifiable x)  = text "Unifiable" <+> ppr x
   ppr (MaybeApart x) = text "MaybeApart" <+> ppr x
