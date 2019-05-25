@@ -25,7 +25,9 @@ module ListSetOps (
 
 import GhcPrelude
 
+import DynFlags (DynFlags)
 import Outputable
+import Outputable.DynFlags
 import Util
 
 import Data.List
@@ -33,7 +35,9 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Set as S
 
-getNth :: Outputable a => [a] -> Int -> a
+getNth
+  :: (Outputable a, OutputableNeedsOfConfig a DynFlags)
+  => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
              xs !! n
 
@@ -52,7 +56,13 @@ deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 -}
 
 
-unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
+unionLists
+  :: ( Outputable a, OutputableNeedsOfConfig a DynFlags
+     , Eq a
+     )
+  => [a]
+  -> [a]
+  -> [a]
 -- Assumes that the arguments contain no duplicates
 unionLists xs ys
   = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)

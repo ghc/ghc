@@ -5,7 +5,11 @@
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Demand (
         StrDmd, UseDmd(..), Count,
@@ -65,6 +69,8 @@ import GhcPrelude
 
 import DynFlags
 import Outputable
+import Outputable.DynFlags (warnPprTrace)
+import PlainPanic (panic)
 import Var ( Var )
 import VarEnv
 import UniqFM
@@ -96,6 +102,9 @@ getUseDmd = ud
 
 -- Pretty-printing
 instance (Outputable s, Outputable u) => Outputable (JointDmd s u) where
+  type OutputableNeedsOfConfig (JointDmd s u) = PairConstraint
+    (OutputableNeedsOfConfig s)
+    (OutputableNeedsOfConfig u)
   ppr (JD {sd = s, ud = u}) = angleBrackets (ppr s <> char ',' <> ppr u)
 
 -- Well-formedness preserving constructors for the joint domain
@@ -961,6 +970,7 @@ bothDmdResult r (Dunno {}) = r
 -- (See Note [Default demand on free variables] for why)
 
 instance Outputable r => Outputable (Termination r) where
+  type OutputableNeedsOfConfig (Termination r) = OutputableNeedsOfConfig r
   ppr Diverges      = char 'b'
   ppr (Dunno c)     = ppr c
 
@@ -1632,7 +1642,7 @@ instance Outputable StrictSig where
    ppr (StrictSig ty) = ppr ty
 
 -- Used for printing top-level strictness pragmas in interface files
-pprIfaceStrictSig :: StrictSig -> SDoc
+pprIfaceStrictSig :: StrictSig -> SDoc' r
 pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
   = hcat (map ppr dmds) <> ppr res
 

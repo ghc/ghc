@@ -24,6 +24,7 @@ import TyCon
 import PrelNames
 
 import Outputable
+import Outputable.DynFlags (assertPprPanic)
 import Util
 import Data.Maybe( isJust )
 

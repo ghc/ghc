@@ -6,7 +6,7 @@ import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
 import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
-import Outputable ( Outputable, OutputableBndr )
+--import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
 import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
 
@@ -30,5 +30,8 @@ isUnboxedSumCon :: DataCon -> Bool
 instance Eq DataCon
 instance Uniquable DataCon
 instance NamedThing DataCon
-instance Outputable DataCon
-instance OutputableBndr DataCon
+
+-- sadly will also provide default instance, breaking the no type familes in
+-- hs-boot rule.
+--instance Outputable DataCon
+--instance OutputableBndr DataCon

@@ -54,7 +54,7 @@ import UniqSet
 import UniqDSet
 import UniqFM( disjointUFM, pluralUFM, pprUFM )
 import UniqDFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
-import Outputable (SDoc)
+import Outputable (SDoc')
 
 -- | A non-deterministic Variable Set
 --
@@ -192,7 +192,7 @@ seqVarSet s = sizeVarSet s `seq` ()
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
-pluralVarSet :: VarSet -> SDoc
+pluralVarSet :: VarSet -> SDoc' r
 pluralVarSet = pluralUFM . getUniqSet
 
 -- | Pretty-print a non-deterministic set.
@@ -206,9 +206,9 @@ pluralVarSet = pluralUFM . getUniqSet
 -- non-deterministically ordered lists and reusing them where determinism
 -- matters.
 pprVarSet :: VarSet          -- ^ The things to be pretty printed
-          -> ([Var] -> SDoc) -- ^ The pretty printing function to use on the
+          -> ([Var] -> SDoc' r) -- ^ The pretty printing function to use on the
                              -- elements
-          -> SDoc            -- ^ 'SDoc' where the things have been pretty
+          -> SDoc' r            -- ^ 'SDoc' where the things have been pretty
                              -- printed
 pprVarSet = pprUFM . getUniqSet
 

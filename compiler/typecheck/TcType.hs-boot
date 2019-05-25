@@ -1,8 +1,8 @@
 module TcType where
-import Outputable( SDoc )
+import Outputable( SDoc' )
 
 data MetaDetails
 
 data TcTyVarDetails
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc' r
 vanillaSkolemTv :: TcTyVarDetails

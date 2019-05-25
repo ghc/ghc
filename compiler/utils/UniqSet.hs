@@ -10,6 +10,7 @@ Basically, the things need to be in class @Uniquable@.
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module UniqSet (
         -- * Unique set type
@@ -187,9 +188,10 @@ unsafeUFMToUniqSet :: UniqFM a -> UniqSet a
 unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where
+    type OutputableNeedsOfConfig (UniqSet a) = OutputableNeedsOfConfig a
     ppr = pprUniqSet ppr
 
-pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
+pprUniqSet :: (a -> SDoc' r) -> UniqSet a -> SDoc' r
 -- It's OK to use nonDetUFMToList here because we only use it for
 -- pretty-printing.
 pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet

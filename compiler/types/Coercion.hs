@@ -2,8 +2,13 @@
 (c) The University of Glasgow 2006
 -}
 
-{-# LANGUAGE RankNTypes, CPP, MultiWayIf, FlexibleContexts, BangPatterns,
-             ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Module for (a) type kinds and (b) type coercions,
 -- as used in System FC. See 'CoreSyn.Expr' for
@@ -130,6 +135,9 @@ import Name hiding ( varName )
 import Util
 import BasicTypes
 import Outputable
+import Packages (HasPackageState)
+import PlainPanic (assertPanic, panic)
+import Outputable.DynFlags (assertPprPanic, pprPanic)
 import Unique
 import Pair
 import SrcLoc
@@ -138,6 +146,7 @@ import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
 import UniqFM
+import TypeSuppress
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -189,13 +198,25 @@ etaExpandCoAxBranch (CoAxBranch { cab_tvs = tvs
  where
     eta_tys = mkTyVarTys eta_tvs
 
-pprCoAxiom :: CoAxiom br -> SDoc
+pprCoAxiom
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => CoAxiom br -> SDoc' r
 -- Used in debug-printing only
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = hang (text "axiom" <+> ppr ax <+> dcolon)
        2 (vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
 
-pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranchUser
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCon -> CoAxBranch -> SDoc' r
 -- Used when printing injectivity errors (FamInst.makeInjectivityErrors)
 -- and inaccessible branches (TcValidity.inaccessibleCoAxBranch)
 -- This happens in error messages: don't print the RHS of a data
@@ -204,7 +225,13 @@ pprCoAxBranchUser tc br
   | isDataFamilyTyCon tc = pprCoAxBranchLHS tc br
   | otherwise            = pprCoAxBranch    tc br
 
-pprCoAxBranchLHS :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranchLHS
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCon -> CoAxBranch -> SDoc' r
 -- Print the family-instance equation when reporting
 --   a conflict between equations (FamInst.conflictInstErr)
 -- For type families the RHS is important; for data families not so.
@@ -215,13 +242,25 @@ pprCoAxBranchLHS = ppr_co_ax_branch pp_rhs
   where
     pp_rhs _ _ = empty
 
-pprCoAxBranch :: TyCon -> CoAxBranch -> SDoc
+pprCoAxBranch
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCon -> CoAxBranch -> SDoc' r
 pprCoAxBranch = ppr_co_ax_branch ppr_rhs
   where
     ppr_rhs env rhs = equals <+> pprPrecTypeX env topPrec rhs
 
-ppr_co_ax_branch :: (TidyEnv -> Type -> SDoc)
-                 -> TyCon -> CoAxBranch -> SDoc
+ppr_co_ax_branch
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => (TidyEnv -> Type -> SDoc' r)
+  -> TyCon -> CoAxBranch -> SDoc' r
 ppr_co_ax_branch ppr_rhs fam_tc branch
   = foldr1 (flip hangNotEmpty 2)
     [ pprUserForAll (mkTyCoVarBinders Inferred bndrs')
@@ -1766,6 +1805,9 @@ data LiftingContext = LC TCvSubst LiftCoEnv
   -- We thus propagate the substitution from OptCoercion here.
 
 instance Outputable LiftingContext where
+  type OutputableNeedsOfConfig LiftingContext = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (LC _ env) = hang (text "LiftingContext:") 2 (ppr env)
 
 type LiftCoEnv = VarEnv Coercion

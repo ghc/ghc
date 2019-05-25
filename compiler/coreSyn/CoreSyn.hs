@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -113,10 +114,14 @@ import Module
 import BasicTypes
 import DynFlags
 import Outputable
+import Outputable.DynFlags (warnPprTrace, pprPanic)
+import PlainPanic (assertPanic, panic)
+import Packages (HasPackageState)
 import Util
 import UniqSet
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
+import TypeSuppress
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -1701,6 +1706,9 @@ the occurrence info is wrong
 -- rid of this Ord.
 
 instance Outputable AltCon where
+  type OutputableNeedsOfConfig AltCon = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    HasPackageState
   ppr (DataAlt dc) = ppr dc
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = text "__DEFAULT"
@@ -1788,6 +1796,11 @@ type TaggedArg  t = Arg  (TaggedBndr t)
 type TaggedAlt  t = Alt  (TaggedBndr t)
 
 instance Outputable b => Outputable (TaggedBndr b) where
+  type OutputableNeedsOfConfig (TaggedBndr b) = PairConstraint
+      (PairConstraint
+        (PairConstraint HasPprConfig HasNameSuppress)
+        (PairConstraint HasTypeSuppress HasPackageState))
+      (OutputableNeedsOfConfig b)
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
 deTagExpr :: TaggedExpr t -> CoreExpr

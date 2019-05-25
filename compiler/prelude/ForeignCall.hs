@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ForeignCall (
         ForeignCall(..), isSafeForeignCall,
@@ -23,7 +24,9 @@ import GhcPrelude
 import FastString
 import Binary
 import Outputable
+import PlainPanic
 import Module
+import Packages (HasPackageState)
 import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
@@ -46,6 +49,7 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
+  type OutputableNeedsOfConfig ForeignCall = HasPackageState
   ppr (CCall cc)  = ppr cc
 
 data Safety
@@ -171,7 +175,7 @@ Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
 -}
 
-ccallConvAttribute :: CCallConv -> SDoc
+ccallConvAttribute :: CCallConv -> SDoc' r
 ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
@@ -180,7 +184,7 @@ ccallConvAttribute JavaScriptCallConv = panic "ccallConvAttribute JavaScriptCall
 
 type CLabelString = FastString          -- A C label, completely unencoded
 
-pprCLabelString :: CLabelString -> SDoc
+pprCLabelString :: CLabelString -> SDoc' r
 pprCLabelString lbl = ftext lbl
 
 isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
@@ -197,7 +201,8 @@ instance Outputable CExportSpec where
   ppr (CExportStatic _ str _) = pprCLabelString str
 
 instance Outputable CCallSpec where
-  ppr (CCallSpec fun cconv safety)
+   type OutputableNeedsOfConfig CCallSpec = HasPackageState
+   ppr (CCallSpec fun cconv safety)
     = hcat [ whenPprDebug callconv, ppr_fun fun ]
     where
       callconv = text "{-" <> ppr cconv <> text "-}"

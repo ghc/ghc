@@ -19,6 +19,7 @@ import GhcPrelude
 import CmmType
 import CmmMachOp
 import Outputable
+import Outputable.DynFlags (pprPanic)
 
 popCntLabel :: Width -> String
 popCntLabel w = "hs_popcnt" ++ pprWidth w

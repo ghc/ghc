@@ -114,6 +114,7 @@ import Unique
 import PrelNames
 import FastString
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import TyCoRep   -- Doesn't need special access, but this is easier to avoid
                  -- import loops which show up if you import Type instead
 
