@@ -2,9 +2,12 @@ module TyCoRep where
 
 import GhcPrelude
 
-import Outputable ( SDoc )
+import Outputable ( SDoc', HasPprConfig )
 import Data.Data  ( Data )
 import {-# SOURCE #-} Var( Var, ArgFlag, AnonArgFlag )
+import {-# SOURCE #-} Packages (HasPackageState)
+import NameSuppress ( HasNameSuppress )
+import TypeSuppress
 
 data Type
 data TyThing
@@ -21,8 +24,20 @@ type ThetaType = [PredType]
 type CoercionN = Coercion
 type MCoercionN = MCoercion
 
-pprKind :: Kind -> SDoc
-pprType :: Type -> SDoc
+pprKind
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Kind -> SDoc' r
+pprType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Type -> SDoc' r
 mkFunTy   :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
 

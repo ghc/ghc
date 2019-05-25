@@ -18,7 +18,7 @@ import Llvm
 import CmmExpr
 import DynFlags
 import FastString
-import Outputable ( panic )
+import PlainPanic ( panic )
 import Unique
 
 -- | Get the LlvmVar function variable storing the real register

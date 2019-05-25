@@ -1,11 +1,28 @@
 module Packages where
+
 import GhcPrelude
-import {-# SOURCE #-} DynFlags(DynFlags)
 import {-# SOURCE #-} Module(ComponentId, UnitId, InstalledUnitId)
+
 data PackageState
 data PackageConfigMap
+
+class HasPackageState c where
+  getPackageState :: c -> PackageState
+
 emptyPackageState :: PackageState
-componentIdString :: DynFlags -> ComponentId -> Maybe String
-displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
+
+componentIdString
+  :: HasPackageState r
+  => r
+  -> ComponentId
+  -> Maybe String
+
+displayInstalledUnitId
+  :: HasPackageState r
+  => r
+  -> InstalledUnitId
+  -> Maybe String
+
 improveUnitId :: PackageConfigMap -> UnitId -> UnitId
-getPackageConfigMap :: DynFlags -> PackageConfigMap
+
+getPackageConfigMap :: HasPackageState r => r -> PackageConfigMap

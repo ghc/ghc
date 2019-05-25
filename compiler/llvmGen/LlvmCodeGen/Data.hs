@@ -21,7 +21,7 @@ import DynFlags
 import Platform
 
 import FastString
-import Outputable
+import PlainPanic (panic)
 import qualified Data.ByteString as BS
 
 -- ----------------------------------------------------------------------------

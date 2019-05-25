@@ -6,9 +6,13 @@
 This module defines interface types and binders
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
 module IfaceType (
@@ -60,7 +64,6 @@ import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon )
 import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
 
-import DynFlags
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import Var
@@ -69,9 +72,13 @@ import Name
 import BasicTypes
 import Binary
 import Outputable
+import Outputable.DynFlags
+import Packages (HasPackageState)
 import FastString
 import FastStringEnv
 import Util
+import TypeSuppress
+import Lens
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
@@ -398,9 +405,10 @@ splitIfaceSigmaTy ty
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
-suppressIfaceInvisibles :: DynFlags -> [IfaceTyConBinder] -> [a] -> [a]
-suppressIfaceInvisibles dflags tys xs
-  | gopt Opt_PrintExplicitKinds dflags = xs
+suppressIfaceInvisibles
+  :: HasTypeSuppress r => r -> [IfaceTyConBinder] -> [a] -> [a]
+suppressIfaceInvisibles cfg tys xs
+  | typeSuppress_printExplicitKinds $ view typeSuppress cfg = xs
   | otherwise = suppress tys xs
     where
       suppress _       []      = []
@@ -409,9 +417,10 @@ suppressIfaceInvisibles dflags tys xs
         | isInvisibleTyConBinder k =     suppress ks xs
         | otherwise                = x : suppress ks xs
 
-stripIfaceInvisVars :: DynFlags -> [IfaceTyConBinder] -> [IfaceTyConBinder]
-stripIfaceInvisVars dflags tyvars
-  | gopt Opt_PrintExplicitKinds dflags = tyvars
+stripIfaceInvisVars
+  :: HasTypeSuppress r => r -> [IfaceTyConBinder] -> [IfaceTyConBinder]
+stripIfaceInvisVars cfg tyvars
+  | typeSuppress_printExplicitKinds $ view typeSuppress cfg = tyvars
   | otherwise = filterOut isInvisibleTyConBinder tyvars
 
 -- | Extract an 'IfaceBndr' from an 'IfaceForAllBndr'.
@@ -532,9 +541,10 @@ substIfaceTyVar env tv
 ************************************************************************
 -}
 
-stripInvisArgs :: DynFlags -> IfaceAppArgs -> IfaceAppArgs
-stripInvisArgs dflags tys
-  | gopt Opt_PrintExplicitKinds dflags = tys
+stripInvisArgs
+  :: HasTypeSuppress r => r -> IfaceAppArgs -> IfaceAppArgs
+stripInvisArgs cfg tys
+  | typeSuppress_printExplicitKinds $ view typeSuppress cfg = tys
   | otherwise = suppress_invis tys
     where
       suppress_invis c
@@ -664,23 +674,25 @@ a lengthier explanation on what "inferred" and "specified" mean.)
 ************************************************************************
 -}
 
-if_print_coercions :: SDoc  -- ^ if printing coercions
-                   -> SDoc  -- ^ otherwise
-                   -> SDoc
+if_print_coercions
+  :: HasTypeSuppress r
+  => SDoc' r  -- ^ if printing coercions
+  -> SDoc' r  -- ^ otherwise
+  -> SDoc' r
 if_print_coercions yes no
-  = sdocWithDynFlags $ \dflags ->
+  = sdocWithDynFlags $ \cfg ->
     getPprStyle $ \style ->
-    if gopt Opt_PrintExplicitCoercions dflags
+    if typeSuppress_printExplicitCoercions (view typeSuppress cfg)
          || dumpStyle style || debugStyle style
     then yes
     else no
 
-pprIfaceInfixApp :: PprPrec -> SDoc -> SDoc -> SDoc -> SDoc
+pprIfaceInfixApp :: PprPrec -> SDoc' r -> SDoc' r -> SDoc' r -> SDoc' r
 pprIfaceInfixApp ctxt_prec pp_tc pp_ty1 pp_ty2
   = maybeParen ctxt_prec opPrec $
     sep [pp_ty1, pp_tc <+> pp_ty2]
 
-pprIfacePrefixApp :: PprPrec -> SDoc -> [SDoc] -> SDoc
+pprIfacePrefixApp :: PprPrec -> SDoc' r -> [SDoc' r] -> SDoc' r
 pprIfacePrefixApp ctxt_prec pp_fun pp_tys
   | null pp_tys = pp_fun
   | otherwise   = maybeParen ctxt_prec appPrec $
@@ -689,20 +701,47 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
 -- ----------------------------- Printing binders ------------------------------------
 
 instance Outputable IfaceBndr where
+    type OutputableNeedsOfConfig IfaceBndr = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
     ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr False bndr
 
-pprIfaceBndrs :: [IfaceBndr] -> SDoc
+pprIfaceBndrs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceBndr] -> SDoc' r
 pprIfaceBndrs bs = sep (map ppr bs)
 
-pprIfaceLamBndr :: IfaceLamBndr -> SDoc
+pprIfaceLamBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceLamBndr -> SDoc' r
 pprIfaceLamBndr (b, IfaceNoOneShot) = ppr b
 pprIfaceLamBndr (b, IfaceOneShot)   = ppr b <> text "[OneShot]"
 
-pprIfaceIdBndr :: IfaceIdBndr -> SDoc
+pprIfaceIdBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceIdBndr -> SDoc' r
 pprIfaceIdBndr (name, ty) = parens (ppr name <+> dcolon <+> ppr ty)
 
-pprIfaceTvBndr :: Bool -> IfaceTvBndr -> SDoc
+pprIfaceTvBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Bool -> IfaceTvBndr -> SDoc' r
 pprIfaceTvBndr use_parens (tv, ki)
   | isIfaceLiftedTypeKind ki = ppr tv
   | otherwise                = maybe_parens (ppr tv <+> dcolon <+> ppr ki)
@@ -710,10 +749,17 @@ pprIfaceTvBndr use_parens (tv, ki)
     maybe_parens | use_parens = parens
                  | otherwise  = id
 
-pprIfaceTyConBinders :: [IfaceTyConBinder] -> SDoc
+pprIfaceTyConBinders
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceTyConBinder] -> SDoc' r
 pprIfaceTyConBinders = sep . map go
   where
-    go :: IfaceTyConBinder -> SDoc
+    go :: IfaceTyConBinder -> SDoc' r
     go (Bndr (IfaceIdBndr bndr) _) = pprIfaceIdBndr bndr
     go (Bndr (IfaceTvBndr bndr) vis) =
       -- See Note [Pretty-printing invisible arguments]
@@ -758,22 +804,49 @@ instance Binary IfaceOneShot where
 
 ---------------------------------
 instance Outputable IfaceType where
+  type OutputableNeedsOfConfig IfaceType = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr ty = pprIfaceType ty
 
-pprIfaceType, pprParendIfaceType :: IfaceType -> SDoc
+pprIfaceType, pprParendIfaceType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceType -> SDoc' r
 pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
-pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
+pprPrecIfaceType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceType -> SDoc' r
 -- We still need `eliminateRuntimeRep`, since the `pprPrecIfaceType` maybe
 -- called from other places, besides `:type` and `:info`.
 pprPrecIfaceType prec ty = eliminateRuntimeRep (ppr_ty prec) ty
 
-ppr_sigma :: PprPrec -> IfaceType -> SDoc
+ppr_sigma
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceType -> SDoc' r
 ppr_sigma ctxt_prec ty
   = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
-ppr_ty :: PprPrec -> IfaceType -> SDoc
+ppr_ty
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceType -> SDoc' r
 ppr_ty ctxt_prec ty@(IfaceForAllTy {})        = ppr_sigma ctxt_prec ty
 ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _) = ppr_sigma ctxt_prec ty
 
@@ -799,12 +872,12 @@ ppr_ty ctxt_prec (IfaceAppTy t ts)
       ppr_app_ty_no_casts
   where
     ppr_app_ty =
-        sdocWithDynFlags $ \dflags ->
+        sdocWithDynFlags $ \cfg ->
         pprIfacePrefixApp ctxt_prec
                           (ppr_ty funPrec t)
-                          (map (ppr_app_arg appPrec) (tys_wo_kinds dflags))
+                          (map (ppr_app_arg appPrec) (tys_wo_kinds cfg))
 
-    tys_wo_kinds dflags = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags ts
+    tys_wo_kinds cfg = appArgsIfaceTypesArgFlags $ stripInvisArgs cfg ts
 
     -- Strip any casts from the head of the application
     ppr_app_ty_no_casts =
@@ -953,33 +1026,56 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
         tc `ifaceTyConHasKey` runtimeRepTyConKey
     isRuntimeRep _ = False
 
-eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
+eliminateRuntimeRep
+  :: HasTypeSuppress r => (IfaceType -> SDoc' r) -> IfaceType -> SDoc' r
 eliminateRuntimeRep f ty
-  = sdocWithDynFlags $ \dflags ->
+  = sdocWithDynFlags $ \cfg ->
     getPprStyle      $ \sty    ->
-    if userStyle sty && not (gopt Opt_PrintExplicitRuntimeReps dflags)
+    if userStyle sty && not (typeSuppress_printExplicitRuntimeReps $ view typeSuppress cfg)
       then f (defaultRuntimeRepVars ty)
       else f ty
 
 instance Outputable IfaceAppArgs where
+  type OutputableNeedsOfConfig IfaceAppArgs = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr tca = pprIfaceAppArgs tca
 
-pprIfaceAppArgs, pprParendIfaceAppArgs :: IfaceAppArgs -> SDoc
+pprIfaceAppArgs, pprParendIfaceAppArgs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceAppArgs -> SDoc' r
 pprIfaceAppArgs  = ppr_app_args topPrec
 pprParendIfaceAppArgs = ppr_app_args appPrec
 
-ppr_app_args :: PprPrec -> IfaceAppArgs -> SDoc
+ppr_app_args
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceAppArgs -> SDoc' r
 ppr_app_args ctx_prec = go
   where
-    go :: IfaceAppArgs -> SDoc
+    go :: IfaceAppArgs -> SDoc' r
     go IA_Nil             = empty
     go (IA_Arg t argf ts) = ppr_app_arg ctx_prec (t, argf) <+> go ts
 
 -- See Note [Pretty-printing invisible arguments]
-ppr_app_arg :: PprPrec -> (IfaceType, ArgFlag) -> SDoc
+ppr_app_arg
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> (IfaceType, ArgFlag) -> SDoc' r
 ppr_app_arg ctx_prec (t, argf) =
-  sdocWithDynFlags $ \dflags ->
-  let print_kinds = gopt Opt_PrintExplicitKinds dflags
+  sdocWithDynFlags $ \cfg ->
+  let print_kinds = typeSuppress_printExplicitKinds $ view typeSuppress cfg
   in case argf of
        Required  -> ppr_ty ctx_prec t
        Specified |  print_kinds
@@ -989,21 +1085,48 @@ ppr_app_arg ctx_prec (t, argf) =
        _         -> empty
 
 -------------------
-pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPart
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceForAllBndr] -> [IfacePredType] -> SDoc' r -> SDoc' r
 pprIfaceForAllPart tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
 
 -- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
-pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceForAllBndr] -> [IfacePredType] -> SDoc' r -> SDoc' r
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
-pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
+pprIfaceForAllCoPart
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  =>  [(IfLclName, IfaceCoercion)] -> SDoc' r -> SDoc' r
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
-ppr_iface_forall_part :: ShowForAllFlag
-                      -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+ppr_iface_forall_part
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowForAllFlag
+  -> [IfaceForAllBndr]
+  -> [IfacePredType]
+  -> SDoc' r
+  -> SDoc' r
 ppr_iface_forall_part show_forall tvs ctxt sdoc
   = sep [ case show_forall of
             ShowForAllMust -> pprIfaceForAll tvs
@@ -1012,7 +1135,13 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
         , sdoc]
 
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
-pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
+pprIfaceForAll
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceForAllBndr] -> SDoc' r
 pprIfaceForAll [] = empty
 pprIfaceForAll bndrs@(Bndr _ vis : _)
   = sep [ add_separator (forAllLit <+> fsep docs)
@@ -1028,32 +1157,62 @@ pprIfaceForAll bndrs@(Bndr _ vis : _)
 -- | Render the ... in @(forall ... .)@ or @(forall ... ->)@.
 -- Returns both the list of not-yet-rendered binders and the doc.
 -- No anonymous binders here!
-ppr_itv_bndrs :: [IfaceForAllBndr]
-             -> ArgFlag  -- ^ visibility of the first binder in the list
-             -> ([IfaceForAllBndr], [SDoc])
+ppr_itv_bndrs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfaceForAllBndr]
+  -> ArgFlag  -- ^ visibility of the first binder in the list
+  -> ([IfaceForAllBndr], [SDoc' r])
 ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
                          (bndrs', pprIfaceForAllBndr bndr : doc)
   | otherwise   = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
-pprIfaceForAllCo :: [(IfLclName, IfaceCoercion)] -> SDoc
+pprIfaceForAllCo
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [(IfLclName, IfaceCoercion)] -> SDoc' r
 pprIfaceForAllCo []  = empty
 pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
 
-pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
+pprIfaceForAllCoBndrs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [(IfLclName, IfaceCoercion)] -> SDoc' r
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
-pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
+pprIfaceForAllBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+   => IfaceForAllBndr -> SDoc' r
 pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) Inferred)
-  = sdocWithDynFlags $ \dflags ->
-                          if gopt Opt_PrintExplicitForalls dflags
+  = sdocWithDynFlags $ \cfg ->
+                          if typeSuppress_printExplicitForalls $ view typeSuppress cfg
                           then braces $ pprIfaceTvBndr False tv
                           else pprIfaceTvBndr True tv
 pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) _)  = pprIfaceTvBndr True tv
 pprIfaceForAllBndr (Bndr (IfaceIdBndr idv) _) = pprIfaceIdBndr idv
 
-pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
+pprIfaceForAllCoBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => (IfLclName, IfaceCoercion) -> SDoc' r
 pprIfaceForAllCoBndr (tv, kind_co)
   = parens (ppr tv <+> dcolon <+> pprIfaceCoercion kind_co)
 
@@ -1064,7 +1223,13 @@ pprIfaceForAllCoBndr (tv, kind_co)
 -- or when compiling with -fprint-explicit-foralls.
 data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
-pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
+pprIfaceSigmaType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ShowForAllFlag -> IfaceType -> SDoc' r
 pprIfaceSigmaType show_forall ty
   = eliminateRuntimeRep ppr_fn ty
   where
@@ -1072,13 +1237,19 @@ pprIfaceSigmaType show_forall ty
       let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
        in ppr_iface_forall_part show_forall tvs theta (ppr tau)
 
-pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
+pprUserIfaceForAll
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => HasTypeSuppress r => [IfaceForAllBndr] -> SDoc' r
 pprUserIfaceForAll tvs
-   = sdocWithDynFlags $ \dflags ->
+   = sdocWithDynFlags $ \cfg ->
      -- See Note [When to print foralls]
      ppWhen (any tv_has_kind_var tvs
              || any tv_is_required tvs
-             || gopt Opt_PrintExplicitForalls dflags) $
+             || typeSuppress_printExplicitForalls (view typeSuppress cfg)) $
      pprIfaceForAll tvs
    where
      tv_has_kind_var (Bndr (IfaceTvBndr (_,kind)) _)
@@ -1185,7 +1356,7 @@ if the first type is itself promoted.  See pprSpaceIfPromotedTyCon.
 
 -- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
 -- See Note [Printing promoted type constructors]
-pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
+pprSpaceIfPromotedTyCon :: IfaceType -> SDoc' r -> SDoc' r
 pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
   = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
       IsPromoted -> (space <>)
@@ -1194,7 +1365,13 @@ pprSpaceIfPromotedTyCon _
   = id
 
 -- See equivalent function in TyCoRep.hs
-pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
+pprIfaceTyList
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceType -> IfaceType -> SDoc' r
 -- Given a type-level list (t1 ': t2), see if we can print
 -- it in list notation [t1, ...].
 -- Precondition: Opt_PrintExplicitKinds is off
@@ -1220,18 +1397,46 @@ pprIfaceTyList ctxt_prec ty1 ty2
       = ([], Nothing)
     gather ty = ([], Just ty)
 
-pprIfaceTypeApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
+pprIfaceTypeApp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec
+  -> IfaceTyCon
+  -> IfaceAppArgs
+  -> SDoc' r
 pprIfaceTypeApp prec tc args = pprTyTcApp prec tc args
 
-pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
+pprTyTcApp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec
+  -> IfaceTyCon
+  -> IfaceAppArgs
+  -> SDoc' r
 pprTyTcApp ctxt_prec tc tys =
-    sdocWithDynFlags $ \dflags ->
+    sdocWithDynFlags $ \cfg ->
     getPprStyle $ \style ->
-    pprTyTcApp' ctxt_prec tc tys dflags style
+    pprTyTcApp' ctxt_prec tc tys cfg style
 
-pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
-            -> DynFlags -> PprStyle -> SDoc
-pprTyTcApp' ctxt_prec tc tys dflags style
+pprTyTcApp'
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec
+  -> IfaceTyCon
+  -> IfaceAppArgs
+  -> r
+  -> PprStyle
+  -> SDoc' r
+pprTyTcApp' ctxt_prec tc tys cfg style
   | ifaceTyConName tc `hasKey` ipClassKey
   , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
            Required (IA_Arg ty Required IA_Nil) <- tys
@@ -1247,7 +1452,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = pprSum arity (ifaceTyConIsPromoted info) tys
 
   | tc `ifaceTyConHasKey` consDataConKey
-  , not (gopt Opt_PrintExplicitKinds dflags)
+  , not $ typeSuppress_printExplicitKinds $ view typeSuppress cfg
   , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
   , isInvisibleArgFlag argf
   = pprIfaceTyList ctxt_prec ty1 ty2
@@ -1270,7 +1475,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
          -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc tys_wo_kinds
   where
     info = ifaceTyConInfo tc
-    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags tys
+    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs cfg tys
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -1281,7 +1486,17 @@ pprTyTcApp' ctxt_prec tc tys dflags style
 --
 -- See Note [Equality predicates in IfaceType]
 -- and Note [The equality types story] in TysPrim
-ppr_equality :: PprPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
+ppr_equality
+  :: forall r
+  .  ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec
+  -> IfaceTyCon
+  -> [IfaceType]
+  -> Maybe (SDoc' r)
 ppr_equality ctxt_prec tc args
   | hetero_eq_tc
   , [k1, k2, t1, t2] <- args
@@ -1313,11 +1528,11 @@ ppr_equality ctxt_prec tc args
     nominal_eq_tc = tc_name `hasKey` heqTyConKey       -- (~~)
                  || tc_name `hasKey` eqPrimTyConKey    -- (~#)
     print_equality args =
-        sdocWithDynFlags $ \dflags ->
+        sdocWithDynFlags $ \cfg ->
         getPprStyle      $ \style  ->
-        print_equality' args style dflags
+        print_equality' args style cfg
 
-    print_equality' (ki1, ki2, ty1, ty2) style dflags
+    print_equality' (ki1, ki2, ty1, ty2) style cfg
       | -- If -fprint-equality-relations is on, just print the original TyCon
         print_eqs
       = ppr_infix_eq (ppr tc)
@@ -1342,7 +1557,7 @@ ppr_equality ctxt_prec tc args
       | otherwise
       = ppr_infix_eq (ppr tc)
       where
-        ppr_infix_eq :: SDoc -> SDoc
+        ppr_infix_eq :: SDoc' r -> SDoc' r
         ppr_infix_eq eq_op = pprIfaceInfixApp ctxt_prec eq_op
                                (pp_ty_ki ty1 ki1) (pp_ty_ki ty2 ki2)
           where
@@ -1352,12 +1567,18 @@ ppr_equality ctxt_prec tc args
               | otherwise
               = pp opPrec ty
 
-        print_kinds = gopt Opt_PrintExplicitKinds dflags
-        print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
+        print_kinds = typeSuppress_printExplicitKinds $ view typeSuppress cfg
+        print_eqs   = typeSuppress_printEqualityRelations (view typeSuppress cfg) ||
                       dumpStyle style || debugStyle style
 
 
-pprIfaceCoTcApp :: PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc
+pprIfaceCoTcApp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc' r
 pprIfaceCoTcApp ctxt_prec tc tys =
   ppr_iface_tc_app (\prec (co, _) -> ppr_co prec co) ctxt_prec tc
     (map (, Required) tys)
@@ -1373,8 +1594,16 @@ pprIfaceCoTcApp ctxt_prec tc tys =
 -- 1. Types (from `pprTyTcApp'`)
 --
 -- 2. Coercions (from 'pprIfaceCoTcApp')
-ppr_iface_tc_app :: (PprPrec -> (a, ArgFlag) -> SDoc)
-                 -> PprPrec -> IfaceTyCon -> [(a, ArgFlag)] -> SDoc
+ppr_iface_tc_app
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => (PprPrec -> (a, ArgFlag) -> SDoc' r)
+  -> PprPrec
+  -> IfaceTyCon
+  -> [(a, ArgFlag)]
+  -> SDoc' r
 ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
 
@@ -1396,7 +1625,13 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | otherwise
   = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
-pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
+pprSum
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Arity -> PromotionFlag -> IfaceAppArgs -> SDoc' r
 pprSum _arity is_promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
@@ -1405,7 +1640,13 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
-pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
+pprTuple
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc' r
 pprTuple ctxt_prec ConstraintTuple NotPromoted IA_Nil
   = maybeParen ctxt_prec appPrec $
     text "() :: Constraint"
@@ -1431,15 +1672,27 @@ pprTuple _ sort promoted args
     pprPromotionQuoteI promoted <>
     tupleParens sort (pprWithCommas pprIfaceType args')
 
-pprIfaceTyLit :: IfaceTyLit -> SDoc
+pprIfaceTyLit :: IfaceTyLit -> SDoc' r
 pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
 
-pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
+pprIfaceCoercion, pprParendIfaceCoercion
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => IfaceCoercion -> SDoc' r
 pprIfaceCoercion = ppr_co topPrec
 pprParendIfaceCoercion = ppr_co appPrec
 
-ppr_co :: PprPrec -> IfaceCoercion -> SDoc
+ppr_co
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> IfaceCoercion -> SDoc' r
 ppr_co _         (IfaceReflCo ty) = angleBrackets (ppr ty) <> ppr_role Nominal
 ppr_co _         (IfaceGReflCo r ty IfaceMRefl)
   = angleBrackets (ppr ty) <> ppr_role r
@@ -1511,12 +1764,18 @@ ppr_co ctxt_prec (IfaceSubCo co)
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
 
-ppr_special_co :: PprPrec -> SDoc -> [IfaceCoercion] -> SDoc
+ppr_special_co
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => PprPrec -> SDoc' r -> [IfaceCoercion] -> SDoc' r
 ppr_special_co ctxt_prec doc cos
   = maybeParen ctxt_prec appPrec
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
-ppr_role :: Role -> SDoc
+ppr_role :: Role -> SDoc' r
 ppr_role r = underscore <> pp_role
   where pp_role = case r of
                     Nominal          -> char 'N'
@@ -1524,7 +1783,13 @@ ppr_role r = underscore <> pp_role
                     Phantom          -> char 'P'
 
 ------------------
-pprIfaceUnivCoProv :: IfaceUnivCoProv -> SDoc
+pprIfaceUnivCoProv
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => IfaceUnivCoProv -> SDoc' r
 pprIfaceUnivCoProv IfaceUnsafeCoerceProv
   = text "unsafe"
 pprIfaceUnivCoProv (IfacePhantomProv co)
@@ -1536,17 +1801,23 @@ pprIfaceUnivCoProv (IfacePluginProv s)
 
 -------------------
 instance Outputable IfaceTyCon where
+  type OutputableNeedsOfConfig IfaceTyCon = PairConstraint
+    HasNameSuppress
+    HasPackageState
   ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
 
-pprPromotionQuote :: IfaceTyCon -> SDoc
+pprPromotionQuote :: IfaceTyCon -> SDoc' r
 pprPromotionQuote tc =
     pprPromotionQuoteI $ ifaceTyConIsPromoted $ ifaceTyConInfo tc
 
-pprPromotionQuoteI  :: PromotionFlag -> SDoc
+pprPromotionQuoteI  :: PromotionFlag -> SDoc' r
 pprPromotionQuoteI NotPromoted = empty
 pprPromotionQuoteI IsPromoted    = char '\''
 
 instance Outputable IfaceCoercion where
+  type OutputableNeedsOfConfig IfaceCoercion = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasPackageState HasTypeSuppress)
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
@@ -1645,19 +1916,37 @@ instance Binary IfaceAppArgs where
 -- Used when we want to print a context in a type, so we
 -- use 'funPrec' to decide whether to parenthesise a singleton
 -- predicate; e.g.   Num a => a -> a
-pprIfaceContextArr :: [IfacePredType] -> SDoc
+pprIfaceContextArr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfacePredType] -> SDoc' r
 pprIfaceContextArr []     = empty
 pprIfaceContextArr [pred] = ppr_ty funPrec pred <+> darrow
 pprIfaceContextArr preds  = ppr_parend_preds preds <+> darrow
 
 -- | Prints a context or @()@ if empty
 -- You give it the context precedence
-pprIfaceContext :: PprPrec -> [IfacePredType] -> SDoc
+pprIfaceContext
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> [IfacePredType] -> SDoc' r
 pprIfaceContext _    []     = text "()"
 pprIfaceContext prec [pred] = ppr_ty prec pred
 pprIfaceContext _    preds  = ppr_parend_preds preds
 
-ppr_parend_preds :: [IfacePredType] -> SDoc
+ppr_parend_preds
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [IfacePredType] -> SDoc' r
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where

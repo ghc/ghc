@@ -1,5 +1,10 @@
-{-# LANGUAGE GADTs, BangPatterns, RecordWildCards,
-    GeneralizedNewtypeDeriving, NondecreasingIndentation, TupleSections #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module CmmBuildInfoTables
   ( CAFSet, CAFEnv, cafAnal
@@ -25,6 +30,8 @@ import CmmUtils
 import DynFlags
 import Maybes
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import SMRep
 import UniqSupply
 import CostCentre
@@ -368,7 +375,11 @@ So, no shortcutting.
 -- map them to SRTEntry later, which ranges over labels that do exist.
 --
 newtype CAFLabel = CAFLabel CLabel
-  deriving (Eq,Ord,Outputable)
+  deriving (Eq, Ord)
+
+instance Outputable CAFLabel where
+  type OutputableNeedsOfConfig CAFLabel = (~) DynFlags -- TODO generalize
+  ppr (CAFLabel cl) = ppr cl
 
 type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
@@ -379,7 +390,11 @@ mkCAFLabel lbl = CAFLabel (toClosureLbl lbl)
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
 newtype SRTEntry = SRTEntry CLabel
-  deriving (Eq, Ord, Outputable)
+  deriving (Eq, Ord)
+
+instance Outputable SRTEntry where
+  type OutputableNeedsOfConfig SRTEntry = (~) DynFlags -- TODO generalize
+  ppr (SRTEntry cl) = ppr cl
 
 -- ---------------------------------------------------------------------
 -- CAF analysis
@@ -464,6 +479,7 @@ data ModuleSRTInfo = ModuleSRTInfo
     -- Used to implement the [Filter] optimisation.
   }
 instance Outputable ModuleSRTInfo where
+  type OutputableNeedsOfConfig ModuleSRTInfo = (~) DynFlags -- TODO generalize
   ppr ModuleSRTInfo{..} =
     text "ModuleSRTInfo:" <+> ppr dedupSRTs <+> ppr flatSRTs
 

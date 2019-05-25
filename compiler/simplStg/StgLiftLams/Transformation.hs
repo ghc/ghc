@@ -17,6 +17,7 @@ import StgLiftLams.Analysis
 import StgLiftLams.LiftM
 import StgSyn
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
 import UniqSupply
 import Util
 import VarSet

@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module CLabel (
         CLabel, -- abstract type
@@ -122,6 +123,7 @@ import Unique
 import PrimOp
 import CostCentre
 import Outputable
+import Outputable.DynFlags
 import FastString
 import DynFlags
 import Platform
@@ -1150,6 +1152,7 @@ and are not externally visible.
 -}
 
 instance Outputable CLabel where
+  type OutputableNeedsOfConfig CLabel = (~) DynFlags -- TODO generalize
   ppr c = sdocWithDynFlags $ \dynFlags -> pprCLabel dynFlags c
 
 pprCLabel :: DynFlags -> CLabel -> SDoc
@@ -1336,6 +1339,7 @@ pp_cSEP = char '_'
 
 
 instance Outputable ForeignLabelSource where
+ type OutputableNeedsOfConfig ForeignLabelSource = (~) DynFlags -- TODO generalize
  ppr fs
   = case fs of
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId

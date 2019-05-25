@@ -2,7 +2,12 @@
 --
 -- FamInstEnv: Type checked family instance declarations
 
-{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
@@ -40,6 +45,7 @@ module FamInstEnv (
 
 import GhcPrelude
 
+import DynFlags (DynFlags)
 import Unify
 import Type
 import TyCoRep
@@ -52,6 +58,8 @@ import Name
 import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import PlainPanic (assertPanic, panic)
 import Maybes
 import CoreMap
 import Unique
@@ -60,6 +68,7 @@ import Var
 import Pair
 import SrcLoc
 import FastString
+
 import Control.Monad
 import Data.List( mapAccumL )
 import Data.Array( Array, assocs )
@@ -214,6 +223,7 @@ instance NamedThing FamInst where
    getName = coAxiomName . fi_axiom
 
 instance Outputable FamInst where
+   type OutputableNeedsOfConfig FamInst = (~) DynFlags --TODO
    ppr = pprFamInst
 
 pprFamInst :: FamInst -> SDoc
@@ -360,6 +370,7 @@ newtype FamilyInstEnv
   = FamIE [FamInst]     -- The instances for a particular family, in any order
 
 instance Outputable FamilyInstEnv where
+  type OutputableNeedsOfConfig FamilyInstEnv = (~) DynFlags --TODO
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
 -- INVARIANTS:
@@ -752,6 +763,7 @@ data FamInstMatch = FamInstMatch { fim_instance :: FamInst
   -- See Note [Over-saturated matches]
 
 instance Outputable FamInstMatch where
+  type OutputableNeedsOfConfig FamInstMatch = (~) DynFlags -- TODO
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys
                     , fim_cos      = cos })

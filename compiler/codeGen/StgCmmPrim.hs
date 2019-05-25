@@ -45,6 +45,8 @@ import PrimOp
 import SMRep
 import FastString
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (assertPanic, panic, sorry)
 import Util
 
 import Data.Bits ((.&.), bit)

@@ -14,6 +14,7 @@ import Instruction
 
 import UniqFM
 import Outputable
+import Outputable.DynFlags (SDoc)
 
 import State
 

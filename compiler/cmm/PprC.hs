@@ -44,6 +44,8 @@ import CPrim
 import DynFlags
 import FastString
 import Outputable
+import Outputable.DynFlags (SDoc, printForC, pprTrace, pprPanic, warnPprTrace)
+import PlainPanic (panic)
 import Platform
 import UniqSet
 import UniqFM

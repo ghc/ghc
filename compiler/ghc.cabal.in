@@ -237,6 +237,7 @@ Library
         Name
         NameEnv
         NameSet
+        NameSuppress
         OccName
         RdrName
         NameCache
@@ -534,6 +535,7 @@ Library
         CoAxiom
         Kind
         Type
+        TypeSuppress
         TyCoRep
         Unify
         Bag
@@ -561,6 +563,7 @@ Library
         MonadUtils
         OrdList
         Outputable
+        Outputable.DynFlags
         Pair
         Panic
         PlainPanic

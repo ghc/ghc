@@ -4,6 +4,7 @@
 -- The @Class@ datatype
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Class (
         Class,
@@ -34,7 +35,11 @@ import Unique
 import Util
 import SrcLoc
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import Packages (HasPackageState)
+import Panic (assertPanic)
 import BooleanFormula (BooleanFormula, mkTrue)
+import TypeSuppress (HasTypeSuppress)
 
 import qualified Data.Data as Data
 
@@ -337,19 +342,39 @@ instance NamedThing Class where
     getName clas = className clas
 
 instance Outputable Class where
+    type OutputableNeedsOfConfig Class = PairConstraint
+      HasNameSuppress
+      HasPackageState
     ppr c = ppr (getName c)
 
-pprDefMethInfo :: DefMethInfo -> SDoc
+pprDefMethInfo
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => DefMethInfo
+  -> SDoc' r
 pprDefMethInfo Nothing                  = empty   -- No default method
 pprDefMethInfo (Just (n, VanillaDM))    = text "Default method" <+> ppr n
 pprDefMethInfo (Just (n, GenericDM ty)) = text "Generic default method"
                                           <+> ppr n <+> dcolon <+> pprType ty
 
-pprFundeps :: Outputable a => [FunDep a] -> SDoc
+pprFundeps
+  :: ( HasPprConfig r
+     , Outputable a, OutputableNeedsOfConfig a r
+     )
+  => [FunDep a]
+  -> SDoc' r
 pprFundeps []  = empty
 pprFundeps fds = hsep (vbar : punctuate comma (map pprFunDep fds))
 
-pprFunDep :: Outputable a => FunDep a -> SDoc
+pprFunDep
+  :: ( HasPprConfig r
+     , Outputable a, OutputableNeedsOfConfig a r
+     )
+  => FunDep a
+  -> SDoc' r
 pprFunDep (us, vs) = hsep [interppSP us, arrow, interppSP vs]
 
 instance Data.Data Class where

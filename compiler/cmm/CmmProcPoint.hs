@@ -23,6 +23,8 @@ import Data.List (sortBy)
 import Maybes
 import Control.Monad
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import Platform
 import UniqSupply
 import Hoopl.Block

@@ -40,6 +40,7 @@ import DynFlags
 import FastString
 import Module
 import Outputable
+import Outputable.DynFlags (showPpr, pprPanic)
 
 import Control.Monad
 import Data.Char (ord)

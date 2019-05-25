@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -335,7 +336,8 @@ bagToList :: Bag a -> [a]
 bagToList b = foldrBag (:) [] b
 
 instance (Outputable a) => Outputable (Bag a) where
-    ppr bag = braces (pprWithCommas ppr (bagToList bag))
+  type OutputableNeedsOfConfig (Bag a) = OutputableNeedsOfConfig a
+  ppr bag = braces (pprWithCommas ppr (bagToList bag))
 
 instance Data a => Data (Bag a) where
   gfoldl k z b = z listToBag `k` bagToList b -- traverse abstract type abstractly

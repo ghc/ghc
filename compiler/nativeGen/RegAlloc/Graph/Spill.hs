@@ -23,6 +23,8 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 import Platform
 
 import Data.List

@@ -1,6 +1,9 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Digraph(
@@ -46,6 +49,7 @@ import GhcPrelude
 
 import Util        ( minWith, count )
 import Outputable
+import Outputable.DynFlags
 import Maybes      ( expectJust )
 
 -- std interfaces
@@ -105,7 +109,10 @@ data Node key payload = DigraphNode {
   }
 
 
-instance (Outputable a, Outputable b) => Outputable (Node  a b) where
+instance (Outputable a, Outputable b) => Outputable (Node a b) where
+  type OutputableNeedsOfConfig (Node a b) = PairConstraint
+    (OutputableNeedsOfConfig a)
+    (OutputableNeedsOfConfig b)
   ppr (DigraphNode a b c) = ppr (a, b, c)
 
 emptyGraph :: Graph a
@@ -392,12 +399,14 @@ emptyG g = graphEmpty (gr_int_graph g)
 -}
 
 instance Outputable node => Outputable (Graph node) where
+    type OutputableNeedsOfConfig (Graph node) = OutputableNeedsOfConfig node
     ppr graph = vcat [
                   hang (text "Vertices:") 2 (vcat (map ppr $ verticesG graph)),
                   hang (text "Edges:") 2 (vcat (map ppr $ edgesG graph))
                 ]
 
 instance Outputable node => Outputable (Edge node) where
+    type OutputableNeedsOfConfig (Edge node) = OutputableNeedsOfConfig node
     ppr (Edge from to) = ppr from <+> text "->" <+> ppr to
 
 graphEmpty :: G.Graph -> Bool
@@ -462,7 +471,11 @@ instance Outputable EdgeType where
   ppr Backward = text "Backward"
   ppr SelfLoop = text "SelfLoop"
 
-newtype Time = Time Int deriving (Eq,Ord,Num,Outputable)
+newtype Time = Time Int deriving (Eq,Ord,Num)
+
+-- Can't newtype derive because of type family
+instance Outputable Time where
+   ppr (Time t) = ppr t
 
 --Allow for specialzation
 {-# INLINEABLE classifyEdges #-}

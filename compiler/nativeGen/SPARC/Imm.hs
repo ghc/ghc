@@ -13,6 +13,8 @@ import Cmm
 import CLabel
 
 import Outputable
+import Outputable.DynFlags (SDoc)
+import PlainPanic (panic)
 
 -- | An immediate value.
 --      Not all of these are directly representable by the machine.
