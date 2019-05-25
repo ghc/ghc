@@ -577,7 +577,7 @@ isSimpleScrut _                _           = return False
 
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
-isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
+isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _ _) _ = return $! not (playSafe safe)
 -- dataToTag# evalautes its argument, see Note [dataToTag#] in primops.txt.pp
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do

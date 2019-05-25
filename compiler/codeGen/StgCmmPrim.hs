@@ -71,8 +71,8 @@ cgOpApp :: StgOp        -- The op
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall _) stg_args res_ty
-  = cgForeignCall fcall stg_args res_ty
+cgOpApp (StgFCallOp fcall ty _) stg_args res_ty
+  = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
 
 -- tagToEnum# is special: we need to pull the constructor

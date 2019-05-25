@@ -10,6 +10,7 @@ test('ccfail004', [extra_files(['Ccfail004A.hs'])], multimod_compile_fail, ['ccf
 test('ccfail005', normal, compile_fail, [''])
 test('ccall_value', normal, compile_fail, [''])
 test('capi_value_function', normal, compile_fail, [''])
+test('NonreducingFfiSignature', normal, compile_fail, [''])
 test('T5664', normal, compile_fail, ['-v0'])
 test('T7506', normal, compile_fail, [''])
 test('T7243', normal, compile_fail, [''])
