@@ -539,7 +539,7 @@ coreToStgApp _ f args ticks = do
 
                 -- A regular foreign call.
                 FCallId call     -> ASSERT( saturated )
-                                    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+                                    StgOpApp (StgFCallOp call (idType f) (idUnique f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
