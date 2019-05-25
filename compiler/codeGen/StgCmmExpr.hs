@@ -37,10 +37,11 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
-import DynFlags (targetPlatform)
+import DynFlags (targetPrimOpCache)
 import ForeignCall
 import Id
 import PrimOp
+import PrimOp.Cache
 import TyCon
 import Type             ( isUnliftedType )
 import RepType          ( isVoidTy, countConRepArgs, primRepSlot )
@@ -503,9 +504,9 @@ cgCase scrut bndr alt_type alts
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
              alt_regs  = map (idToReg dflags) ret_bndrs
-             platform = targetPlatform dflags
+             primOpCache = targetPrimOpCache dflags
              is_cmp_op = \case
-                 (StgOpApp (StgPrimOp op) _ _) -> isComparisonPrimOp platform op
+                 (StgOpApp (StgPrimOp op) _ _) -> isComparisonPrimOp primOpCache op
                  _ -> False
 
        ; simple_scrut <- isSimpleScrut scrut alt_type

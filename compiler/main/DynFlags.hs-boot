@@ -2,6 +2,7 @@ module DynFlags where
 
 import GhcPrelude
 import Platform
+import {-# SOURCE #-} PrimOp.Cache (PrimOpCache)
 
 data DynFlags
 data DumpFlag
@@ -18,3 +19,4 @@ shouldUseColor           :: DynFlags -> Bool
 shouldUseHexWordLiterals :: DynFlags -> Bool
 hasPprDebug              :: DynFlags -> Bool
 hasNoDebugOutput         :: DynFlags -> Bool
+targetPrimOpCache        :: DynFlags -> PrimOpCache

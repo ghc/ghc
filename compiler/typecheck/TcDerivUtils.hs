@@ -39,7 +39,7 @@ import LoadIface (loadInterfaceForName)
 import Module (getModule)
 import Name
 import Outputable
-import Platform
+import PrimOp.Cache
 import PrelNames
 import SrcLoc
 import TcGenDeriv
@@ -422,13 +422,13 @@ case.
 -}
 
 hasStockDeriving
-  :: Platform
+  :: PrimOpCache
   -> Class
   -> Maybe (SrcSpan
             -> TyCon
             -> [Type]
             -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
-hasStockDeriving platform clas
+hasStockDeriving primOpCache clas
   = assocMaybe gen_list (getUnique clas)
   where
     gen_list
@@ -440,7 +440,7 @@ hasStockDeriving platform clas
                , (ordClassKey,         simpleM gen_Ord_binds)
                , (enumClassKey,        simpleM gen_Enum_binds)
                , (boundedClassKey,     simple gen_Bounded_binds)
-               , (ixClassKey,          simpleM $ gen_Ix_binds platform)
+               , (ixClassKey,          simpleM $ gen_Ix_binds primOpCache)
                , (showClassKey,        read_or_show gen_Show_binds)
                , (readClassKey,        read_or_show gen_Read_binds)
                , (dataClassKey,        simpleM gen_Data_binds)
@@ -548,7 +548,7 @@ checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
                    -- other than last). Note that cls_types can contain
                    -- invisible types as well (e.g., for Generic1, which is
                    -- poly-kinded), so make sure those are not counted.
-                 , Just gen_fn <- hasStockDeriving platform cls
+                 , Just gen_fn <- hasStockDeriving primOpCache cls
                    -> CanDeriveStock gen_fn
                  | otherwise -> StockClassError (classArgsErr cls cls_tys)
                    -- e.g. deriving( Eq s )
@@ -560,7 +560,7 @@ checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
   | otherwise
   = CanDeriveAnyClass   -- DeriveAnyClass should work
   where
-    platform = targetPlatform dflags
+    primOpCache = targetPrimOpCache dflags
 
 classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is not a class"

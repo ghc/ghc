@@ -264,6 +264,7 @@ import qualified CmdLineParser as Cmd
 import Constants
 import GhcNameVersion
 import Panic
+import {-# SOURCE#-} PrimOp.Cache
 import qualified PprColour as Col
 import Util
 import Maybes
@@ -945,14 +946,19 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
 
-  -- formerly Settings
+
+  -- formerly Settings, Filled in by SysTools
   ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
   fileSettings      :: {-# UNPACK #-} !FileSettings,
-  targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
+
+  targetPlatform        :: Platform, -- ^ also from Settings
+  targetPrimOpCache     :: {-# UNPACK #-} !PrimOpCache,
+    -- ^ Cache of platform-specific primop info. Pure functions applied to
+    -- 'targetPlatform' above.
 
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
@@ -2027,6 +2033,11 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         platformMisc = sPlatformMisc mySettings,
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
+
+        -- TODO if 'targetPlatformChanges' this should be recomputed. Then again
+        -- anything that reads this should also be recomputed; push-driven
+        -- updates is a larger problem.
+        targetPrimOpCache = mkPrimOpCache (sTargetPlatform mySettings),
 
         llvmTargets             = myLlvmTargets,
         llvmPasses              = myLlvmPasses,
