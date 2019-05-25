@@ -41,6 +41,7 @@ instance Uniquable Label where
   getUnique label = getUnique (lblToUnique label)
 
 instance Outputable Label where
+  type OutputableNeedsOfConfig Label = NoConstraint
   ppr label = ppr (getUnique label)
 
 -----------------------------------------------------------------------------
@@ -120,9 +121,11 @@ instance IsMap LabelMap where
 -- Instances
 
 instance Outputable LabelSet where
+  type OutputableNeedsOfConfig LabelSet = NoConstraint
   ppr = ppr . setElems
 
 instance Outputable a => Outputable (LabelMap a) where
+  type OutputableNeedsOfConfig (LabelMap a) = OutputableNeedsOfConfig a
   ppr = ppr . mapToList
 
 instance TrieMap LabelMap where

@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -------------------------------------------------------------------------------
 --
@@ -248,6 +250,7 @@ module DynFlags (
 import GhcPrelude
 
 import GHC.Platform
+import GHC.Platform.Lens
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
@@ -255,13 +258,14 @@ import PackageConfig
 import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
+import {-# SOURCE #-} Packages (PackageState, HasPackageState(..), emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CliOption
 import CmdLineParser hiding (WarnReason(..))
 import qualified CmdLineParser as Cmd
 import Constants
+import CoreDebugSuppress
 import GhcNameVersion
 import Panic
 import qualified PprColour as Col
@@ -274,9 +278,14 @@ import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
 import FileSettings
+import NameSuppress
 import Outputable
+import Outputable.DynFlags
 import Settings
+import StgDebugSuppress
 import ToolSettings
+import TypeSuppress
+import Lens
 
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
@@ -828,6 +837,7 @@ flattenIncludes :: IncludeSpecs -> [String]
 flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
 
 instance Outputable WarnReason where
+  type OutputableNeedsOfConfig WarnReason = NoConstraint
   ppr = text . show
 
 instance ToJson WarnReason where
@@ -924,6 +934,7 @@ data Language = Haskell98 | Haskell2010
    deriving (Eq, Enum, Show)
 
 instance Outputable Language where
+    type OutputableNeedsOfConfig Language = NoConstraint
     ppr = text . show
 
 -- | The various Safe Haskell modes
@@ -945,6 +956,7 @@ instance Show SafeHaskellMode where
     show Sf_Ignore       = "Ignore"
 
 instance Outputable SafeHaskellMode where
+    type OutputableNeedsOfConfig SafeHaskellMode = NoConstraint
     ppr = text . show
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
@@ -1273,6 +1285,57 @@ instance HasPlatformConstants DynFlags where
   {-# INLINE getPlatformConstants #-}
   getPlatformConstants = platformConstants
 
+instance HasPprConfig DynFlags where
+  getPprConfig dflags = PprConfig
+    { pprConfig_shouldUseColor = shouldUseColor dflags
+    , pprConfig_useUnicode = useUnicode dflags
+    , pprConfig_useUnicodeSyntax = useUnicodeSyntax dflags
+    , pprConfig_useStarIsType = useStarIsType dflags
+    , pprConfig_shouldUseHexWordLiterals = shouldUseHexWordLiterals dflags
+    , pprConfig_numColumns = pprCols dflags
+    }
+
+instance HasNameSuppress DynFlags where
+  getNameSuppress dflags = NameSuppress
+    { nameSuppress_modulePrefixes = gopt Opt_SuppressModulePrefixes dflags
+    , nameSuppress_uniques = gopt Opt_SuppressUniques dflags
+    }
+
+instance HasTypeSuppress DynFlags where
+  typeSuppress = lens
+    (\dflags -> TypeSuppress
+      { typeSuppress_printEqualityRelations = gopt Opt_PrintEqualityRelations dflags
+      , typeSuppress_printExplicitKinds = gopt Opt_PrintExplicitKinds dflags
+      , typeSuppress_printExplicitCoercions = gopt Opt_PrintExplicitCoercions dflags
+      , typeSuppress_printExplicitRuntimeReps = gopt Opt_PrintExplicitRuntimeReps dflags
+      , typeSuppress_printExplicitForalls = gopt Opt_PrintExplicitForalls dflags
+      , typeSuppress_suppressTypeApplications = gopt Opt_SuppressTypeApplications dflags
+      , typeSuppress_suppressTypeSignatures = gopt Opt_SuppressTypeSignatures dflags
+      , typeSuppress_suppressVarKinds = gopt Opt_SuppressVarKinds dflags
+      })
+    (\dflags ts -> dflags
+      & set (_gopt Opt_PrintEqualityRelations) (typeSuppress_printEqualityRelations ts)
+      & set (_gopt Opt_PrintExplicitKinds) (typeSuppress_printExplicitKinds ts)
+      & set (_gopt Opt_PrintExplicitCoercions) (typeSuppress_printExplicitCoercions ts)
+      & set (_gopt Opt_PrintExplicitRuntimeReps) (typeSuppress_printExplicitRuntimeReps ts)
+      & set (_gopt Opt_PrintExplicitForalls) (typeSuppress_printExplicitForalls ts)
+      & set (_gopt Opt_SuppressTypeApplications) (typeSuppress_suppressTypeApplications ts)
+      & set (_gopt Opt_SuppressTypeSignatures) (typeSuppress_suppressTypeSignatures ts)
+      & set (_gopt Opt_SuppressVarKinds) (typeSuppress_suppressVarKinds ts)
+    )
+
+instance HasPackageState DynFlags where
+  getPackageState = pkgState
+
+instance HasCoreDebugSuppress DynFlags where
+  --getCoreDebugSuppress
+
+instance HasStgDebugSuppress DynFlags where
+  --getStgDebugSuppress
+
+instance HasPlatform DynFlags where
+  platform f dflags = (\x -> dflags { targetPlatform = x }) <$> f (targetPlatform dflags)
+
 -- | Edge weights to use when generating a CFG from CMM
 data CfgWeights
     = CFGWeights
@@ -1563,6 +1626,7 @@ data GhcMode
   deriving Eq
 
 instance Outputable GhcMode where
+  type OutputableNeedsOfConfig GhcMode = NoConstraint
   ppr CompManager = text "CompManager"
   ppr OneShot     = text "OneShot"
   ppr MkDepend    = text "MkDepend"
@@ -1593,6 +1657,7 @@ data PackageArg =
     | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
   deriving (Eq, Show)
 instance Outputable PackageArg where
+    type OutputableNeedsOfConfig PackageArg = HasPackageState
     ppr (PackageArg pn) = text "package" <+> text pn
     ppr (UnitIdArg uid) = text "unit" <+> ppr uid
 
@@ -1613,6 +1678,7 @@ data ModRenaming = ModRenaming {
                                                --   under name @n@.
   } deriving (Eq)
 instance Outputable ModRenaming where
+    type OutputableNeedsOfConfig ModRenaming = NoConstraint
     ppr (ModRenaming b rns) = ppr b <+> parens (ppr rns)
 
 -- | Flags for manipulating the set of non-broken packages.
@@ -1653,6 +1719,7 @@ packageFlagsChanged idflags1 idflags0 =
      , Opt_AutoLinkPackages ]
 
 instance Outputable PackageFlag where
+    type OutputableNeedsOfConfig PackageFlag = HasPackageState
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
 
@@ -2276,6 +2343,7 @@ data OnOff a = On a
   deriving (Eq, Show)
 
 instance Outputable a => Outputable (OnOff a) where
+  type OutputableNeedsOfConfig (OnOff a) = OutputableNeedsOfConfig a
   ppr (On x)  = text "On" <+> ppr x
   ppr (Off x) = text "Off" <+> ppr x
 
@@ -2389,6 +2457,12 @@ dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 -- | Test whether a 'GeneralFlag' is set
 gopt :: GeneralFlag -> DynFlags -> Bool
 gopt f dflags  = f `EnumSet.member` generalFlags dflags
+
+_generalFlags :: Lens' DynFlags (EnumSet GeneralFlag)
+_generalFlags f dfs = (\x -> dfs { generalFlags = x }) <$> f (generalFlags dfs)
+
+_gopt :: GeneralFlag -> Lens' DynFlags Bool
+_gopt f = _generalFlags . flip EnumSet.alterF f
 
 -- | Set a 'GeneralFlag'
 gopt_set :: DynFlags -> GeneralFlag -> DynFlags

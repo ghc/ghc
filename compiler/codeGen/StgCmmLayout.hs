@@ -58,6 +58,8 @@ import Module
 import Util
 import Data.List
 import Outputable
+import Outputable.DynFlags (pprPanic, showSDoc)
+import PlainPanic (assertPanic)
 import FastString
 import Control.Monad
 

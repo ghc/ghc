@@ -269,6 +269,7 @@ instance TrieMap m => TrieMap (ListMap m) where
    mapTM    = mapList
 
 instance (TrieMap m, Outputable a) => Outputable (ListMap m a) where
+  type OutputableNeedsOfConfig (ListMap m a) = OutputableNeedsOfConfig a
   ppr m = text "List elts" <+> ppr (foldTM (:) m [])
 
 mapList :: TrieMap m => (a->b) -> ListMap m a -> ListMap m b
@@ -342,6 +343,9 @@ data GenMap m a
    | MultiMap (m a)
 
 instance (Outputable a, Outputable (m a)) => Outputable (GenMap m a) where
+  type OutputableNeedsOfConfig (GenMap m a) = PairConstraint
+    (OutputableNeedsOfConfig a)
+    (OutputableNeedsOfConfig (m a))
   ppr EmptyMap = text "Empty map"
   ppr (SingletonMap _ v) = text "Singleton map" <+> ppr v
   ppr (MultiMap m) = ppr m

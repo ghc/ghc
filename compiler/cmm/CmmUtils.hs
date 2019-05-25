@@ -78,6 +78,8 @@ import Cmm
 import BlockId
 import CLabel
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import DynFlags
 import Unique
 import CodeGen.Platform

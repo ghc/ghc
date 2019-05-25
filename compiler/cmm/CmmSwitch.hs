@@ -14,6 +14,7 @@ module CmmSwitch (
 import GhcPrelude
 
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import DynFlags
 import Hoopl.Label (Label)
 

@@ -1,4 +1,7 @@
-{-# LANGUAGE GADTs, DisambiguateRecordFields, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module CmmProcPoint
     ( ProcPointSet, Status(..)
@@ -23,6 +26,8 @@ import Data.List (sortBy)
 import Maybes
 import Control.Monad
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import GHC.Platform
 import UniqSupply
 import Hoopl.Block
@@ -123,6 +128,7 @@ data Status
   | ProcPoint               -- this block is itself a proc point
 
 instance Outputable Status where
+  type OutputableNeedsOfConfig Status = NoConstraint
   ppr (ReachedBy ps)
       | setNull ps = text "<not-reached>"
       | otherwise = text "reached by" <+>

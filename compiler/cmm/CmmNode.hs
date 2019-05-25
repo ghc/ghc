@@ -5,10 +5,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- CmmNode type for representation using Hoopl graphs.
 
@@ -696,6 +696,7 @@ instance Ord CmmTickScope where
      (sortBy nonDetCmpUnique $ scopeUniques scope')
 
 instance Outputable CmmTickScope where
+  type OutputableNeedsOfConfig CmmTickScope = NoConstraint
   ppr GlobalScope     = text "global"
   ppr (SubScope us GlobalScope)
                       = ppr us

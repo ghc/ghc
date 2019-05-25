@@ -245,6 +245,7 @@ Library
         Name
         NameEnv
         NameSet
+        NameSuppress
         OccName
         RdrName
         NameCache
@@ -392,6 +393,7 @@ Library
         ErrUtils
         Finder
         GHC
+        GHC.Platform.Lens
         GhcMake
         GhcPlugins
         GhcPrelude
@@ -546,6 +548,7 @@ Library
         CoAxiom
         Kind
         Type
+        TypeSuppress
         TyCoRep
         TyCoFVs
         TyCoSubst
@@ -577,6 +580,7 @@ Library
         MonadUtils
         OrdList
         Outputable
+        Outputable.DynFlags
         Pair
         Panic
         PlainPanic

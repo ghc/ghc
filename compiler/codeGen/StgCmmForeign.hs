@@ -39,7 +39,7 @@ import SMRep
 import ForeignCall
 import DynFlags
 import Maybes
-import Outputable
+import PlainPanic (panic)
 import UniqSupply
 import BasicTypes
 

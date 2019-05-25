@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ForeignCall (
         ForeignCall(..), isSafeForeignCall,
@@ -23,7 +24,9 @@ import GhcPrelude
 import FastString
 import Binary
 import Outputable
+import PlainPanic
 import Module
+import Packages (HasPackageState)
 import BasicTypes ( SourceText, pprWithSourceText )
 
 import Data.Char
@@ -46,6 +49,7 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
+  type OutputableNeedsOfConfig ForeignCall = HasPackageState
   ppr (CCall cc)  = ppr cc
 
 data Safety
@@ -67,6 +71,7 @@ data Safety
         -- Show used just for Show Lex.Token, I think
 
 instance Outputable Safety where
+  type OutputableNeedsOfConfig Safety = NoConstraint
   ppr PlaySafe = text "safe"
   ppr PlayInterruptible = text "interruptible"
   ppr PlayRisky = text "unsafe"
@@ -150,6 +155,7 @@ data CCallConv = CCallConv | CApiConv | StdCallConv | PrimCallConv | JavaScriptC
   deriving (Eq, Data)
 
 instance Outputable CCallConv where
+  type OutputableNeedsOfConfig CCallConv = NoConstraint
   ppr StdCallConv = text "stdcall"
   ppr CCallConv   = text "ccall"
   ppr CApiConv    = text "capi"
@@ -171,7 +177,7 @@ Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
 -}
 
-ccallConvAttribute :: CCallConv -> SDoc
+ccallConvAttribute :: CCallConv -> SDoc' r
 ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
 ccallConvAttribute CApiConv          = empty
@@ -180,7 +186,7 @@ ccallConvAttribute JavaScriptCallConv = panic "ccallConvAttribute JavaScriptCall
 
 type CLabelString = FastString          -- A C label, completely unencoded
 
-pprCLabelString :: CLabelString -> SDoc
+pprCLabelString :: CLabelString -> SDoc' r
 pprCLabelString lbl = ftext lbl
 
 isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
@@ -194,10 +200,12 @@ isCLabelString lbl
 -- Printing into C files:
 
 instance Outputable CExportSpec where
+  type OutputableNeedsOfConfig CExportSpec = NoConstraint
   ppr (CExportStatic _ str _) = pprCLabelString str
 
 instance Outputable CCallSpec where
-  ppr (CCallSpec fun cconv safety)
+   type OutputableNeedsOfConfig CCallSpec = HasPackageState
+   ppr (CCallSpec fun cconv safety)
     = hcat [ whenPprDebug callconv, ppr_fun fun ]
     where
       callconv = text "{-" <> ppr cconv <> text "-}"
@@ -223,6 +231,7 @@ data Header = Header SourceText FastString
     deriving (Eq, Data)
 
 instance Outputable Header where
+    type OutputableNeedsOfConfig Header = NoConstraint
     ppr (Header st h) = pprWithSourceText st (doubleQuotes $ ppr h)
 
 -- | A C type, used in CAPI FFI calls
@@ -238,6 +247,7 @@ data CType = CType SourceText -- Note [Pragma source text] in BasicTypes
     deriving (Eq, Data)
 
 instance Outputable CType where
+    type OutputableNeedsOfConfig CType = NoConstraint
     ppr (CType stp mh (stct,ct))
       = pprWithSourceText stp (text "{-# CTYPE") <+> hDoc
         <+> pprWithSourceText stct (doubleQuotes (ftext ct)) <+> text "#-}"

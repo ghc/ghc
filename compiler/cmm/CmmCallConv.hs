@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module CmmCallConv (
   ParamLocation(..),
   assignArgumentsPos,
@@ -13,8 +14,9 @@ import Cmm (Convention(..))
 import PprCmm () -- For Outputable instances
 
 import DynFlags
-import GHC.Platform
 import Outputable
+import PlainPanic (panic)
+import GHC.Platform
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
@@ -24,6 +26,7 @@ data ParamLocation
   | StackParam ByteOff
 
 instance Outputable ParamLocation where
+  type OutputableNeedsOfConfig ParamLocation = (~) DynFlags -- TODO
   ppr (RegisterParam g) = ppr g
   ppr (StackParam p)    = ppr p
 

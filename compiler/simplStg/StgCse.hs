@@ -92,6 +92,7 @@ import DataCon
 import Id
 import StgSyn
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import VarEnv
 import CoreSyn (AltCon(..))
 import Data.List (mapAccumL)
