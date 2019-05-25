@@ -2489,19 +2489,6 @@ getObjTimestamp location is_boot
   = if is_boot == IsBoot then return Nothing
                          else modificationTimeIfExists (ml_obj_file location)
 
-
-preprocessFile :: HscEnv
-               -> FilePath
-               -> Maybe Phase -- ^ Starting phase
-               -> Maybe (StringBuffer,UTCTime)
-               -> IO (DynFlags, FilePath, StringBuffer)
-preprocessFile hsc_env src_fn mb_phase maybe_buf
-  = do
-        (dflags', hspp_fn)
-            <- preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
-        buf <- hGetStringBuffer hspp_fn
-        return (dflags', hspp_fn, buf)
-
 data PreprocessedImports
   = PreprocessedImports
       { pi_local_dflags :: DynFlags
@@ -2523,8 +2510,8 @@ getPreprocessedImports
     -> ExceptT ErrorMessages IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
-      <- liftIO $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
-  pi_hscpp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
+      <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
+  pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
       <- ExceptT $ getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
   return PreprocessedImports {..}
