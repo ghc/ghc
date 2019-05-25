@@ -3,6 +3,7 @@
 --
 module Platform (
         Platform(..),
+        HasPlatform(..),
         Arch(..),
         OS(..),
         ArmISA(..),
@@ -25,6 +26,8 @@ where
 
 import GhcPrelude
 
+import Lens
+
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
@@ -42,6 +45,11 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
+class HasPlatform c where
+  platform :: Lens' c Platform
+
+instance HasPlatform Platform where
+  platform = id
 
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information

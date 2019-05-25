@@ -149,6 +149,8 @@ import ForeignCall
 import Maybes
 import SrcLoc
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic, warnPprTrace)
+import PlainPanic (assertPanic, panic)
 import Unique
 import UniqSupply
 import FastString

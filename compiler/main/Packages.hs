@@ -1,6 +1,10 @@
 -- (c) The University of Glasgow, 2006
 
-{-# LANGUAGE CPP, ScopedTypeVariables, BangPatterns, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Package manipulation
 module Packages (
@@ -8,6 +12,7 @@ module Packages (
 
         -- * Reading the package config, and processing cmdline args
         PackageState(preloadPackages, explicitPackages, moduleToPkgConfAll, requirementContext),
+        HasPackageState(..),
         PackageConfigMap,
         emptyPackageState,
         initPackages,
@@ -79,6 +84,7 @@ import Util
 import Panic
 import Platform
 import Outputable
+import Outputable.DynFlags
 import Maybes
 
 import System.Environment ( getEnv )
@@ -179,6 +185,7 @@ data ModuleOrigin =
       }
 
 instance Outputable ModuleOrigin where
+    type OutputableNeedsOfConfig ModuleOrigin = HasPackageState
     ppr ModHidden = text "hidden module"
     ppr (ModUnusable _) = text "unusable module"
     ppr (ModOrigin e res rhs f) = sep (punctuate comma (
@@ -278,6 +285,7 @@ data UnitVisibility = UnitVisibility
     }
 
 instance Outputable UnitVisibility where
+    type OutputableNeedsOfConfig UnitVisibility = HasPackageState
     ppr (UnitVisibility {
         uv_expose_all = b,
         uv_renamings = rns,
@@ -358,6 +366,9 @@ data PackageState = PackageState {
   requirementContext :: Map ModuleName [IndefModule]
   }
 
+class HasPackageState c where
+  getPackageState :: c -> PackageState
+
 emptyPackageState :: PackageState
 emptyPackageState = PackageState {
     pkgIdMap = emptyPackageConfigMap,
@@ -429,13 +440,21 @@ getPackageDetails :: DynFlags -> UnitId -> PackageConfig
 getPackageDetails dflags pid =
     expectJust "getPackageDetails" (lookupPackage dflags pid)
 
-lookupInstalledPackage :: DynFlags -> InstalledUnitId -> Maybe PackageConfig
-lookupInstalledPackage dflags uid = lookupInstalledPackage' (pkgIdMap (pkgState dflags)) uid
+lookupInstalledPackage
+  :: HasPackageState r
+  => r
+  -> InstalledUnitId
+  -> Maybe PackageConfig
+lookupInstalledPackage cfg uid = lookupInstalledPackage' (pkgIdMap (getPackageState cfg)) uid
 
 lookupInstalledPackage' :: PackageConfigMap -> InstalledUnitId -> Maybe PackageConfig
 lookupInstalledPackage' (PackageConfigMap db _) uid = lookupUDFM db uid
 
-getInstalledPackageDetails :: DynFlags -> InstalledUnitId -> PackageConfig
+getInstalledPackageDetails
+  :: HasPackageState r
+  => r
+  -> InstalledUnitId
+  -> PackageConfig
 getInstalledPackageDetails dflags uid =
     expectJust "getInstalledPackageDetails" $
         lookupInstalledPackage dflags uid
@@ -444,10 +463,10 @@ getInstalledPackageDetails dflags uid =
 -- this function, although all packages in this map are "visible", this
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
-listPackageConfigMap :: DynFlags -> [PackageConfig]
-listPackageConfigMap dflags = eltsUDFM pkg_map
+listPackageConfigMap :: HasPackageState r => r -> [PackageConfig]
+listPackageConfigMap cfg = eltsUDFM pkg_map
   where
-    PackageConfigMap pkg_map _ = pkgIdMap (pkgState dflags)
+    PackageConfigMap pkg_map _ = getPackageConfigMap cfg
 
 -- ----------------------------------------------------------------------------
 -- Loading the package db files and building up the package state
@@ -704,19 +723,19 @@ applyTrustFlag
    -> [PackageConfig]
    -> TrustFlag
    -> IO [PackageConfig]
-applyTrustFlag dflags prec_map unusable pkgs flag =
+applyTrustFlag cfg prec_map unusable pkgs flag =
   case flag of
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr dflags flag ps
+         Left ps       -> trustFlagErr cfg flag ps
          Right (ps,qs) -> return (map trust ps ++ qs)
           where trust p = p {trusted=True}
 
     DistrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr dflags flag ps
+         Left ps       -> trustFlagErr cfg flag ps
          Right (ps,qs) -> return (map distrust ps ++ qs)
           where distrust p = p {trusted=False}
 
@@ -960,12 +979,12 @@ packageFlagErr' dflags flag_doc reasons
         ppr_reason (p, reason) =
             pprReason (ppr (unitId p) <+> text "is") reason
 
-pprFlag :: PackageFlag -> SDoc
+pprFlag :: PackageFlag -> SDoc' r
 pprFlag flag = case flag of
     HidePackage p   -> text "-hide-package " <> text p
     ExposePackage doc _ _ -> text doc
 
-pprTrustFlag :: TrustFlag -> SDoc
+pprTrustFlag :: TrustFlag -> SDoc' r
 pprTrustFlag flag = case flag of
     TrustPackage p    -> text "-trust " <> text p
     DistrustPackage p -> text "-distrust " <> text p
@@ -1147,6 +1166,7 @@ data UnusablePackageReason
   | ShadowedDependencies [InstalledUnitId]
 
 instance Outputable UnusablePackageReason where
+    type OutputableNeedsOfConfig UnusablePackageReason = HasPackageState
     ppr IgnoredWithFlag = text "[ignored with flag]"
     ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
     ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
@@ -1156,7 +1176,11 @@ instance Outputable UnusablePackageReason where
 type UnusablePackages = Map InstalledUnitId
                             (PackageConfig, UnusablePackageReason)
 
-pprReason :: SDoc -> UnusablePackageReason -> SDoc
+pprReason
+  :: HasPackageState r
+  => SDoc' r
+  -> UnusablePackageReason
+  -> SDoc' r
 pprReason pref reason = case reason of
   IgnoredWithFlag ->
       pref <+> text "ignored due to an -ignore-package flag"
@@ -2074,17 +2098,19 @@ add_package dflags pkg_db ps (p, mb_parent)
             add_unit_key ps key
               = add_package dflags pkg_db ps (key, Just p)
 
-missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
+missingPackageMsg
+  :: (Outputable pkgid, OutputableNeedsOfConfig pkgid r)
+  => pkgid -> SDoc' r
 missingPackageMsg p = text "unknown package:" <+> ppr p
 
-missingDependencyMsg :: Maybe InstalledUnitId -> SDoc
+missingDependencyMsg :: Maybe InstalledUnitId -> SDoc' r
 missingDependencyMsg Nothing = Outputable.empty
 missingDependencyMsg (Just parent)
   = space <> parens (text "dependency of" <+> ftext (installedUnitIdFS parent))
 
 -- -----------------------------------------------------------------------------
 
-componentIdString :: DynFlags -> ComponentId -> Maybe String
+componentIdString :: HasPackageState r => r -> ComponentId -> Maybe String
 componentIdString dflags cid = do
     conf <- lookupInstalledPackage dflags (componentIdToInstalledUnitId cid)
     return $
@@ -2095,7 +2121,11 @@ componentIdString dflags cid = do
                     ++ "-" ++ showVersion (packageVersion conf)
                     ++ ":" ++ unpackFS libname
 
-displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
+displayInstalledUnitId
+  :: HasPackageState r
+  => r
+  -> InstalledUnitId
+  -> Maybe String
 displayInstalledUnitId dflags uid =
     fmap sourcePackageIdString (lookupInstalledPackage dflags uid)
 
@@ -2139,10 +2169,10 @@ isDllName dflags this_mod name
 -- Displaying packages
 
 -- | Show (very verbose) package info
-pprPackages :: DynFlags -> SDoc
+pprPackages :: HasPackageState r => r -> SDoc' r
 pprPackages = pprPackagesWith pprPackageConfig
 
-pprPackagesWith :: (PackageConfig -> SDoc) -> DynFlags -> SDoc
+pprPackagesWith :: HasPackageState r => (PackageConfig -> SDoc' r) -> r -> SDoc' r
 pprPackagesWith pprIPI dflags =
     vcat (intersperse (text "---") (map pprIPI (listPackageConfigMap dflags)))
 
@@ -2150,7 +2180,7 @@ pprPackagesWith pprIPI dflags =
 --
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-pprPackagesSimple :: DynFlags -> SDoc
+pprPackagesSimple :: HasPackageState r => r -> SDoc' r
 pprPackagesSimple = pprPackagesWith pprIPI
     where pprIPI ipi = let i = installedUnitIdFS (unitId ipi)
                            e = if exposed ipi then text "E" else text " "
@@ -2158,12 +2188,12 @@ pprPackagesSimple = pprPackagesWith pprIPI
                        in e <> t <> text "  " <> ftext i
 
 -- | Show the mapping of modules to where they come from.
-pprModuleMap :: ModuleToPkgConfAll -> SDoc
+pprModuleMap :: forall r. HasPackageState r => ModuleToPkgConfAll -> SDoc' r
 pprModuleMap mod_map =
   vcat (map pprLine (Map.toList mod_map))
     where
       pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (Map.toList e)))
-      pprEntry :: Outputable a => ModuleName -> (Module, a) -> SDoc
+      pprEntry :: (Outputable a, OutputableNeedsOfConfig a r) => ModuleName -> (Module, a) -> SDoc' r
       pprEntry m (m',o)
         | m == moduleName m' = ppr (moduleUnitId m') <+> parens (ppr o)
         | otherwise = ppr m' <+> parens (ppr o)
@@ -2189,5 +2219,5 @@ improveUnitId pkg_map uid =
 
 -- | Retrieve the 'PackageConfigMap' from 'DynFlags'; used
 -- in the @hs-boot@ loop-breaker.
-getPackageConfigMap :: DynFlags -> PackageConfigMap
-getPackageConfigMap = pkgIdMap . pkgState
+getPackageConfigMap :: HasPackageState r => r -> PackageConfigMap
+getPackageConfigMap = pkgIdMap . getPackageState

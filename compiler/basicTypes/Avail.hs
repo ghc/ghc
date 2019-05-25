@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
+
 --
 -- (c) The University of Glasgow
 --
@@ -38,6 +40,8 @@ import FieldLabel
 import Binary
 import ListSetOps
 import Outputable
+import Outputable.DynFlags
+import Packages ( HasPackageState )
 import Util
 
 import Data.Data ( Data )
@@ -257,9 +261,12 @@ nubAvails avails = nameEnvElts (foldl' add emptyNameEnv avails)
 -- Printing
 
 instance Outputable AvailInfo where
+   type OutputableNeedsOfConfig AvailInfo = PairConstraint
+     HasNameSuppress
+     HasPackageState
    ppr = pprAvail
 
-pprAvail :: AvailInfo -> SDoc
+pprAvail :: (HasNameSuppress r, HasPackageState r) => AvailInfo -> SDoc' r
 pprAvail (Avail n)
   = ppr n
 pprAvail (AvailTC n ns fs)

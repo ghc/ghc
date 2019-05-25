@@ -113,6 +113,7 @@ import GhcPrelude
 
 import FastString
 import Outputable
+import PlainPanic
 import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
@@ -268,7 +269,7 @@ worstOneShot OneShotLam    os            = os
 bestOneShot NoOneShotInfo os         = os
 bestOneShot OneShotLam    _          = OneShotLam
 
-pprOneShotInfo :: OneShotInfo -> SDoc
+pprOneShotInfo :: OneShotInfo -> SDoc' r
 pprOneShotInfo NoOneShotInfo = empty
 pprOneShotInfo OneShotLam    = text "OneShot"
 
@@ -394,7 +395,7 @@ instance Outputable WarningTxt where
           NoSourceText   -> pp_ws ds
           SourceText src -> text src <+> pp_ws ds <+> text "#-}"
 
-pp_ws :: [Located StringLiteral] -> SDoc
+pp_ws :: [Located StringLiteral] -> SDoc' r
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
   = text "["
@@ -402,7 +403,7 @@ pp_ws ws
     <+> text "]"
 
 
-pprWarningTxtForMsg :: WarningTxt -> SDoc
+pprWarningTxtForMsg :: WarningTxt -> SDoc' r
 pprWarningTxtForMsg (WarningTxt    _ ws)
                      = doubleQuotes (vcat (map (ftext . sl_fs . unLoc) ws))
 pprWarningTxtForMsg (DeprecatedTxt _ ds)
@@ -419,7 +420,7 @@ pprWarningTxtForMsg (DeprecatedTxt _ ds)
 
 type RuleName = FastString
 
-pprRuleName :: RuleName -> SDoc
+pprRuleName :: RuleName -> SDoc' r
 pprRuleName rn = doubleQuotes (ftext rn)
 
 {-
@@ -710,7 +711,7 @@ instance Outputable OverlapMode where
    ppr (Overlaps     _) = text "[overlap ok]"
    ppr (Incoherent   _) = text "[incoherent]"
 
-pprSafeOverlap :: Bool -> SDoc
+pprSafeOverlap :: Bool -> SDoc' r
 pprSafeOverlap True  = text "[safe]"
 pprSafeOverlap False = empty
 
@@ -735,7 +736,7 @@ funPrec = PprPrec 2 -- Function args; no parens for constructor apps
 opPrec  = PprPrec 2 -- Infix operator
 appPrec = PprPrec 3 -- Constructor args; no parens for atomic
 
-maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
+maybeParen :: PprPrec -> PprPrec -> SDoc' r -> SDoc' r
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise              = parens pretty
@@ -743,7 +744,7 @@ maybeParen ctxt_prec inner_prec pretty
 {- Note [Precedence in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Many pretty-printing functions have type
-    ppr_ty :: PprPrec -> Type -> SDoc
+    ppr_ty :: PprPrec -> Type -> SDoc' r
 
 The PprPrec gives the binding strength of the context.  For example, in
    T ty1 ty2
@@ -797,7 +798,7 @@ boxityTupleSort :: Boxity -> TupleSort
 boxityTupleSort Boxed   = BoxedTuple
 boxityTupleSort Unboxed = UnboxedTuple
 
-tupleParens :: TupleSort -> SDoc -> SDoc
+tupleParens :: TupleSort -> SDoc' r -> SDoc' r
 tupleParens BoxedTuple      p = parens p
 tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
@@ -812,15 +813,15 @@ tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
 ************************************************************************
 -}
 
-sumParens :: SDoc -> SDoc
+sumParens :: SDoc' r -> SDoc' r
 sumParens p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 
 -- | Pretty print an alternative in an unboxed sum e.g. "| a | |".
-pprAlternative :: (a -> SDoc) -- ^ The pretty printing function to use
+pprAlternative :: (a -> SDoc' r) -- ^ The pretty printing function to use
                -> a           -- ^ The things to be pretty printed
                -> ConTag      -- ^ Alternative (one-based)
                -> Arity       -- ^ Arity
-               -> SDoc        -- ^ 'SDoc' where the alternative havs been pretty
+               -> SDoc' r        -- ^ 'SDoc' where the alternative havs been pretty
                               -- printed and finally packed into a paragraph.
 pprAlternative pp x alt arity =
     fsep (replicate (alt - 1) vbar ++ [pp x] ++ replicate (arity - alt) vbar)
@@ -1013,7 +1014,7 @@ instance Outputable OccInfo where
                   | otherwise = empty
           pp_tail             = pprShortTailCallInfo tail_info
 
-pprShortTailCallInfo :: TailCallInfo -> SDoc
+pprShortTailCallInfo :: TailCallInfo -> SDoc' r
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
 pprShortTailCallInfo NoTailCallInfo        = empty
 
@@ -1167,7 +1168,7 @@ instance Outputable SourceText where
   ppr NoSourceText   = text "NoSourceText"
 
 -- | Special combinator for showing string literals.
-pprWithSourceText :: SourceText -> SDoc -> SDoc
+pprWithSourceText :: SourceText -> SDoc' r -> SDoc' r
 pprWithSourceText NoSourceText     d = d
 pprWithSourceText (SourceText src) _ = text src
 
@@ -1408,15 +1409,15 @@ instance Outputable InlineSpec where
 instance Outputable InlinePragma where
   ppr = pprInline
 
-pprInline :: InlinePragma -> SDoc
+pprInline :: InlinePragma -> SDoc' r
 pprInline = pprInline' True
 
-pprInlineDebug :: InlinePragma -> SDoc
+pprInlineDebug :: InlinePragma -> SDoc' r
 pprInlineDebug = pprInline' False
 
 pprInline' :: Bool           -- True <=> do not display the inl_inline field
            -> InlinePragma
-           -> SDoc
+           -> SDoc' r
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info

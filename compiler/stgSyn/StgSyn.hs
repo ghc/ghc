@@ -61,6 +61,7 @@ module StgSyn (
 import GhcPrelude
 
 import CoreSyn     ( AltCon, Tickish )
+import CoreDebugSuppress
 import CostCentre  ( CostCentreStack )
 import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
@@ -74,13 +75,17 @@ import IdInfo      ( mayHaveCafRefs )
 import VarSet
 import Literal     ( Literal, literalType )
 import Module      ( Module )
+import NameSuppress
 import Outputable
-import Packages    ( isDllName )
+import Packages    ( HasPackageState, isDllName )
 import Platform
+import PlainPanic  ( assertPanic )
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
+import StgDebugSuppress
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
+import TypeSuppress
 import RepType     ( typePrimRep1 )
 import Unique      ( Unique )
 import Util
@@ -125,7 +130,7 @@ data StgArg
 -- | Does this constructor application refer to
 -- anything in a different *Windows* DLL?
 -- If so, we can't allocate it statically
-isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
+isDllConApp :: HasPlatform r => r -> Module -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags this_mod con args
  | platformOS (targetPlatform dflags) == OSMinGW32
     = isDllName dflags this_mod (dataConName con) || any is_dll_arg args
@@ -686,7 +691,7 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Type Unique 
+  | StgFCallOp ForeignCall Type Unique
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
         -- typedef for foreign-export-dynamic. The Type, which is
@@ -714,7 +719,10 @@ type OutputablePass pass =
   )
 
 pprGenStgTopBinding
-  :: OutputablePass pass => GenStgTopBinding pass -> SDoc
+  :: ( OutputablePass pass
+     , HasPprConfig r
+     )
+  => GenStgTopBinding pass -> SDoc' r
 pprGenStgTopBinding (StgTopStringLit bndr str)
   = hang (hsep [pprBndr LetBind bndr, equals])
         4 (pprHsBytes str <> semi)
@@ -722,7 +730,7 @@ pprGenStgTopBinding (StgTopLifted bind)
   = pprGenStgBinding bind
 
 pprGenStgBinding
-  :: OutputablePass pass => GenStgBinding pass -> SDoc
+  :: OutputablePass pass => GenStgBinding pass -> SDoc' r
 
 pprGenStgBinding (StgNonRec bndr rhs)
   = hang (hsep [pprBndr LetBind bndr, equals])
@@ -738,14 +746,14 @@ pprGenStgBinding (StgRec pairs)
              4 (ppr expr <> semi)
 
 pprGenStgTopBindings
-  :: (OutputablePass pass) => [GenStgTopBinding pass] -> SDoc
+  :: (OutputablePass pass) => [GenStgTopBinding pass] -> SDoc' r
 pprGenStgTopBindings binds
   = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
 
-pprStgBinding :: StgBinding -> SDoc
+pprStgBinding :: StgBinding -> SDoc' r
 pprStgBinding = pprGenStgBinding
 
-pprStgTopBindings :: [StgTopBinding] -> SDoc
+pprStgTopBindings :: [StgTopBinding] -> SDoc' r
 pprStgTopBindings = pprGenStgTopBindings
 
 instance Outputable StgArg where
@@ -758,16 +766,57 @@ instance OutputablePass pass => Outputable (GenStgBinding pass) where
     ppr = pprGenStgBinding
 
 instance OutputablePass pass => Outputable (GenStgExpr pass) where
+    type OutputableNeedsOfConfig (GenStgExpr pass) = PairConstraint
+      (PairConstraint
+        (PairConstraint
+          (PairConstraint HasPprConfig HasNameSuppress)
+          (PairConstraint HasTypeSuppress HasPackageState))
+        HasCoreDebugSuppress)
+      (PairConstraint
+        (PairConstraint
+          (OutputableNeedsOfConfig (XLetNoEscape pass))
+          (OutputableNeedsOfConfig (XLet pass)))
+        (PairConstraint
+          (OutputableNeedsOfConfig (BinderP pass))
+          (OutputableBndrNeedsOfConfig (BinderP pass))))
     ppr = pprStgExpr
 
 instance OutputablePass pass => Outputable (GenStgRhs pass) where
+    type OutputableNeedsOfConfig (GenStgRhs pass) = PairConstraint
+      (PairConstraint
+        (PairConstraint HasPprConfig HasNameSuppress)
+        (PairConstraint HasTypeSuppress HasPackageState))
+      (PairConstraint
+        (PairConstraint
+          (OutputableNeedsOfConfig (XRhsClosure pass))
+          (OutputableNeedsOfConfig (XRhsClosure pass)))
+        (PairConstraint
+          (PairConstraint HasCoreDebugSuppress HasStgDebugSuppress)
+          (OutputableNeedsOfConfig (BinderP pass))))
     ppr rhs = pprStgRhs rhs
 
-pprStgArg :: StgArg -> SDoc
+pprStgArg
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => StgArg -> SDoc' r
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
 
-pprStgExpr :: OutputablePass pass => GenStgExpr pass -> SDoc
+pprStgExpr
+  :: ( HasPprConfig r
+     , HasPackageState r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     , OutputableNeedsOfConfig (XLetNoEscape pass) r
+     , OutputableNeedsOfConfig (XLet pass) r
+     , OutputableNeedsOfConfig (BinderP pass) r
+     , OutputableBndrNeedsOfConfig (BinderP pass) r
+     )
+  => OutputablePass pass => GenStgExpr pass -> SDoc' r
 -- special case
 pprStgExpr (StgLit lit)     = ppr lit
 
@@ -830,7 +879,7 @@ pprStgExpr (StgLetNoEscape ext bind expr)
 
 pprStgExpr (StgTick tickish expr)
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressTicks dflags
+    if coreDebugSuppress_suppressTicks $ getCoreDebugSuppress dflags
     then pprStgExpr expr
     else sep [ ppr tickish, pprStgExpr expr ]
 
@@ -853,7 +902,17 @@ pprStgExpr (StgCase expr bndr alt_type alts)
            char '}']
 
 
-pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc
+pprStgAlt
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputablePass pass
+     , OutputableNeedsOfConfig (BinderP pass) r
+     , OutputableBndrNeedsOfConfig (BinderP pass) r
+     )
+  => Bool -> GenStgAlt pass -> SDoc' r
 pprStgAlt indent (con, params, expr)
   | indent    = hang altPattern 4 (ppr expr <> semi)
   | otherwise = sep [altPattern, ppr expr <> semi]
@@ -861,32 +920,50 @@ pprStgAlt indent (con, params, expr)
       altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
 
 
-pprStgOp :: StgOp -> SDoc
+pprStgOp
+  :: ( HasNameSuppress r
+     , HasPackageState r
+     )
+  => StgOp -> SDoc' r
 pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgPrimCallOp op)= ppr op
 pprStgOp (StgFCallOp op _ _) = ppr op
 
 instance Outputable AltType where
+  type OutputableNeedsOfConfig AltType = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr PolyAlt         = text "Polymorphic"
   ppr (MultiValAlt n) = text "MultiAlt" <+> ppr n
   ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
   ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
 
-pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
+pprStgRhs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , HasStgDebugSuppress r
+     , OutputableNeedsOfConfig (XRhsClosure pass) r
+     , OutputablePass pass, OutputableNeedsOfConfig (BinderP pass) r
+     )
+  => GenStgRhs pass -> SDoc' r
 
 -- special case
 pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp func []))
   = sdocWithDynFlags $ \dflags ->
     hsep [ ppr cc,
-           if not $ gopt Opt_SuppressStgExts dflags
+           if not $ stgDebugSuppress_suppressStgExts $ getStgDebugSuppress dflags
              then ppr ext else empty,
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
-    hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
-                if not $ gopt Opt_SuppressStgExts dflags
+    hang (hsep [if stgDebugSuppress_sccProfilingOn $ getStgDebugSuppress dflags
+                  then ppr cc else empty,
+                if not $ stgDebugSuppress_suppressStgExts $ getStgDebugSuppress dflags
                   then ppr ext else empty,
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)

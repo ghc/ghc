@@ -64,6 +64,7 @@ import GhcPrelude
 import Bag
 import Exception
 import Outputable
+import Outputable.DynFlags
 import Panic
 import qualified PprColour as Col
 import SrcLoc

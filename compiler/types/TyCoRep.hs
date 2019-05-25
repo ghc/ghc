@@ -17,7 +17,13 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TyCoRep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
@@ -184,15 +190,19 @@ import FV
 -- others
 import BasicTypes ( LeftOrRight(..), PprPrec(..), topPrec, sigPrec, opPrec
                   , funPrec, appPrec, maybeParen, pickLR )
+import Lens
 import PrelNames
 import Outputable
-import DynFlags
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import Packages (HasPackageState)
+import Panic (assertPanic)
 import FastString
 import Pair
 import UniqSupply
 import Util
 import UniqFM
 import UniqSet
+import TypeSuppress
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
@@ -233,6 +243,9 @@ data TyThing
   | ACoAxiom (CoAxiom Branched)
 
 instance Outputable TyThing where
+  type OutputableNeedsOfConfig TyThing = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprShortTyThing
 
 instance NamedThing TyThing where       -- Can't put this with the type
@@ -241,12 +254,18 @@ instance NamedThing TyThing where       -- Can't put this with the type
   getName (ACoAxiom cc) = getName cc
   getName (AConLike cl) = conLikeName cl
 
-pprShortTyThing :: TyThing -> SDoc
+pprShortTyThing
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyThing -> SDoc' r
 -- c.f. PprTyThing.pprTyThing, which prints all the details
 pprShortTyThing thing
   = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
-pprTyThingCategory :: TyThing -> SDoc
+pprTyThingCategory :: TyThing -> SDoc' r
 pprTyThingCategory = text . capitalise . tyThingCategory
 
 tyThingCategory :: TyThing -> String
@@ -1256,6 +1275,9 @@ type MCoercionR = MCoercion
 type MCoercionN = MCoercion
 
 instance Outputable MCoercion where
+  type OutputableNeedsOfConfig MCoercion = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr MRefl    = text "MRefl"
   ppr (MCo co) = text "MCo" <+> ppr co
 
@@ -1675,6 +1697,9 @@ instance Data.Data CoercionHole where
   dataTypeOf _ = mkNoRepType "CoercionHole"
 
 instance Outputable CoercionHole where
+  type OutputableNeedsOfConfig CoercionHole = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
 
@@ -3029,6 +3054,9 @@ zipCoEnv cvs cos
   = mkVarEnv (zipEqual "zipCoEnv" cvs cos)
 
 instance Outputable TCvSubst where
+  type OutputableNeedsOfConfig TCvSubst = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (TCvSubst ins tenv cenv)
     = brackets $ sep[ text "TCvSubst",
                       nest 2 (text "In scope:" <+> ppr ins),
@@ -3624,14 +3652,32 @@ See Note [Precedence in types] in BasicTypes.
 -- See Note [Pretty printing via IfaceSyn] in PprTyThing
 --------------------------------------------------------
 
-pprType, pprParendType :: Type -> SDoc
+pprType, pprParendType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Type -> SDoc' r
 pprType       = pprPrecType topPrec
 pprParendType = pprPrecType appPrec
 
-pprPrecType :: PprPrec -> Type -> SDoc
+pprPrecType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> Type -> SDoc' r
 pprPrecType = pprPrecTypeX emptyTidyEnv
 
-pprPrecTypeX :: TidyEnv -> PprPrec -> Type -> SDoc
+pprPrecTypeX
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TidyEnv -> PprPrec -> Type -> SDoc' r
 pprPrecTypeX env prec ty
   = getPprStyle $ \sty ->
     if debugStyle sty           -- Use debugPprType when in
@@ -3640,10 +3686,17 @@ pprPrecTypeX env prec ty
     -- NB: debug-style is used for -dppr-debug
     --     dump-style  is used for -ddump-tc-trace etc
 
-pprTyLit :: TyLit -> SDoc
+pprTyLit
+  :: TyLit -> SDoc' r
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
 
-pprKind, pprParendKind :: Kind -> SDoc
+pprKind, pprParendKind
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Kind -> SDoc' r
 pprKind       = pprType
 pprParendKind = pprParendType
 
@@ -3669,7 +3722,13 @@ tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
     free_tcvs = tyCoVarsOfTypeWellScoped ty
 
 ------------
-pprCo, pprParendCo :: Coercion -> SDoc
+pprCo, pprParendCo
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Coercion -> SDoc' r
 pprCo       co = getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
 pprParendCo co = getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
 
@@ -3691,47 +3750,116 @@ tidyToIfaceCo co = toIfaceCoercionX (mkVarSet free_tcvs) (tidyCo env co)
     env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
     free_tcvs = scopedSort $ tyCoVarsOfCoList co
 ------------
-pprClassPred :: Class -> [Type] -> SDoc
+pprClassPred
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Class -> [Type] -> SDoc' r
 pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
-pprTheta :: ThetaType -> SDoc
+pprTheta
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ThetaType -> SDoc' r
 pprTheta = pprIfaceContext topPrec . map tidyToIfaceType
 
-pprParendTheta :: ThetaType -> SDoc
+pprParendTheta
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ThetaType -> SDoc' r
 pprParendTheta = pprIfaceContext appPrec . map tidyToIfaceType
 
-pprThetaArrowTy :: ThetaType -> SDoc
+pprThetaArrowTy
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => ThetaType -> SDoc' r
 pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 
 ------------------
 instance Outputable Type where
-    ppr ty = pprType ty
+  type OutputableNeedsOfConfig Type = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
+  ppr ty = pprType ty
 
 instance Outputable TyLit where
    ppr = pprTyLit
 
 ------------------
-pprSigmaType :: Type -> SDoc
+pprSigmaType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Type -> SDoc' r
 pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 
-pprForAll :: [TyCoVarBinder] -> SDoc
+pprForAll
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [TyCoVarBinder] -> SDoc' r
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
 
 -- | Print a user-level forall; see Note [When to print foralls]
-pprUserForAll :: [TyCoVarBinder] -> SDoc
+pprUserForAll
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [TyCoVarBinder] -> SDoc' r
 pprUserForAll = pprUserIfaceForAll . map toIfaceForAllBndr
 
-pprTCvBndrs :: [TyCoVarBinder] -> SDoc
+pprTCvBndrs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [TyCoVarBinder] -> SDoc' r
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)
 
-pprTCvBndr :: TyCoVarBinder -> SDoc
+pprTCvBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCoVarBinder -> SDoc' r
 pprTCvBndr = pprTyVar . binderVar
 
-pprTyVars :: [TyVar] -> SDoc
+pprTyVars
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => [TyVar] -> SDoc' r
 pprTyVars tvs = sep (map pprTyVar tvs)
 
-pprTyVar :: TyVar -> SDoc
+pprTyVar
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyVar -> SDoc' r
 -- Print a type variable binder with its kind (but not if *)
 -- Here we do not go via IfaceType, because the duplication with
 -- pprIfaceTvBndr is minimal, and the loss of uniques etc in
@@ -3743,6 +3871,9 @@ pprTyVar tv
     kind = tyVarKind tv
 
 instance Outputable TyCoBinder where
+  type OutputableNeedsOfConfig TyCoBinder = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
   ppr (Named (Bndr v Specified)) = char '@' <> ppr v
@@ -3750,9 +3881,18 @@ instance Outputable TyCoBinder where
 
 -----------------
 instance Outputable Coercion where -- defined here to avoid orphans
+  type OutputableNeedsOfConfig Coercion = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr = pprCo
 
-debugPprType :: Type -> SDoc
+debugPprType
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Type -> SDoc' r
 -- ^ debugPprType is a simple pretty printer that prints a type
 -- without going through IfaceType.  It does not format as prettily
 -- as the normal route, but it's much more direct, and that can
@@ -3761,7 +3901,13 @@ debugPprType :: Type -> SDoc
 -- fundamentally cannot do.
 debugPprType ty = debug_ppr_ty topPrec ty
 
-debug_ppr_ty :: PprPrec -> Type -> SDoc
+debug_ppr_ty
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => PprPrec -> Type -> SDoc' r
 debug_ppr_ty _ (LitTy l)
   = ppr l
 
@@ -3846,13 +3992,27 @@ remember to parenthesise the operator, thus
 See #2766.
 -}
 
-pprDataCons :: TyCon -> SDoc
+pprDataCons
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , Outputable DataCon, OutputableNeedsOfConfig DataCon r
+     )
+  => TyCon -> SDoc' r
 pprDataCons = sepWithVBars . fmap pprDataConWithArgs . tyConDataCons
   where
     sepWithVBars [] = empty
     sepWithVBars docs = sep (punctuate (space <> vbar) docs)
 
-pprDataConWithArgs :: DataCon -> SDoc
+pprDataConWithArgs
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , Outputable DataCon, OutputableNeedsOfConfig DataCon r
+     )
+  => DataCon -> SDoc' r
 pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
   where
     (_univ_tvs, _ex_tvs, _eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
@@ -3862,7 +4022,13 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
     argsDoc    = hsep (fmap pprParendType arg_tys)
 
 
-pprTypeApp :: TyCon -> [Type] -> SDoc
+pprTypeApp
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCon -> [Type] -> SDoc' r
 pprTypeApp tc tys
   = pprIfaceTypeApp topPrec (toIfaceTyCon tc)
                             (toIfaceTcArgs tc tys)
@@ -3872,10 +4038,11 @@ pprTypeApp tc tys
 -- | Display all kind information (with @-fprint-explicit-kinds@) when the
 -- provided 'Bool' argument is 'True'.
 -- See @Note [Kind arguments in error messages]@ in "TcErrors".
-pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
+pprWithExplicitKindsWhen
+  :: HasTypeSuppress r => Bool -> SDoc' r -> SDoc' r
 pprWithExplicitKindsWhen b
   = updSDocDynFlags $ \dflags ->
-      if b then gopt_set dflags Opt_PrintExplicitKinds
+      if b then set (typeSuppress . _typeSuppress_printExplicitKinds) True dflags
            else dflags
 
 {-

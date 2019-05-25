@@ -18,6 +18,7 @@ import UniqSupply
 import TysWiredIn
 import Util
 import Outputable
+import Outputable.DynFlags (assertPprPanic)
 import PrelNames
 
 #include "HsVersions.h"

@@ -7,6 +7,7 @@ Printing of Core syntax
 -}
 
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCore (
         pprCoreExpr, pprParendExpr,
@@ -17,10 +18,11 @@ module PprCore (
 
 import GhcPrelude
 
+import CoreDebugSuppress
 import CoreSyn
 import CoreStats (exprStats)
 import Literal( pprLiteral )
-import Name( pprInfixName, pprPrefixName )
+import Name( HasNameSuppress, pprInfixName, pprPrefixName )
 import Var
 import Id
 import IdInfo
@@ -29,13 +31,15 @@ import DataCon
 import TyCon
 import Type
 import Coercion
-import DynFlags
 import BasicTypes
+import Lens
 import Maybes
 import Util
 import Outputable
+import Packages ( HasPackageState )
 import FastString
 import SrcLoc      ( pprUserRealSpan )
+import TypeSuppress
 
 {-
 ************************************************************************
@@ -47,24 +51,88 @@ import SrcLoc      ( pprUserRealSpan )
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 -}
 
-pprCoreBindings :: OutputableBndr b => [Bind b] -> SDoc
-pprCoreBinding  :: OutputableBndr b => Bind b  -> SDoc
-pprCoreExpr     :: OutputableBndr b => Expr b  -> SDoc
-pprParendExpr   :: OutputableBndr b => Expr b  -> SDoc
+pprCoreExpr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => Expr b  -> SDoc' r
+pprCoreExpr   expr = ppr_expr noParens expr
 
+pprParendExpr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => Expr b  -> SDoc' r
+pprParendExpr expr = ppr_expr parens expr
+
+pprCoreBindings
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => [Bind b] -> SDoc' r
 pprCoreBindings = pprTopBinds noAnn
+
+pprCoreBinding
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => Bind b  -> SDoc' r
 pprCoreBinding  = pprTopBind noAnn
 
-pprCoreBindingsWithSize :: [CoreBind] -> SDoc
-pprCoreBindingWithSize  :: CoreBind  -> SDoc
-
+pprCoreBindingsWithSize
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => [CoreBind] -> SDoc' r
 pprCoreBindingsWithSize = pprTopBinds sizeAnn
+
+pprCoreBindingWithSize
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => CoreBind  -> SDoc' r
 pprCoreBindingWithSize = pprTopBind sizeAnn
 
 instance OutputableBndr b => Outputable (Bind b) where
+    type OutputableNeedsOfConfig (Bind b) = PairConstraint
+      (PairConstraint
+        (PairConstraint HasPprConfig HasNameSuppress)
+        (PairConstraint HasTypeSuppress HasPackageState))
+      (PairConstraint
+        HasCoreDebugSuppress
+        (PairConstraint (OutputableNeedsOfConfig b) (OutputableBndrNeedsOfConfig b)))
     ppr bind = ppr_bind noAnn bind
 
 instance OutputableBndr b => Outputable (Expr b) where
+    type OutputableNeedsOfConfig (Expr b) = PairConstraint
+      (PairConstraint
+        (PairConstraint HasPprConfig HasNameSuppress)
+        (PairConstraint HasTypeSuppress HasPackageState))
+      (PairConstraint
+        HasCoreDebugSuppress
+        (PairConstraint (OutputableNeedsOfConfig b) (OutputableBndrNeedsOfConfig b)))
     ppr expr = pprCoreExpr expr
 
 {-
@@ -76,24 +144,39 @@ instance OutputableBndr b => Outputable (Expr b) where
 -}
 
 -- | A function to produce an annotation for a given right-hand-side
-type Annotation b = Expr b -> SDoc
+type Annotation r b = Expr b -> SDoc' r
 
 -- | Annotate with the size of the right-hand-side
-sizeAnn :: CoreExpr -> SDoc
+sizeAnn :: CoreExpr -> SDoc' r
 sizeAnn e = text "-- RHS size:" <+> ppr (exprStats e)
 
 -- | No annotation
-noAnn :: Expr b -> SDoc
+noAnn :: Expr b -> SDoc' r
 noAnn _ = empty
 
-pprTopBinds :: OutputableBndr a
-            => Annotation a -- ^ generate an annotation to place before the
-                            -- binding
-            -> [Bind a]     -- ^ bindings to show
-            -> SDoc         -- ^ the pretty result
+pprTopBinds
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr a, OutputableNeedsOfConfig a r, OutputableBndrNeedsOfConfig a r
+     )
+  => Annotation r a -- ^ generate an annotation to place before the
+                    -- binding
+  -> [Bind a]       -- ^ bindings to show
+  -> SDoc' r        -- ^ the pretty result
 pprTopBinds ann binds = vcat (map (pprTopBind ann) binds)
 
-pprTopBind :: OutputableBndr a => Annotation a -> Bind a -> SDoc
+pprTopBind
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr a, OutputableNeedsOfConfig a r, OutputableBndrNeedsOfConfig a r
+     )
+  => Annotation r a -> Bind a -> SDoc' r
 pprTopBind ann (NonRec binder expr)
  = ppr_binding ann (binder,expr) $$ blankLine
 
@@ -106,18 +189,33 @@ pprTopBind ann (Rec (b:bs))
           text "end Rec }",
           blankLine]
 
-ppr_bind :: OutputableBndr b => Annotation b -> Bind b -> SDoc
-
+ppr_bind
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => Annotation r b -> Bind b -> SDoc' r
 ppr_bind ann (NonRec val_bdr expr) = ppr_binding ann (val_bdr, expr)
 ppr_bind ann (Rec binds)           = vcat (map pp binds)
                                     where
                                       pp bind = ppr_binding ann bind <> semi
 
-ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
+ppr_binding
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => Annotation r b -> (b, Expr b) -> SDoc' r
 ppr_binding ann (val_bdr, expr)
   = sdocWithDynFlags $ \dflags ->
       vcat [ ann expr
-           , if gopt Opt_SuppressTypeSignatures dflags
+           , if typeSuppress_suppressTypeSignatures $ view typeSuppress dflags
                then empty
                else pprBndr LetBind val_bdr
            , pp_bind
@@ -147,20 +245,32 @@ ppr_binding ann (val_bdr, expr)
         lhs_bndrs = take join_arity bndrs
         rhs       = mkLams (drop join_arity bndrs) body
 
-pprParendExpr expr = ppr_expr parens expr
-pprCoreExpr   expr = ppr_expr noParens expr
-
-noParens :: SDoc -> SDoc
+noParens :: SDoc' r -> SDoc' r
 noParens pp = pp
 
-pprOptCo :: Coercion -> SDoc
+pprOptCo
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => Coercion -> SDoc' r
 -- Print a coercion optionally; i.e. honouring -dsuppress-coercions
 pprOptCo co = sdocWithDynFlags $ \dflags ->
-              if gopt Opt_SuppressCoercions dflags
+              if coreDebugSuppress_suppressIdInfo $ getCoreDebugSuppress dflags
               then angleBrackets (text "Co:" <> int (coercionSize co))
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
-ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
+ppr_expr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr b, OutputableNeedsOfConfig b r, OutputableBndrNeedsOfConfig b r
+     )
+  => (SDoc' r -> SDoc' r) -> Expr b -> SDoc' r
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
@@ -190,7 +300,7 @@ ppr_expr add_par expr@(App {})
         val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
         pp_tup_args = pprWithCommas pprCoreExpr val_args
         args'
-          | gopt Opt_SuppressTypeApplications dflags = val_args
+          | typeSuppress_suppressTypeApplications $ view typeSuppress dflags = val_args
           | otherwise = args
         parens
           | null args' = id
@@ -217,7 +327,7 @@ ppr_expr add_par expr@(App {})
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_PprCaseAsLet dflags
+    if coreDebugSuppress_pprCaseAsLet $ getCoreDebugSuppress dflags
     then add_par $  -- See Note [Print case as let]
          sep [ sep [ text "let! {"
                      <+> ppr_case_pat con args
@@ -291,15 +401,31 @@ ppr_expr add_par (Let bind expr)
 
 ppr_expr add_par (Tick tickish expr)
   = sdocWithDynFlags $ \dflags ->
-  if gopt Opt_SuppressTicks dflags
+  if coreDebugSuppress_suppressTicks $ getCoreDebugSuppress dflags
   then ppr_expr add_par expr
   else add_par (sep [ppr tickish, pprCoreExpr expr])
 
-pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
+pprCoreAlt
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr a
+     , OutputableNeedsOfConfig a r, OutputableBndrNeedsOfConfig a r
+     )
+  => (AltCon, [a] , Expr a) -> SDoc' r
 pprCoreAlt (con, args, rhs)
   = hang (ppr_case_pat con args <+> arrow) 2 (pprCoreExpr rhs)
 
-ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
+ppr_case_pat
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , OutputableBndr a
+     , OutputableNeedsOfConfig a r, OutputableBndrNeedsOfConfig a r
+     )
+  => AltCon -> [a] -> SDoc' r
 ppr_case_pat (DataAlt dc) args
   | Just sort <- tyConTuple_maybe tc
   = tupleParens sort (pprWithCommas ppr_bndr args)
@@ -314,10 +440,18 @@ ppr_case_pat con args
 
 
 -- | Pretty print the argument in a function application.
-pprArg :: OutputableBndr a => Expr a -> SDoc
+pprArg
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     , OutputableBndr a, OutputableNeedsOfConfig a r, OutputableBndrNeedsOfConfig a r
+     )
+  => Expr a -> SDoc' r
 pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
-   if gopt Opt_SuppressTypeApplications dflags
+   if typeSuppress_suppressTypeApplications $ view typeSuppress dflags
    then empty
    else text "@" <+> pprParendType ty
 pprArg (Coercion co) = text "@~" <+> pprOptCo co
@@ -357,6 +491,7 @@ binders are printed as "_".
 -- These instances are sadly orphans
 
 instance OutputableBndr Var where
+  type OutputableBndrNeedsOfConfig Var = HasCoreDebugSuppress
   pprBndr = pprCoreBinder
   pprInfixOcc  = pprInfixName  . varName
   pprPrefixOcc = pprPrefixName . varName
@@ -368,7 +503,14 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
   pprPrefixOcc b = ppr b
   bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
 
-pprCoreBinder :: BindingSite -> Var -> SDoc
+pprCoreBinder
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => BindingSite -> Var -> SDoc' r
 pprCoreBinder LetBind binder
   | isTyVar binder = pprKindedTyVarBndr binder
   | otherwise      = pprTypedLetBinder binder $$
@@ -379,12 +521,26 @@ pprCoreBinder bind_site bndr
   = getPprStyle $ \ sty ->
     pprTypedLamBinder bind_site (debugStyle sty) bndr
 
-pprUntypedBinder :: Var -> SDoc
+pprUntypedBinder
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  =>Var -> SDoc' r
 pprUntypedBinder binder
   | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
-pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
+pprTypedLamBinder
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => BindingSite -> Bool -> Var -> SDoc' r
 -- For lambda and case binders, show the unfolding info (usually none)
 pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
@@ -412,36 +568,56 @@ pprTypedLamBinder bind_site debug_on var
                                    2 (vcat [ dcolon <+> pprType (idType var)
                                            , pp_unf]))
   where
-    suppress_sigs = gopt Opt_SuppressTypeSignatures
+    suppress_sigs = typeSuppress_suppressTypeSignatures . view typeSuppress
 
     unf_info = unfoldingInfo (idInfo var)
     pp_unf | hasSomeUnfolding unf_info = text "Unf=" <> ppr unf_info
            | otherwise                 = empty
 
-pprTypedLetBinder :: Var -> SDoc
+pprTypedLetBinder
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => Var -> SDoc' r
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedLetBinder binder
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
       | isTyVar binder                         -> pprKindedTyVarBndr binder
-      | gopt Opt_SuppressTypeSignatures dflags -> pprIdBndr binder
+      | typeSuppress_suppressTypeSignatures $ view typeSuppress dflags -> pprIdBndr binder
       | otherwise                              -> hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
-pprKindedTyVarBndr :: TyVar -> SDoc
+pprKindedTyVarBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyVar -> SDoc' r
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
   = text "@" <+> pprTyVar tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
-pprIdBndr :: Id -> SDoc
+pprIdBndr
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => Id -> SDoc' r
 pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 
-pprIdBndrInfo :: IdInfo -> SDoc
+pprIdBndrInfo :: HasCoreDebugSuppress r => IdInfo -> SDoc' r
 pprIdBndrInfo info
   = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressIdInfo dflags) $
+    ppUnless (coreDebugSuppress_suppressIdInfo $ getCoreDebugSuppress dflags) $
     info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
@@ -467,10 +643,17 @@ pprIdBndrInfo info
 -----------------------------------------------------
 -}
 
-ppIdInfo :: Id -> IdInfo -> SDoc
+ppIdInfo
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     )
+  => Id -> IdInfo -> SDoc' r
 ppIdInfo id info
   = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressIdInfo dflags) $
+    ppUnless (coreDebugSuppress_suppressIdInfo $ getCoreDebugSuppress dflags) $
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,        text "Arity=" <> int arity)
@@ -504,7 +687,7 @@ ppIdInfo id info
 
     rules = ruleInfoRules (ruleInfo info)
 
-showAttributes :: [(Bool,SDoc)] -> SDoc
+showAttributes :: [(Bool,SDoc' r)] -> SDoc' r
 showAttributes stuff
   | null docs = empty
   | otherwise = brackets (sep (punctuate comma docs))
@@ -536,6 +719,11 @@ instance Outputable UnfoldingSource where
   ppr InlineRhs         = text "<vanilla>"
 
 instance Outputable Unfolding where
+  type OutputableNeedsOfConfig Unfolding = PairConstraint
+    (PairConstraint
+     (PairConstraint HasPprConfig HasNameSuppress)
+     (PairConstraint HasTypeSuppress HasPackageState))
+    HasCoreDebugSuppress
   ppr NoUnfolding                = text "No unfolding"
   ppr BootUnfolding              = text "No unfolding (from boot)"
   ppr (OtherCon cs)              = text "OtherCon" <+> ppr cs
@@ -558,7 +746,7 @@ instance Outputable Unfolding where
                 , text "Expandable=" <> ppr exp
                 , text "Guidance="   <> ppr g ]
       pp_tmpl = sdocWithDynFlags $ \dflags ->
-                ppUnless (gopt Opt_SuppressUnfoldings dflags) $
+                ppUnless (typeSuppress_suppressTypeSignatures $ view typeSuppress dflags) $
                 text "Tmpl=" <+> ppr rhs
       pp_rhs | isStableSource src = pp_tmpl
              | otherwise          = empty
@@ -572,12 +760,31 @@ instance Outputable Unfolding where
 -}
 
 instance Outputable CoreRule where
+   type OutputableNeedsOfConfig CoreRule = PairConstraint
+     (PairConstraint
+       (PairConstraint HasPprConfig HasNameSuppress)
+       (PairConstraint HasTypeSuppress HasPackageState))
+     HasCoreDebugSuppress
    ppr = pprRule
 
-pprRules :: [CoreRule] -> SDoc
+pprRules
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     )
+  => [CoreRule] -> SDoc' r
 pprRules rules = vcat (map pprRule rules)
 
-pprRule :: CoreRule -> SDoc
+pprRule
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasCoreDebugSuppress r
+     )
+  => CoreRule -> SDoc' r
 pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
   = text "Built in rule for" <+> ppr fn <> colon <+> doubleQuotes (ftext name)
 
@@ -598,6 +805,9 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 -}
 
 instance Outputable id => Outputable (Tickish id) where
+  type OutputableNeedsOfConfig (Tickish id) = PairConstraint
+    HasPackageState
+    (OutputableNeedsOfConfig id)
   ppr (HpcTick modl ix) =
       hcat [text "hpc<",
             ppr modl, comma,

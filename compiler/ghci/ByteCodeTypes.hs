@@ -1,4 +1,7 @@
-{-# LANGUAGE MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -27,8 +30,10 @@ import SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI
-import Control.DeepSeq
+import Packages (HasPackageState)
+import TypeSuppress (HasTypeSuppress)
 
+import Control.DeepSeq
 import Foreign
 import Data.Array
 import Data.Array.Base  ( UArray(..) )
@@ -54,6 +59,9 @@ newtype FFIInfo = FFIInfo (RemotePtr C_ffi_cif)
   deriving (Show, NFData)
 
 instance Outputable CompiledByteCode where
+  type OutputableNeedsOfConfig CompiledByteCode = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr CompiledByteCode{..} = ppr bc_bcos
 
 -- Not a real NFData instance, because ModBreaks contains some things
@@ -121,12 +129,18 @@ seqCgBreakInfo CgBreakInfo{..} =
   seqType cgb_resty
 
 instance Outputable UnlinkedBCO where
+   type OutputableNeedsOfConfig UnlinkedBCO = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
       = sep [text "BCO", ppr nm, text "with",
              ppr (sizeSS lits), text "lits",
              ppr (sizeSS ptrs), text "ptrs" ]
 
 instance Outputable CgBreakInfo where
+   type OutputableNeedsOfConfig CgBreakInfo = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
    ppr info = text "CgBreakInfo" <+>
               parens (ppr (cgb_vars info) <+>
                       ppr (cgb_resty info))

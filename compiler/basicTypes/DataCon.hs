@@ -5,7 +5,9 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module DataCon (
         -- * Main data types
@@ -76,6 +78,9 @@ import PrelNames
 import Var
 import VarSet( emptyVarSet )
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (assertPanic, panic)
+import Packages (HasPackageState)
 import Util
 import BasicTypes
 import FastString
@@ -83,6 +88,7 @@ import Module
 import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
+import TypeSuppress
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
@@ -714,6 +720,9 @@ filterEqSpec eq_spec
     not_in_eq_spec var = all (not . (== var) . eqSpecTyVar) eq_spec
 
 instance Outputable EqSpec where
+  type OutputableNeedsOfConfig EqSpec = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (EqSpec tv ty) = ppr (tv, ty)
 
 {- Note [Bangs on data constructor arguments]
@@ -791,6 +800,9 @@ instance NamedThing DataCon where
     getName = dcName
 
 instance Outputable DataCon where
+    type OutputableNeedsOfConfig DataCon = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      HasPackageState
     ppr con = ppr (dataConName con)
 
 instance OutputableBndr DataCon where
@@ -807,6 +819,9 @@ instance Outputable HsSrcBang where
     ppr (HsSrcBang _ prag mark) = ppr prag <+> ppr mark
 
 instance Outputable HsImplBang where
+    type OutputableNeedsOfConfig HsImplBang = PairConstraint
+      (PairConstraint HasPprConfig HasNameSuppress)
+      (PairConstraint HasTypeSuppress HasPackageState)
     ppr HsLazy                  = text "Lazy"
     ppr (HsUnpack Nothing)      = text "Unpacked"
     ppr (HsUnpack (Just co))    = text "Unpacked" <> parens (ppr co)

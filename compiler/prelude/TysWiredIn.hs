@@ -159,6 +159,8 @@ import Unique
 import Data.Array
 import FastString
 import Outputable
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import PlainPanic (assertPanic, panic)
 import Util
 import BooleanFormula   ( mkAnd )
 

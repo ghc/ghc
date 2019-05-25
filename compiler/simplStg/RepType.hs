@@ -28,6 +28,9 @@ import GhcPrelude
 import BasicTypes (Arity, RepArity)
 import DataCon
 import Outputable
+import Outputable.DynFlags (SDoc, pprPanic)
+import PlainPanic (assertPanic)
+import DynFlags () -- Has* instances
 import PrelNames
 import Coercion
 import TyCon
