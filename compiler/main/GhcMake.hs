@@ -82,6 +82,7 @@ import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import Data.IORef
 import Data.List
 import qualified Data.List as List
@@ -2237,7 +2238,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
                            Nothing    -> liftIO $ getModificationUTCTime src_fn
                         -- getModificationUTCTime may fail
 
-    new_summary src_fn src_timestamp = fmap Right $ do
+    new_summary src_fn src_timestamp = runExceptT $ do
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
@@ -2249,7 +2250,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location
 
-        makeNewModSummary hsc_env $ MakeNewModSummary
+        liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_timestamp = src_timestamp
             , nms_is_boot = NotBoot
@@ -2272,9 +2273,9 @@ findSummaryBySourceFile summaries file
 
 checkSummaryTimestamp
     :: HscEnv -> DynFlags -> Bool -> IsBoot
-    -> (UTCTime -> IO (Either a ModSummary))
+    -> (UTCTime -> IO (Either e ModSummary))
     -> ModSummary -> ModLocation -> UTCTime
-    -> IO (Either a ModSummary)
+    -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
   old_summary location src_timestamp
@@ -2381,9 +2382,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           Nothing -> return $ Left $ noHsFileErr dflags loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
-
     new_summary location mod src_fn src_timestamp
-      = fmap Right $ do
+      = runExceptT $ do
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
@@ -2400,7 +2400,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                   | otherwise -> HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
-                throwOneError $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+                throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                               text "File name does not match module name:"
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
@@ -2412,7 +2412,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : thisUnitIdInsts dflags)
                         ])
-            in throwOneError $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+            in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
                     then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
@@ -2423,7 +2423,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                                  suggested_instantiated_with <> text "\"" $$
                                 text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
 
-        makeNewModSummary hsc_env $ MakeNewModSummary
+        liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_timestamp = src_timestamp
             , nms_is_boot = is_boot
@@ -2520,13 +2520,13 @@ getPreprocessedImports
     -> FilePath
     -> Maybe Phase
     -> Maybe (StringBuffer, UTCTime)
-    -> IO PreprocessedImports
+    -> ExceptT ErrorMessages IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
-      <- preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
-  pi_hscpp_buf <- hGetStringBuffer pi_hspp_fn
+      <- liftIO $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
+  pi_hscpp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
-      <- getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+      <- ExceptT $ getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
   return PreprocessedImports {..}
 
 

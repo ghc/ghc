@@ -59,17 +59,19 @@ getImports :: DynFlags
                            --   reporting parse error locations.
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
-           -> IO ([(Maybe FastString, Located ModuleName)],
-                  [(Maybe FastString, Located ModuleName)],
-                  Located ModuleName)
+           -> IO (Either
+               ErrorMessages
+               ([(Maybe FastString, Located ModuleName)],
+                [(Maybe FastString, Located ModuleName)],
+                Located ModuleName))
               -- ^ The source imports, normal imports, and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
   case unP parseHeader (mkPState dflags buf loc) of
-    PFailed pst -> do
+    PFailed pst ->
         -- assuming we're not logging warnings here as per below
-      throwErrors (getErrorMessages pst dflags)
-    POk pst rdr_module -> do
+      return $ Left $ getErrorMessages pst dflags
+    POk pst rdr_module -> fmap Right $ do
       let _ms@(_warns, errs) = getMessages pst dflags
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.

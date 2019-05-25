@@ -1032,8 +1032,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
           do
             buf <- hGetStringBuffer input_fn
-            (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
-            return (Just buf, mod_name, imps, src_imps)
+            eimps <- getImports dflags buf input_fn (basename <.> suff)
+            case eimps of
+              Left errs -> throwErrors errs
+              Right (src_imps,imps,L _ mod_name) -> return
+                  (Just buf, mod_name, imps, src_imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking
