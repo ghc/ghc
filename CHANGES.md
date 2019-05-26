@@ -1,4 +1,4 @@
-## Changes in TBA 
+## Changes in 2.23.0
 
  * "Linuwial" is the new default theme (#721, #782, #949)
 
@@ -28,6 +28,8 @@
 
  * Many fixes to the LaTeX backend, mostly focused on not crashing
    as well as generating LaTeX source that compiles
+
+ * More flexible parsing of the module header
 
 ## Changes in version 2.22.0
 

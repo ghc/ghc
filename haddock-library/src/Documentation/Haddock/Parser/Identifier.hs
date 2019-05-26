@@ -109,7 +109,7 @@ takeIdentifier input = listToMaybe $ do
     (cl, input'''') <- maybeToList (T.uncons input''')
     guard (cl == '\'' || cl == '`')
 
-    pure (ns, op, ident, cl, input'''')
+    return (ns, op, ident, cl, input'''')
 
   where
 
@@ -122,21 +122,21 @@ takeIdentifier input = listToMaybe $ do
             , c' == ',' || c' == ')'
             -> do let (commas, t'') = T.span (== ',') t'
                   (')', t''') <- maybeToList (T.uncons t'')
-                  pure (T.take (T.length commas + 2) t, t''')
+                  return (T.take (T.length commas + 2) t, t''')
 
         -- Parenthesized
         '(' -> do (n,   t'' ) <- general False 0 [] t'
                   (')', t''') <- maybeToList (T.uncons t'')
-                  pure (T.take (n + 2) t, t''')
+                  return (T.take (n + 2) t, t''')
 
         -- Backticked
         '`' -> do (n,   t'' ) <- general False 0 [] t'
                   ('`', t''') <- maybeToList (T.uncons t'')
-                  pure (T.take (n + 2) t, t''')
+                  return (T.take (n + 2) t, t''')
 
         -- Unadorned
         _   -> do (n,   t'' ) <- general False 0 [] t
-                  pure (T.take n t, t'')
+                  return (T.take n t, t'')
 
     -- | Parse out a possibly qualified operator or identifier
     general :: Bool           -- ^ refuse inputs starting with operators

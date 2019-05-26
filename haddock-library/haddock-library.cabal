@@ -33,7 +33,7 @@ common lib-defaults
 
   ghc-options: -funbox-strict-fields -Wall -fwarn-tabs
   if impl(ghc >= 8.0)
-    ghc-options: -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
+    ghc-options: -Wcompat -Wnoncanonical-monad-instances
 
 library
   import: lib-defaults
