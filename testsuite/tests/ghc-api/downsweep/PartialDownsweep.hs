@@ -8,6 +8,7 @@ import GhcMake
 import DynFlags
 import Outputable
 import Exception (ExceptionMonad, ghandle)
+import Bag
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
@@ -134,6 +135,17 @@ main = do
          sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "C"]
        )
 
+    go "Import error"
+        [ [ "module A where"
+          , "import B"
+          , "import DoesNotExist_FooBarBaz"
+          ]
+        , [ "module B where"
+          ]
+        ]
+       (\mss -> return $
+           sort (map (moduleNameString . moduleName . ms_mod) mss) == ["A", "B"]
+       )
 
   errored <- readIORef any_failed
   when errored $ exitFailure
@@ -154,6 +166,7 @@ go label mods cnd =
     hsc_env <- getSession
     emss <- liftIO $ downsweep hsc_env [] [] False
     -- liftIO $ hPutStrLn stderr $ showSDocUnsafe $ ppr $ rights emss
+    -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
 
     it label $ cnd (rights emss)
 
