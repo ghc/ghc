@@ -49,7 +49,7 @@ module Haddock.Utils (
   MonadIO(..),
 
   -- * Logging
-  parseVerbosity,
+  parseVerbosity, Verbosity(..), silent, normal, verbose, deafening,
   out,
 
   -- * System tools
@@ -81,8 +81,6 @@ import System.Directory ( createDirectory, removeDirectoryRecursive )
 import System.IO ( hPutStr, hSetEncoding, IOMode(..), stderr, utf8, withFile )
 import System.IO.Unsafe ( unsafePerformIO )
 import qualified System.FilePath.Posix as HtmlPath
-import Distribution.Verbosity
-import Distribution.ReadE
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -95,10 +93,27 @@ import MonadUtils ( MonadIO(..) )
 -- * Logging
 --------------------------------------------------------------------------------
 
+data Verbosity = Silent | Normal | Verbose | Deafening
+  deriving (Eq, Ord, Enum, Bounded, Show)
 
+silent, normal, verbose, deafening :: Verbosity
+silent    = Silent
+normal    = Normal
+verbose   = Verbose
+deafening = Deafening
+
+-- | Parse out a verbosity level. Inspired from Cabal's verbosity parsing.
 parseVerbosity :: String -> Either String Verbosity
-parseVerbosity = runReadE flagToVerbosity
-
+parseVerbosity "0" = Right Silent
+parseVerbosity "1" = Right Normal
+parseVerbosity "2" = Right Silent
+parseVerbosity "3" = Right Deafening
+parseVerbosity "silent"    = return Silent
+parseVerbosity "normal"    = return Normal
+parseVerbosity "verbose"   = return Verbose
+parseVerbosity "debug"     = return Deafening
+parseVerbosity "deafening" = return Deafening
+parseVerbosity other = Left ("Can't parse verbosity " ++ other)
 
 -- | Print a message to stdout, if it is not too verbose
 out :: MonadIO m

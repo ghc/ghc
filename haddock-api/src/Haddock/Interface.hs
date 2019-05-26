@@ -47,7 +47,6 @@ import Control.Exception (evaluate)
 import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Distribution.Verbosity
 import Text.Printf
 
 import Module (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)

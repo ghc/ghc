@@ -43,7 +43,6 @@ module Haddock.Options (
 import qualified Data.Char as Char
 import           Data.Version
 import           Control.Applicative
-import           Distribution.Verbosity
 import           FastString
 import           GHC ( DynFlags, Module, moduleUnitId )
 import           Haddock.Types
@@ -332,7 +331,7 @@ sinceQualification flags =
 verbosity :: [Flag] -> Verbosity
 verbosity flags =
   case [ str | Flag_Verbosity str <- flags ] of
-    []  -> normal
+    []  -> Normal
     x:_ -> case parseVerbosity x of
       Left e -> throwE e
       Right v -> v

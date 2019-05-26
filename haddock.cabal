@@ -77,7 +77,6 @@ executable haddock
       deepseq,
       array,
       xhtml >= 3000.2 && < 3000.3,
-      Cabal >= 1.10,
       ghc-boot,
       ghc == 8.8.*,
       bytestring,
