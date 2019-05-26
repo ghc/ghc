@@ -45,6 +45,7 @@ import BasicTypes
 
 import TyCoRep
 import TysPrim
+import Util (zipEqual)
 
 import Control.Monad
 
@@ -533,7 +534,7 @@ getFCallArgs ::
 -- Precondition: args and typs have the same length
 -- See Note [Unlifted boxed arguments to foreign calls]
 getFCallArgs args typ
-  = do  { mb_cmms <- mapM get (zipExact args (collectStgFArgTypes typ))
+  = do  { mb_cmms <- mapM get (zipEqual "getFCallArgs" args (collectStgFArgTypes typ))
         ; return (catMaybes mb_cmms) }
   where
     get (arg,typ)
@@ -556,11 +557,6 @@ data StgFArgType
   | StgArrayType
   | StgSmallArrayType
   | StgByteArrayType
-
-zipExact :: [a] -> [b] -> [(a,b)]
-zipExact     []     [] = []
-zipExact (x:xs) (y:ys) = (x,y) : zipExact xs ys
-zipExact      _      _ = panic "zipExact"
 
 -- See Note [Unlifted boxed arguments to foreign calls]
 add_shim :: DynFlags -> StgFArgType -> CmmExpr -> CmmExpr
