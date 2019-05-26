@@ -13,3 +13,4 @@ B.hs:2:0: error:
      error: #elif without #if
      #elif <- cpp error here
      
+== Import error
