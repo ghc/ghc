@@ -647,7 +647,6 @@ unariseArgBinder
     :: Bool -- data con arg?
     -> UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 unariseArgBinder is_con_arg rho x =
-  pprTrace "RAE3" (ppr is_con_arg $$ ppr x <+> dcolon <+> ppr (idType x)) $
   case typePrimRep (idType x) of
     []
       | is_con_arg
