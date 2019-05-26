@@ -10,7 +10,7 @@
 --
 -- -----------------------------------------------------------------------------
 module GhcMake(
-        depanal,
+        depanal, depanalPartial,
         load, load', LoadHowMuch(..),
 
         downsweep,
@@ -48,7 +48,7 @@ import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 import HscMain
 
-import Bag              ( unitBag, listToBag, unionManyBags )
+import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import BasicTypes
 import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
@@ -122,6 +122,32 @@ depanal :: GhcMonad m =>
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
+    hsc_env <- getSession
+    (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
+    if isEmptyBag errs
+      then do
+        warnMissingHomeModules hsc_env mod_graph
+        setSession hsc_env { hsc_mod_graph = mod_graph }
+        return mod_graph
+      else throwErrors errs
+
+
+-- | Perform dependency analysis like 'depanal' but return a partial module
+-- graph even in the face of problems with some modules.
+--
+-- Modules which have parse errors in the module header, failing
+-- preprocessors or other issues preventing them from being summarised will
+-- simply be absent from the returned module graph.
+--
+-- Unlike 'depanal' this function will not update 'hsc_mod_graph' with the
+-- new module graph.
+depanalPartial
+    :: GhcMonad m
+    => [ModuleName]  -- ^ excluded modules
+    -> Bool          -- ^ allow duplicate roots
+    -> m (ErrorMessages, ModuleGraph)
+    -- ^ possibly empty 'Bag' of errors and a module graph.
+depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
          dflags  = hsc_dflags hsc_env
@@ -141,14 +167,10 @@ depanal excluded_mods allow_dup_roots = do
 
     mod_summariesE <- liftIO $ downsweep hsc_env (mgModSummaries old_graph)
                                      excluded_mods allow_dup_roots
-    mod_summaries <- reportImportErrors mod_summariesE
-
-    let mod_graph = mkModuleGraph mod_summaries
-
-    warnMissingHomeModules hsc_env mod_graph
-
-    setSession hsc_env { hsc_mod_graph = mod_graph }
-    return mod_graph
+    let
+           (errs, mod_summaries) = partitionEithers mod_summariesE
+           mod_graph = mkModuleGraph mod_summaries
+    return (unionManyBags errs, mod_graph)
 
 -- Note [Missing home modules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
