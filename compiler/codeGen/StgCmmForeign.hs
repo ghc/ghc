@@ -53,8 +53,8 @@ import Control.Monad
 -----------------------------------------------------------------------------
 
 -- | Emit code for a foreign call, and return the results to the sequel.
--- Precondition: the argument types list and the arguments
--- list have the same length.
+-- Precondition: the length of the arguments list is the same as the
+-- number of arguments in the type of the foreign function.
 cgForeignCall :: ForeignCall            -- the op
               -> Type                   -- type of foreign function
               -> [StgArg]               -- x,y    arguments
@@ -519,9 +519,9 @@ closureField dflags off = off + fixedHdrSize dflags
 --
 -- To avoid this bad behavior, we adopt the second strategy: use
 -- the types present in the foreign function's type.
--- In CoreToStg.collectStgFArgTypes, we convert the foreign function's
--- type to a list of StgFArgType. Then, in StgCmmForeign.add_shim,
--- we interpret these as numeric offsets.
+-- In collectStgFArgTypes, we convert the foreign function's
+-- type to a list of StgFArgType. Then, in add_shim, we interpret
+-- these as numeric offsets.
 
 getFCallArgs ::
      [StgArg]
