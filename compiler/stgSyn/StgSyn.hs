@@ -44,7 +44,7 @@ module StgSyn (
         OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
 
         -- StgOp
-        StgOp(..), StgFArgType(..),
+        StgOp(..),
 
         -- utils
         topStgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
@@ -668,12 +668,6 @@ isUpdatable :: UpdateFlag -> Bool
 isUpdatable ReEntrant   = False
 isUpdatable SingleEntry = False
 isUpdatable Updatable   = True
-
-data StgFArgType
-  = StgPlainType
-  | StgArrayType
-  | StgSmallArrayType
-  | StgByteArrayType
 
 {-
 ************************************************************************

@@ -548,6 +548,15 @@ getFCallArgs args typ
         arg_reps = typePrimRep arg_ty
         hint     = typeForeignHint arg_ty
 
+-- The minimum amount of information needed to determine
+-- the offset to apply to an argument to a foreign call.
+-- See Note [Unlifted boxed arguments to foreign calls]
+data StgFArgType
+  = StgPlainType
+  | StgArrayType
+  | StgSmallArrayType
+  | StgByteArrayType
+
 zipExact :: [a] -> [b] -> [(a,b)]
 zipExact     []     [] = []
 zipExact (x:xs) (y:ys) = (x,y) : zipExact xs ys
@@ -578,6 +587,9 @@ collectStgFArgTypes = go []
     go bs (FunTy {ft_arg = arg, ft_res=res}) =
       go (typeToStgFArgType arg:bs) res
 
+-- Choose the offset based on the type. For anything other
+-- than an unlifted boxed type, there is no offset.
+-- See Note [Unlifted boxed arguments to foreign calls]
 typeToStgFArgType :: Type -> StgFArgType
 typeToStgFArgType typ
   | tycon == arrayPrimTyCon = StgArrayType
