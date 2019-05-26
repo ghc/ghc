@@ -43,6 +43,9 @@ import Outputable
 import UniqSupply
 import BasicTypes
 
+import TyCoRep
+import TysPrim
+
 import Control.Monad
 
 -----------------------------------------------------------------------------
@@ -53,12 +56,12 @@ import Control.Monad
 -- Precondition: the argument types list and the arguments
 -- list have the same length.
 cgForeignCall :: ForeignCall            -- the op
-              -> [StgFArgType]          -- argument types
+              -> Type                   -- type of foreign function
               -> [StgArg]               -- x,y    arguments
               -> Type                   -- result type
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typs stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
   = do  { dflags <- getDynFlags
         ; let -- in the stdcall calling convention, the symbol needs @size appended
               -- to it, where size is the total number of bytes of arguments.  We
@@ -71,7 +74,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typs stg_args res_ty
               -- ToDo: this might not be correct for 64-bit API
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType dflags arg)
                                      (wORD_SIZE dflags)
-        ; cmm_args <- getFCallArgs stg_args typs
+        ; cmm_args <- getFCallArgs stg_args typ
         ; (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
@@ -512,7 +515,7 @@ closureField dflags off = off + fixedHdrSize dflags
 -- unsafely coerced from a value of type Any prior to being passed
 -- to a foreign call, StgCmmForeign.add_shim might see the type Any
 -- (instead of ByteArray#) and fail to apply the offset that the
--- user expected for ByteArray# objects. This means that there is
+-- user expected for ByteArray# objects.
 --
 -- To avoid this bad behavior, we adopt the second strategy: use
 -- the types present in the foreign function's type.
@@ -520,20 +523,19 @@ closureField dflags off = off + fixedHdrSize dflags
 -- type to a list of StgFArgType. Then, in StgCmmForeign.add_shim,
 -- we interpret these as numeric offsets.
 
-getFCallArgs :: [StgArg] -> [StgFArgType] -> FCode [(CmmExpr, ForeignHint)]
+getFCallArgs ::
+     [StgArg]
+  -> Type -- the type of the foreign function
+  -> FCode [(CmmExpr, ForeignHint)]
 -- (a) Drop void args
 -- (b) Add foreign-call shim code
 -- It's (b) that makes this differ from getNonVoidArgAmodes
 -- Precondition: args and typs have the same length
 -- See Note [Unlifted boxed arguments to foreign calls]
-getFCallArgs args typs
-  = do  { when (typlen /= arglen) $
-          panic ("getFCallArgs: " ++ show typlen ++ " " ++ show arglen)
-        ; mb_cmms <- mapM get (zip args typs)
+getFCallArgs args typ
+  = do  { mb_cmms <- mapM get (zipExact args (collectStgFArgTypes typ))
         ; return (catMaybes mb_cmms) }
   where
-    arglen = length args
-    typlen = length typs
     get (arg,typ)
       | null arg_reps
       = return Nothing
@@ -546,9 +548,48 @@ getFCallArgs args typs
         arg_reps = typePrimRep arg_ty
         hint     = typeForeignHint arg_ty
 
+zipExact :: [a] -> [b] -> [(a,b)]
+zipExact     []     [] = []
+zipExact (x:xs) (y:ys) = (x,y) : zipExact xs ys
+zipExact      _      _ = panic "zipExact"
+
+-- See Note [Unlifted boxed arguments to foreign calls]
 add_shim :: DynFlags -> StgFArgType -> CmmExpr -> CmmExpr
 add_shim dflags ty expr = case ty of
   StgPlainType -> expr
   StgArrayType -> cmmOffsetB dflags expr (arrPtrsHdrSize dflags)
   StgSmallArrayType -> cmmOffsetB dflags expr (smallArrPtrsHdrSize dflags)
   StgByteArrayType -> cmmOffsetB dflags expr (arrWordsHdrSize dflags)
+
+-- From a function, extract information needed to determine
+-- the offset of each argument when used as a C FFI argument.
+-- See Note [Unlifted boxed arguments to foreign calls]
+collectStgFArgTypes :: Type -> [StgFArgType]
+collectStgFArgTypes = go [] 
+  where
+    -- Skip foralls
+    go bs (ForAllTy _ res) = go bs res
+    go bs (AppTy{}) = reverse bs
+    go bs (TyConApp{}) = reverse bs
+    go bs (LitTy{}) = reverse bs
+    go bs (TyVarTy{}) = reverse bs
+    go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
+    go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
+    go bs (FunTy {ft_arg = arg, ft_res=res}) =
+      go (typeToStgFArgType arg:bs) res
+
+typeToStgFArgType :: Type -> StgFArgType
+typeToStgFArgType typ
+  | tycon == arrayPrimTyCon = StgArrayType
+  | tycon == mutableArrayPrimTyCon = StgArrayType
+  | tycon == arrayArrayPrimTyCon = StgArrayType
+  | tycon == mutableArrayArrayPrimTyCon = StgArrayType
+  | tycon == smallArrayPrimTyCon = StgSmallArrayType
+  | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
+  | tycon == byteArrayPrimTyCon = StgByteArrayType
+  | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
+  | otherwise = StgPlainType
+  where
+  -- should be a tycon app, since this is a foreign call
+  tycon = tyConAppTyCon (unwrapType typ)
+

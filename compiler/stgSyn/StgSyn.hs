@@ -692,10 +692,13 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall [StgFArgType] Unique 
+  | StgFCallOp ForeignCall Type Unique 
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
-        -- typedef for foreign-export-dynamic
+        -- typedef for foreign-export-dynamic. The Type is needed by
+        -- the stg-to-cmm pass to determine the offset to apply to
+        -- unlifted boxed arguments.
+        -- See Note [Unlifted boxed arguments to foreign calls]
 
 {-
 ************************************************************************
