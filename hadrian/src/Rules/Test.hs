@@ -162,9 +162,10 @@ needTestsuitePackages = do
         allpkgs   <- packages <$> flavour
         stgpkgs   <- allpkgs (succ stg)
         testpkgs  <- testsuitePackages
-        targets <- mapM (needFile stg) (stgpkgs ++ testpkgs)
+        let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
+                          (stgpkgs ++ testpkgs)
+        need =<< mapM (pkgFile stg) pkgs
         needIservBins
-        need targets
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
@@ -187,7 +188,7 @@ needIservBins = do
             , w `elem` rtsways
             ]
 
-needFile :: Stage -> Package -> Action FilePath
-needFile stage pkg
+pkgFile :: Stage -> Package -> Action FilePath
+pkgFile stage pkg
     | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
     | otherwise     = programPath =<< programContext stage pkg
