@@ -114,10 +114,10 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Foreign.C
 import GHC.Exts
+import GHC.Exts.Heap
 import System.IO
 import Data.Data
 import Data.IORef
-import Data.Maybe       ( isJust )
 import Data.Char
 import Data.Semigroup as Semi
 
@@ -185,7 +185,7 @@ data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_bs   :: {-# UNPACK #-} !ByteString,
-      fs_ref  :: {-# UNPACK #-} !(IORef (Maybe FastZString))
+      fs_zenc :: FastZString -- lazily computed z-encoding of this string
   }
 
 instance Eq FastString where
@@ -489,23 +489,25 @@ mkZFastString = mkFastZStringString
 mkNewFastString :: ForeignPtr Word8 -> Ptr Word8 -> Int -> Int
                 -> IO FastString
 mkNewFastString fp ptr len uid = do
-  ref <- newIORef Nothing
+  let bs = BS.fromForeignPtr fp 0 len
+  let ref = mkZFastString (zEncodeString (utf8DecodeByteString bs))
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid n_chars (BS.fromForeignPtr fp 0 len) ref)
+  return (FastString uid n_chars bs ref)
 
 mkNewFastStringByteString :: ByteString -> Ptr Word8 -> Int -> Int
                           -> IO FastString
 mkNewFastStringByteString bs ptr len uid = do
-  ref <- newIORef Nothing
+  let ref = mkZFastString (zEncodeString (utf8DecodeByteString bs))
   n_chars <- countUTF8Chars ptr len
   return (FastString uid n_chars bs ref)
 
 copyNewFastString :: Ptr Word8 -> Int -> Int -> IO FastString
 copyNewFastString ptr len uid = do
   fp <- copyBytesToForeignPtr ptr len
-  ref <- newIORef Nothing
+  let bs = BS.fromForeignPtr fp 0 len
+  let ref = mkZFastString (zEncodeString (utf8DecodeByteString bs))
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid n_chars (BS.fromForeignPtr fp 0 len) ref)
+  return (FastString uid n_chars bs ref)
 
 copyBytesToForeignPtr :: Ptr Word8 -> Int -> IO (ForeignPtr Word8)
 copyBytesToForeignPtr ptr len = do
@@ -539,10 +541,21 @@ lengthFS f = n_chars f
 -- | Returns @True@ if this 'FastString' is not Z-encoded but already has
 -- a Z-encoding cached (used in producing stats).
 hasZEncoding :: FastString -> Bool
-hasZEncoding (FastString _ _ _ ref) =
-      inlinePerformIO $ do
-        m <- readIORef ref
-        return (isJust m)
+hasZEncoding (FastString _ _ _ ref) = inlinePerformIO $ evaluated ref
+  where
+    evaluated :: a -> IO Bool
+    evaluated = go . asBox
+        where
+            go box = do
+                c <- getBoxedClosureData box
+                case c of
+                    ThunkClosure     {} -> return False
+                    SelectorClosure  {} -> return False
+                    APClosure        {} -> return False
+                    APStackClosure   {} -> return False
+                    IndClosure       {indirectee = b'} -> go b'
+                    BlackholeClosure {indirectee = b'} -> go b'
+                    _ -> return True
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
@@ -558,16 +571,7 @@ unpackFS (FastString _ _ bs _) = utf8DecodeByteString bs
 -- memoized.
 --
 zEncodeFS :: FastString -> FastZString
-zEncodeFS fs@(FastString _ _ _ ref) =
-      inlinePerformIO $ do
-        m <- readIORef ref
-        case m of
-          Just zfs -> return zfs
-          Nothing -> do
-            atomicModifyIORef' ref $ \m' -> case m' of
-              Nothing  -> let zfs = mkZFastString (zEncodeString (unpackFS fs))
-                          in (Just zfs, zfs)
-              Just zfs -> (m', zfs)
+zEncodeFS (FastString _ _ _ ref) = ref
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringByteString
