@@ -171,20 +171,22 @@ mkFastZStringString str = FastZString (BSC.pack str)
 
 -- -----------------------------------------------------------------------------
 
-{-|
-A 'FastString' is an array of bytes, hashed to support fast O(1)
-comparison.  It is also associated with a character encoding, so that
-we know how to convert a 'FastString' to the local encoding, or to the
-Z-encoding used by the compiler internally.
+{-| A 'FastString' is a UTF-8 encoded string together with a unique ID. All
+'FastString's are stored in a global hashtable to support fast O(1)
+comparison.
 
-'FastString's support a memoized conversion to the Z-encoding via zEncodeFS.
+It is also associated with a lazy reference to the Z-encoding
+of this string which is used by the compiler internally.
 -}
-
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_bs   :: {-# UNPACK #-} !ByteString,
-      fs_zenc :: FastZString -- lazily computed z-encoding of this string
+      fs_zenc :: FastZString
+      -- ^ Lazily computed z-encoding of this string.
+      --
+      -- Since 'FastString's are globally memoized this is computed at most
+      -- once for any given string.
   }
 
 instance Eq FastString where
