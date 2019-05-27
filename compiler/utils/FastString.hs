@@ -78,7 +78,7 @@ module FastString
 
         -- ** Internal
         getFastStringTable,
-        hasZEncoding,
+        getFastStringZEncCounter,
 
         -- * PtrStrings
         PtrString (..),
@@ -117,7 +117,6 @@ import GHC.Exts
 import System.IO
 import Data.Data
 import Data.IORef
-import Data.Maybe       ( isJust )
 import Data.Char
 import Data.Semigroup as Semi
 
@@ -185,7 +184,7 @@ data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
       n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_bs   :: {-# UNPACK #-} !ByteString,
-      fs_ref  :: {-# UNPACK #-} !(IORef (Maybe FastZString))
+      fs_zenc :: FastZString -- lazily computed z-encoding of this string
   }
 
 instance Eq FastString where
@@ -246,6 +245,7 @@ See Note [Updating the FastString table] on how it's updated.
 -}
 data FastStringTable = FastStringTable
   {-# UNPACK #-} !(IORef Int) -- the unique ID counter shared with all buckets
+  {-# UNPACK #-} !(IORef Int) -- number of computed z-encodings for all buckets
   (Array# (IORef FastStringTableSegment)) -- concurrent segments
 
 data FastStringTableSegment = FastStringTableSegment
@@ -318,11 +318,13 @@ stringTable = unsafePerformIO $ do
                   (# s5#, segment #) -> case writeArray# a# i# segment s5# of
                     s6# -> loop a# (i# +# 1#) s6#
   uid <- newIORef 603979776 -- ord '$' * 0x01000000
+  n_zencs <- newIORef 0
   tab <- IO $ \s1# ->
     case newArray# numSegments# (panic "string_table") s1# of
       (# s2#, arr# #) -> case loop arr# 0# s2# of
         s3# -> case unsafeFreezeArray# arr# s3# of
-          (# s4#, segments# #) -> (# s4#, FastStringTable uid segments# #)
+          (# s4#, segments# #) ->
+            (# s4#, FastStringTable uid n_zencs segments# #)
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
@@ -396,7 +398,8 @@ The procedure goes like this:
    * Otherwise, insert and return the string we created.
 -}
 
-mkFastStringWith :: (Int -> IO FastString) -> Ptr Word8 -> Int -> IO FastString
+mkFastStringWith
+    :: (Int -> IORef Int-> IO FastString) -> Ptr Word8 -> Int -> IO FastString
 mkFastStringWith mk_fs !ptr !len = do
   FastStringTableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
@@ -409,10 +412,10 @@ mkFastStringWith mk_fs !ptr !len = do
       -- only run partially and putMVar is not called after takeMVar.
       noDuplicate
       n <- get_uid
-      new_fs <- mk_fs n
+      new_fs <- mk_fs n n_zencs
       withMVar lock $ \_ -> insert new_fs
   where
-    !(FastStringTable uid segments#) = stringTable
+    !(FastStringTable uid n_zencs segments#) = stringTable
     get_uid = atomicModifyIORef' uid $ \n -> (n+1,n)
 
     !(I# hash#) = hashStr ptr len
@@ -482,30 +485,35 @@ mkFastString str =
 mkFastStringByteList :: [Word8] -> FastString
 mkFastStringByteList str = mkFastStringByteString (BS.pack str)
 
--- | Creates a Z-encoded 'FastString' from a 'String'
-mkZFastString :: String -> FastZString
-mkZFastString = mkFastZStringString
+-- | Creates a (lazy) Z-encoded 'FastString' from a 'String' and account
+-- the number of forced z-strings into the passed 'IORef'.
+mkZFastString :: IORef Int -> ByteString -> FastZString
+mkZFastString n_zencs bs = unsafePerformIO $ do
+  atomicModifyIORef' n_zencs $ \n -> (n+1, ())
+  return $ mkFastZStringString (zEncodeString (utf8DecodeByteString bs))
 
 mkNewFastString :: ForeignPtr Word8 -> Ptr Word8 -> Int -> Int
-                -> IO FastString
-mkNewFastString fp ptr len uid = do
-  ref <- newIORef Nothing
+                -> IORef Int -> IO FastString
+mkNewFastString fp ptr len uid n_zencs = do
+  let bs = BS.fromForeignPtr fp 0 len
+      zstr = mkZFastString n_zencs bs
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid n_chars (BS.fromForeignPtr fp 0 len) ref)
+  return (FastString uid n_chars bs zstr)
 
 mkNewFastStringByteString :: ByteString -> Ptr Word8 -> Int -> Int
-                          -> IO FastString
-mkNewFastStringByteString bs ptr len uid = do
-  ref <- newIORef Nothing
+                          -> IORef Int -> IO FastString
+mkNewFastStringByteString bs ptr len uid n_zencs = do
+  let zstr = mkZFastString n_zencs bs
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid n_chars bs ref)
+  return (FastString uid n_chars bs zstr)
 
-copyNewFastString :: Ptr Word8 -> Int -> Int -> IO FastString
-copyNewFastString ptr len uid = do
+copyNewFastString :: Ptr Word8 -> Int -> Int -> IORef Int -> IO FastString
+copyNewFastString ptr len uid n_zencs = do
   fp <- copyBytesToForeignPtr ptr len
-  ref <- newIORef Nothing
+  let bs = BS.fromForeignPtr fp 0 len
+      zstr = mkZFastString n_zencs bs
   n_chars <- countUTF8Chars ptr len
-  return (FastString uid n_chars (BS.fromForeignPtr fp 0 len) ref)
+  return (FastString uid n_chars bs zstr)
 
 copyBytesToForeignPtr :: Ptr Word8 -> Int -> IO (ForeignPtr Word8)
 copyBytesToForeignPtr ptr len = do
@@ -536,14 +544,6 @@ hashStr (Ptr a#) (I# len#) = loop 0# 0#
 lengthFS :: FastString -> Int
 lengthFS f = n_chars f
 
--- | Returns @True@ if this 'FastString' is not Z-encoded but already has
--- a Z-encoding cached (used in producing stats).
-hasZEncoding :: FastString -> Bool
-hasZEncoding (FastString _ _ _ ref) =
-      inlinePerformIO $ do
-        m <- readIORef ref
-        return (isJust m)
-
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
 nullFS f = BS.null (fs_bs f)
@@ -558,16 +558,7 @@ unpackFS (FastString _ _ bs _) = utf8DecodeByteString bs
 -- memoized.
 --
 zEncodeFS :: FastString -> FastZString
-zEncodeFS fs@(FastString _ _ _ ref) =
-      inlinePerformIO $ do
-        m <- readIORef ref
-        case m of
-          Just zfs -> return zfs
-          Nothing -> do
-            atomicModifyIORef' ref $ \m' -> case m' of
-              Nothing  -> let zfs = mkZFastString (zEncodeString (unpackFS fs))
-                          in (Just zfs, zfs)
-              Just zfs -> (m', zfs)
+zEncodeFS (FastString _ _ _ ref) = ref
 
 appendFS :: FastString -> FastString -> FastString
 appendFS fs1 fs2 = mkFastStringByteString
@@ -613,7 +604,12 @@ getFastStringTable =
     forM [0 .. bucketSize - 1] $ \(I# j#) ->
       IO $ readArray# buckets# j#
   where
-    !(FastStringTable _ segments#) = stringTable
+    !(FastStringTable _ _ segments#) = stringTable
+
+getFastStringZEncCounter :: IO Int
+getFastStringZEncCounter = readIORef n_zencs
+  where
+    !(FastStringTable _ n_zencs _) = stringTable
 
 -- -----------------------------------------------------------------------------
 -- Outputting 'FastString's
