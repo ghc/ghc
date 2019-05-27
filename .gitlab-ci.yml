@@ -710,14 +710,19 @@ validate-x86_64-linux-fedora27:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    # FIXME: Testsuite disabled due to #16156.
-    # - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf"
+    # skipping perf tests for now since we build a quick-flavoured GHC,
+    # which might result in some broken perf tests?
   tags:
     - x86_64-windows
   artifacts:
+    reports:
+      junit: junit.xml
+    expire_in: 2 week
     when: always
     paths:
       - ghc.tar.xz
+      - junit.xml
 
 validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
