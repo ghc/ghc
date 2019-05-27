@@ -15,9 +15,6 @@
 
 #include "BeginPrivate.h"
 
-void              initCompact  (void);
-void              exitCompact  (void);
-
 StgCompactNFData *compactNew   (Capability      *cap,
                                 StgWord          size);
 void              compactResize(Capability       *cap,
