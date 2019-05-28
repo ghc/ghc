@@ -44,7 +44,6 @@ import FastString
 import Util
 import DynFlags
 import ForeignCall
-import TyCoRep
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..) )
 import SrcLoc           ( mkGeneralSrcSpan )
