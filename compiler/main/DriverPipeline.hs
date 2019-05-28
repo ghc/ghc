@@ -52,7 +52,7 @@ import DynFlags
 import Config
 import Panic
 import Util
-import StringBuffer     ( StringBuffer, hGetStringBuffer, hPutStringBuffer )
+import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
@@ -90,8 +90,8 @@ import Data.Time        ( UTCTime )
 
 preprocess :: HscEnv
            -> FilePath -- ^ input filename
-           -> Maybe StringBuffer
-           -- ^ optional buffer to use instead of reading input file
+           -> Maybe InputFileBuffer
+           -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
            -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
@@ -576,7 +576,7 @@ doLink dflags stop_phase o_files
 runPipeline
   :: Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath, Maybe StringBuffer, Maybe PhasePlus)
+  -> (FilePath, Maybe InputFileBuffer, Maybe PhasePlus)
                                 -- ^ Pipeline input file name, optional
                                 -- buffer and maybe -x suffix
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)

@@ -2479,6 +2479,7 @@ getPreprocessedImports
     -> FilePath
     -> Maybe Phase
     -> Maybe (StringBuffer, UTCTime)
+    -- ^ optional source code buffer and modification time
     -> ExceptT ErrorMessages IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
   (pi_local_dflags, pi_hspp_fn)
