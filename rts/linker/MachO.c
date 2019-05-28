@@ -1122,8 +1122,12 @@ ocBuildSegments_MachO(ObjectCode *oc)
         n_activeSegments++;
     }
 
-    mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
-    if (NULL == mem) return 0;
+    // N.B. it's possible that there is nothing mappable in an object. In this
+    // case we avoid the mmap call since it would fail. See #16701.
+    if (size_compound > 0) {
+        mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
+        if (NULL == mem) return 0;
+    }
 
     IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));
     segments = (Segment*)stgCallocBytes(n_activeSegments, sizeof(Segment),
