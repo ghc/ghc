@@ -78,6 +78,7 @@ import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
+import Panic (throwGhcException, GhcException(..))
 
 {-
 ************************************************************************
@@ -314,7 +315,13 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
              | otherwise       = sc2
 
 plusSimplCount (VerySimplCount n) (VerySimplCount m) = VerySimplCount (n+m)
-plusSimplCount _                  _                  = panic "plusSimplCount"
+plusSimplCount lhs                rhs                =
+  throwGhcException . PprProgramError "plusSimplCount" $ vcat
+    [ text "lhs"
+    , pprSimplCount lhs
+    , text "rhs"
+    , pprSimplCount rhs
+    ]
        -- We use one or the other consistently
 
 pprSimplCount (VerySimplCount n) = text "Total ticks:" <+> int n
