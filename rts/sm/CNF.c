@@ -281,6 +281,7 @@ compactFree(StgCompactNFData *str)
     }
 }
 
+#if defined(DEBUG)
 void
 compactMarkKnown(StgCompactNFData *str)
 {
@@ -319,7 +320,6 @@ countCompactBlocks(bdescr *outer)
     return count;
 }
 
-#if defined(DEBUG)
 // Like countCompactBlocks, but adjusts the size so each mblock is assumed to
 // only contain BLOCKS_PER_MBLOCK blocks.  Used in memInventory().
 StgWord
