@@ -135,13 +135,14 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 
 mkBootModDetailsTc :: HscEnv -> TcGblEnv -> IO ModDetails
 mkBootModDetailsTc hsc_env
-        TcGblEnv{ tcg_exports   = exports,
-                  tcg_type_env  = type_env, -- just for the Ids
-                  tcg_tcs       = tcs,
-                  tcg_patsyns   = pat_syns,
-                  tcg_insts     = insts,
-                  tcg_fam_insts = fam_insts,
-                  tcg_mod       = this_mod
+        TcGblEnv{ tcg_exports          = exports,
+                  tcg_type_env         = type_env, -- just for the Ids
+                  tcg_tcs              = tcs,
+                  tcg_patsyns          = pat_syns,
+                  tcg_insts            = insts,
+                  tcg_fam_insts        = fam_insts,
+                  tcg_complete_matches = complete_sigs,
+                  tcg_mod              = this_mod
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
@@ -156,13 +157,13 @@ mkBootModDetailsTc hsc_env
               ; dfun_ids   = map instanceDFunId insts'
               ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
               }
-        ; return (ModDetails { md_types     = type_env'
-                             , md_insts     = insts'
-                             , md_fam_insts = fam_insts
-                             , md_rules     = []
-                             , md_anns      = []
-                             , md_exports   = exports
-                             , md_complete_sigs = []
+        ; return (ModDetails { md_types         = type_env'
+                             , md_insts         = insts'
+                             , md_fam_insts     = fam_insts
+                             , md_rules         = []
+                             , md_anns          = []
+                             , md_exports       = exports
+                             , md_complete_sigs = complete_sigs
                              })
         }
   where
