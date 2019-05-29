@@ -1,0 +1,7 @@
+Breakpoint 0 activated at T16700.hs:2:16-47
+Stopped in Main.qsort, T16700.hs:2:16-47
+_result :: [Integer] = _
+a :: Integer = 4
+left :: [Integer] = _
+right :: [Integer] = _
+Syntax:  :forward [num]
