@@ -848,6 +848,15 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
 instance Functor (Array i) where
     fmap = amap
 
+    {-# INLINE (<$) #-}
+    x <$ Array l u n@(I# n#) _ =
+        -- Sadly we can't just use 'newSTArray' (with 'unsafeFreezeSTArray')
+        -- since that would require proof that the indices of the original array
+        -- are instances of 'Ix'.
+        runST $ ST $ \s1# ->
+            case newArray# n# x s1# of
+                (# s2#, marr# #) -> done l u n marr# s2#
+
 -- | @since 2.01
 instance (Ix i, Eq e) => Eq (Array i e) where
     (==) = eqArray
