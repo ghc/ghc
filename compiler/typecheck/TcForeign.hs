@@ -64,7 +64,6 @@ import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Maybe
 
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
@@ -251,8 +250,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
        ; let
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
-             (bndrs, res_ty)   = tcSplitPiTys norm_sig_ty
-             arg_tys           = mapMaybe binderRelevantType_maybe bndrs
+             (arg_tys, res_ty) = tcSplitFunTys (dropForAlls norm_sig_ty)
              id                = mkLocalId nm sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
@@ -424,10 +422,9 @@ tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
     return (CExport (L l (CExportStatic esrc str cconv')) src)
   where
-      -- Drop the foralls before inspecting n
+      -- Drop the foralls before inspecting
       -- the structure of the foreign type.
-    (bndrs, res_ty) = tcSplitPiTys sig_ty
-    arg_tys         = mapMaybe binderRelevantType_maybe bndrs
+    (arg_tys, res_ty) = tcSplitFunTys (dropForAlls sig_ty)
 
 {-
 ************************************************************************
@@ -457,6 +454,11 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
   | Just (_, res_ty) <- tcSplitIOType_maybe ty
   =     -- Got an IO result type, that's always fine!
      check (pred_res_ty res_ty) (illegalForeignTyErr result)
+
+  -- We disallow nested foralls in foreign types
+  -- (at least, for the time being). See #16702.
+  | tcIsForAllTy ty
+  = addErrTc $ illegalForeignTyErr result (text "Unexpected nested forall")
 
   -- Case for non-IO result type with FFI Import
   | not non_io_result_ok
