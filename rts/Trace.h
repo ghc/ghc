@@ -288,6 +288,7 @@ void traceTaskDelete_ (Task       *task);
 
 void traceHeapProfBegin(StgWord8 profile_id);
 void traceHeapProfSampleBegin(StgInt era);
+void traceHeapProfSampleEnd(StgInt era);
 void traceHeapProfSampleString(StgWord8 profile_id,
                                const char *label, StgWord residency);
 #if defined(PROFILING)
