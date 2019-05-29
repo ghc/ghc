@@ -14,9 +14,10 @@ Foreign function interface (FFI)
 
     Allow use of the Haskell foreign function interface.
 
-GHC (mostly) conforms to the Haskell Foreign Function Interface, whose
-definition is part of the Haskell Report on
-`http://www.haskell.org/ <http://www.haskell.org/>`__.
+GHC (mostly) conforms to the Haskell Foreign Function Interface as specified
+in the Haskell Report. Refer to the `relevant chapter
+<https://www.haskell.org/onlinereport/haskell2010/haskellch8.html>_`
+of the Haskell Report for more details.
 
 FFI support is enabled by default, but can be enabled or disabled
 explicitly with the :extension:`ForeignFunctionInterface` flag.
@@ -101,6 +102,25 @@ OK: ::
 
        foreign import foo :: Int -> MyIO Int
        foreign import "dynamic" baz :: (Int -> MyIO Int) -> CInt -> MyIO Int
+
+.. _ffi-foralls:
+
+Explicit ``forall``s in foreign types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The type variables in the type of a foreign declaration may be quantified with
+an explicit ``forall`` by using the :extension:`ExplicitForAll` language
+extension, as in the following example: ::
+
+    {-# LANGUAGE ExplicitForAll #-}
+    foreign import ccall "mmap" c_mmap :: forall a. CSize -> IO (Ptr a)
+
+Note that an explicit ``forall`` must appear at the front of the type signature
+and is not permitted to appear nested within the type, as in the following
+(erroneous) examples: ::
+
+    foreign import ccall "mmap" c_mmap' :: CSize -> forall a. IO (Ptr a)
+    foreign import ccall quux :: (forall a. Ptr a) -> IO ()
 
 .. _ffi-prim:
 
