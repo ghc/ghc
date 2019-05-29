@@ -128,6 +128,11 @@ Compiler
   Generation of these files, which sport a ``.hie`` suffix, is enabled via the
   :ghc-flag:`-fwrite-ide-info` flag. See :ref:`hie-options` for more information.
 
+LLVM backend
+~~~~~~~~~~~~
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is compatible with LLVM 7.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
