@@ -3570,7 +3570,7 @@ forwardCmd :: GhciMonad m => String -> m ()
 forwardCmd arg
   | null arg        = forward 1
   | all isDigit arg = forward (read arg)
-  | otherwise       = liftIO $ putStrLn "Syntax:  :back [num]"
+  | otherwise       = liftIO $ putStrLn "Syntax:  :forward [num]"
   where
   forward num = withSandboxOnly ":forward" $ do
       (names, ix, pan, _) <- GHC.forward num
