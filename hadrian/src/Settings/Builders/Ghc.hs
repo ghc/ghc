@@ -71,6 +71,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     buildPath <- getBuildPath
     libffiName' <- libffiName
     debugged <- ghcDebugged <$> expr flavour
+    traced <- ghcTraced <$> expr flavour
 
     let
         dynamic = Dynamic `wayUnit` way
@@ -125,6 +126,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
+            , traced ?
+              arg "-eventlog"
 
             ]
 

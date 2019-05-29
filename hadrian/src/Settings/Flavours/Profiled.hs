@@ -11,7 +11,8 @@ profiledFlavour = defaultFlavour
     { name        = "prof"
     , args        = defaultBuilderArgs <> profiledArgs <> defaultPackageArgs
     , ghcProfiled = True
-    , dynamicGhcPrograms = pure False }
+    , dynamicGhcPrograms = pure False
+    }
 
 profiledArgs :: Args
 profiledArgs = sourceArgs SourceArgs

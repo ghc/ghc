@@ -215,7 +215,8 @@ defaultFlavour = Flavour
     , ghciWithDebugger   = False
     , ghcProfiled        = False
     , ghcDebugged        = False
-    , ghcDocs            = cmdDocsArgs }
+    , ghcDocs            = cmdDocsArgs
+    , ghcTraced          = False }
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.
