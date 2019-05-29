@@ -11,7 +11,7 @@
 -- | Arity and eta expansion
 module CoreArity (
         manifestArity, joinRhsArity, exprArity, typeArity,
-        exprEtaExpandArity, findRhsArity, CheapFun, etaExpand,
+        exprEtaExpandArity, findRhsArity, etaExpand,
         etaExpandToJoinPoint, etaExpandToJoinPointRule,
         exprBotStrictness_maybe
     ) where
@@ -704,6 +704,28 @@ lambda wasn't one-shot we don't want to do this.
 
 So we combine the best of the two branches, on the (slightly dodgy)
 basis that if we know one branch is one-shot, then they all must be.
+
+Note [Arity trimming]
+~~~~~~~~~~~~~~~~~~~~~
+Consider ((\x y. blah) |> co), where co :: (Int->Int->Int) ~ (Int -> F a) , and
+F is some type family.
+
+Because of Note [exprArity invariant], item (2), we must return with arity at
+most 1, because typeArity (Int -> F a) = 1.  So we have to trim the result of
+calling arityType on (\x y. blah).  Failing to do so, and hence breaking the
+exprArity invariant, led to #5441.
+
+How to trim?  For ATop, it's easy.  But we must take great care with ABot.
+Suppose the expression was (\x y. error "urk"), we'll get (ABot 2).  We
+absolutely must not trim that to (ABot 1), because that claims that
+((\x y. error "urk") |> co) diverges when given one argument, which it
+absolutely does not. And Bad Things happen if we think something returns bottom
+when it doesn't (#16066).
+
+So, do not reduce the 'n' in (ABot n); rather, switch (conservatively) to ATop.
+
+Historical note: long ago, we unconditionally switched to ATop when we
+encountered a cast, but that is far too conservative: see #5475
 -}
 
 ---------------------------
@@ -722,7 +744,9 @@ arityType :: ArityEnv -> CoreExpr -> ArityType
 arityType env (Cast e co)
   = case arityType env e of
       ATop os -> ATop (take co_arity os)
-      ABot n  -> ABot (n `min` co_arity)
+      -- See Note [Arity trimming]
+      ABot n | co_arity < n -> ATop (replicate co_arity noOneShotInfo)
+             | otherwise    -> ABot n
   where
     co_arity = length (typeArity (pSnd (coercionKind co)))
     -- See Note [exprArity invariant] (2); must be true of
