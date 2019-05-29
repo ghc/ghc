@@ -140,6 +140,7 @@ void postTaskDeleteEvent (EventTaskId taskId);
 void postHeapProfBegin(StgWord8 profile_id);
 
 void postHeapProfSampleBegin(StgInt era);
+void postHeapProfSampleEnd(StgInt era);
 
 void postHeapProfSampleString(StgWord8 profile_id,
                               const char *label,

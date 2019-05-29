@@ -84,6 +84,14 @@ in length a single sample may need to be split among multiple
 ``EVENT_HEAP_PROF_SAMPLE`` events. The precise format of the census entries is
 determined by the break-down type.
 
+At the end of the sample period the ``EVENT_HEAP_PROF_SAMPLE_END`` event if
+emitted. This is useful to properly delimit the sampling period and to record
+the total time spent profiling.
+
+
+ * ``EVENT_HEAP_PROF_SAMPLE_END``
+   * ``Word64``: sample number
+
 
 Cost-centre break-down
 ^^^^^^^^^^^^^^^^^^^^^^

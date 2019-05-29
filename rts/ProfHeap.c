@@ -884,6 +884,7 @@ dumpCensus( Census *census )
         fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
     }
 
+    traceHeapProfSampleEnd(era);
     printSample(false, census->time);
 }
 
