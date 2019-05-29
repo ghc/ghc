@@ -81,6 +81,7 @@ instance (Show1 f, Show1 g, Show a) => Show (Product f g a) where
 -- | @since 4.9.0.0
 instance (Functor f, Functor g) => Functor (Product f g) where
     fmap f (Pair x y) = Pair (fmap f x) (fmap f y)
+    a <$ (Pair x y) = Pair (a <$ x) (a <$ y)
 
 -- | @since 4.9.0.0
 instance (Foldable f, Foldable g) => Foldable (Product f g) where

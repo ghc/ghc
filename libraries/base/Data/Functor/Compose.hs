@@ -100,6 +100,7 @@ instance (Show1 f, Show1 g, Show a) => Show (Compose f g a) where
 -- | @since 4.9.0.0
 instance (Functor f, Functor g) => Functor (Compose f g) where
     fmap f (Compose x) = Compose (fmap (fmap f) x)
+    a <$ (Compose x) = Compose (fmap (a <$) x)
 
 -- | @since 4.9.0.0
 instance (Foldable f, Foldable g) => Foldable (Compose f g) where
