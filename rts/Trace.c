@@ -623,6 +623,13 @@ void traceHeapProfSampleBegin(StgInt era)
     }
 }
 
+void traceHeapProfSampleEnd(StgInt era)
+{
+    if (eventlog_enabled) {
+        postHeapProfSampleEnd(era);
+    }
+}
+
 void traceHeapProfSampleString(StgWord8 profile_id,
                                const char *label, StgWord residency)
 {
