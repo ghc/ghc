@@ -786,6 +786,15 @@ lintCoreExpr (Lam var expr)
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
   do { let scrut_diverges = exprIsBottom scrut
+
+      -- If the case has no alternatives the scrutinee needs to diverge
+      ; when (null alts) $
+          lintL scrut_diverges $ vcat
+            [ text "Case expression has no alts, " <>
+              text "but scrutinee is not known to diverge"
+            , text "Scruinee:" <+> ppr scrut
+            ]
+
      ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)

@@ -11,7 +11,7 @@
 -- | Arity and eta expansion
 module CoreArity (
         manifestArity, joinRhsArity, exprArity, typeArity,
-        exprEtaExpandArity, findRhsArity, CheapFun, etaExpand,
+        exprEtaExpandArity, findRhsArity, etaExpand,
         etaExpandToJoinPoint, etaExpandToJoinPointRule,
         exprBotStrictness_maybe
     ) where
@@ -720,7 +720,9 @@ arityType :: ArityEnv -> CoreExpr -> ArityType
 arityType env (Cast e co)
   = case arityType env e of
       ATop os -> ATop (take co_arity os)
-      ABot n  -> ABot (n `min` co_arity)
+      ABot n | co_arity < n -> ATop (replicate co_arity noOneShotInfo)
+             | otherwise    -> ABot n
+
   where
     co_arity = length (typeArity (pSnd (coercionKind co)))
     -- See Note [exprArity invariant] (2); must be true of
