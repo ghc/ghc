@@ -103,6 +103,7 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_BEGIN]     = "Start of heap profile",
   [EVENT_HEAP_PROF_COST_CENTRE]   = "Cost center definition",
   [EVENT_HEAP_PROF_SAMPLE_BEGIN]  = "Start of heap profile sample",
+  [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
   [EVENT_USER_BINARY_MSG]     = "User binary message"
@@ -427,6 +428,10 @@ postHeaderEvents(void)
             break;
 
         case EVENT_HEAP_PROF_SAMPLE_BEGIN:
+            eventTypes[t].size = 8;
+            break;
+
+        case EVENT_HEAP_PROF_SAMPLE_END:
             eventTypes[t].size = 8;
             break;
 
@@ -1206,6 +1211,15 @@ void postHeapProfSampleBegin(StgInt era)
     ACQUIRE_LOCK(&eventBufMutex);
     ensureRoomForEvent(&eventBuf, EVENT_HEAP_PROF_SAMPLE_BEGIN);
     postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_BEGIN);
+    postWord64(&eventBuf, era);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postHeapProfSampleEnd(StgInt era)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_HEAP_PROF_SAMPLE_END);
+    postEventHeader(&eventBuf, EVENT_HEAP_PROF_SAMPLE_END);
     postWord64(&eventBuf, era);
     RELEASE_LOCK(&eventBufMutex);
 }
