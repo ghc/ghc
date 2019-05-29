@@ -1095,6 +1095,10 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
     package.
 
+    Each event is associated with a timestamp which is the number of
+    nanoseconds since the start of executation of the running program.
+    This is the elapsed time, not the CPU time.
+
 .. rts-flag:: -ol ⟨filename⟩
 
     :default: :file:`<program>.eventlog`
