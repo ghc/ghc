@@ -830,7 +830,7 @@ error = true;
 # define TRACING_BUILD_ONLY(x)   x
 #else
 # define TRACING_BUILD_ONLY(x) \
-errorBelch("the flag %s requires the program to be built with -eventlog or -debug", \
+errorBelch("the flag %s requires the program to be built with -eventlog, -prof or -debug", \
            rts_argv[arg]);                                              \
 error = true;
 #endif
