@@ -353,26 +353,26 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; (tidy_env, tidy_binds)
                  <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
 
-        ; let { final_ids  = [ id | id <- bindersOfBinds tidy_binds,
-                                    isExternalName (idName id)]
+        ; let { final_ids  = [ if omit_prags then trimId id else id
+                             | id <- bindersOfBinds tidy_binds
+                             , isExternalName (idName id)
+                             , -- Remove wired-in things. See comments around `tidyTypeEnv`.
+                               not (isWiredInName (getName id))
+                             ]
+
               ; type_env1  = extendTypeEnvWithIds type_env final_ids
 
-              ; tidy_cls_insts = map (updateClsInstDFun (tidyVarOcc tidy_env)) cls_insts
-                -- A DFunId will have a binding in tidy_binds, and so will now be in
-                -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
-                -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
-                -- tidy_cls_insts.  Similarly the Ids inside a PatSyn.
+              ; lookup_final_id id =
+                  case lookupTypeEnv type_env1 (idName id) of
+                    Just (AnId id') -> id'
+                    _ -> pprPanic "lookup_final_id" (ppr id)
+
+              ; tidy_cls_insts = map (updateClsInstDFun lookup_final_id) cls_insts
 
               ; tidy_rules = tidyRules tidy_env trimmed_rules
-                -- You might worry that the tidy_env contains IdInfo-rich stuff
-                -- and indeed it does, but if omit_prags is on, ext_rules is
-                -- empty
 
-                -- Tidy the Ids inside each PatSyn, very similarly to DFunIds
-                -- and then override the PatSyns in the type_env with the new tidy ones
-                -- This is really the only reason we keep mg_patsyns at all; otherwise
-                -- they could just stay in type_env
-              ; tidy_patsyns = map (updatePatSynIds (tidyVarOcc tidy_env)) patsyns
+              ; tidy_patsyns = map (updatePatSynIds lookup_final_id) patsyns
+
               ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
@@ -470,12 +470,17 @@ tidyTypeEnv omit_prags type_env
     type_env2
 
 --------------------------
+trimId :: Id -> Id
+trimId id
+  | not (isImplicitId id)
+  = id `setIdInfo` vanillaIdInfo
+  | otherwise
+  = id
+
 trimThing :: TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
-
 trimThing (AnId id)
-   | not (isImplicitId id)
-   = AnId (id `setIdInfo` vanillaIdInfo)
+  = AnId (trimId id)
 
 trimThing other_thing
   = other_thing
