@@ -149,8 +149,8 @@ mkBootModDetailsTc hsc_env
     Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
-    do  { let { insts'     = map (tidyClsInstDFun globaliseAndTidyId) insts
-              ; pat_syns'  = map (tidyPatSynIds   globaliseAndTidyId) pat_syns
+    do  { let { insts'     = map (updateClsInstDFun globaliseAndTidyId) insts
+              ; pat_syns'  = map (updatePatSynIds   globaliseAndTidyId) pat_syns
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
               ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
@@ -357,7 +357,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                     isExternalName (idName id)]
               ; type_env1  = extendTypeEnvWithIds type_env final_ids
 
-              ; tidy_cls_insts = map (tidyClsInstDFun (tidyVarOcc tidy_env)) cls_insts
+              ; tidy_cls_insts = map (updateClsInstDFun (tidyVarOcc tidy_env)) cls_insts
                 -- A DFunId will have a binding in tidy_binds, and so will now be in
                 -- tidy_type_env, replete with IdInfo.  Its name will be unchanged since
                 -- it was born, but we want Global, IdInfo-rich (or not) DFunId in the
@@ -372,7 +372,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- and then override the PatSyns in the type_env with the new tidy ones
                 -- This is really the only reason we keep mg_patsyns at all; otherwise
                 -- they could just stay in type_env
-              ; tidy_patsyns = map (tidyPatSynIds (tidyVarOcc tidy_env)) patsyns
+              ; tidy_patsyns = map (updatePatSynIds (tidyVarOcc tidy_env)) patsyns
               ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
