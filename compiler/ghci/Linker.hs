@@ -115,7 +115,7 @@ readPLS dl =
 
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f 
+modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
@@ -881,8 +881,8 @@ dynLinkObjs hsc_env pls objs = do
 
 dynLoadObjs :: HscEnv -> PersistentLinkerState -> [FilePath]
             -> IO PersistentLinkerState
-dynLoadObjs _       pls []   = return pls
-dynLoadObjs hsc_env pls objs = do
+dynLoadObjs _       pls                           []   = return pls
+dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
     let dflags = hsc_dflags hsc_env
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
@@ -899,13 +899,13 @@ dynLoadObjs hsc_env pls objs = do
                       -- library.
                       ldInputs =
                            concatMap (\l -> [ Option ("-l" ++ l) ])
-                                     (nub $ snd <$> temp_sos pls)
+                                     (nub $ snd <$> temp_sos)
                         ++ concatMap (\lp -> [ Option ("-L" ++ lp)
                                                     , Option "-Xlinker"
                                                     , Option "-rpath"
                                                     , Option "-Xlinker"
                                                     , Option lp ])
-                                     (nub $ fst <$> temp_sos pls)
+                                     (nub $ fst <$> temp_sos)
                         ++ concatMap
                              (\lp ->
                                  [ Option ("-L" ++ lp)
@@ -933,13 +933,13 @@ dynLoadObjs hsc_env pls objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 objs (pkgs_loaded pls)
+    linkDynLib dflags2 objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
-        Nothing -> return pls { temp_sos = (libPath, libName) : temp_sos pls }
+        Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
         Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
