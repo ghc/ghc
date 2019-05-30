@@ -179,7 +179,7 @@ sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
     , getContextData hcOpts
-    , libraryPackage   ? hsLibrary
+    , libraryPackage   ? notM (packageOneOf [compiler, ghc]) ? hsLibrary
     , package compiler ? hsCompiler
     , package ghc      ? hsGhc ]
 
