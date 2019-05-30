@@ -921,7 +921,7 @@ for example).
     :ref:`rts-eventlog` for more information.
 
     :ghc-flag:`-eventlog` can be used with :ghc-flag:`-threaded`. It is implied by
-    :ghc-flag:`-debug`.
+    :ghc-flag:`-debug` and :ghc-flag:`-prof`.
 
 .. ghc-flag:: -rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]
     :shortdesc: Control whether the RTS behaviour can be tweaked via command-line
