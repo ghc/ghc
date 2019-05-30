@@ -129,10 +129,7 @@ all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)
 all_ghc_stage3 : $(GHC_STAGE3)
 
-settings : $(includes_SETTINGS)
-	"$(CP)" $< $@
-
-$(INPLACE_LIB)/settings : settings
+$(INPLACE_LIB)/settings : $(includes_SETTINGS)
 	"$(CP)" $< $@
 
 $(INPLACE_LIB)/llvm-targets : llvm-targets
@@ -171,7 +168,7 @@ $(GHC_STAGE2) : $(foreach w,$(GhcLibWays),libraries/base/dist-install/build/GHC/
 
 endif
 
-INSTALL_LIBS += settings
+INSTALL_LIBS += $(includes_SETTINGS)
 INSTALL_LIBS += llvm-targets
 INSTALL_LIBS += llvm-passes
 
