@@ -179,7 +179,10 @@ sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
     , getContextData hcOpts
-    , libraryPackage   ? hsLibrary
+    -- `compiler` is also a library but the specific arguments that we want
+    -- to apply to that are given by the hsCompiler option. `ghc` is an
+    -- executable so we don't have to exclude that.
+    , libraryPackage   ? notM (packageOneOf [compiler]) ? hsLibrary
     , package compiler ? hsCompiler
     , package ghc      ? hsGhc ]
 
