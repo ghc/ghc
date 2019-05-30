@@ -49,7 +49,6 @@ stages:
 ############################################################
 
 ghc-linters:
-  allow_failure: true
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
