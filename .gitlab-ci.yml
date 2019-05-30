@@ -100,6 +100,9 @@ lint-submods-mr:
   only:
     refs:
       - merge_requests
+  except:
+    variables:
+      - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
 
 .lint-changelogs:
   stage: lint
