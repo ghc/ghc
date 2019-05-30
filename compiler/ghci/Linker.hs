@@ -115,7 +115,7 @@ readPLS dl =
 
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f 
+modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
