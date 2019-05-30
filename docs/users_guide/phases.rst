@@ -365,7 +365,7 @@ defined by your local GHC installation, the following trick is useful:
 
     .. code-block:: c
 
-        #ifdef MIN_VERSION_GLASGOW_HASKELL
+        #if defined(MIN_VERSION_GLASGOW_HASKELL)
         #if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
         /* code that applies only to GHC 7.10.2 or later */
         #endif
