@@ -1216,7 +1216,7 @@ ocGetNames_MachO(ObjectCode* oc)
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: will load %d sections\n",
                                 oc->n_sections));
 
-#if defined (ios_HOST_OS)
+#if defined(ios_HOST_OS)
     for(int i=0; i < oc->n_sections; i++)
     {
         MachOSection * section = &oc->info->macho_sections[i];
@@ -1641,7 +1641,7 @@ ocResolve_MachO(ObjectCode* oc)
     {
         IF_DEBUG(linker, debugBelch("ocResolve_MachO: relocating section %d\n", i));
 
-#if defined aarch64_HOST_ARCH
+#if defined(aarch64_HOST_ARCH)
         if (!relocateSectionAarch64(oc, &oc->sections[i]))
             return 0;
 #else
