@@ -689,9 +689,10 @@ data StgOp
   | StgFCallOp ForeignCall Type Unique 
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
-        -- typedef for foreign-export-dynamic. The Type is needed by
-        -- the stg-to-cmm pass to determine the offset to apply to
-        -- unlifted boxed arguments.
+        -- typedef for foreign-export-dynamic. The Type, which is
+        -- obtained from the foreign import declaration itself, is
+        -- needed by the stg-to-cmm pass to determine the offset to
+        -- apply to unlifted boxed arguments in StgCmmForeign.
         -- See Note [Unlifted boxed arguments to foreign calls]
 
 {-

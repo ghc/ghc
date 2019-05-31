@@ -55,7 +55,7 @@ import Control.Monad
 
 -- | Emit code for a foreign call, and return the results to the sequel.
 -- Precondition: the length of the arguments list is the same as the
--- number of arguments in the type of the foreign function.
+-- arity of the foreign function.
 cgForeignCall :: ForeignCall            -- the op
               -> Type                   -- type of foreign function
               -> [StgArg]               -- x,y    arguments
@@ -502,21 +502,42 @@ closureField dflags off = off + fixedHdrSize dflags
 --
 -- For certain types passed to foreign calls, we adjust the actual
 -- value passed to the call.  For ByteArray#, Array#, SmallArray#,
--- and ArrayArray#, we pass the address of the actual array, not
--- the address of the heap object. We must work from the type to
--- determine the offset. But where should the type come from? There
--- are two available options. We could use the types of the actual
--- values that the foreign call has been applied to, or we could
--- use the types present in the foreign function's type. Prior to
--- GHC 8.10, we used the former strategy since it's a little more
--- simple. However, in the comments of
+-- and ArrayArray#, we pass the address of the array's payload, not
+-- the address of the heap object. For example, consider
+--   foreign import "c_foo" foo :: ByteArray# -> Int# -> IO ()
+-- At a Haskell call like `foo x y`, we'll generate a C call that
+-- is more like
+--   c_foo( x+8, y )
+-- where the "+8" takes the heap pointer (x :: ByteArray#) and moves
+-- it past the header words of the ByteArray object to point directly
+-- to the data inside the ByteArray#. (The exact offset depends
+-- on the target architecture and on profiling) By contrast, (y :: Int#)
+-- requires no such adjustment.
+--
+-- This adjustment is performed by 'add_shim'. The size of the
+-- adjustment depends on the type of heap object. But
+-- how can we determine that type? There are two available options.
+-- We could use the types of the actual values that the foreign call
+-- has been applied to, or we could use the types present in the
+-- foreign function's type. Prior to GHC 8.10, we used the former
+-- strategy since it's a little more simple. However, in issue #16650
+-- and more compellingly in the comments of
 -- https://gitlab.haskell.org/ghc/ghc/merge_requests/939, it was
--- found that this leads to bad behavior in the presence
--- of unsafeCoerce#. For example, if a ByteArray# argument was
--- unsafely coerced from a value of type Any prior to being passed
--- to a foreign call, StgCmmForeign.add_shim might see the type Any
--- (instead of ByteArray#) and fail to apply the offset that the
--- user expected for ByteArray# objects.
+-- demonstrated that this leads to bad behavior in the presence
+-- of unsafeCoerce#. Returning to the above example, suppose the
+-- Haskell call looked like
+--   foo (unsafeCoerce# p) 
+-- where the types of expressions comprising the arguments are
+--   p :: (Any :: TYPE 'UnliftedRep)
+--   i :: Int#
+-- so that the unsafe-coerce is between Any and ByteArray#.
+-- These two types have the same kind (they are both represented by
+-- a heap pointer) so no GC errors will occur if we do this unsafe coerce.
+-- By the time this gets to the code generator the cast has been
+-- discarded so we have
+--   foo p y
+-- But we *must* adjust the pointer to p by a ByteArray# shim,
+-- *not* by an Any shim (the Any shim involves no offset at all).
 --
 -- To avoid this bad behavior, we adopt the second strategy: use
 -- the types present in the foreign function's type.

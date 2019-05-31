@@ -5,9 +5,10 @@
 {-# language MagicHash #-}
 {-# language UnboxedTuples #-}
 
+-- Test for shims when passing a ByteArray# to a foreign function.
 -- The bad behavior here was initially observed in the MR
 -- https://gitlab.haskell.org/ghc/ghc/merge_requests/939,
--- but this test has been named after issue 16650 since it
+-- but this test has been named after issue #16650 since it
 -- is closely related to the unexpected behavior there.
 
 import GHC.Exts
