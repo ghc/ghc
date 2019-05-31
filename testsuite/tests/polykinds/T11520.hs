@@ -1,11 +1,15 @@
 {-# LANGUAGE RankNTypes, PolyKinds, GADTs, UndecidableSuperClasses, UndecidableInstances #-}
+{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T11520 where
 
+import Data.Kind (Type, Constraint)
 import GHC.Types hiding (TyCon)
 
-data TypeRep (a :: k)
+type TypeRep :: k -> Type
+data TypeRep a
 
+type Typeable :: k -> Constraint
 class Typeable k => Typeable (a :: k) where
     typeRep :: TypeRep a
 

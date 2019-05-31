@@ -1,13 +1,13 @@
 [1 of 2] Compiling T13780b          ( T13780b.hs, T13780b.o )
 [2 of 2] Compiling T13780c          ( T13780c.hs, T13780c.o )
 
-T13780c.hs:11:16: error:
+T13780c.hs:18:16: error:
     • Data constructor ‘SFalse’ cannot be used here
         (it comes from a data family instance)
     • In the third argument of ‘ElimBool’, namely ‘SFalse’
       In the type family declaration for ‘ElimBool’
 
-T13780c.hs:12:16: error:
+T13780c.hs:19:16: error:
     • Data constructor ‘STrue’ cannot be used here
         (it comes from a data family instance)
     • In the third argument of ‘ElimBool’, namely ‘STrue’

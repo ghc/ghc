@@ -1,7 +1,8 @@
-{-# LANGUAGE GADTs , PolyKinds #-}
+{-# LANGUAGE GADTs, PolyKinds, TopLevelKindSignatures #-}
 
 module Bug2 where
 
+import Data.Kind
 import Unsafe.Coerce
 
 data TyConT (a::k) = TyConT String
@@ -14,8 +15,8 @@ eqTyConT (TyConT a) (TyConT b) = a == b
 tyConTArr :: TyConT (->)
 tyConTArr = TyConT "(->)"
 
-
-data TypeRepT (a::k) where
+type TypeRepT :: k -> Type
+data TypeRepT a where
   TRCon :: TyConT a -> TypeRepT a
   TRApp :: TypeRepT a -> TypeRepT b -> TypeRepT (a b)
 
