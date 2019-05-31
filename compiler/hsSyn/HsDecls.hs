@@ -550,6 +550,7 @@ type LHsFunDep pass = Located (FunDep (Located (IdP pass)))
 
 data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
+                 -- See Note [CUSKs: complete user-supplied kind signatures]
              , tcdFVs      :: NameSet }
   deriving Data
 
@@ -864,6 +865,10 @@ NOTE THAT
 
     This last point is much more debatable than the others; see
     #15142 comment:22
+
+    Because this is fiddly to check, there is a field in the DataDeclRn
+    structure (included in a DataDecl after the renamer) that stores whether
+    or not the declaration has a CUSK.
 -}
 
 
