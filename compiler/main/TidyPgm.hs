@@ -373,9 +373,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
               ; tidy_patsyns = map (updatePatSynIds lookup_final_id) patsyns
 
-              ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
-
-              ; tidy_type_env = tidyTypeEnv omit_prags type_env2
+              ; tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env1
               }
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
