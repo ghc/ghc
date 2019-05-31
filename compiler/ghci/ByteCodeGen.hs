@@ -22,7 +22,7 @@ import GHCi.RemoteTypes
 import BasicTypes
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import Name
 import MkId
 import Id

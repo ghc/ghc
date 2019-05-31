@@ -29,7 +29,7 @@ import FastString
 import ForeignCall
 import Outputable hiding (panic, pprPanic)
 import qualified Outputable
-import Platform
+import GHC.Platform
 import OrdList
 import UniqSupply
 import Unique

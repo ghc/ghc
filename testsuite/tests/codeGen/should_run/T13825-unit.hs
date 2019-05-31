@@ -8,7 +8,7 @@ import StgCmmClosure
 import GHC
 import GhcMonad
 import System.Environment
-import Platform
+import GHC.Platform
 
 main :: IO ()
 main = do

@@ -60,7 +60,7 @@ import Cmm
 import CLabel           ( CLabel )
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 
 import qualified Data.Array as A
 

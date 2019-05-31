@@ -14,7 +14,7 @@ import Hoopl.Label
 import Hoopl.Collections
 import Hoopl.Graph
 import CodeGen.Platform
-import Platform (isARM, platformArch)
+import GHC.Platform (isARM, platformArch)
 
 import DynFlags
 import Unique

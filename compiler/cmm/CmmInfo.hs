@@ -45,7 +45,7 @@ import Stream (Stream)
 import qualified Stream
 import Hoopl.Collections
 
-import Platform
+import GHC.Platform
 import Maybes
 import DynFlags
 import Panic
