@@ -40,6 +40,8 @@ module SysTools (
 
 import GhcPrelude
 
+import GHC.Settings
+
 import Module
 import Packages
 import Config
