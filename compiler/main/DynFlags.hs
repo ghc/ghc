@@ -248,7 +248,7 @@ module DynFlags (
 
 import GhcPrelude
 
-import Platform
+import GHC.Platform
 import PlatformConstants
 import Module
 import PackageConfig

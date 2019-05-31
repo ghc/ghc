@@ -42,7 +42,7 @@ import Cmm              hiding (topInfoTable)
 import BlockId
 import CLabel
 import Unique           ( pprUniqueAlways )
-import Platform
+import GHC.Platform
 import FastString
 import Outputable
 

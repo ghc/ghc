@@ -42,7 +42,7 @@ import FastMutInt
 import Unique
 import Outputable
 import NameCache
-import Platform
+import GHC.Platform
 import FastString
 import Constants
 import Util
