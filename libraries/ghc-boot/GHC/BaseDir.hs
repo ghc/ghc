@@ -14,8 +14,9 @@
 -- and so needs the top dir location to do that too.
 module GHC.BaseDir where
 
-import Prelude -- See note [Why do we import Prelude here?]
+import Prelude -- See Note [Why do we import Prelude here?]
 
+import Data.List
 import System.FilePath
 
 -- Windows
@@ -25,6 +26,21 @@ import System.Environment (getExecutablePath)
 #elif defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 import System.Environment (getExecutablePath)
 #endif
+
+-- | Expand occurrences of the @$topdir@ interpolation in a string.
+expandTopDir :: FilePath -> String -> String
+expandTopDir = expandPathVar "topdir"
+
+-- | @expandPathVar var value str@
+--
+--   replaces occurences of variable @$var@ with @value@ in str.
+expandPathVar :: String -> FilePath -> String -> String
+expandPathVar var value str
+  | Just str' <- stripPrefix ('$':var) str
+  , null str' || isPathSeparator (head str')
+  = value ++ expandPathVar var value str'
+expandPathVar var value (x:xs) = x : expandPathVar var value xs
+expandPathVar _ _ [] = []
 
 -- | Calculate the location of the base dir
 getBaseDir :: IO (Maybe String)
