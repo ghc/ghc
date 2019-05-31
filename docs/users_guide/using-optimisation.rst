@@ -707,7 +707,7 @@ by saying ``-fno-wombat``.
     :reverse: -fno-omit-yields
     :category:
 
-    :default: yield points enabled
+    :default: yield points disabled
 
     Tells GHC to omit heap checks when no allocation is
     being performed. While this improves binary sizes by about 5%, it
