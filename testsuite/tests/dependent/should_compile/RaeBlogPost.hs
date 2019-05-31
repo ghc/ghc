@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds, PolyKinds, GADTs, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE TopLevelKindSignatures #-}
 {-# OPTIONS_GHC -fwarn-unticked-promoted-constructors #-}
 
 module RaeBlogPost where
@@ -22,7 +23,8 @@ data E :: D c -> Type
 -- note that E :: forall (a :: A) (b :: B a) (c :: C b). D c -> Type
 
 -- a kind-indexed GADT
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
   TInt   :: TypeRep Int
   TMaybe :: TypeRep Maybe
   TApp   :: TypeRep a -> TypeRep b -> TypeRep (a b)
@@ -36,13 +38,15 @@ type family a + b where
   'Zero     + b = b
   ('Succ a) + b = 'Succ (a + b)
 
-data Vec :: Type -> Nat -> Type where
+type Vec :: Type -> Nat -> Type
+data Vec a n where
   Nil  :: Vec a 'Zero
   (:>) :: a -> Vec a n -> Vec a ('Succ n)
 infixr 5 :>
 
 -- promoted GADT, and using + as a "kind family":
-type family (x :: Vec a n) ++ (y :: Vec a m) :: Vec a (n + m) where
+type (++) :: Vec a n -> Vec a m -> Vec a (n + m)
+type family x ++ y where
   'Nil      ++ y = y
   (h ':> t) ++ y = h ':> (t ++ y)
 

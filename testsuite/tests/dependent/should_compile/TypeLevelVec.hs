@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, PolyKinds, UnicodeSyntax, GADTs, NoImplicitPrelude,
-             TypeOperators, TypeFamilies #-}
+             TypeOperators, TypeFamilies, TopLevelKindSignatures #-}
 {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 
 module TypeLevelVec where
@@ -20,7 +20,8 @@ data Vec ∷ ℕ → Type → Type where
   (:>) ∷ a → Vec n a → Vec (S n) a
 infixr 8 :>
 
-type family (x ∷ Vec n a) ++ (y ∷ Vec m a) ∷ Vec (n + m) a where
+type (++) :: Vec n a -> Vec m a -> Vec (n + m) a
+type family x ++ y where
   Nil       ++ y = y
   (x :> xs) ++ y = x :> (xs ++ y)
 infixl 5 ++

@@ -1,6 +1,7 @@
 {-# Language PatternSynonyms, ViewPatterns, GADTs, ConstraintKinds, RankNTypes,
              PolyKinds, ScopedTypeVariables, DataKinds, TypeOperators,
-             TypeApplications, TypeFamilies, TypeFamilyDependencies #-}
+             TypeApplications, TypeFamilies, TypeFamilyDependencies,
+             TopLevelKindSignatures #-}
 
 module T14507 where
 
@@ -10,7 +11,8 @@ import Data.Kind
 foo :: TypeRep a -> (Bool :~~: k, TypeRep a)
 foo rep = error "urk"
 
-type family SING :: k -> Type where
+type SING :: k -> Type
+type family SING where
   SING = (TypeRep :: Bool -> Type)
 
 pattern RepN :: forall kk (a::kk). () => Bool~kk => SING a -> TypeRep (a::kk)

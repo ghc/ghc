@@ -1,11 +1,12 @@
-{-# LANGUAGE TemplateHaskell, DataKinds, PolyKinds
-             , TypeInType, TypeApplications, TypeFamilies  #-}
+{-# LANGUAGE TemplateHaskell, DataKinds, PolyKinds,
+             TopLevelKindSignatures, TypeApplications, TypeFamilies #-}
 
 module T12045TH1 where
 import Data.Kind
 import Language.Haskell.TH hiding (Type)
 
-$([d| type family F (a :: k) :: Type where
+$([d| type F :: k -> Type
+      type family F a where
                      F @Type Int = Bool
                      F @(Type->Type) Maybe = Char |])
 

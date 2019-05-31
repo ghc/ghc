@@ -1,4 +1,5 @@
-{-# Language RankNTypes, PatternSynonyms, TypeOperators, DataKinds, PolyKinds, KindSignatures, GADTs #-}
+{-# Language RankNTypes, PatternSynonyms, TypeOperators, DataKinds, PolyKinds,
+             TopLevelKindSignatures, GADTs #-}
 
 module T15694 where
 
@@ -9,7 +10,8 @@ data Ctx :: Type -> Type where
  E     :: Ctx(Type)
  (:&:) :: a -> Ctx(as) -> Ctx(a -> as)
 
-data ApplyT(kind::Type) :: kind ->  Ctx(kind) -> Type where
+type ApplyT :: forall (kind::Type) -> kind -> Ctx(kind) -> Type
+data ApplyT k t ctx where
  AO :: a -> ApplyT(Type) a E
  AS :: ApplyT(ks)      (f a) ctx
     -> ApplyT(k -> ks) f     (a:&:ctx)

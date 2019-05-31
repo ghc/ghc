@@ -1,7 +1,8 @@
 -- Based on https://github.com/idris-lang/Idris-dev/blob/v0.9.10/libs/effects/Effects.idr
 
 {-# LANGUAGE DataKinds, PolyKinds, ScopedTypeVariables, TypeOperators,
-             TypeApplications, GADTs, TypeFamilies, AllowAmbiguousTypes #-}
+             TypeApplications, GADTs, TypeFamilies, AllowAmbiguousTypes,
+             TopLevelKindSignatures #-}
 
 module T12442 where
 
@@ -33,9 +34,15 @@ data EffElem :: (Type ~> Type ~> Type ~> Type) -> Type -> [EFFECT] -> Type where
 data instance Sing (elem :: EffElem x a xs) where
   SHere :: Sing Here
 
-type family UpdateResTy (b :: Type) (t :: Type)
-                        (xs :: [EFFECT]) (elem :: EffElem e a xs)
-                        (thing :: e @@ a @@ b @@ t) :: [EFFECT] where
+type UpdateResTy ::
+  forall a e.
+  forall (b :: Type) ->
+  forall (t :: Type) ->
+  forall (xs :: [EFFECT]) ->
+  EffElem e a xs ->
+  (e @@ a @@ b @@ t) ->
+  [EFFECT]
+type family UpdateResTy b t xs elem thing where
   UpdateResTy b _ (MkEff a e ': xs) Here n = MkEff b e ': xs
 
 data EffM :: (Type ~> Type) -> [EFFECT] -> [EFFECT] -> Type -> Type
