@@ -278,6 +278,46 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
+validate-x86_64-darwin-hadrian:
+  <<: *only-default
+  stage: full-build
+  tags:
+    - x86_64-darwin
+  variables:
+    GHC_VERSION: 8.6.3
+    MACOSX_DEPLOYMENT_TARGET: "10.7"
+    ac_cv_func_clock_gettime: "no"
+    LANG: "en_US.UTF-8"
+    CONFIGURE_ARGS: --with-intree-gmp
+    TEST_ENV: "x86_64-darwin"
+  before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - python3 .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+
+    - bash .gitlab/darwin-init.sh
+    - PATH="`pwd`/toolchain/bin:$PATH"
+  script:
+    - cabal update
+    - ./boot
+    - ./configure $CONFIGURE_ARGS
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
+    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  artifacts:
+    when: always
+    expire_in: 2 week
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+
 .validate-linux:
   extends: .validate
   tags:

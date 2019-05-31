@@ -178,7 +178,7 @@ libffiRules = do
                     | windows   = "dll"
                     | osx       = "dylib"
                     | otherwise = "so"
-                filepat = "lib" ++ libffiName'' ++ "*." ++ dynlibext ++ "*"
+                filepat = "lib" ++ libffiName'' ++ "." ++ dynlibext ++ "*"
             liftIO $ getDirectoryFilesIO "." [libfilesDir -/- filepat]
 
         writeFileLines dynLibMan dynLibFiles
