@@ -37,6 +37,7 @@ Library
     default-extensions: NoImplicitPrelude
 
     exposed-modules:
+            GHC.BaseDir
             GHC.LanguageExtensions
             GHC.PackageDb
             GHC.Serialized
