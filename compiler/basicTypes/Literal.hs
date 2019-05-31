@@ -61,7 +61,7 @@ import BasicTypes
 import Binary
 import Constants
 import DynFlags
-import Platform
+import GHC.Platform
 import UniqFM
 import Util
 

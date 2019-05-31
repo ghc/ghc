@@ -59,7 +59,7 @@ import DynFlags
 import FastString
 import OrdList
 import Outputable
-import Platform
+import GHC.Platform
 
 import Control.Monad    ( mapAndUnzipM )
 

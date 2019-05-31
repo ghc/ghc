@@ -34,7 +34,7 @@ import CodeGen.Platform
 import Cmm
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 
 import BasicTypes       (Alignment)
 import CLabel

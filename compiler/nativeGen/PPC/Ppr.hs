@@ -30,7 +30,7 @@ import CLabel
 import PprCmmExpr ()
 
 import Unique                ( pprUniqueAlways, getUnique )
-import Platform
+import GHC.Platform
 import FastString
 import Outputable
 import DynFlags
