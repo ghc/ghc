@@ -4,6 +4,8 @@ Binary serialization for .hie files.
 {-# LANGUAGE ScopedTypeVariables #-}
 module HieBin ( readHieFile, readHieFileWithVersion, HieHeader, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieMagic) where
 
+import GHC.Settings               ( maybeRead )
+
 import Config                     ( cProjectVersion )
 import GhcPrelude
 import Binary
@@ -17,7 +19,6 @@ import Outputable
 import PrelInfo
 import SrcLoc
 import UniqSupply                 ( takeUniqFromSupply )
-import Util                       ( maybeRead )
 import Unique
 import UniqFM
 

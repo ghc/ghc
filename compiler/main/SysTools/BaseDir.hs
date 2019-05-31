@@ -27,7 +27,6 @@ import Panic
 
 import System.Environment (lookupEnv)
 import System.FilePath
-import Data.List
 
 -- Windows
 #if defined(mingw32_HOST_OS)
@@ -76,10 +75,6 @@ $topdir/../../{mingw, perl}/.
 
 -}
 
--- | Expand occurrences of the @$topdir@ interpolation in a string.
-expandTopDir :: FilePath -> String -> String
-expandTopDir = expandPathVar "topdir"
-
 -- | Expand occurrences of the @$tooldir@ interpolation in a string
 -- on Windows, leave the string untouched otherwise.
 expandToolDir :: Maybe FilePath -> String -> String
@@ -89,17 +84,6 @@ expandToolDir Nothing         _ = panic "Could not determine $tooldir"
 #else
 expandToolDir _ s = s
 #endif
-
--- | @expandPathVar var value str@
---
---   replaces occurences of variable @$var@ with @value@ in str.
-expandPathVar :: String -> FilePath -> String -> String
-expandPathVar var value str
-  | Just str' <- stripPrefix ('$':var) str
-  , null str' || isPathSeparator (head str')
-  = value ++ expandPathVar var value str'
-expandPathVar var value (x:xs) = x : expandPathVar var value xs
-expandPathVar _ _ [] = []
 
 -- | Returns a Unix-format path pointing to TopDir.
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).

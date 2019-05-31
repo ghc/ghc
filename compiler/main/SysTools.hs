@@ -40,17 +40,19 @@ module SysTools (
 
 import GhcPrelude
 
+import GHC.Settings
+
 import Module
 import Packages
 import Config
 import Outputable
 import ErrUtils
 import GHC.Platform
-import Util
 import DynFlags
 import Fingerprint
 import ToolSettings
 
+import qualified Data.Map as Map
 import System.FilePath
 import System.IO
 import System.Directory
@@ -151,41 +153,29 @@ initSysTools top_dir
 
        settingsStr <- readFile settingsFile
        platformConstantsStr <- readFile platformConstantsFile
-       mySettings <- case maybeReadFuzzy settingsStr of
+       settingsList <- case maybeReadFuzzy settingsStr of
                      Just s ->
                          return s
                      Nothing ->
                          pgmError ("Can't parse " ++ show settingsFile)
+       let mySettings = Map.fromList settingsList
        platformConstants <- case maybeReadFuzzy platformConstantsStr of
                             Just s ->
                                 return s
                             Nothing ->
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
-       let getSetting key = case lookup key mySettings of
-                            Just xs -> return $ expandTopDir top_dir xs
-                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       -- See Note [Settings file] for a little more about this file. We're
+       -- just partially applying those functions and throwing 'Left's; they're
+       -- written in a very portable style to keep ghc-boot light.
+       let getSetting key = either pgmError pure $
+             getFilePathSetting0 top_dir settingsFile mySettings key
+           getToolSetting :: String -> IO String
            getToolSetting key = expandToolDir mtool_dir <$> getSetting key
-           getBooleanSetting key = case lookup key mySettings of
-                                   Just "YES" -> return True
-                                   Just "NO" -> return False
-                                   Just xs -> pgmError ("Bad value for " ++ show key ++ ": " ++ show xs)
-                                   Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-           readSetting key = case lookup key mySettings of
-                             Just xs ->
-                                 case maybeRead xs of
-                                 Just v -> return v
-                                 Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
-                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-       crossCompiling <- getBooleanSetting "cross compiling"
+           getBooleanSetting :: String -> IO Bool
+           getBooleanSetting key = either pgmError pure $
+             getBooleanSetting0 settingsFile mySettings key
        targetPlatformString <- getSetting "target platform string"
-       targetArch <- readSetting "target arch"
-       targetOS <- readSetting "target os"
-       targetWordSize <- readSetting "target word size"
-       targetUnregisterised <- getBooleanSetting "Unregisterised"
-       targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
-       targetHasIdentDirective <- readSetting "target has .ident directive"
-       targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
        tablesNextToCode <- getBooleanSetting "Tables next to code"
        myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
        -- On Windows, mingw is distributed with GHC,
@@ -200,7 +190,10 @@ initSysTools top_dir
        gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getToolSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
-       let unreg_cc_args = if targetUnregisterised
+
+       platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
+
+       let unreg_cc_args = if platformUnregisterised platform
                            then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                            else []
            cpp_args = map Option (words cpp_args_str)
@@ -249,17 +242,6 @@ initSysTools top_dir
        lcc_prog <- getSetting "LLVM clang command"
 
        let iserv_prog = libexec "ghc-iserv"
-
-       let platform = Platform {
-                          platformArch = targetArch,
-                          platformOS   = targetOS,
-                          platformWordSize = targetWordSize,
-                          platformUnregisterised = targetUnregisterised,
-                          platformHasGnuNonexecStack = targetHasGnuNonexecStack,
-                          platformHasIdentDirective = targetHasIdentDirective,
-                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols,
-                          platformIsCrossCompiling = crossCompiling
-                      }
 
        integerLibrary <- getSetting "integer library"
        integerLibraryType <- case integerLibrary of
@@ -358,7 +340,7 @@ initSysTools top_dir
 
          , sPlatformConstants = platformConstants
 
-         , sRawSettings    = mySettings
+         , sRawSettings    = settingsList
          }
 
 
