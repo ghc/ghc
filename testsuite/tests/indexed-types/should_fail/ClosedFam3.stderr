@@ -22,7 +22,7 @@ ClosedFam3.hs-boot:10:1: error:
                      Bar Int = Bool
                      Bar Double = Char
 
-ClosedFam3.hs-boot:14:1: error:
+ClosedFam3.hs-boot:15:1: error:
     Type constructor ‘Baz’ has conflicting definitions in the module
     and its hs-boot file
     Main module: type Baz :: * -> *
