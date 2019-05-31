@@ -9,7 +9,7 @@ import X86.Regs
 import RegClass
 import Reg
 import Panic
-import Platform
+import GHC.Platform
 
 import Data.Word
 import Data.Bits

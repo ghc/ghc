@@ -48,7 +48,7 @@ import DynFlags
 import FastString
 import Cmm              hiding ( succ )
 import Outputable as Outp
-import Platform
+import GHC.Platform
 import UniqFM
 import Unique
 import BufWrite   ( BufHandle )

@@ -25,7 +25,7 @@ import DynFlags
 import Util
 
 import Outputable
-import Platform
+import GHC.Platform
 
 import Data.Bits
 import Data.Maybe
