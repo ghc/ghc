@@ -1,5 +1,5 @@
 
-T14450.hs:33:3: error:
+T14450.hs:35:3: error:
     • Type indexes must match class instance head
       Expected: Dom @k @k (IddSym0 @k)
         Actual: Dom @* @* (IddSym0 @*)

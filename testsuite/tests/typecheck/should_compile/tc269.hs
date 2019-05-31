@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TopLevelKindSignatures #-}
 module Tc269 where
 
 import GHC.Types
@@ -18,4 +19,6 @@ type TSyn = T
 -- everything.  Need an explicit type signature.
 data K (a :: k) = K
 data S (p :: forall k. k -> Type) = S (SSyn K)
-type SSyn = (S :: (forall k. k -> Type) -> Type)
+
+type SSyn :: (forall k. k -> Type) -> Type
+type SSyn = S

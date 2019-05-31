@@ -1,11 +1,13 @@
 -- inspired by comment:25 on #12708
 
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE PolyKinds, TopLevelKindSignatures #-}
 
 module LevPolyBounded where
 
+import Data.Kind
 import GHC.Exts
 
-class XBounded (a :: TYPE r) where
+type XBounded :: TYPE r -> Constraint
+class XBounded a where
   minBound :: a
   maxBound :: a

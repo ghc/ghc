@@ -1,5 +1,5 @@
 
-T12055a.hs:27:1: error:
+T12055a.hs:30:1: error:
     • Non type-variable argument in the constraint: Category (Dom f)
       (Use FlexibleContexts to permit this)
     • In the context: (Category (Dom f), Category (Cod f))
