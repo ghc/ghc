@@ -31,7 +31,7 @@ import StgCmmHeap
 import StgCmmProf ( costCentreFrom )
 
 import DynFlags
-import Platform
+import GHC.Platform
 import BasicTypes
 import BlockId
 import MkGraph
