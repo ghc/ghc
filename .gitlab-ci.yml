@@ -16,13 +16,13 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
-  - lint       # Source linting
-  - build      # A quick smoke-test to weed out broken commits
+  # - lint       # Source linting
+  # - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup after the shell executor]
-  - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
-  - deploy     # push documentation
+  # - packaging  # Source distribution, etc.
+  # - hackage    # head.hackage testing
+  # - deploy     # push documentation
 
 .only-default: &only-default
   only:
@@ -316,11 +316,11 @@ validate-x86_64-darwin-hadrian:
     paths:
       - ghc.tar.xz
       - junit.xml
-  cache:
-    key: darwin
-    paths:
-      - cabal-cache
-      - toolchain
+  # cache:
+  #   key: darwin
+  #   paths:
+  #     - cabal-cache
+  #     - toolchain
 
 .validate-linux:
   extends: .validate
@@ -356,7 +356,7 @@ validate-x86_64-darwin-hadrian:
 
 .build-aarch64-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/aarch64-linux-deb9:$DOCKER_REV"
   allow_failure: true
   variables:
@@ -389,7 +389,7 @@ nightly-aarch64-linux-deb9:
 
 .build-i386-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
@@ -420,7 +420,7 @@ nightly-i386-linux-deb9:
 
 .build-x86_64-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
@@ -454,14 +454,14 @@ validate-x86_64-linux-deb9-debug:
 
 validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: build
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
@@ -469,7 +469,7 @@ validate-x86_64-linux-deb9-integer-simple:
 
 nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: build
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
@@ -482,7 +482,7 @@ nightly-x86_64-linux-deb9-integer-simple:
 
 validate-x86_64-linux-deb9-unreg:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
@@ -509,7 +509,7 @@ release-x86_64-linux-deb9-dwarf:
 
 release-x86_64-linux-deb8:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb8"
@@ -528,7 +528,7 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-centos7:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
   variables:
     # The sphinx release shipped with Centos 7 fails to build out documentation
@@ -550,7 +550,7 @@ release-x86_64-linux-centos7:
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
@@ -601,7 +601,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows-hadrian:
   extends: .build-windows
-  stage: full-build
+  stage: build
   variables:
     GHC_VERSION: "8.6.2"
   # due to #16574 this currently fails
@@ -640,7 +640,7 @@ nightly-i386-windows-hadrian:
 
 .build-windows-make:
   extends: .build-windows
-  stage: full-build
+  stage: build
   # due to #16084
   allow_failure: true
   variables:
