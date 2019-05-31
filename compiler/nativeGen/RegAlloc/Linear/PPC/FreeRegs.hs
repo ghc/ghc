@@ -9,7 +9,7 @@ import RegClass
 import Reg
 
 import Outputable
-import Platform
+import GHC.Platform
 
 import Data.Word
 import Data.Bits

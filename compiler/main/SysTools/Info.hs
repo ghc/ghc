@@ -19,7 +19,7 @@ import Data.IORef
 
 import System.IO
 
-import Platform
+import GHC.Platform
 import GhcPrelude
 
 import SysTools.Process
