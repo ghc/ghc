@@ -28,7 +28,7 @@ import Cmm
 import DynFlags
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 import FileCleanup
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )

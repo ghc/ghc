@@ -49,7 +49,7 @@ import SrcLoc
 import Outputable
 import FastString
 import DynFlags
-import Platform
+import GHC.Platform
 import OrdList
 import Pair
 import Util

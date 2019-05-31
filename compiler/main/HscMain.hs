@@ -149,7 +149,7 @@ import DynamicLoading   ( initializePlugins )
 
 import DynFlags
 import ErrUtils
-import Platform ( platformOS, osSubsectionsViaSymbols )
+import GHC.Platform ( platformOS, osSubsectionsViaSymbols )
 
 import Outputable
 import NameEnv

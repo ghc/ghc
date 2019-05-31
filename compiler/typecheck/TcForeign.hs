@@ -57,7 +57,7 @@ import TcType
 import PrelNames
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import SrcLoc
 import Bag
 import Hooks

@@ -41,7 +41,7 @@ import UniqFM
 import Unique
 import State
 import Outputable
-import Platform
+import GHC.Platform
 import Hoopl.Collections
 
 import Data.List

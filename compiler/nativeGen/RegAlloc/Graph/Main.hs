@@ -21,7 +21,7 @@ import Reg
 import Bag
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import UniqFM
 import UniqSet
 import UniqSupply

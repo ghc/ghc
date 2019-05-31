@@ -45,7 +45,7 @@ import Packages
 import Config
 import Outputable
 import ErrUtils
-import Platform
+import GHC.Platform
 import Util
 import DynFlags
 import Fingerprint

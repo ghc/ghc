@@ -23,7 +23,7 @@ import Data.List (sortBy)
 import Maybes
 import Control.Monad
 import Outputable
-import Platform
+import GHC.Platform
 import UniqSupply
 import Hoopl.Block
 import Hoopl.Collections

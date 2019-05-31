@@ -58,7 +58,7 @@ import Maybes           ( expectJust )
 import SrcLoc
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
-import Platform
+import GHC.Platform
 import TcRnTypes
 import ToolSettings
 import Hooks

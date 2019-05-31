@@ -16,7 +16,7 @@ import Hoopl.Label
 import Hoopl.Collections
 import Hoopl.Dataflow
 import Module
-import Platform
+import GHC.Platform
 import Digraph
 import CLabel
 import PprCmmDecl ()

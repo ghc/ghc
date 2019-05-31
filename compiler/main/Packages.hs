@@ -77,7 +77,7 @@ import UniqSet
 import Module
 import Util
 import Panic
-import Platform
+import GHC.Platform
 import Outputable
 import Maybes
 

@@ -60,7 +60,7 @@ import qualified RegAlloc.Graph.TrivColorable   as Color
 
 import AsmUtils
 import TargetReg
-import Platform
+import GHC.Platform
 import BlockLayout
 import Config
 import Instruction

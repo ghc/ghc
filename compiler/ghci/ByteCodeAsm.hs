@@ -33,7 +33,7 @@ import StgCmmLayout     ( ArgRep(..) )
 import SMRep
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import Util
 import Unique
 import UniqDSet

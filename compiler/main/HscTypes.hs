@@ -201,7 +201,7 @@ import Bag
 import Binary
 import ErrUtils
 import NameCache
-import Platform
+import GHC.Platform
 import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )

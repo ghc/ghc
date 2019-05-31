@@ -50,7 +50,7 @@ import SrcLoc
 import qualified Maybes
 import UniqDSet
 import FastString
-import Platform
+import GHC.Platform
 import SysTools
 import FileCleanup
 

@@ -54,7 +54,7 @@ import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat, setDeltaNat
 import CFG
 import Format
 import Reg
-import Platform
+import GHC.Platform
 
 -- Our intermediate code:
 import BasicTypes

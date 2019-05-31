@@ -16,7 +16,7 @@ import RegClass
 
 import DynFlags
 import Panic
-import Platform
+import GHC.Platform
 
 -- -----------------------------------------------------------------------------
 -- The free register set

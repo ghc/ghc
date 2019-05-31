@@ -53,7 +53,7 @@ import Outputable
 import FastString
 import BasicTypes
 import DynFlags
-import Platform
+import GHC.Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 

@@ -26,7 +26,7 @@ import CodeGen.Platform
 import DynFlags
 import Cmm
 import PprCmmExpr ()
-import Platform
+import GHC.Platform
 
 import Outputable
 import OrdList

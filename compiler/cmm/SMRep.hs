@@ -49,7 +49,7 @@ import GhcPrelude
 import BasicTypes( ConTagZ )
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import FastString
 
 import Data.Word

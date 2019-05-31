@@ -23,7 +23,7 @@ import UniqFM
 import UniqSet
 import UniqSupply
 import Outputable
-import Platform
+import GHC.Platform
 
 import Data.List
 import Data.Maybe

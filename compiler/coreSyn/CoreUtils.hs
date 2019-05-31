@@ -88,7 +88,7 @@ import FastString
 import Maybes
 import ListSetOps       ( minusList )
 import BasicTypes       ( Arity, isConLike )
-import Platform
+import GHC.Platform
 import Util
 import Pair
 import Data.ByteString     ( ByteString )

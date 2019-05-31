@@ -43,6 +43,7 @@ Library
             GHC.Serialized
             GHC.ForeignSrcLang
             GHC.HandleEncoding
+            GHC.Platform
 
     build-depends: base       >= 4.7 && < 4.14,
                    binary     == 0.8.*,

@@ -13,7 +13,7 @@ import Cmm (Convention(..))
 import PprCmm ()
 
 import DynFlags
-import Platform
+import GHC.Platform
 import Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call

@@ -43,7 +43,7 @@ import CmmInfo
 import FastString
 import CLabel
 import Outputable
-import Platform
+import GHC.Platform
 import UniqFM (listToUFM, lookupUFM)
 import UniqSupply
 

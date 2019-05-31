@@ -101,7 +101,7 @@ import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
-import Platform
+import GHC.Platform
 import qualified PprColour as Col
 import Pretty           ( Doc, Mode(..) )
 import Panic

@@ -44,7 +44,7 @@ import CPrim
 import DynFlags
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 import UniqSet
 import UniqFM
 import Unique

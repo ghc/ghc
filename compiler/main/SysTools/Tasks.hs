@@ -13,7 +13,7 @@ import ErrUtils
 import HscTypes
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import Util
 
 import Data.Char

@@ -47,7 +47,7 @@ import Hoopl.Collections
 
 import Unique           ( pprUniqueAlways )
 import Outputable
-import Platform
+import GHC.Platform
 import FastString
 
 -- -----------------------------------------------------------------------------

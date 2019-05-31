@@ -15,7 +15,7 @@ import Format
 import Reg
 
 import Outputable
-import Platform
+import GHC.Platform
 import Unique
 
 import UniqFM
