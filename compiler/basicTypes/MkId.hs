@@ -298,6 +298,24 @@ so the data constructor for T:C had a single argument, namely the
 predicate (C a).  But now we treat that as an ordinary argument, not
 part of the theta-type, so all is well.
 
+Note [Newtype workers]
+~~~~~~~~~~~~~~~~~~~~~~
+A newtype does not really have a worker. Instead, newtype constructors
+just unfold into a cast. But we need *something* for, say, MkAge to refer
+to. So, we do this:
+
+* The Id used as the newtype worker will have a compulsory unfolding to
+  a cast. See Note [Compulsory newtype unfolding]
+
+* This Id is labeled as a DataConWrapId. We don't want to use a DataConWorkId,
+  as those have special treatment in the back end.
+
+* There is no top-level binding, because the compulsory unfolding
+  means that it will be inlined (to a cast) at every call site.
+
+We probably should have a NewtypeWorkId, but these Ids disappear as soon as
+we desugar anyway, so it seems a step too far.
+
 Note [Compulsory newtype unfolding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Newtype wrappers, just like workers, have compulsory unfoldings.
@@ -447,6 +465,8 @@ mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
   = mkGlobalId (DataConWrapId data_con) wkr_name wkr_ty nt_work_info
+      -- See Note [Newtype workers]
+
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name wkr_ty alg_wkr_info
 
