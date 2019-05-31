@@ -30,7 +30,7 @@ import CmmExpr         ( GlobalReg(..) )
 import Encoding
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 import Unique
 import Reg
 import SrcLoc

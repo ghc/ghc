@@ -16,7 +16,7 @@ import Reg
 import GraphBase
 
 import UniqSet
-import Platform
+import GHC.Platform
 import Panic
 
 -- trivColorable ---------------------------------------------------------------

@@ -64,7 +64,7 @@ import CliOption
 import Fingerprint
 import FileSettings
 import GhcNameVersion
-import Platform
+import GHC.Platform
 import PlatformConstants
 import ToolSettings
 
