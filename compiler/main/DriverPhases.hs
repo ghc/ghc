@@ -44,7 +44,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import System.FilePath
 import Binary
 import Util

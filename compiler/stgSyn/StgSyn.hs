@@ -76,7 +76,7 @@ import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
 import Packages    ( isDllName )
-import Platform
+import GHC.Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
