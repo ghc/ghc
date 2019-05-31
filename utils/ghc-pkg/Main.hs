@@ -31,6 +31,7 @@ import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
+import GHC.Settings (getBaseDir)
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
@@ -601,7 +602,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
   let err_msg = "missing --global-package-db option, location of global package database unknown\n"
   global_conf <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
-        [] -> do mb_dir <- getLibDir
+        [] -> do mb_dir <- getBaseDir
                  case mb_dir of
                    Nothing  -> die err_msg
                    Just dir -> do
@@ -2176,17 +2177,6 @@ reportError s = do hFlush stdout; hPutStrLn stderr s
 
 dieForcible :: String -> IO ()
 dieForcible s = die (s ++ " (use --force to override)")
-
------------------------------------------
--- Cut and pasted from ghc/compiler/main/SysTools
-
-getLibDir :: IO (Maybe String)
-
-#if defined(mingw32_HOST_OS) || defined(darwin_HOST_OS) || defined(linux_HOST_OS)
-getLibDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
-#else
-getLibDir = return Nothing
-#endif
 
 -----------------------------------------
 -- Adapted from ghc/compiler/utils/Panic
