@@ -135,7 +135,7 @@ import MkCore (mkStringExprFSWith)
 import Module
 import Name
 import Outputable
-import Platform
+import GHC.Platform
 import PrelNames
 import TcEnv (lookupGlobal)
 import Type

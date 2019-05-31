@@ -18,7 +18,7 @@ import BlockId
 import CLabel
 import Cmm
 import DynFlags
-import Platform
+import GHC.Platform
 
 import FastString
 import Outputable

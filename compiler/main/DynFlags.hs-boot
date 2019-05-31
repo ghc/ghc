@@ -1,7 +1,7 @@
 module DynFlags where
 
 import GhcPrelude
-import Platform
+import GHC.Platform
 
 data DynFlags
 data DumpFlag
