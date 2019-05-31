@@ -1,11 +1,13 @@
-{-# LANGUAGE ExistentialQuantification, DataKinds, PolyKinds, KindSignatures, GADTs #-}
+{-# LANGUAGE ExistentialQuantification, DataKinds, PolyKinds,
+             TopLevelKindSignatures, GADTs #-}
 module T7503a where
     import Data.Kind
     import GHC.Exts hiding (Any)
 
     data WrappedType = forall a. WrapType a
 
-    data A :: WrappedType -> Type where
+    type A :: WrappedType -> Type
+    data A a where
         MkA :: forall (a :: Type). AW a -> A (WrapType a)
 
     type AW  (a :: k) = A (WrapType a)

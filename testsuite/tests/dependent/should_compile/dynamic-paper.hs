@@ -7,7 +7,7 @@ Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 {-#  LANGUAGE RankNTypes, PolyKinds, TypeOperators,
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
-             DataKinds, MagicHash #-}
+             DataKinds, MagicHash, TopLevelKindSignatures #-}
 {-# OPTIONS_GHC -Wno-missing-methods -Wno-redundant-constraints #-}
 {-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
   -- Because we define a local Typeable class and have
@@ -185,7 +185,8 @@ dynFst (Dyn (rpab :: TypeRep pab) (x :: pab))
 eqT :: forall k1 k2 (a :: k1) (b :: k2).
        TypeRep a -> TypeRep b -> Maybe (a :~: b)
 
-data (a :: k1) :~: (b :: k2) where
+type (:~:) :: k1 -> k2 -> Type
+data a :~: b where
   Refl :: forall k (a :: k). a :~: a
 
 castDance :: (Typeable a, Typeable b)  => a -> Maybe b
@@ -235,7 +236,8 @@ data OrderingT a b where
   EQT  :: OrderingT t t
   GTT  :: OrderingT a b
 
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
   TrApp    :: TypeRep a -> TypeRep b -> TypeRep (a b)
   TrTyCon  :: TyCon -> TypeRep k -> TypeRep (a :: k)
 

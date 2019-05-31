@@ -1,19 +1,19 @@
 
-T15552a.hs:25:9: error:
+T15552a.hs:26:3: error:
     • Illegal nested type family application ‘EntryOfValKey
                                                 (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
 
-T15552a.hs:25:9: error:
+T15552a.hs:26:3: error:
     • Illegal nested type family application ‘EntryOfValKey
                                                 (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
     • In the equations for closed type family ‘FirstEntryOfVal’
       In the type family declaration for ‘FirstEntryOfVal’
 
-T15552a.hs:25:9: error:
+T15552a.hs:26:3: error:
     • Illegal nested type family application ‘GetEntryOfVal
                                                 (FirstEntryOfVal v kvs)’
       (Use UndecidableInstances to permit this)
