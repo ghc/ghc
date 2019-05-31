@@ -17,7 +17,7 @@ import AsmUtils
 import ErrUtils
 import DynFlags
 import Packages
-import Platform
+import GHC.Platform
 import Outputable
 import SrcLoc           ( noSrcSpan )
 import Module
