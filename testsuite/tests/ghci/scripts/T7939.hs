@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, TypeOperators #-}
+{-# LANGUAGE TypeFamilies, PolyKinds, DataKinds, TypeOperators, TopLevelKindSignatures #-}
 module T7939 where
 import Data.Kind (Type)
 
@@ -22,6 +22,7 @@ type family K a where
   K '[] = Nothing
   K (h ': t) = Just h
 
-type family L (a :: k) (b :: Type) :: k where
+type L :: k -> Type -> k
+type family L a b where
   L Int Int = Bool
   L Maybe Bool = IO

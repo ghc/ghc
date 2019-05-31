@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TopLevelKindSignatures #-}
 
 {-# LANGUAGE FlexibleInstances, UndecidableInstances, FunctionalDependencies #-}
 
@@ -21,9 +22,11 @@ import GHC.Exts ( type (~~) )
 
 type Cat k = k -> k -> Type
 
+type Category :: Cat k -> Constraint
 class Category (p :: Cat k) where
     type Ob p :: k -> Constraint
 
+type Functor :: (j -> k) -> Constraint
 class (Category (Dom f), Category (Cod f)) => Functor (f :: j -> k) where
     type Dom f :: Cat j
     type Cod f :: Cat k

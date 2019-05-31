@@ -8,16 +8,19 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE TopLevelKindSignatures #-}
 module T14270 (pattern App) where
 
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
 import GHC.Fingerprint (Fingerprint, fingerprintFingerprints)
 import GHC.Types (RuntimeRep, TYPE, TyCon)
 
-data (a :: k1) :~~: (b :: k2) where
+type (:~~:) :: k1 -> k2 -> Type
+data a :~~: b where
   HRefl :: a :~~: a
 
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
     TrTyCon :: {-# UNPACK #-} !Fingerprint -> !TyCon -> [SomeTypeRep]
             -> TypeRep (a :: k)
 
@@ -63,7 +66,8 @@ pattern App :: forall k2 (t :: k2). ()
 pattern App f x <- (splitApp -> Just (IsApp f x))
   where App f x = mkTrApp f x
 
-data IsApp (a :: k) where
+type IsApp :: k -> Type
+data IsApp a where
     IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
           => TypeRep f -> TypeRep x -> IsApp (f x)
 
@@ -91,13 +95,15 @@ bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
           -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
 bareArrow = undefined
 
-data IsTYPE (a :: Type) where
+type IsTYPE :: Type -> Type
+data IsTYPE a where
     IsTYPE :: forall (r :: RuntimeRep). TypeRep r -> IsTYPE (TYPE r)
 
 isTYPE :: TypeRep (a :: Type) -> Maybe (IsTYPE a)
 isTYPE = undefined
 
-class Typeable (a :: k) where
+type Typeable :: k -> Constraint
+class Typeable a where
 
 typeRep :: Typeable a => TypeRep a
 typeRep = undefined

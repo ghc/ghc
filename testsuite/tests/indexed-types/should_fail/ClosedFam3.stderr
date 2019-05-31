@@ -2,30 +2,27 @@
 ClosedFam3.hs-boot:7:1: error:
     Type constructor ‘Foo’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Foo a :: *
-                   where
-                       Foo Int = Bool
-                       Foo Double = Char
-    Boot file:   type family Foo a :: *
-                   where Foo Int = Bool
+    Main module: type family Foo a :: * where
+                     Foo Int = Bool
+                     Foo Double = Char
+    Boot file:   type family Foo a :: * where
+                     Foo Int = Bool
 
 ClosedFam3.hs-boot:10:1: error:
     Type constructor ‘Bar’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Bar a :: *
-                   where
-                       Bar Int = Bool
-                       Bar Double = Double
-    Boot file:   type family Bar a :: *
-                   where
-                       Bar Int = Bool
-                       Bar Double = Char
+    Main module: type family Bar a :: * where
+                     Bar Int = Bool
+                     Bar Double = Double
+    Boot file:   type family Bar a :: * where
+                     Bar Int = Bool
+                     Bar Double = Char
 
-ClosedFam3.hs-boot:14:1: error:
+ClosedFam3.hs-boot:15:1: error:
     Type constructor ‘Baz’ has conflicting definitions in the module
     and its hs-boot file
-    Main module: type family Baz a :: *
-                   where Baz Int = Bool
-    Boot file:   type family Baz (a :: k) :: *
-                   where Baz Int = Bool
+    Main module: type family Baz a :: * where
+                     Baz Int = Bool
+    Boot file:   type family Baz (a :: k) :: * where
+                     Baz Int = Bool
     The types have different kinds

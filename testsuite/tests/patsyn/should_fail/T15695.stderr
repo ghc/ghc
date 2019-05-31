@@ -1,5 +1,5 @@
 
-T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15695.hs:41:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Could not deduce: a2 ~ NA 'VO
       from the context: ((* -> * -> *) ~ (k1 -> k2 -> *), Either ~~ f,
                          ctx ~~ (a2 ':&: (a3 ':&: 'E)), f a2 ~~ f1, f1 a3 ~~ a4)
@@ -12,7 +12,7 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
                             f a1 ~~ f1, f1 a2 ~~ a3) =>
                            a3 -> ApplyT kind a b,
                  in an equation for ‘from'’
-        at T15695.hs:39:8-21
+        at T15695.hs:41:8-21
       ‘a2’ is a rigid type variable bound by
         a pattern with pattern synonym:
           ASSO :: forall kind (a :: kind) (b :: Ctx kind).
@@ -23,7 +23,7 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
                    f a1 ~~ f1, f1 a2 ~~ a3) =>
                   a3 -> ApplyT kind a b,
         in an equation for ‘from'’
-        at T15695.hs:39:8-21
+        at T15695.hs:41:8-21
       Expected type: a4
         Actual type: Either (NA 'VO) a3
     • In the pattern: Left a
@@ -31,9 +31,9 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘from'’: from' (ASSO (Left a)) = Here (a :* Nil)
     • Relevant bindings include
         from' :: ApplyT (* -> * -> *) Either ctx -> NS (NP NA) '[ '[ 'VO]]
-          (bound at T15695.hs:39:1)
+          (bound at T15695.hs:41:1)
 
-T15695.hs:40:26: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15695.hs:42:26: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘a0 : as0’ with ‘'[]’
       Expected type: NS (NP NA) '[ '[ 'VO]]
         Actual type: NS (NP NA) ('[ 'VO] : a0 : as0)
@@ -42,4 +42,4 @@ T15695.hs:40:26: warning: [-Wdeferred-type-errors (in -Wdefault)]
           from' (ASSO (Right b)) = There (Here undefined)
     • Relevant bindings include
         from' :: ApplyT (* -> * -> *) Either ctx -> NS (NP NA) '[ '[ 'VO]]
-          (bound at T15695.hs:39:1)
+          (bound at T15695.hs:41:1)
