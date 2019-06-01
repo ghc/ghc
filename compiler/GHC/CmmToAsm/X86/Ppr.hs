@@ -824,6 +824,9 @@ pprInstr platform i = case i of
    SETCC cond op
       -> pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
 
+   XCHG format src val
+      -> pprFormatOpReg (sLit "xchg") format src val
+
    JXX cond blockid
       -> pprCondInstr (sLit "j") cond (ppr lab)
          where lab = blockLbl blockid
