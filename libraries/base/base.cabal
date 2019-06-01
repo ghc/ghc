@@ -249,12 +249,16 @@ Library
         GHC.IO.FD
         GHC.IO.Handle
         GHC.IO.Handle.FD
+        GHC.IO.Handle.Windows
         GHC.IO.Handle.Internals
         GHC.IO.Handle.Lock
         GHC.IO.Handle.Text
         GHC.IO.Handle.Types
         GHC.IO.IOMode
         GHC.IO.Unsafe
+        GHC.IO.SmartHandles
+        GHC.IO.SubSystem
+        GHC.IO.Types
         GHC.IOArray
         GHC.IORef
         GHC.Int
@@ -349,6 +353,7 @@ Library
         cbits/md5.c
         cbits/primFloat.c
         cbits/sysconf.c
+        cbits/IOutils.c
         cbits/fs.c
 
     cmm-sources:
