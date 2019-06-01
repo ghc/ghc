@@ -167,18 +167,54 @@ commonGhcArgs = do
             , arg "-outputdir", arg path ]
 
 -- TODO: Do '-ticky' in all debug ways?
+-- This mirrors the logic from mk/ways.mk: to the various ways
+-- in which we can compile Haskell code correspond one or more
+-- command line options for GHC (-static, -prof, -eventlog and
+-- more).
 wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
-    mconcat [ if Dynamic `wayUnit` way
-                then pure ["-fPIC", "-dynamic"]
-                else arg "-static"
-            , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
-            , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
-            , (Profiling `wayUnit` way) ? arg "-prof"
-            , (Logging   `wayUnit` way) ? arg "-eventlog"
-            , (way == debug || way == debugDynamic) ?
-              pure ["-ticky", "-DTICKY_TICKY"] ]
+    pure (wayArgs way)
+
+  where wayArgs w
+          | w == vanilla =
+              ["-static"]
+          | w == profiling =
+              ["-static", "-prof", "-eventlog"]
+          | w == logging =
+              ["-static", "-eventlog"]
+          | w == threaded =
+              ["-optc-DTHREADED_RTS"]
+          | w == threadedProfiling =
+              ["-static", "-prof", "-eventlog", "-optc-DTHREADED_RTS"]
+          | w == threadedLogging =
+              ["-static", "-optc-DTHREADED_RTS", "-eventlog"]
+          | w == debug =
+              ["-static", "-optc-DDEBUG", "-ticky", "-DTICKY_TICKY", "-eventlog"]
+          | w == debugProfiling =
+              ["-static", "-optc-DDEBUG", "-prof", "-eventlog"]
+          | w == threadedDebug =
+              ["-static", "-optc-DTHREADED_RTS", "-optc-DDEBUG", "-eventlog"]
+          | w == threadedDebugProfiling =
+              ["-static", "-optc-DTHREADED_RTS", "-optc-DDEBUG", "-prof", "-eventlog"]
+          | w == dynamic =
+              ["-fPIC", "-dynamic"]
+          | w == profilingDynamic =
+              ["-fPIC", "-dynamic", "-prof", "-eventlog"]
+          | w == threadedProfilingDynamic =
+              ["-fPIC", "-dynamic", "-prof", "-eventlog", "-optc-DTHREADED_RTS"]
+          | w == threadedDynamic =
+              ["-fPIC", "-dynamic", "-optc-DTHREADED_RTS"]
+          | w == threadedDebugDynamic =
+              ["-fPIC", "-dynamic", "-optc-DTHREADED_RTS", "-optc-DDEBUG", "-eventlog"]
+          | w == debugDynamic =
+              ["-fPIC", "-dynamic", "-optc-DDEBUG", "-ticky", "-DTICKY_TICKY", "-eventlog"]
+          | w == loggingDynamic =
+              ["-fPIC", "-dynamic", "-eventlog"]
+          | w == threadedLoggingDynamic =
+              ["-fPIC", "-dynamic", "-optc-DTHREADED_RTS", "-eventlog"]
+          | otherwise = error $
+              "wayArgs: unknown way " ++ show w
 
 packageGhcArgs :: Args
 packageGhcArgs = do
