@@ -14,12 +14,12 @@
 #define WORKQUEUE_SIZE 16
 
 typedef HANDLE           Semaphore;
-typedef CRITICAL_SECTION CritSection;
+typedef SRWLOCK          Mutex;
 
 typedef struct WorkQueue {
     /* the master lock, need to be grabbed prior to
        using any of the other elements of the struct. */
-  CritSection   queueLock;
+  Mutex   queueLock;
   /* consumers/workers block waiting for 'workAvailable' */
   Semaphore     workAvailable;
   Semaphore     roomAvailable;
