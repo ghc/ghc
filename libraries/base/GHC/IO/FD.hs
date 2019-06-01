@@ -436,14 +436,14 @@ setRaw fd raw = System.Posix.Internals.setCooked (fdFD fd) (not raw)
 -- -----------------------------------------------------------------------------
 -- Reading and Writing
 
-fdRead :: FD -> Ptr Word8 -> Int -> IO Int
-fdRead fd ptr bytes
+fdRead :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
+fdRead fd ptr _offset bytes
   = do { r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0
                 (fromIntegral $ clampReadSize bytes)
        ; return (fromIntegral r) }
 
-fdReadNonBlocking :: FD -> Ptr Word8 -> Int -> IO (Maybe Int)
-fdReadNonBlocking fd ptr bytes = do
+fdReadNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO (Maybe Int)
+fdReadNonBlocking fd ptr _offset bytes = do
   r <- readRawBufferPtrNoBlock "GHC.IO.FD.fdReadNonBlocking" fd ptr
            0 (fromIntegral $ clampReadSize bytes)
   case fromIntegral r of
@@ -451,18 +451,18 @@ fdReadNonBlocking fd ptr bytes = do
     n    -> return (Just n)
 
 
-fdWrite :: FD -> Ptr Word8 -> Int -> IO ()
-fdWrite fd ptr bytes = do
+fdWrite :: FD -> Ptr Word8 -> Word64 -> Int -> IO ()
+fdWrite fd ptr _offset bytes = do
   res <- writeRawBufferPtr "GHC.IO.FD.fdWrite" fd ptr 0
           (fromIntegral $ clampWriteSize bytes)
   let res' = fromIntegral res
   if res' < bytes
-     then fdWrite fd (ptr `plusPtr` res') (bytes - res')
+     then fdWrite fd (ptr `plusPtr` res') (_offset + fromIntegral res') (bytes - res')
      else return ()
 
 -- XXX ToDo: this isn't non-blocking
-fdWriteNonBlocking :: FD -> Ptr Word8 -> Int -> IO Int
-fdWriteNonBlocking fd ptr bytes = do
+fdWriteNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
+fdWriteNonBlocking fd ptr _offset bytes = do
   res <- writeRawBufferPtrNoBlock "GHC.IO.FD.fdWriteNonBlocking" fd ptr 0
             (fromIntegral $ clampWriteSize bytes)
   return (fromIntegral res)
