@@ -22,7 +22,10 @@ module GHC.Ptr (
         nullFunPtr, castFunPtr,
 
         -- * Unsafe functions
-        castFunPtrToPtr, castPtrToFunPtr
+        castFunPtrToPtr, castPtrToFunPtr,
+
+        -- * Atomic operations
+        exchangePtr
     ) where
 
 import GHC.Base
@@ -162,6 +165,13 @@ castFunPtrToPtr (FunPtr addr) = Ptr addr
 castPtrToFunPtr :: Ptr a -> FunPtr b
 castPtrToFunPtr (Ptr addr) = FunPtr addr
 
+------------------------------------------------------------------------
+-- Atomic operations for Ptr
+
+{-# INLINE exchangePtr #-}
+exchangePtr :: Ptr (Ptr a) -> Ptr b -> Ptr c
+exchangePtr (Ptr dst) (Ptr val)
+  = Ptr (interlockedExchangeAddr# dst val)
 
 ------------------------------------------------------------------------
 -- Show instances for Ptr and FunPtr

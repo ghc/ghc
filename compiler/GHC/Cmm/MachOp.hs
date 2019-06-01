@@ -632,6 +632,7 @@ data CallishMachOp
   | MO_AtomicRead Width
   | MO_AtomicWrite Width
   | MO_Cmpxchg Width
+  | MO_Xchg
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.
