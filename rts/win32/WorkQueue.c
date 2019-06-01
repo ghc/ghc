@@ -3,11 +3,13 @@
  *
  * (c) sof, 2002-2003.
  */
+#include "Rts.h"
 #include "WorkQueue.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
 
 static void queue_error_rc( char* loc, DWORD err);
 static void queue_error( char* loc, char* reason);
@@ -48,7 +50,7 @@ NewWorkQueue()
 
   memset(wq, 0, sizeof *wq);
 
-  InitializeCriticalSection(&wq->queueLock);
+  OS_INIT_LOCK(&wq->queueLock);
   wq->workAvailable = newSemaphore(0, WORKQUEUE_SIZE);
   wq->roomAvailable = newSemaphore(WORKQUEUE_SIZE, WORKQUEUE_SIZE);
 
@@ -83,7 +85,7 @@ FreeWorkQueue ( WorkQueue* pq )
   if ( pq->roomAvailable ) {
     CloseHandle(pq->roomAvailable);
   }
-  DeleteCriticalSection(&pq->queueLock);
+  OS_CLOSE_LOCK(&pq->queueLock);
   free(pq);
   return;
 }
@@ -147,13 +149,13 @@ FetchWork ( WorkQueue* pq, void** ppw )
     return false;
   }
 
-  EnterCriticalSection(&pq->queueLock);
+  OS_ACQUIRE_LOCK(&pq->queueLock);
   *ppw = pq->items[pq->head];
   /* For sanity's sake, zero out the pointer. */
   pq->items[pq->head] = NULL;
   pq->head = (pq->head + 1) % WORKQUEUE_SIZE;
   rc = ReleaseSemaphore(pq->roomAvailable,1, NULL);
-  LeaveCriticalSection(&pq->queueLock);
+  OS_RELEASE_LOCK(&pq->queueLock);
   if ( 0 == rc ) {
     queue_error_rc("FetchWork.ReleaseSemaphore()", GetLastError());
     return false;
@@ -191,11 +193,11 @@ SubmitWork ( WorkQueue* pq, void* pw )
     return false;
   }
 
-  EnterCriticalSection(&pq->queueLock);
+  OS_ACQUIRE_LOCK(&pq->queueLock);
   pq->items[pq->tail] = pw;
   pq->tail = (pq->tail + 1) % WORKQUEUE_SIZE;
   rc = ReleaseSemaphore(pq->workAvailable,1, NULL);
-  LeaveCriticalSection(&pq->queueLock);
+  OS_RELEASE_LOCK(&pq->queueLock);
   if ( 0 == rc ) {
     queue_error_rc("SubmitWork.ReleaseSemaphore()", GetLastError());
     return false;
