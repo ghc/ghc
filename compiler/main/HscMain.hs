@@ -233,10 +233,6 @@ logWarningsReportErrors (warns,errs) = do
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
--- | Throw some errors.
-throwErrors :: ErrorMessages -> Hsc a
-throwErrors = liftIO . throwIO . mkSrcErr
-
 -- | Deal with errors and warnings returned by a compilation step
 --
 -- In order to reduce dependencies to other parts of the compiler, functions

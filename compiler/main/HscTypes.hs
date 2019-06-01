@@ -133,7 +133,7 @@ module HscTypes (
 
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
-        throwOneError, handleSourceError,
+        throwErrors, throwOneError, handleSourceError,
         handleFlagWarnings, printOrThrowWarnings,
 
         -- * COMPLETE signature
@@ -277,6 +277,10 @@ srcErrorMessages (SourceError msgs) = msgs
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
+
+-- | Throw some errors.
+throwErrors :: MonadIO io => ErrorMessages -> io a
+throwErrors = liftIO . throwIO . mkSrcErr
 
 throwOneError :: MonadIO m => ErrMsg -> m ab
 throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
