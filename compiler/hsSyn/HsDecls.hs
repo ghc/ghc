@@ -302,6 +302,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsGroup p) where
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
+             ppr_ds (tyClGroupRoleDecls tycl_decls),
              ppr_ds (tyClGroupTyClDecls tycl_decls),
              ppr_ds (tyClGroupInstDecls tycl_decls),
              ppr_ds deriv_decls,

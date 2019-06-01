@@ -1,0 +1,7 @@
+T16718.hs:(5,3)-(7,6): Splicing declarations
+    [d| type role P phantom
+        
+        data P a |]
+  ======>
+    type role P phantom
+    data P a
