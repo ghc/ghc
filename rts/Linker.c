@@ -1681,12 +1681,10 @@ int ocTryLoad (ObjectCode* oc) {
         are to be loaded by this call.
 
         This call is intended to have no side-effects when a non-duplicate
-        symbol is re-inserted.  A symbol is only a duplicate if the object file
-        it is defined in has had it's relocations resolved.  A resolved object
-        file means the symbols inside it are required.
+        symbol is re-inserted.
 
-        The symbol address is not used to distinguish symbols. Duplicate symbols
-        are distinguished by name, oc and attributes (weak symbols etc).
+        We set the Address to NULL since that is not used to distinguish
+        symbols. Duplicate symbols are distinguished by name and oc.
     */
     int x;
     Symbol_t symbol;
