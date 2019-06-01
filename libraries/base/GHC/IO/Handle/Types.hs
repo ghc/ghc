@@ -119,7 +119,7 @@ instance Eq Handle where
  _ == _ = False
 
 data Handle__
-  = forall dev enc_state dec_state . (IODevice dev, BufferedIO dev, Typeable dev) =>
+  = forall dev enc_state dec_state . (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) =>
     Handle__ {
       haDevice      :: !dev,
       haType        :: HandleType,           -- type (read/write/append etc.)
