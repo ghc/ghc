@@ -92,9 +92,11 @@ class BufferedIO dev where
 readBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
 readBuf dev bbuf = do
   let bytes = bufferAvailable bbuf
+  let offset = bufferOffset bbuf
   res <- withBuffer bbuf $ \ptr ->
-             RawIO.read dev (ptr `plusPtr` bufR bbuf) bytes
-  return (res, bbuf{ bufR = bufR bbuf + res })
+             RawIO.read dev (ptr `plusPtr` bufR bbuf) offset bytes
+  let bbuf' = bufferAddOffset res bbuf
+  return (res, bbuf'{ bufR = bufR bbuf' + res })
          -- zero indicates end of file
 
 readBufNonBlocking :: RawIO dev => dev -> Buffer Word8
@@ -103,24 +105,30 @@ readBufNonBlocking :: RawIO dev => dev -> Buffer Word8
                             Buffer Word8)
 readBufNonBlocking dev bbuf = do
   let bytes = bufferAvailable bbuf
+  let offset = bufferOffset bbuf
   res <- withBuffer bbuf $ \ptr ->
-           IODevice.readNonBlocking dev (ptr `plusPtr` bufR bbuf) bytes
+           IODevice.readNonBlocking dev (ptr `plusPtr` bufR bbuf) offset bytes
   case res of
      Nothing -> return (Nothing, bbuf)
-     Just n  -> return (Just n, bbuf{ bufR = bufR bbuf + n })
+     Just n  -> do let bbuf' = bufferAddOffset n bbuf
+                   return (Just n, bbuf'{ bufR = bufR bbuf' + n })
 
 writeBuf :: RawIO dev => dev -> Buffer Word8 -> IO (Buffer Word8)
 writeBuf dev bbuf = do
   let bytes = bufferElems bbuf
+  let offset = bufferOffset bbuf
   withBuffer bbuf $ \ptr ->
-      IODevice.write dev (ptr `plusPtr` bufL bbuf) bytes
-  return bbuf{ bufL=0, bufR=0 }
+      IODevice.write dev (ptr `plusPtr` bufL bbuf) offset bytes
+  let bbuf' = bufferAddOffset bytes bbuf
+  return bbuf'{ bufL=0, bufR=0 }
 
 -- XXX ToDo
 writeBufNonBlocking :: RawIO dev => dev -> Buffer Word8 -> IO (Int, Buffer Word8)
 writeBufNonBlocking dev bbuf = do
   let bytes = bufferElems bbuf
+  let offset = bufferOffset bbuf
   res <- withBuffer bbuf $ \ptr ->
-            IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf) bytes
-  return (res, bufferAdjustL (bufL bbuf + res) bbuf)
+            IODevice.writeNonBlocking dev (ptr `plusPtr` bufL bbuf) offset bytes
+  let bbuf' = bufferAddOffset bytes bbuf
+  return (res, bufferAdjustL (bufL bbuf + res) bbuf')
 
