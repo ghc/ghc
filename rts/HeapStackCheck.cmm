@@ -17,8 +17,8 @@
 #if defined(__PIC__)
 import pthread_mutex_unlock;
 #endif
-import EnterCriticalSection;
-import LeaveCriticalSection;
+import AcquireSRWLockExclusive;
+import ReleaseSRWLockExclusives;
 
 /* Stack/Heap Check Failure
  * ------------------------
