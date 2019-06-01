@@ -122,6 +122,8 @@ writeEventLogFile(void *eventlog, size_t eventlog_size)
         begin += written;
     }
     release_event_log_lock();
+
+    flushEventLogFile ();
     return true;
 }
 
