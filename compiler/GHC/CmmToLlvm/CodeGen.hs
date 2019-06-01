@@ -281,6 +281,16 @@ genCall (PrimTarget (MO_Cmpxchg _width))
     retVar' <- doExprW targetTy $ ExtractV retVar 0
     statement $ Store retVar' dstVar
 
+genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
+    dstV <- getCmmRegW (CmmLocal dst) :: WriterT LlvmAccum LlvmM LlvmVar
+    addrVar <- exprToVarW addr
+    valVar <- exprToVarW val
+    let ptrTy = pLift $ getVarType valVar
+        ptrExpr = Cast LM_Inttoptr addrVar ptrTy
+    ptrVar <- doExprW ptrTy ptrExpr
+    resVar <- doExprW (getVarType valVar) (AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst)
+    statement $ Store resVar dstV
+
 genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
@@ -856,6 +866,7 @@ cmmPrimOpFunctions mop = do
     MO_AtomicRMW _ _ -> unsupported
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
+    MO_Xchg _        -> unsupported
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
@@ -1943,10 +1954,10 @@ toIWord platform = mkIntLit (llvmWord platform)
 
 
 -- | Error functions
-panic :: String -> a
+panic :: HasCallStack => String -> a
 panic s = Outputable.panic $ "GHC.CmmToLlvm.CodeGen." ++ s
 
-pprPanic :: String -> SDoc -> a
+pprPanic :: HasCallStack => String -> SDoc -> a
 pprPanic s d = Outputable.pprPanic ("GHC.CmmToLlvm.CodeGen." ++ s) d
 
 

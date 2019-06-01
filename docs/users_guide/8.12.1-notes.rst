@@ -231,6 +231,12 @@ Arrow notation
 Build system
 ~~~~~~~~~~~~
 
+Bootstrapping requirements
+--------------------------
+
+- GHC now requires a C compiler which supports
+  ``__atomic_op_n`` builtins. This raises the requirement for GCC to 4.7.
+
 Included libraries
 ------------------
 
