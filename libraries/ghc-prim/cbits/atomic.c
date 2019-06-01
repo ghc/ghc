@@ -318,6 +318,39 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 }
 #endif
 
+// Atomic exchange operations
+
+extern StgWord hs_xchg8(StgPtr x, StgWord val);
+StgWord
+hs_xchg8(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_1((volatile StgPtr) x, val, __ATOMIC_SEQ_CST);
+}
+
+extern StgWord hs_xchg16(StgPtr x, StgWord val);
+StgWord
+hs_xchg16(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_2(x, val, __ATOMIC_SEQ_CST);
+}
+
+extern StgWord hs_xchg32(StgPtr x, StgWord val);
+StgWord
+hs_xchg32(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_4((volatile StgPtr) x, val, __ATOMIC_SEQ_CST);
+}
+
+#if WORD_SIZE_IN_BITS == 64
+//GCC provides this even on 32bit, but StgWord is still 32 bits.
+extern StgWord hs_xchg64(StgPtr x, StgWord val);
+StgWord
+hs_xchg64(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_8((volatile StgPtr) x, val, __ATOMIC_SEQ_CST);
+}
+#endif
+
 // AtomicReadByteArrayOp_Int
 // Implies a full memory barrier (see compiler/GHC/Builtin/primops.txt.pp)
 // __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking
