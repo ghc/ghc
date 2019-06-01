@@ -4,6 +4,7 @@ module CPrim
     , atomicWriteLabel
     , atomicRMWLabel
     , cmpxchgLabel
+    , xchgLabel
     , popCntLabel
     , pdepLabel
     , pextLabel
@@ -104,6 +105,9 @@ atomicRMWLabel w amop = "hs_atomic_" ++ pprFunName amop ++ pprWidth w
     pprFunName AMO_Nand = "nand"
     pprFunName AMO_Or   = "or"
     pprFunName AMO_Xor  = "xor"
+
+xchgLabel :: String
+xchgLabel = "hs_xchg"
 
 cmpxchgLabel :: Width -> String
 cmpxchgLabel w = "hs_cmpxchg" ++ pprWidth w

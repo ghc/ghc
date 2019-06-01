@@ -833,6 +833,9 @@ pprInstr (XADD format src dst) = pprFormatOpOp (sLit "xadd") format src dst
 pprInstr (CMPXCHG format src dst)
    = pprFormatOpOp (sLit "cmpxchg") format src dst
 
+pprInstr (XCHG format src val)
+   = pprFormatOpOp (sLit "xchg") format src val
+
 
 
 --------------------------

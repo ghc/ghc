@@ -822,6 +822,7 @@ pprCallishMachOp_for_C mop
         (MO_Ctz w)      -> ptext (sLit $ ctzLabel w)
         (MO_AtomicRMW w amop) -> ptext (sLit $ atomicRMWLabel w amop)
         (MO_Cmpxchg w)  -> ptext (sLit $ cmpxchgLabel w)
+        MO_Xchg         -> ptext (sLit $ xchgLabel)
         (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
         (MO_AtomicWrite w) -> ptext (sLit $ atomicWriteLabel w)
         (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)

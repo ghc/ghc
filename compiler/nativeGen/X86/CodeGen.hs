@@ -2262,6 +2262,23 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
   where
     format = intFormat width
 
+genCCall dflags is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
+    Amode amode addr_code <- getSimpleAmode dflags is32Bit addr
+    newval <- getNewRegNat format
+    newval_code <- getAnyReg value
+    let platform = targetPlatform dflags
+        dst_r    = getRegisterReg platform (CmmLocal dst)
+        code     = toOL
+                   [ MOV format (OpReg newval) (OpReg eax)
+                   , LOCK (XCHG format (OpReg eax) (OpAddr amode))
+                   , MOV format (OpReg eax) (OpReg dst_r)
+                   ]
+    return $ addr_code `appOL` newval_code newval `appOL` code
+  where
+    format = intFormat width
+    width | is32Bit   = W32
+          | otherwise = W64
+
 genCCall _ is32Bit target dest_regs args bid = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
@@ -2932,6 +2949,7 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
               MO_Cmpxchg _     -> fsLit "cmpxchg"
+              MO_Xchg          -> fsLit "xchg"
 
               MO_UF_Conv _ -> unsupported
 

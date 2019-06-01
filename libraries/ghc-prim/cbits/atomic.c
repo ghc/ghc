@@ -317,6 +317,15 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 }
 #endif
 
+// Atomic exchange operations
+
+extern StgWord hs_xchg(StgPtr x, StgWord val);
+StgWord
+hs_xchg(StgPtr x, StgWord val)
+{
+  return __sync_lock_test_and_set((volatile StgPtr) x, val);
+}
+
 // AtomicReadByteArrayOp_Int
 // Implies a full memory barrier (see compiler/prelude/primops.txt.pp)
 // __ATOMIC_SEQ_CST: Full barrier in both directions (hoisting and sinking

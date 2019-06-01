@@ -666,6 +666,10 @@ emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
 emitPrimOp _      [res] Word2DoubleOp [w] = emitPrimCall [res]
                                             (MO_UF_Conv W64) [w]
 
+-- Atomic operations
+emitPrimOp _ [res] InterlockedExchangeAddr  [src, value]
+  = emitPrimCall [res] MO_Xchg [src, value]
+
 -- SIMD primops
 emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
     checkVecCompatibility dflags vcat n w

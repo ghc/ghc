@@ -2399,6 +2399,12 @@ primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    with has_side_effects = True
         can_fail         = True
 
+primop  InterlockedExchangeAddr "interlockedExchangeAddr#" GenPrimOp
+   Addr# -> Addr# -> Addr#
+   {The atomic exchange operation. Atomically exchanges a pair of addresses and
+    returns the old value.}
+   with has_side_effects = True
+
 ------------------------------------------------------------------------
 section "Mutable variables"
         {Operations on MutVar\#s.}
