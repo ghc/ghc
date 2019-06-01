@@ -45,6 +45,5 @@ int FS(_wunlink) (const wchar_t *filename);
 int FS(remove) (const char *path);
 int FS(_wremove) (const wchar_t *path);
 #else
-
 FILE *FS(fopen) (const char* filename, const char* mode);
 #endif
