@@ -1341,8 +1341,9 @@ AC_DEFUN([FP_GCC_VERSION], [
         AC_MSG_CHECKING([version of gcc])
         fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
         AC_MSG_RESULT([$fp_cv_gcc_version])
-        FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
-                            [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
+        # 4.7 is needed for __atomic_ builtins.
+        FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.7],
+                            [AC_MSG_ERROR([Need at least gcc version 4.7 (newer recommended)])])
     ])
     AC_SUBST([GccVersion], [$fp_cv_gcc_version])
   else
