@@ -281,6 +281,14 @@ genCall (PrimTarget (MO_Cmpxchg _width))
     retVar' <- doExprW targetTy $ ExtractV retVar 0
     statement $ Store retVar' dstVar
 
+genCall (PrimTarget (MO_Xchg _width)) [] [addr, val] = runStmtsDecls $ do
+    addrVar <- exprToVarW addr
+    valVar <- exprToVarW val
+    let ptrTy = pLift $ getVarType valVar
+        ptrExpr = Cast LM_Inttoptr addrVar ptrTy
+    ptrVar <- doExprW ptrTy ptrExpr
+    statement $ Expr $ AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst
+
 genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
@@ -856,6 +864,7 @@ cmmPrimOpFunctions mop = do
     MO_AtomicRMW _ _ -> unsupported
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
+    MO_Xchg _        -> unsupported
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
