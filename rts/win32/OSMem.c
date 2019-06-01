@@ -37,28 +37,11 @@ static alloc_rec* allocs = NULL;
 /* free_blocks are kept in ascending order, and adjacent blocks are merged */
 static block_rec* free_blocks = NULL;
 
-/* Mingw-w64 does not currently have this in their header. So we have to import it.*/
-typedef LPVOID(WINAPI *VirtualAllocExNumaProc)(HANDLE, LPVOID, SIZE_T, DWORD, DWORD, DWORD);
-
-/* Cache NUMA API call. */
-VirtualAllocExNumaProc VirtualAllocExNuma;
-
 void
 osMemInit(void)
 {
     allocs = NULL;
     free_blocks = NULL;
-
-    /* Resolve and cache VirtualAllocExNuma. */
-    if (osNumaAvailable() && RtsFlags.GcFlags.numa)
-    {
-        VirtualAllocExNuma = (VirtualAllocExNumaProc)GetProcAddress(GetModuleHandleW(L"kernel32"), "VirtualAllocExNuma");
-        if (!VirtualAllocExNuma)
-        {
-            sysErrorBelch(
-                "osBindMBlocksToNode: VirtualAllocExNuma does not exist. How did you get this far?");
-        }
-    }
 }
 
 static
