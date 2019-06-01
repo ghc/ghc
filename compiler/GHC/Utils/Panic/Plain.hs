@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase #-}
+{-# LANGUAGE ConstraintKinds, KindSignatures #-}
 
 -- | Defines a simple exception type and utilities to throw it. The
 -- 'PlainGhcException' type is a subset of the 'Panic.GhcException'
@@ -33,6 +34,7 @@ import GHC.Stack
 import GHC.Prelude
 import System.Environment
 import System.IO.Unsafe
+import Data.Kind (Constraint)
 
 -- | This type is very similar to 'Panic.GhcException', but it omits
 -- the constructors that involve pretty-printing via
@@ -110,13 +112,22 @@ showPlainGhcException =
 throwPlainGhcException :: PlainGhcException -> a
 throwPlainGhcException = Exception.throw
 
+-- | A call stack constraint, but only when 'isDebugOn'.
+-- Redefined here to avoid import cycles.
+#if defined(DEBUG)
+type HasDebugCallStack = HasCallStack
+#else
+type HasDebugCallStack = (() :: Constraint)
+#endif
+
 -- | Panics and asserts.
-panic, sorry, pgmError :: String -> a
+panic, sorry, pgmError :: HasDebugCallStack => String -> a
 panic    x = unsafeDupablePerformIO $ do
    stack <- ccsToStrings =<< getCurrentCCS x
+   let strCallStack = prettyCallStack callStack
    if null stack
-      then throwPlainGhcException (PlainPanic x)
-      else throwPlainGhcException (PlainPanic (x ++ '\n' : renderStack stack))
+      then throwPlainGhcException (PlainPanic (x ++ "\n" ++ strCallStack))
+      else throwPlainGhcException (PlainPanic (x ++ "\n" ++ strCallStack ++ "\n" ++ renderStack stack))
 
 sorry    x = throwPlainGhcException (PlainSorry x)
 pgmError x = throwPlainGhcException (PlainProgramError x)

@@ -90,6 +90,7 @@ test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
 test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
 test('cgrun079', normal, compile_and_run, [''])
+test('cgrun080', normal, compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])

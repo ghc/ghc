@@ -148,11 +148,11 @@ Arrow notation
    ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
    signatures, including those for class methods defined inside classes.
 
-- The ``Exception`` module was boiled down acknowledging the existence of 
+- The ``Exception`` module was boiled down acknowledging the existence of
   the ``exceptions`` dependency. In particular, the ``ExceptionMonad``
   class is not a proper class anymore, but a mere synonym for ``MonadThrow``,
-  ``MonadCatch``, ``MonadMask`` (all from ``exceptions``) and ``MonadIO``. 
-  All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are 
+  ``MonadCatch``, ``MonadMask`` (all from ``exceptions``) and ``MonadIO``.
+  All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are
   erased, and their ``exceptions``-alternatives are meant to be used in the
   GHC code instead.
 
@@ -161,6 +161,12 @@ Arrow notation
 
 Build system
 ~~~~~~~~~~~~
+
+Bootstrapping requirements
+--------------------------
+
+Starting with 8.12.1 GHC requires a C compiler which supports
+__atomic_op_n builtins. This raises the requirement for GCC to 4.7.
 
 Included libraries
 ------------------
