@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 
 -- | A description of the platform we're compiling for.
 --
@@ -19,6 +20,9 @@ module GHC.Platform (
 
         PlatformMisc(..),
         IntegerLibrary(..),
+
+        stringEncodeArch,
+        stringEncodeOS,
 )
 
 where
@@ -69,6 +73,45 @@ data Arch
         | ArchJavaScript
         deriving (Read, Show, Eq)
 
+-- Note [Platform Syntax]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- There is a very loose encoding of platforms shared by many tools we are
+-- encoding to here. GNU Config (http://git.savannah.gnu.org/cgit/config.git),
+-- and LLVM's http://llvm.org/doxygen/classllvm_1_1Triple.html are perhaps the
+-- most definitional parsers. The basic syntax is a list of of '-'-separated
+-- components. The Unix 'uname' command syntax is related but briefer.
+--
+-- Those two parsers are quite forgiving, and even the 'config.sub'
+-- normalization is forgiving too. The "best" way to encode a platform is
+-- therefore somewhat a matter of taste.
+--
+-- The 'stringEncode*' functions here convert each part of GHC's structured
+-- notion of a platform into one dash-separated component.
+
+-- | See Note [Platform Syntax].
+stringEncodeArch :: Arch -> String
+stringEncodeArch = \case
+  ArchUnknown -> "unknown"
+  ArchX86 -> "i386"
+  ArchX86_64 -> "x86_64"
+  ArchPPC -> "powerpc"
+  ArchPPC_64 { ppc_64ABI = abi } -> case abi of
+    ELF_V1 -> "powerpc64"
+    ELF_V2 -> "powerpc64le"
+  ArchSPARC -> "sparc"
+  ArchSPARC64 -> "sparc64"
+  ArchARM { armISA = isa, armISAExt = _, armABI = _ } -> "arm" ++ vsuf
+    where
+      vsuf = case isa of
+        ARMv5 -> "v5"
+        ARMv6 -> "v6"
+        ARMv7 -> "v7"
+  ArchARM64 -> "aarch64"
+  ArchAlpha -> "alpha"
+  ArchMipseb -> "mipseb"
+  ArchMipsel -> "mipsel"
+  ArchJavaScript -> "js"
+
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
 isARM ArchARM64    = True
@@ -92,6 +135,24 @@ data OS
         | OSAIX
         | OSHurd
         deriving (Read, Show, Eq)
+
+-- | See Note [Platform Syntax].
+stringEncodeOS :: OS -> String
+stringEncodeOS = \case
+  OSUnknown -> "unknown"
+  OSLinux -> "linux"
+  OSDarwin -> "darwin"
+  OSSolaris2 -> "solaris2"
+  OSMinGW32 -> "mingw32"
+  OSFreeBSD -> "freebsd"
+  OSDragonFly -> "dragonfly"
+  OSOpenBSD -> "openbsd"
+  OSNetBSD -> "netbsd"
+  OSKFreeBSD -> "kfreebsdgnu"
+  OSHaiku -> "haiku"
+  OSQNXNTO -> "nto-qnx"
+  OSAIX -> "aix"
+  OSHurd -> "hurd"
 
 -- | ARM Instruction Set Architecture, Extensions and ABI
 --
