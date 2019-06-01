@@ -62,7 +62,8 @@ import GHC.IO.Handle.Types
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO (BufferedIO)
 import GHC.IO.Exception
-import GHC.IO.Device (IODevice, SeekMode(..))
+import GHC.IO.Device (IODevice, RawIO, SeekMode(..))
+import GHC.IO.SubSystem ((<!>))
 import qualified GHC.IO.Device as IODevice
 import qualified GHC.IO.BufferedIO as Buffered
 
@@ -93,8 +94,10 @@ newFileHandle :: FilePath -> Maybe HandleFinalizer -> Handle__ -> IO Handle
 newFileHandle filepath mb_finalizer hc = do
   m <- newMVar hc
   case mb_finalizer of
-    Just finalizer -> addMVarFinalizer m (finalizer filepath m)
-    Nothing        -> return ()
+    Just finalizer -> do debugIO $ "Registering finalizer: " ++ show filepath
+                         addMVarFinalizer m (finalizer filepath m)
+    Nothing        -> do debugIO $ "No finalizer: " ++ show filepath
+                         return ()
   return (FileHandle filepath m)
 
 -- ---------------------------------------------------------------------------
@@ -504,6 +507,7 @@ flushByteWriteBuffer h_@Handle__{..} = do
   bbuf <- readIORef haByteBuffer
   when (not (isEmptyBuffer bbuf)) $ do
     bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
+    debugIO ("flushByteWriteBuffer: bbuf=" ++ summaryBuffer bbuf')
     writeIORef haByteBuffer bbuf'
 
 -- write the contents of the CharBuffer to the Handle__.
@@ -583,10 +587,11 @@ flushCharReadBuffer Handle__{..} = do
       (bbuf1,cbuf1) <- (streamEncode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
 
-      debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
+      let bbuf2 = bbuf1 -- {bufOffset = bufOffset bbuf1 - fromIntegral (bufL bbuf1)}
+      debugIO ("finished, bbuf=" ++ summaryBuffer bbuf2 ++
                " cbuf=" ++ summaryBuffer cbuf1)
 
-      writeIORef haByteBuffer bbuf1
+      writeIORef haByteBuffer bbuf2
 
 
 -- When flushing the byte read buffer, we seek backwards by the number
@@ -604,26 +609,32 @@ flushByteReadBuffer h_@Handle__{..} = do
   when (not seekable) $ ioe_cannotFlushNotSeekable
 
   let seek = negate (bufR bbuf - bufL bbuf)
+  let offset = bufOffset bbuf - fromIntegral (bufR bbuf - bufL bbuf)
 
   debugIO ("flushByteReadBuffer: new file offset = " ++ show seek)
-  IODevice.seek haDevice RelativeSeek (fromIntegral seek)
+  debugIO ("flushByteReadBuffer: " ++ summaryBuffer bbuf)
 
-  writeIORef haByteBuffer bbuf{ bufL=0, bufR=0 }
+  let mIOSeek   = IODevice.seek haDevice RelativeSeek (fromIntegral seek)
+  -- win-io doesn't need this, but it allows us to error out on invalid offsets
+  let winIOSeek = IODevice.seek haDevice AbsoluteSeek (fromIntegral offset)
+
+  _ <- mIOSeek <!> winIOSeek  -- execute one of these two seek functions
+
+  writeIORef haByteBuffer bbuf{ bufL=0, bufR=0, bufOffset=offset }
 
 -- ----------------------------------------------------------------------------
 -- Making Handles
 
-mkHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
-            -> FilePath
-            -> HandleType
-            -> Bool                     -- buffered?
-            -> Maybe TextEncoding
-            -> NewlineMode
-            -> Maybe HandleFinalizer
-            -> Maybe (MVar Handle__)
-            -> IO Handle
-
-mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
+mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
+         -> FilePath
+         -> HandleType
+         -> Bool                     -- buffered?
+         -> Maybe TextEncoding
+         -> NewlineMode
+         -> Maybe HandleFinalizer
+         -> Maybe (MVar Handle__)
+         -> IO Handle
+mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
    openTextEncoding mb_codec ha_type $ \ mb_encoder mb_decoder -> do
 
    let buf_state = initBufferState ha_type
@@ -636,6 +647,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
                      else mkUnBuffer buf_state
 
    spares <- newIORef BufferListNil
+   debugIO $ "making handle for " ++ filepath
    newFileHandle filepath finalizer
             (Handle__ { haDevice = dev,
                         haType = ha_type,
@@ -653,7 +665,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
                       })
 
 -- | makes a new 'Handle'
-mkFileHandle :: (IODevice dev, BufferedIO dev, Typeable dev)
+mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
              => dev -- ^ the underlying IO device, which must support
                     -- 'IODevice', 'BufferedIO' and 'Typeable'
              -> FilePath
@@ -674,7 +686,7 @@ mkFileHandle dev filepath iomode mb_codec tr_newlines = do
 -- | like 'mkFileHandle', except that a 'Handle' is created with two
 -- independent buffers, one for reading and one for writing.  Used for
 -- full-duplex streams, such as network sockets.
-mkDuplexHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
+mkDuplexHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
                -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
 mkDuplexHandle dev filepath mb_codec tr_newlines = do
 
@@ -840,7 +852,9 @@ readTextDevice h_@Handle__{..} cbuf = do
   bbuf1 <- if not (isEmptyBuffer bbuf0)
               then return bbuf0
               else do
+                   debugIO $ "readBuf at " ++ show (bufferOffset bbuf0)
                    (r,bbuf1) <- Buffered.fillReadBuffer haDevice bbuf0
+                   debugIO $ "readBuf after " ++ show (bufferOffset bbuf1)
                    if r == 0 then ioe_EOF else do  -- raise EOF
                    return bbuf1
 

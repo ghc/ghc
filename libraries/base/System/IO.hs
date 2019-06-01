@@ -245,13 +245,14 @@ import GHC.IORef
 import GHC.Num
 import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
-import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
+import qualified GHC.IO.Handle.FD as POSIX
 import GHC.IO.Handle.Text ( hGetBufSome, hPutStrLn )
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
 import Text.Read
+import GHC.IO.SmartHandles
 import GHC.Show
 import GHC.MVar
 
@@ -534,7 +535,7 @@ openTempFile' loc tmp_dir template binary mode
       withCWString tmp_dir $ \c_tmp_dir ->
         withCWString label $ \c_template ->
           withCWString suffix $ \c_suffix ->
-            -- NOTE: revisit this when new I/O manager in place and use a UUID
+            -- FIXME: revisit this when new I/O manager in place and use a UUID
             --       based one when we are no longer MAX_PATH bound.
             allocaBytes (sizeOf (undefined :: CWchar) * 260) $ \c_str -> do
             res <- c_getTempFileNameErrorNo c_tmp_dir c_template c_suffix 0
@@ -561,7 +562,7 @@ openTempFile' loc tmp_dir template binary mode
                                      True{-is_nonblock-}
 
              enc <- getLocaleEncoding
-             h <- mkHandleFromFD fD fd_type filename ReadWriteMode
+             h <- POSIX.mkHandleFromFD fD fd_type filename ReadWriteMode
                                  False{-set non-block-} (Just enc)
 
              return (filename, h)
@@ -588,7 +589,7 @@ output_flags = std_flags
                                True{-is_nonblock-}
 
           enc <- getLocaleEncoding
-          h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
+          h <- POSIX.mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
           return (filepath, h)
 

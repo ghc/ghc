@@ -5,7 +5,8 @@
 module GHC.IO.Encoding.CodePage(
 #if defined(mingw32_HOST_OS)
                         codePageEncoding, mkCodePageEncoding,
-                        localeEncoding, mkLocaleEncoding
+                        localeEncoding, mkLocaleEncoding, CodePage,
+                        getCurrentCodePage
 #endif
                             ) where
 
@@ -32,19 +33,15 @@ import GHC.IO.Encoding.UTF8 (mkUTF8)
 import GHC.IO.Encoding.UTF16 (mkUTF16le, mkUTF16be)
 import GHC.IO.Encoding.UTF32 (mkUTF32le, mkUTF32be)
 
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
+import GHC.Windows (DWORD)
+
+#include "windows_cconv.h"
+
+type CodePage = DWORD
 
 -- note CodePage = UInt which might not work on Win64.  But the Win32 package
 -- also has this issue.
-getCurrentCodePage :: IO Word32
+getCurrentCodePage :: IO CodePage
 getCurrentCodePage = do
     conCP <- getConsoleCP
     if conCP > 0
