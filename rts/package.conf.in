@@ -168,6 +168,10 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_cmpxchg64"
 #endif
+         , "-Wl,-u,_hs_xchg8"
+         , "-Wl,-u,_hs_xchg16"
+         , "-Wl,-u,_hs_xchg32"
+         , "-Wl,-u,_hs_xchg64"
          , "-Wl,-u,_hs_atomicread8"
          , "-Wl,-u,_hs_atomicread16"
          , "-Wl,-u,_hs_atomicread32"
@@ -273,6 +277,10 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_cmpxchg64"
 #endif
+         , "-Wl,-u,hs_xchg8"
+         , "-Wl,-u,hs_xchg16"
+         , "-Wl,-u,hs_xchg32"
+         , "-Wl,-u,hs_xchg64"
          , "-Wl,-u,hs_atomicread8"
          , "-Wl,-u,hs_atomicread16"
          , "-Wl,-u,hs_atomicread32"
