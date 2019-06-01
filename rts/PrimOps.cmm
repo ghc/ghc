@@ -34,8 +34,8 @@ import CLOSURE base_GHCziIOziException_heapOverflow_closure;
 import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
 import CLOSURE base_GHCziExceptionziType_underflowException_closure;
 import CLOSURE base_GHCziExceptionziType_overflowException_closure;
-import EnterCriticalSection;
-import LeaveCriticalSection;
+import AcquireSRWLockExclusive;
+import ReleaseSRWLockExclusive;
 import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(PROFILING)
 import CLOSURE CCS_MAIN;
