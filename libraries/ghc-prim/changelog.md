@@ -19,6 +19,11 @@
 
 - Renamed the singleton tuple `GHC.Tuple.Unit` to `GHC.Tuple.Solo`.
 
+- Add primops for atomic exchange:
+
+        interlockedExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
+        interlockedExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
