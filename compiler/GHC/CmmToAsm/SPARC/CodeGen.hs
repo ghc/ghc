@@ -677,6 +677,7 @@ outOfLineMachOp_table mop
         MO_Ctz w     -> fsLit $ ctzLabel w
         MO_AtomicRMW w amop -> fsLit $ atomicRMWLabel w amop
         MO_Cmpxchg w -> fsLit $ cmpxchgLabel w
+        MO_Xchg w -> fsLit $ xchgLabel w
         MO_AtomicRead w -> fsLit $ atomicReadLabel w
         MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
 

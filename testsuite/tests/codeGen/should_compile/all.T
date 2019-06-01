@@ -6,6 +6,8 @@ test('cg005', only_ways(['optasm']), compile, [''])
 test('cg006', normal, compile, [''])
 test('cg007', normal, compile, [''])
 test('cg008', normal, compile, [''])
+# 009/010 have their own all.T file
+test('cg011', normal, compile, [''])
 
 test('T1916', normal, compile, [''])
 test('T2388', normal, compile, [''])

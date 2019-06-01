@@ -1022,7 +1022,12 @@ callishMachOps = listToUFM $
         ( "cmpxchg8",  (MO_Cmpxchg W8,)),
         ( "cmpxchg16", (MO_Cmpxchg W16,)),
         ( "cmpxchg32", (MO_Cmpxchg W32,)),
-        ( "cmpxchg64", (MO_Cmpxchg W64,))
+        ( "cmpxchg64", (MO_Cmpxchg W64,)),
+
+        ( "xchg8",  (MO_Xchg W8,)),
+        ( "xchg16", (MO_Xchg W16,)),
+        ( "xchg32", (MO_Xchg W32,)),
+        ( "xchg64", (MO_Xchg W64,))
 
         -- ToDo: the rest, maybe
         -- edit: which rest?

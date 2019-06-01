@@ -4,6 +4,7 @@ module GHC.CmmToAsm.CPrim
     , atomicWriteLabel
     , atomicRMWLabel
     , cmpxchgLabel
+    , xchgLabel
     , popCntLabel
     , pdepLabel
     , pextLabel
@@ -104,6 +105,15 @@ atomicRMWLabel w amop = "hs_atomic_" ++ pprFunName amop ++ pprWidth w
     pprFunName AMO_Nand = "nand"
     pprFunName AMO_Or   = "or"
     pprFunName AMO_Xor  = "xor"
+
+xchgLabel :: Width -> String
+xchgLabel w = "hs_xchg" ++ pprWidth w
+  where
+    pprWidth W8  = "8"
+    pprWidth W16 = "16"
+    pprWidth W32 = "32"
+    pprWidth W64 = "64"
+    pprWidth w   = pprPanic "xchgLabel: Unsupported word width " (ppr w)
 
 cmpxchgLabel :: Width -> String
 cmpxchgLabel w = "hs_cmpxchg" ++ pprWidth w
