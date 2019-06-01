@@ -1484,6 +1484,7 @@ void printAndClearEventBuf (EventsBuf *ebuf)
                     "printAndClearEventLog: could not flush event log\n"
                 );
             resetEventsBuf(ebuf);
+            flushEventLog();
             return;
         }
 
