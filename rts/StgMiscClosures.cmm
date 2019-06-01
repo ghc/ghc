@@ -15,8 +15,8 @@
 import pthread_mutex_lock;
 import ghczmprim_GHCziTypes_Czh_info;
 import ghczmprim_GHCziTypes_Izh_info;
-import EnterCriticalSection;
-import LeaveCriticalSection;
+import AcquireSRWLockExclusive;
+import ReleaseSRWLockExclusive;
 
 /* ----------------------------------------------------------------------------
    Stack underflow
