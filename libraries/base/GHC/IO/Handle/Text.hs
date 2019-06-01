@@ -32,7 +32,6 @@ module GHC.IO.Handle.Text (
     ) where
 
 import GHC.IO
-import GHC.IO.FD
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
 import GHC.IO.Exception
@@ -46,7 +45,6 @@ import Foreign
 import Foreign.C
 
 import qualified Control.Exception as Exception
-import Data.Typeable
 import System.IO.Error
 import Data.Maybe
 
@@ -632,7 +630,7 @@ commitBuffer hdl !raw !sz !count flush release =
       debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
             ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
 
-      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer,
+      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer, bufOffset=0,
                                  bufL=0, bufR=count, bufSize=sz }
 
       when flush $ flushByteWriteBuffer h_
@@ -656,7 +654,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release h_@Handle__{..}
             ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
 
       let this_buf = Buffer{ bufRaw=raw, bufState=WriteBuffer,
-                             bufL=0, bufR=count, bufSize=sz }
+                             bufL=0, bufR=count, bufSize=sz, bufOffset=0 }
 
       writeCharBuffer h_ this_buf
 
@@ -734,7 +732,7 @@ hPutBuf' handle ptr count can_block
 bufWrite :: Handle__-> Ptr Word8 -> Int -> Bool -> IO Int
 bufWrite h_@Handle__{..} ptr count can_block =
   seq count $ do  -- strictness hack
-  old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size }
+  old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size, bufOffset=offset }
      <- readIORef haByteBuffer
 
   -- TODO: Possible optimisation:
@@ -775,19 +773,17 @@ bufWrite h_@Handle__{..} ptr count can_block =
                 if count < size
                    then bufWrite h_ ptr count can_block
                    else if can_block
-                           then do writeChunk h_ (castPtr ptr) count
+                           then do writeChunk h_ (castPtr ptr) offset count
                                    return count
-                           else writeChunkNonBlocking h_ (castPtr ptr) count
+                           else writeChunkNonBlocking h_ (castPtr ptr) offset count
 
-writeChunk :: Handle__ -> Ptr Word8 -> Int -> IO ()
-writeChunk h_@Handle__{..} ptr bytes
-  | Just fd <- cast haDevice  =  RawIO.write (fd::FD) ptr bytes
-  | otherwise = error "Todo: hPutBuf"
+writeChunk :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO ()
+writeChunk h_@Handle__{..} ptr offset bytes
+  = RawIO.write haDevice ptr offset bytes
 
-writeChunkNonBlocking :: Handle__ -> Ptr Word8 -> Int -> IO Int
-writeChunkNonBlocking h_@Handle__{..} ptr bytes
-  | Just fd <- cast haDevice  =  RawIO.writeNonBlocking (fd::FD) ptr bytes
-  | otherwise = error "Todo: hPutBuf"
+writeChunkNonBlocking :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO Int
+writeChunkNonBlocking h_@Handle__{..} ptr offset bytes
+  = RawIO.writeNonBlocking haDevice ptr offset bytes
 
 -- ---------------------------------------------------------------------------
 -- hGetBuf
@@ -813,12 +809,16 @@ hGetBuf h !ptr count
   | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise =
       wantReadableHandle_ "hGetBuf" h $ \ h_@Handle__{..} -> do
-         flushCharReadBuffer h_
-         buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+          debugIO $ ":: hGetBuf - " ++ show h
+          flushCharReadBuffer h_
+          buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
             <- readIORef haByteBuffer
-         if isEmptyBuffer buf
-            then bufReadEmpty    h_ buf (castPtr ptr) 0 count
-            else bufReadNonEmpty h_ buf (castPtr ptr) 0 count
+          debugIO ("hGetBuf: " ++ summaryBuffer buf)
+          res <- if isEmptyBuffer buf
+                    then bufReadEmpty    h_ buf (castPtr ptr) 0 count
+                    else bufReadNonEmpty h_ buf (castPtr ptr) 0 count
+          debugIO "** hGetBuf done."
+          return res
 
 -- small reads go through the buffer, large reads are satisfied by
 -- taking data first from the buffer and then direct from the file
@@ -829,8 +829,9 @@ bufReadNonEmpty h_@Handle__{..}
                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
                 ptr !so_far !count
  = do
+        debugIO ":: bufReadNonEmpty"
         let avail = w - r
-        if (count < avail)
+        if (count <= avail)
            then do
                 copyFromRawBuffer ptr raw r count
                 writeIORef haByteBuffer buf{ bufL = r + count }
@@ -844,6 +845,7 @@ bufReadNonEmpty h_@Handle__{..}
             so_far' = so_far + avail
             ptr' = ptr `plusPtr` avail
 
+        debugIO ("bufReadNonEmpty: " ++ summaryBuffer buf' ++ " s:" ++ show so_far' ++ " r:" ++ show remaining)
         if remaining == 0
            then return so_far'
            else bufReadEmpty h_ buf' ptr' so_far' remaining
@@ -851,9 +853,14 @@ bufReadNonEmpty h_@Handle__{..}
 
 bufReadEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadEmpty h_@Handle__{..}
-             buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+             buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz, bufOffset=bff }
              ptr so_far count
- | count > sz, Just fd <- cast haDevice = loop fd 0 count
+ | count > sz = do count <- loop haDevice 0 bff count
+                   let buf1 = bufferAddOffset (fromIntegral count) buf
+                   -- let buf2 = buf1 { bufR = w + count }
+                   writeIORef haByteBuffer buf1
+                   debugIO ("bufReadEmpty: " ++ summaryBuffer buf1)
+                   return count
  | otherwise = do
      (r,buf') <- Buffered.fillReadBuffer haDevice buf
      if r == 0
@@ -861,13 +868,15 @@ bufReadEmpty h_@Handle__{..}
         else do writeIORef haByteBuffer buf'
                 bufReadNonEmpty h_ buf' ptr so_far count
  where
-  loop :: FD -> Int -> Int -> IO Int
-  loop fd off bytes | bytes <= 0 = return (so_far + off)
-  loop fd off bytes = do
-    r <- RawIO.read (fd::FD) (ptr `plusPtr` off) bytes
+  loop :: RawIO.RawIO dev => dev -> Int -> Word64 -> Int -> IO Int
+  loop dev delta off bytes | bytes <= 0 = return (so_far + delta)
+  loop dev delta off bytes = do
+    r <- RawIO.read dev (ptr `plusPtr` delta) off bytes
+    debugIO $ show ptr ++ " - loop read@" ++ show delta ++ ": " ++ show r
+    debugIO $ "next:" ++ show (delta + r) ++ " - left:" ++ show (bytes - r)
     if r == 0
-        then return (so_far + off)
-        else loop fd (off + r) (bytes - r)
+        then return (so_far + delta)
+        else loop dev (delta + r) (off + fromIntegral r) (bytes - r)
 
 -- ---------------------------------------------------------------------------
 -- hGetBufSome
@@ -899,7 +908,7 @@ hGetBufSome h !ptr count
          buf@Buffer{ bufSize=sz } <- readIORef haByteBuffer
          if isEmptyBuffer buf
             then case count > sz of  -- large read? optimize it with a little special case:
-                    True | Just fd <- haFD h_ -> do RawIO.read fd (castPtr ptr) count
+                    True -> RawIO.read haDevice (castPtr ptr) 0 count
                     _ -> do (r,buf') <- Buffered.fillReadBuffer haDevice buf
                             if r == 0
                                then return 0
@@ -911,9 +920,6 @@ hGetBufSome h !ptr count
             else
               let count' = min count (bufferElems buf)
               in bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count'
-
-haFD :: Handle__ -> Maybe FD
-haFD h_@Handle__{..} = cast haDevice
 
 -- | 'hGetBufNonBlocking' @hdl buf count@ reads data from the handle @hdl@
 -- into the buffer @buf@ until either EOF is reached, or
@@ -949,11 +955,11 @@ hGetBufNonBlocking h !ptr count
 
 bufReadNBEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNBEmpty   h_@Handle__{..}
-                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz
+                           , bufOffset=offset }
                  ptr so_far count
-  | count > sz,
-    Just fd <- cast haDevice = do
-       m <- RawIO.readNonBlocking (fd::FD) ptr count
+  | count > sz = do
+       m <- RawIO.readNonBlocking haDevice ptr offset count
        case m of
          Nothing -> return so_far
          Just n  -> return (so_far + n)
