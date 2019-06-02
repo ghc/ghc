@@ -552,14 +552,14 @@ validate-x86_64-linux-fedora27:
   cache:
     paths:
       - cabal-cache
-      - ghc-8.6.2
+      - ghc-8.6.5
       - ghc-tarballs
 
 .build-windows-hadrian:
   extends: .build-windows
   stage: full-build
   variables:
-    GHC_VERSION: "8.6.2"
+    GHC_VERSION: "8.6.5"
   # due to #16574 this currently fails
   allow_failure: true
   script:
@@ -601,7 +601,7 @@ nightly-i386-windows-hadrian:
   allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
-    GHC_VERSION: "8.6.2"
+    GHC_VERSION: "8.6.5"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-mingw32.tar.xz"
   script:
     - |
