@@ -265,12 +265,12 @@ typeDocs :: HsType GhcRn -> Map Int (HsDocString)
 typeDocs = go 0
   where
     go n = \case
-      HsForAllTy { hst_body = ty }           -> go n (unLoc ty)
-      HsQualTy   { hst_body = ty }           -> go n (unLoc ty)
-      HsFunTy _ (dL->L _ (HsDocTy _ _ x)) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
-      HsFunTy _ _ ty                         -> go (n+1) (unLoc ty)
-      HsDocTy _ _ doc                        -> M.singleton n (unLoc doc)
-      _                                      -> M.empty
+      HsForAllTy { hst_body = ty }        -> go n (unLoc ty)
+      HsQualTy   { hst_body = ty }        -> go n (unLoc ty)
+      HsFunTy _ (unLoc->HsDocTy _ _ x) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
+      HsFunTy _ _ ty                      -> go (n+1) (unLoc ty)
+      HsDocTy _ _ doc                     -> M.singleton n (unLoc doc)
+      _                                   -> M.empty
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
@@ -308,15 +308,15 @@ collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
 collectDocs = go [] Nothing
   where
     go docs mprev decls = case (decls, mprev) of
-      ((dL->L _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (s:docs) Nothing ds
-      ((dL->L _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> done prev docs $ go [s] Nothing ds
-      ((dL->L _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (s:docs) mprev ds
-      (d                                     : ds, Nothing)   -> go docs (Just d) ds
-      (d                                     : ds, Just prev) -> done prev docs $ go [] (Just d) ds
-      ([]                                        , Nothing)   -> []
-      ([]                                        , Just prev) -> done prev docs []
+      ((unLoc->DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (s:docs) Nothing ds
+      ((unLoc->DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
+      ((unLoc->DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (s:docs) mprev ds
+      (d                                  : ds, Nothing)   -> go docs (Just d) ds
+      (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
+      ([]                                     , Nothing)   -> []
+      ([]                                     , Just prev) -> finished prev docs []
 
-    done decl docs rest = (decl, reverse docs) : rest
+    finished decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
 filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
