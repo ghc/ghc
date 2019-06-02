@@ -84,7 +84,7 @@ test('hGetBuf001',
       expect_fail_if_windows],
      compile_and_run, ['-package unix'])
 
-test('hDuplicateTo001', [], compile_and_run, [''])
+test('hDuplicateTo001', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
 
