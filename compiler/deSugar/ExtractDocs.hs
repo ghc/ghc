@@ -308,15 +308,15 @@ collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
 collectDocs = go [] Nothing
   where
     go docs mprev decls = case (decls, mprev) of
-      ((LL _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (s:docs) Nothing ds
-      ((LL _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
-      ((LL _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (s:docs) mprev ds
-      (d                                  : ds, Nothing)   -> go docs (Just d) ds
-      (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
-      ([]                                     , Nothing)   -> []
-      ([]                                     , Just prev) -> finished prev docs []
+      ((dL->L _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (s:docs) Nothing ds
+      ((dL->L _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> done prev docs $ go [s] Nothing ds
+      ((dL->L _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (s:docs) mprev ds
+      (d                                     : ds, Nothing)   -> go docs (Just d) ds
+      (d                                     : ds, Just prev) -> done prev docs $ go [] (Just d) ds
+      ([]                                        , Nothing)   -> []
+      ([]                                        , Just prev) -> done prev docs []
 
-    finished decl docs rest = (decl, reverse docs) : rest
+    done decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
 filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
