@@ -19,6 +19,7 @@ module GHC.Event.Array
     , removeAt
     , snoc
     , unsafeLoad
+    , unsafeSplat
     , unsafeRead
     , unsafeWrite
     , useAsPtr
@@ -138,6 +139,14 @@ unsafeLoad (Array ref) load = do
     len' <- withForeignPtr es $ \p -> load p cap
     writeIORef ref (AC es len' cap)
     return len'
+
+unsafeSplat :: Array a -> Ptr a -> Int -> IO ()
+unsafeSplat (Array ref) ptr n = do
+    AC es _ cap <- readIORef ref
+    when (n > cap) $ errorWithoutStackTrace "unsafeSplat: bad offsets or lengths"
+    withForeignPtr es $ \p -> do
+      _ <- memcpy p ptr (fromIntegral n)
+      writeIORef ref (AC es n cap)
 
 ensureCapacity :: Storable a => Array a -> Int -> IO ()
 ensureCapacity (Array ref) c = do
