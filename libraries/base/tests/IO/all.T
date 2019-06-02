@@ -16,8 +16,8 @@ test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
-test('hGetBuffering001', 
-	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')], 
+test('hGetBuffering001',
+	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')],
 	compile_and_run, [''])
 
 test('hGetContentsS001', normal, compile_and_run, [''])
@@ -47,7 +47,7 @@ test('hSeek004', [], compile_and_run, ['-cpp'])
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
 test('hSetBuffering003',
-    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')], 
+    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')],
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
@@ -86,7 +86,8 @@ test('hGetBuf001',
      compile_and_run, ['-package unix'])
 
 # As discussed in #16819, this test is racy in a threaded environment.
-test('hDuplicateTo001', [omit_ways(concurrent_ways)], compile_and_run, [''])
+test('hDuplicateTo001', [omit_ways(concurrent_ways),
+                         when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
 
