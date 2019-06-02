@@ -51,6 +51,7 @@
 
 #if defined(mingw32_HOST_OS)
 #include <fenv.h>
+#include <windows.h>
 #else
 #include "posix/TTY.h"
 #endif
@@ -120,6 +121,21 @@ void fpreset(void) {
     _fpreset();
 }
 #endif
+
+/* Set the console's CodePage to UTF-8 if using the new I/O manager and the CP
+   is still the default one.  */
+static void
+initConsoleCP (void)
+{
+    /* Check if the codepage is still the system default ANSI codepage.  */
+    if (GetConsoleCP () == GetOEMCP ()) {
+      if (! SetConsoleCP (CP_UTF8))
+        errorBelch ("Unable to set console CodePage, Unicode output may be "
+                    "garbled.\n");
+      else
+        IF_DEBUG (scheduler, debugBelch ("Codepage set to UTF-8.\n"));
+    }
+}
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -219,6 +235,12 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         DEBUG_LoadSymbols((*argv)[0]);
 #endif /* DEBUG */
     }
+
+    /* Initialize console Codepage.  */
+#if defined(mingw32_HOST_OS)
+   if (is_io_mng_native_p())
+      initConsoleCP();
+#endif
 
     /* Initialise the stats department, phase 1 */
     initStats1();
