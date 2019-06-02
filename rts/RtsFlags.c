@@ -32,6 +32,7 @@
 #endif
 
 #include <fs_rts.h>
+#include <stdbool.h>
 
 // Flag Structure
 RTS_FLAGS RtsFlags;
@@ -238,6 +239,16 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
+#if defined(DEFAULT_NATIVE_IO_MANAGER)
+    RtsFlags.MiscFlags.ioManager               = IO_MNGR_NATIVE;
+#else
+    RtsFlags.MiscFlags.ioManager               = IO_MNGR_POSIX;
+#endif
+#if defined(THREADED_RTS) && defined(mingw32_HOST_OS)
+    RtsFlags.MiscFlags.numIoWorkerThreads      = getNumberOfProcessors();
+#else
+    RtsFlags.MiscFlags.numIoWorkerThreads      = 1;
+#endif
 
 #if defined(THREADED_RTS)
     RtsFlags.ParFlags.nCapabilities     = 1;
@@ -454,7 +465,14 @@ usage_text[] = {
 "            fatal error. When symbols are available an attempt will be",
 "            made to resolve addresses to names. (default: yes)",
 #endif
+"  --io-manager=<native|posix>",
+"            The I/O manager subsystem to use. (default: posix)",
 #if defined(THREADED_RTS)
+#if defined(mingw32_HOST_OS)
+"  --io-manager-threads=<num>",
+"            The number of worker threads to use in the native I/O manager to",
+"            handle completion events. (defualt: num cores)",
+#endif
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
 #if defined(x86_64_HOST_ARCH)
@@ -908,6 +926,16 @@ error = true;
                       OPTION_SAFE;
                       RtsFlags.MiscFlags.internalCounters = true;
                   }
+                  else if (strequal("io-manager=native",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.ioManager = IO_MNGR_NATIVE;
+                  }
+                  else if (strequal("io-manager=posix",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.ioManager = IO_MNGR_POSIX;
+                  }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
@@ -915,6 +943,31 @@ error = true;
                       stg_exit(0);
                   }
 #if defined(THREADED_RTS)
+#if defined(mingw32_HOST_OS)
+                  else if (!strncmp("io-manager-threads",
+                                &rts_argv[arg][2], 18)) {
+                      OPTION_SAFE;
+                      uint32_t num;
+                      if (rts_argv[arg][20] == '=') {
+                          num = (StgWord)strtol(rts_argv[arg]+21,
+                                                 (char **) NULL, 10);
+                      } else {
+                          errorBelch("%s: Expected number of threads to use.",
+                                     rts_argv[arg]);
+                          error = true;
+                          break;
+                      }
+
+                      if (num < 1) {
+                          errorBelch("%s: Expected number of threads to be at least 1.",
+                                     rts_argv[arg]);
+                          error = true;
+                          break;
+                      }
+
+                      RtsFlags.MiscFlags.numIoWorkerThreads = num;
+                  }
+#endif
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
                       if (!osBuiltWithNumaSupport()) {
                           errorBelch("%s: This GHC build was compiled without NUMA support.",
@@ -2311,3 +2364,16 @@ built in the -debug, -eventlog, -prof ways. And even if they do, the
 damage should be limited to DOS, information disclosure and writing
 files like <progname>.eventlog, not arbitrary files.
 */
+
+/* ----------------------------------------------------------------------------
+   Helper utilities to query state.
+   ------------------------------------------------------------------------- */
+
+bool is_io_mng_native_p (void)
+{
+#if defined (mingw32_HOST_OS)
+  return RtsFlags.MiscFlags.ioManager == IO_MNGR_NATIVE;
+#else
+  return false;
+#endif
+}

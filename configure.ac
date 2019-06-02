@@ -123,6 +123,18 @@ if test "$EnableDistroToolchain" = "YES"; then
   TarballsAutodownload=NO
 fi
 
+AC_ARG_ENABLE(native-io-manager,
+[AC_HELP_STRING([--enable-native-io-manager],
+                [Enable the native I/O manager by default.])],
+        EnableNativeIOManager=YES,
+        EnableNativeIOManager=NO
+)
+
+if test "$EnableNativeIOManager" = "YES"; then
+  AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
+
+fi
+
 dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
