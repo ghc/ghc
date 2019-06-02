@@ -335,13 +335,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; print_unqual = mkPrintUnqualified dflags rdr_env
-              }
-
-        ; let { type_env = typeEnvFromEntities [] tcs fam_insts
-
-              ; implicit_binds
-                  = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++
-                    concatMap getTyConImplicitBinds (typeEnvTyCons type_env)
+              ; implicit_binds = concatMap getImplicitBinds tcs
               }
 
         ; (unfold_env, tidy_occ_env)
@@ -360,10 +354,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                not (isWiredInName (getName id))
                              ]
 
-              ; type_env1  = extendTypeEnvWithIds type_env final_ids
+              ; type_env = typeEnvFromEntities final_ids tcs fam_insts
 
               ; lookup_final_id id =
-                  case lookupTypeEnv type_env1 (idName id) of
+                  case lookupTypeEnv type_env (idName id) of
                     Just (AnId id') -> id'
                     _ -> pprPanic "lookup_final_id" (ppr id)
 
@@ -373,7 +367,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
               ; tidy_patsyns = map (updatePatSynIds lookup_final_id) patsyns
 
-              ; tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env1
+              ; tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
               }
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
@@ -568,6 +562,11 @@ namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
 See Note [Data constructor workers] in CorePrep.
 -}
+
+getImplicitBinds :: TyCon -> [CoreBind]
+getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
+  where
+    cls_binds = maybe [] getClassImplicitBinds (tyConClass_maybe tc)
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc = map get_defn (mapMaybe dataConWrapId_maybe (tyConDataCons tc))
