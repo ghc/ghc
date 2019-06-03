@@ -219,7 +219,7 @@ getCompilerInfo dflags = do
 -- See Note [Run-time linker info].
 getCompilerInfo' :: DynFlags -> IO CompilerInfo
 getCompilerInfo' dflags = do
-  let (pgm,_) = pgm_c dflags
+  let pgm = pgm_c dflags
       -- Try to grab the info from the process output.
       parseCompilerInfo _stdo stde _exitc
         -- Regular GCC

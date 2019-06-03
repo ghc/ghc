@@ -510,6 +510,7 @@ SettingsCCompilerCommand = @SettingsCCompilerCommand@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
 SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
 SettingsCCompilerFlags = @SettingsCCompilerFlags@
+SettingsCxxCompilerFlags = @SettingsCxxCompilerFlags@
 SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
 SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
 SettingsLdCommand = @SettingsLdCommand@

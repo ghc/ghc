@@ -62,9 +62,9 @@ runPp dflags args =   do
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
 runCc :: Maybe ForeignSrcLang -> DynFlags -> [Option] -> IO ()
 runCc mLanguage dflags args =   do
-  let (p,args0) = pgm_c dflags
+  let p = pgm_c dflags
       args1 = map Option userOpts
-      args2 = args0 ++ languageOptions ++ args ++ args1
+      args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
@@ -126,12 +126,16 @@ runCc mLanguage dflags args =   do
   -- -x c option.
   (languageOptions, userOpts) = case mLanguage of
     Nothing -> ([], userOpts_c)
-    Just language -> ([Option "-x", Option languageName], opts) where
-      (languageName, opts) = case language of
-        LangCxx    -> ("c++",           userOpts_cxx)
-        LangObjc   -> ("objective-c",   userOpts_c)
-        LangObjcxx -> ("objective-c++", userOpts_cxx)
-        _          -> ("c",             userOpts_c)
+    Just language -> ([Option "-x", Option languageName], opts)
+      where
+        s = settings dflags
+        (languageName, opts) = case language of
+          LangC      -> ("c",             sOpt_c s ++ userOpts_c)
+          LangCxx    -> ("c++",           sOpt_cxx s ++ userOpts_cxx)
+          LangObjc   -> ("objective-c",   userOpts_c)
+          LangObjcxx -> ("objective-c++", userOpts_cxx)
+          LangAsm    -> ("assembler",     [])
+          RawObject  -> ("c",             []) -- claim C for lack of a better idea
   userOpts_c   = getOpts dflags opt_c
   userOpts_cxx = getOpts dflags opt_cxx
 
@@ -333,7 +337,8 @@ runMkDLL dflags args = do
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
-  let (gcc, gcc_args) = pgm_c dflags
+  let cc = pgm_c dflags
+      cc_args = map Option (sOpt_c (settings dflags))
       windres = pgm_windres dflags
       opts = map Option (getOpts dflags opt_windres)
       quote x = "\"" ++ x ++ "\""
@@ -341,8 +346,7 @@ runWindres dflags args = do
               -- spaces then windres fails to run gcc. We therefore need
               -- to tell it what command to use...
               Option ("--preprocessor=" ++
-                      unwords (map quote (gcc :
-                                          map showOpt gcc_args ++
+                      unwords (map quote (cc :
                                           map showOpt opts ++
                                           ["-E", "-xc", "-DRC_INVOKED"])))
               -- ...but if we do that then if windres calls popen then
@@ -351,7 +355,7 @@ runWindres dflags args = do
               -- See #1828.
             : Option "--use-temp-file"
             : args
-  mb_env <- getGccEnv gcc_args
+  mb_env <- getGccEnv cc_args
   runSomethingFiltered dflags id "Windres" windres args' Nothing mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
