@@ -2285,8 +2285,12 @@ rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred c
                                                        (mkTcSymCo co))
 
 rewriteEvidence ev@(CtWanted { ctev_dest = dest
+                             , ctev_nosh = si
                              , ctev_loc = loc }) new_pred co
-  = do { mb_new_ev <- newWanted loc new_pred
+  = do { mb_new_ev <- newWanted_SI si loc new_pred
+               -- The "_SI" varant ensures that we make a new Wanted
+               -- with the same shadow-info as the existing one
+               -- with the same shadow-info as the existing one (#16735)
        ; MASSERT( tcCoercionRole co == ctEvRole ev )
        ; setWantedEvTerm dest
             (mkEvCast (getEvExpr mb_new_ev)
@@ -2334,8 +2338,10 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
-  | CtWanted { ctev_dest = dest } <- old_ev
-  = do { (new_ev, hole_co) <- newWantedEq loc' (ctEvRole old_ev) nlhs nrhs
+  | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
+  = do { (new_ev, hole_co) <- newWantedEq_SI si loc' (ctEvRole old_ev) nlhs nrhs
+               -- The "_SI" varant ensures that we make a new Wanted
+               -- with the same shadow-info as the existing one (#16735)
        ; let co = maybeSym swapped $
                   mkSymCo lhs_co
                   `mkTransCo` hole_co
