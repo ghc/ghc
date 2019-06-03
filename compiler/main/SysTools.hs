@@ -204,8 +204,8 @@ initSysTools top_dir
                            then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                            else []
            cpp_args = map Option (words cpp_args_str)
-           cc_args  = map Option (words cc_args_str ++ unreg_cc_args)
-           cxx_args = map Option (words cxx_args_str)
+           cc_args  = words cc_args_str ++ unreg_cc_args
+           cxx_args = words cxx_args_str
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
@@ -239,9 +239,9 @@ initSysTools top_dir
        -- Other things being equal, as and ld are simply gcc
        cc_link_args_str <- getSetting "C compiler link flags"
        let   as_prog  = cc_prog
-             as_args  = cc_args
+             as_args  = map Option cc_args
              ld_prog  = cc_prog
-             ld_args  = cc_args ++ map Option (words cc_link_args_str)
+             ld_args  = map Option (cc_args ++ words cc_link_args_str)
 
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"

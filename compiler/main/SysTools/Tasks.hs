@@ -64,7 +64,7 @@ runCc :: Maybe ForeignSrcLang -> DynFlags -> [Option] -> IO ()
 runCc mLanguage dflags args =   do
   let p = pgm_c dflags
       args1 = map Option userOpts
-      args2 = args0 ++ languageOptions ++ args ++ args1
+      args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
@@ -337,7 +337,8 @@ runMkDLL dflags args = do
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
-  let (gcc, gcc_args) = pgm_c dflags
+  let cc = pgm_c dflags
+      cc_args = map Option (sOpt_c (settings dflags))
       windres = pgm_windres dflags
       opts = map Option (getOpts dflags opt_windres)
       quote x = "\"" ++ x ++ "\""
@@ -345,8 +346,7 @@ runWindres dflags args = do
               -- spaces then windres fails to run gcc. We therefore need
               -- to tell it what command to use...
               Option ("--preprocessor=" ++
-                      unwords (map quote (gcc :
-                                          map showOpt gcc_args ++
+                      unwords (map quote (cc :
                                           map showOpt opts ++
                                           ["-E", "-xc", "-DRC_INVOKED"])))
               -- ...but if we do that then if windres calls popen then
@@ -355,7 +355,7 @@ runWindres dflags args = do
               -- See #1828.
             : Option "--use-temp-file"
             : args
-  mb_env <- getGccEnv gcc_args
+  mb_env <- getGccEnv cc_args
   runSomethingFiltered dflags id "Windres" windres args' Nothing mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
