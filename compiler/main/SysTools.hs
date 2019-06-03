@@ -194,17 +194,18 @@ initSysTools top_dir
        -- It would perhaps be nice to be able to override this
        -- with the settings file, but it would be a little fiddly
        -- to make that possible, so for now you can't.
-       gcc_prog <- getToolSetting "C compiler command"
-       gcc_args_str <- getSetting "C compiler flags"
+       cc_prog <- getToolSetting "C compiler command"
+       cc_args_str <- getSetting "C compiler flags"
+       cxx_args_str <- getSetting "C++ compiler flags"
        gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getToolSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
        let unreg_gcc_args = if targetUnregisterised
                             then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                             else []
-           cpp_args= map Option (words cpp_args_str)
-           gcc_args = map Option (words gcc_args_str
-                               ++ unreg_gcc_args)
+           cpp_args = map Option (words cpp_args_str)
+           cc_args  = map Option (words cc_args_str ++ unreg_cc_args)
+           cxx_args = map Option (words cxx_args_str)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
@@ -308,7 +309,8 @@ initSysTools top_dir
            , toolSettings_pgm_L   = unlit_path
            , toolSettings_pgm_P   = (cpp_prog, cpp_args)
            , toolSettings_pgm_F   = ""
-           , toolSettings_pgm_c   = (gcc_prog, gcc_args)
+           , toolSettings_pgm_c   = (cc_prog, cc_args)
+           , toolSettings_pgm_cxx = (cc_prog, cxx_args)
            , toolSettings_pgm_a   = (as_prog, as_args)
            , toolSettings_pgm_l   = (ld_prog, ld_args)
            , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
