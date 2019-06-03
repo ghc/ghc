@@ -22,7 +22,7 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_L       :: String
   , toolSettings_pgm_P       :: (String, [Option])
   , toolSettings_pgm_F       :: String
-  , toolSettings_pgm_c       :: (String, [Option])
+  , toolSettings_pgm_c       :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
   , toolSettings_pgm_dll     :: (String, [Option])
