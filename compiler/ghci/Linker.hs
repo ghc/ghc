@@ -343,7 +343,7 @@ linkCmdLineLibs' hsc_env pls =
 
       -- Add directories to library search paths, this only has an effect
       -- on Windows. On Unix OSes this function is a NOP.
-      let all_paths = let paths = takeDirectory (fst $ pgm_c dflags)
+      let all_paths = let paths = takeDirectory (pgm_c dflags)
                                 : framework_paths
                                ++ lib_paths_base
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
