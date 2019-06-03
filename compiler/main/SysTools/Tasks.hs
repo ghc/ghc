@@ -62,7 +62,7 @@ runPp dflags args =   do
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
 runCc :: Maybe ForeignSrcLang -> DynFlags -> [Option] -> IO ()
 runCc mLanguage dflags args =   do
-  let (p,args0) = pgm_c dflags
+  let p = pgm_c dflags
       args1 = map Option userOpts
       args2 = args0 ++ languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
@@ -126,12 +126,16 @@ runCc mLanguage dflags args =   do
   -- -x c option.
   (languageOptions, userOpts) = case mLanguage of
     Nothing -> ([], userOpts_c)
-    Just language -> ([Option "-x", Option languageName], opts) where
-      (languageName, opts) = case language of
-        LangCxx    -> ("c++",           userOpts_cxx)
-        LangObjc   -> ("objective-c",   userOpts_c)
-        LangObjcxx -> ("objective-c++", userOpts_cxx)
-        _          -> ("c",             userOpts_c)
+    Just language -> ([Option "-x", Option languageName], opts)
+      where
+        s = settings dflags
+        (languageName, opts) = case language of
+          LangC      -> ("c",             sOpt_c s ++ userOpts_c)
+          LangCxx    -> ("c++",           sOpt_cxx s ++ userOpts_cxx)
+          LangObjc   -> ("objective-c",   userOpts_c)
+          LangObjcxx -> ("objective-c++", userOpts_cxx)
+          LangAsm    -> ("assembler",     [])
+          RawObject  -> ("c",             []) -- claim C for lack of a better idea
   userOpts_c   = getOpts dflags opt_c
   userOpts_cxx = getOpts dflags opt_cxx
 
