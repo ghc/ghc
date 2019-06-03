@@ -153,9 +153,7 @@ mkBootModDetailsTc hsc_env
               ; pat_syns'  = map (updatePatSynIds   globaliseAndTidyBootId) pat_syns
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
-              ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
-              ; dfun_ids   = map instanceDFunId insts'
-              ; type_env'  = extendTypeEnvWithIds type_env2 dfun_ids
+              ; type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
               }
         ; return (ModDetails { md_types         = type_env'
                              , md_insts         = insts'
