@@ -88,6 +88,7 @@ data SettingsFileSetting
     | SettingsFileSetting_HaskellCPPCommand
     | SettingsFileSetting_HaskellCPPFlags
     | SettingsFileSetting_CCompilerFlags
+    | SettingsFileSetting_CxxCompilerFlags
     | SettingsFileSetting_CCompilerLinkFlags
     | SettingsFileSetting_CCompilerSupportsNoPie
     | SettingsFileSetting_LdCommand
@@ -162,6 +163,7 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_HaskellCPPCommand -> "settings-haskell-cpp-command"
     SettingsFileSetting_HaskellCPPFlags -> "settings-haskell-cpp-flags"
     SettingsFileSetting_CCompilerFlags -> "settings-c-compiler-flags"
+    SettingsFileSetting_CxxCompilerFlags -> "settings-cxx-compiler-flags"
     SettingsFileSetting_CCompilerLinkFlags -> "settings-c-compiler-link-flags"
     SettingsFileSetting_CCompilerSupportsNoPie -> "settings-c-compiler-supports-no-pie"
     SettingsFileSetting_LdCommand -> "settings-ld-command"
