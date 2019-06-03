@@ -1420,7 +1420,7 @@ pgm_P                 :: DynFlags -> (String,[Option])
 pgm_P dflags = toolSettings_pgm_P $ toolSettings dflags
 pgm_F                 :: DynFlags -> String
 pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
-pgm_c                 :: DynFlags -> (String,[Option])
+pgm_c                 :: DynFlags -> String
 pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
@@ -3048,7 +3048,7 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s
-         { toolSettings_pgm_c   = (f,[])
+         { toolSettings_pgm_c   = f
          , -- Don't pass -no-pie with -pgmc
            -- (see #15319)
            toolSettings_ccSupportsNoPie = False

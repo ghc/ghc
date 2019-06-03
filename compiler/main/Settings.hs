@@ -119,7 +119,7 @@ sPgm_P :: Settings -> (String, [Option])
 sPgm_P = toolSettings_pgm_P . sToolSettings
 sPgm_F :: Settings -> String
 sPgm_F = toolSettings_pgm_F . sToolSettings
-sPgm_c :: Settings -> (String, [Option])
+sPgm_c :: Settings -> String
 sPgm_c = toolSettings_pgm_c . sToolSettings
 sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings

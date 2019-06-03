@@ -179,6 +179,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
 	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
+	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
 	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
 	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
 	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
