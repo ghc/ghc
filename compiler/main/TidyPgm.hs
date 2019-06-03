@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP, ViewPatterns #-}
 
 module TidyPgm (
-       mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
+       mkBootModDetailsTc, tidyProgram
    ) where
 
 #include "HsVersions.h"
@@ -149,8 +149,8 @@ mkBootModDetailsTc hsc_env
     Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
-    do  { let { insts'     = map (updateClsInstDFun globaliseAndTidyId) insts
-              ; pat_syns'  = map (updatePatSynIds   globaliseAndTidyId) pat_syns
+    do  { let { insts'     = map (updateClsInstDFun globaliseAndTidyBootId) insts
+              ; pat_syns'  = map (updatePatSynIds   globaliseAndTidyBootId) pat_syns
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                            (typeEnvIds type_env) tcs fam_insts
               ; type_env2  = extendTypeEnvWithPatSyns pat_syns' type_env1
@@ -185,9 +185,7 @@ mkBootTypeEnv exports ids tcs fam_insts
         -- Do make sure that we keep Ids that are already Global.
         -- When typechecking an .hs-boot file, the Ids come through as
         -- GlobalIds.
-    final_ids = [ (if isLocalId id then globaliseAndTidyId id
-                                   else id)
-                        `setIdUnfolding` BootUnfolding
+    final_ids = [ globaliseAndTidyBootId id
                 | id <- ids
                 , keep_it id ]
 
@@ -198,16 +196,16 @@ mkBootTypeEnv exports ids tcs fam_insts
 
 
 
-globaliseAndTidyId :: Id -> Id
--- Takes a LocalId with an External Name,
+globaliseAndTidyBootId :: Id -> Id
+-- For a LocalId with an External Name,
 -- makes it into a GlobalId
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
---     * VanillaIdInfo (makes a conservative assumption about Caf-hood)
-globaliseAndTidyId id
-  = Id.setIdType (globaliseId id) tidy_type
-  where
-    tidy_type = tidyTopType (idType id)
+--     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
+--     * BootUnfolding (see Note [Inlining and hs-boot files] in ToIface)
+globaliseAndTidyBootId id =
+  (if isLocalId id then id `setIdType` tidyTopType (idType id) else id)
+    `setIdUnfolding` BootUnfolding
 
 {-
 ************************************************************************

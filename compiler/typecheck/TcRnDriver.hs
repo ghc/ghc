@@ -61,7 +61,6 @@ import RnExpr
 import RnUtils ( HsDocContext(..) )
 import RnFixity ( lookupFixityRn )
 import MkId
-import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
@@ -2559,7 +2558,9 @@ tcRnDeclsi hsc_env local_decls
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id
   = do { name' <- externaliseName this_mod (idName id)
-       ; return (globaliseAndTidyId (setIdName id name')) }
+       ; return $ globaliseId id
+                     `setIdName` name'
+                     `setIdType` tidyTopType (idType id) }
 
 
 {-
