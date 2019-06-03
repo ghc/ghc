@@ -176,9 +176,11 @@ wayGhcArgs = do
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
-            , (Logging   `wayUnit` way) ? arg "-eventlog"
+            , supportsEventlog way ? arg "-eventlog"
             , (way == debug || way == debugDynamic) ?
               pure ["-ticky", "-DTICKY_TICKY"] ]
+
+  where supportsEventlog w = any (`wayUnit` w) [Logging, Profiling, Debug]
 
 packageGhcArgs :: Args
 packageGhcArgs = do
