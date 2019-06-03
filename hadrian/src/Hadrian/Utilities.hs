@@ -34,6 +34,7 @@ module Hadrian.Utilities (
     Dynamic, fromDynamic, toDyn, TypeRep, typeOf
     ) where
 
+import Control.Applicative
 import Control.Monad.Extra
 import Data.Char
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
@@ -296,7 +297,9 @@ createFileLinkUntracked linkTarget link = do
     let dir = takeDirectory link
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderCreateFileLink linkTarget link
-    quietly . liftIO $ IO.createFileLink linkTarget link
+    quietly . liftIO $ do
+        IO.removeFile link <|> return ()
+        IO.createFileLink linkTarget link
 
 -- | Link a file tracking the link target. Create the target directory if
 -- missing.
