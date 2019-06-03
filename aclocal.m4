@@ -511,6 +511,7 @@ AC_DEFUN([FP_SETTINGS],
     then
         SettingsCCompilerCommand="$(basename $CC)"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$(basename $LdCmd)"
@@ -564,6 +565,7 @@ AC_DEFUN([FP_SETTINGS],
       SettingsOptCommand="$OptCmd"
     fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+    SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
@@ -571,6 +573,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
+    AC_SUBST(SettingsCxxCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsLdCommand)

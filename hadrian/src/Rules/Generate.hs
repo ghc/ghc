@@ -277,6 +277,7 @@ generateSettings = do
         [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
         , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
         , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
+        , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
         , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
         , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
         , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
