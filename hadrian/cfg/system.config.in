@@ -126,6 +126,7 @@ settings-c-compiler-command = @SettingsCCompilerCommand@
 settings-haskell-cpp-command = @SettingsHaskellCPPCommand@
 settings-haskell-cpp-flags = @SettingsHaskellCPPFlags@
 settings-c-compiler-flags = @SettingsCCompilerFlags@
+settings-cxx-compiler-flags = @SettingsCxxCompilerFlags@
 settings-c-compiler-link-flags = @SettingsCCompilerLinkFlags@
 settings-c-compiler-supports-no-pie = @SettingsCCompilerSupportsNoPie@
 settings-ld-command = @SettingsLdCommand@
