@@ -228,12 +228,24 @@ hadrian-ghc-in-ghci:
       THREADS=`mk/detect-cpu-count.sh`
       make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
     - |
+      # Generate OpenMetrics summary
+      if [ -n "$CI_MERGE_REQUEST_SOURCE_BRANCH_SHA" ]; then
+          testsuite/driver/perf_notes.py \
+              --test-env=$TEST_ENV --openmetrics \
+              $CI_MERGE_REQUEST_SOURCE_BRANCH_SHA \
+              $CI_COMMIT_SHA \
+              > metrics.txt
+      else
+          echo "No base commit, skipping OpenMetrics generation..."
+      fi
+    - |
       # Push git notes.
       METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
   dependencies: []
   artifacts:
     reports:
       junit: junit.xml
+      metrics: metrics.txt
     expire_in: 2 week
     paths:
       - ghc-*.tar.xz
