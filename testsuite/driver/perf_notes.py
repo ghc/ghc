@@ -503,6 +503,8 @@ if __name__ == '__main__':
     parser.add_argument("--add-note", nargs=3,
                         help="Development only. --add-note N commit seed \
                         Adds N fake metrics to the given commit using the random seed.")
+    parser.add_argument("--openmetrics", action="store_true",
+                        help="Produce an OpenMetrics report comparing two commits' metrics")
     parser.add_argument("--ref", type=str, default='perf',
                         help="Git notes ref")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
@@ -576,6 +578,13 @@ if __name__ == '__main__':
         print(second_line)
         print("-" * (len(second_line)+1))
 
+    def get_metric_avg(commit, test):
+        values = [float(t.stat.value) for t in metrics if t.commit == commit and t.stat.test == test]
+        if values == []:
+            return None
+        else:
+            return sum(values) / len(values)
+
     def commit_string(test, flag):
         def delta(v1, v2):
             return round((100 * (v1 - v2)/v2),2)
@@ -584,11 +593,7 @@ if __name__ == '__main__':
         # Note: if the test environment is not set, this will combine metrics from all test environments.
         averageValuesOrNones = []
         for commit in args.commits:
-            values = [float(t.stat.value) for t in metrics if t.commit == commit and t.stat.test == test]
-            if values == []:
-                averageValuesOrNones.append(None)
-            else:
-                averageValuesOrNones.append(sum(values) / len(values))
+            averageValuesOrNones.append(get_metric_avg(commit, test))
 
         if flag == 'metrics':
             strings = [str(v) if v != None else '-' for v in averageValuesOrNones]
@@ -606,17 +611,40 @@ if __name__ == '__main__':
     #
     # The pretty-printed output
     #
-
-    header('commit')
-    # Printing out metrics.
     all_tests = sorted(set([(test.stat.test, test.stat.metric) for test in metrics]))
-    for test, metric in all_tests:
-        print("{:27}{:30}".format(test, metric) + commit_string(test,'metrics'))
+    if args.openmetrics:
+        if len(args.commits) == 2:
+            ref_commit, commit = args.commits
+        else:
+            raise ValueError("--openmetrics expects precisely two commits to compare")
 
-    # Has no meaningful output if there is no commit to compare to.
-    if not singleton_commit:
-        header('percent')
-
-        # Printing out percentages.
+        metrics_by_test = {}
         for test, metric in all_tests:
-            print("{:27}{:30}".format(test, metric) + commit_string(test,'percentages'))
+            ref = get_metric_avg(ref_commit, test)
+            val = get_metric_avg(commit, test)
+            metrics_by_test[(test, metric)] = (ref, val)
+
+        def rel_change(x):
+            (_, (ref, val)) = x
+            return (val - ref) / ref
+        sorted_metrics = sorted(metrics_by_test.items(), key=rel_change)
+
+        num_results = 20
+        to_render = sorted_metrics[:num_results] + sorted_metrics[-num_results:]
+        print('# Top {n} changes between {ref_commit} and {commit}'.format(n=num_results, ref_commit=ref_commit, commit=commit))
+        for ((test, metric), (ref, val)) in to_render:
+            print("# {}/{}: {:10} -> {:10}: {:2.2}%".format(test, metric, ref, val, (val-ref) / ref * 100.0))
+            print("{:27} {:30} {:10}".format(test, metric, val))
+    else:
+        header('commit')
+        # Printing out metrics.
+        for test, metric in all_tests:
+            print("{:27}{:30}".format(test, metric) + commit_string(test,'metrics'))
+
+        # Has no meaningful output if there is no commit to compare to.
+        if not singleton_commit:
+            header('percent')
+
+            # Printing out percentages.
+            for test, metric in all_tests:
+                print("{:27}{:30}".format(test, metric) + commit_string(test,'percentages'))
