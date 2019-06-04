@@ -39,6 +39,7 @@ module GHC.Types.Literal
         , litValue, isLitValue, isLitValue_maybe, mapLitValue
 
         -- ** Coercions
+        , word64ToInt64Lit, int64ToWord64Lit
         , wordToIntLit, intToWordLit
         , narrowLit
         , narrow8IntLit, narrow16IntLit, narrow32IntLit
@@ -288,16 +289,27 @@ Int/Word range.
 wrapLitNumber :: Platform -> Literal -> Literal
 wrapLitNumber platform v@(LitNumber nt i) = case nt of
   LitNumInt -> case platformWordSize platform of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32))
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64))
+    PW4 -> int32
+    PW8 -> int64
   LitNumWord -> case platformWordSize platform of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32))
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64))
-  LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64))
-  LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64))
+    PW4 -> word32
+    PW8 -> word64
+  LitNumInt64   -> int64
+  LitNumWord64  -> word64
   LitNumInteger -> v
   LitNumNatural -> v
+  where
+    int32  = LitNumber nt $ wrapInt32 i
+    word32 = LitNumber nt $ wrapWord32 i
+    int64  = LitNumber nt $ wrapInt64 i
+    word64 = LitNumber nt $ wrapWord64 i
 wrapLitNumber _ x = x
+
+wrapInt32, wrapWord32, wrapInt64, wrapWord64 :: Integer -> Integer
+wrapInt32 i = toInteger (fromIntegral i :: Int32)
+wrapWord32 i = toInteger (fromIntegral i :: Word32)
+wrapInt64 i = toInteger (fromIntegral i :: Int64)
+wrapWord64 i = toInteger (fromIntegral i :: Word64)
 
 -- | Create a numeric 'Literal' of the given type
 mkLitNumberWrap :: Platform -> LitNumType -> Integer -> Literal
@@ -373,8 +385,8 @@ mkLitInt64  x = ASSERT2( inInt64Range x, integer x ) (mkLitInt64Unchecked x)
 
 -- | Creates a 'Literal' of type @Int64#@.
 --   If the argument is out of the range, it is wrapped.
-mkLitInt64Wrap :: Platform -> Integer -> Literal
-mkLitInt64Wrap platform i = wrapLitNumber platform $ mkLitInt64Unchecked i
+mkLitInt64Wrap :: Integer -> Literal
+mkLitInt64Wrap = mkLitInt64Unchecked . wrapInt64
 
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
 mkLitInt64Unchecked :: Integer -> Literal
@@ -386,8 +398,8 @@ mkLitWord64 x = ASSERT2( inWord64Range x, integer x ) (mkLitWord64Unchecked x)
 
 -- | Creates a 'Literal' of type @Word64#@.
 --   If the argument is out of the range, it is wrapped.
-mkLitWord64Wrap :: Platform -> Integer -> Literal
-mkLitWord64Wrap platform i = wrapLitNumber platform $ mkLitWord64Unchecked i
+mkLitWord64Wrap :: Integer -> Literal
+mkLitWord64Wrap = mkLitWord64Unchecked . wrapWord64
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
 mkLitWord64Unchecked :: Integer -> Literal
@@ -479,7 +491,30 @@ narrow8IntLit, narrow16IntLit, narrow32IntLit,
   floatToDoubleLit, doubleToFloatLit
   :: Literal -> Literal
 
+maxBoundInt64, maxBoundWord64 :: Integer
+maxBoundInt64 = toInteger (maxBound :: Int64)
+maxBoundWord64 = toInteger (maxBound :: Word64)
+
+word64ToInt64Lit, int64ToWord64Lit :: Literal -> Literal
+
+word64ToInt64Lit (LitNumber LitNumWord64 w)
+  -- Map Word64 range [max_int64+1, max_word64]
+  -- to Int64 range   [min_int64  , -1]
+  -- Range [0,max_int64] has the same representation with both Int64 and Word64
+  | w > maxBoundInt64 = mkLitInt64 $ w - maxBoundWord64 - 1
+  | otherwise         = mkLitInt64 w
+word64ToInt64Lit l = pprPanic "word64ToInt64Lit" (ppr l)
+
+int64ToWord64Lit (LitNumber LitNumInt64 i)
+  -- Map Int64 range [min_int64  , -1]
+  -- to Word64 range [max_int64+1, max_word64]
+  -- Range [0,max_int64] has the same representation with both Int64 and Word64
+  | i < 0     = mkLitWord64 $ 1 + maxBoundWord64 + i
+  | otherwise = mkLitWord64 i
+int64ToWord64Lit l = pprPanic "int64ToWord64Lit" (ppr l)
+
 wordToIntLit, intToWordLit :: Platform -> Literal -> Literal
+
 wordToIntLit platform (LitNumber LitNumWord w)
   -- Map Word range [max_int+1, max_word]
   -- to Int range   [min_int  , -1]

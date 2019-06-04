@@ -624,8 +624,8 @@ mkTyConRepTyConRHS :: TypeableStuff -> TypeRepTodo
                    -> LHsExpr GhcTc
 mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
   =           nlHsDataCon trTyConDataCon
-    `nlHsApp` nlHsLit (word64 platform high)
-    `nlHsApp` nlHsLit (word64 platform low)
+    `nlHsApp` nlHsLit (word64 high)
+    `nlHsApp` nlHsLit (word64 low)
     `nlHsApp` mod_rep_expr todo
     `nlHsApp` trNameLit (mkFastString tycon_str)
     `nlHsApp` nlHsLit (int n_kind_vars)
@@ -646,10 +646,8 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
     int :: Int -> HsLit GhcTc
     int n = HsIntPrim (SourceText $ show n) (toInteger n)
 
-word64 :: Platform -> Word64 -> HsLit GhcTc
-word64 platform n = case platformWordSize platform of
-   PW4 -> HsWord64Prim NoSourceText (toInteger n)
-   PW8 -> HsWordPrim   NoSourceText (toInteger n)
+word64 :: Word64 -> HsLit GhcTc
+word64 n = HsWord64Prim NoSourceText (toInteger n)
 
 {-
 Note [Representing TyCon kinds: KindRep]

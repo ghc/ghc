@@ -187,8 +187,6 @@ defaults
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
-#include "MachDeps.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
@@ -210,22 +208,12 @@ section "The word size story."
          In addition, GHC supports families of explicit-sized integers
          and words at 8, 16, 32, and 64 bits, with the usual
          arithmetic operations, comparisons, and a range of
-         conversions.  The 8-bit and 16-bit sizes are always
+         conversions. The fixed-size integers and words are always
          represented as {\tt Int\#} and {\tt Word\#}, and the
          operations implemented in terms of the primops on these
          types, with suitable range restrictions on the results (using
-         the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
-         of primops.  The 32-bit sizes are represented using {\tt
-         Int\#} and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS}
-         $\geq$ 32; otherwise, these are represented using distinct
-         primitive types {\tt Int32\#} and {\tt Word32\#}. These (when
-         needed) have a complete set of corresponding operations;
-         however, nearly all of these are implemented as external C
-         functions rather than as primops.  Exactly the same story
-         applies to the 64-bit sizes.  All of these details are hidden
-         under the {\tt PrelInt} and {\tt PrelWord} modules, which use
-         {\tt \#if}-defs to invoke the appropriate types and
-         operators.
+         the {\tt intToInt$n$\#} and {\tt wordToWord$n$\#} families of
+         primops.
 
          Word size also matters for the families of primops for
          indexing/reading/writing fixed-size quantities at offsets
@@ -248,17 +236,14 @@ section "The word size story."
          so are not available in this case.  }
 
 -- Define synonyms for indexing ops.
+-- TODO use Int32# once we have `data Int<N> = I<N># Int<N>#` for all N.
 
 #define INT32 Int#
 #define WORD32 Word#
 
-#if WORD_SIZE_IN_BITS < 64
+-- TODO inline
 #define INT64 Int64#
 #define WORD64 Word64#
-#else
-#define INT64 Int#
-#define WORD64 Word#
-#endif
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -291,8 +276,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8ToInt "int8ToInt#" GenPrimOp Int8# -> Int#
+primop IntToInt8 "intToInt8#" GenPrimOp Int# -> Int8#
 
 primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
@@ -327,13 +312,13 @@ primop Int8NeOp "neInt8#" Compare Int8# -> Int8# -> Int#
 
 ------------------------------------------------------------------------
 section "Word8#"
-        {Operations on 8-bit unsigned integers.}
+        {Operations on 8-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word8#
 
-primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8ToWord "word8ToWord#" GenPrimOp Word8# -> Word#
+primop WordToWord8 "wordToWord8#" GenPrimOp Word# -> Word8#
 
 primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
@@ -373,8 +358,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16ToInt "int16ToInt#" GenPrimOp Int16# -> Int#
+primop IntToInt16 "intToInt16#" GenPrimOp Int# -> Int16#
 
 primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
@@ -409,13 +394,13 @@ primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
 
 ------------------------------------------------------------------------
 section "Word16#"
-        {Operations on 16-bit unsigned integers.}
+        {Operations on 16-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word16#
 
-primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16ToWord "word16ToWord#" GenPrimOp Word16# -> Word#
+primop WordToWord16 "wordToWord16#" GenPrimOp Word# -> Word16#
 
 primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
@@ -448,26 +433,213 @@ primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
 
-#if WORD_SIZE_IN_BITS < 64
+------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int32#
+
+primop Int32ToInt "int32ToInt#" GenPrimOp Int32# -> Int#
+primop IntToInt32 "intToInt32#" GenPrimOp Int# -> Int32#
+
+primop Int32NegOp "negateInt32#" GenPrimOp Int32# -> Int32#
+
+primop Int32AddOp "plusInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    commutable = True
+
+primop Int32SubOp "subInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+
+primop Int32MulOp "timesInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    commutable = True
+
+primop Int32QuotOp "quotInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    can_fail = True
+
+primop Int32RemOp "remInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    can_fail = True
+
+primop Int32QuotRemOp "quotRemInt32#" GenPrimOp Int32# -> Int32# -> (# Int32#, Int32# #)
+  with
+    can_fail = True
+
+primop Int32SllOp "uncheckedIShiftL32#"  GenPrimOp Int32# -> Int# -> Int32#
+primop Int32SraOp "uncheckedIShiftRA32#" GenPrimOp Int32# -> Int# -> Int32#
+primop Int32SrlOp "uncheckedIShiftRL32#" GenPrimOp Int32# -> Int# -> Int32#
+
+primop Int32ToWord32Op "int32ToWord32#" GenPrimOp Int32# -> Word32#
+   with code_size = 0
+
+primop Int32EqOp "eqInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32GeOp "geInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32GtOp "gtInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32LeOp "leInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32LtOp "ltInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32NeOp "neInt32#" Compare Int32# -> Int32# -> Int#
+
+------------------------------------------------------------------------
+section "Word32#"
+        {Operations on 32-bit unsigned words.}
+------------------------------------------------------------------------
+
+primtype Word32#
+
+primop Word32ToWord "word32ToWord#" GenPrimOp Word32# -> Word#
+primop WordToWord32 "wordToWord32#" GenPrimOp Word# -> Word32#
+
+primop Word32AddOp "plusWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    commutable = True
+
+primop Word32SubOp "subWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+
+primop Word32MulOp "timesWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    commutable = True
+
+primop Word32QuotOp "quotWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    can_fail = True
+
+primop Word32RemOp "remWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    can_fail = True
+
+primop Word32QuotRemOp "quotRemWord32#" GenPrimOp Word32# -> Word32# -> (# Word32#, Word32# #)
+  with
+    can_fail = True
+
+primop Word32AndOp "and32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32OrOp "or32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32XorOp "xor32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32NotOp "not32#" GenPrimOp Word32# -> Word32#
+
+primop Word32SllOp "uncheckedShiftL32#"  GenPrimOp Word32# -> Int# -> Word32#
+primop Word32SrlOp "uncheckedShiftRL32#" GenPrimOp Word32# -> Int# -> Word32#
+
+primop Word32ToInt32Op "word32ToInt32#" GenPrimOp Word32# -> Int32#
+   with code_size = 0
+
+primop Word32EqOp "eqWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32GeOp "geWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32GtOp "gtWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32LeOp "leWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32LtOp "ltWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
+
 ------------------------------------------------------------------------
 section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit integers.}
 ------------------------------------------------------------------------
 
 primtype Int64#
 
+primop Int64ToInt "int64ToInt#" GenPrimOp Int64# -> Int#
+primop IntToInt64 "intToInt64#" GenPrimOp Int# -> Int64#
+
+primop Int64NegOp "negateInt64#" GenPrimOp Int64# -> Int64#
+
+primop Int64AddOp "plusInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    commutable = True
+
+primop Int64SubOp "subInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+
+primop Int64MulOp "timesInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    commutable = True
+
+primop Int64QuotOp "quotInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    can_fail = True
+
+primop Int64RemOp "remInt64#" GenPrimOp Int64# -> Int64# -> Int64#
+  with
+    can_fail = True
+
+primop Int64QuotRemOp "quotRemInt64#" GenPrimOp Int64# -> Int64# -> (# Int64#, Int64# #)
+  with
+    can_fail = True
+
+primop Int64SllOp "uncheckedIShiftL64#"  GenPrimOp Int64# -> Int# -> Int64#
+primop Int64SraOp "uncheckedIShiftRA64#" GenPrimOp Int64# -> Int# -> Int64#
+primop Int64SrlOp "uncheckedIShiftRL64#" GenPrimOp Int64# -> Int# -> Int64#
+
+primop Int64ToWord64Op "int64ToWord64#" GenPrimOp Int64# -> Word64#
+   with code_size = 0
+
+primop Int64EqOp "eqInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64GeOp "geInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64GtOp "gtInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64LeOp "leInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64LtOp "ltInt64#" Compare Int64# -> Int64# -> Int#
+primop Int64NeOp "neInt64#" Compare Int64# -> Int64# -> Int#
+
 ------------------------------------------------------------------------
 section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word64#
 
-#endif
+primop Word64ToWord "word64ToWord#" GenPrimOp Word64# -> Word#
+primop WordToWord64 "wordToWord64#" GenPrimOp Word# -> Word64#
+
+primop Word64AddOp "plusWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    commutable = True
+
+primop Word64SubOp "subWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+
+primop Word64MulOp "timesWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    commutable = True
+
+primop Word64QuotOp "quotWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    can_fail = True
+
+primop Word64RemOp "remWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    can_fail = True
+
+primop Word64QuotRemOp "quotRemWord64#" GenPrimOp Word64# -> Word64# -> (# Word64#, Word64# #)
+  with
+    can_fail = True
+
+primop Word64AndOp "and64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64OrOp "or64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64XorOp "xor64#" GenPrimOp Word64# -> Word64# -> Word64#
+   with commutable = True
+
+primop Word64NotOp "not64#" GenPrimOp Word64# -> Word64#
+
+primop Word64SllOp "uncheckedShiftL64#"  GenPrimOp Word64# -> Int# -> Word64#
+primop Word64SrlOp "uncheckedShiftRL64#" GenPrimOp Word64# -> Int# -> Word64#
+
+primop Word64ToInt64Op "word64ToInt64#" GenPrimOp Word64# -> Int64#
+   with code_size = 0
+
+primop Word64EqOp "eqWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64GeOp "geWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64GtOp "gtWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64LeOp "leWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64LtOp "ltWord64#" Compare Word64# -> Word64# -> Int#
+primop Word64NeOp "neWord64#" Compare Word64# -> Word64# -> Int#
 
 ------------------------------------------------------------------------
 section "Int#"
@@ -540,19 +712,19 @@ primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    {Rounds towards zero.}
    with can_fail = True
 
-primop   AndIOp   "andI#"   GenPrimOp    Int# -> Int# -> Int#
+primop   IntAndOp   "andI#"   GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "and".}
    with commutable = True
 
-primop   OrIOp   "orI#"     GenPrimOp    Int# -> Int# -> Int#
+primop   IntOrOp   "orI#"     GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "or".}
    with commutable = True
 
-primop   XorIOp   "xorI#"   GenPrimOp    Int# -> Int# -> Int#
+primop   IntXorOp   "xorI#"   GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "xor".}
    with commutable = True
 
-primop   NotIOp   "notI#"   GenPrimOp   Int# -> Int#
+primop   IntNotOp   "notI#"   GenPrimOp   Int# -> Int#
    {Bitwise "not", also known as the binary complement.}
 
 primop   IntNegOp    "negateInt#"    GenPrimOp   Int# -> Int#
@@ -612,13 +784,13 @@ primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
 primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
 primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
 
-primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
+primop   IntSllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
+primop   IntSraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
          {Shift right arithmetic.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
+primop   IntSrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
          {Shift right logical.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 
@@ -678,21 +850,21 @@ primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
            Requires that high word < divisor.}
    with can_fail = True
 
-primop   AndOp   "and#"   GenPrimOp   Word# -> Word# -> Word#
+primop   WordAndOp   "and#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   OrOp   "or#"   GenPrimOp   Word# -> Word# -> Word#
+primop   WordOrOp   "or#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   XorOp   "xor#"   GenPrimOp   Word# -> Word# -> Word#
+primop   WordXorOp   "xor#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   NotOp   "not#"   GenPrimOp   Word# -> Word#
+primop   WordNotOp   "not#"   GenPrimOp   Word# -> Word#
 
-primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
+primop   WordSllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift left logical.   Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
+primop   WordSrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift right logical.   Result undefined if shift  amount is not
           in the range 0 to word size - 1 inclusive.}
 
