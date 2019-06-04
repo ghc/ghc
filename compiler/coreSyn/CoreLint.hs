@@ -536,7 +536,8 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
-               || exprIsTickedString rhs)
+               || exprIsTickedString rhs
+                )
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is top-level or recursive, it's not
@@ -1018,7 +1019,7 @@ lintCoreArg fun_ty arg
              (ppr arg <+> dcolon <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))))
           -- check for levity polymorphism first, because otherwise isUnliftedType panics
 
-       ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
+       ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg || exprIsBottom arg)
                 (mkLetAppMsg arg)
        ; lintValApp arg fun_ty arg_ty }
 

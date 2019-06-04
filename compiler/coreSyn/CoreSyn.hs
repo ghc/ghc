@@ -420,9 +420,9 @@ parts of the compilation pipeline.
 
 Note [CoreSyn let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The let/app invariant
-     the right hand side of a non-recursive 'Let', and
-     the argument of an 'App',
+The let/app invariant:
+    the right hand side of a non-recursive 'Let', and
+    the argument of an 'App',
     /may/ be of unlifted type, but only if
     the expression is ok-for-speculation
     or the 'Let' is for a join point.
@@ -444,6 +444,14 @@ which will generate a @case@ if necessary
 
 The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
 coreSyn/MkCore.
+
+One notable exception to this rule is bottoming expressions. For instance, we
+allow
+
+  y::Int = I# (runtimeError ...)
+
+since we sometimes need to make unlifted bindings bottom (e.g. see
+PrelRules.shiftRule).
 
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
