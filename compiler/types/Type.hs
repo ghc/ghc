@@ -58,7 +58,7 @@ module Type (
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
-        mkCastTy, mkCastTyMCo, mkCoercionTy, splitCastTy_maybe,
+        mkCastTy, mkCoercionTy, splitCastTy_maybe,
         discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
@@ -1271,11 +1271,6 @@ mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
     else ForAllTy (Bndr tv vis) (inner_ty `mkCastTy` co)
 
 mkCastTy ty co = CastTy ty co
-
--- | Cast a type by an 'MCoercion'.
-mkCastTyMCo :: Type -> MCoercion -> Type
-mkCastTyMCo ty MRefl    = ty
-mkCastTyMCo ty (MCo co) = mkCastTy ty co
 
 tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 -- Return the tyConBinders in TyCoBinder form

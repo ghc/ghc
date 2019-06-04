@@ -71,7 +71,6 @@ import DynFlags
 import Unique
 import ConLike( ConLike(..) )
 import BasicTypes
-import TcEvidence
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1188,18 +1187,26 @@ kcTyClDecl (XTyClDecl _)                            = panic "kcTyClDecl"
 
 -------------------
 
--- | Unify the kind of the first type provided with the newtype's kind. If there
+-- | Unify the kind of the first type provided with the newtype's kind, if
+-- -XUnliftedNewtypes is enabled and the NewOrData indicates Newtype. If there
 -- is more than one type provided, do nothing: the newtype is in error, and this
 -- will be caught in validity checking (which will give a better error than we can
 -- here.)
-unifyNewtypeKind :: [LHsType GhcRn]   -- user-written argument types, should be just 1
+unifyNewtypeKind :: DynFlags
+                 -> NewOrData
+                 -> [LHsType GhcRn]   -- user-written argument types, should be just 1
                  -> [TcType]          -- type-checked argument types, should be just 1
                  -> TcKind            -- expected kind of newtype
-                 -> TcM MCoercion     -- co :: arg_ki ~ res_ki
-unifyNewtypeKind [hs_ty] [tc_ty] ki
+                 -> TcM [TcType]      -- casted argument types (should be just 1)
+                                      --  result = orig_arg |> kind_co
+                                      -- where kind_co :: orig_arg_ki ~N expected_ki
+unifyNewtypeKind dflags NewType [hs_ty] [tc_ty] ki
+  | xopt LangExt.UnliftedNewtypes dflags
   = do { traceTc "unifyNewtypeKind" (ppr hs_ty $$ ppr tc_ty $$ ppr ki)
-       ; tcCoToMCo <$> unifyKind (Just (unLoc hs_ty)) (typeKind tc_ty) ki }
-unifyNewtypeKind _ _ _ = return MRefl
+       ; co <- unifyKind (Just (unLoc hs_ty)) (typeKind tc_ty) ki
+       ; return [tc_ty `mkCastTy` co] }
+  -- See comments above: just do nothing here
+unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
 
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
@@ -1223,10 +1230,9 @@ kcConDecl new_or_data res_kind (ConDeclH98
        ; arg_tc_tys <- mapM tcHsOpenType arg_tys
        ; traceTc "kcConDecl }" (ppr name)
          -- See Note [Implementation of UnliftedNewtypes], STEP 2
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; when (unlifted_newtypes && new_or_data == NewType) $
-           discardResult $
-           unifyNewtypeKind arg_tys arg_tc_tys res_kind
+       ; dflags <- getDynFlags
+       ; discardResult $
+         unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
          -- We don't need to check the telescope here, because that's
          -- done in tcConDecl
        }
@@ -1252,10 +1258,9 @@ kcConDecl new_or_data res_kind (ConDeclGADT
        ; let arg_tys = hsConDeclArgTys args
        ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
          -- See Note [Implementation of UnliftedNewtypes], STEP 2
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; when (unlifted_newtypes && new_or_data == NewType) $
-           discardResult $
-           unifyNewtypeKind arg_tys arg_tc_tys res_kind
+       ; dflags <- getDynFlags
+       ; discardResult $
+           unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _) = panic "kcConDecl"
@@ -2485,8 +2490,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts, kind_mco))
+       ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts))
            <- pushTcLevelM_                             $
               solveEqualities                           $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
@@ -2494,23 +2498,22 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  ; btys <- tcConArgs hs_args
                  ; field_lbls <- lookupConstructorFields (unLoc name)
                  ; let (arg_tys, stricts) = unzip btys
-                 ; kind_mco <-
-                   if unlifted_newtypes && new_or_data == NewType
-                     then unifyNewtypeKind (hsConDeclArgTys hs_args)
-                                           arg_tys res_kind
-                     else return MRefl
-                 ; return (ctxt, arg_tys, field_lbls, stricts, kind_mco)
+                 ; dflags <- getDynFlags
+                 ; final_arg_tys <-
+                     unifyNewtypeKind dflags new_or_data
+                                      (hsConDeclArgTys hs_args)
+                                      arg_tys res_kind
+                 ; return (ctxt, final_arg_tys, field_lbls, stricts)
                  }
 
          -- exp_tvs have explicit, user-written binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; let final_arg_tys = map (`mkCastTyMCo` kind_mco) arg_tys
        ; kvs <- kindGeneralize (mkSpecForAllTys (binderVars tmpl_bndrs) $
                                 mkSpecForAllTys exp_tvs $
                                 mkPhiTy ctxt $
-                                mkVisFunTys final_arg_tys $
+                                mkVisFunTys arg_tys $
                                 unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
@@ -2522,7 +2525,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrs kvs
        ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
-       ; arg_tys         <- zonkTcTypesToTypesX ze final_arg_tys
+       ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
        ; ctxt            <- zonkTcTypesToTypesX ze ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
@@ -2569,8 +2572,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let ((dL->L _ name) : _) = names
 
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts, kind_mco)))
+       ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
                                   -- want an error cascade
@@ -2581,27 +2583,26 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; let (arg_tys, stricts) = unzip btys
                  ; (res_ty, res_ki) <- tcLHsType hs_res_ty
                    -- See Note [Implementation of unlifted newtypes]
-                 ; kind_mco <-
-                   if unlifted_newtypes && new_or_data == NewType
-                     then unifyNewtypeKind (hsConDeclArgTys hs_args)
-                                           arg_tys res_ki
-                     else return MRefl
+                 ; dflags <- getDynFlags
+                 ; final_arg_tys <-
+                     unifyNewtypeKind dflags new_or_data
+                                      (hsConDeclArgTys hs_args)
+                                      arg_tys res_ki
                  ; field_lbls <- lookupConstructorFields name
-                 ; return (ctxt, arg_tys, res_ty, field_lbls, stricts, kind_mco)
+                 ; return (ctxt, final_arg_tys, res_ty, field_lbls, stricts)
                  }
        ; imp_tvs <- zonkAndScopedSort imp_tvs
        ; let user_tvs      = imp_tvs ++ exp_tvs
-             final_arg_tys = map (`mkCastTyMCo` kind_mco) arg_tys
 
        ; tkvs <- kindGeneralize (mkSpecForAllTys user_tvs $
                                  mkPhiTy ctxt $
-                                 mkVisFunTys final_arg_tys $
+                                 mkVisFunTys arg_tys $
                                  res_ty)
 
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
-       ; arg_tys <- zonkTcTypesToTypesX ze final_arg_tys
+       ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
        ; ctxt    <- zonkTcTypesToTypesX ze ctxt
        ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
