@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 -- emitPrimOp is quite large
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
 
@@ -894,6 +895,13 @@ callishPrimOpSupported dflags op
                                      -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
 
+      Int32QuotRemOp | ncg && (x86ish || ppc)
+                                     -> Left (MO_S_QuotRem W32)
+                     | otherwise     -> Right (genericIntQuotRemOp W32)
+
+      Int64QuotRemOp | ncg && (x86ish || ppc)
+                                     -> Left (MO_S_QuotRem W64)
+                     | otherwise     -> Right (genericIntQuotRemOp W64)
 
       WordQuotRemOp  | ncg && (x86ish || ppc) ->
                          Left (MO_U_QuotRem  (wordWidth dflags))
@@ -911,6 +919,14 @@ callishPrimOpSupported dflags op
       Word16QuotRemOp| ncg && (x86ish || ppc)
                                      -> Left (MO_U_QuotRem W16)
                      | otherwise     -> Right (genericWordQuotRemOp W16)
+
+      Word32QuotRemOp| ncg && (x86ish || ppc)
+                                     -> Left (MO_U_QuotRem W32)
+                     | otherwise     -> Right (genericWordQuotRemOp W32)
+
+      Word64QuotRemOp| ncg && (x86ish || ppc)
+                                     -> Left (MO_U_QuotRem W64)
+                     | otherwise     -> Right (genericWordQuotRemOp W64)
 
       WordAdd2Op     | (ncg && (x86ish || ppc))
                          || llvm      -> Left (MO_Add2       (wordWidth dflags))
@@ -1240,249 +1256,435 @@ genericFabsOp w [res_r] [aa]
 
 genericFabsOp _ _ _ = panic "genericFabsOp"
 
--- These PrimOps are NOPs in Cmm
+-- | Helper datatype used to ensure completion. Should be totally eliminated in
+-- optimized builds.
+data OpDest
+  = OpDest_Nop
+  | OpDest_Narrow !(Width -> Width -> MachOp, Width)
+  | OpDest_Callish !CallishMachOp
+  | OpDest_Translate !MachOp
+  -- | handled in 'callishPrimOpSupported'
+  | OpDest_CallishHandledLater
 
+
+-- | These PrimOps are NOPs in Cmm
 nopOp :: PrimOp -> Bool
-nopOp Int2WordOp     = True
-nopOp Word2IntOp     = True
-nopOp Int2AddrOp     = True
-nopOp Addr2IntOp     = True
-nopOp ChrOp          = True  -- Int# and Char# are rep'd the same
-nopOp OrdOp          = True
-nopOp _              = False
+nopOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Nop -> True
+  _ -> False
 
--- These PrimOps turn into double casts
-
+-- | These PrimOps turn into double casts
 narrowOp :: PrimOp -> Maybe (Width -> Width -> MachOp, Width)
-narrowOp Narrow8IntOp   = Just (MO_SS_Conv, W8)
-narrowOp Narrow16IntOp  = Just (MO_SS_Conv, W16)
-narrowOp Narrow32IntOp  = Just (MO_SS_Conv, W32)
-narrowOp Narrow8WordOp  = Just (MO_UU_Conv, W8)
-narrowOp Narrow16WordOp = Just (MO_UU_Conv, W16)
-narrowOp Narrow32WordOp = Just (MO_UU_Conv, W32)
-narrowOp _              = Nothing
+narrowOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Narrow x -> Just x
+  _ -> Nothing
+
+-- | These primops are implemented by CallishMachOps, because they sometimes
+-- turn into foreign calls depending on the backend.
+callishOp :: PrimOp -> Maybe CallishMachOp
+callishOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Callish x -> Just x
+  _ -> Nothing
+
+translateOp :: DynFlags -> PrimOp -> Maybe MachOp
+translateOp dflags op = case dealWithOp dflags op of
+  OpDest_Translate x -> Just x
+  _ -> Nothing
+
+{-# INLINE dealWithOp #-}
+-- | Combination of the three previous functions to ensure completeness.
+dealWithOp :: DynFlags -> PrimOp -> OpDest
+dealWithOp dflags = \case
+
+  Int64ToWord64Op -> OpDest_Nop
+  Word64ToInt64Op -> OpDest_Nop
+  Int32ToWord32Op -> OpDest_Nop
+  Word32ToInt32Op -> OpDest_Nop
+  Int2WordOp      -> OpDest_Nop
+  Word2IntOp      -> OpDest_Nop
+  Int2AddrOp      -> OpDest_Nop
+  Addr2IntOp      -> OpDest_Nop
+  ChrOp           -> OpDest_Nop  -- Int# and Char# are rep'd the same
+  OrdOp           -> OpDest_Nop
+
+  Narrow8IntOp   -> OpDest_Narrow (MO_SS_Conv, W8)
+  Narrow16IntOp  -> OpDest_Narrow (MO_SS_Conv, W16)
+  Narrow32IntOp  -> OpDest_Narrow (MO_SS_Conv, W32)
+  Narrow8WordOp  -> OpDest_Narrow (MO_UU_Conv, W8)
+  Narrow16WordOp -> OpDest_Narrow (MO_UU_Conv, W16)
+  Narrow32WordOp -> OpDest_Narrow (MO_UU_Conv, W32)
+
+  DoublePowerOp  -> OpDest_Callish MO_F64_Pwr
+  DoubleSinOp    -> OpDest_Callish MO_F64_Sin
+  DoubleCosOp    -> OpDest_Callish MO_F64_Cos
+  DoubleTanOp    -> OpDest_Callish MO_F64_Tan
+  DoubleSinhOp   -> OpDest_Callish MO_F64_Sinh
+  DoubleCoshOp   -> OpDest_Callish MO_F64_Cosh
+  DoubleTanhOp   -> OpDest_Callish MO_F64_Tanh
+  DoubleAsinOp   -> OpDest_Callish MO_F64_Asin
+  DoubleAcosOp   -> OpDest_Callish MO_F64_Acos
+  DoubleAtanOp   -> OpDest_Callish MO_F64_Atan
+  DoubleAsinhOp  -> OpDest_Callish MO_F64_Asinh
+  DoubleAcoshOp  -> OpDest_Callish MO_F64_Acosh
+  DoubleAtanhOp  -> OpDest_Callish MO_F64_Atanh
+  DoubleLogOp    -> OpDest_Callish MO_F64_Log
+  DoubleLog1POp  -> OpDest_Callish MO_F64_Log1P
+  DoubleExpOp    -> OpDest_Callish MO_F64_Exp
+  DoubleExpM1Op  -> OpDest_Callish MO_F64_ExpM1
+  DoubleSqrtOp   -> OpDest_Callish MO_F64_Sqrt
+
+  FloatPowerOp   -> OpDest_Callish MO_F32_Pwr
+  FloatSinOp     -> OpDest_Callish MO_F32_Sin
+  FloatCosOp     -> OpDest_Callish MO_F32_Cos
+  FloatTanOp     -> OpDest_Callish MO_F32_Tan
+  FloatSinhOp    -> OpDest_Callish MO_F32_Sinh
+  FloatCoshOp    -> OpDest_Callish MO_F32_Cosh
+  FloatTanhOp    -> OpDest_Callish MO_F32_Tanh
+  FloatAsinOp    -> OpDest_Callish MO_F32_Asin
+  FloatAcosOp    -> OpDest_Callish MO_F32_Acos
+  FloatAtanOp    -> OpDest_Callish MO_F32_Atan
+  FloatAsinhOp   -> OpDest_Callish MO_F32_Asinh
+  FloatAcoshOp   -> OpDest_Callish MO_F32_Acosh
+  FloatAtanhOp   -> OpDest_Callish MO_F32_Atanh
+  FloatLogOp     -> OpDest_Callish MO_F32_Log
+  FloatLog1POp   -> OpDest_Callish MO_F32_Log1P
+  FloatExpOp     -> OpDest_Callish MO_F32_Exp
+  FloatExpM1Op   -> OpDest_Callish MO_F32_ExpM1
+  FloatSqrtOp    -> OpDest_Callish MO_F32_Sqrt
 
 -- Native word signless ops
 
-translateOp :: DynFlags -> PrimOp -> Maybe MachOp
-translateOp dflags IntAddOp       = Just (mo_wordAdd dflags)
-translateOp dflags IntSubOp       = Just (mo_wordSub dflags)
-translateOp dflags WordAddOp      = Just (mo_wordAdd dflags)
-translateOp dflags WordSubOp      = Just (mo_wordSub dflags)
-translateOp dflags AddrAddOp      = Just (mo_wordAdd dflags)
-translateOp dflags AddrSubOp      = Just (mo_wordSub dflags)
+  IntAddOp       -> OpDest_Translate (mo_wordAdd dflags)
+  IntSubOp       -> OpDest_Translate (mo_wordSub dflags)
+  WordAddOp      -> OpDest_Translate (mo_wordAdd dflags)
+  WordSubOp      -> OpDest_Translate (mo_wordSub dflags)
+  AddrAddOp      -> OpDest_Translate (mo_wordAdd dflags)
+  AddrSubOp      -> OpDest_Translate (mo_wordSub dflags)
 
-translateOp dflags IntEqOp        = Just (mo_wordEq dflags)
-translateOp dflags IntNeOp        = Just (mo_wordNe dflags)
-translateOp dflags WordEqOp       = Just (mo_wordEq dflags)
-translateOp dflags WordNeOp       = Just (mo_wordNe dflags)
-translateOp dflags AddrEqOp       = Just (mo_wordEq dflags)
-translateOp dflags AddrNeOp       = Just (mo_wordNe dflags)
+  IntEqOp        -> OpDest_Translate (mo_wordEq dflags)
+  IntNeOp        -> OpDest_Translate (mo_wordNe dflags)
+  WordEqOp       -> OpDest_Translate (mo_wordEq dflags)
+  WordNeOp       -> OpDest_Translate (mo_wordNe dflags)
+  AddrEqOp       -> OpDest_Translate (mo_wordEq dflags)
+  AddrNeOp       -> OpDest_Translate (mo_wordNe dflags)
 
-translateOp dflags AndOp          = Just (mo_wordAnd dflags)
-translateOp dflags OrOp           = Just (mo_wordOr dflags)
-translateOp dflags XorOp          = Just (mo_wordXor dflags)
-translateOp dflags NotOp          = Just (mo_wordNot dflags)
-translateOp dflags SllOp          = Just (mo_wordShl dflags)
-translateOp dflags SrlOp          = Just (mo_wordUShr dflags)
+  WordAndOp      -> OpDest_Translate (mo_wordAnd dflags)
+  WordOrOp       -> OpDest_Translate (mo_wordOr dflags)
+  WordXorOp      -> OpDest_Translate (mo_wordXor dflags)
+  WordNotOp      -> OpDest_Translate (mo_wordNot dflags)
+  WordSllOp      -> OpDest_Translate (mo_wordShl dflags)
+  WordSrlOp      -> OpDest_Translate (mo_wordUShr dflags)
 
-translateOp dflags AddrRemOp      = Just (mo_wordURem dflags)
+  AddrRemOp      -> OpDest_Translate (mo_wordURem dflags)
 
 -- Native word signed ops
 
-translateOp dflags IntMulOp        = Just (mo_wordMul dflags)
-translateOp dflags IntMulMayOfloOp = Just (MO_S_MulMayOflo (wordWidth dflags))
-translateOp dflags IntQuotOp       = Just (mo_wordSQuot dflags)
-translateOp dflags IntRemOp        = Just (mo_wordSRem dflags)
-translateOp dflags IntNegOp        = Just (mo_wordSNeg dflags)
+  IntMulOp        -> OpDest_Translate (mo_wordMul dflags)
+  IntMulMayOfloOp -> OpDest_Translate (MO_S_MulMayOflo (wordWidth dflags))
+  IntQuotOp       -> OpDest_Translate (mo_wordSQuot dflags)
+  IntRemOp        -> OpDest_Translate (mo_wordSRem dflags)
+  IntNegOp        -> OpDest_Translate (mo_wordSNeg dflags)
 
 
-translateOp dflags IntGeOp        = Just (mo_wordSGe dflags)
-translateOp dflags IntLeOp        = Just (mo_wordSLe dflags)
-translateOp dflags IntGtOp        = Just (mo_wordSGt dflags)
-translateOp dflags IntLtOp        = Just (mo_wordSLt dflags)
+  IntGeOp        -> OpDest_Translate (mo_wordSGe dflags)
+  IntLeOp        -> OpDest_Translate (mo_wordSLe dflags)
+  IntGtOp        -> OpDest_Translate (mo_wordSGt dflags)
+  IntLtOp        -> OpDest_Translate (mo_wordSLt dflags)
 
-translateOp dflags AndIOp         = Just (mo_wordAnd dflags)
-translateOp dflags OrIOp          = Just (mo_wordOr dflags)
-translateOp dflags XorIOp         = Just (mo_wordXor dflags)
-translateOp dflags NotIOp         = Just (mo_wordNot dflags)
-translateOp dflags ISllOp         = Just (mo_wordShl dflags)
-translateOp dflags ISraOp         = Just (mo_wordSShr dflags)
-translateOp dflags ISrlOp         = Just (mo_wordUShr dflags)
+  IntAndOp       -> OpDest_Translate (mo_wordAnd dflags)
+  IntOrOp        -> OpDest_Translate (mo_wordOr dflags)
+  IntXorOp       -> OpDest_Translate (mo_wordXor dflags)
+  IntNotOp       -> OpDest_Translate (mo_wordNot dflags)
+  IntSllOp       -> OpDest_Translate (mo_wordShl dflags)
+  IntSraOp       -> OpDest_Translate (mo_wordSShr dflags)
+  IntSrlOp       -> OpDest_Translate (mo_wordUShr dflags)
 
 -- Native word unsigned ops
 
-translateOp dflags WordGeOp       = Just (mo_wordUGe dflags)
-translateOp dflags WordLeOp       = Just (mo_wordULe dflags)
-translateOp dflags WordGtOp       = Just (mo_wordUGt dflags)
-translateOp dflags WordLtOp       = Just (mo_wordULt dflags)
+  WordGeOp       -> OpDest_Translate (mo_wordUGe dflags)
+  WordLeOp       -> OpDest_Translate (mo_wordULe dflags)
+  WordGtOp       -> OpDest_Translate (mo_wordUGt dflags)
+  WordLtOp       -> OpDest_Translate (mo_wordULt dflags)
 
-translateOp dflags WordMulOp      = Just (mo_wordMul dflags)
-translateOp dflags WordQuotOp     = Just (mo_wordUQuot dflags)
-translateOp dflags WordRemOp      = Just (mo_wordURem dflags)
+  WordMulOp      -> OpDest_Translate (mo_wordMul dflags)
+  WordQuotOp     -> OpDest_Translate (mo_wordUQuot dflags)
+  WordRemOp      -> OpDest_Translate (mo_wordURem dflags)
 
-translateOp dflags AddrGeOp       = Just (mo_wordUGe dflags)
-translateOp dflags AddrLeOp       = Just (mo_wordULe dflags)
-translateOp dflags AddrGtOp       = Just (mo_wordUGt dflags)
-translateOp dflags AddrLtOp       = Just (mo_wordULt dflags)
+  AddrGeOp       -> OpDest_Translate (mo_wordUGe dflags)
+  AddrLeOp       -> OpDest_Translate (mo_wordULe dflags)
+  AddrGtOp       -> OpDest_Translate (mo_wordUGt dflags)
+  AddrLtOp       -> OpDest_Translate (mo_wordULt dflags)
 
 -- Int8# signed ops
 
-translateOp dflags Int8Extend     = Just (MO_SS_Conv W8 (wordWidth dflags))
-translateOp dflags Int8Narrow     = Just (MO_SS_Conv (wordWidth dflags) W8)
-translateOp _      Int8NegOp      = Just (MO_S_Neg W8)
-translateOp _      Int8AddOp      = Just (MO_Add W8)
-translateOp _      Int8SubOp      = Just (MO_Sub W8)
-translateOp _      Int8MulOp      = Just (MO_Mul W8)
-translateOp _      Int8QuotOp     = Just (MO_S_Quot W8)
-translateOp _      Int8RemOp      = Just (MO_S_Rem W8)
+  Int8ToInt      -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
+  IntToInt8      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
+  Int8NegOp      -> OpDest_Translate (MO_S_Neg W8)
+  Int8AddOp      -> OpDest_Translate (MO_Add W8)
+  Int8SubOp      -> OpDest_Translate (MO_Sub W8)
+  Int8MulOp      -> OpDest_Translate (MO_Mul W8)
+  Int8QuotOp     -> OpDest_Translate (MO_S_Quot W8)
+  Int8RemOp      -> OpDest_Translate (MO_S_Rem W8)
 
-translateOp _      Int8EqOp       = Just (MO_Eq W8)
-translateOp _      Int8GeOp       = Just (MO_S_Ge W8)
-translateOp _      Int8GtOp       = Just (MO_S_Gt W8)
-translateOp _      Int8LeOp       = Just (MO_S_Le W8)
-translateOp _      Int8LtOp       = Just (MO_S_Lt W8)
-translateOp _      Int8NeOp       = Just (MO_Ne W8)
+  Int8EqOp       -> OpDest_Translate (MO_Eq W8)
+  Int8GeOp       -> OpDest_Translate (MO_S_Ge W8)
+  Int8GtOp       -> OpDest_Translate (MO_S_Gt W8)
+  Int8LeOp       -> OpDest_Translate (MO_S_Le W8)
+  Int8LtOp       -> OpDest_Translate (MO_S_Lt W8)
+  Int8NeOp       -> OpDest_Translate (MO_Ne W8)
 
 -- Word8# unsigned ops
 
-translateOp dflags Word8Extend     = Just (MO_UU_Conv W8 (wordWidth dflags))
-translateOp dflags Word8Narrow     = Just (MO_UU_Conv (wordWidth dflags) W8)
-translateOp _      Word8NotOp      = Just (MO_Not W8)
-translateOp _      Word8AddOp      = Just (MO_Add W8)
-translateOp _      Word8SubOp      = Just (MO_Sub W8)
-translateOp _      Word8MulOp      = Just (MO_Mul W8)
-translateOp _      Word8QuotOp     = Just (MO_U_Quot W8)
-translateOp _      Word8RemOp      = Just (MO_U_Rem W8)
+  Word8ToWord     -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
+  WordToWord8     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
+  Word8NotOp      -> OpDest_Translate (MO_Not W8)
+  Word8AddOp      -> OpDest_Translate (MO_Add W8)
+  Word8SubOp      -> OpDest_Translate (MO_Sub W8)
+  Word8MulOp      -> OpDest_Translate (MO_Mul W8)
+  Word8QuotOp     -> OpDest_Translate (MO_U_Quot W8)
+  Word8RemOp      -> OpDest_Translate (MO_U_Rem W8)
 
-translateOp _      Word8EqOp       = Just (MO_Eq W8)
-translateOp _      Word8GeOp       = Just (MO_U_Ge W8)
-translateOp _      Word8GtOp       = Just (MO_U_Gt W8)
-translateOp _      Word8LeOp       = Just (MO_U_Le W8)
-translateOp _      Word8LtOp       = Just (MO_U_Lt W8)
-translateOp _      Word8NeOp       = Just (MO_Ne W8)
+  Word8EqOp       -> OpDest_Translate (MO_Eq W8)
+  Word8GeOp       -> OpDest_Translate (MO_U_Ge W8)
+  Word8GtOp       -> OpDest_Translate (MO_U_Gt W8)
+  Word8LeOp       -> OpDest_Translate (MO_U_Le W8)
+  Word8LtOp       -> OpDest_Translate (MO_U_Lt W8)
+  Word8NeOp       -> OpDest_Translate (MO_Ne W8)
 
 -- Int16# signed ops
 
-translateOp dflags Int16Extend     = Just (MO_SS_Conv W16 (wordWidth dflags))
-translateOp dflags Int16Narrow     = Just (MO_SS_Conv (wordWidth dflags) W16)
-translateOp _      Int16NegOp      = Just (MO_S_Neg W16)
-translateOp _      Int16AddOp      = Just (MO_Add W16)
-translateOp _      Int16SubOp      = Just (MO_Sub W16)
-translateOp _      Int16MulOp      = Just (MO_Mul W16)
-translateOp _      Int16QuotOp     = Just (MO_S_Quot W16)
-translateOp _      Int16RemOp      = Just (MO_S_Rem W16)
+  Int16ToInt      -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
+  IntToInt16      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
+  Int16NegOp      -> OpDest_Translate (MO_S_Neg W16)
+  Int16AddOp      -> OpDest_Translate (MO_Add W16)
+  Int16SubOp      -> OpDest_Translate (MO_Sub W16)
+  Int16MulOp      -> OpDest_Translate (MO_Mul W16)
+  Int16QuotOp     -> OpDest_Translate (MO_S_Quot W16)
+  Int16RemOp      -> OpDest_Translate (MO_S_Rem W16)
 
-translateOp _      Int16EqOp       = Just (MO_Eq W16)
-translateOp _      Int16GeOp       = Just (MO_S_Ge W16)
-translateOp _      Int16GtOp       = Just (MO_S_Gt W16)
-translateOp _      Int16LeOp       = Just (MO_S_Le W16)
-translateOp _      Int16LtOp       = Just (MO_S_Lt W16)
-translateOp _      Int16NeOp       = Just (MO_Ne W16)
+  Int16EqOp       -> OpDest_Translate (MO_Eq W16)
+  Int16GeOp       -> OpDest_Translate (MO_S_Ge W16)
+  Int16GtOp       -> OpDest_Translate (MO_S_Gt W16)
+  Int16LeOp       -> OpDest_Translate (MO_S_Le W16)
+  Int16LtOp       -> OpDest_Translate (MO_S_Lt W16)
+  Int16NeOp       -> OpDest_Translate (MO_Ne W16)
 
 -- Word16# unsigned ops
 
-translateOp dflags Word16Extend     = Just (MO_UU_Conv W16 (wordWidth dflags))
-translateOp dflags Word16Narrow     = Just (MO_UU_Conv (wordWidth dflags) W16)
-translateOp _      Word16NotOp      = Just (MO_Not W16)
-translateOp _      Word16AddOp      = Just (MO_Add W16)
-translateOp _      Word16SubOp      = Just (MO_Sub W16)
-translateOp _      Word16MulOp      = Just (MO_Mul W16)
-translateOp _      Word16QuotOp     = Just (MO_U_Quot W16)
-translateOp _      Word16RemOp      = Just (MO_U_Rem W16)
+  Word16ToWord     -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
+  WordToWord16     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
+  Word16NotOp      -> OpDest_Translate (MO_Not W16)
+  Word16AddOp      -> OpDest_Translate (MO_Add W16)
+  Word16SubOp      -> OpDest_Translate (MO_Sub W16)
+  Word16MulOp      -> OpDest_Translate (MO_Mul W16)
+  Word16QuotOp     -> OpDest_Translate (MO_U_Quot W16)
+  Word16RemOp      -> OpDest_Translate (MO_U_Rem W16)
 
-translateOp _      Word16EqOp       = Just (MO_Eq W16)
-translateOp _      Word16GeOp       = Just (MO_U_Ge W16)
-translateOp _      Word16GtOp       = Just (MO_U_Gt W16)
-translateOp _      Word16LeOp       = Just (MO_U_Le W16)
-translateOp _      Word16LtOp       = Just (MO_U_Lt W16)
-translateOp _      Word16NeOp       = Just (MO_Ne W16)
+  Word16EqOp       -> OpDest_Translate (MO_Eq W16)
+  Word16GeOp       -> OpDest_Translate (MO_U_Ge W16)
+  Word16GtOp       -> OpDest_Translate (MO_U_Gt W16)
+  Word16LeOp       -> OpDest_Translate (MO_U_Le W16)
+  Word16LtOp       -> OpDest_Translate (MO_U_Lt W16)
+  Word16NeOp       -> OpDest_Translate (MO_Ne W16)
+
+-- Int32# signed ops
+
+  Int32ToInt      -> OpDest_Translate (MO_SS_Conv W32 (wordWidth dflags))
+  IntToInt32      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W32)
+  Int32NegOp      -> OpDest_Translate (MO_S_Neg W32)
+  Int32AddOp      -> OpDest_Translate (MO_Add W32)
+  Int32SubOp      -> OpDest_Translate (MO_Sub W32)
+  Int32MulOp      -> OpDest_Translate (MO_Mul W32)
+  Int32QuotOp     -> OpDest_Translate (MO_S_Quot W32)
+  Int32RemOp      -> OpDest_Translate (MO_S_Rem W32)
+
+  Int32SllOp      -> OpDest_Translate (MO_Shl W32)
+  Int32SraOp      -> OpDest_Translate (MO_S_Shr W32)
+  Int32SrlOp      -> OpDest_Translate (MO_U_Shr W32)
+
+  Int32EqOp       -> OpDest_Translate (MO_Eq W32)
+  Int32GeOp       -> OpDest_Translate (MO_S_Ge W32)
+  Int32GtOp       -> OpDest_Translate (MO_S_Gt W32)
+  Int32LeOp       -> OpDest_Translate (MO_S_Le W32)
+  Int32LtOp       -> OpDest_Translate (MO_S_Lt W32)
+  Int32NeOp       -> OpDest_Translate (MO_Ne W32)
+
+-- Word32# unsigned ops
+
+  Word32ToWord     -> OpDest_Translate (MO_UU_Conv W32 (wordWidth dflags))
+  WordToWord32     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W32)
+  Word32AddOp      -> OpDest_Translate (MO_Add W32)
+  Word32SubOp      -> OpDest_Translate (MO_Sub W32)
+  Word32MulOp      -> OpDest_Translate (MO_Mul W32)
+  Word32QuotOp     -> OpDest_Translate (MO_U_Quot W32)
+  Word32RemOp      -> OpDest_Translate (MO_U_Rem W32)
+
+  Word32AndOp      -> OpDest_Translate (MO_And W32)
+  Word32OrOp       -> OpDest_Translate (MO_Or W32)
+  Word32XorOp      -> OpDest_Translate (MO_Xor W32)
+  Word32NotOp      -> OpDest_Translate (MO_Not W32)
+  Word32SllOp      -> OpDest_Translate (MO_Shl W32)
+  Word32SrlOp      -> OpDest_Translate (MO_U_Shr W32)
+
+  Word32EqOp       -> OpDest_Translate (MO_Eq W32)
+  Word32GeOp       -> OpDest_Translate (MO_U_Ge W32)
+  Word32GtOp       -> OpDest_Translate (MO_U_Gt W32)
+  Word32LeOp       -> OpDest_Translate (MO_U_Le W32)
+  Word32LtOp       -> OpDest_Translate (MO_U_Lt W32)
+  Word32NeOp       -> OpDest_Translate (MO_Ne W32)
+
+-- Int64# signed ops
+
+  Int64ToInt      -> OpDest_Translate (MO_SS_Conv W64 (wordWidth dflags))
+  IntToInt64      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W64)
+  Int64NegOp      -> OpDest_Translate (MO_S_Neg W64)
+  Int64AddOp      -> OpDest_Translate (MO_Add W64)
+  Int64SubOp      -> OpDest_Translate (MO_Sub W64)
+  Int64MulOp      -> OpDest_Translate (MO_Mul W64)
+  Int64QuotOp     -> OpDest_Translate (MO_S_Quot W64)
+  Int64RemOp      -> OpDest_Translate (MO_S_Rem W64)
+
+  Int64SllOp      -> OpDest_Translate (MO_Shl W64)
+  Int64SraOp      -> OpDest_Translate (MO_S_Shr W64)
+  Int64SrlOp      -> OpDest_Translate (MO_U_Shr W64)
+
+  Int64EqOp       -> OpDest_Translate (MO_Eq W64)
+  Int64GeOp       -> OpDest_Translate (MO_S_Ge W64)
+  Int64GtOp       -> OpDest_Translate (MO_S_Gt W64)
+  Int64LeOp       -> OpDest_Translate (MO_S_Le W64)
+  Int64LtOp       -> OpDest_Translate (MO_S_Lt W64)
+  Int64NeOp       -> OpDest_Translate (MO_Ne W64)
+
+-- Word64# unsigned ops
+
+  Word64ToWord     -> OpDest_Translate (MO_UU_Conv W64 (wordWidth dflags))
+  WordToWord64     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W64)
+  Word64AddOp      -> OpDest_Translate (MO_Add W64)
+  Word64SubOp      -> OpDest_Translate (MO_Sub W64)
+  Word64MulOp      -> OpDest_Translate (MO_Mul W64)
+  Word64QuotOp     -> OpDest_Translate (MO_U_Quot W64)
+  Word64RemOp      -> OpDest_Translate (MO_U_Rem W64)
+
+  Word64AndOp      -> OpDest_Translate (MO_And W64)
+  Word64OrOp       -> OpDest_Translate (MO_Or W64)
+  Word64XorOp      -> OpDest_Translate (MO_Xor W64)
+  Word64NotOp      -> OpDest_Translate (MO_Not W64)
+  Word64SllOp      -> OpDest_Translate (MO_Shl W64)
+  Word64SrlOp      -> OpDest_Translate (MO_U_Shr W64)
+
+  Word64EqOp       -> OpDest_Translate (MO_Eq W64)
+  Word64GeOp       -> OpDest_Translate (MO_U_Ge W64)
+  Word64GtOp       -> OpDest_Translate (MO_U_Gt W64)
+  Word64LeOp       -> OpDest_Translate (MO_U_Le W64)
+  Word64LtOp       -> OpDest_Translate (MO_U_Lt W64)
+  Word64NeOp       -> OpDest_Translate (MO_Ne W64)
 
 -- Char# ops
 
-translateOp dflags CharEqOp       = Just (MO_Eq (wordWidth dflags))
-translateOp dflags CharNeOp       = Just (MO_Ne (wordWidth dflags))
-translateOp dflags CharGeOp       = Just (MO_U_Ge (wordWidth dflags))
-translateOp dflags CharLeOp       = Just (MO_U_Le (wordWidth dflags))
-translateOp dflags CharGtOp       = Just (MO_U_Gt (wordWidth dflags))
-translateOp dflags CharLtOp       = Just (MO_U_Lt (wordWidth dflags))
+  CharEqOp       -> OpDest_Translate (MO_Eq (wordWidth dflags))
+  CharNeOp       -> OpDest_Translate (MO_Ne (wordWidth dflags))
+  CharGeOp       -> OpDest_Translate (MO_U_Ge (wordWidth dflags))
+  CharLeOp       -> OpDest_Translate (MO_U_Le (wordWidth dflags))
+  CharGtOp       -> OpDest_Translate (MO_U_Gt (wordWidth dflags))
+  CharLtOp       -> OpDest_Translate (MO_U_Lt (wordWidth dflags))
 
 -- Double ops
 
-translateOp _      DoubleEqOp     = Just (MO_F_Eq W64)
-translateOp _      DoubleNeOp     = Just (MO_F_Ne W64)
-translateOp _      DoubleGeOp     = Just (MO_F_Ge W64)
-translateOp _      DoubleLeOp     = Just (MO_F_Le W64)
-translateOp _      DoubleGtOp     = Just (MO_F_Gt W64)
-translateOp _      DoubleLtOp     = Just (MO_F_Lt W64)
+  DoubleEqOp     -> OpDest_Translate (MO_F_Eq W64)
+  DoubleNeOp     -> OpDest_Translate (MO_F_Ne W64)
+  DoubleGeOp     -> OpDest_Translate (MO_F_Ge W64)
+  DoubleLeOp     -> OpDest_Translate (MO_F_Le W64)
+  DoubleGtOp     -> OpDest_Translate (MO_F_Gt W64)
+  DoubleLtOp     -> OpDest_Translate (MO_F_Lt W64)
 
-translateOp _      DoubleAddOp    = Just (MO_F_Add W64)
-translateOp _      DoubleSubOp    = Just (MO_F_Sub W64)
-translateOp _      DoubleMulOp    = Just (MO_F_Mul W64)
-translateOp _      DoubleDivOp    = Just (MO_F_Quot W64)
-translateOp _      DoubleNegOp    = Just (MO_F_Neg W64)
+  DoubleAddOp    -> OpDest_Translate (MO_F_Add W64)
+  DoubleSubOp    -> OpDest_Translate (MO_F_Sub W64)
+  DoubleMulOp    -> OpDest_Translate (MO_F_Mul W64)
+  DoubleDivOp    -> OpDest_Translate (MO_F_Quot W64)
+  DoubleNegOp    -> OpDest_Translate (MO_F_Neg W64)
 
 -- Float ops
 
-translateOp _      FloatEqOp     = Just (MO_F_Eq W32)
-translateOp _      FloatNeOp     = Just (MO_F_Ne W32)
-translateOp _      FloatGeOp     = Just (MO_F_Ge W32)
-translateOp _      FloatLeOp     = Just (MO_F_Le W32)
-translateOp _      FloatGtOp     = Just (MO_F_Gt W32)
-translateOp _      FloatLtOp     = Just (MO_F_Lt W32)
+  FloatEqOp     -> OpDest_Translate (MO_F_Eq W32)
+  FloatNeOp     -> OpDest_Translate (MO_F_Ne W32)
+  FloatGeOp     -> OpDest_Translate (MO_F_Ge W32)
+  FloatLeOp     -> OpDest_Translate (MO_F_Le W32)
+  FloatGtOp     -> OpDest_Translate (MO_F_Gt W32)
+  FloatLtOp     -> OpDest_Translate (MO_F_Lt W32)
 
-translateOp _      FloatAddOp    = Just (MO_F_Add  W32)
-translateOp _      FloatSubOp    = Just (MO_F_Sub  W32)
-translateOp _      FloatMulOp    = Just (MO_F_Mul  W32)
-translateOp _      FloatDivOp    = Just (MO_F_Quot W32)
-translateOp _      FloatNegOp    = Just (MO_F_Neg  W32)
+  FloatAddOp    -> OpDest_Translate (MO_F_Add  W32)
+  FloatSubOp    -> OpDest_Translate (MO_F_Sub  W32)
+  FloatMulOp    -> OpDest_Translate (MO_F_Mul  W32)
+  FloatDivOp    -> OpDest_Translate (MO_F_Quot W32)
+  FloatNegOp    -> OpDest_Translate (MO_F_Neg  W32)
 
 -- Vector ops
 
-translateOp _ (VecAddOp FloatVec n w) = Just (MO_VF_Add  n w)
-translateOp _ (VecSubOp FloatVec n w) = Just (MO_VF_Sub  n w)
-translateOp _ (VecMulOp FloatVec n w) = Just (MO_VF_Mul  n w)
-translateOp _ (VecDivOp FloatVec n w) = Just (MO_VF_Quot n w)
-translateOp _ (VecNegOp FloatVec n w) = Just (MO_VF_Neg  n w)
+  (VecAddOp FloatVec n w) -> OpDest_Translate (MO_VF_Add  n w)
+  (VecSubOp FloatVec n w) -> OpDest_Translate (MO_VF_Sub  n w)
+  (VecMulOp FloatVec n w) -> OpDest_Translate (MO_VF_Mul  n w)
+  (VecDivOp FloatVec n w) -> OpDest_Translate (MO_VF_Quot n w)
+  (VecNegOp FloatVec n w) -> OpDest_Translate (MO_VF_Neg  n w)
 
-translateOp _ (VecAddOp  IntVec n w) = Just (MO_V_Add   n w)
-translateOp _ (VecSubOp  IntVec n w) = Just (MO_V_Sub   n w)
-translateOp _ (VecMulOp  IntVec n w) = Just (MO_V_Mul   n w)
-translateOp _ (VecQuotOp IntVec n w) = Just (MO_VS_Quot n w)
-translateOp _ (VecRemOp  IntVec n w) = Just (MO_VS_Rem  n w)
-translateOp _ (VecNegOp  IntVec n w) = Just (MO_VS_Neg  n w)
+  (VecAddOp  IntVec n w) -> OpDest_Translate (MO_V_Add   n w)
+  (VecSubOp  IntVec n w) -> OpDest_Translate (MO_V_Sub   n w)
+  (VecMulOp  IntVec n w) -> OpDest_Translate (MO_V_Mul   n w)
+  (VecQuotOp IntVec n w) -> OpDest_Translate (MO_VS_Quot n w)
+  (VecRemOp  IntVec n w) -> OpDest_Translate (MO_VS_Rem  n w)
+  (VecNegOp  IntVec n w) -> OpDest_Translate (MO_VS_Neg  n w)
 
-translateOp _ (VecAddOp  WordVec n w) = Just (MO_V_Add   n w)
-translateOp _ (VecSubOp  WordVec n w) = Just (MO_V_Sub   n w)
-translateOp _ (VecMulOp  WordVec n w) = Just (MO_V_Mul   n w)
-translateOp _ (VecQuotOp WordVec n w) = Just (MO_VU_Quot n w)
-translateOp _ (VecRemOp  WordVec n w) = Just (MO_VU_Rem  n w)
+  (VecAddOp  WordVec n w) -> OpDest_Translate (MO_V_Add   n w)
+  (VecSubOp  WordVec n w) -> OpDest_Translate (MO_V_Sub   n w)
+  (VecMulOp  WordVec n w) -> OpDest_Translate (MO_V_Mul   n w)
+  (VecQuotOp WordVec n w) -> OpDest_Translate (MO_VU_Quot n w)
+  (VecRemOp  WordVec n w) -> OpDest_Translate (MO_VU_Rem  n w)
 
 -- Conversions
 
-translateOp dflags Int2DoubleOp   = Just (MO_SF_Conv (wordWidth dflags) W64)
-translateOp dflags Double2IntOp   = Just (MO_FS_Conv W64 (wordWidth dflags))
+  Int2DoubleOp   -> OpDest_Translate (MO_SF_Conv (wordWidth dflags) W64)
+  Double2IntOp   -> OpDest_Translate (MO_FS_Conv W64 (wordWidth dflags))
 
-translateOp dflags Int2FloatOp    = Just (MO_SF_Conv (wordWidth dflags) W32)
-translateOp dflags Float2IntOp    = Just (MO_FS_Conv W32 (wordWidth dflags))
+  Int2FloatOp    -> OpDest_Translate (MO_SF_Conv (wordWidth dflags) W32)
+  Float2IntOp    -> OpDest_Translate (MO_FS_Conv W32 (wordWidth dflags))
 
-translateOp _      Float2DoubleOp = Just (MO_FF_Conv W32 W64)
-translateOp _      Double2FloatOp = Just (MO_FF_Conv W64 W32)
+  Float2DoubleOp -> OpDest_Translate (MO_FF_Conv W32 W64)
+  Double2FloatOp -> OpDest_Translate (MO_FF_Conv W64 W32)
 
 -- Word comparisons masquerading as more exotic things.
 
-translateOp dflags SameMutVarOp           = Just (mo_wordEq dflags)
-translateOp dflags SameMVarOp             = Just (mo_wordEq dflags)
-translateOp dflags SameMutableArrayOp     = Just (mo_wordEq dflags)
-translateOp dflags SameMutableByteArrayOp = Just (mo_wordEq dflags)
-translateOp dflags SameMutableArrayArrayOp= Just (mo_wordEq dflags)
-translateOp dflags SameSmallMutableArrayOp= Just (mo_wordEq dflags)
-translateOp dflags SameTVarOp             = Just (mo_wordEq dflags)
-translateOp dflags EqStablePtrOp          = Just (mo_wordEq dflags)
+  SameMutVarOp            -> OpDest_Translate (mo_wordEq dflags)
+  SameMVarOp              -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableArrayOp      -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableByteArrayOp  -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableArrayArrayOp -> OpDest_Translate (mo_wordEq dflags)
+  SameSmallMutableArrayOp -> OpDest_Translate (mo_wordEq dflags)
+  SameTVarOp              -> OpDest_Translate (mo_wordEq dflags)
+  EqStablePtrOp           -> OpDest_Translate (mo_wordEq dflags)
 -- See Note [Comparing stable names]
-translateOp dflags EqStableNameOp         = Just (mo_wordEq dflags)
+  EqStableNameOp          -> OpDest_Translate (mo_wordEq dflags)
 
-translateOp _      _ = Nothing
+-- handled in 'callishPrimOpSupported'
+  IntQuotRemOp    -> OpDest_CallishHandledLater
+  Int8QuotRemOp   -> OpDest_CallishHandledLater
+  Int16QuotRemOp  -> OpDest_CallishHandledLater
+  Int32QuotRemOp  -> OpDest_CallishHandledLater
+  Int64QuotRemOp  -> OpDest_CallishHandledLater
+  WordQuotRemOp   -> OpDest_CallishHandledLater
+  WordQuotRem2Op  -> OpDest_CallishHandledLater
+  Word8QuotRemOp  -> OpDest_CallishHandledLater
+  Word16QuotRemOp -> OpDest_CallishHandledLater
+  Word32QuotRemOp -> OpDest_CallishHandledLater
+  Word64QuotRemOp -> OpDest_CallishHandledLater
+  WordAdd2Op      -> OpDest_CallishHandledLater
+  WordAddCOp      -> OpDest_CallishHandledLater
+  WordSubCOp      -> OpDest_CallishHandledLater
+  IntAddCOp       -> OpDest_CallishHandledLater
+  IntSubCOp       -> OpDest_CallishHandledLater
+  WordMul2Op      -> OpDest_CallishHandledLater
+  FloatFabsOp     -> OpDest_CallishHandledLater
+  DoubleFabsOp    -> OpDest_CallishHandledLater
+
+  _ -> OpDest_CallishHandledLater -- already handled TODO
 
 -- Note [Comparing stable names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1494,50 +1696,6 @@ translateOp _      _ = Nothing
 -- this is not necessary: there is a one-to-one correspondence
 -- between SNOs and entries in the SNT, so simple pointer equality
 -- does the trick.
-
--- These primops are implemented by CallishMachOps, because they sometimes
--- turn into foreign calls depending on the backend.
-
-callishOp :: PrimOp -> Maybe CallishMachOp
-callishOp DoublePowerOp  = Just MO_F64_Pwr
-callishOp DoubleSinOp    = Just MO_F64_Sin
-callishOp DoubleCosOp    = Just MO_F64_Cos
-callishOp DoubleTanOp    = Just MO_F64_Tan
-callishOp DoubleSinhOp   = Just MO_F64_Sinh
-callishOp DoubleCoshOp   = Just MO_F64_Cosh
-callishOp DoubleTanhOp   = Just MO_F64_Tanh
-callishOp DoubleAsinOp   = Just MO_F64_Asin
-callishOp DoubleAcosOp   = Just MO_F64_Acos
-callishOp DoubleAtanOp   = Just MO_F64_Atan
-callishOp DoubleAsinhOp  = Just MO_F64_Asinh
-callishOp DoubleAcoshOp  = Just MO_F64_Acosh
-callishOp DoubleAtanhOp  = Just MO_F64_Atanh
-callishOp DoubleLogOp    = Just MO_F64_Log
-callishOp DoubleLog1POp  = Just MO_F64_Log1P
-callishOp DoubleExpOp    = Just MO_F64_Exp
-callishOp DoubleExpM1Op  = Just MO_F64_ExpM1
-callishOp DoubleSqrtOp   = Just MO_F64_Sqrt
-
-callishOp FloatPowerOp  = Just MO_F32_Pwr
-callishOp FloatSinOp    = Just MO_F32_Sin
-callishOp FloatCosOp    = Just MO_F32_Cos
-callishOp FloatTanOp    = Just MO_F32_Tan
-callishOp FloatSinhOp   = Just MO_F32_Sinh
-callishOp FloatCoshOp   = Just MO_F32_Cosh
-callishOp FloatTanhOp   = Just MO_F32_Tanh
-callishOp FloatAsinOp   = Just MO_F32_Asin
-callishOp FloatAcosOp   = Just MO_F32_Acos
-callishOp FloatAtanOp   = Just MO_F32_Atan
-callishOp FloatAsinhOp  = Just MO_F32_Asinh
-callishOp FloatAcoshOp  = Just MO_F32_Acosh
-callishOp FloatAtanhOp  = Just MO_F32_Atanh
-callishOp FloatLogOp    = Just MO_F32_Log
-callishOp FloatLog1POp  = Just MO_F32_Log1P
-callishOp FloatExpOp    = Just MO_F32_Exp
-callishOp FloatExpM1Op  = Just MO_F32_ExpM1
-callishOp FloatSqrtOp   = Just MO_F32_Sqrt
-
-callishOp _ = Nothing
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.

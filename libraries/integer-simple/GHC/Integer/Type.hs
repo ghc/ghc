@@ -30,9 +30,6 @@ import GHC.Prim
 import GHC.Classes
 import GHC.Types
 import GHC.Tuple ()
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
 
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
 -- such as 'Int', the 'Integer' type represents the entire infinite range of
@@ -95,9 +92,6 @@ integerToWord _ = 0##
 integerToInt :: Integer -> Int#
 integerToInt i = word2Int# (integerToWord i)
 
-#if WORD_SIZE_IN_BITS == 64
--- Nothing
-#elif WORD_SIZE_IN_BITS == 32
 {-# NOINLINE integerToWord64 #-}
 integerToWord64 :: Integer -> Word64#
 integerToWord64 i = int64ToWord64# (integerToInt64 i)
@@ -123,9 +117,6 @@ int64ToInteger i
    else if isTrue# (i `gtInt64#` intToInt64# 0#)
    then Positive (word64ToPositive (int64ToWord64# i))
    else Negative (word64ToPositive (int64ToWord64# (negateInt64# i)))
-#else
-#error WORD_SIZE_IN_BITS not supported
-#endif
 
 oneInteger :: Integer
 oneInteger = Positive onePositive

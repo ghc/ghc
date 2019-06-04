@@ -156,6 +156,7 @@ module PrelNames (
     ) where
 
 #include "HsVersions.h"
+#include "../include/MachDeps.h"
 
 import GhcPrelude
 
