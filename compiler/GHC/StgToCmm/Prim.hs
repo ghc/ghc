@@ -1079,6 +1079,8 @@ emitPrimOp dflags primop = case primop of
 
 -- The rest just translate straightforwardly
 
+  Int32ToWord32Op -> \args -> opNop args
+  Word32ToInt32Op -> \args -> opNop args
   IntToWordOp     -> \args -> opNop args
   WordToIntOp     -> \args -> opNop args
   IntToAddrOp     -> \args -> opNop args
@@ -1269,11 +1271,47 @@ emitPrimOp dflags primop = case primop of
 
   Int32ExtendOp  -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
   Int32NarrowOp  -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
+  Int32NegOp     -> \args -> opTranslate args (MO_S_Neg W32)
+  Int32AddOp     -> \args -> opTranslate args (MO_Add W32)
+  Int32SubOp     -> \args -> opTranslate args (MO_Sub W32)
+  Int32MulOp     -> \args -> opTranslate args (MO_Mul W32)
+  Int32QuotOp    -> \args -> opTranslate args (MO_S_Quot W32)
+  Int32RemOp     -> \args -> opTranslate args (MO_S_Rem W32)
+
+  Int32SllOp     -> \args -> opTranslate args (MO_Shl W32)
+  Int32SraOp     -> \args -> opTranslate args (MO_S_Shr W32)
+  Int32SrlOp     -> \args -> opTranslate args (MO_U_Shr W32)
+
+  Int32EqOp      -> \args -> opTranslate args (MO_Eq W32)
+  Int32GeOp      -> \args -> opTranslate args (MO_S_Ge W32)
+  Int32GtOp      -> \args -> opTranslate args (MO_S_Gt W32)
+  Int32LeOp      -> \args -> opTranslate args (MO_S_Le W32)
+  Int32LtOp      -> \args -> opTranslate args (MO_S_Lt W32)
+  Int32NeOp      -> \args -> opTranslate args (MO_Ne W32)
 
 -- Word32# unsigned ops
 
   Word32ExtendOp -> \args -> opTranslate args (MO_UU_Conv W32 (wordWidth platform))
   Word32NarrowOp -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W32)
+  Word32AddOp    -> \args -> opTranslate args (MO_Add W32)
+  Word32SubOp    -> \args -> opTranslate args (MO_Sub W32)
+  Word32MulOp    -> \args -> opTranslate args (MO_Mul W32)
+  Word32QuotOp   -> \args -> opTranslate args (MO_U_Quot W32)
+  Word32RemOp    -> \args -> opTranslate args (MO_U_Rem W32)
+
+  Word32AndOp    -> \args -> opTranslate args (MO_And W32)
+  Word32OrOp     -> \args -> opTranslate args (MO_Or W32)
+  Word32XorOp    -> \args -> opTranslate args (MO_Xor W32)
+  Word32NotOp    -> \args -> opTranslate args (MO_Not W32)
+  Word32SllOp    -> \args -> opTranslate args (MO_Shl W32)
+  Word32SrlOp    -> \args -> opTranslate args (MO_U_Shr W32)
+
+  Word32EqOp     -> \args -> opTranslate args (MO_Eq W32)
+  Word32GeOp     -> \args -> opTranslate args (MO_U_Ge W32)
+  Word32GtOp     -> \args -> opTranslate args (MO_U_Gt W32)
+  Word32LeOp     -> \args -> opTranslate args (MO_U_Le W32)
+  Word32LtOp     -> \args -> opTranslate args (MO_U_Lt W32)
+  Word32NeOp     -> \args -> opTranslate args (MO_Ne W32)
 
 -- Char# ops
 
@@ -1380,6 +1418,11 @@ emitPrimOp dflags primop = case primop of
     then Left (MO_S_QuotRem W16)
     else Right (genericIntQuotRemOp W16)
 
+  Int32QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W32)
+    else Right (genericIntQuotRemOp W32)
+
   WordQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem  (wordWidth platform))
@@ -1399,6 +1442,11 @@ emitPrimOp dflags primop = case primop of
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W16)
     else Right (genericWordQuotRemOp W16)
+
+  Word32QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W32)
+    else Right (genericWordQuotRemOp W32)
 
   WordAdd2Op -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm
