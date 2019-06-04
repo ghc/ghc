@@ -37,9 +37,6 @@ import GHC.Classes
 import GHC.Magic
 import GHC.Prim
 import GHC.Types
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
 
 default ()
 
@@ -216,7 +213,6 @@ smallInteger i# = S# i#
 ----------------------------------------------------------------------------
 -- Int64/Word64 specific primitives
 
-#if WORD_SIZE_IN_BITS < 64
 int64ToInteger :: Int64# -> Integer
 int64ToInteger i
   | isTrue# (i `leInt64#` intToInt64#  0x7FFFFFFF#)
@@ -249,14 +245,14 @@ integerToWord64 (Jn# bn)
     = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64 bn)))
 {-# CONSTANT_FOLDED integerToWord64 #-}
 
-#if GMP_LIMB_BITS == 32
 word64ToBigNat :: Word64# -> BigNat
+bigNatToWord64 :: BigNat -> Word64#
+#if GMP_LIMB_BITS == 32
 word64ToBigNat w64 = wordToBigNat2 wh# wl#
   where
     wh# = word64ToWord# (uncheckedShiftRL64# w64 32#)
     wl# = word64ToWord# w64
 
-bigNatToWord64 :: BigNat -> Word64#
 bigNatToWord64 bn
   | isTrue# (sizeofBigNat# bn ># 1#)
     = let wh# = wordToWord64# (indexBigNat# bn 1#)
@@ -264,7 +260,12 @@ bigNatToWord64 bn
   | True = wl#
   where
     wl# = wordToWord64# (bigNatToWord bn)
-#endif
+#elif GMP_LIMB_BITS == 64
+word64ToBigNat w# = wordToBigNat (word64ToWord# w#)
+
+bigNatToWord64 (BN# ba#) = wordToWord64# (indexWordArray# ba# 0#)
+#else
+# error 'bigNatToWord64' only supported if 32 or 64 bit limbs
 #endif
 
 -- End of Int64/Word64 specific primitives
@@ -1619,13 +1620,8 @@ foreign import ccall unsafe "integer_gmp_invert"
 
 decodeDoubleInteger :: Double# -> (# Integer, Int# #)
 -- decodeDoubleInteger 0.0## = (# S# 0#, 0# #)
-#if WORD_SIZE_IN_BITS == 64
-decodeDoubleInteger x = case decodeDouble_Int64# x of
-                          (# m#, e# #) -> (# S# m#, e# #)
-#elif WORD_SIZE_IN_BITS == 32
 decodeDoubleInteger x = case decodeDouble_Int64# x of
                           (# m#, e# #) -> (# int64ToInteger m#, e# #)
-#endif
 {-# CONSTANT_FOLDED decodeDoubleInteger #-}
 
 -- provided by GHC's RTS
