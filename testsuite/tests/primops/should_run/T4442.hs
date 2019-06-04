@@ -8,10 +8,8 @@ import GHC.Stable(
   StablePtr(..), castStablePtrToPtr, castPtrToStablePtr, newStablePtr)
 import GHC.Exts
 import Data.Char(ord)
-#if WORD_SIZE_IN_BITS < 64
 import GHC.Int (Int64(..))
 import GHC.Word (Word64(..))
-#endif
 
 assertEqual :: (Show a, Eq a) => a -> a -> IO ()
 assertEqual a b
@@ -115,9 +113,6 @@ testIntArray name0 index read write val0 len = do
     (intToBytes val len)
     len
 
-#if WORD_SIZE_IN_BITS == 64
-testInt64Array = testIntArray
-#else
 testInt64Array ::
      String
   -> (ByteArray# -> Int# -> Int64#)
@@ -141,7 +136,6 @@ testInt64Array name0 index read write val0 len = do
     val
     (intToBytes (fromIntegral val) len)
     len
-#endif
 
 testWordArray ::
      String
@@ -162,9 +156,6 @@ testWordArray name index read write val len = test
   (intToBytes (fromIntegral val) len)
   len
 
-#if WORD_SIZE_IN_BITS == 64
-testWord64Array = testWordArray
-#else
 testWord64Array ::
      String
   -> (ByteArray# -> Int# -> Word64#)
@@ -183,7 +174,6 @@ testWord64Array name index read write val len = test
   val
   (intToBytes (fromIntegral val) len)
   len
-#endif
 
 wordSizeInBytes :: Int
 wordSizeInBytes = WORD_SIZE_IN_BITS `div` 8
