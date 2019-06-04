@@ -5,6 +5,10 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * Fix the `integer-gmp` variant of `isValidNatural`: Previously it would fail
+    to detect values `<= maxBound::Word` that were incorrectly encoded using
+    the `NatJ#` constructor.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 

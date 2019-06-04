@@ -157,7 +157,9 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
 isValidNatural :: Natural -> Bool
 isValidNatural (NatS# _)  = True
 isValidNatural (NatJ# bn) = isTrue# (isValidBigNat# bn)
-                            && isTrue# (sizeofBigNat# bn ># 0#)
+                            -- A 1-limb BigNat could fit into a NatS#, so we
+                            -- require at least 2 limbs.
+                            && isTrue# (sizeofBigNat# bn ># 1#)
 
 signumNatural :: Natural -> Natural
 signumNatural (NatS# 0##) = NatS# 0##
