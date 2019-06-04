@@ -536,7 +536,9 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
-               || exprIsTickedString rhs)
+               || exprIsTickedString rhs
+               || exprIsBottom rhs
+                )
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is top-level or recursive, it's not
