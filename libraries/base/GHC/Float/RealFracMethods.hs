@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -18,8 +18,6 @@
 -- Moved to their own module to not bloat GHC.Float further.
 --
 -----------------------------------------------------------------------------
-
-#include "MachDeps.h"
 
 module GHC.Float.RealFracMethods
     ( -- * Double methods
@@ -58,30 +56,6 @@ import GHC.Integer
 
 import GHC.Base
 import GHC.Num ()
-
-#if WORD_SIZE_IN_BITS < 64
-
-import GHC.IntWord64
-
-#define TO64 integerToInt64
-#define FROM64 int64ToInteger
-#define MINUS64 minusInt64#
-#define NEGATE64 negateInt64#
-
-#else
-
-#define TO64 integerToInt
-#define FROM64 smallInteger
-#define MINUS64 ( -# )
-#define NEGATE64 negateInt#
-
-uncheckedIShiftRA64# :: Int# -> Int# -> Int#
-uncheckedIShiftRA64# = uncheckedIShiftRA#
-
-uncheckedIShiftL64# :: Int# -> Int# -> Int#
-uncheckedIShiftL64# = uncheckedIShiftL#
-
-#endif
 
 default ()
 
@@ -237,21 +211,21 @@ properFractionDoubleInteger v@(D# x) =
           case negateInt# e of
             s | isTrue# (s ># 52#) -> (0, v)
               | m < 0                 ->
-                case TO64 (negateInteger m) of
+                case integerToInt64 (negateInteger m) of
                   n ->
                     case n `uncheckedIShiftRA64#` s of
                       k ->
-                        (FROM64 (NEGATE64 k),
-                          case MINUS64 n (k `uncheckedIShiftL64#` s) of
+                        (int64ToInteger (negateInt64# k),
+                          case subInt64# n (k `uncheckedIShiftL64#` s) of
                             r ->
-                              D# (encodeDoubleInteger (FROM64 (NEGATE64 r)) e))
+                              D# (encodeDoubleInteger (int64ToInteger (negateInt64# r)) e))
               | otherwise           ->
-                case TO64 m of
+                case integerToInt64 m of
                   n ->
                     case n `uncheckedIShiftRA64#` s of
-                      k -> (FROM64 k,
-                            case MINUS64 n (k `uncheckedIShiftL64#` s) of
-                              r -> D# (encodeDoubleInteger (FROM64 r) e))
+                      k -> (int64ToInteger k,
+                            case subInt64# n (k `uncheckedIShiftL64#` s) of
+                              r -> D# (encodeDoubleInteger (int64ToInteger r) e))
         | otherwise -> (shiftLInteger m e, D# 0.0##)
 
 {-# INLINE truncateDoubleInteger #-}
@@ -271,8 +245,8 @@ floorDoubleInteger (D# x) =
           case negateInt# e of
             s | isTrue# (s ># 52#) -> if m < 0 then (-1) else 0
               | otherwise          ->
-                case TO64 m of
-                  n -> FROM64 (n `uncheckedIShiftRA64#` s)
+                case integerToInt64 m of
+                  n -> int64ToInteger (n `uncheckedIShiftRA64#` s)
         | otherwise -> shiftLInteger m e
 
 {-# INLINE ceilingDoubleInteger #-}
@@ -313,8 +287,8 @@ double2Integer (D# x) =
     case decodeDoubleInteger x of
       (# m, e #)
         | isTrue# (e <# 0#) ->
-          case TO64 m of
-            n -> FROM64 (n `uncheckedIShiftRA64#` negateInt# e)
+          case integerToInt64 m of
+            n -> int64ToInteger (n `uncheckedIShiftRA64#` negateInt# e)
         | otherwise -> shiftLInteger m e
 
 {-# INLINE float2Integer #-}
