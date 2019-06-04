@@ -68,6 +68,7 @@ import UniqSet
 import Util
 import NameEnv
 import FileCleanup
+import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
