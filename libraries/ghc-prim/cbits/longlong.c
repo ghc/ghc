@@ -32,31 +32,32 @@ The exceptions to the rule are primops that cast to and from
 
 /* Relational operators */
 
+HsInt hs_eq64 (HsWord64 a, HsWord64 b) {return a == b;}
+HsInt hs_ne64 (HsWord64 a, HsWord64 b) {return a != b;}
+
 HsInt hs_gtWord64 (HsWord64 a, HsWord64 b) {return a >  b;}
 HsInt hs_geWord64 (HsWord64 a, HsWord64 b) {return a >= b;}
-HsInt hs_eqWord64 (HsWord64 a, HsWord64 b) {return a == b;}
-HsInt hs_neWord64 (HsWord64 a, HsWord64 b) {return a != b;}
 HsInt hs_ltWord64 (HsWord64 a, HsWord64 b) {return a <  b;}
 HsInt hs_leWord64 (HsWord64 a, HsWord64 b) {return a <= b;}
 
 HsInt hs_gtInt64 (HsInt64 a, HsInt64 b) {return a >  b;}
 HsInt hs_geInt64 (HsInt64 a, HsInt64 b) {return a >= b;}
-HsInt hs_eqInt64 (HsInt64 a, HsInt64 b) {return a == b;}
-HsInt hs_neInt64 (HsInt64 a, HsInt64 b) {return a != b;}
 HsInt hs_ltInt64 (HsInt64 a, HsInt64 b) {return a <  b;}
 HsInt hs_leInt64 (HsInt64 a, HsInt64 b) {return a <= b;}
 
 /* Arithmetic operators */
+
+HsInt64 hs_neg64       (HsInt64 a)              {return - a;}
+
+HsWord64 hs_add64      (HsWord64 a, HsWord64 b) {return a + b;}
+HsWord64 hs_sub64      (HsWord64 a, HsWord64 b) {return a - b;}
+HsWord64 hs_mul64      (HsWord64 a, HsWord64 b) {return a * b;}
 
 HsWord64 hs_remWord64  (HsWord64 a, HsWord64 b) {return a % b;}
 HsWord64 hs_quotWord64 (HsWord64 a, HsWord64 b) {return a / b;}
 
 HsInt64 hs_remInt64    (HsInt64 a, HsInt64 b)   {return a % b;}
 HsInt64 hs_quotInt64   (HsInt64 a, HsInt64 b)   {return a / b;}
-HsInt64 hs_negateInt64 (HsInt64 a)              {return -a;}
-HsInt64 hs_plusInt64   (HsInt64 a, HsInt64 b)   {return a + b;}
-HsInt64 hs_minusInt64  (HsInt64 a, HsInt64 b)   {return a - b;}
-HsInt64 hs_timesInt64  (HsInt64 a, HsInt64 b)   {return a * b;}
 
 /* Logical operators: */
 
@@ -71,10 +72,7 @@ HsWord64 hs_uncheckedShiftRL64  (HsWord64 a, HsInt b)    {return a >> b;}
    the behaviour you'll get from using these primops depends
    on the whatever your C compiler is doing. ToDo: fix. -- sof 8/98
 */
-HsInt64  hs_uncheckedIShiftL64  (HsInt64 a,  HsInt b)    {return a << b;}
 HsInt64  hs_uncheckedIShiftRA64 (HsInt64 a,  HsInt b)    {return a >> b;}
-HsInt64  hs_uncheckedIShiftRL64 (HsInt64 a,  HsInt b)
-                                    {return (HsInt64) ((HsWord64) a >> b);}
 
 /* Casting between longs and longer longs.
 */
