@@ -35,6 +35,12 @@ data Entry
     | PrimTypeSpec { ty    :: Ty,      -- name in prog text
                      desc  :: String,      -- description
                      opts  :: [Option] }   -- default overrides
+    | PrimTypeSynSpec
+      { synonym :: String -- ^ LHS of type alias
+      , original :: String -- ^ RHS of type alias
+      , desc :: String -- description
+      , opts :: [Option] -- default overrides
+      }
     | PrimVecTypeSpec { ty    :: Ty,      -- name in prog text
                         prefix  :: String,    -- prefix for generated names
                         veclen  :: Int,       -- vector length

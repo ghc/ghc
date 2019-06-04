@@ -4,7 +4,6 @@
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 -}
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | This module is about types that can be defined in Haskell, but which
@@ -123,9 +122,6 @@ module TysWiredIn (
         doubleElemRepDataConTy
 
     ) where
-
-#include "HsVersions.h"
-#include "MachDeps.h"
 
 import GhcPrelude
 

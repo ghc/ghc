@@ -156,6 +156,7 @@ module PrelNames (
     ) where
 
 #include "HsVersions.h"
+#include "../include/MachDeps.h"
 
 import GhcPrelude
 
@@ -1676,7 +1677,15 @@ doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
 funTyConKey                             = mkPreludeTyConUnique 13
-intPrimTyConKey                         = mkPreludeTyConUnique 14
+intPrimTyConKey                         =
+#if WORD_SIZE_IN_BITS == 32
+  int32PrimTyConKey
+#elif WORD_SIZE_IN_BITS == 64
+  int64PrimTyConKey
+#else
+#  error "unsupported word size"
+#endif
+-- TODO decrement rest?
 intTyConKey                             = mkPreludeTyConUnique 15
 int8PrimTyConKey                        = mkPreludeTyConUnique 16
 int8TyConKey                            = mkPreludeTyConUnique 17

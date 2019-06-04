@@ -44,6 +44,14 @@ desugarVectorSpec i              = case vecOptions i of
                               , desc    = desc i
                               , opts    = opts i
                               }
+          PrimTypeSynSpec {} ->
+              PrimVecTypeSpec { ty      = TyApp (TyCon $ original i) []
+                              , prefix  = pfx
+                              , veclen  = n
+                              , elemrep = con ++ "ElemRep"
+                              , desc    = []
+                              , opts    = []
+                              }
           _ ->
               error "vector options can only be given for primops and primtypes"
       where
@@ -293,6 +301,7 @@ gen_hs_source (Info defaults entries) =
                   -- GHC lacks the syntax to explicitly export "->"
            hdr (PrimTypeSpec { ty = TyApp (TyCon n) _ })         = wrapOp n ++ ","
            hdr (PrimTypeSpec {})                                 = error $ "Illegal type spec"
+           hdr (PrimTypeSynSpec { synonym = n })                = wrapOp n ++ ","
            hdr (PrimVecTypeSpec { ty = TyApp (VecTyCon n _) _ }) = wrapOp n ++ ","
            hdr (PrimVecTypeSpec {})                              = error $ "Illegal type spec"
 
@@ -304,6 +313,7 @@ gen_hs_source (Info defaults entries) =
            ent o@(PrimOpSpec {})      = spec o
            ent o@(PrimVecOpSpec {})   = spec o
            ent o@(PrimTypeSpec {})    = spec o
+           ent o@(PrimTypeSynSpec {}) = spec o
            ent o@(PrimVecTypeSpec {}) = spec o
            ent o@(PseudoOpSpec {})    = spec o
 
@@ -325,6 +335,7 @@ gen_hs_source (Info defaults entries) =
                  PrimVecOpSpec { name = n, ty = t } -> prim_func n t
                  PseudoOpSpec { name = n, ty = t }  -> prim_func n t
                  PrimTypeSpec { ty = t }    -> prim_data t
+                 PrimTypeSynSpec { synonym = l, original = r } -> prim_type l r
                  PrimVecTypeSpec { ty = t } -> prim_data t
                  Section { } -> error "Section is not an entity"
              ]
@@ -360,6 +371,8 @@ gen_hs_source (Info defaults entries) =
 
            prim_data t = [ "data " ++ pprTy t ]
 
+           prim_type l r = [ "type " ++ pprTy (TyApp (TyCon l) []) ++ " = " ++ pprTy (TyApp (TyCon r) []) ]
+
            unlatex s = case s of
                 '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
                 '{':'\\':'t':'e':'x':'t':'t':'t':' ':cs -> markup "@" "@" cs
@@ -382,6 +395,7 @@ getName PrimOpSpec{ name = n } = Just n
 getName PrimVecOpSpec{ name = n } = Just n
 getName PseudoOpSpec{ name = n } = Just n
 getName PrimTypeSpec{ ty = TyApp tc _ } = Just (show tc)
+getName PrimTypeSynSpec{ synonym = n } = Just n
 getName _ = Nothing
 
 {- Note [Placeholder declarations]
