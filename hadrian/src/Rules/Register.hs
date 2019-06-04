@@ -1,7 +1,11 @@
-module Rules.Register (configurePackageRules, registerPackageRules) where
+module Rules.Register (
+    configurePackageRules, registerPackageRules, registerPackages,
+    libraryTargets
+    ) where
 
 import Base
 import Context
+import Expression ( getContextData )
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -12,7 +16,9 @@ import Rules.Rts
 import Settings
 import Target
 import Utilities
-import Rules.Library
+
+import Hadrian.Haskell.Cabal.Type
+import qualified Text.Parsec      as Parsec
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
@@ -21,7 +27,6 @@ import qualified Distribution.Types.PackageId as Cabal
 
 import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 import qualified System.Directory            as IO
-import qualified Text.Parsec                 as Parsec
 
 -- * Configuring
 
@@ -62,6 +67,15 @@ parseToBuildSubdirectory root = do
     return (stage, pkgPath)
 
 -- * Registering
+
+registerPackages :: [Context] -> Action ()
+registerPackages ctxs = do
+    need =<< mapM pkgRegisteredLibraryFile ctxs
+
+    -- | Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
+    forM_ ctxs $ \ ctx -> when (package ctx == rts) $ do
+        ways <- interpretInContext ctx (getLibraryWays <> getRtsWays)
+        needRtsSymLinks (stage ctx) ways
 
 -- | Register a package and initialise the corresponding package database if
 -- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
@@ -118,9 +132,6 @@ buildConf _ context@Context {..} conf = do
     Cabal.copyPackage context
     Cabal.registerPackage context
 
-    -- | Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
-    when (package == rts) (needRtsSymLinks stage ways)
-
     -- The above two steps produce an entry in the package database, with copies
     -- of many of the files we have build, e.g. Haskell interface files. We need
     -- to record this side effect so that Shake can cache these files too.
@@ -171,3 +182,25 @@ parseCabalName = fmap f . Cabal.eitherParsec
   where
     f :: Cabal.PackageId -> (String, Version)
     f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
+
+-- | Return extra library targets.
+extraTargets :: Context -> Action [FilePath]
+extraTargets context
+    | package context == rts  = needRtsLibffiTargets (Context.stage context)
+    | otherwise               = return []
+
+-- | Given a library 'Package' this action computes all of its targets. Needing
+-- all the targets should build the library such that it is ready to be
+-- registered into the package database.
+-- See 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
+libraryTargets :: Bool -> Context -> Action [FilePath]
+libraryTargets includeGhciLib context@Context {..} = do
+    libFile  <- pkgLibraryFile     context
+    ghciLib  <- pkgGhciLibraryFile context
+    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
+                then interpretInContext context $ getContextData buildGhciLib
+                else return False
+    extra    <- extraTargets context
+    return $ [ libFile ]
+          ++ [ ghciLib | ghci ]
+          ++ extra
