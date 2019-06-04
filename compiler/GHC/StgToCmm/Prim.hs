@@ -1060,10 +1060,14 @@ emitPrimOp dflags primop = case primop of
 
 -- The rest just translate straightforwardly
 
-  IntToWordOp     -> \args -> opNop args
-  WordToIntOp     -> \args -> opNop args
-  IntToAddrOp     -> \args -> opNop args
-  AddrToIntOp     -> \args -> opNop args
+  Int64ToWord64Op -> \args -> opNop args
+  Word64ToInt64Op -> \args -> opNop args
+  Int32ToWord32Op -> \args -> opNop args
+  Word32ToInt32Op -> \args -> opNop args
+  IntToWordOp      -> \args -> opNop args
+  WordToIntOp      -> \args -> opNop args
+  IntToAddrOp      -> \args -> opNop args
+  AddrToIntOp      -> \args -> opNop args
   ChrOp           -> \args -> opNop args  -- Int# and Char# are rep'd the same
   OrdOp           -> \args -> opNop args
 
@@ -1128,12 +1132,12 @@ emitPrimOp dflags primop = case primop of
   AddrEqOp       -> \args -> opTranslate args (mo_wordEq platform)
   AddrNeOp       -> \args -> opTranslate args (mo_wordNe platform)
 
-  AndOp          -> \args -> opTranslate args (mo_wordAnd platform)
-  OrOp           -> \args -> opTranslate args (mo_wordOr platform)
-  XorOp          -> \args -> opTranslate args (mo_wordXor platform)
-  NotOp          -> \args -> opTranslate args (mo_wordNot platform)
-  SllOp          -> \args -> opTranslate args (mo_wordShl platform)
-  SrlOp          -> \args -> opTranslate args (mo_wordUShr platform)
+  WordAndOp      -> \args -> opTranslate args (mo_wordAnd platform)
+  WordOrOp       -> \args -> opTranslate args (mo_wordOr platform)
+  WordXorOp      -> \args -> opTranslate args (mo_wordXor platform)
+  WordNotOp      -> \args -> opTranslate args (mo_wordNot platform)
+  WordSllOp      -> \args -> opTranslate args (mo_wordShl platform)
+  WordSrlOp      -> \args -> opTranslate args (mo_wordUShr platform)
 
   AddrRemOp      -> \args -> opTranslate args (mo_wordURem platform)
 
@@ -1150,13 +1154,13 @@ emitPrimOp dflags primop = case primop of
   IntGtOp        -> \args -> opTranslate args (mo_wordSGt platform)
   IntLtOp        -> \args -> opTranslate args (mo_wordSLt platform)
 
-  AndIOp         -> \args -> opTranslate args (mo_wordAnd platform)
-  OrIOp          -> \args -> opTranslate args (mo_wordOr platform)
-  XorIOp         -> \args -> opTranslate args (mo_wordXor platform)
-  NotIOp         -> \args -> opTranslate args (mo_wordNot platform)
-  ISllOp         -> \args -> opTranslate args (mo_wordShl platform)
-  ISraOp         -> \args -> opTranslate args (mo_wordSShr platform)
-  ISrlOp         -> \args -> opTranslate args (mo_wordUShr platform)
+  IntAndOp       -> \args -> opTranslate args (mo_wordAnd platform)
+  IntOrOp        -> \args -> opTranslate args (mo_wordOr platform)
+  IntXorOp       -> \args -> opTranslate args (mo_wordXor platform)
+  IntNotOp       -> \args -> opTranslate args (mo_wordNot platform)
+  IntSllOp       -> \args -> opTranslate args (mo_wordShl platform)
+  IntSraOp       -> \args -> opTranslate args (mo_wordSShr platform)
+  IntSrlOp       -> \args -> opTranslate args (mo_wordUShr platform)
 
 -- Native word unsigned ops
 
@@ -1176,8 +1180,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int8# signed ops
 
-  Int8Extend     -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
-  Int8Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
+  Int8ToInt      -> \args -> opTranslate args (MO_SS_Conv W8 (wordWidth platform))
+  IntToInt8      -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W8)
   Int8NegOp      -> \args -> opTranslate args (MO_S_Neg W8)
   Int8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Int8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1194,8 +1198,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
-  Word8Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
+  Word8ToWord     -> \args -> opTranslate args (MO_UU_Conv W8 (wordWidth platform))
+  WordToWord8     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W8)
   Word8NotOp      -> \args -> opTranslate args (MO_Not W8)
   Word8AddOp      -> \args -> opTranslate args (MO_Add W8)
   Word8SubOp      -> \args -> opTranslate args (MO_Sub W8)
@@ -1212,8 +1216,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Int16# signed ops
 
-  Int16Extend     -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
-  Int16Narrow     -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
+  Int16ToInt      -> \args -> opTranslate args (MO_SS_Conv W16 (wordWidth platform))
+  IntToInt16      -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W16)
   Int16NegOp      -> \args -> opTranslate args (MO_S_Neg W16)
   Int16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Int16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1230,8 +1234,8 @@ emitPrimOp dflags primop = case primop of
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
-  Word16Narrow     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
+  Word16ToWord     -> \args -> opTranslate args (MO_UU_Conv W16 (wordWidth platform))
+  WordToWord16     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W16)
   Word16NotOp      -> \args -> opTranslate args (MO_Not W16)
   Word16AddOp      -> \args -> opTranslate args (MO_Add W16)
   Word16SubOp      -> \args -> opTranslate args (MO_Sub W16)
@@ -1245,6 +1249,98 @@ emitPrimOp dflags primop = case primop of
   Word16LeOp       -> \args -> opTranslate args (MO_U_Le W16)
   Word16LtOp       -> \args -> opTranslate args (MO_U_Lt W16)
   Word16NeOp       -> \args -> opTranslate args (MO_Ne W16)
+
+-- Int32# signed ops
+
+  Int32ToInt      -> \args -> opTranslate args (MO_SS_Conv W32 (wordWidth platform))
+  IntToInt32      -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W32)
+  Int32NegOp      -> \args -> opTranslate args (MO_S_Neg W32)
+  Int32AddOp      -> \args -> opTranslate args (MO_Add W32)
+  Int32SubOp      -> \args -> opTranslate args (MO_Sub W32)
+  Int32MulOp      -> \args -> opTranslate args (MO_Mul W32)
+  Int32QuotOp     -> \args -> opTranslate args (MO_S_Quot W32)
+  Int32RemOp      -> \args -> opTranslate args (MO_S_Rem W32)
+
+  Int32SllOp      -> \args -> opTranslate args (MO_Shl W32)
+  Int32SraOp      -> \args -> opTranslate args (MO_S_Shr W32)
+  Int32SrlOp      -> \args -> opTranslate args (MO_U_Shr W32)
+
+  Int32EqOp       -> \args -> opTranslate args (MO_Eq W32)
+  Int32GeOp       -> \args -> opTranslate args (MO_S_Ge W32)
+  Int32GtOp       -> \args -> opTranslate args (MO_S_Gt W32)
+  Int32LeOp       -> \args -> opTranslate args (MO_S_Le W32)
+  Int32LtOp       -> \args -> opTranslate args (MO_S_Lt W32)
+  Int32NeOp       -> \args -> opTranslate args (MO_Ne W32)
+
+-- Word32# unsigned ops
+
+  Word32ToWord     -> \args -> opTranslate args (MO_UU_Conv W32 (wordWidth platform))
+  WordToWord32     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W32)
+  Word32AddOp      -> \args -> opTranslate args (MO_Add W32)
+  Word32SubOp      -> \args -> opTranslate args (MO_Sub W32)
+  Word32MulOp      -> \args -> opTranslate args (MO_Mul W32)
+  Word32QuotOp     -> \args -> opTranslate args (MO_U_Quot W32)
+  Word32RemOp      -> \args -> opTranslate args (MO_U_Rem W32)
+
+  Word32AndOp      -> \args -> opTranslate args (MO_And W32)
+  Word32OrOp       -> \args -> opTranslate args (MO_Or W32)
+  Word32XorOp      -> \args -> opTranslate args (MO_Xor W32)
+  Word32NotOp      -> \args -> opTranslate args (MO_Not W32)
+  Word32SllOp      -> \args -> opTranslate args (MO_Shl W32)
+  Word32SrlOp      -> \args -> opTranslate args (MO_U_Shr W32)
+
+  Word32EqOp       -> \args -> opTranslate args (MO_Eq W32)
+  Word32GeOp       -> \args -> opTranslate args (MO_U_Ge W32)
+  Word32GtOp       -> \args -> opTranslate args (MO_U_Gt W32)
+  Word32LeOp       -> \args -> opTranslate args (MO_U_Le W32)
+  Word32LtOp       -> \args -> opTranslate args (MO_U_Lt W32)
+  Word32NeOp       -> \args -> opTranslate args (MO_Ne W32)
+
+-- Int64# signed ops
+
+  Int64ToInt      -> \args -> opTranslate args (MO_SS_Conv W64 (wordWidth platform))
+  IntToInt64      -> \args -> opTranslate args (MO_SS_Conv (wordWidth platform) W64)
+  Int64NegOp      -> \args -> opTranslate args (MO_S_Neg W64)
+  Int64AddOp      -> \args -> opTranslate args (MO_Add W64)
+  Int64SubOp      -> \args -> opTranslate args (MO_Sub W64)
+  Int64MulOp      -> \args -> opTranslate args (MO_Mul W64)
+  Int64QuotOp     -> \args -> opTranslate args (MO_S_Quot W64)
+  Int64RemOp      -> \args -> opTranslate args (MO_S_Rem W64)
+
+  Int64SllOp      -> \args -> opTranslate args (MO_Shl W64)
+  Int64SraOp      -> \args -> opTranslate args (MO_S_Shr W64)
+  Int64SrlOp      -> \args -> opTranslate args (MO_U_Shr W64)
+
+  Int64EqOp       -> \args -> opTranslate args (MO_Eq W64)
+  Int64GeOp       -> \args -> opTranslate args (MO_S_Ge W64)
+  Int64GtOp       -> \args -> opTranslate args (MO_S_Gt W64)
+  Int64LeOp       -> \args -> opTranslate args (MO_S_Le W64)
+  Int64LtOp       -> \args -> opTranslate args (MO_S_Lt W64)
+  Int64NeOp       -> \args -> opTranslate args (MO_Ne W64)
+
+-- Word64# unsigned ops
+
+  Word64ToWord     -> \args -> opTranslate args (MO_UU_Conv W64 (wordWidth platform))
+  WordToWord64     -> \args -> opTranslate args (MO_UU_Conv (wordWidth platform) W64)
+  Word64AddOp      -> \args -> opTranslate args (MO_Add W64)
+  Word64SubOp      -> \args -> opTranslate args (MO_Sub W64)
+  Word64MulOp      -> \args -> opTranslate args (MO_Mul W64)
+  Word64QuotOp     -> \args -> opTranslate args (MO_U_Quot W64)
+  Word64RemOp      -> \args -> opTranslate args (MO_U_Rem W64)
+
+  Word64AndOp      -> \args -> opTranslate args (MO_And W64)
+  Word64OrOp       -> \args -> opTranslate args (MO_Or W64)
+  Word64XorOp      -> \args -> opTranslate args (MO_Xor W64)
+  Word64NotOp      -> \args -> opTranslate args (MO_Not W64)
+  Word64SllOp      -> \args -> opTranslate args (MO_Shl W64)
+  Word64SrlOp      -> \args -> opTranslate args (MO_U_Shr W64)
+
+  Word64EqOp       -> \args -> opTranslate args (MO_Eq W64)
+  Word64GeOp       -> \args -> opTranslate args (MO_U_Ge W64)
+  Word64GtOp       -> \args -> opTranslate args (MO_U_Gt W64)
+  Word64LeOp       -> \args -> opTranslate args (MO_U_Le W64)
+  Word64LtOp       -> \args -> opTranslate args (MO_U_Lt W64)
+  Word64NeOp       -> \args -> opTranslate args (MO_Ne W64)
 
 -- Char# ops
 
@@ -1351,6 +1447,16 @@ emitPrimOp dflags primop = case primop of
     then Left (MO_S_QuotRem W16)
     else Right (genericIntQuotRemOp W16)
 
+  Int32QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W32)
+    else Right (genericIntQuotRemOp W32)
+
+  Int64QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W64)
+    else Right (genericIntQuotRemOp W64)
+
   WordQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem  (wordWidth platform))
@@ -1370,6 +1476,16 @@ emitPrimOp dflags primop = case primop of
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W16)
     else Right (genericWordQuotRemOp W16)
+
+  Word32QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W32)
+    else Right (genericWordQuotRemOp W32)
+
+  Word64QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W64)
+    else Right (genericWordQuotRemOp W64)
 
   WordAdd2Op -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm

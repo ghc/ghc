@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
+             MultiParamTypeClasses, RoleAnnotations, TypeOperators,
              PolyKinds, NegativeLiterals, DataKinds #-}
 -- NegativeLiterals: see Note [Fixity of (->)]
 -----------------------------------------------------------------------------
@@ -496,8 +496,6 @@ or Module (for example when deserialising a TypeRep), in which case we
 can't conveniently come up with an Addr#.
 -}
 
-#include "MachDeps.h"
-
 data Module = Module
                 TrName   -- ^ Package name
                 TrName   -- ^ Module name
@@ -508,12 +506,6 @@ data TrName
 
 -- | A de Bruijn index for a binder within a 'KindRep'.
 type KindBndr = Int
-
-#if WORD_SIZE_IN_BITS < 64
-#define WORD64_TY Word64#
-#else
-#define WORD64_TY Word#
-#endif
 
 -- | The representation produced by GHC for conjuring up the kind of a
 -- 'Data.Typeable.TypeRep'.
@@ -531,8 +523,8 @@ data TypeLitSort = TypeLitSymbol
                  | TypeLitNat
 
 -- Show instance for TyCon found in GHC.Show
-data TyCon = TyCon WORD64_TY  -- ^ Fingerprint (high)
-                   WORD64_TY  -- ^ Fingerprint (low)
+data TyCon = TyCon Word64#    -- ^ Fingerprint (high)
+                   Word64#    -- ^ Fingerprint (low)
                    Module     -- ^ Module in which this is defined
                    TrName     -- ^ Type constructor name
                    Int#       -- ^ How many kind variables do we accept?
