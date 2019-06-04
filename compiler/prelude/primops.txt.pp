@@ -394,6 +394,27 @@ primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
 
+#if WORD_SIZE_IN_BITS < 64
+------------------------------------------------------------------------
+section "Int64#"
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
+------------------------------------------------------------------------
+
+primtype Int64#
+
+------------------------------------------------------------------------
+section "Word64#"
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
+------------------------------------------------------------------------
+
+primtype Word64#
+
+#endif
+
 ------------------------------------------------------------------------
 section "Int#"
         {Operations on native-size integers (32+ bits).}
@@ -717,28 +738,6 @@ primop   Narrow32IntOp     "narrow32Int#"     Monadic   Int# -> Int#
 primop   Narrow8WordOp     "narrow8Word#"     Monadic   Word# -> Word#
 primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
-
-
-#if WORD_SIZE_IN_BITS < 64
-------------------------------------------------------------------------
-section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Int64#
-
-------------------------------------------------------------------------
-section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Word64#
-
-#endif
 
 ------------------------------------------------------------------------
 section "Double#"
