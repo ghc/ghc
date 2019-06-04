@@ -212,6 +212,10 @@ test('PrimFFIInt16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'
 
 test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
 
+test('PrimFFIInt32', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt32_c.c'])
+
+test('PrimFFIWord32', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord32_c.c'])
+
 test('T493', [omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
 
 test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])

@@ -214,18 +214,16 @@ section "The word size story."
          represented as {\tt Int\#} and {\tt Word\#}, and the
          operations implemented in terms of the primops on these
          types, with suitable range restrictions on the results (using
-         the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families
-         of primops.  The 32-bit sizes are represented using {\tt
-         Int\#} and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS}
-         $\geq$ 32; otherwise, these are represented using distinct
-         primitive types {\tt Int32\#} and {\tt Word32\#}. These (when
-         needed) have a complete set of corresponding operations;
-         however, nearly all of these are implemented as external C
-         functions rather than as primops.  Exactly the same story
-         applies to the 64-bit sizes.  All of these details are hidden
+         the {\tt narrow$n$Int\#} and {\tt narrow$n$Word\#} families of
+         primops.  The 64-bit sizes are represented using {\tt Int\#}
+         and {\tt Word\#} when {\tt WORD\_SIZE\_IN\_BITS} $\geq$ 64;
+         otherwise, these are represented using distinct primitive
+         types {\tt Int64\#} and {\tt Word64\#}. These (when needed)
+         have a complete set of corresponding operations; however,
+         nearly all of these are implemented as external C functions
+         rather than as primops.  All of these details are hidden
          under the {\tt PrelInt} and {\tt PrelWord} modules, which use
-         {\tt \#if}-defs to invoke the appropriate types and
-         operators.
+         {\tt \#if}-defs to invoke the appropriate types and operators.
 
          Word size also matters for the families of primops for
          indexing/reading/writing fixed-size quantities at offsets
@@ -458,15 +456,99 @@ primtype Int32#
 primop Int32ToIntOp "extendInt32#" GenPrimOp Int32# -> Int#
 primop IntToInt32Op "narrowInt32#" GenPrimOp Int# -> Int32#
 
+primop Int32NegOp "negateInt32#" GenPrimOp Int32# -> Int32#
+
+primop Int32AddOp "plusInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    commutable = True
+
+primop Int32SubOp "subInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+
+primop Int32MulOp "timesInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    commutable = True
+
+primop Int32QuotOp "quotInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    can_fail = True
+
+primop Int32RemOp "remInt32#" GenPrimOp Int32# -> Int32# -> Int32#
+  with
+    can_fail = True
+
+primop Int32QuotRemOp "quotRemInt32#" GenPrimOp Int32# -> Int32# -> (# Int32#, Int32# #)
+  with
+    can_fail = True
+
+primop Int32SllOp "uncheckedShiftLInt32#"  GenPrimOp Int32# -> Int# -> Int32#
+primop Int32SraOp "uncheckedShiftRAInt32#" GenPrimOp Int32# -> Int# -> Int32#
+primop Int32SrlOp "uncheckedShiftRLInt32#" GenPrimOp Int32# -> Int# -> Int32#
+
+primop Int32ToWord32Op "int32ToWord32#" GenPrimOp Int32# -> Word32#
+   with code_size = 0
+
+primop Int32EqOp "eqInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32GeOp "geInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32GtOp "gtInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32LeOp "leInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32LtOp "ltInt32#" Compare Int32# -> Int32# -> Int#
+primop Int32NeOp "neInt32#" Compare Int32# -> Int32# -> Int#
+
 ------------------------------------------------------------------------
 section "Word32#"
-        {Operations on 32-bit unsigned integers.}
+        {Operations on 32-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word32#
 
 primop Word32ToWordOp "extendWord32#" GenPrimOp Word32# -> Word#
 primop WordToWord32Op "narrowWord32#" GenPrimOp Word# -> Word32#
+
+primop Word32AddOp "plusWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    commutable = True
+
+primop Word32SubOp "subWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+
+primop Word32MulOp "timesWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    commutable = True
+
+primop Word32QuotOp "quotWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    can_fail = True
+
+primop Word32RemOp "remWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+  with
+    can_fail = True
+
+primop Word32QuotRemOp "quotRemWord32#" GenPrimOp Word32# -> Word32# -> (# Word32#, Word32# #)
+  with
+    can_fail = True
+
+primop Word32AndOp "andWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32OrOp "orWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32XorOp "xorWord32#" GenPrimOp Word32# -> Word32# -> Word32#
+   with commutable = True
+
+primop Word32NotOp "not32Word#" GenPrimOp Word32# -> Word32#
+
+primop Word32SllOp "uncheckedShiftLWord32#"  GenPrimOp Word32# -> Int# -> Word32#
+primop Word32SrlOp "uncheckedShiftRLWord32#" GenPrimOp Word32# -> Int# -> Word32#
+
+primop Word32ToInt32Op "word32ToInt32#" GenPrimOp Word32# -> Int32#
+   with code_size = 0
+
+primop Word32EqOp "eqWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32GeOp "geWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32GtOp "gtWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32LeOp "leWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32LtOp "ltWord32#" Compare Word32# -> Word32# -> Int#
+primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
 
 #if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------

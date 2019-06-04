@@ -74,7 +74,7 @@ data Platform = Platform
 data PlatformWordSize
   = PW4 -- ^ A 32-bit platform
   | PW8 -- ^ A 64-bit platform
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show PlatformWordSize where
   show PW4 = "4"
