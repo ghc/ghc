@@ -33,14 +33,12 @@ hs_atomic_add32(StgWord x, StgWord val)
   return __sync_fetch_and_add((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_add64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_add64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_add((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchSubByteArrayOp_Int
 
@@ -65,14 +63,12 @@ hs_atomic_sub32(StgWord x, StgWord val)
   return __sync_fetch_and_sub((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_sub64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_sub64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_sub((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchAndByteArrayOp_Int
 
@@ -97,14 +93,12 @@ hs_atomic_and32(StgWord x, StgWord val)
   return __sync_fetch_and_and((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_and64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_and64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_and((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchNandByteArrayOp_Int
 
@@ -207,7 +201,6 @@ hs_atomic_nand32(StgWord x, StgWord val)
 #endif
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(StgWord x, StgWord64 val)
@@ -218,7 +211,6 @@ hs_atomic_nand64(StgWord x, StgWord64 val)
   CAS_NAND((volatile StgWord64 *) x, val);
 #endif
 }
-#endif
 
 #pragma GCC diagnostic pop
 
@@ -245,14 +237,12 @@ hs_atomic_or32(StgWord x, StgWord val)
   return __sync_fetch_and_or((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_or64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_or64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_or((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchXorByteArrayOp_Int
 
@@ -277,14 +267,12 @@ hs_atomic_xor32(StgWord x, StgWord val)
   return __sync_fetch_and_xor((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_xor64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_xor((volatile StgWord64 *) x, val);
 }
-#endif
 
 // CasByteArrayOp_Int
 
@@ -309,14 +297,12 @@ hs_cmpxchg32(StgWord x, StgWord old, StgWord new)
   return __sync_val_compare_and_swap((volatile StgWord32 *) x, (StgWord32) old, (StgWord32) new);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new);
 StgWord
 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 {
   return __sync_val_compare_and_swap((volatile StgWord64 *) x, old, new);
 }
-#endif
 
 // Atomic exchange operations
 
