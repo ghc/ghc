@@ -25,14 +25,10 @@ module GHC.Integer (
 
     -- * Construct 'Integer's
     mkInteger, smallInteger, wordToInteger,
-#if WORD_SIZE_IN_BITS < 64
     word64ToInteger, int64ToInteger,
-#endif
     -- * Conversion to other integral types
     integerToWord, integerToInt,
-#if WORD_SIZE_IN_BITS < 64
     integerToWord64, integerToInt64,
-#endif
 
     -- * Helpers for 'RealFloat' type-class operations
     encodeFloatInteger, floatFromInteger,
