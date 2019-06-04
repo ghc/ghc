@@ -1507,7 +1507,8 @@ gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
     eqDouble_RDR, ltDouble_RDR, geDouble_RDR, gtDouble_RDR, leDouble_RDR,
     word8ToWord_RDR , int8ToInt_RDR ,
     word16ToWord_RDR, int16ToInt_RDR,
-    word32ToWord_RDR, int32ToInt_RDR
+    word32ToWord_RDR, int32ToInt_RDR,
+    word64ToWord_RDR, int64ToInt_RDR
     :: RdrName
 gfoldl_RDR     = varQual_RDR  gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR  gENERICS (fsLit "gunfold")
@@ -1617,6 +1618,9 @@ int16ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int16ToInt#")
 
 word32ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word32ToWord#")
 int32ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int32ToInt#")
+
+word64ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word64ToWord#")
+int64ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int64ToInt#")
 
 {-
 ************************************************************************
@@ -2428,6 +2432,12 @@ boxConTbl =
     , (word32PrimTy,
         nlHsApp (nlHsVar $ getRdrName wordDataCon)
         . nlHsApp (nlHsVar word32ToWord_RDR))
+    , (int64PrimTy,
+        nlHsApp (nlHsVar $ getRdrName intDataCon)
+        . nlHsApp (nlHsVar int64ToInt_RDR))
+    , (word64PrimTy,
+        nlHsApp (nlHsVar $ getRdrName wordDataCon)
+        . nlHsApp (nlHsVar word64ToWord_RDR))
     ]
 
 
@@ -2455,6 +2465,8 @@ primConvTbl =
     , (word16PrimTy, "wordToWord16#")
     , (int32PrimTy, "intToInt32#")
     , (word32PrimTy, "wordToWord32#")
+    , (int64PrimTy, "intToInt64#")
+    , (word64PrimTy, "wordToWord64#")
     ]
 
 litConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]

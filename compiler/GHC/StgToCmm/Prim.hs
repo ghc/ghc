@@ -1500,6 +1500,11 @@ emitPrimOp dflags primop = case primop of
     then Left (MO_S_QuotRem W32)
     else Right (genericIntQuotRemOp W32)
 
+  Int64QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W64)
+    else Right (genericIntQuotRemOp W64)
+
   WordQuotRemOp -> \args -> opCallishHandledLater args $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem  (wordWidth platform))
@@ -1524,6 +1529,11 @@ emitPrimOp dflags primop = case primop of
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W32)
     else Right (genericWordQuotRemOp W32)
+
+  Word64QuotRemOp -> \args -> opCallishHandledLater args $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W64)
+    else Right (genericWordQuotRemOp W64)
 
   WordAdd2Op -> \args -> opCallishHandledLater args $
     if (ncg && (x86ish || ppc)) || llvm

@@ -584,9 +584,7 @@ primop Word32NeOp "neWord32#" Compare Word32# -> Word32# -> Int#
 
 ------------------------------------------------------------------------
 section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit integers.}
 ------------------------------------------------------------------------
 
 primtype Int64#
@@ -614,6 +612,10 @@ primop Int64RemOp "remInt64#" GenPrimOp Int64# -> Int64# -> Int64#
   with
     can_fail = True
 
+primop Int64QuotRemOp "quotRemInt64#" GenPrimOp Int64# -> Int64# -> (# Int64#, Int64# #)
+  with
+    can_fail = True
+
 primop Int64SllOp "uncheckedIShiftL64#"  GenPrimOp Int64# -> Int# -> Int64#
 primop Int64SraOp "uncheckedIShiftRA64#" GenPrimOp Int64# -> Int# -> Int64#
 primop Int64SrlOp "uncheckedIShiftRL64#" GenPrimOp Int64# -> Int# -> Int64#
@@ -630,9 +632,7 @@ primop Int64NeOp "neInt64#" Compare Int64# -> Int64# -> Int#
 
 ------------------------------------------------------------------------
 section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word64#
@@ -655,6 +655,10 @@ primop Word64QuotOp "quotWord64#" GenPrimOp Word64# -> Word64# -> Word64#
     can_fail = True
 
 primop Word64RemOp "remWord64#" GenPrimOp Word64# -> Word64# -> Word64#
+  with
+    can_fail = True
+
+primop Word64QuotRemOp "quotRemWord64#" GenPrimOp Word64# -> Word64# -> (# Word64#, Word64# #)
   with
     can_fail = True
 

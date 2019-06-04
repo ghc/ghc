@@ -51,9 +51,9 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, divInt8#, divInt16#, divInt32#,
-    modInt#, modInt8#, modInt16#, modInt32#,
-    divModInt#, divModInt8#, divModInt16#, divModInt32#
+    divInt#, divInt8#, divInt16#, divInt32#, divInt64#,
+    modInt#, modInt8#, modInt16#, modInt32#, modInt64#,
+    divModInt#, divModInt8#, divModInt16#, divModInt32#, divModInt64#
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -585,6 +585,21 @@ x# `divInt32#` y# = ((x# `plusInt32#` bias#) `quotInt32#` y#) `subInt32#` hard#
       !bias# = c0# `subInt32#` c1#
       !hard# = c0# `orInt32#` c1#
 
+{-# INLINE [0] divInt64# #-}
+divInt64# :: Int64# -> Int64# -> Int64#
+x# `divInt64#` y# = ((x# `plusInt64#` bias#) `quotInt64#` y#) `subInt64#` hard#
+   where
+      zero# = intToInt64# 0#
+      x `andInt64#` y = word64ToInt64# (int64ToWord64# x `and64#` int64ToWord64# y)
+      x `orInt64#` y = word64ToInt64# (int64ToWord64# x `or64#` int64ToWord64# y)
+      notInt64# x = word64ToInt64# (not64# (int64ToWord64# x))
+      -- See Note [divInt# implementation]
+      !yn#   = intToInt64# (y# `ltInt64#` zero#)
+      !c0#   = intToInt64# (x# `ltInt64#` zero#) `andInt64#` (notInt64# yn#)
+      !c1#   = intToInt64# (x# `gtInt64#` zero#) `andInt64#` yn#
+      !bias# = c0# `subInt64#` c1#
+      !hard# = c0# `orInt64#` c1#
+
 -- Note [divInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -703,6 +718,22 @@ x# `modInt32#` y# = r# `plusInt32#` k#
     !k#  = s# `andInt32#` y#
     !r#  = x# `remInt32#` y#
 
+{-# INLINE [0] modInt64# #-}
+modInt64# :: Int64# -> Int64# -> Int64#
+x# `modInt64#` y# = r# `plusInt64#` k#
+  where
+    zero# = intToInt64# 0#
+    x `andInt64#` y = word64ToInt64# (int64ToWord64# x `and64#` int64ToWord64# y)
+    x `orInt64#` y = word64ToInt64# (int64ToWord64# x `or64#` int64ToWord64# y)
+    notInt64# x = word64ToInt64# (not64# (int64ToWord64# x))
+    -- See Note [modInt# implementation]
+    !yn# = intToInt64# (y# `ltInt64#` zero#)
+    !c0# = intToInt64# (x# `ltInt64#` zero#) `andInt64#` (notInt64# yn#)
+    !c1# = intToInt64# (x# `gtInt64#` zero#) `andInt64#` yn#
+    !s#  = zero# `subInt64#` ((c0# `orInt64#` c1#) `andInt64#` (intToInt64# (r# `neInt64#` zero#)))
+    !k#  = s# `andInt64#` y#
+    !r#  = x# `remInt64#` y#
+
 -- Note [modInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -820,6 +851,24 @@ x# `divModInt32#` y# = case (x# `plusInt32#` bias#) `quotRemInt32#` y# of
     !hard# = c0# `orInt32#` c1#
     !s#    = zero# `subInt32#` hard#
     !k#    = (s# `andInt32#` y#) `subInt32#` bias#
+
+{-# INLINE [0] divModInt64# #-}
+divModInt64# :: Int64# -> Int64# -> (# Int64#, Int64# #)
+x# `divModInt64#` y# = case (x# `plusInt64#` bias#) `quotRemInt64#` y# of
+  (# q#, r# #) -> (# q# `subInt64#` hard#, r# `plusInt64#` k# #)
+  where
+    zero# = intToInt64# 0#
+    x `andInt64#` y = word64ToInt64# (int64ToWord64# x `and64#` int64ToWord64# y)
+    x `orInt64#` y = word64ToInt64# (int64ToWord64# x `or64#` int64ToWord64# y)
+    notInt64# x = word64ToInt64# (not64# (int64ToWord64# x))
+    -- See Note [divModInt# implementation]
+    !yn#   = intToInt64# (y# `ltInt64#` zero#)
+    !c0#   = intToInt64# (x# `ltInt64#` zero#) `andInt64#` (notInt64# yn#)
+    !c1#   = intToInt64# (x# `gtInt64#` zero#) `andInt64#` yn#
+    !bias# = c0# `subInt64#` c1#
+    !hard# = c0# `orInt64#` c1#
+    !s#    = zero# `subInt64#` hard#
+    !k#    = (s# `andInt64#` y#) `subInt64#` bias#
 
 -- Note [divModInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

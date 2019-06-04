@@ -57,16 +57,16 @@ T9509:
 
 T13317:
 	$(RM) -f T13317.o T13317.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl-stats T13317.hs | grep 'KnownBranch'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl-stats T13317.hs | grep 'KnownBranch'
 
 T13367:
 	$(RM) -f T13317.o T13317.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T13367.hs | grep 'foo'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-ticks T13367.hs | grep 'foo'
         # There should be only one copy of the string "foo"#
 
 T8832:
 	$(RM) -f T8832.o T8832.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl -dsuppress-ticks T8832.hs | grep '^[a-zA-Z0-9]\+ ='
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-ticks T8832.hs | grep '^[a-zA-Z0-9]\+ ='
 
 T12603:
 	$(RM) -f T12603.o T12603.hi
