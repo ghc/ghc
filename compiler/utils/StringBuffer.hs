@@ -51,7 +51,7 @@ import GhcPrelude
 import Encoding
 import FastString
 import FastFunctions
-import Outputable
+import PlainPanic
 import Util
 
 import Data.Maybe

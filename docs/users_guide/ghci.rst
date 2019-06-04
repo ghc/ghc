@@ -3308,11 +3308,14 @@ The interpreter can't load modules with foreign export declarations!
     need to go fast, rather than interpreting them with optimisation
     turned on.
 
-Unboxed tuples don't work with GHCi
-    That's right. You can always compile a module that uses unboxed
-    tuples and load it into GHCi, however. (Incidentally the previous
-    point, namely that :ghc-flag:`-O` is incompatible with GHCi, is because the
-    bytecode compiler can't deal with unboxed tuples).
+Modules using unboxed tuples will automatically enable `-fobject-code`
+    The interpreter doesn't support unboxed tuples, so GHCi will
+    automatically compile these modules, and all modules they depend
+    on, to object code instead of bytecode.
+
+    Incidentally, the previous point, that :ghc-flag:`-O` is
+    incompatible with GHCi, is because the bytecode compiler can't
+    deal with unboxed tuples.
 
 Concurrent threads don't carry on running when GHCi is waiting for input.
     This should work, as long as your GHCi was built with the
