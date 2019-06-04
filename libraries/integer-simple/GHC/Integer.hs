@@ -20,10 +20,8 @@
 module GHC.Integer (
     Integer, mkInteger,
     smallInteger, wordToInteger, integerToWord, integerToInt,
-#if WORD_SIZE_IN_BITS < 64
     integerToWord64, word64ToInteger,
     integerToInt64, int64ToInteger,
-#endif
     plusInteger, minusInteger, timesInteger, negateInteger,
     eqInteger, neqInteger, absInteger, signumInteger,
     leInteger, gtInteger, ltInteger, geInteger, compareInteger,
