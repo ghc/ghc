@@ -64,7 +64,7 @@ isNvUnaryType ty
   = False
 
 -- INVARIANT: the result list is never empty.
-typePrimRepArgs :: Type -> [PrimRep]
+typePrimRepArgs :: HasDebugCallStack => Type -> [PrimRep]
 typePrimRepArgs ty
   | [] <- reps
   = [VoidRep]
