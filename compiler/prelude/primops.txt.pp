@@ -44,7 +44,7 @@
 --
 -- type refers to the general category of the primop. Valid settings include,
 --
---  * Compare:   A comparison operation of the shape a -> a -> Int#
+--  * Compare:   A comparison operation of the shape a -> a -> INT
 --  * Monadic:   A unary operation of shape a -> a
 --  * Dyadic:    A binary operation of shape a -> a -> a
 --  * GenPrimOp: Any other sort of primop
@@ -56,14 +56,14 @@
 -- SCALAR_TYPE is the scalar type used to inject to/project from vector
 -- element. Note that ELEM_TYPE and SCALAR_TYPE are not the same; for example,
 -- to broadcast a scalar value to a vector whose elements are of type Int8, we
--- use an Int#.
+-- use an INT.
 
 -- When a primtype or primop has a vector attribute, it is instantiated at each
 -- 3-tuple in the list of 3-tuples. That is, the vector attribute allows us to
 -- define a family of types or primops. Vector support also adds three new
 -- keywords: VECTOR, SCALAR, and VECTUPLE. These keywords are expanded to types
--- derived from the 3-tuple. For the 3-tuple <Int64,INT64,2>, VECTOR expands to
--- Int64X2#, SCALAR expands to INT64, and VECTUPLE expands to (# INT64, INT64
+-- derived from the 3-tuple. For the 3-tuple <Int64,Int64#,2>, VECTOR expands to
+-- Int64X2#, SCALAR expands to Int64#, and VECTUPLE expands to (# Int64#, Int64#
 -- #).
 
 defaults
@@ -147,15 +147,14 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#define INT32 Int#
-#define WORD32 Word#
-
-#if WORD_SIZE_IN_BITS < 64
-#define INT64 Int64#
-#define WORD64 Word64#
+#if WORD_SIZE_IN_BITS == 32
+#  define INT Int32#
+#  define WORD Word32#
+#elif WORD_SIZE_IN_BITS == 64
+#  define INT Int64#
+#  define WORD Word64#
 #else
-#define INT64 Int#
-#define WORD64 Word#
+#  error "Unsupported word size"
 #endif
 
 -- This type won't be exported directly (since there is no concrete
@@ -180,21 +179,21 @@ section "Char#"
 
 primtype Char#
 
-primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> Int#
-primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> Int#
+primop   CharGtOp  "gtChar#"   Compare   Char# -> Char# -> INT
+primop   CharGeOp  "geChar#"   Compare   Char# -> Char# -> INT
 
 primop   CharEqOp  "eqChar#"   Compare
-   Char# -> Char# -> Int#
+   Char# -> Char# -> INT
    with commutable = True
 
 primop   CharNeOp  "neChar#"   Compare
-   Char# -> Char# -> Int#
+   Char# -> Char# -> INT
    with commutable = True
 
-primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> Int#
-primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Int#
+primop   CharLtOp  "ltChar#"   Compare   Char# -> Char# -> INT
+primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> INT
 
-primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
+primop   OrdOp   "ord#"  GenPrimOp   Char# -> INT
    with code_size = 0
 
 ------------------------------------------------------------------------
@@ -202,24 +201,22 @@ section "Int#"
         {Operations on native-size integers (32+ bits).}
 ------------------------------------------------------------------------
 
-primtype Int#
-
 primop   IntAddOp    "+#"    Dyadic
-   Int# -> Int# -> Int#
+   INT -> INT -> INT
    with commutable = True
         fixity = infixl 6
 
-primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
+primop   IntSubOp    "-#"    Dyadic   INT -> INT -> INT
    with fixity = infixl 6
 
 primop   IntMulOp    "*#"
-   Dyadic   Int# -> Int# -> Int#
+   Dyadic   INT -> INT -> INT
    {Low word of signed integer multiply.}
    with commutable = True
         fixity = infixl 7
 
 primop   IntMulMayOfloOp  "mulIntMayOflo#"
-   Dyadic   Int# -> Int# -> Int#
+   Dyadic   INT -> INT -> INT
    {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
     zero only if you are completely sure that no overflow can occur.
@@ -243,103 +240,103 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
    with commutable = True
 
 primop   IntQuotOp    "quotInt#"    Dyadic
-   Int# -> Int# -> Int#
+   INT -> INT -> INT
    {Rounds towards zero. The behavior is undefined if the second argument is
     zero.
    }
    with can_fail = True
 
 primop   IntRemOp    "remInt#"    Dyadic
-   Int# -> Int# -> Int#
+   INT -> INT -> INT
    {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
     behavior is undefined if the second argument is zero.
    }
    with can_fail = True
 
 primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
-   Int# -> Int# -> (# Int#, Int# #)
+   INT -> INT -> (# INT, INT #)
    {Rounds towards zero.}
    with can_fail = True
 
-primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+primop   AndIOp   "andI#"   Dyadic    INT -> INT -> INT
    {Bitwise "and".}
    with commutable = True
 
-primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+primop   OrIOp   "orI#"     Dyadic    INT -> INT -> INT
    {Bitwise "or".}
    with commutable = True
 
-primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+primop   XorIOp   "xorI#"   Dyadic    INT -> INT -> INT
    {Bitwise "xor".}
    with commutable = True
 
-primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+primop   NotIOp   "notI#"   Monadic   INT -> INT
    {Bitwise "not", also known as the binary complement.}
 
-primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
+primop   IntNegOp    "negateInt#"    Monadic   INT -> INT
    {Unary negation.
-    Since the negative {\tt Int#} range extends one further than the
-    positive range, {\tt negateInt#} of the most negative number is an
-    identity operation. This way, {\tt negateInt#} is always its own inverse.}
+    Since the negative {\tt INT} range extends one further than the
+    positive range, {\tt negateINT} of the most negative number is an
+    identity operation. This way, {\tt negateINT} is always its own inverse.}
 
-primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
+primop   IntAddCOp   "addIntC#"    GenPrimOp   INT -> INT -> (# INT, INT #)
          {Add signed integers reporting overflow.
-          First member of result is the sum truncated to an {\tt Int#};
-          second member is zero if the true sum fits in an {\tt Int#},
+          First member of result is the sum truncated to an {\tt INT};
+          second member is zero if the true sum fits in an {\tt INT},
           nonzero if overflow occurred (the sum is either too large
-          or too small to fit in an {\tt Int#}).}
+          or too small to fit in an {\tt INT}).}
    with code_size = 2
         commutable = True
 
-primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
+primop   IntSubCOp   "subIntC#"    GenPrimOp   INT -> INT -> (# INT, INT #)
          {Subtract signed integers reporting overflow.
-          First member of result is the difference truncated to an {\tt Int#};
-          second member is zero if the true difference fits in an {\tt Int#},
+          First member of result is the difference truncated to an {\tt INT};
+          second member is zero if the true difference fits in an {\tt INT},
           nonzero if overflow occurred (the difference is either too large
-          or too small to fit in an {\tt Int#}).}
+          or too small to fit in an {\tt INT}).}
    with code_size = 2
 
-primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
+primop   IntGtOp  ">#"   Compare   INT -> INT -> INT
    with fixity = infix 4
 
-primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
+primop   IntGeOp  ">=#"   Compare   INT -> INT -> INT
    with fixity = infix 4
 
 primop   IntEqOp  "==#"   Compare
-   Int# -> Int# -> Int#
+   INT -> INT -> INT
    with commutable = True
         fixity = infix 4
 
 primop   IntNeOp  "/=#"   Compare
-   Int# -> Int# -> Int#
+   INT -> INT -> INT
    with commutable = True
         fixity = infix 4
 
-primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
+primop   IntLtOp  "<#"   Compare   INT -> INT -> INT
    with fixity = infix 4
 
-primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
+primop   IntLeOp  "<=#"   Compare   INT -> INT -> INT
    with fixity = infix 4
 
-primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
+primop   ChrOp   "chr#"   GenPrimOp   INT -> Char#
    with code_size = 0
 
-primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
+primop   Int2WordOp "int2Word#" GenPrimOp INT -> WORD
    with code_size = 0
 
-primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
-primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+primop   Int2FloatOp   "int2Float#"      GenPrimOp  INT -> Float#
+primop   Int2DoubleOp   "int2Double#"          GenPrimOp  INT -> Double#
 
-primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
-primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+primop   Word2FloatOp   "word2Float#"      GenPrimOp  WORD -> Float#
+primop   Word2DoubleOp   "word2Double#"          GenPrimOp  WORD -> Double#
 
-primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
+primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  INT -> INT -> INT
          {Shift left.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
+primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp INT -> INT -> INT
          {Shift right arithmetic.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
+primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp INT -> INT -> INT
          {Shift right logical.  Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
 
@@ -350,8 +347,8 @@ section "Int8#"
 
 primtype Int8#
 
-primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
-primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
+primop Int8Extend "extendInt8#" GenPrimOp Int8# -> INT
+primop Int8Narrow "narrowInt8#" GenPrimOp INT -> Int8#
 
 primop Int8NegOp "negateInt8#" Monadic Int8# -> Int8#
 
@@ -377,12 +374,12 @@ primop Int8QuotRemOp "quotRemInt8#" GenPrimOp Int8# -> Int8# -> (# Int8#, Int8# 
   with
     can_fail = True
 
-primop Int8EqOp "eqInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8GeOp "geInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8GtOp "gtInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8LeOp "leInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8LtOp "ltInt8#" Compare Int8# -> Int8# -> Int#
-primop Int8NeOp "neInt8#" Compare Int8# -> Int8# -> Int#
+primop Int8EqOp "eqInt8#" Compare Int8# -> Int8# -> INT
+primop Int8GeOp "geInt8#" Compare Int8# -> Int8# -> INT
+primop Int8GtOp "gtInt8#" Compare Int8# -> Int8# -> INT
+primop Int8LeOp "leInt8#" Compare Int8# -> Int8# -> INT
+primop Int8LtOp "ltInt8#" Compare Int8# -> Int8# -> INT
+primop Int8NeOp "neInt8#" Compare Int8# -> Int8# -> INT
 
 ------------------------------------------------------------------------
 section "Word8#"
@@ -391,8 +388,8 @@ section "Word8#"
 
 primtype Word8#
 
-primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
-primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
+primop Word8Extend "extendWord8#" GenPrimOp Word8# -> WORD
+primop Word8Narrow "narrowWord8#" GenPrimOp WORD -> Word8#
 
 primop Word8NotOp "notWord8#" Monadic Word8# -> Word8#
 
@@ -418,12 +415,12 @@ primop Word8QuotRemOp "quotRemWord8#" GenPrimOp Word8# -> Word8# -> (# Word8#, W
   with
     can_fail = True
 
-primop Word8EqOp "eqWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8GeOp "geWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8GtOp "gtWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8LeOp "leWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8LtOp "ltWord8#" Compare Word8# -> Word8# -> Int#
-primop Word8NeOp "neWord8#" Compare Word8# -> Word8# -> Int#
+primop Word8EqOp "eqWord8#" Compare Word8# -> Word8# -> INT
+primop Word8GeOp "geWord8#" Compare Word8# -> Word8# -> INT
+primop Word8GtOp "gtWord8#" Compare Word8# -> Word8# -> INT
+primop Word8LeOp "leWord8#" Compare Word8# -> Word8# -> INT
+primop Word8LtOp "ltWord8#" Compare Word8# -> Word8# -> INT
+primop Word8NeOp "neWord8#" Compare Word8# -> Word8# -> INT
 
 ------------------------------------------------------------------------
 section "Int16#"
@@ -432,8 +429,8 @@ section "Int16#"
 
 primtype Int16#
 
-primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
-primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+primop Int16Extend "extendInt16#" GenPrimOp Int16# -> INT
+primop Int16Narrow "narrowInt16#" GenPrimOp INT -> Int16#
 
 primop Int16NegOp "negateInt16#" Monadic Int16# -> Int16#
 
@@ -459,12 +456,12 @@ primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, I
   with
     can_fail = True
 
-primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16LeOp "leInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
-primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> INT
+primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> INT
+primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> INT
+primop Int16LeOp "leInt16#" Compare Int16# -> Int16# -> INT
+primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> INT
+primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> INT
 
 ------------------------------------------------------------------------
 section "Word16#"
@@ -473,8 +470,8 @@ section "Word16#"
 
 primtype Word16#
 
-primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
-primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+primop Word16Extend "extendWord16#" GenPrimOp Word16# -> WORD
+primop Word16Narrow "narrowWord16#" GenPrimOp WORD -> Word16#
 
 primop Word16NotOp "notWord16#" Monadic Word16# -> Word16#
 
@@ -500,170 +497,168 @@ primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word1
   with
     can_fail = True
 
-primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
-primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> INT
+primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> INT
+primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> INT
+primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> INT
+primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> INT
+primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> INT
 
 ------------------------------------------------------------------------
 section "Word#"
         {Operations on native-sized unsigned words (32+ bits).}
 ------------------------------------------------------------------------
 
-primtype Word#
-
-primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordAddOp   "plusWord#"   Dyadic   WORD -> WORD -> WORD
    with commutable = True
 
-primop   WordAddCOp   "addWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
+primop   WordAddCOp   "addWordC#"   GenPrimOp   WORD -> WORD -> (# WORD, INT #)
          {Add unsigned integers reporting overflow.
           The first element of the pair is the result.  The second element is
           the carry flag, which is nonzero on overflow. See also {\tt plusWord2#}.}
    with code_size = 2
         commutable = True
 
-primop   WordSubCOp   "subWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
+primop   WordSubCOp   "subWordC#"   GenPrimOp   WORD -> WORD -> (# WORD, INT #)
          {Subtract unsigned integers reporting overflow.
           The first element of the pair is the result.  The second element is
           the carry flag, which is nonzero on overflow.}
    with code_size = 2
 
-primop   WordAdd2Op   "plusWord2#"   GenPrimOp   Word# -> Word# -> (# Word#, Word# #)
+primop   WordAdd2Op   "plusWord2#"   GenPrimOp   WORD -> WORD -> (# WORD, WORD #)
          {Add unsigned integers, with the high part (carry) in the first
           component of the returned pair and the low part in the second
           component of the pair. See also {\tt addWordC#}.}
    with code_size = 2
         commutable = True
 
-primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordSubOp   "minusWord#"   Dyadic   WORD -> WORD -> WORD
 
-primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordMulOp   "timesWord#"   Dyadic   WORD -> WORD -> WORD
    with commutable = True
 
 -- Returns (# high, low #)
 primop   WordMul2Op  "timesWord2#"   GenPrimOp
-   Word# -> Word# -> (# Word#, Word# #)
+   WORD -> WORD -> (# WORD, WORD #)
    with commutable = True
 
-primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordQuotOp   "quotWord#"   Dyadic   WORD -> WORD -> WORD
    with can_fail = True
 
-primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordRemOp   "remWord#"   Dyadic   WORD -> WORD -> WORD
    with can_fail = True
 
 primop   WordQuotRemOp "quotRemWord#" GenPrimOp
-   Word# -> Word# -> (# Word#, Word# #)
+   WORD -> WORD -> (# WORD, WORD #)
    with can_fail = True
 
 -- Takes high word of dividend, then low word of dividend, then divisor.
 -- Requires that high word is not divisible by divisor.
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
-   Word# -> Word# -> Word# -> (# Word#, Word# #)
+   WORD -> WORD -> WORD -> (# WORD, WORD #)
    with can_fail = True
 
-primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
+primop   AndOp   "and#"   Dyadic   WORD -> WORD -> WORD
    with commutable = True
 
-primop   OrOp   "or#"   Dyadic   Word# -> Word# -> Word#
+primop   OrOp   "or#"   Dyadic   WORD -> WORD -> WORD
    with commutable = True
 
-primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
+primop   XorOp   "xor#"   Dyadic   WORD -> WORD -> WORD
    with commutable = True
 
-primop   NotOp   "not#"   Monadic   Word# -> Word#
+primop   NotOp   "not#"   Monadic   WORD -> WORD
 
-primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
+primop   SllOp   "uncheckedShiftL#"   GenPrimOp   WORD -> INT -> WORD
          {Shift left logical.   Result undefined if shift amount is not
           in the range 0 to word size - 1 inclusive.}
-primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
+primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   WORD -> INT -> WORD
          {Shift right logical.   Result undefined if shift  amount is not
           in the range 0 to word size - 1 inclusive.}
 
-primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
+primop   Word2IntOp   "word2Int#"   GenPrimOp   WORD -> INT
    with code_size = 0
 
-primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Int#
-primop   WordGeOp   "geWord#"   Compare   Word# -> Word# -> Int#
-primop   WordEqOp   "eqWord#"   Compare   Word# -> Word# -> Int#
-primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Int#
-primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Int#
-primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Int#
+primop   WordGtOp   "gtWord#"   Compare   WORD -> WORD -> INT
+primop   WordGeOp   "geWord#"   Compare   WORD -> WORD -> INT
+primop   WordEqOp   "eqWord#"   Compare   WORD -> WORD -> INT
+primop   WordNeOp   "neWord#"   Compare   WORD -> WORD -> INT
+primop   WordLtOp   "ltWord#"   Compare   WORD -> WORD -> INT
+primop   WordLeOp   "leWord#"   Compare   WORD -> WORD -> INT
 
-primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
+primop   PopCnt8Op   "popCnt8#"   Monadic   WORD -> WORD
     {Count the number of set bits in the lower 8 bits of a word.}
-primop   PopCnt16Op   "popCnt16#"   Monadic   Word# -> Word#
+primop   PopCnt16Op   "popCnt16#"   Monadic   WORD -> WORD
     {Count the number of set bits in the lower 16 bits of a word.}
-primop   PopCnt32Op   "popCnt32#"   Monadic   Word# -> Word#
+primop   PopCnt32Op   "popCnt32#"   Monadic   WORD -> WORD
     {Count the number of set bits in the lower 32 bits of a word.}
-primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
+primop   PopCnt64Op   "popCnt64#"   GenPrimOp   Word64# -> WORD
     {Count the number of set bits in a 64-bit word.}
-primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
+primop   PopCntOp   "popCnt#"   Monadic   WORD -> WORD
     {Count the number of set bits in a word.}
 
-primop   Pdep8Op   "pdep8#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep8Op   "pdep8#"   Dyadic   WORD -> WORD -> WORD
     {Deposit bits to lower 8 bits of a word at locations specified by a mask.}
-primop   Pdep16Op   "pdep16#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep16Op   "pdep16#"   Dyadic   WORD -> WORD -> WORD
     {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
-primop   Pdep32Op   "pdep32#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep32Op   "pdep32#"   Dyadic   WORD -> WORD -> WORD
     {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
-primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+primop   Pdep64Op   "pdep64#"   GenPrimOp   Word64# -> Word64# -> Word64#
     {Deposit bits to a word at locations specified by a mask.}
-primop   PdepOp   "pdep#"   Dyadic   Word# -> Word# -> Word#
+primop   PdepOp   "pdep#"   Dyadic   WORD -> WORD -> WORD
     {Deposit bits to a word at locations specified by a mask.}
 
-primop   Pext8Op   "pext8#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext8Op   "pext8#"   Dyadic   WORD -> WORD -> WORD
     {Extract bits from lower 8 bits of a word at locations specified by a mask.}
-primop   Pext16Op   "pext16#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext16Op   "pext16#"   Dyadic   WORD -> WORD -> WORD
     {Extract bits from lower 16 bits of a word at locations specified by a mask.}
-primop   Pext32Op   "pext32#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext32Op   "pext32#"   Dyadic   WORD -> WORD -> WORD
     {Extract bits from lower 32 bits of a word at locations specified by a mask.}
-primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
+primop   Pext64Op   "pext64#"   GenPrimOp   Word64# -> Word64# -> Word64#
     {Extract bits from a word at locations specified by a mask.}
-primop   PextOp   "pext#"   Dyadic   Word# -> Word# -> Word#
+primop   PextOp   "pext#"   Dyadic   WORD -> WORD -> WORD
     {Extract bits from a word at locations specified by a mask.}
 
-primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
+primop   Clz8Op   "clz8#" Monadic   WORD -> WORD
     {Count leading zeros in the lower 8 bits of a word.}
-primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
+primop   Clz16Op   "clz16#" Monadic   WORD -> WORD
     {Count leading zeros in the lower 16 bits of a word.}
-primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
+primop   Clz32Op   "clz32#" Monadic   WORD -> WORD
     {Count leading zeros in the lower 32 bits of a word.}
-primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
+primop   Clz64Op   "clz64#" GenPrimOp Word64# -> WORD
     {Count leading zeros in a 64-bit word.}
-primop   ClzOp     "clz#"   Monadic   Word# -> Word#
+primop   ClzOp     "clz#"   Monadic   WORD -> WORD
     {Count leading zeros in a word.}
 
-primop   Ctz8Op   "ctz8#"  Monadic   Word# -> Word#
+primop   Ctz8Op   "ctz8#"  Monadic   WORD -> WORD
     {Count trailing zeros in the lower 8 bits of a word.}
-primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
+primop   Ctz16Op   "ctz16#" Monadic   WORD -> WORD
     {Count trailing zeros in the lower 16 bits of a word.}
-primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
+primop   Ctz32Op   "ctz32#" Monadic   WORD -> WORD
     {Count trailing zeros in the lower 32 bits of a word.}
-primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
+primop   Ctz64Op   "ctz64#" GenPrimOp Word64# -> WORD
     {Count trailing zeros in a 64-bit word.}
-primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
+primop   CtzOp     "ctz#"   Monadic   WORD -> WORD
     {Count trailing zeros in a word.}
 
-primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
+primop   BSwap16Op   "byteSwap16#"   Monadic   WORD -> WORD
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
-primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
+primop   BSwap32Op   "byteSwap32#"   Monadic   WORD -> WORD
     {Swap bytes in the lower 32 bits of a word. The higher bytes are undefined. }
-primop   BSwap64Op   "byteSwap64#"   Monadic   WORD64 -> WORD64
+primop   BSwap64Op   "byteSwap64#"   Monadic   Word64# -> Word64#
     {Swap bytes in a 64 bits of a word.}
-primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
+primop   BSwapOp     "byteSwap#"     Monadic   WORD -> WORD
     {Swap bytes in a word.}
 
-primop   BRev8Op    "bitReverse8#"   Monadic   Word# -> Word#
+primop   BRev8Op    "bitReverse8#"   Monadic   WORD -> WORD
     {Reverse the order of the bits in a 8-bit word.}
-primop   BRev16Op   "bitReverse16#"   Monadic   Word# -> Word#
+primop   BRev16Op   "bitReverse16#"   Monadic   WORD -> WORD
     {Reverse the order of the bits in a 16-bit word.}
-primop   BRev32Op   "bitReverse32#"   Monadic   Word# -> Word#
+primop   BRev32Op   "bitReverse32#"   Monadic   WORD -> WORD
     {Reverse the order of the bits in a 32-bit word.}
-primop   BRev64Op   "bitReverse64#"   Monadic   WORD64 -> WORD64
+primop   BRev64Op   "bitReverse64#"   Monadic   Word64# -> Word64#
     {Reverse the order of the bits in a 64-bit word.}
-primop   BRevOp     "bitReverse#"     Monadic   Word# -> Word#
+primop   BRevOp     "bitReverse#"     Monadic   WORD -> WORD
     {Reverse the order of the bits in a word.}
 
 ------------------------------------------------------------------------
@@ -671,34 +666,41 @@ section "Narrowings"
         {Explicit narrowing of native-sized ints or words.}
 ------------------------------------------------------------------------
 
-primop   Narrow8IntOp      "narrow8Int#"      Monadic   Int# -> Int#
-primop   Narrow16IntOp     "narrow16Int#"     Monadic   Int# -> Int#
-primop   Narrow32IntOp     "narrow32Int#"     Monadic   Int# -> Int#
-primop   Narrow8WordOp     "narrow8Word#"     Monadic   Word# -> Word#
-primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
-primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
+primop   Narrow8IntOp      "narrow8Int#"      Monadic   INT -> INT
+primop   Narrow16IntOp     "narrow16Int#"     Monadic   INT -> INT
+primop   Narrow32IntOp     "narrow32Int#"     Monadic   INT -> INT
+primop   Narrow8WordOp     "narrow8Word#"     Monadic   WORD -> WORD
+primop   Narrow16WordOp    "narrow16Word#"    Monadic   WORD -> WORD
+primop   Narrow32WordOp    "narrow32Word#"    Monadic   WORD -> WORD
 
 
-#if WORD_SIZE_IN_BITS < 64
+------------------------------------------------------------------------
+section "Int32#"
+        {Operations on 32-bit integers ({\tt Int32\#}).}
+------------------------------------------------------------------------
+
+primtype Int32#
+
+------------------------------------------------------------------------
+section "Word32#"
+        {Operations on 32-bit unsigned words.}
+------------------------------------------------------------------------
+
+primtype Word32#
+
 ------------------------------------------------------------------------
 section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Int64#
 
 ------------------------------------------------------------------------
 section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
+        {Operations on 64-bit unsigned words.}
 ------------------------------------------------------------------------
 
 primtype Word64#
-
-#endif
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -707,26 +709,26 @@ section "Double#"
 
 primtype Double#
 
-primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGtOp ">##"   Compare   Double# -> Double# -> INT
    with fixity = infix 4
 
-primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> Int#
+primop   DoubleGeOp ">=##"   Compare   Double# -> Double# -> INT
    with fixity = infix 4
 
 primop DoubleEqOp "==##"   Compare
-   Double# -> Double# -> Int#
+   Double# -> Double# -> INT
    with commutable = True
         fixity = infix 4
 
 primop DoubleNeOp "/=##"   Compare
-   Double# -> Double# -> Int#
+   Double# -> Double# -> INT
    with commutable = True
         fixity = infix 4
 
-primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> INT
    with fixity = infix 4
 
-primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
+primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> INT
    with fixity = infix 4
 
 primop   DoubleAddOp   "+##"   Dyadic
@@ -751,10 +753,10 @@ primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 
 primop   DoubleFabsOp  "fabsDouble#"    Monadic   Double# -> Double#
 
-primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
-   {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
+primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> INT
+   {Truncates a {\tt Double#} value to the nearest {\tt INT}.
     Results are undefined if the truncation if truncation yields
-    a value outside the range of {\tt Int#}.}
+    a value outside the range of {\tt INT}.}
 
 primop   Double2FloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
@@ -843,7 +845,7 @@ primop   DoublePowerOp   "**##" Dyadic
    code_size = { primOpCodeSizeForeignCall }
 
 primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
-   Double# -> (# Int#, Word#, Word#, Int# #)
+   Double# -> (# INT, WORD, WORD, INT #)
    {Convert to integer.
     First component of the result is -1 or 1, indicating the sign of the
     mantissa. The next two are the high and low 32 bits of the mantissa
@@ -851,7 +853,7 @@ primop   DoubleDecode_2IntOp   "decodeDouble_2Int#" GenPrimOp
    with out_of_line = True
 
 primop   DoubleDecode_Int64Op   "decodeDouble_Int64#" GenPrimOp
-   Double# -> (# INT64, Int# #)
+   Double# -> (# Int64#, INT #)
    {Decode {\tt Double\#} into mantissa and base-2 exponent.}
    with out_of_line = True
 
@@ -862,19 +864,19 @@ section "Float#"
 
 primtype Float#
 
-primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> Int#
-primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatGtOp  "gtFloat#"   Compare   Float# -> Float# -> INT
+primop   FloatGeOp  "geFloat#"   Compare   Float# -> Float# -> INT
 
 primop   FloatEqOp  "eqFloat#"   Compare
-   Float# -> Float# -> Int#
+   Float# -> Float# -> INT
    with commutable = True
 
 primop   FloatNeOp  "neFloat#"   Compare
-   Float# -> Float# -> Int#
+   Float# -> Float# -> INT
    with commutable = True
 
-primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
-primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
+primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> INT
+primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> INT
 
 primop   FloatAddOp   "plusFloat#"      Dyadic
    Float# -> Float# -> Float#
@@ -894,10 +896,10 @@ primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
 
 primop   FloatFabsOp  "fabsFloat#"        Monadic    Float# -> Float#
 
-primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
-   {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
+primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> INT
+   {Truncates a {\tt Float#} value to the nearest {\tt INT}.
     Results are undefined if the truncation if truncation yields
-    a value outside the range of {\tt Int#}.}
+    a value outside the range of {\tt INT}.}
 
 primop   FloatExpOp   "expFloat#"      Monadic
    Float# -> Float#
@@ -985,7 +987,7 @@ primop   FloatPowerOp   "powerFloat#"      Dyadic
 primop   Float2DoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 
 primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
-   Float# -> (# Int#, Int# #)
+   Float# -> (# INT, INT #)
    {Convert to integers.
     First {\tt Int\#} in result is the mantissa; second is the exponent.}
    with out_of_line = True
@@ -1000,7 +1002,7 @@ primtype Array# a
 primtype MutableArray# s a
 
 primop  NewArrayOp "newArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, MutableArray# s a #)
+   INT -> a -> State# s -> (# State# s, MutableArray# s a #)
    {Create a new mutable array with the specified number of elements,
     in the specified state thread,
     with each element containing the specified initial value.}
@@ -1009,17 +1011,17 @@ primop  NewArrayOp "newArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
-   MutableArray# s a -> MutableArray# s a -> Int#
+   MutableArray# s a -> MutableArray# s a -> INT
 
 primop  ReadArrayOp "readArray#" GenPrimOp
-   MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   MutableArray# s a -> INT -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
-   MutableArray# s a -> Int# -> a -> State# s -> State# s
+   MutableArray# s a -> INT -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
@@ -1027,15 +1029,15 @@ primop  WriteArrayOp "writeArray#" GenPrimOp
    code_size        = 2 -- card update too
 
 primop  SizeofArrayOp "sizeofArray#" GenPrimOp
-   Array# a -> Int#
+   Array# a -> INT
    {Return the number of elements in the array.}
 
 primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
-   MutableArray# s a -> Int#
+   MutableArray# s a -> INT
    {Return the number of elements in the array.}
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
-   Array# a -> Int# -> (# a #)
+   Array# a -> INT -> (# a #)
    {Read from the specified index of an immutable array. The result is packaged
     into an unboxed unary tuple; the result itself is not yet
     evaluated. Pattern matching on the tuple forces the indexing of the
@@ -1060,7 +1062,7 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
    has_side_effects = True
 
 primop  CopyArrayOp "copyArray#" GenPrimOp
-  Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  Array# a -> INT -> MutableArray# s a -> INT -> INT -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1074,7 +1076,7 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
   can_fail         = True
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
-  MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  MutableArray# s a -> INT -> MutableArray# s a -> INT -> INT -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1088,7 +1090,7 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
-  Array# a -> Int# -> Int# -> Array# a
+  Array# a -> INT -> INT -> Array# a
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1099,7 +1101,7 @@ primop  CloneArrayOp "cloneArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
-  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  MutableArray# s a -> INT -> INT -> State# s -> (# State# s, MutableArray# s a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1110,7 +1112,7 @@ primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  FreezeArrayOp "freezeArray#" GenPrimOp
-  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
+  MutableArray# s a -> INT -> INT -> State# s -> (# State# s, Array# a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1121,7 +1123,7 @@ primop  FreezeArrayOp "freezeArray#" GenPrimOp
   can_fail         = True
 
 primop  ThawArrayOp "thawArray#" GenPrimOp
-  Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  Array# a -> INT -> INT -> State# s -> (# State# s, MutableArray# s a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1132,7 +1134,7 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   can_fail         = True
 
 primop CasArrayOp  "casArray#" GenPrimOp
-   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   MutableArray# s a -> INT -> a -> a -> State# s -> (# State# s, INT, a #)
    {Given an array, an offset, the expected old value, and
     the new value, perform an atomic compare and swap (i.e. write the new
     value if the current value and the old value are the same pointer).
@@ -1178,7 +1180,7 @@ primtype SmallArray# a
 primtype SmallMutableArray# s a
 
 primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
-   Int# -> a -> State# s -> (# State# s, SmallMutableArray# s a #)
+   INT -> a -> State# s -> (# State# s, SmallMutableArray# s a #)
    {Create a new mutable array with the specified number of elements,
     in the specified state thread,
     with each element containing the specified initial value.}
@@ -1187,32 +1189,32 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
+   SmallMutableArray# s a -> SmallMutableArray# s a -> INT
 
 primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
+   SmallMutableArray# s a -> INT -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
+   SmallMutableArray# s a -> INT -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
    can_fail         = True
 
 primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
-   SmallArray# a -> Int#
+   SmallArray# a -> INT
    {Return the number of elements in the array.}
 
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
-   SmallMutableArray# s a -> Int#
+   SmallMutableArray# s a -> INT
    {Return the number of elements in the array.}
 
 primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
-   SmallArray# a -> Int# -> (# a #)
+   SmallArray# a -> INT -> (# a #)
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
    with
@@ -1235,7 +1237,7 @@ primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
 -- primops aren't inlined. It would be nice to keep track of both.
 
 primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  SmallArray# a -> INT -> SmallMutableArray# s a -> INT -> INT -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1249,7 +1251,7 @@ primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
   can_fail         = True
 
 primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  SmallMutableArray# s a -> INT -> SmallMutableArray# s a -> INT -> INT -> State# s -> State# s
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
@@ -1264,7 +1266,7 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> Int# -> SmallArray# a
+  SmallArray# a -> INT -> INT -> SmallArray# a
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1275,7 +1277,7 @@ primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
   can_fail         = True
 
 primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  SmallMutableArray# s a -> INT -> INT -> State# s -> (# State# s, SmallMutableArray# s a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1286,7 +1288,7 @@ primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
   can_fail         = True
 
 primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
-  SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallArray# a #)
+  SmallMutableArray# s a -> INT -> INT -> State# s -> (# State# s, SmallArray# a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1297,7 +1299,7 @@ primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
   can_fail         = True
 
 primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
-  SmallArray# a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
+  SmallArray# a -> INT -> INT -> State# s -> (# State# s, SmallMutableArray# s a #)
   {Given a source array, an offset into the source array, and a number
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
@@ -1308,7 +1310,7 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
   can_fail         = True
 
 primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   SmallMutableArray# s a -> INT -> a -> a -> State# s -> (# State# s, INT, a #)
    {Unsafe, machine-level atomic compare and swap on an element within an array.
     See the documentation of {\tt casArray\#}.}
    with
@@ -1335,32 +1337,32 @@ primtype ByteArray#
 primtype MutableByteArray# s
 
 primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   INT -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a new mutable byte array of specified size (in bytes), in
     the specified state thread.}
    with out_of_line = True
         has_side_effects = True
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   INT -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array that the GC guarantees not to move.}
    with out_of_line = True
         has_side_effects = True
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
-   Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   INT -> INT -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
    with out_of_line = True
         has_side_effects = True
 
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
-   MutableByteArray# s -> Int#
+   MutableByteArray# s -> INT
    {Determine whether a {\tt MutableByteArray\#} is guaranteed not to move
    during GC.}
    with out_of_line = True
 
 primop  ByteArrayIsPinnedOp "isByteArrayPinned#" GenPrimOp
-   ByteArray# -> Int#
+   ByteArray# -> INT
    {Determine whether a {\tt ByteArray\#} is guaranteed not to move during GC.}
    with out_of_line = True
 
@@ -1369,10 +1371,10 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
    {Intended for use with pinned arrays; otherwise very unsafe!}
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> MutableByteArray# s -> Int#
+   MutableByteArray# s -> MutableByteArray# s -> INT
 
 primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
     equal to the current size as reported by {\tt sizeofMutableArray\#}.}
@@ -1380,7 +1382,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
         has_side_effects = True
 
 primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s,MutableByteArray# s #)
    {Resize (unpinned) mutable byte array to new specified size (in bytes).
     The returned {\tt MutableByteArray\#} is either the original
     {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
@@ -1402,478 +1404,478 @@ primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    has_side_effects = True
 
 primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
-   ByteArray# -> Int#
+   ByteArray# -> INT
    {Return the size of the array in bytes.}
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> Int#
+   MutableByteArray# s -> INT
    {Return the size of the array in bytes. Note that this is deprecated as it is
    unsafe in the presence of concurrent resize operations on the same byte
    array.}
    with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 
 primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> State# s -> (# State# s, INT #)
    {Return the number of elements in the array.}
 
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
-   ByteArray# -> Int# -> Char#
+   ByteArray# -> INT -> Char#
    {Read 8-bit character; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_WideChar "indexWideCharArray#" GenPrimOp
-   ByteArray# -> Int# -> Char#
+   ByteArray# -> INT -> Char#
    {Read 31-bit character; offset in 4-byte words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> INT -> INT
    with can_fail = True
 
 primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> INT -> WORD
    with can_fail = True
 
 primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
-   ByteArray# -> Int# -> Addr#
+   ByteArray# -> INT -> Addr#
    with can_fail = True
 
 primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
-   ByteArray# -> Int# -> Float#
+   ByteArray# -> INT -> Float#
    with can_fail = True
 
 primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
-   ByteArray# -> Int# -> Double#
+   ByteArray# -> INT -> Double#
    with can_fail = True
 
 primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
-   ByteArray# -> Int# -> StablePtr# a
+   ByteArray# -> INT -> StablePtr# a
    with can_fail = True
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> INT -> INT
    {Read 8-bit integer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> INT -> INT
    {Read 16-bit integer; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> INT -> Int32#
    {Read 32-bit integer; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> INT -> Int64#
    {Read 64-bit integer; offset in 64-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> INT -> WORD
    {Read 8-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> INT -> WORD
    {Read 16-bit word; offset in 16-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> INT -> Word32#
    {Read 32-bit word; offset in 32-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> INT -> Word64#
    {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsChar "indexWord8ArrayAsChar#" GenPrimOp
-   ByteArray# -> Int# -> Char#
+   ByteArray# -> INT -> Char#
    {Read 8-bit character; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWideChar "indexWord8ArrayAsWideChar#" GenPrimOp
-   ByteArray# -> Int# -> Char#
+   ByteArray# -> INT -> Char#
    {Read 31-bit character; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsAddr "indexWord8ArrayAsAddr#" GenPrimOp
-   ByteArray# -> Int# -> Addr#
+   ByteArray# -> INT -> Addr#
    {Read address; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsFloat "indexWord8ArrayAsFloat#" GenPrimOp
-   ByteArray# -> Int# -> Float#
+   ByteArray# -> INT -> Float#
    {Read float; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsDouble "indexWord8ArrayAsDouble#" GenPrimOp
-   ByteArray# -> Int# -> Double#
+   ByteArray# -> INT -> Double#
    {Read double; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsStablePtr "indexWord8ArrayAsStablePtr#" GenPrimOp
-   ByteArray# -> Int# -> StablePtr# a
+   ByteArray# -> INT -> StablePtr# a
    {Read stable pointer; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> INT -> INT
    {Read 16-bit int; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
-   ByteArray# -> Int# -> INT32
+   ByteArray# -> INT -> Int32#
    {Read 32-bit int; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
-   ByteArray# -> Int# -> INT64
+   ByteArray# -> INT -> Int64#
    {Read 64-bit int; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsInt "indexWord8ArrayAsInt#" GenPrimOp
-   ByteArray# -> Int# -> Int#
+   ByteArray# -> INT -> INT
    {Read int; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord16 "indexWord8ArrayAsWord16#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> INT -> WORD
    {Read 16-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
-   ByteArray# -> Int# -> WORD32
+   ByteArray# -> INT -> Word32#
    {Read 32-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord64 "indexWord8ArrayAsWord64#" GenPrimOp
-   ByteArray# -> Int# -> WORD64
+   ByteArray# -> INT -> Word64#
    {Read 64-bit word; offset in bytes.}
    with can_fail = True
 
 primop IndexByteArrayOp_Word8AsWord "indexWord8ArrayAsWord#" GenPrimOp
-   ByteArray# -> Int# -> Word#
+   ByteArray# -> INT -> WORD
    {Read word; offset in bytes.}
    with can_fail = True
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Char# #)
    {Read 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    {Read integer; offset in machine words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, WORD #)
    {Read word; offset in machine words.}
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Addr "readAddrArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Addr# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Float "readFloatArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Float# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Double# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, StablePtr# a #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Int32# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Int64# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Word32# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Word64# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsChar "readWord8ArrayAsChar#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Char# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWideChar "readWord8ArrayAsWideChar#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Char# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsAddr "readWord8ArrayAsAddr#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Addr# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsFloat "readWord8ArrayAsFloat#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Float# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsDouble "readWord8ArrayAsDouble#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Double# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsStablePtr "readWord8ArrayAsStablePtr#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, StablePtr# a #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt16 "readWord8ArrayAsInt16#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Int32# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Int64# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsInt "readWord8ArrayAsInt#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord16 "readWord8ArrayAsWord16#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Word32# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord64 "readWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, Word64# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadByteArrayOp_Word8AsWord "readWord8ArrayAsWord#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Char# -> State# s -> State# s
    {Write 8-bit character; offset in bytes.}
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_WideChar "writeWideCharArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Char# -> State# s -> State# s
    {Write 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int "writeIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word "writeWordArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Addr "writeAddrArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Addr# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Float "writeFloatArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Float# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Double "writeDoubleArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Double# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
+   MutableByteArray# s -> INT -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Int32# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Int64# -> State# s -> State# s
    with can_fail = True
         has_side_effects = True
 
 primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Word32# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Word64# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsChar "writeWord8ArrayAsChar#" GenPrimOp
-   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Char# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWideChar "writeWord8ArrayAsWideChar#" GenPrimOp
-   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Char# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsAddr "writeWord8ArrayAsAddr#" GenPrimOp
-   MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Addr# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsFloat "writeWord8ArrayAsFloat#" GenPrimOp
-   MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Float# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsDouble "writeWord8ArrayAsDouble#" GenPrimOp
-   MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
+   MutableByteArray# s -> INT -> Double# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsStablePtr "writeWord8ArrayAsStablePtr#" GenPrimOp
-   MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
+   MutableByteArray# s -> INT -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt16 "writeWord8ArrayAsInt16#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Int32# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
-   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Int64# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsInt "writeWord8ArrayAsInt#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord16 "writeWord8ArrayAsWord16#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Word32# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord64 "writeWord8ArrayAsWord64#" GenPrimOp
-   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   MutableByteArray# s -> INT -> Word64# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteByteArrayOp_Word8AsWord "writeWord8ArrayAsWord#" GenPrimOp
-   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   MutableByteArray# s -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
-   ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
+   ByteArray# -> INT -> ByteArray# -> INT -> INT -> INT
    {{\tt compareByteArrays# src1 src1_ofs src2 src2_ofs n} compares
     {\tt n} bytes starting at offset {\tt src1_ofs} in the first
     {\tt ByteArray#} {\tt src1} to the range of {\tt n} bytes
     (i.e. same length) starting at offset {\tt src2_ofs} of the second
     {\tt ByteArray#} {\tt src2}.  Both arrays must fully contain the
-    specified ranges, but this is not checked.  Returns an {\tt Int#}
+    specified ranges, but this is not checked.  Returns an {\tt INT}
     less than, equal to, or greater than zero if the range is found,
     respectively, to be byte-wise lexicographically less than, to
     match, or be greater than the second range.}
@@ -1881,7 +1883,7 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
    can_fail = True
 
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
-  ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  ByteArray# -> INT -> MutableByteArray# s -> INT -> INT -> State# s -> State# s
   {{\tt copyByteArray# src src_ofs dst dst_ofs n} copies the range
    starting at offset {\tt src_ofs} of length {\tt n} from the
    {\tt ByteArray#} {\tt src} to the {\tt MutableByteArray#} {\tt dst}
@@ -1895,7 +1897,7 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   can_fail = True
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
-  MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> MutableByteArray# s -> INT -> INT -> State# s -> State# s
   {Copy a range of the first MutableByteArray\# to the specified region in the second MutableByteArray\#.
    Both arrays must fully contain the specified ranges, but this is not checked. The regions are
    allowed to overlap, although this is only possible when the same array is provided
@@ -1906,7 +1908,7 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   can_fail = True
 
 primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
-  ByteArray# -> Int# -> Addr# -> Int# -> State# s -> State# s
+  ByteArray# -> INT -> Addr# -> INT -> State# s -> State# s
   {Copy a range of the ByteArray\# to the memory range starting at the Addr\#.
    The ByteArray\# and the memory region at Addr\# must fully contain the
    specified ranges, but this is not checked. The Addr\# must not point into the
@@ -1918,7 +1920,7 @@ primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
   can_fail = True
 
 primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
-  MutableByteArray# s -> Int# -> Addr# -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> Addr# -> INT -> State# s -> State# s
   {Copy a range of the MutableByteArray\# to the memory range starting at the
    Addr\#. The MutableByteArray\# and the memory region at Addr\# must fully
    contain the specified ranges, but this is not checked. The Addr\# must not
@@ -1930,7 +1932,7 @@ primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
   can_fail = True
 
 primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
-  Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  Addr# -> MutableByteArray# s -> INT -> INT -> State# s -> State# s
   {Copy a memory range starting at the Addr\# to the specified range in the
    MutableByteArray\#. The memory region at Addr\# and the ByteArray\# must fully
    contain the specified ranges, but this is not checked. The Addr\# must not
@@ -1942,7 +1944,7 @@ primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
   can_fail = True
 
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
-  MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> INT -> INT -> State# s -> State# s
   {{\tt setByteArray# ba off len c} sets the byte range {\tt [off, off+len]} of
    the {\tt MutableByteArray#} to the byte {\tt c}.}
   with
@@ -1953,21 +1955,21 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
 -- Atomic operations
 
 primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, INT #)
    {Given an array and an offset in machine words, read an element. The
     index is assumed to be in bounds. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
 
 primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   MutableByteArray# s -> INT -> INT -> State# s -> State# s
    {Given an array and an offset in machine words, write an element. The
     index is assumed to be in bounds. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
 
 primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, an offset in machine words, the expected old value, and
     the new value, perform an atomic compare and swap i.e. write the new
     value if the current value matches the provided old value. Returns
@@ -1977,7 +1979,7 @@ primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to add,
     atomically add the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
@@ -1985,7 +1987,7 @@ primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to subtract,
     atomically substract the value to the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
@@ -1993,7 +1995,7 @@ primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to AND,
     atomically AND the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
@@ -2001,7 +2003,7 @@ primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to NAND,
     atomically NAND the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
@@ -2009,7 +2011,7 @@ primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to OR,
     atomically OR the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
@@ -2017,7 +2019,7 @@ primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
         can_fail = True
 
 primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
+   MutableByteArray# s -> INT -> INT -> State# s -> (# State# s, INT #)
    {Given an array, and offset in machine words, and a value to XOR,
     atomically XOR the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
@@ -2039,7 +2041,7 @@ primtype ArrayArray#
 primtype MutableArrayArray# s
 
 primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableArrayArray# s #)
+   INT -> State# s -> (# State# s, MutableArrayArray# s #)
    {Create a new mutable array of arrays with the specified number of elements,
     in the specified state thread, with each element recursively referring to the
     newly created array.}
@@ -2048,7 +2050,7 @@ primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
    has_side_effects = True
 
 primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> MutableArrayArray# s -> Int#
+   MutableArrayArray# s -> MutableArrayArray# s -> INT
 
 primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
@@ -2057,63 +2059,63 @@ primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    has_side_effects = True
 
 primop  SizeofArrayArrayOp "sizeofArrayArray#" GenPrimOp
-   ArrayArray# -> Int#
+   ArrayArray# -> INT
    {Return the number of elements in the array.}
 
 primop  SizeofMutableArrayArrayOp "sizeofMutableArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int#
+   MutableArrayArray# s -> INT
    {Return the number of elements in the array.}
 
 primop IndexArrayArrayOp_ByteArray "indexByteArrayArray#" GenPrimOp
-   ArrayArray# -> Int# -> ByteArray#
+   ArrayArray# -> INT -> ByteArray#
    with can_fail = True
 
 primop IndexArrayArrayOp_ArrayArray "indexArrayArrayArray#" GenPrimOp
-   ArrayArray# -> Int# -> ArrayArray#
+   ArrayArray# -> INT -> ArrayArray#
    with can_fail = True
 
 primop  ReadArrayArrayOp_ByteArray "readByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ByteArray# #)
+   MutableArrayArray# s -> INT -> State# s -> (# State# s, ByteArray# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadArrayArrayOp_MutableByteArray "readMutableByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   MutableArrayArray# s -> INT -> State# s -> (# State# s, MutableByteArray# s #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadArrayArrayOp_ArrayArray "readArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ArrayArray# #)
+   MutableArrayArray# s -> INT -> State# s -> (# State# s, ArrayArray# #)
    with has_side_effects = True
         can_fail = True
 
 primop  ReadArrayArrayOp_MutableArrayArray "readMutableArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableArrayArray# s #)
+   MutableArrayArray# s -> INT -> State# s -> (# State# s, MutableArrayArray# s #)
    with has_side_effects = True
         can_fail = True
 
 primop  WriteArrayArrayOp_ByteArray "writeByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> ByteArray# -> State# s -> State# s
+   MutableArrayArray# s -> INT -> ByteArray# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteArrayArrayOp_MutableByteArray "writeMutableByteArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> MutableByteArray# s -> State# s -> State# s
+   MutableArrayArray# s -> INT -> MutableByteArray# s -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteArrayArrayOp_ArrayArray "writeArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> ArrayArray# -> State# s -> State# s
+   MutableArrayArray# s -> INT -> ArrayArray# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  WriteArrayArrayOp_MutableArrayArray "writeMutableArrayArrayArray#" GenPrimOp
-   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> State# s -> State# s
+   MutableArrayArray# s -> INT -> MutableArrayArray# s -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
 primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
-  ArrayArray# -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
+  ArrayArray# -> INT -> MutableArrayArray# s -> INT -> INT -> State# s -> State# s
   {Copy a range of the ArrayArray\# to the specified region in the MutableArrayArray\#.
    Both arrays must fully contain the specified ranges, but this is not checked.
    The two arrays must not be the same array in different states, but this is not checked either.}
@@ -2123,7 +2125,7 @@ primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
   can_fail         = True
 
 primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
-  MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
+  MutableArrayArray# s -> INT -> MutableArrayArray# s -> INT -> INT -> State# s -> State# s
   {Copy a range of the first MutableArrayArray# to the specified region in the second
    MutableArrayArray#.
    Both arrays must fully contain the specified ranges, but this is not checked.
@@ -2146,254 +2148,254 @@ primtype Addr#
 pseudoop "nullAddr#" Addr#
         { The null address. }
 
-primop   AddrAddOp "plusAddr#" GenPrimOp Addr# -> Int# -> Addr#
-primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
+primop   AddrAddOp "plusAddr#" GenPrimOp Addr# -> INT -> Addr#
+primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> INT
          {Result is meaningless if two {\tt Addr\#}s are so far apart that their
          difference doesn't fit in an {\tt Int\#}.}
-primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
+primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> INT -> INT
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
+primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> INT
         {Coerce directly from address to int.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
-primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
+primop   Int2AddrOp   "int2Addr#"    GenPrimOp  INT -> Addr#
         {Coerce directly from int to address.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
 
-primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Int#
-primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
+primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> INT
+primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> INT
+primop   AddrEqOp  "eqAddr#"   Compare   Addr# -> Addr# -> INT
+primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> INT
+primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> INT
+primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> INT
 
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> Char#
+   Addr# -> INT -> Char#
    {Reads 8-bit character; offset in bytes.}
    with can_fail = True
 
 primop IndexOffAddrOp_WideChar "indexWideCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> Char#
+   Addr# -> INT -> Char#
    {Reads 31-bit character; offset in 4-byte words.}
    with can_fail = True
 
 primop IndexOffAddrOp_Int "indexIntOffAddr#" GenPrimOp
-   Addr# -> Int# -> Int#
+   Addr# -> INT -> INT
    with can_fail = True
 
 primop IndexOffAddrOp_Word "indexWordOffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
+   Addr# -> INT -> WORD
    with can_fail = True
 
 primop IndexOffAddrOp_Addr "indexAddrOffAddr#" GenPrimOp
-   Addr# -> Int# -> Addr#
+   Addr# -> INT -> Addr#
    with can_fail = True
 
 primop IndexOffAddrOp_Float "indexFloatOffAddr#" GenPrimOp
-   Addr# -> Int# -> Float#
+   Addr# -> INT -> Float#
    with can_fail = True
 
 primop IndexOffAddrOp_Double "indexDoubleOffAddr#" GenPrimOp
-   Addr# -> Int# -> Double#
+   Addr# -> INT -> Double#
    with can_fail = True
 
 primop IndexOffAddrOp_StablePtr "indexStablePtrOffAddr#" GenPrimOp
-   Addr# -> Int# -> StablePtr# a
+   Addr# -> INT -> StablePtr# a
    with can_fail = True
 
 primop IndexOffAddrOp_Int8 "indexInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int#
+   Addr# -> INT -> INT
    with can_fail = True
 
 primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int#
+   Addr# -> INT -> INT
    with can_fail = True
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32
+   Addr# -> INT -> Int32#
    with can_fail = True
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64
+   Addr# -> INT -> Int64#
    with can_fail = True
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
+   Addr# -> INT -> WORD
    with can_fail = True
 
 primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word#
+   Addr# -> INT -> WORD
    with can_fail = True
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32
+   Addr# -> INT -> Word32#
    with can_fail = True
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64
+   Addr# -> INT -> Word64#
    with can_fail = True
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Char# #)
+   Addr# -> INT -> State# s -> (# State# s, Char# #)
    {Reads 8-bit character; offset in bytes.}
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_WideChar "readWideCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Char# #)
+   Addr# -> INT -> State# s -> (# State# s, Char# #)
    {Reads 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int "readIntOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   Addr# -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word "readWordOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   Addr# -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Addr "readAddrOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Addr# #)
+   Addr# -> INT -> State# s -> (# State# s, Addr# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Float "readFloatOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Float# #)
+   Addr# -> INT -> State# s -> (# State# s, Float# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Double "readDoubleOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Double# #)
+   Addr# -> INT -> State# s -> (# State# s, Double# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   Addr# -> INT -> State# s -> (# State# s, StablePtr# a #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   Addr# -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Int# #)
+   Addr# -> INT -> State# s -> (# State# s, INT #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT32 #)
+   Addr# -> INT -> State# s -> (# State# s, Int32# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT64 #)
+   Addr# -> INT -> State# s -> (# State# s, Int64# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   Addr# -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, Word# #)
+   Addr# -> INT -> State# s -> (# State# s, WORD #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
+   Addr# -> INT -> State# s -> (# State# s, Word32# #)
    with has_side_effects = True
         can_fail         = True
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
+   Addr# -> INT -> State# s -> (# State# s, Word64# #)
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> Char# -> State# s -> State# s
+   Addr# -> INT -> Char# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_WideChar "writeWideCharOffAddr#" GenPrimOp
-   Addr# -> Int# -> Char# -> State# s -> State# s
+   Addr# -> INT -> Char# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int "writeIntOffAddr#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> State# s
+   Addr# -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word "writeWordOffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
+   Addr# -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Addr "writeAddrOffAddr#" GenPrimOp
-   Addr# -> Int# -> Addr# -> State# s -> State# s
+   Addr# -> INT -> Addr# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Float "writeFloatOffAddr#" GenPrimOp
-   Addr# -> Int# -> Float# -> State# s -> State# s
+   Addr# -> INT -> Float# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Double "writeDoubleOffAddr#" GenPrimOp
-   Addr# -> Int# -> Double# -> State# s -> State# s
+   Addr# -> INT -> Double# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_StablePtr "writeStablePtrOffAddr#" GenPrimOp
-   Addr# -> Int# -> StablePtr# a -> State# s -> State# s
+   Addr# -> INT -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int8 "writeInt8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> State# s
+   Addr# -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Int# -> State# s -> State# s
+   Addr# -> INT -> INT -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32 -> State# s -> State# s
+   Addr# -> INT -> Int32# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64 -> State# s -> State# s
+   Addr# -> INT -> Int64# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
+   Addr# -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
-   Addr# -> Int# -> Word# -> State# s -> State# s
+   Addr# -> INT -> WORD -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32 -> State# s -> State# s
+   Addr# -> INT -> Word32# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64 -> State# s -> State# s
+   Addr# -> INT -> Word64# -> State# s -> State# s
    with has_side_effects = True
         can_fail         = True
 
@@ -2442,7 +2444,7 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
-   MutVar# s a -> MutVar# s a -> Int#
+   MutVar# s a -> MutVar# s a -> INT
 
 -- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2481,7 +2483,7 @@ primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    can_fail         = True
 
 primop  CasMutVarOp "casMutVar#" GenPrimOp
-  MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
+  MutVar# s a -> a -> a -> State# s -> (# State# s, INT, a #)
    with
    out_of_line = True
    has_side_effects = True
@@ -2576,7 +2578,7 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
    has_side_effects = True
 
 primop  MaskStatus "getMaskingState#" GenPrimOp
-        State# RealWorld -> (# State# RealWorld, Int# #)
+        State# RealWorld -> (# State# RealWorld, INT #)
    with
    out_of_line = True
    has_side_effects = True
@@ -2671,7 +2673,7 @@ primop  WriteTVarOp "writeTVar#" GenPrimOp
    has_side_effects = True
 
 primop  SameTVarOp "sameTVar#" GenPrimOp
-   TVar# s a -> TVar# s a -> Int#
+   TVar# s a -> TVar# s a -> INT
 
 
 ------------------------------------------------------------------------
@@ -2700,7 +2702,7 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   MVar# s a -> State# s -> (# State# s, INT, a #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
@@ -2716,7 +2718,7 @@ primop  PutMVarOp "putMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
-   MVar# s a -> a -> State# s -> (# State# s, Int# #)
+   MVar# s a -> a -> State# s -> (# State# s, INT #)
    {If {\tt MVar\#} is full, immediately return with integer 0.
     Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
@@ -2733,7 +2735,7 @@ primop  ReadMVarOp "readMVar#" GenPrimOp
    has_side_effects = True
 
 primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
+   MVar# s a -> State# s -> (# State# s, INT, a #)
    {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
    Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
    with
@@ -2741,10 +2743,10 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    has_side_effects = True
 
 primop  SameMVarOp "sameMVar#" GenPrimOp
-   MVar# s a -> MVar# s a -> Int#
+   MVar# s a -> MVar# s a -> INT
 
 primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int# #)
+   MVar# s a -> State# s -> (# State# s, INT #)
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
    out_of_line = True
@@ -2755,21 +2757,21 @@ section "Delay/wait operations"
 ------------------------------------------------------------------------
 
 primop  DelayOp "delay#" GenPrimOp
-   Int# -> State# s -> State# s
+   INT -> State# s -> State# s
    {Sleep specified number of microseconds.}
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  WaitReadOp "waitRead#" GenPrimOp
-   Int# -> State# s -> State# s
+   INT -> State# s -> State# s
    {Block until input is available on specified file descriptor.}
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  WaitWriteOp "waitWrite#" GenPrimOp
-   Int# -> State# s -> State# s
+   INT -> State# s -> State# s
    {Block until output is possible on specified file descriptor.}
    with
    has_side_effects = True
@@ -2777,21 +2779,21 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
 
 #if defined(mingw32_TARGET_OS)
 primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   INT -> INT -> INT -> Addr# -> State# RealWorld-> (# State# RealWorld, INT, INT #)
    {Asynchronously read bytes from specified file descriptor.}
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   INT -> INT -> INT -> Addr# -> State# RealWorld-> (# State# RealWorld, INT, INT #)
    {Asynchronously write bytes from specified file descriptor.}
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, INT, INT #)
    {Asynchronously perform procedure (first arg), passing it 2nd arg.}
    with
    has_side_effects = True
@@ -2827,7 +2829,7 @@ primop  ForkOp "fork#" GenPrimOp
    out_of_line      = True
 
 primop  ForkOnOp "forkOn#" GenPrimOp
-   Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
+   INT -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    has_side_effects = True
    out_of_line      = True
@@ -2856,7 +2858,7 @@ primop LabelThreadOp "labelThread#" GenPrimOp
    out_of_line      = True
 
 primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, Int# #)
+   State# RealWorld -> (# State# RealWorld, INT #)
    with
    out_of_line = True
    has_side_effects = True
@@ -2868,7 +2870,7 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    has_side_effects = True
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
-   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, INT, INT, INT #)
    with
    out_of_line = True
    has_side_effects = True
@@ -2900,8 +2902,8 @@ primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
    out_of_line      = True
 
 primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
-   Addr# -> Addr# -> Int# -> Addr# -> Weak# b
-          -> State# RealWorld -> (# State# RealWorld, Int# #)
+   Addr# -> Addr# -> INT -> Addr# -> Weak# b
+          -> State# RealWorld -> (# State# RealWorld, INT #)
    { {\tt addCFinalizerToWeak# fptr ptr flag eptr w} attaches a C
      function pointer {\tt fptr} to a weak pointer {\tt w} as a finalizer. If
      {\tt flag} is zero, {\tt fptr} will be called with one argument,
@@ -2913,18 +2915,18 @@ primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
    out_of_line      = True
 
 primop  DeRefWeakOp "deRefWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
+   Weak# a -> State# RealWorld -> (# State# RealWorld, INT, a #)
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
+   Weak# a -> State# RealWorld -> (# State# RealWorld, INT,
               (State# RealWorld -> (# State# RealWorld, b #) ) #)
    { Finalize a weak pointer. The return value is an unboxed tuple
      containing the new state of the world and an "unboxed Maybe",
-     represented by an {\tt Int#} and a (possibly invalid) finalization
-     action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
+     represented by an {\tt INT} and a (possibly invalid) finalization
+     action. An {\tt INT} of {\tt 1} indicates that the finalizer is valid. The
      return value {\tt b} from the finalizer should be ignored. }
    with
    has_side_effects = True
@@ -2957,7 +2959,7 @@ primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    out_of_line      = True
 
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
-   StablePtr# a -> StablePtr# a -> Int#
+   StablePtr# a -> StablePtr# a -> INT
    with
    has_side_effects = True
 
@@ -2968,10 +2970,10 @@ primop  MakeStableNameOp "makeStableName#" GenPrimOp
    out_of_line      = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
-   StableName# a -> StableName# b -> Int#
+   StableName# a -> StableName# b -> INT
 
 primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
-   StableName# a -> Int#
+   StableName# a -> INT
 
 ------------------------------------------------------------------------
 section "Compact normal form"
@@ -2980,7 +2982,7 @@ section "Compact normal form"
 primtype Compact#
 
 primop  CompactNewOp "compactNew#" GenPrimOp
-   Word# -> State# RealWorld -> (# State# RealWorld, Compact# #)
+   WORD -> State# RealWorld -> (# State# RealWorld, Compact# #)
    { Create a new Compact with the given size (in bytes, not words).
      The size is rounded up to a multiple of the allocator block size,
      and capped to one mega block. }
@@ -2989,7 +2991,7 @@ primop  CompactNewOp "compactNew#" GenPrimOp
    out_of_line      = True
 
 primop  CompactResizeOp "compactResize#" GenPrimOp
-   Compact# -> Word# -> State# RealWorld ->
+   Compact# -> WORD -> State# RealWorld ->
    State# RealWorld
    { Set the new allocation size of the compact. This value (in bytes)
      determines the size of each block in the compact chain. }
@@ -2998,26 +3000,26 @@ primop  CompactResizeOp "compactResize#" GenPrimOp
    out_of_line      = True
 
 primop  CompactContainsOp "compactContains#" GenPrimOp
-   Compact# -> a -> State# RealWorld -> (# State# RealWorld, Int# #)
+   Compact# -> a -> State# RealWorld -> (# State# RealWorld, INT #)
    { Returns 1\# if the object is contained in the compact, 0\# otherwise. }
    with
    out_of_line      = True
 
 primop  CompactContainsAnyOp "compactContainsAny#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, Int# #)
+   a -> State# RealWorld -> (# State# RealWorld, INT #)
    { Returns 1\# if the object is in any compact at all, 0\# otherwise. }
    with
    out_of_line      = True
 
 primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
-   Compact# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
+   Compact# -> State# RealWorld -> (# State# RealWorld, Addr#, WORD #)
    { Returns the address and the size (in bytes) of the first block of
      a compact. }
    with
    out_of_line      = True
 
 primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
-   Compact# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
+   Compact# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr#, WORD #)
    { Given a compact and the address of one its blocks, returns the
      next block and its size, or #nullAddr if the argument was the
      last block in the compact. }
@@ -3025,7 +3027,7 @@ primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
    out_of_line      = True
 
 primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
-   Word# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
+   WORD -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
    { Attempt to allocate a compact block with the given size (in
      bytes, given by the first argument). The {\texttt Addr\#} is a pointer to
      previous block of the compact or {\texttt nullAddr\#} to create a new compact.
@@ -3073,7 +3075,7 @@ primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
    out_of_line      = True
 
 primop CompactSize "compactSize#" GenPrimOp
-   Compact# -> State# RealWorld -> (# State# RealWorld, Word# #)
+   Compact# -> State# RealWorld -> (# State# RealWorld, WORD #)
    { Return the size (in bytes) of the total amount of data in the Compact# }
    with
    has_side_effects = True
@@ -3085,7 +3087,7 @@ section "Unsafe pointer equality"
 ------------------------------------------------------------------------
 
 primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
-   a -> a -> Int#
+   a -> a -> INT
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
    can_fail   = True -- See Note [reallyUnsafePtrEquality#]
@@ -3125,7 +3127,7 @@ section "Parallelism"
 ------------------------------------------------------------------------
 
 primop  ParOp "par#" GenPrimOp
-   a -> Int#
+   a -> INT
    with
       -- Note that Par is lazy to avoid that the sparked thing
       -- gets evaluated strictly, which it should *not* be
@@ -3143,13 +3145,13 @@ primop SeqOp "seq#" GenPrimOp
    -- See Note [seq# magic] in PrelRules
 
 primop GetSparkOp "getSpark#" GenPrimOp
-   State# s -> (# State# s, Int#, a #)
+   State# s -> (# State# s, INT, a #)
    with
    has_side_effects = True
    out_of_line = True
 
 primop NumSparks "numSparks#" GenPrimOp
-   State# s -> (# State# s, Int# #)
+   State# s -> (# State# s, INT #)
    { Returns the number of sparks in the local spark pool. }
    with
    has_side_effects = True
@@ -3162,13 +3164,13 @@ section "Tag to enum stuff"
 ------------------------------------------------------------------------
 
 primop  DataToTagOp "dataToTag#" GenPrimOp
-   a -> Int#  -- Zero-indexed; the first constructor has tag zero
+   a -> INT  -- Zero-indexed; the first constructor has tag zero
    with
    strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topRes }
    -- See Note [dataToTag# magic] in PrelRules
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
-   Int# -> a
+   INT -> a
 
 ------------------------------------------------------------------------
 section "Bytecode operations"
@@ -3211,7 +3213,7 @@ primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
+   ByteArray# -> ByteArray# -> Array# a -> INT -> ByteArray# -> State# s -> (# State# s, BCO# #)
    { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
      encoded in {\tt instrs}, and a static reference table usage bitmap given by
@@ -3230,14 +3232,14 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    out_of_line = True
 
 primop  ClosureSizeOp "closureSize#" GenPrimOp
-   a -> Int#
+   a -> INT
    { {\tt closureSize\# closure} returns the size of the given closure in
      machine words. }
    with
    out_of_line = True
 
 primop  GetApStackValOp "getApStackVal#" GenPrimOp
-   a -> Int# -> (# Int#, b #)
+   a -> INT -> (# INT, b #)
    with
    out_of_line = True
 
@@ -3355,7 +3357,7 @@ primop  TraceEventOp "traceEvent#" GenPrimOp
    out_of_line      = True
 
 primop  TraceEventBinaryOp "traceBinaryEvent#" GenPrimOp
-   Addr# -> Int# -> State# s -> State# s
+   Addr# -> INT -> State# s -> State# s
    { Emits an event via the RTS tracing framework.  The contents
      of the event is the binary object passed as the first argument with
      the the given length passed as the second argument. The event will be
@@ -3375,14 +3377,14 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    out_of_line      = True
 
 primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
+   State# RealWorld -> (# State# RealWorld, Int64# #)
    { Retrieves the allocation counter for the current thread. }
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
-   INT64 -> State# RealWorld -> State# RealWorld
+   Int64# -> State# RealWorld -> State# RealWorld
    { Sets the allocation counter for the current thread to the given value. }
    with
    has_side_effects = True
@@ -3408,20 +3410,20 @@ section "SIMD Vectors"
 ------------------------------------------------------------------------
 
 #define ALL_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8> \
+  [<Int8,INT,16>,<Int16,INT,8>,<Int32,Int32#,4>,<Int64,Int64#,2> \
+  ,<Int8,INT,32>,<Int16,INT,16>,<Int32,Int32#,8>,<Int64,Int64#,4> \
+  ,<Int8,INT,64>,<Int16,INT,32>,<Int32,Int32#,16>,<Int64,Int64#,8> \
+  ,<Word8,WORD,16>,<Word16,WORD,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
+  ,<Word8,WORD,32>,<Word16,WORD,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
+  ,<Word8,WORD,64>,<Word16,WORD,32>,<Word32,Word32#,16>,<Word64,Word64#,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define SIGNED_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
+  [<Int8,INT,16>,<Int16,INT,8>,<Int32,Int32#,4>,<Int64,Int64#,2> \
+  ,<Int8,INT,32>,<Int16,INT,16>,<Int32,Int32#,8>,<Int64,Int64#,4> \
+  ,<Int8,INT,64>,<Int16,INT,32>,<Int32,Int32#,16>,<Int64,Int64#,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
@@ -3432,12 +3434,12 @@ section "SIMD Vectors"
   ,<Float,Float#,16>,<Double,Double#,8>]
 
 #define INT_VECTOR_TYPES \
-  [<Int8,Int#,16>,<Int16,Int#,8>,<Int32,INT32,4>,<Int64,INT64,2> \
-  ,<Int8,Int#,32>,<Int16,Int#,16>,<Int32,INT32,8>,<Int64,INT64,4> \
-  ,<Int8,Int#,64>,<Int16,Int#,32>,<Int32,INT32,16>,<Int64,INT64,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,WORD32,4>,<Word64,WORD64,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,WORD32,8>,<Word64,WORD64,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,WORD32,16>,<Word64,WORD64,8>]
+  [<Int8,INT,16>,<Int16,INT,8>,<Int32,Int32#,4>,<Int64,Int64#,2> \
+  ,<Int8,INT,32>,<Int16,INT,16>,<Int32,Int32#,8>,<Int64,Int64#,4> \
+  ,<Int8,INT,64>,<Int16,INT,32>,<Int32,Int32#,16>,<Int64,Int64#,8> \
+  ,<Word8,WORD,16>,<Word16,WORD,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
+  ,<Word8,WORD,32>,<Word16,WORD,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
+  ,<Word8,WORD,64>,<Word16,WORD,32>,<Word32,Word32#,16>,<Word64,Word64#,8>]
 
 primtype VECTOR
    with llvm_only = True
@@ -3462,7 +3464,7 @@ primop VecUnpackOp "unpack#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecInsertOp "insert#" GenPrimOp
-   VECTOR -> SCALAR -> Int# -> VECTOR
+   VECTOR -> SCALAR -> INT -> VECTOR
    { Insert a scalar at the given position in a vector. }
    with can_fail = True
         llvm_only = True
@@ -3516,14 +3518,14 @@ primop VecNegOp "negate#" Monadic
         vector = SIGNED_VECTOR_TYPES
 
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
-   ByteArray# -> Int# -> VECTOR
+   ByteArray# -> INT -> VECTOR
    { Read a vector from specified index of immutable array. }
    with can_fail = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadByteArrayOp "readArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, VECTOR #)
    { Read a vector from specified index of mutable array. }
    with has_side_effects = True
         can_fail = True
@@ -3531,7 +3533,7 @@ primop VecReadByteArrayOp "readArray#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
+   MutableByteArray# s -> INT -> VECTOR -> State# s -> State# s
    { Write a vector to specified index of mutable array. }
    with has_side_effects = True
         can_fail = True
@@ -3539,14 +3541,14 @@ primop VecWriteByteArrayOp "writeArray#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
-   Addr# -> Int# -> VECTOR
+   Addr# -> INT -> VECTOR
    { Reads vector; offset in bytes. }
    with can_fail = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
+   Addr# -> INT -> State# s -> (# State# s, VECTOR #)
    { Reads vector; offset in bytes. }
    with has_side_effects = True
         can_fail = True
@@ -3554,7 +3556,7 @@ primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
-   Addr# -> Int# -> VECTOR -> State# s -> State# s
+   Addr# -> INT -> VECTOR -> State# s -> State# s
    { Write vector; offset in bytes. }
    with has_side_effects = True
         can_fail = True
@@ -3563,14 +3565,14 @@ primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
 
 
 primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
-   ByteArray# -> Int# -> VECTOR
+   ByteArray# -> INT -> VECTOR
    { Read a vector from specified index of immutable array of scalars; offset is in scalar elements. }
    with can_fail = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
+   MutableByteArray# s -> INT -> State# s -> (# State# s, VECTOR #)
    { Read a vector from specified index of mutable array of scalars; offset is in scalar elements. }
    with has_side_effects = True
         can_fail = True
@@ -3578,7 +3580,7 @@ primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
-   MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
+   MutableByteArray# s -> INT -> VECTOR -> State# s -> State# s
    { Write a vector to specified index of mutable array of scalars; offset is in scalar elements. }
    with has_side_effects = True
         can_fail = True
@@ -3586,14 +3588,14 @@ primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexScalarOffAddrOp "indexOffAddrAs#" GenPrimOp
-   Addr# -> Int# -> VECTOR
+   Addr# -> INT -> VECTOR
    { Reads vector; offset in scalar elements. }
    with can_fail = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
+   Addr# -> INT -> State# s -> (# State# s, VECTOR #)
    { Reads vector; offset in scalar elements. }
    with has_side_effects = True
         can_fail = True
@@ -3601,7 +3603,7 @@ primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
-   Addr# -> Int# -> VECTOR -> State# s -> State# s
+   Addr# -> INT -> VECTOR -> State# s -> State# s
    { Write vector; offset in scalar elements. }
    with has_side_effects = True
         can_fail = True
@@ -3665,19 +3667,19 @@ section "Prefetch"
 ------------------------------------------------------------------------
 
 
---- the Int# argument for prefetch is the byte offset on the byteArray or  Addr#
+--- the INT argument for prefetch is the byte offset on the byteArray or  Addr#
 
 ---
 primop PrefetchByteArrayOp3 "prefetchByteArray3#" GenPrimOp
-  ByteArray# -> Int# ->  State# s -> State# s
+  ByteArray# -> INT ->  State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp3 "prefetchMutableByteArray3#" GenPrimOp
-  MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
-  Addr# -> Int# -> State# s -> State# s
+  Addr# -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
@@ -3687,15 +3689,15 @@ primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
 ----
 
 primop PrefetchByteArrayOp2 "prefetchByteArray2#" GenPrimOp
-  ByteArray# -> Int# ->  State# s -> State# s
+  ByteArray# -> INT ->  State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp2 "prefetchMutableByteArray2#" GenPrimOp
-  MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
-  Addr# -> Int# ->  State# s -> State# s
+  Addr# -> INT ->  State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
@@ -3705,15 +3707,15 @@ primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
 ----
 
 primop PrefetchByteArrayOp1 "prefetchByteArray1#" GenPrimOp
-   ByteArray# -> Int# -> State# s -> State# s
+   ByteArray# -> INT -> State# s -> State# s
    with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp1 "prefetchMutableByteArray1#" GenPrimOp
-  MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
-  Addr# -> Int# -> State# s -> State# s
+  Addr# -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
@@ -3723,15 +3725,15 @@ primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
 ----
 
 primop PrefetchByteArrayOp0 "prefetchByteArray0#" GenPrimOp
-  ByteArray# -> Int# ->  State# s -> State# s
+  ByteArray# -> INT ->  State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchMutableByteArrayOp0 "prefetchMutableByteArray0#" GenPrimOp
-  MutableByteArray# s -> Int# -> State# s -> State# s
+  MutableByteArray# s -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
-  Addr# -> Int# -> State# s -> State# s
+  Addr# -> INT -> State# s -> State# s
   with has_side_effects =  True
 
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
