@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
-             MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
+             MultiParamTypeClasses, RoleAnnotations, TypeOperators,
              PolyKinds, NegativeLiterals, DataKinds, ScopedTypeVariables,
              TypeApplications, StandaloneKindSignatures,
              FlexibleInstances, UndecidableInstances #-}
@@ -523,8 +523,6 @@ but we also need TrNameD for the case where we are deserialising a TyCon
 or Module (for example when deserialising a TypeRep), in which case we
 can't conveniently come up with an Addr#.
 -}
-
-#include "MachDeps.h"
 
 data Module = Module
                 TrName   -- ^ Package name

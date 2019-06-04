@@ -43,8 +43,6 @@ import Data.Bits
 import Data.Maybe
 
 import GHC.Prim
-import GHC.Base
-
 import GHC.Enum
 import GHC.Num
 import GHC.Real

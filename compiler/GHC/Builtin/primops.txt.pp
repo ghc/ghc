@@ -132,8 +132,9 @@
 -- 3-tuple in the list of 3-tuples. That is, the vector attribute allows us to
 -- define a family of types or primops. Vector support also adds three new
 -- keywords: VECTOR, SCALAR, and VECTUPLE. These keywords are expanded to types
--- derived from the 3-tuple. For the 3-tuple <Int64#,Int64#,2>, VECTOR expands to
--- Int64X2#, SCALAR expands to Int64#, and VECTUPLE expands to (# Int64#, Int64# #).
+-- derived from the 3-tuple. For the 3-tuple <Int64,Int64#,2>, VECTOR expands to
+-- Int64X2#, SCALAR expands to Int64#, and VECTUPLE expands to (# Int64#, Int64#
+-- #).
 
 defaults
    has_side_effects = False
@@ -228,7 +229,12 @@ section "The word size story."
          the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.
          This is normally set based on the {\tt config.h} parameter
          {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
-         bits on 64-bit machines.
+         bits on 64-bit machines.  However, it can also be explicitly
+         set to a smaller number than 64, e.g., 62 bits, to allow the
+         possibility of using tag bits. Currently GHC itself has only
+         32-bit and 64-bit variants, but 61, 62, or 63-bit code can be
+         exported as an external core file for use in other back ends.
+         30 and 31-bit code is no longer supported.
 
          GHC also implements a primitive unsigned integer type {\tt
          Word\#} which always has the same number of bits as {\tt
@@ -237,7 +243,10 @@ section "The word size story."
          In addition, GHC supports families of explicit-sized integers
          and words at 8, 16, 32, and 64 bits, with the usual
          arithmetic operations, comparisons, and a range of
-         conversions.
+         conversions. The fixed-size integers and words are always
+         represented as {\tt Int<N>\#} and {\tt Word<N>\#}, and the
+         operations implemented in terms of the primops on these
+         types.
 
          Finally, there are strongly deprecated primops for coercing
          between {\tt Addr\#}, the primitive type of machine

@@ -1114,16 +1114,9 @@ doubleOp2 _ _ _ _ = Nothing
 --------------------------
 doubleDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
 doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
-  = Just $ mkCoreUbxTup [iNT64Ty, intPrimTy]
-                        [ Lit (mkLitINT64 (toInteger m))
-                        , mkIntVal platform (toInteger e) ]
-  where
-    platform = roPlatform env
-    (iNT64Ty, mkLitINT64)
-      | platformWordSizeInBits platform < 64
-      = (int64PrimTy, mkLitInt64Wrap)
-      | otherwise
-      = (intPrimTy  , mkLitIntWrap platform)
+  = Just $ mkCoreUbxTup [int64PrimTy, intPrimTy]
+                        [ Lit (mkLitInt64Wrap (toInteger m))
+                        , mkIntVal (roPlatform env) (toInteger e) ]
 doubleDecodeOp _   _
   = Nothing
 
