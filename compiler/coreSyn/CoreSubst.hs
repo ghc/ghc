@@ -637,8 +637,8 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
         -- Retain an InlineRule!
-  | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
-  = NoUnfolding
+  -- | not (isStableSource src)  -- Zap an unstable unfolding, to save substitution work
+  -- = NoUnfolding
   | otherwise                 -- But keep a stable one!
   = seqExpr new_tmpl `seq`
     unf { uf_tmpl = new_tmpl }
