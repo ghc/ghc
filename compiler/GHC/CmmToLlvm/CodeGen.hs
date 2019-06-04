@@ -803,6 +803,8 @@ cmmPrimOpFunctions mop = do
       intrinTy2 = "p0i8." ++ showSDoc dflags (ppr $ llvmWord platform)
       unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
                         ++ " not supported here")
+      dontReach64 = panic ("cmmPrimOpFunctions: " ++ show mop
+                        ++ " should be not be encountered because the regular primop for this 64-bit operation is used instead.")
 
   return $ case mop of
     MO_F32_Exp    -> fsLit "expf"
@@ -903,6 +905,39 @@ cmmPrimOpFunctions mop = do
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
     MO_Xchg _        -> unsupported
+
+    MO_64_S_Conv_ToNative   -> dontReach64
+    MO_64_S_Conv_FromNative -> dontReach64
+    MO_64_U_Conv_ToNative   -> dontReach64
+    MO_64_U_Conv_FromNative -> dontReach64
+
+    MO_64_Neg        -> dontReach64
+    MO_64_Add        -> dontReach64
+    MO_64_Sub        -> dontReach64
+    MO_64_Mul        -> dontReach64
+    MO_64_S_Quot     -> dontReach64
+    MO_64_S_Rem      -> dontReach64
+    MO_64_U_Quot     -> dontReach64
+    MO_64_U_Rem      -> dontReach64
+
+    MO_64_And        -> dontReach64
+    MO_64_Or         -> dontReach64
+    MO_64_Xor        -> dontReach64
+    MO_64_Not        -> dontReach64
+    MO_64_Shl        -> dontReach64
+    MO_64_S_Shr      -> dontReach64
+    MO_64_U_Shr      -> dontReach64
+
+    MO_64_Eq         -> dontReach64
+    MO_64_Ne         -> dontReach64
+    MO_64_S_Ge       -> dontReach64
+    MO_64_S_Gt       -> dontReach64
+    MO_64_S_Le       -> dontReach64
+    MO_64_S_Lt       -> dontReach64
+    MO_64_U_Ge       -> dontReach64
+    MO_64_U_Gt       -> dontReach64
+    MO_64_U_Le       -> dontReach64
+    MO_64_U_Lt       -> dontReach64
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData

@@ -13,14 +13,11 @@ module GHC.Integer (
 
     -- * Construct 'Integer's
     smallInteger, wordToInteger,
-#if WORD_SIZE_IN_BITS < 64
     word64ToInteger, int64ToInteger,
-#endif
+
     -- * Conversion to other integral types
     integerToWord, integerToInt,
-#if WORD_SIZE_IN_BITS < 64
     integerToWord64, integerToInt64,
-#endif
 
     -- * Helpers for 'RealFloat' type-class operations
     encodeFloatInteger, floatFromInteger,
@@ -75,7 +72,6 @@ wordToInteger = I.integerFromWord#
 integerToWord :: Integer -> Word#
 integerToWord = I.integerToWord#
 
-#if WORD_SIZE_IN_BITS < 64
 
 word64ToInteger :: Word64# -> Integer
 word64ToInteger = I.integerFromWord64#
@@ -88,8 +84,6 @@ int64ToInteger = I.integerFromInt64#
 
 integerToInt64 :: Integer -> Int64#
 integerToInt64 = I.integerToInt64#
-
-#endif
 
 
 encodeFloatInteger :: Integer -> Int# -> Float#
