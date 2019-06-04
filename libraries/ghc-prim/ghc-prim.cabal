@@ -43,7 +43,6 @@ Library
         GHC.CString
         GHC.Classes
         GHC.Debug
-        GHC.IntWord64
         GHC.Magic
         GHC.PrimopWrappers
         GHC.Tuple
@@ -73,7 +72,6 @@ Library
         cbits/clz.c
         cbits/ctz.c
         cbits/debug.c
-        cbits/longlong.c
         cbits/pdep.c
         cbits/pext.c
         cbits/popcnt.c

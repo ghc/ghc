@@ -882,6 +882,10 @@ emitPrimOp dflags [res] CasByteArrayOp_Int [mba, ix, old, new] = OpDest_AllDone 
     doCasByteArray res mba ix (bWord dflags) old new
 
 
+  Int64ToWord64Op -> OpDest_Nop
+  Word64ToInt64Op -> OpDest_Nop
+  Int32ToWord32Op -> OpDest_Nop
+  Word32ToInt32Op -> OpDest_Nop
   Int2WordOp      -> OpDest_Nop
   Word2IntOp      -> OpDest_Nop
   Int2AddrOp      -> OpDest_Nop
@@ -936,6 +940,14 @@ callishPrimOpSupported dflags op
                                      -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
 
+      Int32QuotRemOp | ncg && (x86ish || ppc)
+                                     -> Left (MO_S_QuotRem W32)
+                     | otherwise     -> Right (genericIntQuotRemOp W32)
+
+      Int64QuotRemOp | ncg && (x86ish || ppc)
+                                     -> Left (MO_S_QuotRem W64)
+                     | otherwise     -> Right (genericIntQuotRemOp W64)
+
       WordQuotRemOp  | ncg && (x86ish || ppc) ->
                          Left (MO_U_QuotRem  (wordWidth dflags))
                      | otherwise      ->
@@ -952,6 +964,14 @@ callishPrimOpSupported dflags op
       Word16QuotRemOp| ncg && (x86ish || ppc)
                                      -> Left (MO_U_QuotRem W16)
                      | otherwise     -> Right (genericWordQuotRemOp W16)
+
+      Word32QuotRemOp| ncg && (x86ish || ppc)
+                                     -> Left (MO_U_QuotRem W32)
+                     | otherwise     -> Right (genericWordQuotRemOp W32)
+
+      Word64QuotRemOp| ncg && (x86ish || ppc)
+                                     -> Left (MO_U_QuotRem W64)
+                     | otherwise     -> Right (genericWordQuotRemOp W64)
 
       WordAdd2Op     | (ncg && (x86ish || ppc))
                          || llvm      -> Left (MO_Add2       (wordWidth dflags))
@@ -1383,12 +1403,12 @@ dealWithOp dflags = \case
   AddrEqOp       -> OpDest_Translate (mo_wordEq dflags)
   AddrNeOp       -> OpDest_Translate (mo_wordNe dflags)
 
-  AndOp          -> OpDest_Translate (mo_wordAnd dflags)
-  OrOp           -> OpDest_Translate (mo_wordOr dflags)
-  XorOp          -> OpDest_Translate (mo_wordXor dflags)
-  NotOp          -> OpDest_Translate (mo_wordNot dflags)
-  SllOp          -> OpDest_Translate (mo_wordShl dflags)
-  SrlOp          -> OpDest_Translate (mo_wordUShr dflags)
+  WordAndOp      -> OpDest_Translate (mo_wordAnd dflags)
+  WordOrOp       -> OpDest_Translate (mo_wordOr dflags)
+  WordXorOp      -> OpDest_Translate (mo_wordXor dflags)
+  WordNotOp      -> OpDest_Translate (mo_wordNot dflags)
+  WordSllOp      -> OpDest_Translate (mo_wordShl dflags)
+  WordSrlOp      -> OpDest_Translate (mo_wordUShr dflags)
 
   AddrRemOp      -> OpDest_Translate (mo_wordURem dflags)
 
@@ -1406,9 +1426,13 @@ dealWithOp dflags = \case
   IntGtOp        -> OpDest_Translate (mo_wordSGt dflags)
   IntLtOp        -> OpDest_Translate (mo_wordSLt dflags)
 
-  ISllOp         -> OpDest_Translate (mo_wordShl dflags)
-  ISraOp         -> OpDest_Translate (mo_wordSShr dflags)
-  ISrlOp         -> OpDest_Translate (mo_wordUShr dflags)
+  IntAndOp       -> OpDest_Translate (mo_wordAnd dflags)
+  IntOrOp        -> OpDest_Translate (mo_wordOr dflags)
+  IntXorOp       -> OpDest_Translate (mo_wordXor dflags)
+  IntNotOp       -> OpDest_Translate (mo_wordNot dflags)
+  IntSllOp       -> OpDest_Translate (mo_wordShl dflags)
+  IntSraOp       -> OpDest_Translate (mo_wordSShr dflags)
+  IntSrlOp       -> OpDest_Translate (mo_wordUShr dflags)
 
 -- Native word unsigned ops
 
@@ -1428,8 +1452,8 @@ dealWithOp dflags = \case
 
 -- Int8# signed ops
 
-  Int8Extend     -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
-  Int8Narrow     -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
+  Int8ToInt      -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
+  IntToInt8      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
   Int8NegOp      -> OpDest_Translate (MO_S_Neg W8)
   Int8AddOp      -> OpDest_Translate (MO_Add W8)
   Int8SubOp      -> OpDest_Translate (MO_Sub W8)
@@ -1446,8 +1470,8 @@ dealWithOp dflags = \case
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
-  Word8Narrow     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
+  Word8ToWord     -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
+  WordToWord8     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
   Word8NotOp      -> OpDest_Translate (MO_Not W8)
   Word8AddOp      -> OpDest_Translate (MO_Add W8)
   Word8SubOp      -> OpDest_Translate (MO_Sub W8)
@@ -1464,8 +1488,8 @@ dealWithOp dflags = \case
 
 -- Int16# signed ops
 
-  Int16Extend     -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
-  Int16Narrow     -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
+  Int16ToInt      -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
+  IntToInt16      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
   Int16NegOp      -> OpDest_Translate (MO_S_Neg W16)
   Int16AddOp      -> OpDest_Translate (MO_Add W16)
   Int16SubOp      -> OpDest_Translate (MO_Sub W16)
@@ -1482,8 +1506,8 @@ dealWithOp dflags = \case
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
-  Word16Narrow     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
+  Word16ToWord     -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
+  WordToWord16     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
   Word16NotOp      -> OpDest_Translate (MO_Not W16)
   Word16AddOp      -> OpDest_Translate (MO_Add W16)
   Word16SubOp      -> OpDest_Translate (MO_Sub W16)
@@ -1497,6 +1521,98 @@ dealWithOp dflags = \case
   Word16LeOp       -> OpDest_Translate (MO_U_Le W16)
   Word16LtOp       -> OpDest_Translate (MO_U_Lt W16)
   Word16NeOp       -> OpDest_Translate (MO_Ne W16)
+
+-- Int32# signed ops
+
+  Int32ToInt      -> OpDest_Translate (MO_SS_Conv W32 (wordWidth dflags))
+  IntToInt32      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W32)
+  Int32NegOp      -> OpDest_Translate (MO_S_Neg W32)
+  Int32AddOp      -> OpDest_Translate (MO_Add W32)
+  Int32SubOp      -> OpDest_Translate (MO_Sub W32)
+  Int32MulOp      -> OpDest_Translate (MO_Mul W32)
+  Int32QuotOp     -> OpDest_Translate (MO_S_Quot W32)
+  Int32RemOp      -> OpDest_Translate (MO_S_Rem W32)
+
+  Int32SllOp      -> OpDest_Translate (MO_Shl W32)
+  Int32SraOp      -> OpDest_Translate (MO_S_Shr W32)
+  Int32SrlOp      -> OpDest_Translate (MO_U_Shr W32)
+
+  Int32EqOp       -> OpDest_Translate (MO_Eq W32)
+  Int32GeOp       -> OpDest_Translate (MO_S_Ge W32)
+  Int32GtOp       -> OpDest_Translate (MO_S_Gt W32)
+  Int32LeOp       -> OpDest_Translate (MO_S_Le W32)
+  Int32LtOp       -> OpDest_Translate (MO_S_Lt W32)
+  Int32NeOp       -> OpDest_Translate (MO_Ne W32)
+
+-- Word32# unsigned ops
+
+  Word32ToWord     -> OpDest_Translate (MO_UU_Conv W32 (wordWidth dflags))
+  WordToWord32     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W32)
+  Word32AddOp      -> OpDest_Translate (MO_Add W32)
+  Word32SubOp      -> OpDest_Translate (MO_Sub W32)
+  Word32MulOp      -> OpDest_Translate (MO_Mul W32)
+  Word32QuotOp     -> OpDest_Translate (MO_U_Quot W32)
+  Word32RemOp      -> OpDest_Translate (MO_U_Rem W32)
+
+  Word32AndOp      -> OpDest_Translate (MO_And W32)
+  Word32OrOp       -> OpDest_Translate (MO_Or W32)
+  Word32XorOp      -> OpDest_Translate (MO_Xor W32)
+  Word32NotOp      -> OpDest_Translate (MO_Not W32)
+  Word32SllOp      -> OpDest_Translate (MO_Shl W32)
+  Word32SrlOp      -> OpDest_Translate (MO_U_Shr W32)
+
+  Word32EqOp       -> OpDest_Translate (MO_Eq W32)
+  Word32GeOp       -> OpDest_Translate (MO_U_Ge W32)
+  Word32GtOp       -> OpDest_Translate (MO_U_Gt W32)
+  Word32LeOp       -> OpDest_Translate (MO_U_Le W32)
+  Word32LtOp       -> OpDest_Translate (MO_U_Lt W32)
+  Word32NeOp       -> OpDest_Translate (MO_Ne W32)
+
+-- Int64# signed ops
+
+  Int64ToInt      -> OpDest_Translate (MO_SS_Conv W64 (wordWidth dflags))
+  IntToInt64      -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W64)
+  Int64NegOp      -> OpDest_Translate (MO_S_Neg W64)
+  Int64AddOp      -> OpDest_Translate (MO_Add W64)
+  Int64SubOp      -> OpDest_Translate (MO_Sub W64)
+  Int64MulOp      -> OpDest_Translate (MO_Mul W64)
+  Int64QuotOp     -> OpDest_Translate (MO_S_Quot W64)
+  Int64RemOp      -> OpDest_Translate (MO_S_Rem W64)
+
+  Int64SllOp      -> OpDest_Translate (MO_Shl W64)
+  Int64SraOp      -> OpDest_Translate (MO_S_Shr W64)
+  Int64SrlOp      -> OpDest_Translate (MO_U_Shr W64)
+
+  Int64EqOp       -> OpDest_Translate (MO_Eq W64)
+  Int64GeOp       -> OpDest_Translate (MO_S_Ge W64)
+  Int64GtOp       -> OpDest_Translate (MO_S_Gt W64)
+  Int64LeOp       -> OpDest_Translate (MO_S_Le W64)
+  Int64LtOp       -> OpDest_Translate (MO_S_Lt W64)
+  Int64NeOp       -> OpDest_Translate (MO_Ne W64)
+
+-- Word64# unsigned ops
+
+  Word64ToWord     -> OpDest_Translate (MO_UU_Conv W64 (wordWidth dflags))
+  WordToWord64     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W64)
+  Word64AddOp      -> OpDest_Translate (MO_Add W64)
+  Word64SubOp      -> OpDest_Translate (MO_Sub W64)
+  Word64MulOp      -> OpDest_Translate (MO_Mul W64)
+  Word64QuotOp     -> OpDest_Translate (MO_U_Quot W64)
+  Word64RemOp      -> OpDest_Translate (MO_U_Rem W64)
+
+  Word64AndOp      -> OpDest_Translate (MO_And W64)
+  Word64OrOp       -> OpDest_Translate (MO_Or W64)
+  Word64XorOp      -> OpDest_Translate (MO_Xor W64)
+  Word64NotOp      -> OpDest_Translate (MO_Not W64)
+  Word64SllOp      -> OpDest_Translate (MO_Shl W64)
+  Word64SrlOp      -> OpDest_Translate (MO_U_Shr W64)
+
+  Word64EqOp       -> OpDest_Translate (MO_Eq W64)
+  Word64GeOp       -> OpDest_Translate (MO_U_Ge W64)
+  Word64GtOp       -> OpDest_Translate (MO_U_Gt W64)
+  Word64LeOp       -> OpDest_Translate (MO_U_Le W64)
+  Word64LtOp       -> OpDest_Translate (MO_U_Lt W64)
+  Word64NeOp       -> OpDest_Translate (MO_Ne W64)
 
 -- Char# ops
 
@@ -1586,10 +1702,14 @@ dealWithOp dflags = \case
   IntQuotRemOp    -> OpDest_CallishHandledLater
   Int8QuotRemOp   -> OpDest_CallishHandledLater
   Int16QuotRemOp  -> OpDest_CallishHandledLater
+  Int32QuotRemOp  -> OpDest_CallishHandledLater
+  Int64QuotRemOp  -> OpDest_CallishHandledLater
   WordQuotRemOp   -> OpDest_CallishHandledLater
   WordQuotRem2Op  -> OpDest_CallishHandledLater
   Word8QuotRemOp  -> OpDest_CallishHandledLater
   Word16QuotRemOp -> OpDest_CallishHandledLater
+  Word32QuotRemOp -> OpDest_CallishHandledLater
+  Word64QuotRemOp -> OpDest_CallishHandledLater
   WordAdd2Op      -> OpDest_CallishHandledLater
   WordAddCOp      -> OpDest_CallishHandledLater
   WordSubCOp      -> OpDest_CallishHandledLater
