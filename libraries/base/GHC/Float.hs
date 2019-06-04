@@ -1421,11 +1421,7 @@ castWord64ToDouble :: Word64 -> Double
 castWord64ToDouble (W64# w) = D# (stgWord64ToDouble w)
 
 foreign import prim "stg_word64ToDoublezh"
-#if WORD_SIZE_IN_BITS == 64
-    stgWord64ToDouble :: Word# -> Double#
-#else
     stgWord64ToDouble :: Word64# -> Double#
-#endif
 
 
 -- | @'castFloatToWord64' f@ does a bit-for-bit copy from a floating-point value
@@ -1438,8 +1434,4 @@ castDoubleToWord64 :: Double -> Word64
 castDoubleToWord64 (D# d#) = W64# (stgDoubleToWord64 d#)
 
 foreign import prim "stg_doubleToWord64zh"
-#if WORD_SIZE_IN_BITS == 64
-    stgDoubleToWord64 :: Double# -> Word#
-#else
     stgDoubleToWord64 :: Double# -> Word64#
-#endif

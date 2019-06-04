@@ -43,7 +43,6 @@ Library
         GHC.CString
         GHC.Classes
         GHC.Debug
-        GHC.IntWord64
         GHC.Magic
         GHC.Prim.Ext
         GHC.Prim.Panic
