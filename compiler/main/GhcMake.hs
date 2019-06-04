@@ -2063,8 +2063,8 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
 enableCodeGenForTH :: HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForTH =
   enableCodeGenWhen condition should_modify TFL_CurrentModule TFL_GhcSession
   where
@@ -2083,8 +2083,8 @@ enableCodeGenForTH =
 -- This is used used in order to load code that uses unboxed tuples
 -- into GHCi while still allowing some code to be interpreted.
 enableCodeGenForUnboxedTuples :: HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForUnboxedTuples =
   enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
   where
@@ -2106,8 +2106,8 @@ enableCodeGenWhen
   -> TempFileLifetime
   -> TempFileLifetime
   -> HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
