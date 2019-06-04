@@ -39,13 +39,11 @@ import Id
 import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
-import FamInstEnv
 import Type             ( tidyTopType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
-import NameEnv
 import NameCache
 import Avail
 import IfaceEnv
@@ -60,6 +58,7 @@ import HscTypes
 import Maybes
 import UniqSupply
 import Outputable
+import Util( filterOut )
 import qualified ErrUtils as Err
 
 import Control.Monad
@@ -149,50 +148,65 @@ mkBootModDetailsTc hsc_env
     Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
-    do  { let { insts'     = map (updateClsInstDFun globaliseAndTidyBootId) insts
-              ; pat_syns'  = map (updatePatSynIds   globaliseAndTidyBootId) pat_syns
-              ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
-                                           (typeEnvIds type_env) tcs fam_insts
-              ; type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
-              }
-        ; return (ModDetails { md_types         = type_env'
-                             , md_insts         = insts'
-                             , md_fam_insts     = fam_insts
-                             , md_rules         = []
-                             , md_anns          = []
-                             , md_exports       = exports
-                             , md_complete_sigs = complete_sigs
-                             })
-        }
+    return (ModDetails { md_types         = type_env'
+                       , md_insts         = insts'
+                       , md_fam_insts     = fam_insts
+                       , md_rules         = []
+                       , md_anns          = []
+                       , md_exports       = exports
+                       , md_complete_sigs = complete_sigs
+                       })
   where
     dflags = hsc_dflags hsc_env
 
-mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst] -> TypeEnv
-mkBootTypeEnv exports ids tcs fam_insts
-  = tidyTypeEnv True $
-       typeEnvFromEntities final_ids tcs fam_insts
-  where
-        -- Find the LocalIds in the type env that are exported
-        -- Make them into GlobalIds, and tidy their types
-        --
-        -- It's very important to remove the non-exported ones
-        -- because we don't tidy the OccNames, and if we don't remove
-        -- the non-exported ones we'll get many things with the
-        -- same name in the interface file, giving chaos.
-        --
-        -- Do make sure that we keep Ids that are already Global.
-        -- When typechecking an .hs-boot file, the Ids come through as
-        -- GlobalIds.
+    -- Find the LocalIds in the type env that are exported
+    -- Make them into GlobalIds, and tidy their types
+    --
+    -- It's very important to remove the non-exported ones
+    -- because we don't tidy the OccNames, and if we don't remove
+    -- the non-exported ones we'll get many things with the
+    -- same name in the interface file, giving chaos.
+    --
+    -- Do make sure that we keep Ids that are already Global.
+    -- When typechecking an .hs-boot file, the Ids come through as
+    -- GlobalIds.
     final_ids = [ globaliseAndTidyBootId id
-                | id <- ids
+                | id <- typeEnvIds type_env
                 , keep_it id ]
 
-        -- default methods have their export flag set, but everything
-        -- else doesn't (yet), because this is pre-desugaring, so we
-        -- must test both.
-    keep_it id = isExportedId id || idName id `elemNameSet` exports
+    final_tcs  = filterOut (isWiredInName . getName) tcs
+    type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
+    insts'     = mkFinalClsInsts type_env1 insts
+    pat_syns'  = mkFinalPatSyns  type_env1 pat_syns
+    type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
 
+    -- Default methods have their export flag set (isExportedId),
+    -- but everything else doesn't (yet), because this is
+    -- pre-desugaring, so we must test against the exports too.
+    keep_it id | isWiredInName id_name           = False
+               | isExportedId id                 = True
+               | id_name `elemNameSet` exp_names = True
+               | otherwise                       = False
+               where
+                 id_name = idName id
 
+    exp_names = availsToNameSet exports
+
+lookupFinalId :: TypeEnv -> Id -> Id
+lookupFinalId type_env id
+  = case lookupTypeEnv type_env (idName id) of
+      Just (AnId id') -> id'
+      _ -> pprPanic "lookup_final_id" (ppr id)
+
+mkFinalClsInsts :: TypeEnv -> [ClsInst] -> [ClsInst]
+mkFinalClsInsts env = map (updateClsInstDFun (lookupFinalId env))
+
+mkFinalPatSyns :: TypeEnv -> [PatSyn] -> [PatSyn]
+mkFinalPatSyns env = map (updatePatSynIds (lookupFinalId env))
+
+extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
+extendTypeEnvWithPatSyns tidy_patsyns type_env
+  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
 
 globaliseAndTidyBootId :: Id -> Id
 -- For a LocalId with an External Name,
@@ -201,9 +215,9 @@ globaliseAndTidyBootId :: Id -> Id
 --     * unchanged details
 --     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in ToIface)
-globaliseAndTidyBootId id =
-  (if isLocalId id then id `setIdType` tidyTopType (idType id) else id)
-    `setIdUnfolding` BootUnfolding
+globaliseAndTidyBootId id
+  = globaliseId id `setIdType`      tidyTopType (idType id)
+                   `setIdUnfolding` BootUnfolding
 
 {-
 ************************************************************************
@@ -343,28 +357,32 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; (tidy_env, tidy_binds)
                  <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
 
+        -- The completed type environment is gotten from
+        --      a) the types and classes defined here (plus implicit things)
+        --      b) adding Ids with correct IdInfo, including unfoldings,
+        --              gotten from the bindings
+        -- From (b) we keep only those Ids with External names;
+        --          the CoreTidy pass makes sure these are all and only
+        --          the externally-accessible ones
+        -- This truncates the type environment to include only the
+        -- exported Ids and things needed from them, which saves space
+        --
+        -- See Note [Don't attempt to trim data types]
         ; let { final_ids  = [ if omit_prags then trimId id else id
                              | id <- bindersOfBinds tidy_binds
                              , isExternalName (idName id)
-                             , -- Remove wired-in things. See comments around `tidyTypeEnv`.
-                               not (isWiredInName (getName id))
-                             ]
+                             , not (isWiredInName (getName id))
+                             ]   -- See Note [Drop wired-in things]
 
-              ; type_env = typeEnvFromEntities final_ids tcs fam_insts
-
-              ; lookup_final_id id =
-                  case lookupTypeEnv type_env (idName id) of
-                    Just (AnId id') -> id'
-                    _ -> pprPanic "lookup_final_id" (ppr id)
-
-              ; tidy_cls_insts = map (updateClsInstDFun lookup_final_id) cls_insts
-
-              ; tidy_rules = tidyRules tidy_env trimmed_rules
-
-              ; tidy_patsyns = map (updatePatSynIds lookup_final_id) patsyns
-
-              ; tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
+              ; final_tcs      = filterOut (isWiredInName . getName) tcs
+                                 -- See Note [Drop wired-in things]
+              ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
+              ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts
+              ; tidy_patsyns   = mkFinalPatSyns  type_env patsyns
+              ; tidy_type_env  = extendTypeEnvWithPatSyns tidy_patsyns type_env
+              ; tidy_rules     = tidyRules tidy_env trimmed_rules
               }
+
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
@@ -432,31 +450,6 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
   where
     dflags = hsc_dflags hsc_env
 
-tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
-            -> TypeEnv -> TypeEnv
-
--- The completed type environment is gotten from
---      a) the types and classes defined here (plus implicit things)
---      b) adding Ids with correct IdInfo, including unfoldings,
---              gotten from the bindings
--- From (b) we keep only those Ids with External names;
---          the CoreTidy pass makes sure these are all and only
---          the externally-accessible ones
--- This truncates the type environment to include only the
--- exported Ids and things needed from them, which saves space
---
--- See Note [Don't attempt to trim data types]
-
-tidyTypeEnv omit_prags type_env
- = let
-        type_env1 = filterNameEnv (not . isWiredInName . getName) type_env
-          -- (1) remove wired-in things
-        type_env2 | omit_prags = mapNameEnv trimThing type_env1
-                  | otherwise  = type_env1
-          -- (2) trimmed if necessary
-    in
-    type_env2
-
 --------------------------
 trimId :: Id -> Id
 trimId id
@@ -465,19 +458,11 @@ trimId id
   | otherwise
   = id
 
-trimThing :: TyThing -> TyThing
--- Trim off inessentials, for boot files and no -O
-trimThing (AnId id)
-  = AnId (trimId id)
+{- Note [Drop wired-in things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never put wired-in TyCons or Ids in an interface file.
+They are wired-in, so the compiler knows about them already.
 
-trimThing other_thing
-  = other_thing
-
-extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
-extendTypeEnvWithPatSyns tidy_patsyns type_env
-  = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
-
-{-
 Note [Don't attempt to trim data types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For some time GHC tried to avoid exporting the data constructors
