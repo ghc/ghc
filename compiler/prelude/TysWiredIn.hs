@@ -127,7 +127,6 @@ module TysWiredIn (
     ) where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
 
 import GhcPrelude
 
