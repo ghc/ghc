@@ -52,7 +52,7 @@ import DynFlags
 import Config
 import Panic
 import Util
-import StringBuffer     ( hGetStringBuffer )
+import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
@@ -64,6 +64,8 @@ import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
 import Ar
+import Bag              ( unitBag )
+import FastString       ( mkFastString )
 
 import Exception
 import System.Directory
@@ -87,17 +89,28 @@ import Data.Time        ( UTCTime )
 -- of slurping in the OPTIONS pragmas
 
 preprocess :: HscEnv
-           -> (FilePath, Maybe Phase) -- ^ filename and starting phase
-           -> IO (DynFlags, FilePath)
-preprocess hsc_env (filename, mb_phase) =
-  ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
-  runPipeline anyHsc hsc_env (filename, fmap RealPhase mb_phase)
+           -> FilePath -- ^ input filename
+           -> Maybe InputFileBuffer
+           -- ^ optional buffer to use instead of reading the input file
+           -> Maybe Phase -- ^ starting phase
+           -> IO (Either ErrorMessages (DynFlags, FilePath))
+preprocess hsc_env input_fn mb_input_buf mb_phase =
+  handleSourceError (\err -> return (Left (srcErrorMessages err))) $
+  ghandle handler $
+  fmap Right $
+  ASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
+  runPipeline anyHsc hsc_env (input_fn, mb_input_buf, fmap RealPhase mb_phase)
         Nothing
         -- We keep the processed file for the whole session to save on
         -- duplicated work in ghci.
         (Temporary TFL_GhcSession)
         Nothing{-no ModLocation-}
         []{-no foreign objects-}
+  where
+    srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
+    handler (ProgramError msg) = return $ Left $ unitBag $
+        mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
+    handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
 
@@ -186,6 +199,7 @@ compileOne' m_tc_result mHscMessage
             -- handled properly
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
+                               Nothing,
                                Just (HscOut src_flavour
                                             mod_name HscUpdateSig))
                               (Just basename)
@@ -223,6 +237,7 @@ compileOne' m_tc_result mHscMessage
             -- We're in --make mode: finish the compilation pipeline.
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
+                               Nothing,
                                Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
                               (Just basename)
                               Persistent
@@ -313,7 +328,7 @@ compileForeign hsc_env lang stub_c = do
               LangAsm    -> As True -- allow CPP
               RawObject  -> panic "compileForeign: should be unreachable"
         (_, stub_o) <- runPipeline StopLn hsc_env
-                       (stub_c, Just (RealPhase phase))
+                       (stub_c, Nothing, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)
                        Nothing{-no ModLocation-}
                        []
@@ -335,7 +350,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
-                  (empty_stub, Nothing)
+                  (empty_stub, Nothing, Nothing)
                   (Just basename)
                   Persistent
                   (Just location)
@@ -525,9 +540,10 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
         stop_phase' = case stop_phase of
                         As _ | split -> SplitAs
                         _            -> stop_phase
-
    ( _, out_file) <- runPipeline stop_phase' hsc_env
-                            (src, fmap RealPhase mb_phase) Nothing output
+                            (src, Nothing, fmap RealPhase mb_phase)
+                            Nothing
+                            output
                             Nothing{-no ModLocation-} []
    return out_file
 
@@ -560,13 +576,15 @@ doLink dflags stop_phase o_files
 runPipeline
   :: Phase                      -- ^ When to stop
   -> HscEnv                     -- ^ Compilation environment
-  -> (FilePath,Maybe PhasePlus) -- ^ Input filename (and maybe -x suffix)
+  -> (FilePath, Maybe InputFileBuffer, Maybe PhasePlus)
+                                -- ^ Pipeline input file name, optional
+                                -- buffer and maybe -x suffix
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
-runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
+runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
 
     = do let
@@ -618,8 +636,22 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                                       ++ input_fn))
              HscOut {} -> return ()
 
+         -- Write input buffer to temp file if requested
+         input_fn' <- case (start_phase, mb_input_buf) of
+             (RealPhase real_start_phase, Just input_buf) -> do
+                 let suffix = phaseInputExt real_start_phase
+                 fn <- newTempName dflags TFL_CurrentModule suffix
+                 hdl <- openBinaryFile fn WriteMode
+                 -- Add a LINE pragma so reported source locations will
+                 -- mention the real input file, not this temp file.
+                 hPutStrLn hdl $ "{-# LINE 1 \""++ input_fn ++ "\"#-}"
+                 hPutStringBuffer hdl input_buf
+                 hClose hdl
+                 return fn
+             (_, _) -> return input_fn
+
          debugTraceMsg dflags 4 (text "Running the pipeline")
-         r <- runPipeline' start_phase hsc_env env input_fn
+         r <- runPipeline' start_phase hsc_env env input_fn'
                            maybe_loc foreign_os
 
          -- If we are compiling a Haskell module, and doing
@@ -633,7 +665,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                    (text "Running the pipeline again for -dynamic-too")
                let dflags' = dynamicTooMkDynamicDynFlags dflags
                hsc_env' <- newHscEnv dflags'
-               _ <- runPipeline' start_phase hsc_env' env input_fn
+               _ <- runPipeline' start_phase hsc_env' env input_fn'
                                  maybe_loc foreign_os
                return ()
          return r
@@ -1007,8 +1039,11 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         (hspp_buf,mod_name,imps,src_imps) <- liftIO $ do
           do
             buf <- hGetStringBuffer input_fn
-            (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
-            return (Just buf, mod_name, imps, src_imps)
+            eimps <- getImports dflags buf input_fn (basename <.> suff)
+            case eimps of
+              Left errs -> throwErrors errs
+              Right (src_imps,imps,L _ mod_name) -> return
+                  (Just buf, mod_name, imps, src_imps)
 
   -- Take -o into account if present
   -- Very like -ohi, but we must *only* do this if we aren't linking

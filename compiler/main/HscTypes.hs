@@ -13,7 +13,7 @@ module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
-        Target(..), TargetId(..), pprTarget, pprTargetId,
+        Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
         IServ(..),
 
@@ -133,7 +133,7 @@ module HscTypes (
 
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
-        throwOneError, handleSourceError,
+        throwErrors, throwOneError, handleSourceError,
         handleFlagWarnings, printOrThrowWarnings,
 
         -- * COMPLETE signature
@@ -277,6 +277,10 @@ srcErrorMessages (SourceError msgs) = msgs
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
+
+-- | Throw some errors.
+throwErrors :: MonadIO io => ErrorMessages -> io a
+throwErrors = liftIO . throwIO . mkSrcErr
 
 throwOneError :: MonadIO m => ErrMsg -> m ab
 throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
@@ -499,8 +503,17 @@ data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetContents     :: Maybe (StringBuffer,UTCTime)
-                                        -- ^ in-memory text buffer?
+      targetContents     :: Maybe (InputFileBuffer, UTCTime)
+      -- ^ Optional in-memory buffer containing the source code GHC should
+      -- use for this target instead of reading it from disk.
+      --
+      -- Since GHC version 8.10 modules which require preprocessors such as
+      -- Literate Haskell or CPP to run are also supported.
+      --
+      -- If a corresponding source file does not exist on disk this will
+      -- result in a 'SourceError' exception if @targetId = TargetModule _@
+      -- is used. However together with @targetId = TargetFile _@ GHC will
+      -- not complain about the file missing.
     }
 
 data TargetId
@@ -512,6 +525,8 @@ data TargetId
         -- (which phase to start from).  Nothing indicates the starting phase
         -- should be determined from the suffix of the filename.
   deriving Eq
+
+type InputFileBuffer = StringBuffer
 
 pprTarget :: Target -> SDoc
 pprTarget (Target id obj _) =

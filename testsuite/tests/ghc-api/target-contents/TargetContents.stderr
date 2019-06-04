@@ -1,0 +1,37 @@
+== Error
+
+A.hs:3:5: error: Variable not in scope: z
+== CPP_D
+== CPP_M
+== Dep_DD_AB
+== Dep_Error_DD_AB
+
+B.hs:3:5: error: Variable not in scope: z
+== Dep_Error_DD_A
+
+B.hs:3:5: error: Variable not in scope: z
+== Dep_MM_AB
+== Dep_Error_MM_AB
+
+B.hs:3:5: error: Variable not in scope: z
+== Dep_Error_MM_A
+
+A.hs:3:1: error:
+    Could not find module ‘B’
+    Use -v (or `:set -v` in ghci) to see a list of the files searched for.
+== Dep_DM_AB
+== Dep_Error_DM_AB
+
+B.hs:3:5: error: Variable not in scope: z
+== Dep_Error_DM_A
+
+A.hs:3:1: error:
+    Could not find module ‘B’
+    Use -v (or `:set -v` in ghci) to see a list of the files searched for.
+== Dep_MD_AB
+== Dep_Error_MD_AB
+
+B.hs:3:5: error: Variable not in scope: z
+== Dep_Error_MD_A
+
+B.hs:3:5: error: Variable not in scope: z

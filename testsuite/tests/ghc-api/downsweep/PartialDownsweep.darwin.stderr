@@ -1,0 +1,16 @@
+== Parse error in export list
+== Parse error in export list with bypass module
+== Parse error in import list
+== CPP preprocessor error
+
+B.hs:2:2:  #elif without #if
+     #elif <- cpp error here
+ ^
+1 error generated.
+== CPP preprocessor error with bypass
+
+B.hs:2:2:  #elif without #if
+     #elif <- cpp error here
+ ^
+1 error generated.
+== Import error
