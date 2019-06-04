@@ -273,16 +273,23 @@ compileOne' m_tc_result mHscMessage
                   then gopt_set dflags0 Opt_BuildDynamicToo
                   else dflags0
 
+       -- #16331 - when no "internal interpreter" is available but we
+       -- need to process some TemplateHaskell or QuasiQuotes, we automatically
+       -- turn on -fexternal-interpreter.
+       dflags2 = if not internalInterpreter && needsLinker
+                 then gopt_set dflags1 Opt_ExternalInterpreter
+                 else dflags1
+
        basename = dropExtension input_fn
 
        -- We add the directory in which the .hs files resides) to the import
        -- path.  This is needed when we try to compile the .hc file later, if it
        -- imports a _stub.h file that we created here.
        current_dir = takeDirectory basename
-       old_paths   = includePaths dflags1
+       old_paths   = includePaths dflags2
        !prevailing_dflags = hsc_dflags hsc_env0
        dflags =
-          dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
+          dflags2 { includePaths = addQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
