@@ -27,6 +27,7 @@ import GHC.Platform
 import Name
 import MkId
 import Id
+import Var             ( updateVarType )
 import ForeignCall
 import HscTypes
 import CoreUtils
@@ -62,7 +63,6 @@ import Data.Char
 
 import UniqSupply
 import Module
-import Control.Arrow ( second )
 
 import Control.Exception
 import Data.Array
@@ -91,7 +91,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                 (const ()) $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
-        let (strings, flatBinds) = partitionEithers $ do
+        let (strings, flatBinds) = partitionEithers $ do  -- list monad
                 (bndr, rhs) <- flattenBinds binds
                 return $ case exprIsTickedString_maybe rhs of
                     Just str -> Left (bndr, str)
@@ -182,29 +182,13 @@ coreExprToBCOs hsc_env this_mod expr
   where dflags = hsc_dflags hsc_env
 
 -- The regular freeVars function gives more information than is useful to
--- us here. simpleFreeVars does the impedance matching.
+-- us here. We need only the free variables, not everything in an FVAnn.
+-- Historical note: At one point FVAnn was more sophisticated than just
+-- a set. Now it isn't. So this function is much simpler. Keeping it around
+-- so that if someone changes FVAnn, they will get a nice type error right
+-- here.
 simpleFreeVars :: CoreExpr -> AnnExpr Id DVarSet
-simpleFreeVars = go . freeVars
-  where
-    go :: AnnExpr Id FVAnn -> AnnExpr Id DVarSet
-    go (ann, e) = (freeVarsOfAnn ann, go' e)
-
-    go' :: AnnExpr' Id FVAnn -> AnnExpr' Id DVarSet
-    go' (AnnVar id)                  = AnnVar id
-    go' (AnnLit lit)                 = AnnLit lit
-    go' (AnnLam bndr body)           = AnnLam bndr (go body)
-    go' (AnnApp fun arg)             = AnnApp (go fun) (go arg)
-    go' (AnnCase scrut bndr ty alts) = AnnCase (go scrut) bndr ty (map go_alt alts)
-    go' (AnnLet bind body)           = AnnLet (go_bind bind) (go body)
-    go' (AnnCast expr (ann, co))     = AnnCast (go expr) (freeVarsOfAnn ann, co)
-    go' (AnnTick tick body)          = AnnTick tick (go body)
-    go' (AnnType ty)                 = AnnType ty
-    go' (AnnCoercion co)             = AnnCoercion co
-
-    go_alt (con, args, expr) = (con, args, go expr)
-
-    go_bind (AnnNonRec bndr rhs) = AnnNonRec bndr (go rhs)
-    go_bind (AnnRec pairs)       = AnnRec (map (second go) pairs)
+simpleFreeVars = freeVars
 
 -- -----------------------------------------------------------------------------
 -- Compilation schema for the bytecode generator
@@ -257,6 +241,7 @@ mkProtoBCO
    -> name
    -> BCInstrList
    -> Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet)
+        -- ^ original expression; for debugging only
    -> Int
    -> Word16
    -> [StgWord]
@@ -369,6 +354,9 @@ schemeR fvs (nm, rhs)
 -}
    = schemeR_wrk fvs nm rhs (collect rhs)
 
+-- If an expression is a lambda (after apply bcView), return the
+-- list of arguments to the lambda (in R-to-L order) and the
+-- underlying expression
 collect :: AnnExpr Id DVarSet -> ([Var], AnnExpr' Id DVarSet)
 collect (_, e) = go [] e
   where
@@ -383,8 +371,8 @@ collect (_, e) = go [] e
 schemeR_wrk
     :: [Id]
     -> Id
-    -> AnnExpr Id DVarSet
-    -> ([Var], AnnExpr' Var DVarSet)
+    -> AnnExpr Id DVarSet             -- expression e, for debugging only
+    -> ([Var], AnnExpr' Var DVarSet)  -- result of collect on e
     -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
@@ -509,6 +497,8 @@ schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeArgRep (litera
 schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
 
 schemeE d s p e@(AnnVar v)
+      -- See Note [Not-necessarily-lifted join points], step 3.
+    | isNNLJoinPoint v          = doTailCall d s p (protectNNLJoinPointId v) [AnnVar voidPrimId]
     | isUnliftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
     | otherwise                 = schemeT d s p e
 
@@ -535,19 +525,22 @@ schemeE d s p (AnnLet binds (_,body)) = do
 
          fvss  = map (fvsToEnv p' . fst) rhss
 
+           -- See Note [Not-necessarily-lifted join points], step 2.
+         (xs',rhss') = zipWithAndUnzip protectNNLJoinPointBind xs rhss
+
          -- Sizes of free vars
          size_w = trunc16W . idSizeW dflags
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
-         arities = map (genericLength . fst . collect) rhss
+         arities = map (genericLength . fst . collect) rhss'
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1 word.  d' and p' reflect the stack
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
          offsets = mkStackOffsets d (genericReplicate n_binds (wordSize dflags))
-         p' = Map.insertList (zipE xs offsets) p
+         p' = Map.insertList (zipE xs' offsets) p
          d' = d + wordsToBytes dflags n_binds
          zipE = zipEqual "schemeE"
 
@@ -588,7 +581,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
          compile_binds =
             [ compile_bind d' fvs x rhs size arity (trunc16W n)
             | (fvs, x, rhs, size, arity, n) <-
-                zip6 fvss xs rhss sizes arities [n_binds, n_binds-1 .. 1]
+                zip6 fvss xs' rhss' sizes arities [n_binds, n_binds-1 .. 1]
             ]
      body_code <- schemeE d' s p' body
      thunk_codes <- sequence compile_binds
@@ -682,6 +675,30 @@ schemeE _ _ _ expr
    = pprPanic "ByteCodeGen.schemeE: unhandled case"
                (pprCoreExpr (deAnnotate' expr))
 
+-- Is this Id a not-necessarily-lifted join point?
+-- See Note [Not-necessarily-lifted join points], step 1
+isNNLJoinPoint :: Id -> Bool
+isNNLJoinPoint x = isJoinId x &&
+                   Just True /= isLiftedType_maybe (idType x)
+
+-- If necessary, modify this Id and body to protect not-necessarily-lifted join points.
+-- See Note [Not-necessarily-lifted join points], step 2.
+protectNNLJoinPointBind :: Id -> AnnExpr Id DVarSet -> (Id, AnnExpr Id DVarSet)
+protectNNLJoinPointBind x rhs@(fvs, _)
+  | isNNLJoinPoint x
+  = (protectNNLJoinPointId x, (fvs, AnnLam voidArgId rhs))
+
+  | otherwise
+  = (x, rhs)
+
+-- Update an Id's type to take a Void# argument.
+-- Precondition: the Id is a not-necessarily-lifted join point.
+-- See Note [Not-necessarily-lifted join points]
+protectNNLJoinPointId :: Id -> Id
+protectNNLJoinPointId x
+  = ASSERT( isNNLJoinPoint x )
+    updateVarType (voidPrimTy `mkVisFunTy`) x
+
 {-
    Ticked Expressions
    ------------------
@@ -689,6 +706,64 @@ schemeE _ _ _ expr
   The idea is that the "breakpoint<n,fvs> E" is really just an annotation on
   the code. When we find such a thing, we pull out the useful information,
   and then compile the code as if it was just the expression E.
+
+Note [Not-necessarily-lifted join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A join point variable is essentially a goto-label: it is, for example,
+never used as an argument to another function, and it is called only
+in tail position. See Note [Join points] and Note [Invariants on join points],
+both in CoreSyn. Because join points do not compile to true, red-blooded
+variables (with, e.g., registers allocated to them), they are allowed
+to be levity-polymorphic. (See invariant #6 in Note [Invariants on join points]
+in CoreSyn.)
+
+However, in this byte-code generator, join points *are* treated just as
+ordinary variables. There is no check whether a binding is for a join point
+or not; they are all treated uniformly. (Perhaps there is a missed optimization
+opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
+
+We thus must have *some* strategy for dealing with levity-polymorphic and
+unlifted join points. Levity-polymorphic variables are generally not allowed
+(though levity-polymorphic join points *are*; see Note [Invariants on join points]
+in CoreSyn, point 6), and we don't wish to evaluate unlifted join points eagerly.
+The questionable join points are *not-necessarily-lifted join points*
+(NNLJPs). (Not having such a strategy led to #16509, which panicked in the
+isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
+
+1. Detect NNLJPs. This is done in isNNLJoinPoint.
+
+2. When binding an NNLJP, add a `\ (_ :: Void#) ->` to its RHS, and modify the
+   type to tack on a `Void# ->`. (Void# is written voidPrimTy within GHC.)
+   Note that functions are never levity-polymorphic, so this transformation
+   changes an NNLJP to a non-levity-polymorphic join point. This is done
+   in protectNNLJoinPointBind, called from the AnnLet case of schemeE.
+
+3. At an occurrence of an NNLJP, add an application to void# (called voidPrimId),
+   being careful to note the new type of the NNLJP. This is done in the AnnVar
+   case of schemeE, with help from protectNNLJoinPointId.
+
+Here is an example. Suppose we have
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      join j :: a
+           j = error @r @a "bloop"
+      in case x of
+           A -> j
+           B -> j
+           C -> error @r @a "blurp"
+
+Our plan is to behave is if the code was
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      let j :: (Void# -> a)
+          j = \ _ -> error @r @a "bloop"
+      in case x of
+           A -> j void#
+           B -> j void#
+           C -> error @r @a "blurp"
+
+It's a bit hacky, but it works well in practice and is local. I suspect the
+Right Fix is to take advantage of join points as goto-labels.
 
 -}
 
