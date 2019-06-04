@@ -134,45 +134,31 @@ ld-options:
          , "-Wl,-u,_hs_atomic_add8"
          , "-Wl,-u,_hs_atomic_add16"
          , "-Wl,-u,_hs_atomic_add32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_add64"
-#endif
          , "-Wl,-u,_hs_atomic_sub8"
          , "-Wl,-u,_hs_atomic_sub16"
          , "-Wl,-u,_hs_atomic_sub32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_sub64"
-#endif
          , "-Wl,-u,_hs_atomic_and8"
          , "-Wl,-u,_hs_atomic_and16"
          , "-Wl,-u,_hs_atomic_and32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_and64"
-#endif
          , "-Wl,-u,_hs_atomic_nand8"
          , "-Wl,-u,_hs_atomic_nand16"
          , "-Wl,-u,_hs_atomic_nand32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_nand64"
-#endif
          , "-Wl,-u,_hs_atomic_or8"
          , "-Wl,-u,_hs_atomic_or16"
          , "-Wl,-u,_hs_atomic_or32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_or64"
-#endif
          , "-Wl,-u,_hs_atomic_xor8"
          , "-Wl,-u,_hs_atomic_xor16"
          , "-Wl,-u,_hs_atomic_xor32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomic_xor64"
-#endif
          , "-Wl,-u,_hs_cmpxchg8"
          , "-Wl,-u,_hs_cmpxchg16"
          , "-Wl,-u,_hs_cmpxchg32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_cmpxchg64"
-#endif
          , "-Wl,-u,_hs_xchg8"
          , "-Wl,-u,_hs_xchg16"
          , "-Wl,-u,_hs_xchg32"
@@ -180,15 +166,11 @@ ld-options:
          , "-Wl,-u,_hs_atomicread8"
          , "-Wl,-u,_hs_atomicread16"
          , "-Wl,-u,_hs_atomicread32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomicread64"
-#endif
          , "-Wl,-u,_hs_atomicwrite8"
          , "-Wl,-u,_hs_atomicwrite16"
          , "-Wl,-u,_hs_atomicwrite32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomicwrite64"
-#endif
 #if defined(DEBUG)
           /* This symbol is useful in gdb, but not referred to anywhere,
            * so we need to force it to be included in the binary. */
@@ -248,45 +230,31 @@ ld-options:
          , "-Wl,-u,hs_atomic_add8"
          , "-Wl,-u,hs_atomic_add16"
          , "-Wl,-u,hs_atomic_add32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_add64"
-#endif
          , "-Wl,-u,hs_atomic_sub8"
          , "-Wl,-u,hs_atomic_sub16"
          , "-Wl,-u,hs_atomic_sub32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_sub64"
-#endif
          , "-Wl,-u,hs_atomic_and8"
          , "-Wl,-u,hs_atomic_and16"
          , "-Wl,-u,hs_atomic_and32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_and64"
-#endif
          , "-Wl,-u,hs_atomic_nand8"
          , "-Wl,-u,hs_atomic_nand16"
          , "-Wl,-u,hs_atomic_nand32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_nand64"
-#endif
          , "-Wl,-u,hs_atomic_or8"
          , "-Wl,-u,hs_atomic_or16"
          , "-Wl,-u,hs_atomic_or32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_or64"
-#endif
          , "-Wl,-u,hs_atomic_xor8"
          , "-Wl,-u,hs_atomic_xor16"
          , "-Wl,-u,hs_atomic_xor32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomic_xor64"
-#endif
          , "-Wl,-u,hs_cmpxchg8"
          , "-Wl,-u,hs_cmpxchg16"
          , "-Wl,-u,hs_cmpxchg32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_cmpxchg64"
-#endif
          , "-Wl,-u,hs_xchg8"
          , "-Wl,-u,hs_xchg16"
          , "-Wl,-u,hs_xchg32"
@@ -294,15 +262,11 @@ ld-options:
          , "-Wl,-u,hs_atomicread8"
          , "-Wl,-u,hs_atomicread16"
          , "-Wl,-u,hs_atomicread32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomicread64"
-#endif
          , "-Wl,-u,hs_atomicwrite8"
          , "-Wl,-u,hs_atomicwrite16"
          , "-Wl,-u,hs_atomicwrite32"
-#if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomicwrite64"
-#endif
 #if defined(DEBUG)
           /* This symbol is useful in gdb, but not referred to anywhere,
            * so we need to force it to be included in the binary. */
