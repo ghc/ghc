@@ -1087,6 +1087,10 @@ dispatchPrimop dflags = \case
 
 -- The rest just translate straightforwardly
 
+  Int64ToWord64Op -> \_ -> OpDest_Nop
+  Word64ToInt64Op -> \_ -> OpDest_Nop
+  Int32ToWord32Op -> \_ -> OpDest_Nop
+  Word32ToInt32Op -> \_ -> OpDest_Nop
   Int2WordOp      -> \_ -> OpDest_Nop
   Word2IntOp      -> \_ -> OpDest_Nop
   Int2AddrOp      -> \_ -> OpDest_Nop
@@ -1155,12 +1159,12 @@ dispatchPrimop dflags = \case
   AddrEqOp       -> \_ -> OpDest_Translate (mo_wordEq dflags)
   AddrNeOp       -> \_ -> OpDest_Translate (mo_wordNe dflags)
 
-  AndOp          -> \_ -> OpDest_Translate (mo_wordAnd dflags)
-  OrOp           -> \_ -> OpDest_Translate (mo_wordOr dflags)
-  XorOp          -> \_ -> OpDest_Translate (mo_wordXor dflags)
-  NotOp          -> \_ -> OpDest_Translate (mo_wordNot dflags)
-  SllOp          -> \_ -> OpDest_Translate (mo_wordShl dflags)
-  SrlOp          -> \_ -> OpDest_Translate (mo_wordUShr dflags)
+  WordAndOp      -> \_ -> OpDest_Translate (mo_wordAnd dflags)
+  WordOrOp       -> \_ -> OpDest_Translate (mo_wordOr dflags)
+  WordXorOp      -> \_ -> OpDest_Translate (mo_wordXor dflags)
+  WordNotOp      -> \_ -> OpDest_Translate (mo_wordNot dflags)
+  WordSllOp      -> \_ -> OpDest_Translate (mo_wordShl dflags)
+  WordSrlOp      -> \_ -> OpDest_Translate (mo_wordUShr dflags)
 
   AddrRemOp      -> \_ -> OpDest_Translate (mo_wordURem dflags)
 
@@ -1177,13 +1181,13 @@ dispatchPrimop dflags = \case
   IntGtOp        -> \_ -> OpDest_Translate (mo_wordSGt dflags)
   IntLtOp        -> \_ -> OpDest_Translate (mo_wordSLt dflags)
 
-  AndIOp         -> \_ -> OpDest_Translate (mo_wordAnd dflags)
-  OrIOp          -> \_ -> OpDest_Translate (mo_wordOr dflags)
-  XorIOp         -> \_ -> OpDest_Translate (mo_wordXor dflags)
-  NotIOp         -> \_ -> OpDest_Translate (mo_wordNot dflags)
-  ISllOp         -> \_ -> OpDest_Translate (mo_wordShl dflags)
-  ISraOp         -> \_ -> OpDest_Translate (mo_wordSShr dflags)
-  ISrlOp         -> \_ -> OpDest_Translate (mo_wordUShr dflags)
+  IntAndOp        -> \_ -> OpDest_Translate (mo_wordAnd dflags)
+  IntOrOp         -> \_ -> OpDest_Translate (mo_wordOr dflags)
+  IntXorOp        -> \_ -> OpDest_Translate (mo_wordXor dflags)
+  IntNotOp        -> \_ -> OpDest_Translate (mo_wordNot dflags)
+  IntSllOp        -> \_ -> OpDest_Translate (mo_wordShl dflags)
+  IntSraOp        -> \_ -> OpDest_Translate (mo_wordSShr dflags)
+  IntSrlOp        -> \_ -> OpDest_Translate (mo_wordUShr dflags)
 
 -- Native word unsigned ops
 
@@ -1203,8 +1207,8 @@ dispatchPrimop dflags = \case
 
 -- Int8# signed ops
 
-  Int8Extend     -> \_ -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
-  Int8Narrow     -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
+  Int8ToInt      -> \_ -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
+  IntToInt8      -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
   Int8NegOp      -> \_ -> OpDest_Translate (MO_S_Neg W8)
   Int8AddOp      -> \_ -> OpDest_Translate (MO_Add W8)
   Int8SubOp      -> \_ -> OpDest_Translate (MO_Sub W8)
@@ -1221,8 +1225,8 @@ dispatchPrimop dflags = \case
 
 -- Word8# unsigned ops
 
-  Word8Extend     -> \_ -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
-  Word8Narrow     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
+  Word8ToWord     -> \_ -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
+  WordToWord8     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
   Word8NotOp      -> \_ -> OpDest_Translate (MO_Not W8)
   Word8AddOp      -> \_ -> OpDest_Translate (MO_Add W8)
   Word8SubOp      -> \_ -> OpDest_Translate (MO_Sub W8)
@@ -1239,8 +1243,8 @@ dispatchPrimop dflags = \case
 
 -- Int16# signed ops
 
-  Int16Extend     -> \_ -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
-  Int16Narrow     -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
+  Int16ToInt      -> \_ -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
+  IntToInt16      -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
   Int16NegOp      -> \_ -> OpDest_Translate (MO_S_Neg W16)
   Int16AddOp      -> \_ -> OpDest_Translate (MO_Add W16)
   Int16SubOp      -> \_ -> OpDest_Translate (MO_Sub W16)
@@ -1257,8 +1261,8 @@ dispatchPrimop dflags = \case
 
 -- Word16# unsigned ops
 
-  Word16Extend     -> \_ -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
-  Word16Narrow     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
+  Word16ToWord     -> \_ -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
+  WordToWord16     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
   Word16NotOp      -> \_ -> OpDest_Translate (MO_Not W16)
   Word16AddOp      -> \_ -> OpDest_Translate (MO_Add W16)
   Word16SubOp      -> \_ -> OpDest_Translate (MO_Sub W16)
@@ -1272,6 +1276,98 @@ dispatchPrimop dflags = \case
   Word16LeOp       -> \_ -> OpDest_Translate (MO_U_Le W16)
   Word16LtOp       -> \_ -> OpDest_Translate (MO_U_Lt W16)
   Word16NeOp       -> \_ -> OpDest_Translate (MO_Ne W16)
+
+-- Int32# signed ops
+
+  Int32ToInt      -> \_ -> OpDest_Translate (MO_SS_Conv W32 (wordWidth dflags))
+  IntToInt32      -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W32)
+  Int32NegOp      -> \_ -> OpDest_Translate (MO_S_Neg W32)
+  Int32AddOp      -> \_ -> OpDest_Translate (MO_Add W32)
+  Int32SubOp      -> \_ -> OpDest_Translate (MO_Sub W32)
+  Int32MulOp      -> \_ -> OpDest_Translate (MO_Mul W32)
+  Int32QuotOp     -> \_ -> OpDest_Translate (MO_S_Quot W32)
+  Int32RemOp      -> \_ -> OpDest_Translate (MO_S_Rem W32)
+
+  Int32SllOp      -> \_ -> OpDest_Translate (MO_Shl W32)
+  Int32SraOp      -> \_ -> OpDest_Translate (MO_S_Shr W32)
+  Int32SrlOp      -> \_ -> OpDest_Translate (MO_U_Shr W32)
+
+  Int32EqOp       -> \_ -> OpDest_Translate (MO_Eq W32)
+  Int32GeOp       -> \_ -> OpDest_Translate (MO_S_Ge W32)
+  Int32GtOp       -> \_ -> OpDest_Translate (MO_S_Gt W32)
+  Int32LeOp       -> \_ -> OpDest_Translate (MO_S_Le W32)
+  Int32LtOp       -> \_ -> OpDest_Translate (MO_S_Lt W32)
+  Int32NeOp       -> \_ -> OpDest_Translate (MO_Ne W32)
+
+-- Word32# unsigned ops
+
+  Word32ToWord     -> \_ -> OpDest_Translate (MO_UU_Conv W32 (wordWidth dflags))
+  WordToWord32     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W32)
+  Word32AddOp      -> \_ -> OpDest_Translate (MO_Add W32)
+  Word32SubOp      -> \_ -> OpDest_Translate (MO_Sub W32)
+  Word32MulOp      -> \_ -> OpDest_Translate (MO_Mul W32)
+  Word32QuotOp     -> \_ -> OpDest_Translate (MO_U_Quot W32)
+  Word32RemOp      -> \_ -> OpDest_Translate (MO_U_Rem W32)
+
+  Word32AndOp      -> \_ -> OpDest_Translate (MO_And W32)
+  Word32OrOp       -> \_ -> OpDest_Translate (MO_Or W32)
+  Word32XorOp      -> \_ -> OpDest_Translate (MO_Xor W32)
+  Word32NotOp      -> \_ -> OpDest_Translate (MO_Not W32)
+  Word32SllOp      -> \_ -> OpDest_Translate (MO_Shl W32)
+  Word32SrlOp      -> \_ -> OpDest_Translate (MO_U_Shr W32)
+
+  Word32EqOp       -> \_ -> OpDest_Translate (MO_Eq W32)
+  Word32GeOp       -> \_ -> OpDest_Translate (MO_U_Ge W32)
+  Word32GtOp       -> \_ -> OpDest_Translate (MO_U_Gt W32)
+  Word32LeOp       -> \_ -> OpDest_Translate (MO_U_Le W32)
+  Word32LtOp       -> \_ -> OpDest_Translate (MO_U_Lt W32)
+  Word32NeOp       -> \_ -> OpDest_Translate (MO_Ne W32)
+
+-- Int64# signed ops
+
+  Int64ToInt      -> \_ -> OpDest_Translate (MO_SS_Conv W64 (wordWidth dflags))
+  IntToInt64      -> \_ -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W64)
+  Int64NegOp      -> \_ -> OpDest_Translate (MO_S_Neg W64)
+  Int64AddOp      -> \_ -> OpDest_Translate (MO_Add W64)
+  Int64SubOp      -> \_ -> OpDest_Translate (MO_Sub W64)
+  Int64MulOp      -> \_ -> OpDest_Translate (MO_Mul W64)
+  Int64QuotOp     -> \_ -> OpDest_Translate (MO_S_Quot W64)
+  Int64RemOp      -> \_ -> OpDest_Translate (MO_S_Rem W64)
+
+  Int64SllOp      -> \_ -> OpDest_Translate (MO_Shl W64)
+  Int64SraOp      -> \_ -> OpDest_Translate (MO_S_Shr W64)
+  Int64SrlOp      -> \_ -> OpDest_Translate (MO_U_Shr W64)
+
+  Int64EqOp       -> \_ -> OpDest_Translate (MO_Eq W64)
+  Int64GeOp       -> \_ -> OpDest_Translate (MO_S_Ge W64)
+  Int64GtOp       -> \_ -> OpDest_Translate (MO_S_Gt W64)
+  Int64LeOp       -> \_ -> OpDest_Translate (MO_S_Le W64)
+  Int64LtOp       -> \_ -> OpDest_Translate (MO_S_Lt W64)
+  Int64NeOp       -> \_ -> OpDest_Translate (MO_Ne W64)
+
+-- Word64# unsigned ops
+
+  Word64ToWord     -> \_ -> OpDest_Translate (MO_UU_Conv W64 (wordWidth dflags))
+  WordToWord64     -> \_ -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W64)
+  Word64AddOp      -> \_ -> OpDest_Translate (MO_Add W64)
+  Word64SubOp      -> \_ -> OpDest_Translate (MO_Sub W64)
+  Word64MulOp      -> \_ -> OpDest_Translate (MO_Mul W64)
+  Word64QuotOp     -> \_ -> OpDest_Translate (MO_U_Quot W64)
+  Word64RemOp      -> \_ -> OpDest_Translate (MO_U_Rem W64)
+
+  Word64AndOp      -> \_ -> OpDest_Translate (MO_And W64)
+  Word64OrOp       -> \_ -> OpDest_Translate (MO_Or W64)
+  Word64XorOp      -> \_ -> OpDest_Translate (MO_Xor W64)
+  Word64NotOp      -> \_ -> OpDest_Translate (MO_Not W64)
+  Word64SllOp      -> \_ -> OpDest_Translate (MO_Shl W64)
+  Word64SrlOp      -> \_ -> OpDest_Translate (MO_U_Shr W64)
+
+  Word64EqOp       -> \_ -> OpDest_Translate (MO_Eq W64)
+  Word64GeOp       -> \_ -> OpDest_Translate (MO_U_Ge W64)
+  Word64GtOp       -> \_ -> OpDest_Translate (MO_U_Gt W64)
+  Word64LeOp       -> \_ -> OpDest_Translate (MO_U_Le W64)
+  Word64LtOp       -> \_ -> OpDest_Translate (MO_U_Lt W64)
+  Word64NeOp       -> \_ -> OpDest_Translate (MO_Ne W64)
 
 -- Char# ops
 
@@ -1377,6 +1473,16 @@ dispatchPrimop dflags = \case
     then Left (MO_S_QuotRem W16)
     else Right (genericIntQuotRemOp W16)
 
+  Int32QuotRemOp -> \args -> OpDest_CallishHandledLater $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W32)
+    else Right (genericIntQuotRemOp W32)
+
+  Int64QuotRemOp -> \args -> OpDest_CallishHandledLater $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_S_QuotRem W64)
+    else Right (genericIntQuotRemOp W64)
+
   WordQuotRemOp -> \args -> OpDest_CallishHandledLater $
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem  (wordWidth dflags))
@@ -1396,6 +1502,16 @@ dispatchPrimop dflags = \case
     if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
     then Left (MO_U_QuotRem W16)
     else Right (genericWordQuotRemOp W16)
+
+  Word32QuotRemOp -> \args -> OpDest_CallishHandledLater $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W32)
+    else Right (genericWordQuotRemOp W32)
+
+  Word64QuotRemOp -> \args -> OpDest_CallishHandledLater $
+    if ncg && (x86ish || ppc) && not (quotRemCanBeOptimized args)
+    then Left (MO_U_QuotRem W64)
+    else Right (genericWordQuotRemOp W64)
 
   WordAdd2Op -> \_ -> OpDest_CallishHandledLater $
     if (ncg && (x86ish || ppc)) || llvm
