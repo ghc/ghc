@@ -192,3 +192,4 @@ test('T15892',
         # happen, so -G1 -A32k:
         extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
+test('T16449_2', exit_code(1), compile_and_run, [''])
