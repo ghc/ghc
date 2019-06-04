@@ -134,8 +134,11 @@ dsHsBind dflags (VarBind { var_id = var
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
-        ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
-                   | otherwise         = var
+
+        -- ; let var' | inline_regardless = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
+        --            | otherwise         = var
+        ; let var' = var `setIdUnfolding` mkCompulsoryUnfolding core_expr
+
         ; let core_bind@(id,_) = makeCorePair dflags var' False 0 core_expr
               force_var = if xopt LangExt.Strict dflags
                           then [id]
@@ -374,10 +377,11 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInline -> (gbl_id, rhs)
-          NoInline     -> (gbl_id, rhs)
-          Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          -- NoUserInline -> (gbl_id, rhs)
+          -- NoInline     -> (gbl_id, rhs)
+          -- Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
           Inline       -> inline_pair
+          _            -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
 
   where
     inline_prag   = idInlinePragma gbl_id
