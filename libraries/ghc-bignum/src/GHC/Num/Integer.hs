@@ -32,10 +32,6 @@ import GHC.Num.Primitives
 import GHC.Num.BigNat
 import GHC.Num.Natural
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 default ()
 
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
@@ -974,8 +970,6 @@ integerIsPowerOf2# (IS i)
 integerIsPowerOf2# (IN _) = (# () | #)
 integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
-#if WORD_SIZE_IN_BITS == 32
-
 -- | Convert an Int64# into an Integer on 32-bit architectures
 integerFromInt64# :: Int64# -> Integer
 {-# NOINLINE integerFromInt64# #-}
@@ -1012,14 +1006,6 @@ integerToWord64# :: Integer -> Word64#
 integerToWord64# (IS i) = int64ToWord64# (intToInt64# i)
 integerToWord64# (IP b) = bigNatToWord64# b
 integerToWord64# (IN b) = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64# b)))
-
-#else
-
--- | Convert an Int64# into an Integer on 64-bit architectures
-integerFromInt64# :: Int# -> Integer
-integerFromInt64# !x = IS x
-
-#endif
 
 ----------------------------------------------------------------------------
 -- Conversions to/from floating point

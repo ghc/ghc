@@ -54,10 +54,12 @@ module GHC.Utils.Outputable (
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
 
-        primFloatSuffix, primCharSuffix, primWordSuffix, primDoubleSuffix,
-        primInt64Suffix, primWord64Suffix, primIntSuffix,
+        primFloatSuffix, primCharSuffix, primDoubleSuffix,
+        primInt64Suffix, primWord64Suffix,
+        primIntSuffix, primWordSuffix,
 
-        pprPrimChar, pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64,
+        pprPrimChar, pprPrimInt, pprPrimWord,
+        pprPrimInt64, pprPrimWord64,
 
         pprFastFilePath, pprFilePathString,
 
@@ -1014,8 +1016,9 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
 
 -- Postfix modifiers for unboxed literals.
 -- See Note [Printing of literals in Core] in "GHC.Types.Literal".
-primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
-primDoubleSuffix, primWordSuffix, primInt64Suffix, primWord64Suffix :: SDoc
+primCharSuffix, primFloatSuffix, primDoubleSuffix,
+  primIntSuffix, primWordSuffix,
+  primInt64Suffix, primWord64Suffix :: SDoc
 primCharSuffix   = char '#'
 primFloatSuffix  = char '#'
 primIntSuffix    = char '#'
@@ -1026,7 +1029,8 @@ primWord64Suffix = text "L##"
 
 -- | Special combinator for showing unboxed literals.
 pprPrimChar :: Char -> SDoc
-pprPrimInt, pprPrimWord, pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
+pprPrimInt, pprPrimWord,
+  pprPrimInt64, pprPrimWord64 :: Integer -> SDoc
 pprPrimChar c   = pprHsChar c <> primCharSuffix
 pprPrimInt i    = integer i   <> primIntSuffix
 pprPrimWord w   = word    w   <> primWordSuffix
