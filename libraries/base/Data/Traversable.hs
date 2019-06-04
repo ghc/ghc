@@ -115,7 +115,13 @@ import qualified GHC.List as List ( foldr )
 -- 'Data.Functor.Compose.Compose' are from "Data.Functor.Identity" and
 -- "Data.Functor.Compose".
 --
--- (The naturality law is implied by parametricity.)
+-- A result of the naturality law is the intuitive generalised identity law
+-- for 'traverse'
+--
+-- @'traverse' 'pure' = 'pure'@
+--
+-- (The naturality law is implied by parametricity and thus so is the
+-- generalised identity law [reference not available, word of mouth].)
 --
 -- Instances are similar to 'Functor', e.g. given a data type
 --
