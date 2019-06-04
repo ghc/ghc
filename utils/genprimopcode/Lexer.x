@@ -40,6 +40,7 @@ words :-
     <0>         "primop"            { mkT TPrimop }
     <0>         "pseudoop"          { mkT TPseudoop }
     <0>         "primtype"          { mkT TPrimtype }
+    <0>         "primtypesyn"       { mkT TPrimtypeSyn }
     <0>         "with"              { mkT TWith }
     <0>         "defaults"          { mkT TDefaults }
     <0>         "True"              { mkT TTrue }

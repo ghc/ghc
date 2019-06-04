@@ -32,6 +32,7 @@ import Syntax
     primop          { TPrimop }
     pseudoop        { TPseudoop }
     primtype        { TPrimtype }
+    primtypeSyn     { TPrimtypeSyn }
     with            { TWith }
     defaults        { TDefaults }
     true            { TTrue }
@@ -90,6 +91,7 @@ pEntries : pEntry pEntries { $1 : $2 }
 pEntry :: { Entry }
 pEntry : pPrimOpSpec   { $1 }
        | pPrimTypeSpec { $1 }
+       | pPrimTypeSynSpec { $1 }
        | pPseudoOpSpec { $1 }
        | pSection      { $1 }
 
@@ -109,6 +111,11 @@ pPrimOpSpec : primop upperName string pCategory pType
 pPrimTypeSpec :: { Entry }
 pPrimTypeSpec : primtype pType pDesc pWithOptions
                 { PrimTypeSpec { ty = $2, desc = $3, opts = $4 } }
+
+
+pPrimTypeSynSpec :: { Entry }
+pPrimTypeSynSpec : primtypeSyn upperName '=' upperName pDesc pWithOptions
+                   { PrimTypeSynSpec { synonym = $2, original = $4, desc = $5, opts = $6 } }
 
 pPseudoOpSpec :: { Entry }
 pPseudoOpSpec : pseudoop string pType pDesc pWithOptions

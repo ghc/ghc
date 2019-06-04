@@ -86,6 +86,7 @@ data Token = TEOF
            | TPrimop
            | TPseudoop
            | TPrimtype
+           | TPrimtypeSyn
            | TWith
            | TDefaults
            | TTrue
