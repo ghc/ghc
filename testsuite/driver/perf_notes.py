@@ -70,9 +70,10 @@ def parse_perf_stat(stat_str):
 
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
-def get_perf_stats(commit='HEAD', namespace='perf'):
+def get_perf_stats(commit='HEAD', ref='perf'):
     try:
-        log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
+        args = ['git', 'notes', '--ref=' + ref, 'show', commit]
+        log = subprocess.check_output(args, stderr=subprocess.STDOUT).decode('utf-8')
     except subprocess.CalledProcessError:
         return []
 
@@ -502,6 +503,8 @@ if __name__ == '__main__':
     parser.add_argument("--add-note", nargs=3,
                         help="Development only. --add-note N commit seed \
                         Adds N fake metrics to the given commit using the random seed.")
+    parser.add_argument("--ref", type=str, default='perf',
+                        help="Git notes ref")
     parser.add_argument("commits", nargs=argparse.REMAINDER,
                         help="The rest of the arguments will be the commits that will be used.")
     args = parser.parse_args()
@@ -519,7 +522,10 @@ if __name__ == '__main__':
 
     if args.commits:
         for c in args.commits:
-            metrics += [CommitAndStat(c, stat) for stat in get_perf_stats(c)]
+            xs = [CommitAndStat(c, stat) for stat in get_perf_stats(c, ref=args.ref)]
+            if len(xs) == 0:
+                raise UserWarning("No stats found for {commit} in notes ref {ref}".format(commit=c, ref=args.ref))
+            metrics += xs
 
     if args.test_env:
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
@@ -546,6 +552,9 @@ if __name__ == '__main__':
             append_perf_stat(note, commit)
 
         note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
+    else:
+        if len(metrics) == 0:
+            raise ValueError("No matching metrics.")
 
     #
     # String utilities for pretty-printing
