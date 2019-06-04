@@ -655,6 +655,16 @@ invariant 3 does still need to be checked.) For the rigorous definition of
 
 Invariant 4 is subtle; see Note [The polymorphism rule of join points].
 
+Invariant 6 is to enable code like this:
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      join j :: a
+           j = error @r @a "bloop"
+      in case x of
+           A -> j
+           B -> j
+           C -> error @r @a "blurp"
+
 Core Lint will check these invariants, anticipating that any binder whose
 OccInfo is marked AlwaysTailCalled will become a join point as soon as the
 simplifier (or simpleOptPgm) runs.
