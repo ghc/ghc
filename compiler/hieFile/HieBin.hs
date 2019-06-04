@@ -1,8 +1,11 @@
+{-
+Binary serialization for .hie files.
+-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module HieBin ( readHieFile, writeHieFile, HieName(..), toHieName ) where
+module HieBin ( readHieFile, readHieFileWithVersion, HieHeader, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieMagic) where
 
+import Config                     ( cProjectVersion )
 import GhcPrelude
-
 import Binary
 import BinIface                   ( getDictFastString )
 import FastMutInt
@@ -14,16 +17,22 @@ import Outputable
 import PrelInfo
 import SrcLoc
 import UniqSupply                 ( takeUniqFromSupply )
+import Util                       ( maybeRead )
 import Unique
 import UniqFM
 
 import qualified Data.Array as A
 import Data.IORef
+import Data.ByteString            ( ByteString )
+import qualified Data.ByteString  as BS
+import qualified Data.ByteString.Char8 as BSC
 import Data.List                  ( mapAccumR )
-import Data.Word                  ( Word32 )
-import Control.Monad              ( replicateM )
+import Data.Word                  ( Word8, Word32 )
+import Control.Monad              ( replicateM, when )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
+
+import HieTypes
 
 -- | `Name`'s get converted into `HieName`'s before being written into @.hie@
 -- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
@@ -63,9 +72,32 @@ data HieDictionary = HieDictionary
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
-writeHieFile :: Binary a => FilePath -> a -> IO ()
+-- | The header for HIE files - Capital ASCII letters "HIE".
+hieMagic :: [Word8]
+hieMagic = [72,73,69]
+
+hieMagicLen :: Int
+hieMagicLen = length hieMagic
+
+ghcVersion :: ByteString
+ghcVersion = BSC.pack cProjectVersion
+
+putBinLine :: BinHandle -> ByteString -> IO ()
+putBinLine bh xs = do
+  mapM_ (putByte bh) $ BS.unpack xs
+  putByte bh 10 -- newline char
+
+-- | Write a `HieFile` to the given `FilePath`, with a proper header and
+-- symbol tables for `Name`s and `FastString`s
+writeHieFile :: FilePath -> HieFile -> IO ()
 writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
+
+  -- Write the header: hieHeader followed by the
+  -- hieVersion and the GHC version used to generate this file
+  mapM_ (putByte bh0) hieMagic
+  putBinLine bh0 $ BSC.pack $ show hieVersion
+  putBinLine bh0 $ ghcVersion
 
   -- remember where the dictionary pointer will go
   dict_p_p <- tellBin bh0
@@ -105,7 +137,7 @@ writeHieFile hie_file_path hiefile = do
   symtab_map'  <- readIORef symtab_map
   putSymbolTable bh symtab_next' symtab_map'
 
-  -- write the dictionary pointer at the fornt of the file
+  -- write the dictionary pointer at the front of the file
   dict_p <- tellBin bh
   putAt bh dict_p_p dict_p
   seekBin bh dict_p
@@ -120,9 +152,86 @@ writeHieFile hie_file_path hiefile = do
   writeBinMem bh hie_file_path
   return ()
 
-readHieFile :: Binary a => NameCache -> FilePath -> IO (a, NameCache)
-readHieFile nc file = do
+data HieFileResult
+  = HieFileResult
+  { hie_file_result_version :: Integer
+  , hie_file_result_ghc_version :: ByteString
+  , hie_file_result :: HieFile
+  }
+
+type HieHeader = (Integer, ByteString)
+
+-- | Read a `HieFile` from a `FilePath`. Can use
+-- an existing `NameCache`. Allows you to specify
+-- which versions of hieFile to attempt to read.
+-- `Left` case returns the failing header versions.
+readHieFileWithVersion :: (HieHeader -> Bool) -> NameCache -> FilePath -> IO (Either HieHeader (HieFileResult, NameCache))
+readHieFileWithVersion readVersion nc file = do
   bh0 <- readBinMem file
+
+  (hieVersion, ghcVersion) <- readHieFileHeader file bh0
+
+  if readVersion (hieVersion, ghcVersion)
+  then do
+    (hieFile, nc') <- readHieFileContents bh0 nc
+    return $ Right (HieFileResult hieVersion ghcVersion hieFile, nc')
+  else return $ Left (hieVersion, ghcVersion)
+
+
+-- | Read a `HieFile` from a `FilePath`. Can use
+-- an existing `NameCache`.
+readHieFile :: NameCache -> FilePath -> IO (HieFileResult, NameCache)
+readHieFile nc file = do
+
+  bh0 <- readBinMem file
+
+  (readHieVersion, ghcVersion) <- readHieFileHeader file bh0
+
+  -- Check if the versions match
+  when (readHieVersion /= hieVersion) $
+    panic $ unwords ["readHieFile: hie file versions don't match for file:"
+                    , file
+                    , "Expected"
+                    , show hieVersion
+                    , "but got", show readHieVersion
+                    ]
+  (hieFile, nc') <- readHieFileContents bh0 nc
+  return $ (HieFileResult hieVersion ghcVersion hieFile, nc')
+
+readBinLine :: BinHandle -> IO ByteString
+readBinLine bh = BS.pack . reverse <$> loop []
+  where
+    loop acc = do
+      char <- get bh :: IO Word8
+      if char == 10 -- ASCII newline '\n'
+      then return acc
+      else loop (char : acc)
+
+readHieFileHeader :: FilePath -> BinHandle -> IO HieHeader
+readHieFileHeader file bh0 = do
+  -- Read the header
+  magic <- replicateM hieMagicLen (get bh0)
+  version <- BSC.unpack <$> readBinLine bh0
+  case maybeRead version of
+    Nothing ->
+      panic $ unwords ["readHieFileHeader: hieVersion isn't an Integer:"
+                      , show version
+                      ]
+    Just readHieVersion -> do
+      ghcVersion <- readBinLine bh0
+
+      -- Check if the header is valid
+      when (magic /= hieMagic) $
+        panic $ unwords ["readHieFileHeader: headers don't match for file:"
+                        , file
+                        , "Expected"
+                        , show hieMagic
+                        , "but got", show magic
+                        ]
+      return (readHieVersion, ghcVersion)
+
+readHieFileContents :: BinHandle -> NameCache -> IO (HieFile, NameCache)
+readHieFileContents bh0 nc = do
 
   dict  <- get_dictionary bh0
 
