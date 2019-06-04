@@ -34,10 +34,6 @@ import GHC.Num.BigNat
 import GHC.Num.Natural
 import qualified GHC.Num.Backend as Backend
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 default ()
 
 -- | Arbitrary precision integers. In contrast with fixed-size integral types
@@ -995,14 +991,12 @@ integerIsPowerOf2# (IS i)
 integerIsPowerOf2# (IN _) = (# () | #)
 integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 
-#if WORD_SIZE_IN_BITS == 32
-
--- | Convert an Int64# into an Integer on 32-bit architectures
+-- | Convert an Int64# into an Integer
 integerFromInt64# :: Int64# -> Integer
 {-# NOINLINE integerFromInt64# #-}
 integerFromInt64# !i
-  | isTrue# ((i `leInt64#` intToInt64#  0x7FFFFFFF#)
-      &&# (i `geInt64#` intToInt64# -0x80000000#))
+  | isTrue# ((i `leInt64#` intToInt64#  INT_MAXBOUND#)
+      &&# (i `geInt64#` intToInt64# INT_MINBOUND#))
   = IS (int64ToInt# i)
 
   | isTrue# (i `geInt64#` intToInt64# 0#)
@@ -1011,36 +1005,28 @@ integerFromInt64# !i
   | True
   = IN (bigNatFromWord64# (int64ToWord64# (negateInt64# i)))
 
--- | Convert a Word64# into an Integer on 32-bit architectures
+-- | Convert a Word64# into an Integer
 integerFromWord64# :: Word64# -> Integer
 {-# NOINLINE integerFromWord64# #-}
 integerFromWord64# !w
-  | isTrue# (w `leWord64#` wordToWord64# 0x7FFFFFFF##)
+  | isTrue# (w `leWord64#` wordToWord64# INT_MAXBOUND##)
   = IS (int64ToInt# (word64ToInt64# w))
   | True
   = IP (bigNatFromWord64# w)
 
--- | Convert an Integer into an Int64# on 32-bit architectures
+-- | Convert an Integer into an Int64#
 integerToInt64# :: Integer -> Int64#
 {-# NOINLINE integerToInt64# #-}
 integerToInt64# (IS i) = intToInt64# i
 integerToInt64# (IP b) = word64ToInt64# (bigNatToWord64# b)
 integerToInt64# (IN b) = negateInt64# (word64ToInt64# (bigNatToWord64# b))
 
--- | Convert an Integer into a Word64# on 32-bit architectures
+-- | Convert an Integer into a Word64#
 integerToWord64# :: Integer -> Word64#
 {-# NOINLINE integerToWord64# #-}
 integerToWord64# (IS i) = int64ToWord64# (intToInt64# i)
 integerToWord64# (IP b) = bigNatToWord64# b
 integerToWord64# (IN b) = int64ToWord64# (negateInt64# (word64ToInt64# (bigNatToWord64# b)))
-
-#else
-
--- | Convert an Int64# into an Integer on 64-bit architectures
-integerFromInt64# :: Int# -> Integer
-integerFromInt64# !x = IS x
-
-#endif
 
 ----------------------------------------------------------------------------
 -- Conversions to/from floating point

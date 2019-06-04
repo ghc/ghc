@@ -25,10 +25,6 @@ import GHC.Num.Primitives
 import GHC.Num.WordArray
 import GHC.Num.Backend
 
-#if WORD_SIZE_IN_BITS < 64
-import GHC.IntWord64
-#endif
-
 default ()
 
 -- | A BigNat
@@ -247,26 +243,30 @@ bigNatToInt# a
 bigNatToInt :: BigNat# -> Int
 bigNatToInt bn = I# (bigNatToInt# bn)
 
-#if WORD_SIZE_IN_BITS == 32
-
--- | Convert a Word64# into a BigNat on 32-bit architectures
+-- | Convert a Word64# into a BigNat
 bigNatFromWord64# :: Word64# -> BigNat#
+#if WORD_SIZE_IN_BITS == 32
 bigNatFromWord64# w64 = bigNatFromWord2# wh# wl#
   where
     wh# = word64ToWord# (uncheckedShiftRL64# w64 32#)
     wl# = word64ToWord# w64
+#else
+bigNatFromWord64# w64 = bigNatFromWord# (word64ToWord# w64)
+#endif
 
--- | Convert a BigNat into a Word64# on 32-bit architectures
+-- | Convert a BigNat into a Word64#
 bigNatToWord64# :: BigNat# -> Word64#
 bigNatToWord64# b
   | bigNatIsZero b = wordToWord64# 0##
+#if WORD_SIZE_IN_BITS == 32
   | wl <- wordToWord64# (bigNatToWord# b)
   = if isTrue# (bigNatSize# b ># 1#)
       then
          let wh = wordToWord64# (bigNatIndex# b 1#)
          in uncheckedShiftL64# wh 32# `or64#` wl
       else wl
-
+#else
+  | True = wordToWord64# (bigNatToWord# b)
 #endif
 
 -- | Encode (# BigNat mantissa, Int# exponent #) into a Double#
