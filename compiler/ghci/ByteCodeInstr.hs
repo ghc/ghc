@@ -45,7 +45,7 @@ data ProtoBCO a
         protoBCOBitmap     :: [StgWord],
         protoBCOBitmapSize :: Word16,
         protoBCOArity      :: Int,
-        -- what the BCO came from
+        -- what the BCO came from, for debugging only
         protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
         -- malloc'd pointers
         protoBCOFFIs       :: [FFIInfo]
@@ -179,7 +179,13 @@ data BCInstr
 -- Printing bytecode instructions
 
 instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs bitmap bsize arity origin ffis)
+   ppr (ProtoBCO { protoBCOName       = name
+                 , protoBCOInstrs     = instrs
+                 , protoBCOBitmap     = bitmap
+                 , protoBCOBitmapSize = bsize
+                 , protoBCOArity      = arity
+                 , protoBCOExpr       = origin
+                 , protoBCOFFIs       = ffis })
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
                 <+> text (show ffis) <> colon)
         $$ nest 3 (case origin of
