@@ -121,24 +121,24 @@ primOpRules nm IntRemOp    = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (intO
                                                     retLit zeroi
                                                , equalArgs >> retLit zeroi
                                                , equalArgs >> retLit zeroi ]
-primOpRules nm AndIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
+primOpRules nm IntAndOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.&.))
                                                , idempotent
                                                , zeroElem zeroi ]
-primOpRules nm OrIOp       = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
+primOpRules nm IntOrOp     = mkPrimOpRule nm 2 [ binaryLit (intOp2 (.|.))
                                                , idempotent
                                                , identityDynFlags zeroi ]
-primOpRules nm XorIOp      = mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
+primOpRules nm IntXorOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 xor)
                                                , identityDynFlags zeroi
                                                , equalArgs >> retLit zeroi ]
-primOpRules nm NotIOp      = mkPrimOpRule nm 1 [ unaryLit complementOp
-                                               , inversePrimOp NotIOp ]
+primOpRules nm IntNotOp    = mkPrimOpRule nm 1 [ unaryLit complementOp
+                                               , inversePrimOp IntNotOp ]
 primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
                                                , inversePrimOp IntNegOp ]
-primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
+primOpRules nm IntSllOp    = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
+primOpRules nm IntSraOp    = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
+primOpRules nm IntSrlOp    = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
                                                , rightIdentityDynFlags zeroi ]
 
 -- Word operations
@@ -169,19 +169,19 @@ primOpRules nm WordRemOp   = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word
                                                     guard (l == onew dflags)
                                                     retLit zerow
                                                , equalArgs >> retLit zerow ]
-primOpRules nm AndOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
+primOpRules nm WordAndOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.&.))
                                                , idempotent
                                                , zeroElem zerow ]
-primOpRules nm OrOp        = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
+primOpRules nm WordOrOp    = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (.|.))
                                                , idempotent
                                                , identityDynFlags zerow ]
-primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
+primOpRules nm WordXorOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , identityDynFlags zerow
                                                , equalArgs >> retLit zerow ]
-primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
-                                               , inversePrimOp NotOp ]
-primOpRules nm SllOp       = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
-primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
+primOpRules nm WordNotOp   = mkPrimOpRule nm 1 [ unaryLit complementOp
+                                               , inversePrimOp WordNotOp ]
+primOpRules nm WordSllOp   = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
+primOpRules nm WordSrlOp   = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
 
 -- coercions
 primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLitDynFlags word2IntLit
@@ -465,8 +465,8 @@ wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
 shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
---    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
---    SllOp, SrlOp           :: Word# -> Int# -> Word#
+--    IntSllOp, IntSraOp, IntSrlOp :: Word# -> Int# -> Word#
+--    SllOp, SrlOp                 :: Word# -> Int# -> Word#
 shiftRule shift_op
   = do { dflags <- getDynFlags
        ; [e1, Lit (LitNumber LitNumInt shift_len _)] <- getArgs
@@ -724,7 +724,7 @@ transform the invalid shift into an "obviously incorrect" value.
 
 There are two cases:
 
-- Shifting fixed-width things: the primops ISll, Sll, etc
+- Shifting fixed-width things: the primops IntSll, Sll, etc
   These are handled by shiftRule.
 
   We are happy to shift by any amount up to wordSize but no more.
@@ -1220,7 +1220,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just n <- return $ exactLog2 d
           dflags <- getDynFlags
-          return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal dflags n
+          return $ Var (mkPrimOpId IntSraOp) `App` arg `App` mkIntVal dflags n
         ],
      mkBasicRule modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
@@ -1229,7 +1229,7 @@ builtinRules
           [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
           Just _ <- return $ exactLog2 d
           dflags <- getDynFlags
-          return $ Var (mkPrimOpId AndIOp)
+          return $ Var (mkPrimOpId IntAndOp)
             `App` arg `App` mkIntVal dflags (d - 1)
         ]
      ]
@@ -2074,8 +2074,8 @@ adjustDyadicRight op lit
          IntAddOp  -> Just (\y -> y-lit      )
          WordSubOp -> Just (\y -> y+lit      )
          IntSubOp  -> Just (\y -> y+lit      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordXorOp -> Just (\y -> y `xor` lit)
+         IntXorOp  -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
 adjustDyadicLeft :: Integer -> PrimOp -> Maybe (Integer -> Integer)
@@ -2086,8 +2086,8 @@ adjustDyadicLeft lit op
          IntAddOp  -> Just (\y -> y-lit      )
          WordSubOp -> Just (\y -> lit-y      )
          IntSubOp  -> Just (\y -> lit-y      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordXorOp -> Just (\y -> y `xor` lit)
+         IntXorOp  -> Just (\y -> y `xor` lit)
          _         -> Nothing
 
 
@@ -2095,8 +2095,8 @@ adjustUnary :: PrimOp -> Maybe (Integer -> Integer)
 -- Given (op x) return a function 'f' s.t.  f (op x) = x
 adjustUnary op
   = case op of
-         NotOp     -> Just (\y -> complement y)
-         NotIOp    -> Just (\y -> complement y)
+         WordNotOp -> Just (\y -> complement y)
+         IntNotOp  -> Just (\y -> complement y)
          IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 

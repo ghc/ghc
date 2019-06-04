@@ -642,9 +642,7 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
     int n = HsIntPrim (SourceText $ show n) (toInteger n)
 
 word64 :: DynFlags -> Word64 -> HsLit GhcTc
-word64 dflags n
-  | wORD_SIZE dflags == 4 = HsWord64Prim NoSourceText (toInteger n)
-  | otherwise             = HsWordPrim   NoSourceText (toInteger n)
+word64 dflags n = HsWord64Prim NoSourceText (toInteger n)
 
 {-
 Note [Representing TyCon kinds: KindRep]
