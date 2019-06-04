@@ -134,11 +134,11 @@ primOpRules nm NotIOp      = mkPrimOpRule nm 1 [ unaryLit complementOp
                                                , inversePrimOp NotIOp ]
 primOpRules nm IntNegOp    = mkPrimOpRule nm 1 [ unaryLit negOp
                                                , inversePrimOp IntNegOp ]
-primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
+primOpRules nm ISllOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) intPrimTy
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
+primOpRules nm ISraOp      = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR) intPrimTy
                                                , rightIdentityDynFlags zeroi ]
-primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
+primOpRules nm ISrlOp      = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical intPrimTy
                                                , rightIdentityDynFlags zeroi ]
 
 -- Word operations
@@ -180,8 +180,8 @@ primOpRules nm XorOp       = mkPrimOpRule nm 2 [ binaryLit (wordOp2 xor)
                                                , equalArgs >> retLit zerow ]
 primOpRules nm NotOp       = mkPrimOpRule nm 1 [ unaryLit complementOp
                                                , inversePrimOp NotOp ]
-primOpRules nm SllOp       = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
-primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
+primOpRules nm SllOp       = mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) wordPrimTy ]
+primOpRules nm SrlOp       = mkPrimOpRule nm 2 [ shiftRule shiftRightLogical wordPrimTy ]
 
 -- coercions
 primOpRules nm Word2IntOp     = mkPrimOpRule nm 1 [ liftLitDynFlags word2IntLit
@@ -462,12 +462,12 @@ wordOpC2 op dflags (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _) =
   wordCResult dflags (fromInteger w1 `op` fromInteger w2)
 wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
 
-shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
+shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> Type -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
 --    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
 --    SllOp, SrlOp           :: Word# -> Int# -> Word#
-shiftRule shift_op
+shiftRule shift_op resultTy
   = do { dflags <- getDynFlags
        ; [e1, Lit (LitNumber LitNumInt shift_len _)] <- getArgs
        ; case e1 of
@@ -475,7 +475,7 @@ shiftRule shift_op
              -> return e1
              -- See Note [Guarding against silly shifts]
              | shift_len < 0 || shift_len > wordSizeInBits dflags
-             -> return $ mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
+             -> return $ mkRuntimeErrorApp rUNTIME_ERROR_ID resultTy
                            ("Bad shift length " ++ show shift_len)
 
            -- Do the shift at type Integer, but shift length is Int
