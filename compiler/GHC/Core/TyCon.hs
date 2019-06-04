@@ -1505,11 +1505,11 @@ primRepSizeB platform = \case
    Int8Rep          -> 1
    Int16Rep         -> 2
    Int32Rep         -> 4
-   Int64Rep         -> wORD64_SIZE
+   Int64Rep         -> 8
    Word8Rep         -> 1
    Word16Rep        -> 2
    Word32Rep        -> 4
-   Word64Rep        -> wORD64_SIZE
+   Word64Rep        -> 8
    FloatRep         -> fLOAT_SIZE
    DoubleRep        -> dOUBLE_SIZE
    AddrRep          -> platformWordSizeInBytes platform

@@ -55,7 +55,6 @@ module GHC.Classes(
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
-import GHC.IntWord64
 import GHC.Prim
 import GHC.Tuple
 import GHC.CString (unpackCString#)
@@ -279,7 +278,6 @@ eqInt, neInt :: Int -> Int -> Bool
 (I# x) `eqInt` (I# y) = isTrue# (x ==# y)
 (I# x) `neInt` (I# y) = isTrue# (x /=# y)
 
-#if WORD_SIZE_IN_BITS < 64
 instance Eq TyCon where
   (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
        = isTrue# (hi1 `eqWord64#` hi2) && isTrue# (lo1 `eqWord64#` lo2)
@@ -290,18 +288,6 @@ instance Ord TyCon where
     | isTrue# (lo1 `gtWord64#` lo2) = GT
     | isTrue# (lo1 `ltWord64#` lo2) = LT
     | True                = EQ
-#else
-instance Eq TyCon where
-  (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-       = isTrue# (hi1 `eqWord#` hi2) && isTrue# (lo1 `eqWord#` lo2)
-instance Ord TyCon where
-  compare (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-    | isTrue# (hi1 `gtWord#` hi2) = GT
-    | isTrue# (hi1 `ltWord#` hi2) = LT
-    | isTrue# (lo1 `gtWord#` lo2) = GT
-    | isTrue# (lo1 `ltWord#` lo2) = LT
-    | True              = EQ
-#endif
 
 
 -- | The 'Ord' class is used for totally ordered datatypes.
