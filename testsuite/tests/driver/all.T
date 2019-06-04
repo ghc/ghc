@@ -287,3 +287,4 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
 
 test('T14452', [], run_command, ['$MAKE -s --no-print-directory T14452'])
 test('T15396', normal, compile_and_run, ['-package ghc'])
+test('T16737', [extra_files(['T16737include/'])], compile_and_run, ['-optP=-isystem -optP=T16737include'])
