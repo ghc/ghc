@@ -2175,7 +2175,6 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
         {Coerce directly from address to int.}
    with code_size = 0
@@ -2184,7 +2183,6 @@ primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
         {Coerce directly from int to address.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
-#endif
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
