@@ -156,7 +156,11 @@ assembleOneBCO hsc_env pbco = do
   return ubco'
 
 assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = do
+assembleBCO dflags (ProtoBCO { protoBCOName       = nm
+                             , protoBCOInstrs     = instrs
+                             , protoBCOBitmap     = bitmap
+                             , protoBCOBitmapSize = bsize
+                             , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
   let asm = mapM_ (assembleI dflags) instrs
 
