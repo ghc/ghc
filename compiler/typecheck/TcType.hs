@@ -516,6 +516,17 @@ superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely disti
                   -- The choice of level number here is a bit dodgy, but
                   -- topTcLevel works in the places that vanillaSkolemTv is used
 
+instance Outputable TcTyVarDetails where
+  ppr = pprTcTyVarDetails
+
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+-- For debugging
+pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
+pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
+  = ppr info <> colon <> ppr tclvl
+
 -----------------------------
 data MetaDetails
   = Flexi  -- Flexi type variables unify to become Indirects
@@ -544,20 +555,11 @@ instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
--- For debugging
-pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
-pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
-  = pp_info <> colon <> ppr tclvl
-  where
-    pp_info = case info of
-                TauTv      -> text "tau"
-                TyVarTv    -> text "tyv"
-                FlatMetaTv -> text "fmv"
-                FlatSkolTv -> text "fsk"
-
+instance Outputable MetaInfo where
+  ppr TauTv         = text "tau"
+  ppr TyVarTv       = text "tyv"
+  ppr FlatMetaTv    = text "fmv"
+  ppr FlatSkolTv    = text "fsk"
 
 {- *********************************************************************
 *                                                                      *
@@ -795,10 +797,10 @@ checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
 checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
   = ctxt_tclvl >= tv_tclvl
 
+-- Returns topTcLevel for non-TcTyVars
 tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
           SkolemTv tv_lvl _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
