@@ -103,7 +103,8 @@ module TcRnMonad(
   pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
-  traceTcConstraints, emitWildCardHoleConstraints,
+  traceTcConstraints,
+  emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
 
   -- * Template Haskell context
   recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
@@ -1676,8 +1677,16 @@ traceTcConstraints msg
          hang (text (msg ++ ": LIE:")) 2 (ppr lie)
        }
 
-emitWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
-emitWildCardHoleConstraints wcs
+emitAnonWildCardHoleConstraint :: TcTyVar -> TcM ()
+emitAnonWildCardHoleConstraint tv
+  = do { ct_loc <- getCtLocM HoleOrigin Nothing
+       ; emitInsolubles $ unitBag $
+         CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
+                                      , ctev_loc  = ct_loc }
+                  , cc_hole = TypeHole (mkTyVarOcc "_") } }
+
+emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
+emitNamedWildCardHoleConstraints wcs
   = do { ct_loc <- getCtLocM HoleOrigin Nothing
        ; emitInsolubles $ listToBag $
          map (do_one ct_loc) wcs }
@@ -1690,7 +1699,7 @@ emitWildCardHoleConstraints wcs
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
-                           UnhelpfulSpan str -> pprPanic "emitWildCardHoleConstraints"
+                           UnhelpfulSpan str -> pprPanic "emitNamedWildCardHoleConstraints"
                                                       (ppr name <+> quotes (ftext str))
                -- Wildcards are defined locally, and so have RealSrcSpans
          ct_loc' = setCtLocSpan ct_loc real_span

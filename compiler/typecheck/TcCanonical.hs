@@ -1009,6 +1009,8 @@ can_eq_nc_forall ev eq_rel s1 s2
                                                   (substTy subst (tyVarKind tv2))
                    ; let subst' = extendTvSubstAndInScope subst tv2
                                        (mkCastTy (mkTyVarTy skol_tv) kind_co)
+                         -- skol_tv is already in the in-scope set, but the
+                         -- free vars of kind_co are not; hence "...AndInScope"
                    ; (co, wanteds2) <- go skol_tvs subst' bndrs2
                    ; return ( mkTcForAllCo skol_tv kind_co co
                             , wanteds1 `unionBags` wanteds2 ) }

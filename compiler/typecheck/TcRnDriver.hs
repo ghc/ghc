@@ -2438,8 +2438,8 @@ tcRnType hsc_env flexi normalise rdr_type
                         -- must push level to satisfy level precondition of
                         -- kindGeneralize, below
                        solveEqualities       $
-                       tcWildCardBinders wcs $ \ wcs' ->
-                       do { emitWildCardHoleConstraints wcs'
+                       tcNamedWildCardBinders wcs $ \ wcs' ->
+                       do { emitNamedWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
