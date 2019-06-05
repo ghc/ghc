@@ -2,6 +2,5 @@
 tcfail134.hs:5:33: error:
     • Expecting one more argument to ‘XML’
       Expected a type, but ‘XML’ has kind ‘* -> Constraint’
-    • In the type signature:
-        toXML :: a -> XML
+    • In the type signature: toXML :: a -> XML
       In the class declaration for ‘XML’
