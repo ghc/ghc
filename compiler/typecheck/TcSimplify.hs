@@ -169,9 +169,10 @@ solveLocalEqualities callsite thing_inside
        ; emitConstraints wanted
 
        -- See Note [Fail fast if there are insoluble kind equalities]
-       ; if insolubleWC wanted
-         then failM
-         else return res }
+       ; when (insolubleWC wanted) $
+           failM
+
+       ; return res }
 
 {- Note [Fail fast if there are insoluble kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

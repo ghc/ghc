@@ -568,7 +568,7 @@ generaliseTcTyCon tc
              -- Running example in Note [Inferring kinds for type declarations]
              --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
              --                   , ("k2",kk2), ("x", (xx::kk2))]
-             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVarss,
+             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVars,
              -- specifically TyVarTvs
 
        -- Step 0: zonk and skolemise the Specified and Required binders
@@ -1153,8 +1153,10 @@ kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
   where
-    kc_sig (ClassOpSig _ _ nms op_ty) = kcHsSigType nms op_ty
+    kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
     kc_sig _                          = return ()
+
+    skol_info = TyConSkol ClassFlavour name
 
 kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = (dL->L _ fam_tc_name)
                                   , fdInfo   = fd_info }))

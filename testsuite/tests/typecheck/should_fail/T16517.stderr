@@ -1,0 +1,6 @@
+
+T16517.hs:5:29: error:
+    • Expected kind ‘k’, but ‘a’ has kind ‘k0’
+    • In the first argument of ‘Proxy’, namely ‘(a :: k)’
+      In the type signature: m :: Proxy (a :: k)
+      In the class declaration for ‘C’
