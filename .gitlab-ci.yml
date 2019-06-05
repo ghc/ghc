@@ -158,10 +158,10 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-linux-deb8-hadrian:
+validate-x86_64-linux-deb9-hadrian:
   extends: .validate-hadrian
   stage: build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -176,7 +176,7 @@ validate-x86_64-linux-deb8-hadrian:
 hadrian-ghc-in-ghci:
   <<: *only-default
   stage: build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
