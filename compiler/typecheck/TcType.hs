@@ -801,10 +801,10 @@ checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
 checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
   = ctxt_tclvl >= tv_tclvl
 
+-- Returns topTcLevel for non-TcTyVars
 tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
           SkolemTv tv_lvl _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
