@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-deprecations #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : Hadrian.Haskell.Cabal.Parse
@@ -17,6 +16,7 @@ module Hadrian.Haskell.Cabal.Parse (
 import Data.Bifunctor
 import Data.List.Extra
 import Development.Shake
+import qualified Distribution.Compat.Graph                     as Graph
 import qualified Distribution.ModuleName                       as C
 import qualified Distribution.Package                          as C
 import qualified Distribution.PackageDescription               as C
@@ -30,6 +30,7 @@ import qualified Distribution.Simple.Utils                     as C
 import qualified Distribution.Simple.Program.Types             as C
 import qualified Distribution.Simple.Configure                 as C (getPersistBuildConfig)
 import qualified Distribution.Simple.Build                     as C
+import qualified Distribution.Types.ComponentLocalBuildInfo    as C
 import qualified Distribution.Types.ComponentRequestedSpec     as C
 import qualified Distribution.InstalledPackageInfo             as Installed
 import qualified Distribution.Simple.PackageIndex              as C
@@ -215,7 +216,7 @@ resolveContextData context@Context {..} = do
 
     -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
     -- See: https://github.com/snowleopard/hadrian/issues/548
-    let extDeps      = C.externalPackageDeps lbi'
+    let extDeps      = externalPackageDeps lbi'
         deps         = map (C.display . snd) extDeps
         depDirect    = map (fromMaybe (error "resolveContextData: depDirect failed")
                      . C.lookupUnitId (C.installedPkgs lbi') . fst) extDeps
@@ -288,7 +289,20 @@ resolveContextData context@Context {..} = do
 getHookedBuildInfo :: [FilePath] -> IO C.HookedBuildInfo
 getHookedBuildInfo [] = return C.emptyHookedBuildInfo
 getHookedBuildInfo (baseDir:baseDirs) = do
-    maybeInfoFile <- C.findHookedPackageDesc baseDir
+    maybeInfoFile <- C.findHookedPackageDesc C.normal baseDir
     case maybeInfoFile of
         Nothing       -> getHookedBuildInfo baseDirs
         Just infoFile -> C.readHookedBuildInfo C.silent infoFile
+
+externalPackageDeps :: C.LocalBuildInfo -> [(C.UnitId, C.MungedPackageId)]
+externalPackageDeps lbi =
+    -- TODO:  what about non-buildable components?
+    nub [ (ipkgid, pkgid)
+        | clbi            <- Graph.toList (C.componentGraph lbi)
+        , (ipkgid, pkgid) <- C.componentPackageDeps clbi
+        , not (internal ipkgid) ]
+  where
+    -- True if this dependency is an internal one (depends on the library
+    -- defined in the same package).
+    internal ipkgid = any ((==ipkgid) . C.componentUnitId) (Graph.toList (C.componentGraph lbi))
+
