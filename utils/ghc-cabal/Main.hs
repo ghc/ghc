@@ -19,8 +19,10 @@ import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, wri
                                   toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
+import qualified Distribution.Compat.Graph as Graph
 import Distribution.Text
 import Distribution.Types.MungedPackageId
+import Distribution.Types.LocalBuildInfo
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
@@ -251,6 +253,18 @@ updateInstallDirTemplates relocatableBuild myPrefix myLibdir myDocdir idts
           htmldir   = toPathTemplate "$docdir"
       }
 
+externalPackageDeps :: LocalBuildInfo -> [(UnitId, MungedPackageId)]
+externalPackageDeps lbi =
+    -- TODO:  what about non-buildable components?
+    nub [ (ipkgid, pkgid)
+        | clbi            <- Graph.toList (componentGraph lbi)
+        , (ipkgid, pkgid) <- componentPackageDeps clbi
+        , not (internal ipkgid) ]
+  where
+    -- True if this dependency is an internal one (depends on the library
+    -- defined in the same package).
+    internal ipkgid = any ((==ipkgid) . componentUnitId) (Graph.toList (componentGraph lbi))
+
 generate :: FilePath -> FilePath -> [String] -> IO ()
 generate directory distdir config_args
  = withCurrentDirectory directory
@@ -274,8 +288,8 @@ generate directory distdir config_args
               -- cabal 2.2+ will expect it, but fallback to the old default
               -- location if we don't find any.  This is the case of the
               -- bindist, which doesn't ship the $dist/build folder.
-              maybe_infoFile <- findHookedPackageDesc (cwd </> distdir </> "build")
-                                <|> defaultHookedPackageDesc
+              maybe_infoFile <- findHookedPackageDesc verbosity (cwd </> distdir </> "build")
+                                <|> fmap Just (defaultPackageDesc verbosity)
               case maybe_infoFile of
                   Nothing       -> return emptyHookedBuildInfo
                   Just infoFile -> readHookedBuildInfo verbosity infoFile
@@ -307,8 +321,9 @@ generate directory distdir config_args
 
       let
           comp = compiler lbi
-          libBiModules lib = (libBuildInfo lib, libModules lib)
+          libBiModules lib = (libBuildInfo lib, foldMap (allLibModules lib) (componentNameCLBIs lbi $ CLibName defaultLibName))
           exeBiModules exe = (buildInfo exe, ModuleName.main : exeModules exe)
+          biModuless :: [(BuildInfo, [ModuleName.ModuleName])]
           biModuless = (map libBiModules . maybeToList $ library pd)
                     ++ (map exeBiModules $ executables pd)
           buildableBiModuless = filter isBuildable biModuless
