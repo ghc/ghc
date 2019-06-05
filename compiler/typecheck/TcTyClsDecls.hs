@@ -542,10 +542,15 @@ generaliseTcTyCon tc
              tc_res_kind = tyConResKind tc
              tc_tvs      = tyConTyVars  tc
              user_tyvars = tcTyConUserTyVars tc  -- ToDo: nuke
+             spec_req_prs = tcTyConScopedTyVars tc
 
-             (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
-             -- NB: scoped_tvs includes both specified and required (tc_tvs)
-             -- ToDo: Is this a good idea?
+             (spec_req_names, spec_req_tvs) = unzip spec_req_prs
+             -- NB: spec_req_tvs includes both Specified and Required
+             -- Running example in Note [Inferring kinds for type declarations]
+             --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
+             --                   , ("k2",kk2), ("x", (xx::kk2))]
+             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVars,
+             -- specifically TyVarTvs
 
        -- Step 1: find all the variables we want to quantify over,
        --         including Inferred, Specfied, and Required
@@ -1038,8 +1043,10 @@ kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
   where
-    kc_sig (ClassOpSig _ _ nms op_ty) = kcHsSigType nms op_ty
+    kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
     kc_sig _                          = return ()
+
+    skol_info = TyConSkol ClassFlavour name
 
 kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = (dL->L _ fam_tc_name)
                                   , fdInfo   = fd_info }))
