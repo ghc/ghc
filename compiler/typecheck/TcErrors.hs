@@ -158,14 +158,22 @@ reportUnsolved wanted
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- However, do not make any evidence bindings, because we don't
 -- have any convenient place to put them.
+-- NB: Type-level holes are OK, because there are no bindings.
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
---      (see Note [Fail fast on kind errors] in TcSimplify]
+--      (see Note [Fail fast on kind errors] in TcSimplify)
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
-       ; report_unsolved TypeError HoleError HoleError HoleError
+
+       ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
+       ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
+       ; let type_holes | not partial_sigs  = HoleError
+                        | warn_partial_sigs = HoleWarn
+                        | otherwise         = HoleDefer
+
+       ; report_unsolved TypeError HoleError type_holes HoleError
                          ev_binds wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
