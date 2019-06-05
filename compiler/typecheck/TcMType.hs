@@ -834,14 +834,14 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
 
 --------------------
@@ -1094,14 +1094,14 @@ we are trying to generalise this type:
   forall arg. ... (alpha[tau]:arg) ...
 
 We have a metavariable alpha whose kind mentions a skolem variable
-boudn inside the very type we are generalising.
+bound inside the very type we are generalising.
 This can arise while type-checking a user-written type signature
 (see the test case for the full code).
 
 We cannot generalise over alpha!  That would produce a type like
   forall {a :: arg}. forall arg. ...blah...
 The fact that alpha's kind mentions arg renders it completely
-ineligible for generaliation.
+ineligible for generalisation.
 
 However, we are not going to learn any new constraints on alpha,
 because its kind isn't even in scope in the outer context.  So alpha
@@ -1203,7 +1203,7 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
 
 collect_cand_qtvs
   :: Bool            -- True <=> consider every fv in Type to be dependent
-  -> VarSet          -- Bound variables (both locally bound and globally bound)
+  -> VarSet          -- Bound variables (locals only)
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
   -> TcM CandidatesQTvs
@@ -1237,10 +1237,20 @@ collect_cand_qtvs is_dep bound dvs ty
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv
-      | otherwise   = do { m_contents <- isFilledMetaTyVar_maybe tv
+      | otherwise   = do { lvl <- getTcLevel
+                         ; m_contents <- isFilledMetaTyVar_maybe tv
                          ; case m_contents of
                              Just ind_ty -> go dv ind_ty
-                             Nothing     -> go_tv dv tv }
+                             Nothing
+                                -- This check makes sure that we don't try
+                                -- to label a metavariable from an outer scope
+                                -- as a "naughty" quantification candidate.
+                                -- See Note [Naughty quantification candidates]
+                                -- Missing this check caused #16517
+                               |  tcTyVarLevel tv `strictlyDeeperThan` lvl
+                               -> go_tv dv tv
+                               |  otherwise
+                               -> return dv }
 
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
