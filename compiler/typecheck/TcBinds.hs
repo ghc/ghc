@@ -1020,7 +1020,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
            ; case tcGetCastedTyVar_maybe wc_var_ty of
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
-               -- comes from the checkExpectedKind in TcHsType.tcWildCardOcc. So, to
+               -- comes from the checkExpectedKind in TcHsType.tcAnonWildCardOcc. So, to
                -- make the kinds work out, we reverse the cast here.
                Just (wc_var, wc_co) -> writeMetaTyVar wc_var (ctuple `mkCastTy` mkTcSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)

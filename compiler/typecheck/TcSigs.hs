@@ -498,25 +498,14 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
-
-        -- Clone the quantified tyvars
-        -- Reason: we might have    f, g :: forall a. a -> _ -> a
-        --         and we want it to behave exactly as if there were
-        --         two separate signatures.  Cloning here seems like
-        --         the easiest way to do so, and is very similar to
-        --         the tcInstType in the CompleteSig case
-        -- See #14643
-       ; (subst, tvs') <- newMetaTyVarTyVars tvs
-                         -- Why newMetaTyVarTyVars?  See TcBinds
-                         -- Note [Quantified variables in partial type signatures]
-       ; let tv_prs = tv_names `zip` tvs'
-             inst_sig = TISI { sig_inst_sig   = hs_sig
+       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+         -- See Note [Checking partial type signatures] in TcHsType
+       ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs
                              , sig_inst_wcx   = wcx
-                             , sig_inst_theta = substTysUnchecked subst theta
-                             , sig_inst_tau   = substTyUnchecked  subst tau }
+                             , sig_inst_theta = theta
+                             , sig_inst_tau   = tau }
        ; traceTc "End partial sig }" (ppr inst_sig)
        ; return inst_sig }
 
