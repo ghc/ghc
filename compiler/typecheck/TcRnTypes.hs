@@ -1561,7 +1561,7 @@ data TcIdSigInst
                -- Extra-constraints wildcard to fill in, if any
                -- If this exists, it is surely of the form (meta_tv |> co)
                -- (where the co might be reflexive). This is filled in
-               -- only from the return value of TcHsType.tcWildCardOcc
+               -- only from the return value of TcHsType.tcAnonWildCardOcc
          }
 
 {- Note [sig_inst_tau may be polymorphic]
