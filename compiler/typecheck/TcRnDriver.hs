@@ -2436,8 +2436,8 @@ tcRnType hsc_env normalise rdr_type
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; ((ty, kind), lie)  <-
                        captureTopConstraints $
-                       tcWildCardBinders wcs $ \ wcs' ->
-                       do { emitWildCardHoleConstraints wcs'
+                       tcNamedWildCardBinders wcs $ \ wcs' ->
+                       do { emitNamedWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }
        ; _ <- checkNoErrs (simplifyInteractive lie)
 

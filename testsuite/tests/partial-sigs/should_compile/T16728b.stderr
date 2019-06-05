@@ -1,0 +1,13 @@
+
+T16728b.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Bool’
+    • In the type ‘a -> _’
+      In the type signature: h :: forall a. a -> _
+
+T16728b.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘a’
+      Where: ‘a’ is a rigid type variable bound by
+               the inferred type of g :: a -> a
+               at T16728b.hs:6:1-7
+    • In the type ‘a -> _’
+      In the type signature: g :: forall a. a -> _
