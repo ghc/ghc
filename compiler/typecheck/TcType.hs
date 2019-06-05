@@ -1795,11 +1795,14 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
        Nothing      -> False
 
 evVarPred :: EvVar -> PredType
-evVarPred var
-  = ASSERT2( isEvVarType var_ty, ppr var <+> dcolon <+> ppr var_ty )
-    var_ty
- where
-    var_ty = varType var
+evVarPred var = varType var
+  -- Historical note: I used to have an ASSERT here,
+  -- checking (isEvVarType (varType var)).  But with something like
+  --   f :: c => _ -> _
+  -- we end up with (c :: kappa), and (kappa ~ Constraint).  Until
+  -- we solve and zonk (which there is no particular reason to do for
+  -- partial signatures, (isEvVarType kappa) will return False. But
+  -- nothing is wrong.  So I just removed the ASSERT.
 
 ------------------
 -- | When inferring types, should we quantify over a given predicate?

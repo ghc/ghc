@@ -1,0 +1,20 @@
+
+T16728a.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred types of
+                 g :: a -> _
+                 h :: a -> _
+               at T16728a.hs:(5,1)-(7,9)
+    • In the type ‘a -> _’
+      In the type signature: g :: forall a. a -> _
+
+T16728a.hs:4:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘_’
+      Where: ‘_’ is a rigid type variable bound by
+               the inferred types of
+                 g :: a -> _
+                 h :: a -> _
+               at T16728a.hs:(5,1)-(7,9)
+    • In the type ‘a -> _’
+      In the type signature: h :: forall a. a -> _

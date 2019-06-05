@@ -378,42 +378,35 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
 
-       ; arg2'  <- tcArg op arg2 arg2_sigma 2
+       ; arg2' <- tcArg op arg2 arg2_sigma 2
 
        -- Make sure that the argument type has kind '*'
        --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
        -- Eg we do not want to allow  (D#  $  4.0#)   #5570
        --    (which gives a seg fault)
-       --
-       -- The *result* type can have any kind (#8739),
-       -- so we don't need to check anything for that
        ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
                         (tcTypeKind arg2_sigma) liftedTypeKind
-           -- ignore the evidence. arg2_sigma must have type * or #,
-           -- because we know arg2_sigma -> or_res_ty is well-kinded
+           -- Ignore the evidence. arg2_sigma must have type * or #,
+           -- because we know (arg2_sigma -> op_res_ty) is well-kinded
            -- (because otherwise matchActualFunTys would fail)
-           -- There's no possibility here of, say, a kind family reducing to *.
+           -- So this 'unifyKind' will either succeed with Refl, or will
+           -- produce an insoluble constraint * ~ #, which we'll report later.
 
-       ; wrap_res <- tcSubTypeHR orig1 (Just expr) op_res_ty res_ty
-                       -- op_res -> res
+       -- NB: unlike the argument type, the *result* type, op_res_ty can
+       -- have any kind (#8739), so we don't need to check anything for that
 
        ; op_id  <- tcLookupId op_name
-       ; res_ty <- readExpType res_ty
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
+       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep op_res_ty
                                                , arg2_sigma
-                                               , res_ty])
+                                               , op_res_ty])
                                    (HsVar noExt (L lv op_id)))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
-             -- wrap_res :: op_res_ty "->" res_ty
-             -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
+             -- op' :: (a2_ty -> op_res_ty) -> a2_ty -> op_res_ty
 
-             -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
-             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
-                     <.> wrap_arg1
-             doc = text "When looking at the argument to ($)"
+             expr' = OpApp fix (mkLHsWrap wrap_arg1 arg1') op' arg2'
 
-       ; return (OpApp fix (mkLHsWrap wrap1 arg1') op' arg2') }
+       ; tcWrapResult expr expr' op_res_ty res_ty }
 
   | (L loc (HsRecFld _ (Ambiguous _ lbl))) <- op
   , Just sig_ty <- obviousSig (unLoc arg1)
