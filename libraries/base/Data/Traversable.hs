@@ -115,13 +115,12 @@ import qualified GHC.List as List ( foldr )
 -- 'Data.Functor.Compose.Compose' are from "Data.Functor.Identity" and
 -- "Data.Functor.Compose".
 --
--- A result of the naturality law is the intuitive generalised identity law
--- for 'traverse'
+-- A result of the naturality law is a `purity law` for 'traverse'
 --
 -- @'traverse' 'pure' = 'pure'@
 --
 -- (The naturality law is implied by parametricity and thus so is the
--- generalised identity law [reference not available, word of mouth].)
+-- purity law [1, p15].)
 --
 -- Instances are similar to 'Functor', e.g. given a data type
 --
@@ -146,6 +145,8 @@ import qualified GHC.List as List ( foldr )
 --    equivalent to traversal with a constant applicative functor
 --    ('foldMapDefault').
 --
+-- References:
+-- [1] The Essence of the Iterator Pattern, Jeremy Gibbons and Bruno C. d. S. Oliveira
 class (Functor t, Foldable t) => Traversable t where
     {-# MINIMAL traverse | sequenceA #-}
 
