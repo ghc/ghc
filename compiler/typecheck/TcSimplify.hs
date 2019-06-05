@@ -152,7 +152,25 @@ solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
   = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
        ; emitConstraints wanted
+
+       -- See Note [Fail fast if there are insoluble kind equalities]
+       ; when (insolubleWC wanted) $
+           failM
+
        ; return res }
+
+{- Note [Fail fast if there are insoluble kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Rather like in simplifyInfer, fail fast if there is an insoluble
+constraint.  Otherwise we'll just succeed in kind-checking a nonsense
+type, with a cascade of follow-up errors.
+
+For example polykinds/T12593, T15577, and many others.
+
+Take care to ensure that you emit the insoluble constraints before
+failing, because they are what will ulimately lead to the error
+messsage!
+-}
 
 solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)
 solveLocalEqualitiesX callsite thing_inside

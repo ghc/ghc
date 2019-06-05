@@ -4,23 +4,7 @@ DepFail1.hs:7:6: error:
       Expected a type, but ‘Proxy Bool’ has kind ‘Bool -> *’
     • In the type signature: z :: Proxy Bool
 
-DepFail1.hs:8:5: error:
-    • Couldn't match expected type ‘Proxy Bool’
-                  with actual type ‘Proxy k0 a1’
-    • In the expression: P
-      In an equation for ‘z’: z = P
-
 DepFail1.hs:10:16: error:
     • Expected kind ‘Int’, but ‘Bool’ has kind ‘*’
     • In the second argument of ‘Proxy’, namely ‘Bool’
       In the type signature: a :: Proxy Int Bool
-
-DepFail1.hs:11:5: error:
-    • Couldn't match kind ‘*’ with ‘Int’
-      When matching types
-        a0 :: Int
-        Bool :: *
-      Expected type: Proxy Int Bool
-        Actual type: Proxy Int a0
-    • In the expression: P
-      In an equation for ‘a’: a = P
