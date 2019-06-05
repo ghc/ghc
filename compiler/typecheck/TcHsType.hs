@@ -36,7 +36,7 @@ module TcHsType (
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
         kcLHsQTyVars,
-        tcWildCardBinders,
+        tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
@@ -387,7 +387,7 @@ tcHsTypeApp wc_ty kind
                unsetWOptM Opt_WarnPartialTypeSignatures $
                setXOptM LangExt.PartialTypeSignatures $
                -- See Note [Wildcards in visible type application]
-               tcWildCardBinders sig_wcs $ \ _ ->
+               tcNamedWildCardBinders sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        -- We must promote here. Ex:
        --   f :: forall a. a
@@ -402,18 +402,19 @@ tcHsTypeApp (XHsWildCardBndrs _) _ = panic "tcHsTypeApp"
 
 {- Note [Wildcards in visible type application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A HsWildCardBndrs's hswc_ext now only includes /named/ wildcards, so
+any unnamed wildcards stay unchanged in hswc_body.  When called in
+tcHsTypeApp, tcCheckLHsType will call emitAnonWildCardHoleConstraint
+on these anonymous wildcards. However, this would trigger
+error/warning when an anonymous wildcard is passed in as a visible type
+argument, which we do not want because users should be able to write
+@_ to skip a instantiating a type variable variable without fuss. The
+solution is to switch the PartialTypeSignatures flags here to let the
+typechecker know that it's checking a '@_' and do not emit hole
+constraints on it.  See related Note [Wildcards in visible kind
+application] and Note [The wildcard story for types] in HsTypes.hs
 
-A HsWildCardBndrs's hswc_ext now only includes named wildcards, so any unnamed
-wildcards stay unchanged in hswc_body and when called in tcHsTypeApp, tcCheckLHsType
-will call emitWildCardHoleConstraints on them. However, this would trigger
-error/warning when an unnamed wildcard is passed in as a visible type argument,
-which we do not want because users should be able to write @_ to skip a instantiating
-a type variable variable without fuss. The solution is to switch the
-PartialTypeSignatures flags here to let the typechecker know that it's checking
-a '@_' and do not emit hole constraints on it.
-See related Note [Wildcards in visible kind application]
-and Note [The wildcard story for types] in HsTypes.hs
-
+Ugh!
 -}
 
 {-
@@ -829,7 +830,7 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type _    wc@(HsWildCardTy _)        ek = tcWildCardOcc wc ek
+tc_hs_type _    wc@(HsWildCardTy _)        ek = tcAnonWildCardOcc wc ek
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
@@ -849,18 +850,18 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
                            liftedTypeKind exp_kind }
 
 ---------------------------
-tcWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
-tcWildCardOcc wc exp_kind
-  = do { wc_tv <- newWildTyVar
-          -- The wildcard's kind should be an un-filled-in meta tyvar
-       ; loc <- getSrcSpanM
-       ; uniq <- newUnique
-       ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
+tcAnonWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc wc exp_kind
+  = do { wc_tv <- newWildTyVar  -- The wildcard's kind will be an un-filled-in meta tyvar
+
        ; part_tysig <- xoptM LangExt.PartialTypeSignatures
        ; warning <- woptM Opt_WarnPartialTypeSignatures
-       -- See Note [Wildcards in visible kind application]
-       ; unless (part_tysig && not warning)
-             (emitWildCardHoleConstraints [(name,wc_tv)])
+
+       ; unless (part_tysig && not warning) $
+         emitAnonWildCardHoleConstraint wc_tv
+         -- Why the 'unless' guard?
+         -- See Note [Wildcards in visible kind application]
+
        ; checkExpectedKind wc (mkTyVarTy wc_tv)
                            (tyVarKind wc_tv) exp_kind }
 
@@ -877,11 +878,11 @@ x = MkT
 So we should allow '@_' without emitting any hole constraints, and
 regardless of whether PartialTypeSignatures is enabled or not. But how would
 the typechecker know which '_' is being used in VKA and which is not when it
-calls emitWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
+calls emitNamedWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
 The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
-but instead give every unnamed wildcard a fresh wild tyvar in tcWildCardOcc.
+but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
 And whenever we see a '@', we automatically turn on PartialTypeSignatures and
-turn off hole constraint warnings, and never call emitWildCardHoleConstraints
+turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
 under these conditions.
 See related Note [Wildcards in visible type application] here and
 Note [The wildcard story for types] in HsTypes.hs
@@ -1722,23 +1723,26 @@ To avoid the double-zonk, we do two things:
     gathers free variables. So this way effectively sidesteps step 3.
 -}
 
-tcWildCardBinders :: [Name]
-                  -> ([(Name, TcTyVar)] -> TcM a)
-                  -> TcM a
-tcWildCardBinders wc_names thing_inside
+tcNamedWildCardBinders :: [Name]
+                       -> ([(Name, TcTyVar)] -> TcM a)
+                       -> TcM a
+-- Bring into scope the /named/ wildcard binders.  Remember that
+-- plain wildcards _ are anonymous and dealt with by HsWildCardTy
+-- Soe Note [The wildcard story for types] in HsTypes
+tcNamedWildCardBinders wc_names thing_inside
   = do { wcs <- mapM (const newWildTyVar) wc_names
        ; let wc_prs = wc_names `zip` wcs
        ; tcExtendNameTyVarEnv wc_prs $
          thing_inside wc_prs }
 
 newWildTyVar :: TcM TcTyVar
--- ^ New unification variable for a wildcard
+-- ^ New unification variable '_' for a wildcard
 newWildTyVar
   = do { kind <- newMetaKindVar
        ; uniq <- newUnique
        ; details <- newMetaDetails TauTv
-       ; let name = mkSysTvName uniq (fsLit "_")
-             tyvar = (mkTcTyVar name kind details)
+       ; let name  = mkSysTvName uniq (fsLit "_")
+             tyvar = mkTcTyVar name kind details
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
 
@@ -2490,11 +2494,11 @@ tcHsPartialSigType
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
-         , [Name]             -- Original tyvar names, in correspondence with ...
-         , [TcTyVar]          -- ... Implicitly and explicitly bound type variables
+         , [(Name,TcTyVar)]   -- Original tyvar names, in correspondence with
+                              --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
--- See Note [Recipe for checking a signature]
+-- See Note [Checking partial type signatures]
 tcHsPartialSigType ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs, hswc_body = ib_ty } <- sig_ty
   , HsIB { hsib_ext = implicit_hs_tvs
@@ -2502,8 +2506,11 @@ tcHsPartialSigType ctxt sig_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
-            <- solveLocalEqualities "tcHsPatSigTypes"      $
-               tcWildCardBinders sig_wcs $ \ wcs ->
+            <- solveLocalEqualities "tcHsPartialSigType"    $
+                 -- This solveLocalEqualiltes fails fast if there are
+                 -- insoluble equalities. See TcSimplify
+                 -- Note [Fail fast if there are insoluble kind equalities]
+               tcNamedWildCardBinders sig_wcs $ \ wcs ->
                bindImplicitTKBndrs_Tv implicit_hs_tvs       $
                bindExplicitTKBndrs_Tv explicit_hs_tvs       $
                do {   -- Instantiate the type-class context; but if there
@@ -2514,38 +2521,23 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
-         -- We must return these separately, because all the zonking below
-         -- might change the name of a TyVarTv. This, in turn, causes trouble
-         -- in partial type signatures that bind scoped type variables, as
-         -- we bring the wrong name into scope in the function body.
-         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
-       ; let tv_names = implicit_hs_tvs ++ hsLTyVarNames explicit_hs_tvs
-
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary
        -- See Note [Extra-constraint holes in partial type signatures]
-       ; emitWildCardHoleConstraints wcs
+       ; emitNamedWildCardHoleConstraints wcs
 
-         -- The TyVarTvs created above will sometimes have too high a TcLevel
-         -- (note that they are generated *after* bumping the level in
-         -- the tc{Im,Ex}plicitTKBndrsSig functions. Bumping the level
-         -- is still important here, because the kinds of these variables
-         -- do indeed need to have the higher level, so they can unify
-         -- with other local type variables. But, now that we've type-checked
-         -- everything (and solved equalities in the tcImplicit call)
-         -- we need to promote the TyVarTvs so we don't violate the TcLevel
-         -- invariant
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
-       ; explicit_tvs <- mapM zonkAndSkolemise explicit_tvs
-       ; theta        <- mapM zonkTcType theta
-       ; tau          <- zonkTcType tau
+         -- We return a proper (Name,TyVar) environment, to be sure that
+         -- we bring the right name into scope in the function body.
+         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
+       ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvs)
+                      ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvs)
 
-       ; let all_tvs = implicit_tvs ++ explicit_tvs
+      -- NB: checkValidType on the final inferred type will be
+      --     done later by checkInferredPolyId.  We can't do it
+      --     here because we don't have a complete tuype to check
 
-       ; checkValidType ctxt (mkSpecForAllTys all_tvs $ mkPhiTy theta tau)
-
-       ; traceTc "tcHsPartialSigType" (ppr all_tvs)
-       ; return (wcs, wcx, tv_names, all_tvs, theta, tau) }
+       ; traceTc "tcHsPartialSigType" (ppr tv_prs)
+       ; return (wcs, wcx, tv_prs, theta, tau) }
 
 tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPartialSigType"
 tcHsPartialSigType _ (XHsWildCardBndrs _) = panic "tcHsPartialSigType"
@@ -2555,14 +2547,43 @@ tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpan wc_loc $
-                     tcWildCardOcc wc constraintKind
+                     tcAnonWildCardOcc wc constraintKind
        ; theta <- mapM tcLHsPredType hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise
   = do { theta <- mapM tcLHsPredType hs_theta
        ; return (theta, Nothing) }
 
-{- Note [Extra-constraint holes in partial type signatures]
+{- Note [Checking partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Recipe for checking a signature]
+
+When we have a parital signature like
+   f,g :: forall a. a -> _
+we do the following
+
+* In TcSigs.tcUserSigType we return a PartialSig, which (unlike
+  the companion CompleteSig) contains the original, as-yet-unchecked
+  source-code LHsSigWcType
+
+* Then, for f and g /separately/, we call tcInstSig, which in turn
+  call tchsPartialSig (defined near this Note).  It kind-checks the
+  LHsSigWcType, creating fresh unification variables for each "_"
+  wildcard.  It's important that the wildcards for f and g are distinct
+  becase they migh get instantiated completely differently.  E.g.
+     f,g :: forall a. a -> _
+     f x = a
+     g x = True
+  It's really as if we'd written two distinct signatures.
+
+* Note that we don't make quantified type (forall a. blah) and then
+  instantiate it -- it makes no sense to instantiate a type with
+  wildcards in it.  Rather, tcHsPartialSigType just returns the
+  'a' and the 'blah' separately.
+
+  Nor, for the same reason, do we push a level in tcHsPartialSigType.
+
+Note [Extra-constraint holes in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   f :: (_) => a -> a
@@ -2631,12 +2652,12 @@ tcHsPatSigType ctxt sig_ty
                  -- Always solve local equalities if possible,
                  -- else casts get in the way of deep skolemisation
                  -- (#16033)
-               tcWildCardBinders sig_wcs        $ \ wcs ->
+               tcNamedWildCardBinders sig_wcs        $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
 
-        ; emitWildCardHoleConstraints wcs
+        ; emitNamedWildCardHoleConstraints wcs
 
           -- sig_ty might have tyvars that are at a higher TcLevel (if hs_ty
           -- contains a forall). Promote these.

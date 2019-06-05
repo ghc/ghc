@@ -92,3 +92,6 @@ test('T15039c', normal, compile, ['-fprint-equality-relations'])
 test('T15039d', normal, compile,
                 ['-fprint-explicit-kinds -fprint-equality-relations'])
 test('T16334', normal, compile, [''])
+test('T16728', normal, compile, [''])
+test('T16728a', normal, compile, [''])
+test('T16728b', normal, compile, [''])
