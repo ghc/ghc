@@ -297,23 +297,22 @@ instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- If they don't match, emit a kind-equality to promise that they will
 -- eventually do so, and thus make a kind-homongeneous substitution.
 instTyVarsWith orig tvs tys
-  = go empty_subst tvs tys
+  = go emptyTCvSubst tvs tys
   where
-    empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfTypes tys))
-
     go subst [] []
       = return subst
     go subst (tv:tvs) (ty:tys)
       | tv_kind `tcEqType` ty_kind
-      = go (extendTCvSubst subst tv ty) tvs tys
+      = go (extendTvSubstAndInScope subst tv ty) tvs tys
       | otherwise
       = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
-           ; go (extendTCvSubst subst tv (ty `mkCastTy` co)) tvs tys }
+           ; go (extendTvSubstAndInScope subst tv (ty `mkCastTy` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
         ty_kind = tcTypeKind ty
 
     go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
+
 
 {-
 ************************************************************************
