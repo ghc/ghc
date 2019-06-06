@@ -82,14 +82,14 @@ createThread(Capability *cap, W_ size)
     stack_size = round_to_mblocks(size - sizeofW(StgTSO));
     stack = (StgStack *)allocate(cap, stack_size);
     TICK_ALLOC_STACK(stack_size);
+    SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
     stack->stack_size   = stack_size - sizeofW(StgStack);
     stack->sp           = stack->stack + stack->stack_size;
     stack->dirty        = 1;
-    write_barrier();
-    SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
 
     tso = (StgTSO *)allocate(cap, sizeofW(StgTSO));
     TICK_ALLOC_TSO();
+    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 
     // Always start with the compiled code evaluator
     tso->what_next = ThreadRunGHC;
@@ -116,9 +116,6 @@ createThread(Capability *cap, W_ size)
     tso->prof.cccs = CCS_MAIN;
 #endif
 
-    write_barrier();
-    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
-
     // put a stop frame on the stack
     stack->sp -= sizeofW(StgStopFrame);
     SET_HDR((StgClosure*)stack->sp,
@@ -129,6 +126,8 @@ createThread(Capability *cap, W_ size)
     ACQUIRE_LOCK(&sched_mutex);
     tso->id = next_thread_id++;  // while we have the mutex
     tso->global_link = g0->threads;
+    /* Mutations above need no memory barrier since this lock will provide
+     * a release barrier */
     g0->threads = tso;
     RELEASE_LOCK(&sched_mutex);
 
@@ -261,8 +260,9 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         MessageWakeup *msg;
         msg = (MessageWakeup *)allocate(cap,sizeofW(MessageWakeup));
         msg->tso = tso;
-        write_barrier();
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
+        // Ensure that writes constructing Message are committed before sending.
+        write_barrier();
         sendMessage(cap, tso->cap, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
                       (W_)tso->id, tso->cap->no);
@@ -389,8 +389,6 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
 {
     StgBlockingQueue *bq, *next;
     StgClosure *p;
-    const StgInfoTable *bqinfo;
-    const StgInfoTable *pinfo;
 
     debugTraceCap(DEBUG_sched, cap,
                   "collision occurred; checking blocking queues for thread %ld",
@@ -399,8 +397,8 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
 
-        bqinfo = bq->header.info;
-        load_load_barrier();
+        const StgInfoTable *bqinfo = bq->header.info;
+        load_load_barrier();  // XXX: Is this needed?
         if (bqinfo == &stg_IND_info) {
             // ToDo: could short it out right here, to avoid
             // traversing this IND multiple times.
@@ -408,7 +406,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
         }
 
         p = bq->bh;
-        pinfo = p->header.info;
+        const StgInfoTable *pinfo = p->header.info;
         load_load_barrier();
         if (pinfo != &stg_BLACKHOLE_info ||
             ((StgInd *)p)->indirectee != (StgClosure*)bq)
@@ -609,13 +607,12 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     new_stack = (StgStack*) allocate(cap, chunk_size);
     cap->r.rCurrentTSO = NULL;
 
+    SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
     TICK_ALLOC_STACK(chunk_size);
 
     new_stack->dirty = 0; // begin clean, we'll mark it dirty below
     new_stack->stack_size = chunk_size - sizeofW(StgStack);
     new_stack->sp = new_stack->stack + new_stack->stack_size;
-    write_barrier();
-    SET_HDR(new_stack, &stg_STACK_info, old_stack->header.prof.ccs);
 
     tso->tot_stack_size += new_stack->stack_size;
 
@@ -664,9 +661,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         } else {
             new_stack->sp -= sizeofW(StgUnderflowFrame);
             frame = (StgUnderflowFrame*)new_stack->sp;
-            frame->next_chunk  = old_stack;
-            write_barrier();
             frame->info = &stg_stack_underflow_frame_info;
+            frame->next_chunk  = old_stack;
         }
 
         // copy the stack chunk between tso->sp and sp to
@@ -681,6 +677,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         new_stack->sp -= chunk_words;
     }
 
+    // No write barriers needed; all of the writes above are to structured
+    // owned by our capability.
     tso->stackobj = new_stack;
 
     // we're about to run it, better mark it dirty

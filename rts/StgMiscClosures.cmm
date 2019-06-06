@@ -317,8 +317,10 @@ retry:
 
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = node;
-        prim_write_barrier;
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
+        // Write barrier to ensure that writes constructing Message are
+        // committed before we expose to other threads.
+        prim_write_barrier;
 
         (r) = ccall messageBlackHole(MyCapability() "ptr", msg "ptr");
 

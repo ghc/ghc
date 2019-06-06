@@ -553,8 +553,6 @@ update_fwd_large( bdescr *bd )
 static /* STATIC_INLINE */ StgPtr
 thread_obj (const StgInfoTable *info, StgPtr p)
 {
-    load_load_barrier();
-
     switch (info->type) {
     case THUNK_0_1:
         return p + sizeofW(StgThunk) + 1;

@@ -65,9 +65,8 @@ stg_newByteArrayzh ( W_ n )
         jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
     }
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
-    StgArrBytes_bytes(p) = n;
-    prim_write_barrier;
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -103,9 +102,9 @@ stg_newPinnedByteArrayzh ( W_ n )
        to BA_ALIGN bytes: */
     p = p + ((-p - SIZEOF_StgArrBytes) & BA_MASK);
 
-    StgArrBytes_bytes(p) = n;
-    prim_write_barrier;
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -146,9 +145,9 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
        <alignment> is a power of 2, which is technically not guaranteed */
     p = p + ((-p - SIZEOF_StgArrBytes) & (alignment - 1));
 
-    StgArrBytes_bytes(p) = n;
-    prim_write_barrier;
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(p) = n;
     return (p);
 }
 
@@ -257,6 +256,8 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
+    /* No write barrier needed since this is a new allocation. */
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
@@ -269,9 +270,6 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
         goto for;
     }
 
-    prim_write_barrier;
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
-
     return (arr);
 }
 
@@ -283,13 +281,11 @@ stg_unsafeThawArrayzh ( gcptr arr )
     // mut_list so no need to add it again. MUT_ARR_PTRS_FROZEN_CLEAN means it's
     // not and we should add it to a mut_list.
     if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN_DIRTY_info) {
-        prim_write_barrier; // see below:
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE():
         recordMutable(arr);
         return (arr);
     } else {
-        prim_write_barrier;
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
         return (arr);
     }
@@ -377,6 +373,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
@@ -388,9 +385,6 @@ stg_newArrayArrayzh ( W_ n /* words */ )
         p = p + WDS(1);
         goto for;
     }
-
-    prim_write_barrier;
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
 
     return (arr);
 }
@@ -414,6 +408,8 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
+    /* No write barrier needed since this is a new allocation. */
+    SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(arr) = n;
 
     // Initialise all elements of the array with the value in R2
@@ -428,9 +424,6 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
         goto for;
     }
 
-    prim_write_barrier;
-    SET_HDR(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info, CCCS);
-
     return (arr);
 }
 
@@ -439,13 +432,11 @@ stg_unsafeThawSmallArrayzh ( gcptr arr )
     // See stg_unsafeThawArrayzh
     if (StgHeader_info(arr) != stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info) {
         SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
-        prim_write_barrier;
         recordMutable(arr);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
         return (arr);
     } else {
         SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
-        prim_write_barrier;
         return (arr);
     }
 }
@@ -475,13 +466,12 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
 {
     W_ dst_p, src_p, bytes;
 
+    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
+
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
     bytes = WDS(n);
     prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
-
-    prim_write_barrier;
-    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
     return ();
 }
@@ -489,6 +479,8 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
 stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
 {
     W_ dst_p, src_p, bytes;
+
+    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(src_off);
@@ -498,9 +490,6 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
     } else {
         prim %memcpy(dst_p, src_p, bytes, SIZEOF_W);
     }
-
-    prim_write_barrier;
-    SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
     return ();
 }
@@ -537,9 +526,9 @@ stg_newMutVarzh ( gcptr init )
     ALLOC_PRIM_P (SIZEOF_StgMutVar, stg_newMutVarzh, init);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
-    StgMutVar_var(mv) = init;
-    prim_write_barrier;
+    /* No write barrier needed since this is a new allocation. */
     SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
+    StgMutVar_var(mv) = init;
 
     return (mv);
 }
@@ -622,18 +611,16 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
     TICK_ALLOC_THUNK_2();
     CCCS_ALLOC(THUNK_2_SIZE);
     z = Hp - THUNK_2_SIZE + WDS(1);
+    SET_HDR(z, stg_ap_2_upd_info, CCCS);
     LDV_RECORD_CREATE(z);
     StgThunk_payload(z,0) = f;
-    prim_write_barrier;
-    SET_HDR(z, stg_ap_2_upd_info, CCCS);
 
     TICK_ALLOC_THUNK_1();
     CCCS_ALLOC(THUNK_1_SIZE);
     y = z - THUNK_1_SIZE;
+    SET_HDR(y, stg_sel_0_upd_info, CCCS);
     LDV_RECORD_CREATE(y);
     StgThunk_payload(y,0) = z;
-    prim_write_barrier;
-    SET_HDR(y, stg_sel_0_upd_info, CCCS);
 
   retry:
     x = StgMutVar_var(mv);
@@ -683,10 +670,9 @@ stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
     TICK_ALLOC_THUNK();
     CCCS_ALLOC(THUNK_SIZE);
     z = Hp - THUNK_SIZE + WDS(1);
+    SET_HDR(z, stg_ap_2_upd_info, CCCS);
     LDV_RECORD_CREATE(z);
     StgThunk_payload(z,0) = f;
-    prim_write_barrier;
-    SET_HDR(z, stg_ap_2_upd_info, CCCS);
 
   retry:
     x = StgMutVar_var(mv);
@@ -719,6 +705,8 @@ stg_mkWeakzh ( gcptr key,
     ALLOC_PRIM (SIZEOF_StgWeak)
 
     w = Hp - SIZEOF_StgWeak + WDS(1);
+    // No memory barrier needed as this is a new allocation.
+    SET_HDR(w, stg_WEAK_info, CCCS);
 
     StgWeak_key(w)         = key;
     StgWeak_value(w)       = value;
@@ -726,10 +714,6 @@ stg_mkWeakzh ( gcptr key,
     StgWeak_cfinalizers(w) = stg_NO_FINALIZER_closure;
 
     StgWeak_link(w) = Capability_weak_ptr_list_hd(MyCapability());
-
-    prim_write_barrier;
-    SET_HDR(w, stg_WEAK_info, CCCS);
-
     Capability_weak_ptr_list_hd(MyCapability()) = w;
     if (Capability_weak_ptr_list_tl(MyCapability()) == NULL) {
         Capability_weak_ptr_list_tl(MyCapability()) = w;
@@ -756,14 +740,12 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
     ALLOC_PRIM (SIZEOF_StgCFinalizerList)
 
     c = Hp - SIZEOF_StgCFinalizerList + WDS(1);
+    SET_HDR(c, stg_C_FINALIZER_LIST_info, CCCS);
 
     StgCFinalizerList_fptr(c) = fptr;
     StgCFinalizerList_ptr(c) = ptr;
     StgCFinalizerList_eptr(c) = eptr;
     StgCFinalizerList_flag(c) = flag;
-
-    prim_write_barrier;
-    SET_HDR(c, stg_C_FINALIZER_LIST_info, CCCS);
 
     LOCK_CLOSURE(w, info);
 
@@ -1485,12 +1467,12 @@ stg_newMVarzh ()
     ALLOC_PRIM_ (SIZEOF_StgMVar, stg_newMVarzh);
 
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
+    // No memory barrier needed as this is a new allocation.
+    SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
+        // MVARs start dirty: generation 0 has no mutable list
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_tail(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
-    prim_write_barrier;
-    SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
-        // MVARs start dirty: generation 0 has no mutable list
     return (mvar);
 }
 
@@ -1534,9 +1516,10 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
 
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
-
-        prim_write_barrier;
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        // Write barrier before we make the new MVAR_TSO_QUEUE
+        // visible to other cores.
+        prim_write_barrier;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -1958,10 +1941,10 @@ stg_makeStableNamezh ( P_ obj )
         // too complicated and doesn't buy us much. See D5342?id=18700.)
         ("ptr" sn_obj) = ccall allocate(MyCapability() "ptr",
                                         BYTES_TO_WDS(SIZEOF_StgStableName));
-        StgStableName_sn(sn_obj) = index;
-        snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
-        prim_write_barrier;
         SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
+        StgStableName_sn(sn_obj) = index;
+        prim_write_barrier;
+        snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
         sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
     }
@@ -2002,6 +1985,8 @@ stg_newBCOzh ( P_ instrs,
     ALLOC_PRIM (bytes);
 
     bco = Hp - bytes + WDS(1);
+    // No memory barrier necessary as this is a new allocation.
+    SET_HDR(bco, stg_BCO_info, CCS_MAIN);
 
     StgBCO_instrs(bco)     = instrs;
     StgBCO_literals(bco)   = literals;
@@ -2018,9 +2003,6 @@ for:
         i = i + 1;
         goto for;
     }
-
-    prim_write_barrier;
-    SET_HDR(bco, stg_BCO_info, CCS_MAIN);
 
     return (bco);
 }
@@ -2040,12 +2022,11 @@ stg_mkApUpd0zh ( P_ bco )
     CCCS_ALLOC(SIZEOF_StgAP);
 
     ap = Hp - SIZEOF_StgAP + WDS(1);
+    // No memory barrier necessary as this is a new allocation.
+    SET_HDR(ap, stg_AP_info, CCS_MAIN);
 
     StgAP_n_args(ap) = HALF_W_(0);
     StgAP_fun(ap) = bco;
-
-    prim_write_barrier;
-    SET_HDR(ap, stg_AP_info, CCS_MAIN);
 
     return (ap);
 }
@@ -2075,6 +2056,7 @@ stg_unpackClosurezh ( P_ closure )
     dat_arr = Hp - dat_arr_sz + WDS(1);
 
 
+    SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(dat_arr) = WDS(len);
     p = 0;
 for:
@@ -2088,9 +2070,6 @@ for:
 
     // Follow the pointers
     ("ptr" ptrArray) = foreign "C" heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
-
-    prim_write_barrier;
-    SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
 
     return (info, dat_arr, ptrArray);
 }
