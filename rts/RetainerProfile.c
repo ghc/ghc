@@ -780,6 +780,10 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
     debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
+    // Is this the last sub-element? If so instead of modifying the current
+    // stackElement in place we actually remove it from the stack.
+    bool last = false;
+
     do {
         if (isOnBoundary()) {     // if the current stack chunk is depleted
             *c = NULL;
@@ -791,21 +795,21 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         // If this is a top-level element, you should pop that out.
         if (se->info.type == posTypeFresh) {
             *cp = se->info.next.parent;
-            *c = se->c;
-            *r = se->c_child_r;
-            popOff();
-            return;
+            last = true;
+            break;
         }
+
+        // Note: The first ptr of all of these was already returned as
+        // *fist_child in push(), so we always start with the second field.
 
         switch (get_itbl(se->c)->type) {
             // two children (fixed), no SRT
             // nothing in se.info
         case CONSTR_2_0:
             *c = se->c->payload[1];
-            *cp = se->c;
-            *r = se->c_child_r;
-            popOff();
-            return;
+            ASSERT(*c != NULL);
+            last = true;
+            break;
 
             // three children (fixed), no SRT
             // need to push a stackElement
@@ -819,9 +823,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 *c = ((StgMVar *)se->c)->value;
                 popOff();
             }
-            *cp = se->c;
-            *r = se->c_child_r;
-            return;
+            ASSERT(*c != NULL);
+            break;
 
             // three children (fixed), no SRT
         case WEAK:
@@ -833,9 +836,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 *c = ((StgWeak *)se->c)->finalizer;
                 popOff();
             }
-            *cp = se->c;
-            *r = se->c_child_r;
-            return;
+            ASSERT(*c != NULL);
+            break;
 
         case TREC_CHUNK: {
             // These are pretty complicated: we have N entries, each
@@ -849,6 +851,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
                 *c = NULL;
                 popOff();
+                last = true;
                 break;
             }
             entry = &((StgTRecChunk *)se->c)->entries[entry_no];
@@ -859,10 +862,9 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             } else {
                 *c = entry->new_value;
             }
-            *cp = se->c;
-            *r = se->c_child_r;
             se->info.next.step++;
-            return;
+            ASSERT(*c != NULL);
+            break;
         }
 
         case TVAR:
@@ -884,9 +886,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 popOff();
                 break;
             }
-            *cp = se->c;
-            *r = se->c_child_r;
-            return;
+            ASSERT(*c != NULL);
+            break;
 
             // layout.payload.ptrs, SRT
         case FUN:         // always a heap object
@@ -895,9 +896,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             if (se->info.type == posTypePtrs) {
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
-                    *cp = se->c;
-                    *r = se->c_child_r;
-                    return;
+                    break;
                 }
                 init_srt_fun(&se->info, get_fun_itbl(se->c));
             }
@@ -908,9 +907,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             if (se->info.type == posTypePtrs) {
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
-                    *cp = se->c;
-                    *r = se->c_child_r;
-                    return;
+                    break;
                 }
                 init_srt_thunk(&se->info, get_thunk_itbl(se->c));
             }
@@ -928,12 +925,9 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case THUNK_1_0:
         case THUNK_1_1:
             *c = find_srt(&se->info);
-            if (*c != NULL) {
-                *cp = se->c;
-                *r = se->c_child_r;
-                return;
+            if (*c == NULL) {
+                popOff();
             }
-            popOff();
             break;
 
             // no child (fixed), no SRT
@@ -968,7 +962,19 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             barf("Invalid object *c in pop(): %d", get_itbl(se->c)->type);
             return;
         }
-    } while (true);
+    } while (*c == NULL);
+
+out:
+    *cp = se->c;
+    *r = se->c_child_r;
+
+    // We mutate the current element as long as there's still closures left in
+    // it. but on the last one we actually remove the stackElement from the
+    // stack.
+    if(last)
+        popOff();
+
+    return;
 }
 
 /* -----------------------------------------------------------------------------
