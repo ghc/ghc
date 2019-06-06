@@ -229,6 +229,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             // If we've already marked this frame, then stop here.
             frame_info = frame->header.info;
+            // Ensure that read from frame->updatee below sees any pending writes
             load_load_barrier();
             if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
@@ -239,12 +240,11 @@ threadPaused(Capability *cap, StgTSO *tso)
                 goto end;
             }
 
-            write_barrier();
             SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
-            load_load_barrier();
+            load_load_barrier(); // XXX: Why is this needed?
 
 #if defined(THREADED_RTS)
         retry:

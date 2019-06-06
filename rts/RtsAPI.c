@@ -30,9 +30,8 @@ HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
 {
   StgClosure *p = (StgClosure *)allocate(cap, CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
-  write_barrier();
   SET_HDR(p, Czh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)(StgChar)c;
   return p;
 }
 
@@ -40,9 +39,8 @@ HaskellObj
 rts_mkInt (Capability *cap, HsInt i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgInt)i;
-  write_barrier();
   SET_HDR(p, Izh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
@@ -50,10 +48,9 @@ HaskellObj
 rts_mkInt8 (Capability *cap, HsInt8 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
+  SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the bits above the lowest 8 */
   p->payload[0]  = (StgClosure *)(StgInt)i;
-  write_barrier();
-  SET_HDR(p, I8zh_con_info, CCS_SYSTEM);
   return p;
 }
 
@@ -61,10 +58,9 @@ HaskellObj
 rts_mkInt16 (Capability *cap, HsInt16 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
+  SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   /* Make sure we mask out the relevant bits */
   p->payload[0]  = (StgClosure *)(StgInt)i;
-  write_barrier();
-  SET_HDR(p, I16zh_con_info, CCS_SYSTEM);
   return p;
 }
 
@@ -72,9 +68,8 @@ HaskellObj
 rts_mkInt32 (Capability *cap, HsInt32 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgInt)i;
-  write_barrier();
   SET_HDR(p, I32zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgInt)i;
   return p;
 }
 
@@ -82,9 +77,8 @@ HaskellObj
 rts_mkInt64 (Capability *cap, HsInt64 i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,2));
-  ASSIGN_Int64((P_)&(p->payload[0]), i);
-  write_barrier();
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
+  ASSIGN_Int64((P_)&(p->payload[0]), i);
   return p;
 }
 
@@ -92,9 +86,8 @@ HaskellObj
 rts_mkWord (Capability *cap, HsWord i)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgWord)i;
-  write_barrier();
   SET_HDR(p, Wzh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)i;
   return p;
 }
 
@@ -103,9 +96,8 @@ rts_mkWord8 (Capability *cap, HsWord8 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
-  write_barrier();
   SET_HDR(p, W8zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xff);
   return p;
 }
 
@@ -114,9 +106,8 @@ rts_mkWord16 (Capability *cap, HsWord16 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
-  write_barrier();
   SET_HDR(p, W16zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffff);
   return p;
 }
 
@@ -125,9 +116,8 @@ rts_mkWord32 (Capability *cap, HsWord32 w)
 {
   /* see rts_mkInt* comments */
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
-  write_barrier();
   SET_HDR(p, W32zh_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)(StgWord)(w & 0xffffffff);
   return p;
 }
 
@@ -136,9 +126,8 @@ rts_mkWord64 (Capability *cap, HsWord64 w)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
-  ASSIGN_Word64((P_)&(p->payload[0]), w);
-  write_barrier();
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
+  ASSIGN_Word64((P_)&(p->payload[0]), w);
   return p;
 }
 
@@ -147,9 +136,8 @@ HaskellObj
 rts_mkFloat (Capability *cap, HsFloat f)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,1));
-  ASSIGN_FLT((P_)p->payload, (StgFloat)f);
-  write_barrier();
   SET_HDR(p, Fzh_con_info, CCS_SYSTEM);
+  ASSIGN_FLT((P_)p->payload, (StgFloat)f);
   return p;
 }
 
@@ -157,9 +145,8 @@ HaskellObj
 rts_mkDouble (Capability *cap, HsDouble d)
 {
   StgClosure *p = (StgClosure *)allocate(cap,CONSTR_sizeW(0,sizeofW(StgDouble)));
-  ASSIGN_DBL((P_)p->payload, (StgDouble)d);
-  write_barrier();
   SET_HDR(p, Dzh_con_info, CCS_SYSTEM);
+  ASSIGN_DBL((P_)p->payload, (StgDouble)d);
   return p;
 }
 
@@ -167,9 +154,8 @@ HaskellObj
 rts_mkStablePtr (Capability *cap, HsStablePtr s)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
-  p->payload[0]  = (StgClosure *)s;
-  write_barrier();
   SET_HDR(p, StablePtr_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)s;
   return p;
 }
 
@@ -177,9 +163,8 @@ HaskellObj
 rts_mkPtr (Capability *cap, HsPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
-  p->payload[0]  = (StgClosure *)a;
-  write_barrier();
   SET_HDR(p, Ptr_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)a;
   return p;
 }
 
@@ -187,9 +172,8 @@ HaskellObj
 rts_mkFunPtr (Capability *cap, HsFunPtr a)
 {
   StgClosure *p = (StgClosure *)allocate(cap,sizeofW(StgHeader)+1);
-  p->payload[0]  = (StgClosure *)a;
-  write_barrier();
   SET_HDR(p, FunPtr_con_info, CCS_SYSTEM);
+  p->payload[0]  = (StgClosure *)a;
   return p;
 }
 
@@ -218,10 +202,9 @@ rts_apply (Capability *cap, HaskellObj f, HaskellObj arg)
     // Here we don't want to use CCS_SYSTEM, because it's a hidden cost centre,
     // and evaluating Haskell code under a hidden cost centre leads to
     // confusing profiling output. (#7753)
+    SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_MAIN);
     ap->payload[0] = f;
     ap->payload[1] = arg;
-    write_barrier();
-    SET_HDR(ap, (StgInfoTable *)&stg_ap_2_upd_info, CCS_MAIN);
     return (StgClosure *)ap;
 }
 

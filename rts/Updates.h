@@ -39,6 +39,12 @@
                  PROF_HDR_FIELDS(w_,ccs,p2)              \
                  p_ updatee
 
+/*
+ * Getting the memory barriers correct here is quite tricky. Essentially
+ * the write barrier ensures that any writes to the new indirectee are visible
+ * before we introduce the indirection.
+ * See Note [Heap memory barriers] in SMP.h.
+ */
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
                                                                 \
@@ -69,6 +75,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     ASSERT( (P_)p1 != (P_)p2 );
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
+    /* See Note [Heap memory barriers] in SMP.h */
     write_barrier();
     OVERWRITING_CLOSURE(p1);
     ((StgInd *)p1)->indirectee = p2;

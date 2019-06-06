@@ -235,6 +235,7 @@ static bool tidyWeakList(generation *gen)
     for (w = gen->old_weak_ptr_list; w != NULL; w = next_w) {
 
         info = get_itbl((StgClosure *)w);
+        load_load_barrier();
 
         /* There might be a DEAD_WEAK on the list if finalizeWeak# was
          * called on a live weak pointer object.  Just remove it.
