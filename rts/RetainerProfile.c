@@ -146,10 +146,6 @@ typedef union {
     struct {
         StgClosure *srt;
     } srt;
-
-    // parent of the current object, used
-    // when posTypeFresh is set
-    StgClosure *parent;
 } nextPos;
 
 // Tagged stack element, that keeps information how to process
@@ -163,6 +159,9 @@ typedef struct {
 // how to continue processing the element, and it's retainer set.
 typedef struct {
     StgClosure *c;
+    // parent of the current object, used
+    // when posTypeFresh is set
+    StgClosure *parent;
     retainer c_child_r;
     stackPos info;
 } stackElement;
@@ -447,7 +446,7 @@ retainPushClosure( traverseState *ts, StgClosure *c, StgClosure *p, retainer c_c
 
     se.c = c;
     se.c_child_r = c_child_r;
-    se.info.next.parent = p;
+    se.parent = p;
     se.info.type = posTypeFresh;
 
     retainActualPush(ts, &se);
@@ -788,7 +787,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
 
         // If this is a top-level element, you should pop that out.
         if (se->info.type == posTypeFresh) {
-            *cp = se->info.next.parent;
+            *cp = se->parent;
             *c = se->c;
             *r = se->c_child_r;
             popOff(ts);
