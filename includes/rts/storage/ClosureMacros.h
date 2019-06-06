@@ -545,7 +545,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
                                         uint32_t size /* closure size, in words */,
                                         bool prim /* Whether to call LDV_recordDead */
                                         );
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim)
+EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
 {
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop], also #8402
