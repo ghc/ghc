@@ -69,7 +69,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, fromMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -1552,17 +1552,9 @@ rnTyClDecl (DataDecl
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
-         -- See Note [Unlifted Newtypes and CUSKs], and for a broader
-         -- picture, see Note [Implementation of UnliftedNewtypes].
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; let non_cusk_newtype
-               | NewType <- new_or_data =
-                   unlifted_newtypes && isNothing kind_sig
-               | otherwise = False
-         -- See Note [Complete user-supplied kind signatures] in HsDecls
-       ; cusks_enabled <- xoptM LangExt.CUSKs
-       ; let cusk = cusks_enabled && hsTvbAllKinded tyvars' && no_rhs_kvs && not non_cusk_newtype
-             rn_info = DataDeclRn { tcdDataCusk = cusk
+       ; cusk <- dataDeclHasCUSK
+           tyvars' new_or_data no_rhs_kvs (isJust kind_sig)
+       ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
        ; return (DataDecl { tcdLName    = tycon'
@@ -1637,6 +1629,22 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
     cls_doc  = ClassDeclCtx lcls
 
 rnTyClDecl (XTyClDecl _) = panic "rnTyClDecl"
+
+-- Does the data type declaration include a CUSK?
+dataDeclHasCUSK :: LHsQTyVars pass -> NewOrData -> Bool -> Bool -> RnM Bool
+dataDeclHasCUSK tyvars new_or_data no_rhs_kvs has_kind_sig = do
+  { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
+    -- picture, see Note [Implementation of UnliftedNewtypes].
+  ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
+  ; let non_cusk_newtype
+          | NewType <- new_or_data =
+              unlifted_newtypes && not has_kind_sig
+          | otherwise = False
+    -- See Note [CUSKs: complete user-supplied kind signatures] in HsDecls
+  ; cusks_enabled <- xoptM LangExt.CUSKs
+  ; return $ cusks_enabled && hsTvbAllKinded tyvars &&
+             no_rhs_kvs && not non_cusk_newtype
+  }
 
 {- Note [Unlifted Newtypes and CUSKs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

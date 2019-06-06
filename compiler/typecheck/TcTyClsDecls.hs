@@ -1208,6 +1208,19 @@ unifyNewtypeKind dflags NewType [hs_ty] [tc_ty] ki
   -- See comments above: just do nothing here
 unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
 
+-- Type check the types of the arguments to a data constructor.
+-- This includes doing kind unification if the type is a newtype.
+-- See Note [Implementation of UnliftedNewtypes] for why we need
+-- the first two arguments.
+tcConArgTys :: NewOrData -> Kind -> [LHsType GhcRn] -> TcM ()
+tcConArgTys new_or_data res_kind arg_tys = do
+  { arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
+    -- See Note [Implementation of UnliftedNewtypes], STEP 2
+  ; dflags <- getDynFlags
+  ; discardResult $
+      unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
+  }
+
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
 -- declared with data or newtype, and we need to know the result kind of
@@ -1224,15 +1237,8 @@ kcConDecl new_or_data res_kind (ConDeclH98
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
-    do { let arg_tys = map getBangType $ hsConDeclArgTys args
-       ; _ <- tcHsMbContext ex_ctxt
-       ; traceTc "kcConDecl {" (ppr name $$ ppr args)
-       ; arg_tc_tys <- mapM tcHsOpenType arg_tys
-       ; traceTc "kcConDecl }" (ppr name)
-         -- See Note [Implementation of UnliftedNewtypes], STEP 2
-       ; dflags <- getDynFlags
-       ; discardResult $
-         unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
+    do { _ <- tcHsMbContext ex_ctxt
+       ; tcConArgTys new_or_data res_kind (hsConDeclArgTys args)
          -- We don't need to check the telescope here, because that's
          -- done in tcConDecl
        }
@@ -1255,12 +1261,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; let arg_tys = hsConDeclArgTys args
-       ; arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
-         -- See Note [Implementation of UnliftedNewtypes], STEP 2
-       ; dflags <- getDynFlags
-       ; discardResult $
-           unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
+       ; tcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _) = panic "kcConDecl"
@@ -1434,8 +1435,12 @@ STEP 2: Kind-checking, as done by kcTyClDecl. This step is skipped for CUSKs.
 The key function here is kcConDecl, which looks at an individual constructor
 declaration. In the unlifted-newtypes case (i.e., -XUnliftedNewtypes and,
 indeed, we are processing a newtype), we call unifyNewtypeKind, which is a
-thin wrapper around unifyKind, unfiying the kind of the one argument and the
-kind of the newtype tycon.
+thin wrapper around unifyKind, unifying the kind of the one argument and the
+result kind of the newtype tycon. Examples of an unlifted newtype:
+
+  newtype X = X Int#
+  newtype Y :: TYPE 'WordRep where
+    YC :: Word# -> Y
 
 Note that, in the GADT case, we might have a kind signature with arrows
 (newtype XYZ a b :: Type -> Type where ...). We want only the final

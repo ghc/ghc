@@ -339,7 +339,9 @@ in DsExpr.
 However, if we make a *wrapper* for a newtype, we get into trouble.
 The saturation condition is no longer checked (because hasNoBinding
 returns False) and indeed we generate a forbidden levity-polymorphic
-binding. The solution is simple, though: just make the newtype wrappers
+binding.
+
+The solution is simple, though: just make the newtype wrappers
 as ephemeral as the newtype workers. In other words, give the wrappers
 compulsory unfoldings and no bindings. The compulsory unfolding is given
 in wrap_unf in mkDataConRep, and the lack of a binding happens in

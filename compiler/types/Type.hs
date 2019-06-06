@@ -875,6 +875,12 @@ isLitTy ty | Just ty1 <- coreView ty = isLitTy ty1
 isLitTy (LitTy l)                    = Just l
 isLitTy _                            = Nothing
 
+-- | Is this a cast? Nothing fancy is done here. This
+-- is only used internally in an assertion.
+_isCastTy :: Type -> Bool
+_isCastTy CastTy{} = True
+_isCastTy _        = False
+
 -- | Is this type a custom user error?
 -- If so, give us the kind and the error message.
 userTypeError_maybe :: Type -> Maybe Type
@@ -1281,9 +1287,13 @@ tyConBindersTyCoBinders = map to_tyb
 
 -- | Drop the cast on a type, if any. If there is no
 -- cast, just return the original type. This is rarely what
--- you want.
+-- you want. The CastTy data constructor (in TyCoRep) has the
+-- invariant that another CastTy is not inside. See the
+-- data constructor for a full description of this invariant.
+-- Since CastTy cannot be nested, the result of discardCast
+-- cannot be a CastTy.
 discardCast :: Type -> Type
-discardCast (CastTy ty _) = ty
+discardCast (CastTy ty _) = ASSERT(not (_isCastTy ty)) ty
 discardCast ty            = ty
 
 {-
