@@ -249,11 +249,10 @@ StgClosure * newEmptyPAP (Capability *cap,
                           uint32_t arity)
 {
     StgPAP *pap = (StgPAP *)allocate(cap, sizeofW(StgPAP));
+    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     pap->arity = arity;
     pap->n_args = 0;
     pap->fun = tagged_obj;
-    write_barrier();
-    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     return (StgClosure *)pap;
 }
 
@@ -274,7 +273,7 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
     for (i = 0; i < ((StgPAP *)pap)->n_args; i++) {
         pap->payload[i] = oldpap->payload[i];
     }
-    write_barrier();
+    // No write barrier is needed here as this is a new allocation
     SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
     return (StgClosure *)pap;
 }
@@ -483,9 +482,8 @@ eval_obj:
         {
             StgUpdateFrame *__frame;
             __frame = (StgUpdateFrame *)Sp;
-            __frame->updatee = (StgClosure *)(ap);
-            write_barrier();
             SET_INFO((StgClosure *)__frame, (StgInfoTable *)&stg_upd_frame_info);
+            __frame->updatee = (StgClosure *)(ap);
         }
 
         ENTER_CCS_THUNK(cap,ap);
@@ -811,7 +809,7 @@ do_apply:
                 for (i = 0; i < m; i++) {
                     new_pap->payload[pap->n_args + i] = (StgClosure *)SpW(i);
                 }
-                write_barrier();
+                // No write barrier is needed here as this is a new allocation
                 SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)new_pap;
                 Sp_addW(m);
@@ -854,7 +852,7 @@ do_apply:
                 for (i = 0; i < m; i++) {
                     pap->payload[i] = (StgClosure *)SpW(i);
                 }
-                write_barrier();
+                // No write barrier is needed here as this is a new allocation
                 SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)pap;
                 Sp_addW(m);
@@ -1099,7 +1097,7 @@ run_BCO:
                      new_aps->payload[i] = (StgClosure *)SpW(i-2);
                   }
 
-                  write_barrier();
+                  // No write barrier is needed here as this is a new allocation
                   SET_HDR(new_aps,&stg_AP_STACK_info,cap->r.rCCCS);
 
                   // Arrange the stack to call the breakpoint IO action, and
@@ -1428,10 +1426,11 @@ run_BCO:
             StgAP* ap;
             int n_payload = BCO_NEXT;
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
-            ap->n_args = n_payload;
-            write_barrier();
-            SET_HDR(ap, &stg_AP_info, cap->r.rCCCS)
             SpW(-1) = (W_)ap;
+            ap->n_args = n_payload;
+            // No write barrier is needed here as this is a new allocation
+            // visible only from our stack
+            SET_HDR(ap, &stg_AP_info, cap->r.rCCCS)
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1440,10 +1439,11 @@ run_BCO:
             StgAP* ap;
             int n_payload = BCO_NEXT;
             ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
-            ap->n_args = n_payload;
-            write_barrier();
-            SET_HDR(ap, &stg_AP_NOUPD_info, cap->r.rCCCS)
             SpW(-1) = (W_)ap;
+            ap->n_args = n_payload;
+            // No write barrier is needed here as this is a new allocation
+            // visible only from our stack
+            SET_HDR(ap, &stg_AP_NOUPD_info, cap->r.rCCCS)
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1453,11 +1453,12 @@ run_BCO:
             int arity = BCO_NEXT;
             int n_payload = BCO_NEXT;
             pap = (StgPAP*)allocate(cap, PAP_sizeW(n_payload));
+            SpW(-1) = (W_)pap;
             pap->n_args = n_payload;
             pap->arity = arity;
-            write_barrier();
+            // No write barrier is needed here as this is a new allocation
+            // visible only from our stack
             SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS)
-            SpW(-1) = (W_)pap;
             Sp_subW(1);
             goto nextInsn;
         }
@@ -1538,7 +1539,8 @@ run_BCO:
             }
             Sp_addW(n_words);
             Sp_subW(1);
-            write_barrier();
+            // No write barrier is needed here as this is a new allocation
+            // visible only from our stack
             SET_HDR(con, (StgInfoTable*)BCO_LIT(o_itbl), cap->r.rCCCS);
             SpW(0) = (W_)con;
             IF_DEBUG(interpreter,
