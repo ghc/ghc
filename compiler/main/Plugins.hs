@@ -30,6 +30,10 @@ module Plugins (
       -- - access to loaded interface files with 'interfaceLoadAction'
       --
     , keepRenamedSource
+      -- ** Hole fit plugins
+      -- | hole fit plugins allow plugins to change the behavior of valid hole
+      -- fit suggestions
+    , HoleFitPluginR
 
       -- * Internal
     , PluginWithArgs(..), plugins, pluginRecompile'
@@ -42,8 +46,8 @@ import GhcPrelude
 
 import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
 import qualified TcRnTypes
-import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports
-                 , HoleFitPluginR )
+import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
+import TcHoleFitTypes ( HoleFitPluginR )
 import HsSyn
 import DynFlags
 import HscTypes
@@ -173,7 +177,7 @@ instance Monoid PluginRecompile where
 
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
-type HoleFitPlugin = [CommandLineOption] -> Maybe TcRnTypes.HoleFitPluginR
+type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile

@@ -521,6 +521,7 @@ Library
         TcRules
         TcSimplify
         TcHoleErrors
+        TcHoleFitTypes
         TcErrors
         TcTyClsDecls
         TcTyDecls

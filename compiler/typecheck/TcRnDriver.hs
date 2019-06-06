@@ -140,6 +140,8 @@ import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
 
+import TcHoleFitTypes ( HoleFitPluginR (..) )
+
 
 #include "HsVersions.h"
 
@@ -165,7 +167,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-          withTcPlugins hsc_env $ withHfPlugins hsc_env $
+          withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
 
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
@@ -1841,7 +1843,7 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHfPlugins hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -2882,8 +2884,8 @@ getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
 
 
-withHfPlugins :: HscEnv -> TcM a -> TcM a
-withHfPlugins hsc_env m =
+withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
+withHoleFitPlugins hsc_env m =
   case (getHfPlugins (hsc_dflags hsc_env)) of
     [] -> m  -- Common fast case
     plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins

@@ -34,7 +34,7 @@ fromModule (GreHFCand gre) =
 fromModule _ = []
 
 toHoleFitCommand :: TypedHole -> String -> Maybe String
-toHoleFitCommand TyH{holeCt = Just (CHoleCan _ h)} str
+toHoleFitCommand TyH{tyHCt = Just (CHoleCan _ h)} str
     = stripPrefix ("_" <> str) $ occNameString $ holeOcc h
 toHoleFitCommand _ _ = Nothing
 
