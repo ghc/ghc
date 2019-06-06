@@ -542,8 +542,10 @@ void LDV_recordDead (const StgClosure *c, uint32_t size);
 
 EXTERN_INLINE void overwritingClosure_ (StgClosure *p,
                                         uint32_t offset /* in words */,
-                                        uint32_t size /* closure size, in words */);
-EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size)
+                                        uint32_t size /* closure size, in words */,
+                                        bool prim /* Whether to call LDV_recordDead */
+                                        );
+EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t size, bool prim USED_IF_PROFILING)
 {
 #if ZERO_SLOP_FOR_LDV_PROF && !ZERO_SLOP_FOR_SANITY_CHECK
     // see Note [zeroing slop], also #8402
@@ -552,7 +554,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t
 
     // For LDV profiling, we need to record the closure as dead
 #if defined(PROFILING)
-    LDV_recordDead(p, size);
+    if (!prim) { LDV_recordDead(p, size); };
 #endif
 
     for (uint32_t i = offset; i < size; i++) {
@@ -563,7 +565,7 @@ EXTERN_INLINE void overwritingClosure_ (StgClosure *p, uint32_t offset, uint32_t
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
-    overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p));
+    overwritingClosure_(p, sizeofW(StgThunkHeader), closure_sizeW(p), false);
 }
 
 // Version of 'overwritingClosure' which overwrites only a suffix of a
@@ -576,12 +578,14 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    overwritingClosure_(p, offset, closure_sizeW(p));
+    // Set prim = true because only called on ARR_WORDS with the
+    // shrinkMutableByteArray# primop
+    overwritingClosure_(p, offset, closure_sizeW(p), true);
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
-    overwritingClosure_(p, sizeofW(StgThunkHeader), size);
+    overwritingClosure_(p, sizeofW(StgThunkHeader), size, false);
 }
