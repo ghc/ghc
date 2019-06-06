@@ -864,6 +864,12 @@ pages:
     - tar -xf haddock.html.tar.xz -C public/doc
     - tar -xf libraries.html.tar.xz -C public/doc
     - tar -xf users_guide.html.tar.xz -C public/doc
+    - |
+      cat >public/index.html <<EOF
+      <!DOCTYPE HTML>
+      <meta charset="UTF-8">
+      <meta http-equiv="refresh" content="1; url=doc/">
+      EOF
     - cp -f index.html public/doc
   only:
     - master
