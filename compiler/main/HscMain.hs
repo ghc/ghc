@@ -1839,7 +1839,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Prepare for codegen -}
          ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
-           {- Lint if necessary -}
+           -- Lint if necessary
          ; lintInteractiveExpr "hscCompileExpr" hsc_env prepd_expr
 
            {- Convert to BCOs -}
