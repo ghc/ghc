@@ -115,7 +115,7 @@ import qualified GHC.List as List ( foldr )
 -- 'Data.Functor.Compose.Compose' are from "Data.Functor.Identity" and
 -- "Data.Functor.Compose".
 --
--- A result of the naturality law is a `purity law` for 'traverse'
+-- A result of the naturality law is a purity law for 'traverse'
 --
 -- @'traverse' 'pure' = 'pure'@
 --
