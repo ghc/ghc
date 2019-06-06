@@ -93,14 +93,6 @@ StgWord flip = 0;     // flip bit
 #define setRetainerSetToNull(c)   \
   (c)->header.prof.hp.rs = (RetainerSet *)((StgWord)NULL | flip)
 
-static void retainStack(StgClosure *, retainer, StgPtr, StgPtr);
-static void retainClosure(StgClosure *, StgClosure *, retainer);
-#if defined(DEBUG_RETAINER)
-static void belongToHeap(StgPtr p);
-static uint32_t checkHeapSanityForRetainerProfiling( void );
-#endif
-static void retainPushClosure( StgClosure *p, StgClosure *c, retainer c_child_r);
-
 #if defined(DEBUG_RETAINER)
 static uint32_t sumOfNewCost;        // sum of the cost of each object, computed
                                 // when the object is first visited
@@ -175,8 +167,7 @@ typedef struct {
     stackPos info;
 } stackElement;
 
-static void retainActualPush( stackElement *se);
-
+typedef struct {
 /*
   Invariants:
     firstStack points to the first block group.
@@ -194,9 +185,9 @@ static void retainActualPush( stackElement *se);
     the topmost element on the previous block group so as to satisfy
     the invariants described above.
  */
-static bdescr *firstStack = NULL;
-static bdescr *currentStack;
-static stackElement *stackBottom, *stackTop, *stackLimit;
+    bdescr *firstStack;
+    bdescr *currentStack;
+    stackElement *stackBottom, *stackTop, *stackLimit;
 
 /*
   currentStackBoundary is used to mark the current stack chunk.
@@ -204,7 +195,7 @@ static stackElement *stackBottom, *stackTop, *stackLimit;
   is empty. It is the responsibility of the user to keep currentStackBoundary
   valid all the time if it is to be employed.
  */
-static stackElement *currentStackBoundary;
+    stackElement *currentStackBoundary;
 
 #if defined(DEBUG_RETAINER)
 /*
@@ -219,8 +210,23 @@ static stackElement *currentStackBoundary;
     retainer profiling, maxStackSize is some value no greater
     than the actual depth of the graph.
  */
-static int stackSize, maxStackSize;
+    int stackSize, maxStackSize;
 #endif
+} traverseState;
+
+traverseState g_retainerTraverseState;
+
+
+static void retainStack(traverseState *, StgClosure *, retainer, StgPtr, StgPtr);
+static void retainClosure(traverseState *, StgClosure *, StgClosure *, retainer);
+static void retainPushClosure(traverseState *, StgClosure *, StgClosure *, retainer);
+static void retainActualPush(traverseState *, stackElement *);
+
+#if defined(DEBUG_RETAINER)
+static void belongToHeap(StgPtr p);
+static uint32_t checkHeapSanityForRetainerProfiling( void );
+#endif
+
 
 // number of blocks allocated for one stack
 #define BLOCKS_IN_STACK 1
@@ -231,13 +237,13 @@ static int stackSize, maxStackSize;
  *  currentStack->link == s.
  * -------------------------------------------------------------------------- */
 static INLINE void
-newStackBlock( bdescr *bd )
+newStackBlock( traverseState *ts, bdescr *bd )
 {
-    currentStack = bd;
-    stackTop     = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
-    stackBottom  = (stackElement *)bd->start;
-    stackLimit   = (stackElement *)stackTop;
-    bd->free     = (StgPtr)stackLimit;
+    ts->currentStack = bd;
+    ts->stackTop     = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
+    ts->stackBottom  = (stackElement *)bd->start;
+    ts->stackLimit   = (stackElement *)ts->stackTop;
+    bd->free     = (StgPtr)ts->stackLimit;
 }
 
 /* -----------------------------------------------------------------------------
@@ -246,30 +252,30 @@ newStackBlock( bdescr *bd )
  *   s->link == currentStack.
  * -------------------------------------------------------------------------- */
 static INLINE void
-returnToOldStack( bdescr *bd )
+returnToOldStack( traverseState *ts, bdescr *bd )
 {
-    currentStack = bd;
-    stackTop = (stackElement *)bd->free;
-    stackBottom = (stackElement *)bd->start;
-    stackLimit = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
-    bd->free = (StgPtr)stackLimit;
+    ts->currentStack = bd;
+    ts->stackTop = (stackElement *)bd->free;
+    ts->stackBottom = (stackElement *)bd->start;
+    ts->stackLimit = (stackElement *)(bd->start + BLOCK_SIZE_W * bd->blocks);
+    bd->free = (StgPtr)ts->stackLimit;
 }
 
 /* -----------------------------------------------------------------------------
  *  Initializes the traverse stack.
  * -------------------------------------------------------------------------- */
 static void
-initializeTraverseStack( void )
+initializeTraverseStack( traverseState *ts )
 {
-    if (firstStack != NULL) {
-        freeChain(firstStack);
+    if (ts->firstStack != NULL) {
+        freeChain(ts->firstStack);
     }
 
-    firstStack = allocGroup(BLOCKS_IN_STACK);
-    firstStack->link = NULL;
-    firstStack->u.back = NULL;
+    ts->firstStack = allocGroup(BLOCKS_IN_STACK);
+    ts->firstStack->link = NULL;
+    ts->firstStack->u.back = NULL;
 
-    newStackBlock(firstStack);
+    newStackBlock(ts, ts->firstStack);
 }
 
 /* -----------------------------------------------------------------------------
@@ -278,19 +284,19 @@ initializeTraverseStack( void )
  *   firstStack != NULL
  * -------------------------------------------------------------------------- */
 static void
-closeTraverseStack( void )
+closeTraverseStack( traverseState *ts )
 {
-    freeChain(firstStack);
-    firstStack = NULL;
+    freeChain(ts->firstStack);
+    ts->firstStack = NULL;
 }
 
 /* -----------------------------------------------------------------------------
  * Returns true if the whole stack is empty.
  * -------------------------------------------------------------------------- */
 static INLINE bool
-isEmptyRetainerStack( void )
+isEmptyRetainerStack( traverseState *ts )
 {
-    return (firstStack == currentStack) && stackTop == stackLimit;
+    return (ts->firstStack == ts->currentStack) && ts->stackTop == ts->stackLimit;
 }
 
 /* -----------------------------------------------------------------------------
@@ -301,8 +307,9 @@ retainerStackBlocks( void )
 {
     bdescr* bd;
     W_ res = 0;
+    traverseState *ts = &g_retainerTraverseState;
 
-    for (bd = firstStack; bd != NULL; bd = bd->link)
+    for (bd = ts->firstStack; bd != NULL; bd = bd->link)
       res += bd->blocks;
 
     return res;
@@ -313,9 +320,9 @@ retainerStackBlocks( void )
  * i.e., if the current stack chunk is empty.
  * -------------------------------------------------------------------------- */
 static INLINE bool
-isOnBoundary( void )
+isOnBoundary( traverseState *ts )
 {
-    return stackTop == currentStackBoundary;
+    return ts->stackTop == ts->currentStackBoundary;
 }
 
 /* -----------------------------------------------------------------------------
@@ -388,40 +395,40 @@ find_srt( stackPos *info )
  * Pushes an element onto traverse stack
  * -------------------------------------------------------------------------- */
 static void
-retainActualPush(stackElement *se) {
+retainActualPush(traverseState *ts, stackElement *se) {
     bdescr *nbd;      // Next Block Descriptor
-    if (stackTop - 1 < stackBottom) {
+    if (ts->stackTop - 1 < ts->stackBottom) {
 #if defined(DEBUG_RETAINER)
         // debugBelch("push() to the next stack.\n");
 #endif
         // currentStack->free is updated when the active stack is switched
         // to the next stack.
-        currentStack->free = (StgPtr)stackTop;
+        ts->currentStack->free = (StgPtr)ts->stackTop;
 
-        if (currentStack->link == NULL) {
+        if (ts->currentStack->link == NULL) {
             nbd = allocGroup(BLOCKS_IN_STACK);
             nbd->link = NULL;
-            nbd->u.back = currentStack;
-            currentStack->link = nbd;
+            nbd->u.back = ts->currentStack;
+            ts->currentStack->link = nbd;
         } else
-            nbd = currentStack->link;
+            nbd = ts->currentStack->link;
 
-        newStackBlock(nbd);
+        newStackBlock(ts, nbd);
     }
 
     // adjust stackTop (acutal push)
-    stackTop--;
+    ts->stackTop--;
     // If the size of stackElement was huge, we would better replace the
     // following statement by either a memcpy() call or a switch statement
     // on the type of the element. Currently, the size of stackElement is
     // small enough (5 words) that this direct assignment seems to be enough.
-    *stackTop = *se;
+    *ts->stackTop = *se;
 
 #if defined(DEBUG_RETAINER)
-    stackSize++;
-    if (stackSize > maxStackSize) maxStackSize = stackSize;
-    ASSERT(stackSize >= 0);
-    debugBelch("stackSize = %d\n", stackSize);
+    ts->stackSize++;
+    if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
+    ASSERT(ts->stackSize >= 0);
+    debugBelch("stackSize = %d\n", ts->stackSize);
 #endif
 
 }
@@ -435,7 +442,7 @@ retainActualPush(stackElement *se) {
  *  c_child_r - closure retainer.
  */
 static INLINE void
-retainPushClosure( StgClosure *c, StgClosure *p, retainer c_child_r) {
+retainPushClosure( traverseState *ts, StgClosure *c, StgClosure *p, retainer c_child_r) {
     stackElement se;
 
     se.c = c;
@@ -443,7 +450,7 @@ retainPushClosure( StgClosure *c, StgClosure *p, retainer c_child_r) {
     se.info.next.parent = p;
     se.info.type = posTypeFresh;
 
-    retainActualPush(&se);
+    retainActualPush(ts, &se);
 };
 
 /* -----------------------------------------------------------------------------
@@ -462,13 +469,13 @@ retainPushClosure( StgClosure *c, StgClosure *p, retainer c_child_r) {
  *  Note: SRTs are considered to  be children as well.
  * -------------------------------------------------------------------------- */
 static INLINE void
-push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
+push( traverseState *ts, StgClosure *c, retainer c_child_r, StgClosure **first_child )
 {
     stackElement se;
     bdescr *nbd;      // Next Block Descriptor
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type != TSO);
@@ -661,7 +668,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         return;
     }
 
-    retainActualPush(&se);
+    retainActualPush(ts, &se);
 }
 
 /* -----------------------------------------------------------------------------
@@ -678,7 +685,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
  *    is called only within popOff() and nowhere else.
  * -------------------------------------------------------------------------- */
 static void
-popOffReal(void)
+popOffReal(traverseState *ts)
 {
     bdescr *pbd;    // Previous Block Descriptor
 
@@ -686,62 +693,62 @@ popOffReal(void)
     debugBelch("pop() to the previous stack.\n");
 #endif
 
-    ASSERT(stackTop + 1 == stackLimit);
-    ASSERT(stackBottom == (stackElement *)currentStack->start);
+    ASSERT(ts->stackTop + 1 == ts->stackLimit);
+    ASSERT(ts->stackBottom == (stackElement *)ts->currentStack->start);
 
-    if (firstStack == currentStack) {
+    if (ts->firstStack == ts->currentStack) {
         // The stack is completely empty.
-        stackTop++;
-        ASSERT(stackTop == stackLimit);
+        ts->stackTop++;
+        ASSERT(ts->stackTop == ts->stackLimit);
 #if defined(DEBUG_RETAINER)
-        stackSize--;
-        if (stackSize > maxStackSize) maxStackSize = stackSize;
-        ASSERT(stackSize >= 0);
-        debugBelch("stackSize = %d\n", stackSize);
+        ts->stackSize--;
+        if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
+        ASSERT(ts->stackSize >= 0);
+        debugBelch("stackSize = %d\n", ts->stackSize);
 #endif
         return;
     }
 
     // currentStack->free is updated when the active stack is switched back
     // to the previous stack.
-    currentStack->free = (StgPtr)stackLimit;
+    ts->currentStack->free = (StgPtr)ts->stackLimit;
 
     // find the previous block descriptor
-    pbd = currentStack->u.back;
+    pbd = ts->currentStack->u.back;
     ASSERT(pbd != NULL);
 
-    returnToOldStack(pbd);
+    returnToOldStack(ts, pbd);
 
 #if defined(DEBUG_RETAINER)
-    stackSize--;
-    if (stackSize > maxStackSize) maxStackSize = stackSize;
-    ASSERT(stackSize >= 0);
-    debugBelch("stackSize = %d\n", stackSize);
+    ts->stackSize--;
+    if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
+    ASSERT(ts->stackSize >= 0);
+    debugBelch("stackSize = %d\n", ts->stackSize);
 #endif
 }
 
 static INLINE void
-popOff(void) {
+popOff(traverseState *ts) {
 #if defined(DEBUG_RETAINER)
-    debugBelch("\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
-    ASSERT(stackTop != stackLimit);
-    ASSERT(!isEmptyRetainerStack());
+    ASSERT(ts->stackTop != ts->stackLimit);
+    ASSERT(!isEmptyRetainerStack(ts));
 
     // <= (instead of <) is wrong!
-    if (stackTop + 1 < stackLimit) {
-        stackTop++;
+    if (ts->stackTop + 1 < ts->stackLimit) {
+        ts->stackTop++;
 #if defined(DEBUG_RETAINER)
-        stackSize--;
-        if (stackSize > maxStackSize) maxStackSize = stackSize;
-        ASSERT(stackSize >= 0);
-        debugBelch("stackSize = %d\n", stackSize);
+        ts->stackSize--;
+        if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
+        ASSERT(ts->stackSize >= 0);
+        debugBelch("stackSize = %d\n", ts->stackSize);
 #endif
         return;
     }
 
-    popOffReal();
+    popOffReal(ts);
 }
 
 /* -----------------------------------------------------------------------------
@@ -763,28 +770,28 @@ popOff(void) {
  *    is empty.
  * -------------------------------------------------------------------------- */
 static INLINE void
-pop( StgClosure **c, StgClosure **cp, retainer *r )
+pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
 {
     stackElement *se;
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
     do {
-        if (isOnBoundary()) {     // if the current stack chunk is depleted
+        if (isOnBoundary(ts)) {     // if the current stack chunk is depleted
             *c = NULL;
             return;
         }
 
-        se = stackTop;
+        se = ts->stackTop;
 
         // If this is a top-level element, you should pop that out.
         if (se->info.type == posTypeFresh) {
             *cp = se->info.next.parent;
             *c = se->c;
             *r = se->c_child_r;
-            popOff();
+            popOff(ts);
             return;
         }
 
@@ -795,7 +802,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             *c = se->c->payload[1];
             *cp = se->c;
             *r = se->c_child_r;
-            popOff();
+            popOff(ts);
             return;
 
             // three children (fixed), no SRT
@@ -808,7 +815,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 // no popOff
             } else {
                 *c = ((StgMVar *)se->c)->value;
-                popOff();
+                popOff(ts);
             }
             *cp = se->c;
             *r = se->c_child_r;
@@ -822,7 +829,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 // no popOff
             } else {
                 *c = ((StgWeak *)se->c)->finalizer;
-                popOff();
+                popOff(ts);
             }
             *cp = se->c;
             *r = se->c_child_r;
@@ -839,7 +846,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             uint32_t field_no = se->info.next.step & 3;
             if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
                 *c = NULL;
-                popOff();
+                popOff(ts);
                 break;
             }
             entry = &((StgTRecChunk *)se->c)->entries[entry_no];
@@ -872,7 +879,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
-                popOff();
+                popOff(ts);
                 break;
             }
             *cp = se->c;
@@ -924,7 +931,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
                 *r = se->c_child_r;
                 return;
             }
-            popOff();
+            popOff(ts);
             break;
 
             // no child (fixed), no SRT
@@ -1169,8 +1176,8 @@ associate( StgClosure *c, RetainerSet *s )
    -------------------------------------------------------------------------- */
 
 static void
-retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, uint32_t size,
-                     StgClosure *c, retainer c_child_r)
+retain_large_bitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
+                     uint32_t size, StgClosure *c, retainer c_child_r)
 {
     uint32_t i, b;
     StgWord bitmap;
@@ -1179,7 +1186,7 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, uint32_t size,
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
         if ((bitmap & 1) == 0) {
-            retainPushClosure((StgClosure *)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure *)*p, c, c_child_r);
         }
         i++;
         p++;
@@ -1193,12 +1200,12 @@ retain_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, uint32_t size,
 }
 
 static INLINE StgPtr
-retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
+retain_small_bitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
                      StgClosure *c, retainer c_child_r)
 {
     while (size > 0) {
         if ((bitmap & 1) == 0) {
-            retainPushClosure((StgClosure *)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure *)*p, c, c_child_r);
         }
         p++;
         bitmap = bitmap >> 1;
@@ -1226,7 +1233,7 @@ retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
  *    retainPushClosure() is invoked instead of evacuate().
  * -------------------------------------------------------------------------- */
 static void
-retainStack( StgClosure *c, retainer c_child_r,
+retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
              StgPtr stackStart, StgPtr stackEnd )
 {
     stackElement *oldStackBoundary;
@@ -1241,12 +1248,12 @@ retainStack( StgClosure *c, retainer c_child_r,
       record the current currentStackBoundary, which will be restored
       at the exit.
     */
-    oldStackBoundary = currentStackBoundary;
-    currentStackBoundary = stackTop;
+    oldStackBoundary = ts->currentStackBoundary;
+    ts->currentStackBoundary = ts->stackTop;
 
 #if defined(DEBUG_RETAINER)
     debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
-        oldStackBoundary, currentStackBoundary);
+        oldStackBoundary, ts->currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type == STACK);
@@ -1258,7 +1265,7 @@ retainStack( StgClosure *c, retainer c_child_r,
         switch(info->i.type) {
 
         case UPDATE_FRAME:
-            retainPushClosure(((StgUpdateFrame *)p)->updatee, c, c_child_r);
+            retainPushClosure(ts, ((StgUpdateFrame *)p)->updatee, c, c_child_r);
             p += sizeofW(StgUpdateFrame);
             continue;
 
@@ -1272,11 +1279,11 @@ retainStack( StgClosure *c, retainer c_child_r,
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
             p++;
-            p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+            p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
 
         follow_srt:
             if (info->i.srt) {
-                retainPushClosure(GET_SRT(info), c, c_child_r);
+                retainPushClosure(ts, GET_SRT(info), c, c_child_r);
             }
             continue;
 
@@ -1284,11 +1291,11 @@ retainStack( StgClosure *c, retainer c_child_r,
             StgBCO *bco;
 
             p++;
-            retainPushClosure((StgClosure*)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure*)*p, c, c_child_r);
             bco = (StgBCO *)*p;
             p++;
             size = BCO_BITMAP_SIZE(bco);
-            retain_large_bitmap(p, BCO_BITMAP(bco), size, c, c_child_r);
+            retain_large_bitmap(ts, p, BCO_BITMAP(bco), size, c, c_child_r);
             p += size;
             continue;
         }
@@ -1297,7 +1304,7 @@ retainStack( StgClosure *c, retainer c_child_r,
         case RET_BIG:
             size = GET_LARGE_BITMAP(&info->i)->size;
             p++;
-            retain_large_bitmap(p, GET_LARGE_BITMAP(&info->i),
+            retain_large_bitmap(ts, p, GET_LARGE_BITMAP(&info->i),
                                 size, c, c_child_r);
             p += size;
             // and don't forget to follow the SRT
@@ -1307,7 +1314,7 @@ retainStack( StgClosure *c, retainer c_child_r,
             StgRetFun *ret_fun = (StgRetFun *)p;
             const StgFunInfoTable *fun_info;
 
-            retainPushClosure(ret_fun->fun, c, c_child_r);
+            retainPushClosure(ts, ret_fun->fun, c, c_child_r);
             fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(ret_fun->fun));
 
             p = (P_)&ret_fun->payload;
@@ -1315,18 +1322,18 @@ retainStack( StgClosure *c, retainer c_child_r,
             case ARG_GEN:
                 bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
                 size = BITMAP_SIZE(fun_info->f.b.bitmap);
-                p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+                p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
                 break;
             case ARG_GEN_BIG:
                 size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-                retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info),
+                retain_large_bitmap(ts, p, GET_FUN_LARGE_BITMAP(fun_info),
                                     size, c, c_child_r);
                 p += size;
                 break;
             default:
                 bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
                 size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
-                p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
+                p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
                 break;
             }
             goto follow_srt;
@@ -1339,10 +1346,10 @@ retainStack( StgClosure *c, retainer c_child_r,
     }
 
     // restore currentStackBoundary
-    currentStackBoundary = oldStackBoundary;
+    ts->currentStackBoundary = oldStackBoundary;
 #if defined(DEBUG_RETAINER)
     debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n",
-        currentStackBoundary);
+        ts->currentStackBoundary);
 #endif
 }
 
@@ -1351,7 +1358,8 @@ retainStack( StgClosure *c, retainer c_child_r,
  * ------------------------------------------------------------------------- */
 
 static INLINE StgPtr
-retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
+retain_PAP_payload (traverseState *ts,
+                    StgClosure *pap,    /* NOT tagged */
                     retainer c_child_r, /* NOT tagged */
                     StgClosure *fun,    /* tagged */
                     StgClosure** payload, StgWord n_args)
@@ -1360,7 +1368,7 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
     StgWord bitmap;
     const StgFunInfoTable *fun_info;
 
-    retainPushClosure(fun, pap, c_child_r);
+    retainPushClosure(ts, fun, pap, c_child_r);
     fun = UNTAG_CLOSURE(fun);
     fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
@@ -1370,22 +1378,22 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
-        p = retain_small_bitmap(p, n_args, bitmap,
+        p = retain_small_bitmap(ts, p, n_args, bitmap,
                                 pap, c_child_r);
         break;
     case ARG_GEN_BIG:
-        retain_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info),
+        retain_large_bitmap(ts, p, GET_FUN_LARGE_BITMAP(fun_info),
                             n_args, pap, c_child_r);
         p += n_args;
         break;
     case ARG_BCO:
-        retain_large_bitmap((StgPtr)payload, BCO_BITMAP(fun),
+        retain_large_bitmap(ts, (StgPtr)payload, BCO_BITMAP(fun),
                             n_args, pap, c_child_r);
         p += n_args;
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
-        p = retain_small_bitmap(p, n_args, bitmap, pap, c_child_r);
+        p = retain_small_bitmap(ts, p, n_args, bitmap, pap, c_child_r);
         break;
     }
     return p;
@@ -1408,7 +1416,7 @@ retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
  *    *c0 can be TSO (as well as AP_STACK).
  * -------------------------------------------------------------------------- */
 static void
-retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
+retainClosure( traverseState *ts, StgClosure *c0, StgClosure *cp0, retainer r0 )
 {
     // c = Current closure                          (possibly tagged)
     // cp = Current closure's Parent                (NOT tagged)
@@ -1419,14 +1427,14 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
     RetainerSet *s, *retainerSetOfc;
     retainer r, c_child_r;
     StgWord typeOfc;
-    retainPushClosure(c0, cp0, r0);
+    retainPushClosure(ts, c0, cp0, r0);
 
 #if defined(DEBUG_RETAINER)
     StgPtr oldStackTop;
 #endif
 
 #if defined(DEBUG_RETAINER)
-    oldStackTop = stackTop;
+    oldStackTop = ts->stackTop;
     debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n"
         , c0, cp0, r0);
 #endif
@@ -1436,12 +1444,12 @@ loop:
     debugBelch("loop");
 #endif
     // pop to (c, cp, r);
-    pop(&c, &cp, &r);
+    pop(ts, &c, &cp, &r);
 
     if (c == NULL) {
 #if defined(DEBUG_RETAINER)
         debugBelch("retainClosure() ends: oldStackTop = 0x%x,stackTop = 0x%x\n",
-            oldStackTop, stackTop);
+            oldStackTop, ts->stackTop);
 #endif
         return;
     }
@@ -1615,7 +1623,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
-        retainStack(c, c_child_r,
+        retainStack(ts, c, c_child_r,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
         goto loop;
@@ -1624,16 +1632,16 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        retainPushClosure((StgClosure *) tso->stackobj, c, c_child_r);
-        retainPushClosure((StgClosure *) tso->blocked_exceptions, c, c_child_r);
-        retainPushClosure((StgClosure *) tso->bq, c, c_child_r);
-        retainPushClosure((StgClosure *) tso->trec, c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->stackobj, c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->bq, c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->trec, c, c_child_r);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {
-            retainPushClosure(tso->block_info.closure, c, c_child_r);
+            retainPushClosure(ts, tso->block_info.closure, c, c_child_r);
         }
         goto loop;
     }
@@ -1641,36 +1649,36 @@ inner_loop:
     case BLOCKING_QUEUE:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
-        retainPushClosure((StgClosure *) bq->link,            c, c_child_r);
-        retainPushClosure((StgClosure *) bq->bh,              c, c_child_r);
-        retainPushClosure((StgClosure *) bq->owner,           c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->link,            c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->bh,              c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->owner,           c, c_child_r);
         goto loop;
     }
 
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
-        retain_PAP_payload(c, c_child_r, pap->fun, pap->payload, pap->n_args);
+        retain_PAP_payload(ts, c, c_child_r, pap->fun, pap->payload, pap->n_args);
         goto loop;
     }
 
     case AP:
     {
         StgAP *ap = (StgAP *)c;
-        retain_PAP_payload(c, c_child_r, ap->fun, ap->payload, ap->n_args);
+        retain_PAP_payload(ts, c, c_child_r, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
-        retainPushClosure(((StgAP_STACK *)c)->fun, c, c_child_r);
-        retainStack(c, c_child_r,
+        retainPushClosure(ts, ((StgAP_STACK *)c)->fun, c, c_child_r);
+        retainStack(ts, c, c_child_r,
                     (StgPtr)((StgAP_STACK *)c)->payload,
                     (StgPtr)((StgAP_STACK *)c)->payload +
                              ((StgAP_STACK *)c)->size);
         goto loop;
     }
 
-    push(c, c_child_r, &first_child);
+    push(ts, c, c_child_r, &first_child);
 
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
@@ -1689,22 +1697,23 @@ inner_loop:
  *  Compute the retainer set for every object reachable from *tl.
  * -------------------------------------------------------------------------- */
 static void
-retainRoot(void *user STG_UNUSED, StgClosure **tl)
+retainRoot(void *user, StgClosure **tl)
 {
+    traverseState *ts = (traverseState*) user;
     StgClosure *c;
 
     // We no longer assume that only TSOs and WEAKs are roots; any closure can
     // be a root.
 
-    ASSERT(isEmptyRetainerStack());
-    currentStackBoundary = stackTop;
+    ASSERT(isEmptyRetainerStack(ts));
+    ts->currentStackBoundary = ts->stackTop;
 
     c = UNTAG_CLOSURE(*tl);
     maybeInitRetainerSet(c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
-        retainClosure(c, c, getRetainerFrom(c));
+        retainClosure(ts, c, c, getRetainerFrom(c));
     } else {
-        retainClosure(c, c, CCS_SYSTEM);
+        retainClosure(ts, c, c, CCS_SYSTEM);
     }
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
@@ -1716,7 +1725,7 @@ retainRoot(void *user STG_UNUSED, StgClosure **tl)
  *  Compute the retainer set for each of the objects in the heap.
  * -------------------------------------------------------------------------- */
 static void
-computeRetainerSet( void )
+computeRetainerSet( traverseState *ts )
 {
     StgWeak *weak;
     uint32_t g, n;
@@ -1727,7 +1736,7 @@ computeRetainerSet( void )
     RetainerSet tmpRetainerSet;
 #endif
 
-    markCapabilities(retainRoot, NULL); // for scheduler roots
+    markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
     // This function is called after a major GC, when key, value, and finalizer
     // all are guaranteed to be valid, or reachable.
@@ -1743,12 +1752,12 @@ computeRetainerSet( void )
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (weak = generations[g].weak_ptr_list; weak != NULL; weak = weak->link) {
             // retainRoot((StgClosure *)weak);
-            retainRoot(NULL, (StgClosure **)&weak);
+            retainRoot((void*)ts, (StgClosure **)&weak);
         }
     }
 
     // Consider roots from the stable ptr table.
-    markStablePtrTable(retainRoot, NULL);
+    markStablePtrTable(retainRoot, (void*)ts);
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
@@ -1923,8 +1932,8 @@ retainerProfile(void)
   flip = flip ^ 1;
 
 #if defined(DEBUG_RETAINER)
-  stackSize = 0;
-  maxStackSize = 0;
+  g_retainerTraverseState.stackSize = 0;
+  g_retainerTraverseState.maxStackSize = 0;
 #endif
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
@@ -1943,13 +1952,13 @@ retainerProfile(void)
     and this operation is not costly anyhow). However, we just refresh the
     retainer sets.
    */
-  initializeTraverseStack();
+  initializeTraverseStack(&g_retainerTraverseState);
 #if defined(DEBUG_RETAINER)
   initializeAllRetainerSet();
 #else
   refreshAllRetainerSet();
 #endif
-  computeRetainerSet();
+  computeRetainerSet(&g_retainerTraverseState);
 
 #if defined(DEBUG_RETAINER)
   debugBelch("After traversing:\n");
@@ -1991,7 +2000,7 @@ retainerProfile(void)
 #endif
 
   // post-processing
-  closeTraverseStack();
+  closeTraverseStack(&g_retainerTraverseState);
 #if defined(DEBUG_RETAINER)
   closeAllRetainerSet();
 #else
@@ -2002,7 +2011,7 @@ retainerProfile(void)
   stat_endRP(
     retainerGeneration - 1,   // retainerGeneration has just been incremented!
 #if defined(DEBUG_RETAINER)
-    maxStackSize,
+    g_retainerTraverseState.maxStackSize,
 #endif
     (double)timesAnyObjectVisited / numObjectVisited);
 }
