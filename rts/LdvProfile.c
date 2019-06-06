@@ -173,28 +173,6 @@ processHeapForDead( bdescr *bd )
 }
 
 /* --------------------------------------------------------------------------
- * Calls processHeapClosureForDead() on every *dead* closures in the nursery.
- * ----------------------------------------------------------------------- */
-static void
-processNurseryForDead( void )
-{
-    StgPtr p;
-    bdescr *bd;
-
-    if (MainCapability.r.rNursery == NULL)
-        return;
-
-    for (bd = MainCapability.r.rNursery->blocks; bd != NULL; bd = bd->link) {
-        p = bd->start;
-        while (p < bd->free) {
-            while (p < bd->free && !*p) p++; // skip slop
-            if (p >= bd->free) break;
-            p += processHeapClosureForDead((StgClosure *)p);
-        }
-    }
-}
-
-/* --------------------------------------------------------------------------
  * Calls processHeapClosureForDead() on every *dead* closures in the closure
  * chain.
  * ----------------------------------------------------------------------- */
@@ -233,7 +211,6 @@ LdvCensusForDead( uint32_t N )
         //
         barf("Lag/Drag/Void profiling not supported with -G1");
     } else {
-        processNurseryForDead();
         for (g = 0; g <= N; g++) {
             processHeapForDead(generations[g].old_blocks);
             processChainForDead(generations[g].large_objects);
