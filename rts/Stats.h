@@ -41,9 +41,9 @@ void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct, W_ live,
 void      stat_startRP(void);
 void      stat_endRP(uint32_t,
 #if defined(DEBUG_RETAINER)
-                            uint32_t, int,
+                     int,
 #endif
-                            double);
+                     double);
 #endif /* PROFILING */
 
 #if defined(PROFILING) || defined(DEBUG)
