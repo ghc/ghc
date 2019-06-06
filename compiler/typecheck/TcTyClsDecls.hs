@@ -1212,8 +1212,8 @@ unifyNewtypeKind _ _ _ arg_tys _ = return arg_tys
 -- This includes doing kind unification if the type is a newtype.
 -- See Note [Implementation of UnliftedNewtypes] for why we need
 -- the first two arguments.
-tcConArgTys :: NewOrData -> Kind -> [LHsType GhcRn] -> TcM ()
-tcConArgTys new_or_data res_kind arg_tys = do
+kcConArgTys :: NewOrData -> Kind -> [LHsType GhcRn] -> TcM ()
+kcConArgTys new_or_data res_kind arg_tys = do
   { arg_tc_tys <- mapM (tcHsOpenType . getBangType) arg_tys
     -- See Note [Implementation of UnliftedNewtypes], STEP 2
   ; dflags <- getDynFlags
@@ -1238,7 +1238,7 @@ kcConDecl new_or_data res_kind (ConDeclH98
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; tcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
          -- We don't need to check the telescope here, because that's
          -- done in tcConDecl
        }
@@ -1261,7 +1261,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
-       ; tcConArgTys new_or_data res_kind (hsConDeclArgTys args)
+       ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _) = panic "kcConDecl"
