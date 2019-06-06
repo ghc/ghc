@@ -187,7 +187,6 @@ scavenge_compact(StgCompactNFData *str)
                str, Bdescr((P_)str)->gen_no, str->totalW * sizeof(W_))
 
     gct->eager_promotion = saved_eager;
-    write_barrier();
     if (gct->failed_to_evac) {
         ((StgClosure *)str)->header.info = &stg_COMPACT_NFDATA_DIRTY_info;
     } else {
@@ -453,7 +452,6 @@ scavenge_block (bdescr *bd)
         evacuate((StgClosure **)&mvar->value);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             mvar->header.info = &stg_MVAR_DIRTY_info;
         } else {
@@ -471,7 +469,6 @@ scavenge_block (bdescr *bd)
         evacuate((StgClosure **)&tvar->first_watch_queue_entry);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             tvar->header.info = &stg_TVAR_DIRTY_info;
         } else {
@@ -606,7 +603,6 @@ scavenge_block (bdescr *bd)
         evacuate(&((StgMutVar *)p)->var);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
         } else {
@@ -626,7 +622,6 @@ scavenge_block (bdescr *bd)
         evacuate((StgClosure**)&bq->link);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
         } else {
@@ -679,7 +674,6 @@ scavenge_block (bdescr *bd)
 
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -697,7 +691,6 @@ scavenge_block (bdescr *bd)
     {
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
@@ -723,7 +716,6 @@ scavenge_block (bdescr *bd)
         }
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -745,7 +737,6 @@ scavenge_block (bdescr *bd)
             evacuate((StgClosure **)p);
         }
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
@@ -886,7 +877,6 @@ scavenge_mark_stack(void)
             evacuate((StgClosure **)&mvar->value);
             gct->eager_promotion = saved_eager_promotion;
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 mvar->header.info = &stg_MVAR_DIRTY_info;
             } else {
@@ -903,7 +893,6 @@ scavenge_mark_stack(void)
             evacuate((StgClosure **)&tvar->first_watch_queue_entry);
             gct->eager_promotion = saved_eager_promotion;
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 tvar->header.info = &stg_TVAR_DIRTY_info;
             } else {
@@ -1010,7 +999,6 @@ scavenge_mark_stack(void)
             evacuate(&((StgMutVar *)p)->var);
             gct->eager_promotion = saved_eager_promotion;
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
             } else {
@@ -1030,7 +1018,6 @@ scavenge_mark_stack(void)
             evacuate((StgClosure**)&bq->link);
             gct->eager_promotion = saved_eager_promotion;
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
             } else {
@@ -1079,7 +1066,6 @@ scavenge_mark_stack(void)
 
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
             } else {
@@ -1099,7 +1085,6 @@ scavenge_mark_stack(void)
 
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
             } else {
@@ -1127,7 +1112,6 @@ scavenge_mark_stack(void)
             }
             gct->eager_promotion = saved_eager;
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
             } else {
@@ -1149,7 +1133,6 @@ scavenge_mark_stack(void)
                 evacuate((StgClosure **)p);
             }
 
-            write_barrier();
             if (gct->failed_to_evac) {
                 ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
             } else {
@@ -1256,7 +1239,6 @@ scavenge_one(StgPtr p)
         evacuate((StgClosure **)&mvar->value);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             mvar->header.info = &stg_MVAR_DIRTY_info;
         } else {
@@ -1273,7 +1255,6 @@ scavenge_one(StgPtr p)
         evacuate((StgClosure **)&tvar->first_watch_queue_entry);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             tvar->header.info = &stg_TVAR_DIRTY_info;
         } else {
@@ -1338,7 +1319,6 @@ scavenge_one(StgPtr p)
         evacuate(&((StgMutVar *)p)->var);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
         } else {
@@ -1358,7 +1338,6 @@ scavenge_one(StgPtr p)
         evacuate((StgClosure**)&bq->link);
         gct->eager_promotion = saved_eager_promotion;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
         } else {
@@ -1407,7 +1386,6 @@ scavenge_one(StgPtr p)
 
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -1425,7 +1403,6 @@ scavenge_one(StgPtr p)
         // follow everything
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
@@ -1453,7 +1430,6 @@ scavenge_one(StgPtr p)
         }
         gct->eager_promotion = saved_eager;
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -1475,7 +1451,6 @@ scavenge_one(StgPtr p)
             evacuate((StgClosure **)p);
         }
 
-        write_barrier();
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
@@ -1599,10 +1574,6 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
     StgPtr p, q;
     uint32_t gen_no;
 
-#if defined(DEBUG)
-    const StgInfoTable *pinfo;
-#endif
-
     gen_no = gen->no;
     gct->evac_gen_no = gen_no;
     for (; bd != NULL; bd = bd->link) {
@@ -1611,6 +1582,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
 #if defined(DEBUG)
+            const StgInfoTable *pinfo;
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_VAR_CLEAN:
                 // can happen due to concurrent writeMutVars
@@ -1664,7 +1636,6 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 
                 scavenge_mut_arr_ptrs_marked((StgMutArrPtrs *)p);
 
-                write_barrier();
                 if (gct->failed_to_evac) {
                     ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
                 } else {

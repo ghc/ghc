@@ -408,8 +408,9 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
-    write_barrier();
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
+    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
+    write_barrier();
 
     caf->indirectee = (StgClosure *)bh;
     write_barrier();

@@ -98,15 +98,15 @@ EXTERN_INLINE void load_load_barrier(void);
 
 /*
  * Note [Heap memory barriers]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
  * Machines with weak memory ordering semantics have consequences for how
- * closures are observed and mutated. For example, consider a closure that needs
+ * closures are observed and mutated. For example, consider a thunk that needs
  * to be updated to an indirection. In order for the indirection to be safe for
  * concurrent observers to enter, said observers must read the indirection's
- * info table before they read the indirectee. Furthermore, the entering
- * observer makes assumptions about the closure based on its info table
- * contents, e.g. an INFO_TYPE of IND imples the closure has an indirectee
- * pointer that is safe to follow.
+ * info table before they read the indirectee. Furthermore, the indirectee must
+ * be set before the info table pointer. This ensures that if the observer sees
+ * an IND info table then the indirectee is valid.
  *
  * When a closure is updated with an indirection, both its info table and its
  * indirectee must be written. With weak memory ordering, these two writes can
@@ -145,6 +145,24 @@ EXTERN_INLINE void load_load_barrier(void);
  * - Read the closure's info pointer.
  * - Read barrier.
  * - Read the closure's (non-info table) fields.
+ *
+ * We must also take care when we expose a newly-allocated closure to other cores
+ * by writing a pointer to it to some shared data structure (e.g. an MVar#, a Message,
+ * or MutVar#). Specifically, we need to ensure that all writes constructing the
+ * closure are visible *before* the write exposing the new closure is made visible:
+ *
+ * - Allocate memory for the closure
+ * - Write the closure's info pointer and fields (ordering betweeen this doesn't
+ *   matter since the closure isn't yet visible to anyone else).
+ * - Write barrier
+ * - Make closure visible to other cores
+ *
+ * Note that thread stacks are inherently thread-local and consequently allocating an
+ * object and introducing a reference to it to our stack needs no barrier.
+ *
+ * Finally, we take pains to ensure that we flush all write buffers before
+ * entering GC, since stacks may be read by other cores.
+ *
  */
 
 /* ----------------------------------------------------------------------------

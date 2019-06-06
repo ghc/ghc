@@ -373,6 +373,7 @@ compactNew (Capability *cap, StgWord size)
                                          ALLOCATE_NEW);
 
     self = firstBlockGetCompact(block);
+    SET_HDR((StgClosure*)self, &stg_COMPACT_NFDATA_CLEAN_info, CCS_SYSTEM);
     self->autoBlockW = aligned_size / sizeof(StgWord);
     self->nursery = block;
     self->last = block;
@@ -388,9 +389,6 @@ compactNew (Capability *cap, StgWord size)
     self->totalW = bd->blocks * BLOCK_SIZE_W;
 
     debugTrace(DEBUG_compact, "compactNew: size %" FMT_Word, size);
-
-    write_barrier();
-    SET_HDR((StgClosure*)self, &stg_COMPACT_NFDATA_CLEAN_info, CCS_SYSTEM);
 
     return self;
 }
