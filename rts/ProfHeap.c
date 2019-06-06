@@ -197,7 +197,7 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
                 if (RtsFlags.ProfFlags.bioSelector == NULL) {
                     censuses[t].void_total   += size;
                     censuses[era].void_total -= size;
-                    ASSERT(censuses[t].void_total < censuses[t].not_used);
+                    ASSERT(censuses[t].void_total <= censuses[t].not_used);
                 } else {
                     id = closureIdentity(c);
                     ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
