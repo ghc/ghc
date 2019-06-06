@@ -4,7 +4,7 @@ import Hadrian.BuildPath
 import Hadrian.Oracles.TextFile
 
 import Base
-import Context
+import Context as C
 import Expression
 import Rules.Generate
 import Settings
@@ -30,16 +30,29 @@ compilePackage rs = do
     --
     -- and parse the information we need (stage, package path, ...) from
     -- the path and figure out the suitable way to produce that object file.
-    objectFilesUnder root |%> \path -> do
-        obj <- parsePath (parseBuildObject root) "<object file path parser>" path
-        compileObject rs path obj
-  where
-    objectFilesUnder r = [ r -/- ("**/build/**/*" ++ pat)
-                         | pat <- extensionPats ]
+    alternatives $ do
+      -- Language is identified by subdirectory under /build.
+      -- These are non-haskell files so only have a .o or .<way>_o suffix.
+      [ root -/- "**/build/c/**/*." ++ wayPat ++ "o"
+        | wayPat <- wayPats] |%> compileNonHsObject rs C
 
-    exts = [ "o", "hi", "o-boot", "hi-boot" ]
-    patternsFor e = [ "." ++ e, ".*_" ++ e ]
-    extensionPats = concatMap patternsFor exts
+      [ root -/- "**/build/cmm/**/*." ++ wayPat ++ "o"
+        | wayPat <- wayPats] |%> compileNonHsObject rs Cmm
+
+      [ root -/- "**/build/s/**/*." ++ wayPat ++ "o"
+        | wayPat <- wayPats] |%> compileNonHsObject rs Asm
+
+      -- All else is haskell.
+      -- This comes last as it overlaps with the above rules' file patterns.
+      forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
+        [ root -/- "**/build/**/*." ++ wayPat ++ oExt
+        , root -/- "**/build/**/*." ++ wayPat ++ hiExt ]
+          &%> \ [o, _hi] -> compileHsObjectAndHi rs o
+  where
+    hsExts = [ ("o", "hi")
+             , ("o-boot", "hi-boot")
+             ]
+    wayPats = [ "", "*_" ]
 
 -- * Object file paths types and parsers
 
@@ -153,67 +166,47 @@ objectContext (BuildPath _ stage pkgPath obj) =
 
 -- * Building an object
 
-compileHsObject
-    :: [(Resource, Int)] -> FilePath -> BuildPath Object -> HsObject -> Action ()
-compileHsObject rs objpath b@(BuildPath _root stage _path _o) hsobj =
-  case hsobj of
-    HsObject _basename (Extension way Hi    ) -> need [objpath -<.> osuf     way]
-    HsObject _basename (Extension way HiBoot) -> need [objpath -<.> obootsuf way]
-    HsObject _basename (Extension way suf) -> do
-        let ctx = objectContext b
-        ctxPath <- contextPath ctx
-        (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
-        need (src:deps)
-        needLibrary =<< contextDependencies ctx
+compileHsObjectAndHi
+    :: [(Resource, Int)] -> FilePath -> Action ()
+compileHsObjectAndHi rs objpath = do
+  root <- buildRoot
+  b@(BuildPath _root stage _path _o)
+    <- parsePath (parseBuildObject root) "<object file path parser>" objpath
+  let ctx = objectContext b
+      way = C.way ctx
+  ctxPath <- contextPath ctx
+  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+  need (src:deps)
+  needLibrary =<< contextDependencies ctx
 
-        -- The .dependencies files only lists shallow dependencies. ghc will
-        -- generally read more *.hi and *.hi-boot files (deep dependencies).
-        -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#cloud-shared-cache-build)
-        -- Note that this may allow too many *.hi and *.hi-boot files, but
-        -- calculating the exact set of deep dependencies is not feasible.
-        trackAllow [ "//*." ++ hisuf     way
-                   , "//*." ++ hibootsuf way
-                   ]
+  -- The .dependencies file lists indicating inputs. ghc will
+  -- generally read more *.hi and *.hi-boot files (direct inputs).
+  -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
+  -- Note that this may allow too many *.hi and *.hi-boot files, but
+  -- calculating the exact set of direct inputs is not feasible.
+  trackAllow [ "//*." ++ hisuf     way
+             , "//*." ++ hibootsuf way
+             ]
 
-        buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
-        -- Andrey: It appears that the previous refactoring has broken
-        -- multiple-output build rules. Ideally, we should bring multiple-output
-        -- rules back, see: https://github.com/snowleopard/hadrian/issues/216.
-        -- As a temporary solution, I'm using Shake's new 'produces' feature to
-        -- record that this rule also produces a corresponding interface file.
-        let hi | suf == O     = objpath -<.> hisuf     way
-               | suf == OBoot = objpath -<.> hibootsuf way
-               | otherwise    = error "Internal error: unknown Haskell object extension"
-        produces [hi]
+  buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
 
-compileNonHsObject
-  :: [(Resource, Int)] -> FilePath -> BuildPath Object -> NonHsObject
-  -> Action ()
-compileNonHsObject rs objpath b@(BuildPath _root stage _path _o) nonhsobj =
-  case nonhsobj of
-    NonHsObject lang _basename _way ->
-      go (builderFor lang) (toSrcFor lang)
-
-  where builderFor C = Ghc CompileCWithGhc
-        builderFor _ = Ghc CompileHs
-
-        toSrcFor Asm = obj2src "S"   (const False)
-        toSrcFor C   = obj2src "c"   (const False)
-        toSrcFor Cmm = obj2src "cmm" isGeneratedCmmFile
-
-        go builder tosrc = do
-            let ctx = objectContext b
-            src <- tosrc ctx objpath
-            need [src]
-            needDependencies ctx src (objpath <.> "d")
-            buildWithResources rs $ target ctx (builder stage) [src] [objpath]
-
-compileObject
-  :: [(Resource, Int)] -> FilePath -> BuildPath Object -> Action ()
-compileObject rs objpath b@(BuildPath _root _stage _path (Hs o)) =
-  compileHsObject rs objpath b o
-compileObject rs objpath b@(BuildPath _root _stage _path (NonHs o)) =
-  compileNonHsObject rs objpath b o
+compileNonHsObject :: [(Resource, Int)] -> SourceLang -> FilePath -> Action ()
+compileNonHsObject rs lang path = do
+  root <- buildRoot
+  b@(BuildPath _root stage _path _o)
+    <- parsePath (parseBuildObject root) "<object file path parser>" path
+  let
+    ctx = objectContext b
+    builder = case lang of
+      C -> Ghc CompileCWithGhc
+      _ -> Ghc CompileHs
+  src <- case lang of
+      Asm -> obj2src "S"   (const False)      ctx path
+      C   -> obj2src "c"   (const False)      ctx path
+      Cmm -> obj2src "cmm" isGeneratedCmmFile ctx path
+  need [src]
+  needDependencies ctx src (path <.> "d")
+  buildWithResources rs $ target ctx (builder stage) [src] [path]
 
 -- * Helpers
 
