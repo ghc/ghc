@@ -102,15 +102,6 @@ static uint32_t checkHeapSanityForRetainerProfiling( void );
 static void retainPushClosure( StgClosure *p, StgClosure *c, retainer c_child_r);
 
 #if defined(DEBUG_RETAINER)
-/*
-  cStackSize records how many times retainStack() has been invoked recursively,
-  that is, the number of activation records for retainStack() on the C stack.
-  maxCStackSize records its max value.
-  Invariants:
-    cStackSize <= maxCStackSize
- */
-static uint32_t cStackSize, maxCStackSize;
-
 static uint32_t sumOfNewCost;        // sum of the cost of each object, computed
                                 // when the object is first visited
 static uint32_t sumOfNewCostExtra;   // for those objects not visited during
@@ -225,7 +216,7 @@ static stackElement *currentStackBoundary;
     stackSize is just an estimate measure of the depth of the graph. The reason
     is that some heap objects have only a single child and may not result
     in a new element being pushed onto the stack. Therefore, at the end of
-    retainer profiling, maxStackSize + maxCStackSize is some value no greater
+    retainer profiling, maxStackSize is some value no greater
     than the actual depth of the graph.
  */
 static int stackSize, maxStackSize;
@@ -1244,11 +1235,6 @@ retainStack( StgClosure *c, retainer c_child_r,
     StgWord bitmap;
     uint32_t size;
 
-#if defined(DEBUG_RETAINER)
-    cStackSize++;
-    if (cStackSize > maxCStackSize) maxCStackSize = cStackSize;
-#endif
-
     /*
       Each invocation of retainStack() creates a new virtual
       stack. Since all such stacks share a single common stack, we
@@ -1357,10 +1343,6 @@ retainStack( StgClosure *c, retainer c_child_r,
 #if defined(DEBUG_RETAINER)
     debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n",
         currentStackBoundary);
-#endif
-
-#if defined(DEBUG_RETAINER)
-    cStackSize--;
 #endif
 }
 
@@ -1943,8 +1925,6 @@ retainerProfile(void)
 #if defined(DEBUG_RETAINER)
   stackSize = 0;
   maxStackSize = 0;
-  cStackSize = 0;
-  maxCStackSize = 0;
 #endif
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
@@ -2022,7 +2002,7 @@ retainerProfile(void)
   stat_endRP(
     retainerGeneration - 1,   // retainerGeneration has just been incremented!
 #if defined(DEBUG_RETAINER)
-    maxCStackSize, maxStackSize,
+    maxStackSize,
 #endif
     (double)timesAnyObjectVisited / numObjectVisited);
 }
