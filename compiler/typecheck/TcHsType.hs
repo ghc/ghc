@@ -863,7 +863,7 @@ regardless of whether PartialTypeSignatures is enabled or not. But how would
 the typechecker know which '_' is being used in VKA and which is not when it
 calls emitNamedWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
 The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
-but instead give every anonymouswildcard a fresh wild tyvar in tcAnonWildCardOcc.
+but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
 And whenever we see a '@', we automatically turn on PartialTypeSignatures and
 turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
 under these conditions.
@@ -1709,7 +1709,7 @@ To avoid the double-zonk, we do two things:
 tcNamedWildCardBinders :: [Name]
                        -> ([(Name, TcTyVar)] -> TcM a)
                        -> TcM a
--- Bring into scope the /named/ wildcard binders.  Remember taht
+-- Bring into scope the /named/ wildcard binders.  Remember that
 -- plain wildcards _ are anonymous and dealt with by HsWildCardTy
 -- Soe Note [The wildcard story for types] in HsTypes
 tcNamedWildCardBinders wc_names thing_inside
@@ -2477,8 +2477,8 @@ tcHsPartialSigType
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
-         , [Name]             -- Original tyvar names, in correspondence with ...
-         , [TcTyVar]          -- ... Implicitly and explicitly bound type variables
+         , [(Name,TcTyVar)]   -- Original tyvar names, in correspondence with
+                              --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
 -- See Note [Checking partial type signatures]
@@ -2504,26 +2504,23 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
-         -- We must return these separately, because all the zonking below
-         -- might change the name of a TyVarTv. This, in turn, causes trouble
-         -- in partial type signatures that bind scoped type variables, as
-         -- we bring the wrong name into scope in the function body.
-         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
-       ; let tv_names = implicit_hs_tvs ++ hsLTyVarNames explicit_hs_tvs
-
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary
        -- See Note [Extra-constraint holes in partial type signatures]
        ; emitNamedWildCardHoleConstraints wcs
 
-       ; let all_tvs = implicit_tvs ++ explicit_tvs
+         -- We return a proper (Name,TyVar) environment, to be sure that
+         -- we bring the right name into scope in the function body.
+         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
+       ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvs)
+                      ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvs)
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it
       --     here because we don't have a complete tuype to check
 
-       ; traceTc "tcHsPartialSigType" (ppr all_tvs)
-       ; return (wcs, wcx, tv_names, all_tvs, theta, tau) }
+       ; traceTc "tcHsPartialSigType" (ppr tv_prs)
+       ; return (wcs, wcx, tv_prs, theta, tau) }
 
 tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPartialSigType"
 tcHsPartialSigType _ (XHsWildCardBndrs _) = panic "tcHsPartialSigType"

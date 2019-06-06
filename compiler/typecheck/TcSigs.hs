@@ -498,10 +498,9 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
          -- See Note [Checking partial type signatures] in TcHsType
-       ; let tv_prs = tv_names `zip` tvs
-             inst_sig = TISI { sig_inst_sig   = hs_sig
+       ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs
                              , sig_inst_wcx   = wcx

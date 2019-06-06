@@ -1794,8 +1794,8 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
 
 evVarPred :: EvVar -> PredType
 evVarPred var = varType var
-  -- Historical note: I used to have an ASSERRT here,
-  -- checking (isEvVarType (varType var).  But with something like
+  -- Historical note: I used to have an ASSERT here,
+  -- checking (isEvVarType (varType var)).  But with something like
   --   f :: c => _ -> _
   -- we end up with (c :: kappa), and (kappa ~ Constraint).  Until
   -- we solve and zonk (which there is no particular reason to do for
