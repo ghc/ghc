@@ -233,7 +233,6 @@ LdvCensusForDead( uint32_t N )
         //
         barf("Lag/Drag/Void profiling not supported with -G1");
     } else {
-        processNurseryForDead();
         for (g = 0; g <= N; g++) {
             processHeapForDead(generations[g].old_blocks);
             processChainForDead(generations[g].large_objects);
