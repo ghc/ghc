@@ -1010,19 +1010,6 @@ heapCensusChain( Census *census, bdescr *bd )
 
         p = bd->start;
 
-        // When we shrink a large ARR_WORDS, we do not adjust the free pointer
-        // of the associated block descriptor, thus introducing slop at the end
-        // of the object.  This slop remains after GC, violating the assumption
-        // of the loop below that all slop has been eliminated (#11627).
-        // Consequently, we handle large ARR_WORDS objects as a special case.
-        if (bd->flags & BF_LARGE
-            && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
-            size = arr_words_sizeW((StgArrBytes *)p);
-            prim = true;
-            heapProfObject(census, (StgClosure *)p, size, prim);
-            continue;
-        }
-
         while (p < bd->free) {
             info = get_itbl((const StgClosure *)p);
             prim = false;
@@ -1172,6 +1159,8 @@ heapCensusChain( Census *census, bdescr *bd )
             heapProfObject(census,(StgClosure*)p,size,prim);
 
             p += size;
+            /* skip over slop */
+            while (p < bd->free && !*p) p++; // skip slop
         }
     }
 }
