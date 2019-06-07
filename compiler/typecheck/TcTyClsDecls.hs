@@ -2444,30 +2444,6 @@ But it can deal with covars that are arguments to GADT data constructors.
 So we somehow want to allow covars only in precisely those spots, then use
 them as givens when checking the RHS. TODO (RAE): Implement plan.
 
-
-Note [Quantifying over family patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We need to quantify over two different lots of kind variables:
-
-First, the ones that come from the kinds of the tyvar args of
-tcTyVarBndrsKindGen, as usual
-  data family Dist a
-
-  -- Proxy :: forall k. k -> *
-  data instance Dist (Proxy a) = DP
-  -- Generates  data DistProxy = DP
-  --            ax8 k (a::k) :: Dist * (Proxy k a) ~ DistProxy k a
-  -- The 'k' comes from the tcTyVarBndrsKindGen (a::k)
-
-Second, the ones that come from the kind argument of the type family
-which we pick up using the (tyCoVarsOfTypes typats) in the result of
-the thing_inside of tcHsTyvarBndrsGen.
-  -- Any :: forall k. k
-  data instance Dist Any = DA
-  -- Generates  data DistAny k = DA
-  --            ax7 k :: Dist k (Any k) ~ DistAny k
-  -- The 'k' comes from kindGeneralizeKinds (Any k)
-
 Note [Quantified kind variables of a family pattern]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider   type family KindFam (p :: k1) (q :: k1)
@@ -2586,11 +2562,11 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- kindGeneralize (mkSpecForAllTys (binderVars tmpl_bndrs) $
-                                mkSpecForAllTys exp_tvs $
-                                mkPhiTy ctxt $
-                                mkVisFunTys arg_tys $
-                                unitTy)
+       ; kvs <- kindGeneralizeAll (mkSpecForAllTys (binderVars tmpl_bndrs) $
+                                   mkSpecForAllTys exp_tvs $
+                                   mkPhiTy ctxt $
+                                   mkVisFunTys arg_tys $
+                                   unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
                  -- at hand. But the result would mention only the tmpl_tvs,
@@ -2670,10 +2646,10 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; imp_tvs <- zonkAndScopedSort imp_tvs
        ; let user_tvs      = imp_tvs ++ exp_tvs
 
-       ; tkvs <- kindGeneralize (mkSpecForAllTys user_tvs $
-                                 mkPhiTy ctxt $
-                                 mkVisFunTys arg_tys $
-                                 res_ty)
+       ; tkvs <- kindGeneralizeAll (mkSpecForAllTys user_tvs $
+                                    mkPhiTy ctxt $
+                                    mkVisFunTys arg_tys $
+                                    res_ty)
 
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
