@@ -495,6 +495,7 @@ release-x86_64-linux-deb9-dwarf:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9"
+    TEST_TYPE: slowtest
   artifacts:
     when: always
     expire_in: 2 week
