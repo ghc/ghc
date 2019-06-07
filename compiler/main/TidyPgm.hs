@@ -58,7 +58,6 @@ import HscTypes
 import Maybes
 import UniqSupply
 import Outputable
-import Util( filterOut )
 import qualified ErrUtils as Err
 
 import Control.Monad
@@ -174,8 +173,7 @@ mkBootModDetailsTc hsc_env
                 | id <- typeEnvIds type_env
                 , keep_it id ]
 
-    final_tcs  = filterOut (isWiredInName . getName) tcs
-    type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
+    type_env1  = typeEnvFromEntities final_ids tcs fam_insts
     insts'     = mkFinalClsInsts type_env1 insts
     pat_syns'  = mkFinalPatSyns  type_env1 pat_syns
     type_env'  = extendTypeEnvWithPatSyns pat_syns' type_env1
@@ -374,9 +372,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                              , not (isWiredInName (getName id))
                              ]   -- See Note [Drop wired-in things]
 
-              ; final_tcs      = filterOut (isWiredInName . getName) tcs
-                                 -- See Note [Drop wired-in things]
-              ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
+              ; type_env       = typeEnvFromEntities final_ids tcs fam_insts
               ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts
               ; tidy_patsyns   = mkFinalPatSyns  type_env patsyns
               ; tidy_type_env  = extendTypeEnvWithPatSyns tidy_patsyns type_env
