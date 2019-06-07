@@ -1439,12 +1439,11 @@ thin wrapper around unifyKind, unifying the kind of the one argument and the
 result kind of the newtype tycon.
 
 Examples of newtypes affected by STEP 2, assuming -XUnliftedNewtypes is
-enabled (we use r0 to denote an unsolved metavar):
+enabled (we use r0 to denote a unification variable):
 
 newtype Foo rep = MkFoo (forall (a :: TYPE rep). a)
-+ Data Type Vars: rep (r0 :: RuntimeRep)
-+ Constructor Vars: (a :: TYPE rep)
-+ kcConDecl unifies (TYPE r0) with (TYPE rep)
++ kcConDecl unifies (TYPE r0) with (TYPE rep), where (TYPE r0)
+  is the kind that getInitialKind invented for (Foo rep).
 
 data Color = Red | Blue
 type family Interpret (x :: Color) :: RuntimeRep where
