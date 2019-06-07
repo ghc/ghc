@@ -387,6 +387,8 @@ decodeFromFile :: FilePath -> DbOpenMode mode t -> Get pkgs ->
                   IO (pkgs, DbOpenMode mode PackageDbLock)
 decodeFromFile file mode decoder = case mode of
   DbOpenReadOnly -> do
+  -- Note [Locking package database on Windows]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   -- When we open the package db in read only mode, there is no need to acquire
   -- shared lock on non-Windows platform because we update the database with an
   -- atomic rename, so readers will always see the database in a consistent
