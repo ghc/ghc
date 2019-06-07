@@ -159,7 +159,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  * Note that thread stacks are inherently thread-local and consequently allocating an
  * object and introducing a reference to it to our stack needs no barrier.
- * 
+ *
  * Finally, we take pains to ensure that we flush all write buffers before
  * entering GC, since stacks may be read by other cores.
  *
