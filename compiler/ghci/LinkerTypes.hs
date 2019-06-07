@@ -28,7 +28,7 @@ import NameEnv                 ( NameEnv )
 import Name                    ( Name )
 import GHCi.RemoteTypes        ( ForeignHValue )
 
-type ClosureEnv = NameEnv (Name, ForeignHValue) 
+type ClosureEnv = NameEnv (Name, ForeignHValue)
 
 newtype DynLinker =
   DynLinker { dl_mpls :: MVar (Maybe PersistentLinkerState) }

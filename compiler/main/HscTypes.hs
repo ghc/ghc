@@ -443,7 +443,7 @@ data HscEnv
                 -- time it is needed.
 
         , hsc_dynLinker :: DynLinker
-                -- ^ dynamic linker. 
+                -- ^ dynamic linker.
 
  }
 

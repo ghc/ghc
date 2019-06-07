@@ -1470,8 +1470,8 @@ mkPackageState dflags dbs preload0 = do
             _  -> unit'
       addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
       -- This is the set of maximally preferable packages. In fact, it is a set of
-      -- most preferable *units* keyed by package name, which act as stand-ins in 
-      -- for "a package in a database". We use units here because we don't have 
+      -- most preferable *units* keyed by package name, which act as stand-ins in
+      -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
       mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
@@ -1481,7 +1481,7 @@ mkPackageState dflags dbs preload0 = do
       -- with the most preferable unit for package. Being equi-preferable means that
       -- they must be in the same database, with the same version, and the same pacakge name.
       --
-      -- We must take care to consider all these units and not just the most 
+      -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
       mostPreferable u =
         case lookupUDFM mostPreferablePackageReps (fsPackageName u) of

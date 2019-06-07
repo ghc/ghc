@@ -526,7 +526,7 @@ closureField dflags off = off + fixedHdrSize dflags
 -- demonstrated that this leads to bad behavior in the presence
 -- of unsafeCoerce#. Returning to the above example, suppose the
 -- Haskell call looked like
---   foo (unsafeCoerce# p) 
+--   foo (unsafeCoerce# p)
 -- where the types of expressions comprising the arguments are
 --   p :: (Any :: TYPE 'UnliftedRep)
 --   i :: Int#
@@ -591,7 +591,7 @@ add_shim dflags ty expr = case ty of
 -- the offset of each argument when used as a C FFI argument.
 -- See Note [Unlifted boxed arguments to foreign calls]
 collectStgFArgTypes :: Type -> [StgFArgType]
-collectStgFArgTypes = go [] 
+collectStgFArgTypes = go []
   where
     -- Skip foralls
     go bs (ForAllTy _ res) = go bs res
