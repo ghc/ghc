@@ -1553,7 +1553,7 @@ flatten_tyvar1 tv
                              (ppr tv <+> equals <+> ppr ty)
                          ; role <- getRole
                          ; return (FTRFollowed ty (mkReflCo role ty)) } ;
-           Nothing -> do { traceFlat "Unfilled tyvar" (ppr tv)
+           Nothing -> do { traceFlat "Unfilled tyvar" (pprTyVar tv)
                          ; fr <- getFlavourRole
                          ; flatten_tyvar2 tv fr } }
 
