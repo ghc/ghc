@@ -53,9 +53,9 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - echo "Linting changes between $CI_MERGE_REQUEST_TARGET_BRANCH_NAME..$CI_COMMIT_SHA"
+    - git fetch "$CI_MERGE_REQUEST_SOURCE_PROJECT_PATH" $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    - git merge-base FETCH_HEAD $CI_COMMIT_SHA
+    - echo "Linting changes between $(git rev-parse FETCH_HEAD)..$CI_COMMIT_SHA"
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
