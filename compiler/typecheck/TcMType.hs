@@ -1433,9 +1433,9 @@ quantifyTyVars gbl_tvs
               -- NB: All variables in the kind of a covar must not be
               -- quantified over, as we don't quantify over the covar.
 
-             dep_kvs = dVarSetElemsWellScoped $
+             dep_kvs = scopedSort $ dVarSetElems $
                        dep_tkvs `dVarSetMinusVarSet` mono_tvs
-                       -- dVarSetElemsWellScoped: put the kind variables into
+                       -- scopedSort: put the kind variables into
                        --    well-scoped order.
                        --    E.g.  [k, (a::k)] not the other way roud
 
@@ -1453,7 +1453,7 @@ quantifyTyVars gbl_tvs
 
        -- This block uses level numbers to decide what to quantify
        -- and emits a warning if the two methods do not give the same answer
-       ; let dep_kvs2    = dVarSetElemsWellScoped $
+       ; let dep_kvs2    = scopedSort $ dVarSetElems $
                            filterDVarSet (quantifiableTv outer_tclvl) dep_tkvs
              nondep_tvs2 = filter (quantifiableTv outer_tclvl) $
                            dVarSetElems (nondep_tkvs `minusDVarSet` dep_tkvs)
