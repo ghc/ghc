@@ -1260,7 +1260,12 @@ collect_cand_qtvs is_dep bound dvs ty
            ; if intersectsVarSet bound (tyCoVarsOfType tv_kind)
 
              then -- See Note [Naughty quantification candidates]
-                  do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
+                  do { traceTc "Zapping naughty quantifier" $
+                         vcat [ ppr tv <+> dcolon <+> ppr tv_kind
+                              , text "bound:" <+> pprTyVars (nonDetEltsUniqSet bound)
+                              , text "fvs:" <+> pprTyVars (nonDetEltsUniqSet $
+                                                           tyCoVarsOfType tv_kind) ]
+
                      ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
                      ; collect_cand_qtvs True bound dv tv_kind }
 
@@ -1400,6 +1405,13 @@ quantifyTyVars
 --   associated type declarations. Also accepts covars, but *never* returns any.
 quantifyTyVars gbl_tvs
                dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs, dv_cvs = covars })
+       -- short-circuit common case
+  | isEmptyDVarSet dep_tkvs
+  , isEmptyDVarSet nondep_tkvs
+  = do { traceTc "quantifyTyVars has nothing to quantify" empty
+       ; return [] }
+
+  | otherwise
   = do { outer_tclvl <- getTcLevel
        ; traceTc "quantifyTyVars 1" (vcat [ppr outer_tclvl, ppr dvs, ppr gbl_tvs])
        ; let co_tvs = closeOverKinds covars
