@@ -106,6 +106,8 @@ lint-submods-marge:
 
 lint-submods-mr:
   extends: .lint-submods
+  # Allow failure since any necessary submodule patches may not be upstreamed
+  # yet.
   allow_failure: true
   only:
     refs:
@@ -129,6 +131,7 @@ lint-submods-mr:
 
 lint-changelogs:
   extends: .lint-changelogs
+  # Allow failure since this isn't a final release.
   allow_failure: true
   only:
     refs:
