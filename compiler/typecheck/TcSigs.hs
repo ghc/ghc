@@ -396,7 +396,7 @@ tcPatSynSig name sig_ty
                                                  req ex_tvs prov body_ty
 
        -- Kind generalisation
-       ; kvs <- kindGeneralize ungen_patsyn_ty
+       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
        -- These are /signatures/ so we zonk to squeeze out any kind

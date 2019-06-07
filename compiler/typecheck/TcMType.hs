@@ -65,7 +65,7 @@ module TcMType (
   tidyEvVar, tidyCt, tidySkolemInfo,
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
-  zonkTyCoVarsAndFV, zonkTcTypeAndFV,
+  zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
@@ -759,7 +759,7 @@ cloneAnonMetaTyVar info tv kind
   = do  { details <- newMetaDetails info
         ; name    <- cloneMetaTyVarName (tyVarName tv)
         ; let tyvar = mkTcTyVar name kind details
-        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar)
+        ; traceTc "cloneAnonMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar))
         ; return tyvar }
 
 newFskTyVar :: TcType -> TcM TcTyVar
@@ -1145,8 +1145,11 @@ data CandidatesQTvs
   -- See Note [CandidatesQTvs determinism and order]
   --
   -- Invariants:
-  --   * All variables stored here are MetaTvs. No exceptions.
   --   * All variables are fully zonked, including their kinds
+  --
+  -- This *can* contain skolems. For example, in `data X k :: k -> Type`
+  -- we need to know that the k is a dependent variable. This is done
+  -- by collecting the candidates in the kind.
   --
   = DV { dv_kvs :: DTyVarSet    -- "kind" metavariables (dependent)
        , dv_tvs :: DTyVarSet    -- "type" metavariables (non-dependent)
@@ -1252,11 +1255,11 @@ collect_cand_qtvs is_dep bound dvs ty
     go dv (CoercionTy co)   = collect_cand_qtvs_co bound dv co
 
     go dv (TyVarTy tv)
-      | is_bound tv = return dv
-      | otherwise   = do { m_contents <- isFilledMetaTyVar_maybe tv
-                         ; case m_contents of
-                             Just ind_ty -> go dv ind_ty
-                             Nothing     -> go_tv dv tv }
+      | is_bound tv      = return dv
+      | otherwise        = do { m_contents <- isFilledMetaTyVar_maybe tv
+                              ; case m_contents of
+                                  Just ind_ty -> go dv ind_ty
+                                  Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
@@ -1286,7 +1289,12 @@ collect_cand_qtvs is_dep bound dvs ty
                 intersectsVarSet bound (tyCoVarsOfType tv_kind)
 
              then -- See Note [Naughty quantification candidates]
-                  do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
+                  do { traceTc "Zapping naughty quantifier" $
+                         vcat [ ppr tv <+> dcolon <+> ppr tv_kind
+                              , text "bound:" <+> pprTyVars (nonDetEltsUniqSet bound)
+                              , text "fvs:" <+> pprTyVars (nonDetEltsUniqSet $
+                                                           tyCoVarsOfType tv_kind) ]
+
                      ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
                      ; collect_cand_qtvs True bound dv tv_kind }
 
@@ -1295,6 +1303,7 @@ collect_cand_qtvs is_dep bound dvs ty
                                | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv' }
                                -- See Note [Order of accumulation]
                      ; collect_cand_qtvs True emptyVarSet dv' tv_kind } }
+            -- Why emptyVarSet? See Note [Closing over free variable kinds] in TyCoRep
 
 collect_cand_qtvs_co :: VarSet -- bound variables
                      -> CandidatesQTvs -> Coercion
@@ -1320,10 +1329,19 @@ collect_cand_qtvs_co bound = go_co
     go_co dv (KindCo co)           = go_co dv co
     go_co dv (SubCo co)            = go_co dv co
 
-    go_co dv (HoleCo hole) = do m_co <- unpackCoercionHole_maybe hole
-                                case m_co of
-                                  Just co -> go_co dv co
-                                  Nothing -> go_cv dv (coHoleCoVar hole)
+    go_co dv@(DV { dv_cvs = cvs }) (HoleCo hole)
+      = do m_co <- unpackCoercionHole_maybe hole
+           case m_co of
+             Just co -> go_co dv co
+             Nothing
+               | cv `elemVarSet` cvs -> return dv
+
+               | otherwise
+               -> collect_cand_qtvs True bound (dv { dv_cvs = cvs `extendVarSet` cv })
+                                                     cv_type
+                        -- See Note [Free vars in coercion hole]
+               where cv      = coHoleCoVar hole
+                     cv_type = varType cv
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 
@@ -1343,6 +1361,8 @@ collect_cand_qtvs_co bound = go_co
     go_cv dv@(DV { dv_cvs = cvs }) cv
       | is_bound cv         = return dv
       | cv `elemVarSet` cvs = return dv
+
+      -- Why emptyVarSet below? See Note [Closing over free variable kinds] in TyCoRep
       | otherwise           = collect_cand_qtvs True emptyVarSet
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
@@ -1368,6 +1388,37 @@ element to the right.
 
 Note that the unitDVarSet/mappend implementation would not be wrong
 against any specification -- just suboptimal and confounding to users.
+
+Note [Free vars in coercion hole]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First, read Note [Closing over free variable kinds] in TyCoRep, paying
+attention to the end of the Note about using an empty bound set when
+traversing a variable's kind.
+
+We do not do this for coercion holes. (The other Note doesn't address coercion
+holes, because that Note is about Core, where coercion holes do not exist.)
+Coercion holes are *never* bound. Yet a coercion hole *can* mention a locally
+bound type/coercion variable in its kind. This would happen if the constraint
+associated with the coercion hole is inside an implication constraint, and the
+bound variables in the hole's type are the skolems of the implication. We do
+not want to collect *all* free variables in the coercion hole's kind, because
+that list might contain skolems. (This actually happened in test case
+dependent/should_fail/BadTelescope5.) Instead, we remember the bound variables
+when traversing the coercion hole's kind so we can avoid visiting bound
+variables there.
+
+Example: forall k1 k2. .... |> (hole :: k1 ~# k2) ....
+This is obviously bogus, but if we collect k1 and k2 into the candidates,
+we'll have skolems in the CandidatesQTvs, directly contradicting that data
+structure's invariant. See its definition.
+
+Of course, Note [Closing over free variable kinds] observes that maintaining
+a bound set while going into a kind is potentially wrong, if there is shadowing.
+However, given that we are in the type-checker now, not in Core, shadowing cannot
+happen: the renamer would have sorted it out. So the bug that Note is fixing
+cannot occur here, and so we do not have to zap the bound set when looking at
+kinds.
+
 -}
 
 {- *********************************************************************
@@ -1426,6 +1477,13 @@ quantifyTyVars
 --   associated type declarations. Also accepts covars, but *never* returns any.
 quantifyTyVars gbl_tvs
                dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs, dv_cvs = covars })
+       -- short-circuit common case
+  | isEmptyDVarSet dep_tkvs
+  , isEmptyDVarSet nondep_tkvs
+  = do { traceTc "quantifyTyVars has nothing to quantify" empty
+       ; return [] }
+
+  | otherwise
   = do { outer_tclvl <- getTcLevel
        ; traceTc "quantifyTyVars 1" (vcat [ppr outer_tclvl, ppr dvs, ppr gbl_tvs])
        ; let co_tvs = closeOverKinds covars
@@ -1461,6 +1519,8 @@ quantifyTyVars gbl_tvs
              all_ok = dep_kvs == dep_kvs2 && nondep_tvs == nondep_tvs2
              bad_msg = hang (text "Quantification by level numbers would fail")
                           2 (vcat [ text "Outer level =" <+> ppr outer_tclvl
+                                  , text "gbl_tvs ="     <+> ppr gbl_tvs
+                                  , text "mono_tvs ="    <+> ppr mono_tvs
                                   , text "dep_tkvs ="    <+> ppr dep_tkvs
                                   , text "co_vars ="     <+> vcat [ ppr cv <+> dcolon <+> ppr (varType cv)
                                                                   | cv <- nonDetEltsUniqSet covars ]
@@ -1469,7 +1529,7 @@ quantifyTyVars gbl_tvs
                                   , text "dep_kvs2 ="    <+> ppr dep_kvs2
                                   , text "nondep_tvs ="  <+> ppr nondep_tvs
                                   , text "nondep_tvs2 =" <+> ppr nondep_tvs2 ])
-       ; WARN( not all_ok, bad_msg ) return ()
+       ; MASSERT2( all_ok, bad_msg )
 
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
@@ -1842,6 +1902,10 @@ zonkTyCoVarsAndFV tycovars
   -- It's OK to use nonDetEltsUniqSet here because we immediately forget about
   -- the ordering by turning it into a nondeterministic set and the order
   -- of zonking doesn't matter for determinism.
+
+zonkDTyCoVarSetAndFV :: DTyCoVarSet -> TcM DTyCoVarSet
+zonkDTyCoVarSetAndFV tycovars
+  = mkDVarSet <$> (zonkTyCoVarsAndFVList $ dVarSetElems tycovars)
 
 -- Takes a list of TyCoVars, zonks them and returns a
 -- deterministically ordered list of their free variables.

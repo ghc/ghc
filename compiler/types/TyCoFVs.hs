@@ -162,8 +162,11 @@ ty_co_vars_of_type (TyVarTy v) is acc
   | otherwise          = ty_co_vars_of_type (tyVarKind v) emptyVarSet (extendVarSet acc v)
                                                           ^^^^^^^^^^^
 
-And that's it.
-
+And that's it. This works because a variable is either bound or free. If it is bound,
+then we won't look at it at all. If it is free, then all the variables free in its
+kind are free -- regardless of whether some local variable has the same Unique.
+So if we're looking at a variable occurrence at all, then all variables in its
+kind are free.
 -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
@@ -816,4 +819,3 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
-

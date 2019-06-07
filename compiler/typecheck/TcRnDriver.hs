@@ -2432,6 +2432,8 @@ tcRnType hsc_env flexi normalise rdr_type
                   -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM
 
+        -- We follow Note [Recipe for checking a signature] in TcHsType here
+
         -- Now kind-check the type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
@@ -2445,8 +2447,7 @@ tcRnType hsc_env flexi normalise rdr_type
                           ; tcLHsTypeUnsaturated rn_type }
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
-       ; kind <- zonkTcType kind
-       ; kvs <- kindGeneralize kind
+       ; kvs <- kindGeneralizeAll kind
        ; e <- mkEmptyZonkEnv flexi
 
        ; ty  <- zonkTcTypeToTypeX e ty
