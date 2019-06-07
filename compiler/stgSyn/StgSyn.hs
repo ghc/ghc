@@ -686,7 +686,7 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Type Unique 
+  | StgFCallOp ForeignCall Type Unique
         -- The Unique is occasionally needed by the C pretty-printer
         -- (which lacks a unique supply), notably when generating a
         -- typedef for foreign-export-dynamic. The Type, which is
