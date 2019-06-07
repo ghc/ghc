@@ -1436,11 +1436,23 @@ The key function here is kcConDecl, which looks at an individual constructor
 declaration. In the unlifted-newtypes case (i.e., -XUnliftedNewtypes and,
 indeed, we are processing a newtype), we call unifyNewtypeKind, which is a
 thin wrapper around unifyKind, unifying the kind of the one argument and the
-result kind of the newtype tycon. Examples of an unlifted newtype:
+result kind of the newtype tycon.
 
-  newtype X = X Int#
-  newtype Y :: TYPE 'WordRep where
-    YC :: Word# -> Y
+Examples of newtypes affected by STEP 2, assuming -XUnliftedNewtypes is
+enabled (we use r0 to denote an unsolved metavar):
+
+newtype Foo rep = MkFoo (forall (a :: TYPE rep). a)
++ Data Type Vars: rep (r0 :: RuntimeRep)
++ Constructor Vars: (a :: TYPE rep)
++ kcConDecl unifies (TYPE r0) with (TYPE rep)
+
+data Color = Red | Blue
+type family Interpret (x :: Color) :: RuntimeRep where
+  Interpret 'Red = 'IntRep
+  Interpret 'Blue = 'WordRep
+data family Foo (x :: Color) :: TYPE (Interpret x)
+newtype instance Foo 'Red = FooRedC Int#
++ kcConDecl unifies TYPE (Interpret 'Red) with TYPE 'IntRep
 
 Note that, in the GADT case, we might have a kind signature with arrows
 (newtype XYZ a b :: Type -> Type where ...). We want only the final
