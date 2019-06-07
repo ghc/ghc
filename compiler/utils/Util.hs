@@ -147,6 +147,7 @@ import GHC.Stack (HasCallStack)
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM, guard )
 import Control.Monad.IO.Class ( MonadIO, liftIO )
+import Data.Bifunctor ( first )
 import GHC.Conc.Sync ( sharedCAF )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime, renameFile )
@@ -785,15 +786,11 @@ lastMaybe xs = Just $ last xs
 -- be more efficient.
 snocView :: [a] -> Maybe ([a],a)
 snocView [] = Nothing
-snocView xs
-    | (xs,x) <- go xs
-    = Just (xs,x)
+snocView xs = Just (go xs)
   where
     go :: [a] -> ([a],a)
     go [x] = ([],x)
-    go (x:xs)
-        | !(xs',x') <- go xs
-        = (x:xs', x')
+    go (x:xs) = first (x:) (go xs)
     go [] = error "impossible"
 
 split :: Char -> String -> [String]
