@@ -158,8 +158,8 @@ module Type (
         typeSize, occCheckExpand,
 
         -- * Well-scoped lists of variables
-        dVarSetElemsWellScoped, scopedSort, tyCoVarsOfTypeWellScoped,
-        tyCoVarsOfTypesWellScoped, tyCoVarsOfBindersWellScoped,
+        scopedSort, tyCoVarsOfTypeWellScoped,
+        tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
@@ -250,7 +250,7 @@ import UniqSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
+import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind )
 import PrelNames
@@ -2199,15 +2199,6 @@ scopedSort = go [] []
        -- lists not in correspondence
     insert _ _ _ = panic "scopedSort"
 
--- | Extract a well-scoped list of variables from a deterministic set of
--- variables. The result is deterministic.
--- NB: There used to exist varSetElemsWellScoped :: VarSet -> [Var] which
--- took a non-deterministic set and produced a non-deterministic
--- well-scoped list. If you care about the list being well-scoped you also
--- most likely care about it being in deterministic order.
-dVarSetElemsWellScoped :: DVarSet -> [Var]
-dVarSetElemsWellScoped = scopedSort . dVarSetElems
-
 -- | Get the free vars of a type in scoped order
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
 tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
@@ -2215,12 +2206,6 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
-
--- | Given the suffix of a telescope, returns the prefix.
--- Ex: given [(k :: j), (a :: Proxy k)], returns [(j :: *)].
-tyCoVarsOfBindersWellScoped :: [TyVar] -> [TyVar]
-tyCoVarsOfBindersWellScoped tvs
-  = tyCoVarsOfTypeWellScoped (mkInvForAllTys tvs unitTy)
 
 ------------- Closing over kinds -----------------
 
