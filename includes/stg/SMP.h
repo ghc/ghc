@@ -160,8 +160,68 @@ EXTERN_INLINE void load_load_barrier(void);
  * Note that thread stacks are inherently thread-local and consequently allocating an
  * object and introducing a reference to it to our stack needs no barrier.
  *
- * Finally, we take pains to ensure that we flush all write buffers before
- * entering GC, since stacks may be read by other cores.
+ * There are several ways in which the mutator may make a newly-allocated
+ * closure visible to other cores:
+ *
+ *  - Eager blackholing a THUNK:
+ *    This is protected by an explicit write barrier in the eager blackholing
+ *    code produced by the codegen. See StgCmmBind.emitBlackHoleCode.
+ *
+ *  - Lazy blackholing a THUNK:
+ *    This is is protected by an explicit write barrier in the thread suspension
+ *    code. See ThreadPaused.c:threadPaused.
+ *
+ *  - Updating a BLACKHOLE:
+ *    This case is protected by explicit write barriers in the the update frame
+ *    entry code (see rts/Updates.h).
+ *
+ *  - Writing to the thread's local stack, followed by the thread blocking:
+ *    This is protected by the write barrier necessary to place the thread on
+ *    whichever blocking queue it is blocked on:
+ *
+ *     - a BLACKHOLE's BLOCKING_QUEUE: explicit barriers in
+ *       Messages.c:messageBlackHole and Messages.c:sendMessage.
+ *
+ *     - a TVAR's STM_TVAR_WATCH_QUEUE: The CAS in STM.c:unlock_stm, called by
+ *       STM.c:stmWaitUnlock.
+ *
+ *     - an MVAR's MVAR_TSO_QUEUE: explicit write barriers in the appropriate
+ *       MVar primops (e.g. stg_takeMVarzh).
+ *
+ *  - Write to a TVar#:
+ *    This is protected by the full barrier implied by the CAS in STM.c:lock_stm.
+ *
+ *  - Write to an Array#, ArrayArray#, or SmallArray#:
+ *    This case is protected by an explicit write barrier in the code produced
+ *    for this primop by the codegen. See StgCmmPrim.doWritePtrArrayOp and
+ *    StgCmmPrim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
+ *
+ *  - Write to MutVar# via writeMutVar#:
+ *    This case is protected by an explicit write barrier in the code produced
+ *    for this primop by the codegen.
+ *
+ *  - Write to MutVar# via atomicModifyMutVar# or casMutVar#:
+ *    This is protected by the full barrier implied by the cmpxchg operations
+ *    in this primops.
+ *
+ *  - Write to an MVar#:
+ *    This protected by the full barrier implied by the CAS in putMVar#.
+ *
+ *  - Sending a Message to another capability:
+ *    This is protected by the acquition and release of the target capability's
+ *    lock in Messages.c:sendMessage.
+ *
+ * Finally, we must ensure that we flush all cores store buffers before
+ * entering and leaving GC, since stacks may be read by other cores. This
+ * happens as a side-effect of taking and release mutexes (which implies
+ * acquire and release barriers, respectively).
+ *
+ * N.B. recordClosureMutated places a reference to the mutated object on
+ * the capability-local mut_list. Consequently this does not require any memory
+ * barrier.
+ *
+ * During parallel GC cores are each scavenging disjoint sets of blocks and
+ * consequently no barriers are needed.
  *
  */
 
