@@ -263,7 +263,7 @@ loop:
         }
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
-        write_barrier(); // make the BQ visible
+        write_barrier(); // make the BQ visible, see Note [Heap memory barriers].
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
         recordClosureMutated(cap,bh); // bh was mutated
 
