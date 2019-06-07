@@ -17,12 +17,12 @@ before_script:
 
 stages:
   - lint       # Source linting
-  - build      # A quick smoke-test to weed out broken commits
-  - full-build # Build all the things
-  - cleanup    # See Note [Cleanup after the shell executor]
-  - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
-  - deploy     # push documentation
+    #  - build      # A quick smoke-test to weed out broken commits
+    #- full-build # Build all the things
+    #- cleanup    # See Note [Cleanup after the shell executor]
+    #- packaging  # Source distribution, etc.
+    #- hackage    # head.hackage testing
+    #- deploy     # push documentation
 
 .only-default: &only-default
   only:
@@ -55,6 +55,7 @@ ghc-linters:
   script:
     - echo "Linting changes between $CI_MERGE_REQUEST_TARGET_BRANCH_NAME..$CI_COMMIT_SHA"
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git merge-base FETCH_HEAD $CI_COMMIT_SHA
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Merge base $base"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
