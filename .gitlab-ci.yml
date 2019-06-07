@@ -69,6 +69,8 @@ ghc-linters:
   dependencies: []
   tags:
     - lint
+  variables:
+    GIT_DEPTH: "500"
   only:
     refs:
       - merge_requests
