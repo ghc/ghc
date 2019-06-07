@@ -280,7 +280,8 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
-validate-x86_64-darwin-hadrian:
+# Disabled because of OS X CI capacity
+.validate-x86_64-darwin-hadrian:
   <<: *only-default
   stage: full-build
   tags:
