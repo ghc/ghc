@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 -- | Evaluation of 32 bit values.
 module SPARC.CodeGen.Gen32 (
         getSomeReg,
@@ -25,7 +27,6 @@ import Reg
 
 import Cmm
 
-import Control.Monad (liftM)
 import DynFlags
 import OrdList
 import Outputable
@@ -640,8 +641,8 @@ condIntReg NE x y = do
     return (Any II32 code__2)
 
 condIntReg cond x y = do
-    bid1 <- liftM (\a -> seq a a) getBlockIdNat
-    bid2 <- liftM (\a -> seq a a) getBlockIdNat
+    !bid1 <- getBlockIdNat
+    !bid2 <- getBlockIdNat
     CondCode _ cond cond_code <- condIntCode cond x y
     let
         code__2 dst
@@ -666,8 +667,8 @@ condIntReg cond x y = do
 
 condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
 condFltReg cond x y = do
-    bid1 <- liftM (\a -> seq a a) getBlockIdNat
-    bid2 <- liftM (\a -> seq a a) getBlockIdNat
+    !bid1 <- getBlockIdNat
+    !bid2 <- getBlockIdNat
 
     CondCode _ cond cond_code <- condFltCode cond x y
     let

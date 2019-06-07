@@ -81,7 +81,6 @@
 - ignore: {name: "Use catMaybes"}
 - ignore: {name: "Use ||"}
 - ignore: {name: "Use infix"}
-- ignore: {name: "Redundant seq"}
 - ignore: {name: "Use isDigit"}
 - ignore: {name: "Use isOctDigit"}
 - ignore: {name: "Use isAsciiUpper"}
