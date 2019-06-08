@@ -294,7 +294,7 @@ ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
 -- | Catch any 'IOError' that occurs in the computation and throw a
 -- modified version.
 modifyIOError :: (IOError -> IOError) -> IO a -> IO a
-modifyIOError f io = catch io (\e -> ioError (f e))
+modifyIOError f io = catch io (ioError . f)
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError

@@ -174,7 +174,7 @@ filterEdges f cfg =
     mapMapWithKey filterSources cfg
     where
       filterSources from m =
-        mapFilterWithKey (\to w -> f from to w) m
+        mapFilterWithKey (f from) m
 
 
 {- Note [Updating the CFG during shortcutting]

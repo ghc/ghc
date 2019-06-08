@@ -96,7 +96,7 @@ preprocess :: HscEnv
            -> Maybe Phase -- ^ starting phase
            -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
-  handleSourceError (\err -> return (Left (srcErrorMessages err))) $
+  handleSourceError (pure . Left . srcErrorMessages) $
   ghandle handler $
   fmap Right $
   ASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)

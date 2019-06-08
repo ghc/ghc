@@ -96,7 +96,7 @@ getPragmas anns = pragmaStr
     comments = case Map.lookup noSrcSpan (snd anns) of
       Nothing -> []
       Just cl -> map tokComment $ sortLocated cl
-    pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
+    pragmas = filter (isPrefixOf "{-#") comments
     pragmaStr = intercalate "\n" pragmas
 
 pp :: (Outputable a) => a -> String

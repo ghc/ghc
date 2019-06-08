@@ -308,7 +308,7 @@ coalesceGraph'
 coalesceGraph' aggressive triv graph kkPairsAcc
  = let
         -- find all the nodes that have coalescence edges
-        cNodes  = filter (\node -> not $ isEmptyUniqSet (nodeCoalesce node))
+        cNodes  = filter (not . isEmptyUniqSet . nodeCoalesce)
                 $ nonDetEltsUFM $ graphMap graph
                 -- See Note [Unique Determinism and code generation]
 
@@ -507,7 +507,7 @@ freezeOneInGraph graph
         candidates
                 = sortBy compareNodeDegree
                 $ take 5        -- 5 isn't special, it's just a small number.
-                $ scanGraph (\node -> not $ isEmptyUniqSet (nodeCoalesce node)) graph
+                $ scanGraph (not . isEmptyUniqSet . nodeCoalesce) graph
 
    in   case candidates of
 
@@ -586,7 +586,7 @@ validateGraph doc isColored graph
         -- If this is supposed to be a colored graph,
         --      check that all nodes have a color.
         | isColored
-        , badNodes      <- filter (\n -> isNothing $ nodeColor n)
+        , badNodes      <- filter (isNothing . nodeColor)
                         $  nonDetEltsUFM $ graphMap graph
         , not $ null badNodes
         = pprPanic "GraphOps.validateGraph"

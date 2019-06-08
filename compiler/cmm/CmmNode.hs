@@ -508,7 +508,7 @@ mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))
-        Nothing   -> (\xs -> CmmUnsafeForeignCall tgt fs xs) `fmap` mapListM f as
+        Nothing   -> CmmUnsafeForeignCall tgt fs <$> mapListM f as
 mapExpM f (CmmForeignCall tgt fs as succ ret_args updfr intrbl)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmForeignCall tgt' fs (mapListJ f as) succ ret_args updfr intrbl)

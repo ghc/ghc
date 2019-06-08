@@ -320,7 +320,7 @@ tcClassMinimalDef _clas sigs op_info
         -- since you can't write a default implementation.
         when (tcg_src tcg_env /= HsigFile) $
             whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
-                       (\bf -> addWarnTc NoReason (warningMinimalDefIncomplete bf))
+                       (addWarnTc NoReason . warningMinimalDefIncomplete)
         return mindef
   where
     -- By default require all methods without a default implementation

@@ -144,7 +144,7 @@ openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
   catchException
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
-    (\e -> ioError (addFilePathToIOError "openFile" fp e))
+    (ioError . addFilePathToIOError "openFile" fp)
 
 -- | Like 'openFile', but opens the file in ordinary blocking mode.
 -- This can be useful for opening a FIFO for writing: if we open in
@@ -156,7 +156,7 @@ openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
   catchException
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
-    (\e -> ioError (addFilePathToIOError "openFile" fp e))
+    (ioError . addFilePathToIOError "openFile" fp)
 
 -- | Like 'openFile', but open the file in binary mode.
 -- On Windows, reading a file in text mode (which is the default)
@@ -171,7 +171,7 @@ openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
   catchException
     (openFile' fp m True True)
-    (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
+    (ioError . addFilePathToIOError "openBinaryFile" fp)
 
 openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
 openFile' filepath iomode binary non_blocking = do

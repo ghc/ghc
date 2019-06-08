@@ -4126,7 +4126,7 @@ dFlagsDeps = [
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
-     (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
+     (useInstead "-d" "suppress-ticks" . not),
   flagSpec "suppress-ticks"             Opt_SuppressTicks,
   depFlagSpec' "suppress-stg-free-vars" Opt_SuppressStgExts
      (useInstead "-d" "suppress-stg-exts"),
@@ -5022,17 +5022,17 @@ sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 sepArg fn = SepArg (upd . fn)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
-intSuffix fn = IntSuffix (\n -> upd (fn n))
+intSuffix fn = IntSuffix (upd . fn)
 
 intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
-intSuffixM fn = IntSuffix (\n -> updM (fn n))
+intSuffixM fn = IntSuffix (updM . fn)
 
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
-floatSuffix fn = FloatSuffix (\n -> upd (fn n))
+floatSuffix fn = FloatSuffix (upd . fn)
 
 optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
               -> OptKind (CmdLineP DynFlags)
-optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
+optIntSuffixM fn = OptIntSuffix (updM . fn)
 
 setDumpFlag :: DumpFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)

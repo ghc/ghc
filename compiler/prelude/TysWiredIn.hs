@@ -896,7 +896,7 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
     -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPE k1 -> TYPE k2 -> #
     tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
-                                        (\ks -> map tYPE ks)
+                                        (map tYPE)
 
     tc_res_kind = unboxedTupleKind rr_tys
 
@@ -1016,7 +1016,7 @@ mk_sum arity = (tycon, sum_cons)
     rep_name = Nothing -- Just $ mkPrelTyConRepName tc_name
 
     tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)
-                                        (\ks -> map tYPE ks)
+                                        (map tYPE)
 
     tyvars = binderVars tc_binders
 

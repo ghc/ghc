@@ -682,9 +682,9 @@ readConstr :: DataType -> String -> Maybe Constr
 readConstr dt str =
       case dataTypeRep dt of
         AlgRep cons -> idx cons
-        IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
+        IntRep      -> mkReadCon (mkPrimCon dt str . IntConstr)
         FloatRep    -> mkReadCon ffloat
-        CharRep     -> mkReadCon (\c -> (mkPrimCon dt str (CharConstr c)))
+        CharRep     -> mkReadCon (mkPrimCon dt str . CharConstr)
         NoRep       -> Nothing
   where
 

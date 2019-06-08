@@ -108,7 +108,7 @@ worst regsOfClass regAlias neighbors classN classC
         -- for each of the subsets of C, the regs which conflict
         -- with posiblities for N
         regsS_conflict
-                = map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
+                = map (intersectUniqSets regsN . regAliasS) regsS
 
   in    maximum $ map sizeUniqSet $ regsS_conflict
 

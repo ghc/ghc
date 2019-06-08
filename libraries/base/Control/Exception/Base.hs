@@ -158,7 +158,7 @@ handleJust p =  flip (catchJust p)
 
 mapException :: (Exception e1, Exception e2) => (e1 -> e2) -> a -> a
 mapException f v = unsafePerformIO (catch (evaluate v)
-                                          (\x -> throwIO (f x)))
+                                          (throwIO . f))
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
@@ -169,10 +169,10 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- If any other type of exception is raised than it will be propogated
 -- up to the next enclosing exception handler.
 --
--- >  try a = catch (Right `liftM` a) (return . Left)
+-- >  try a = catch (Right <$> a) (pure . Left)
 
 try :: Exception e => IO a -> IO (Either e a)
-try a = catch (a >>= \ v -> return (Right v)) (\e -> return (Left e))
+try a = catch (fmap Right a) (pure . Left)
 
 -- | A variant of 'try' that takes an exception predicate to select
 -- which exceptions are caught (c.f. 'catchJust').  If the exception

@@ -63,11 +63,11 @@ class MonadIO m => ExceptionMonad m where
 
 instance ExceptionMonad IO where
   gcatch    = Control.Exception.catch
-  gmask f   = mask (\x -> f x)
+  gmask     = mask
 
 gtry :: (ExceptionMonad m, Exception e) => m a -> m (Either e a)
-gtry act = gcatch (act >>= \a -> return (Right a))
-                  (\e -> return (Left e))
+gtry act = gcatch (Right <$> act)
+                  (return . Left)
 
 -- | Generalised version of 'Control.Exception.handle', allowing an arbitrary
 -- exception handling monad instead of just 'IO'.

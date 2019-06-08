@@ -227,7 +227,7 @@ instance Monad CmmLint where
                                 Right a -> unCL (k a) dflags
 
 instance HasDynFlags CmmLint where
-    getDynFlags = CmmLint (\dflags -> Right dflags)
+    getDynFlags = CmmLint Right
 
 cmmLintErr :: SDoc -> CmmLint a
 cmmLintErr msg = CmmLint (\_ -> Left msg)

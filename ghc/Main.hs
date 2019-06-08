@@ -722,7 +722,7 @@ doMake srcs  = do
        then liftIO (oneShot hsc_env StopLn srcs)
        else do
 
-    o_files <- mapM (\x -> liftIO $ compileFile hsc_env StopLn x)
+    o_files <- mapM (liftIO . compileFile hsc_env StopLn)
                  non_hs_srcs
     dflags <- GHC.getSessionDynFlags
     let dflags' = dflags { ldInputs = map (FileOption "") o_files

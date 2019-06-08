@@ -252,7 +252,7 @@ gather (R m)
   gath :: (String -> String) -> P (String -> P b) -> P b
   gath l (Get f)      = Get (\c -> gath (l.(c:)) (f c))
   gath _ Fail         = Fail
-  gath l (Look f)     = Look (\s -> gath l (f s))
+  gath l (Look f)     = Look (gath l . f)
   gath l (Result k p) = k (l []) <|> gath l p
   gath _ (Final _)    = errorWithoutStackTrace "do not use readS_to_P in gather!"
 

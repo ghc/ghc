@@ -48,7 +48,7 @@ testOneFile libdir fileName = do
            exploded' = Map.toList $ Map.fromListWith (++) exploded
 
            problems' = filter (\(_,anchors)
-                               -> not (any (\a -> Set.member a sspans) anchors))
+                               -> not (any (`Set.member` sspans) anchors))
                               exploded'
 
            problems'' = filter (\((a,_),_) -> a /= AnnEofPos) problems'

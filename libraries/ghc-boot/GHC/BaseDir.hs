@@ -29,7 +29,7 @@ import System.Environment (getExecutablePath)
 -- | Calculate the location of the base dir
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
-getBaseDir = Just . (\p -> p </> "lib") . rootDir <$> getExecutablePath
+getBaseDir = Just . (</> "lib") . rootDir <$> getExecutablePath
   where
     -- locate the "base dir" when given the path
     -- to the real ghc executable (as opposed to symlink)
@@ -55,7 +55,7 @@ getBaseDir = Just . (\p -> p </> "lib") . rootDir <$> getExecutablePath
 -- the layout is changed, such that we have ghc-X.Y.Z/{bin,lib}
 -- this would need to be changed accordingly.
 --
-getBaseDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
+getBaseDir = Just . (</> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
 #else
 getBaseDir = return Nothing
 #endif

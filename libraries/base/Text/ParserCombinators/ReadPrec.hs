@@ -75,7 +75,7 @@ newtype ReadPrec a = P (Prec -> ReadP a)
 
 -- | @since 2.01
 instance Functor ReadPrec where
-  fmap h (P f) = P (\n -> fmap h (f n))
+  fmap h (P f) = P (fmap h . f)
 
 -- | @since 4.6.0.0
 instance Applicative ReadPrec where
@@ -173,5 +173,5 @@ readPrec_to_S :: ReadPrec a -> (Int -> ReadS a)
 readPrec_to_S (P f) n = readP_to_S (f n)
 
 readS_to_Prec :: (Int -> ReadS a) -> ReadPrec a
-readS_to_Prec f = P (\n -> readS_to_P (f n))
+readS_to_Prec f = P (readS_to_P . f)
 

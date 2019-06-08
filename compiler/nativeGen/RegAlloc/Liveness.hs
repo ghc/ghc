@@ -246,7 +246,7 @@ mapBlockTop
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
 mapBlockTop f cmm
-        = evalState (mapBlockTopM (\x -> return $ f x) cmm) ()
+        = evalState (mapBlockTopM (pure . f) cmm) ()
 
 
 -- | map a function across all the basic blocks in this code (monadic version)
@@ -279,7 +279,7 @@ mapGenBlockTop
         -> (GenCmmDecl d h (ListGraph i) -> GenCmmDecl d h (ListGraph i))
 
 mapGenBlockTop f cmm
-        = evalState (mapGenBlockTopM (\x -> return $ f x) cmm) ()
+        = evalState (mapGenBlockTopM (pure . f) cmm) ()
 
 
 -- | map a function across all the basic blocks in this code (monadic version)

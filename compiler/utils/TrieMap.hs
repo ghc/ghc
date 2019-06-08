@@ -400,6 +400,6 @@ mapG f (MultiMap m) = MultiMap (mapTM f m)
 
 {-# INLINEABLE fdG #-}
 fdG :: TrieMap m => (a -> b -> b) -> GenMap m a -> b -> b
-fdG _ EmptyMap = \z -> z
-fdG k (SingletonMap _ v) = \z -> k v z
+fdG _ EmptyMap = id
+fdG k (SingletonMap _ v) = k v
 fdG k (MultiMap m) = foldTM k m

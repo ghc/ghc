@@ -424,7 +424,7 @@ nub = nubBy (==)
 -- user-supplied equality predicate instead of the overloaded '=='
 -- function.
 nubBy :: (a -> a -> Bool) -> NonEmpty a -> NonEmpty a
-nubBy eq (a :| as) = a :| List.nubBy eq (List.filter (\b -> not (eq a b)) as)
+nubBy eq (a :| as) = a :| List.nubBy eq (List.filter (not . eq a) as)
 
 -- | 'transpose' for 'NonEmpty', behaves the same as 'Data.List.transpose'
 -- The rows/columns need not be the same length, in which case

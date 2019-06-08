@@ -208,7 +208,7 @@ thenUs_ (USM expr) (USM cont)
   = USM (\us0 -> case (expr us0) of { UniqResult _ us1 -> cont us1 })
 
 returnUs :: a -> UniqSM a
-returnUs result = USM (\us -> UniqResult result us)
+returnUs result = USM (UniqResult result)
 
 getUs :: UniqSM UniqSupply
 getUs = USM (\us0 -> case splitUniqSupply us0 of (us1,us2) -> UniqResult us1 us2)

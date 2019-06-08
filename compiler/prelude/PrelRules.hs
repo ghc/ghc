@@ -2045,24 +2045,24 @@ adjustDyadicRight :: PrimOp -> Integer -> Maybe (Integer -> Integer)
 -- Given (x `op` lit) return a function 'f' s.t.  f (x `op` lit) = x
 adjustDyadicRight op lit
   = case op of
-         WordAddOp -> Just (\y -> y-lit      )
-         IntAddOp  -> Just (\y -> y-lit      )
-         WordSubOp -> Just (\y -> y+lit      )
-         IntSubOp  -> Just (\y -> y+lit      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordAddOp -> Just (subtract lit)
+         IntAddOp  -> Just (subtract lit)
+         WordSubOp -> Just (+ lit)
+         IntSubOp  -> Just (+ lit)
+         XorOp     -> Just (xor lit)
+         XorIOp    -> Just (xor lit)
          _         -> Nothing
 
 adjustDyadicLeft :: Integer -> PrimOp -> Maybe (Integer -> Integer)
 -- Given (lit `op` x) return a function 'f' s.t.  f (lit `op` x) = x
 adjustDyadicLeft lit op
   = case op of
-         WordAddOp -> Just (\y -> y-lit      )
-         IntAddOp  -> Just (\y -> y-lit      )
-         WordSubOp -> Just (\y -> lit-y      )
-         IntSubOp  -> Just (\y -> lit-y      )
-         XorOp     -> Just (\y -> y `xor` lit)
-         XorIOp    -> Just (\y -> y `xor` lit)
+         WordAddOp -> Just (subtract lit)
+         IntAddOp  -> Just (subtract lit)
+         WordSubOp -> Just (lit -)
+         IntSubOp  -> Just (lit -)
+         XorOp     -> Just (xor lit)
+         XorIOp    -> Just (xor lit)
          _         -> Nothing
 
 
@@ -2070,9 +2070,9 @@ adjustUnary :: PrimOp -> Maybe (Integer -> Integer)
 -- Given (op x) return a function 'f' s.t.  f (op x) = x
 adjustUnary op
   = case op of
-         NotOp     -> Just (\y -> complement y)
-         NotIOp    -> Just (\y -> complement y)
-         IntNegOp  -> Just (\y -> negate y    )
+         NotOp     -> Just complement
+         NotIOp    -> Just complement
+         IntNegOp  -> Just negate
          _         -> Nothing
 
 tx_con_tte :: DynFlags -> AltCon -> Maybe AltCon

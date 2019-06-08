@@ -660,7 +660,7 @@ nop s x = do
     return (x, s, emptyWriter $ (hsc_dflags . cr_hsc_env) r)
 
 read :: (CoreReader -> a) -> CoreM a
-read f = CoreM (\s -> getEnv >>= (\r -> nop s (f r)))
+read f = CoreM (\s -> getEnv >>= nop s . f)
 
 getS :: (CoreState -> a) -> CoreM a
 getS f = CoreM (\s -> nop s (f s))
@@ -675,7 +675,7 @@ write w = CoreM (\s -> return ((), s, w))
 
 -- | Lift an 'IOEnv' operation into 'CoreM'
 liftIOEnv :: CoreIOEnv a -> CoreM a
-liftIOEnv mx = CoreM (\s -> mx >>= (\x -> nop s x))
+liftIOEnv mx = CoreM (\s -> mx >>= nop s)
 
 instance MonadIO CoreM where
     liftIO = liftIOEnv . IOEnv.liftIO

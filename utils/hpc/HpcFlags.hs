@@ -230,7 +230,7 @@ data CombineFun = ADD | DIFF | SUB
 
 theCombineFun :: CombineFun -> Integer -> Integer -> Integer
 theCombineFun fn = case fn of
-            ADD  -> \ l r -> l + r
+            ADD  -> (+)
             SUB  -> \ l r -> max 0 (l - r)
             DIFF -> \ g b -> if g > 0 then 0 else min 1 b
 

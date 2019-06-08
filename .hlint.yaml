@@ -23,7 +23,6 @@
 - ignore: {name: "Use id"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Move brackets to avoid $"}
-- ignore: {name: "Avoid lambda"}
 - ignore: {name: "Use sortOn"}
 - ignore: {name: "Use list comprehension"}
 - ignore: {name: "Fuse concatMap/map"}
@@ -165,6 +164,8 @@
 #    curry return
 #
 - ignore: {name: "Use curry"}
+
+- ignore: {name: "Avoid lambda"}
 
 
 # Define some custom infix operators

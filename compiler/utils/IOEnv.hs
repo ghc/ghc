@@ -72,7 +72,7 @@ instance Applicative (IOEnv m) where
     (*>) = thenM_
 
 instance Functor (IOEnv m) where
-    fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
+    fmap f (IOEnv m) = IOEnv (fmap f . m)
 
 returnM :: a -> IOEnv env a
 returnM a = IOEnv (\ _ -> return a)
@@ -146,7 +146,7 @@ tryM :: IOEnv env r -> IOEnv env (Either IOEnvFailure r)
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
 -- not be caught here, else they'll be reported as errors in the program
 -- begin compiled!
-tryM (IOEnv thing) = IOEnv (\ env -> tryIOEnvFailure (thing env))
+tryM (IOEnv thing) = IOEnv (tryIOEnvFailure . thing)
 
 tryIOEnvFailure :: IO a -> IO (Either IOEnvFailure a)
 tryIOEnvFailure = try
@@ -156,17 +156,17 @@ tryAllM :: IOEnv env r -> IOEnv env (Either SomeException r)
 -- Catch *all* exceptions
 -- This is used when running a Template-Haskell splice, when
 -- even a pattern-match failure is a programmer error
-tryAllM (IOEnv thing) = IOEnv (\ env -> try (thing env))
+tryAllM (IOEnv thing) = IOEnv (try . thing)
 
 tryMostM :: IOEnv env r -> IOEnv env (Either SomeException r)
-tryMostM (IOEnv thing) = IOEnv (\ env -> tryMost (thing env))
+tryMostM (IOEnv thing) = IOEnv (tryMost . thing)
 
 ---------------------------
 unsafeInterleaveM :: IOEnv env a -> IOEnv env a
-unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
+unsafeInterleaveM (IOEnv m) = IOEnv (unsafeInterleaveIO . m)
 
 uninterruptibleMaskM_ :: IOEnv env a -> IOEnv env a
-uninterruptibleMaskM_ (IOEnv m) = IOEnv (\ env -> uninterruptibleMask_ (m env))
+uninterruptibleMaskM_ (IOEnv m) = IOEnv (uninterruptibleMask_ . m)
 
 ----------------------------------------------------------------------
 -- Alternative/MonadPlus
@@ -212,7 +212,7 @@ atomicUpdMutVar' var upd = liftIO (atomicModifyIORef' var upd)
 
 getEnv :: IOEnv env env
 {-# INLINE getEnv #-}
-getEnv = IOEnv (\ env -> return env)
+getEnv = IOEnv pure
 
 -- | Perform a computation with a different environment
 setEnv :: env' -> IOEnv env' a -> IOEnv env a
@@ -222,4 +222,4 @@ setEnv new_env (IOEnv m) = IOEnv (\ _ -> m new_env)
 -- | Perform a computation with an altered environment
 updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnv #-}
-updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
+updEnv upd (IOEnv m) = IOEnv (m . upd)
