@@ -59,7 +59,6 @@
 - ignore: {name: "Use >=>"}
 - ignore: {name: "Use lambda-case"}
 - ignore: {name: "Redundant guard"}
-- ignore: {name: "Use curry"}
 - ignore: {name: "Use ++"}
 - ignore: {name: "Use replicateM"}
 - ignore: {name: "Use forM"}
@@ -161,6 +160,13 @@
 # Ignore some builtin hints
 # - ignore: {name: Use let}
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
+
+# Currently (2019-06) all suggestions are to replace
+#    \ e w -> return (e, w)
+# with
+#    curry return
+#
+- ignore: {name: "Use curry"}
 
 
 # Define some custom infix operators

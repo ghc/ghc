@@ -425,7 +425,7 @@ extract_renamed_stuff mod_summary tc_result = do
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
-            hs_env <- Hsc $ \e w -> return (e, w)
+            hs_env <- getHscEnv
             liftIO $ do
               -- Validate Scopes
               case validateScopes $ getAsts $ hie_asts hieFile of
