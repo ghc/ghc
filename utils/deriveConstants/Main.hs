@@ -153,8 +153,8 @@ data What f = GetFieldType   Name (f CExpr   Integer)
             | ClosurePayloadMacro Name
             | FieldTypeGcptrMacro Name
 
-data Fst a b = Fst a
-data Snd a b = Snd b
+newtype Fst a b = Fst a
+newtype Snd a b = Snd b
 
 data Where = C | Haskell | Both
     deriving Eq

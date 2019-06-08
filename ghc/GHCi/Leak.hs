@@ -22,7 +22,7 @@ import UniqDFM
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.
 
-data LeakIndicators = LeakIndicators [LeakModIndicators]
+newtype LeakIndicators = LeakIndicators [LeakModIndicators]
 
 data LeakModIndicators = LeakModIndicators
   { leakMod :: Weak HomeModInfo
