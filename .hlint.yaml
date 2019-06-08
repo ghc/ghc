@@ -43,7 +43,6 @@
 - ignore: {name: "Use let"}
 - ignore: {name: "Use isNothing"}
 - ignore: {name: "Avoid lambda using `infix`"}
-- ignore: {name: "Redundant lambda"}
 - ignore: {name: "Use if"}
 - ignore: {name: "Use replicate"}
 - ignore: {name: "Use when"}
@@ -161,6 +160,10 @@
 #    curry return
 #
 - ignore: {name: "Use curry"}
+
+# The offending bits of code as of 2019-06 look more readable than the suggested
+# replacements.
+- ignore: {name: "Redundant lambda"}
 
 - ignore: {name: "Avoid lambda"}
 

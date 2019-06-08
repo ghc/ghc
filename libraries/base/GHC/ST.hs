@@ -94,7 +94,7 @@ data STret s a = STret (State# s) a
 
 -- liftST is useful when we want a lifted result from an ST computation.
 liftST :: ST s a -> State# s -> STret s a
-liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
+liftST (ST m) s = case m s of (# s', r #) -> STret s' r
 
 noDuplicateST :: ST s ()
 noDuplicateST = ST $ \s -> (# noDuplicate# s, () #)

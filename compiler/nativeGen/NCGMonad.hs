@@ -119,9 +119,8 @@ unNat (NatM a) = a
 
 mkNatM_State :: UniqSupply -> Int -> DynFlags -> Module -> ModLocation ->
                 DwarfFiles -> LabelMap DebugBlock -> CFG -> NatM_State
-mkNatM_State us delta dflags this_mod
-        = \loc dwf dbg cfg ->
-                NatM_State
+mkNatM_State us delta dflags this_mod loc dwf dbg cfg
+              = NatM_State
                         { natm_us = us
                         , natm_delta = delta
                         , natm_imports = []

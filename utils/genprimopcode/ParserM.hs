@@ -45,8 +45,8 @@ instance Monad ParserM where
     fail err = ParserM $ \_ _ -> Left err
 
 run_parser :: ParserM a -> (String -> Either String a)
-run_parser (ParserM f)
- = \s -> case f (AlexInput init_pos s) init_state of
+run_parser (ParserM f) s
+ = case f (AlexInput init_pos s) init_state of
              Left es -> Left es
              Right (_, _, x) -> Right x
 
