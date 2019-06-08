@@ -114,6 +114,7 @@ import Unique
 import PrelNames
 import FastString
 import Outputable
+import Platform
 import TyCoRep   -- Doesn't need special access, but this is easier to avoid
                  -- import loops which show up if you import Type instead
 import Platform
@@ -201,10 +202,12 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 intPrimTyConName, wordPrimTyConName :: Platform -> Name
-intPrimTyConName platform = mkPrimTc (fsLit "Int#") intPrimTyConKey $
-  intPrimTyCon platform
-wordPrimTyConName platform = mkPrimTc (fsLit "Word#") wordPrimTyConKey $
-  wordPrimTyCon platform
+intPrimTyConName platform = mkPrimTc (fsLit "Int#")
+  (intPrimTyConKey platform)
+  (intPrimTyCon platform)
+wordPrimTyConName platform = mkPrimTc (fsLit "Word#")
+  (wordPrimTyConKey platform)
+  (wordPrimTyCon platform)
 
 charPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon

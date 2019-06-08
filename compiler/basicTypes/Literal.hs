@@ -674,9 +674,9 @@ absent_lits :: Platform -> UniqFM Literal
 absent_lits platform = listToUFM
                         [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
-                        , (intPrimTyConKey, mkLitIntUnchecked platform 0)
+                        , (intPrimTyConKey platform, mkLitIntUnchecked platform 0)
                         , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
-                        , (wordPrimTyConKey, mkLitWordUnchecked platform 0)
+                        , (wordPrimTyConKey platform, mkLitWordUnchecked platform 0)
                         , (word64PrimTyConKey,  mkLitWord64Unchecked 0)
                         , (floatPrimTyConKey,   LitFloat 0)
                         , (doublePrimTyConKey,  LitDouble 0)

@@ -165,6 +165,8 @@ import OccName
 import RdrName
 import Unique
 import Name
+import Platform
+import PlainPanic
 import SrcLoc
 import FastString
 
@@ -1653,10 +1655,21 @@ hasFieldClassNameKey = mkPreludeClassUnique 49
 ************************************************************************
 -}
 
+intPrimTyConKey, wordPrimTyConKey :: Platform -> Unique
+intPrimTyConKey platform
+  | platformWordSize platform == 32 = int32PrimTyConKey
+  | platformWordSize platform == 64 = int64PrimTyConKey
+  | otherwise = panic "Unsupported native word size"
+
+wordPrimTyConKey platform
+  | platformWordSize platform == 32 = word32PrimTyConKey
+  | platformWordSize platform == 64 = word64PrimTyConKey
+  | otherwise = panic "Unsupported native word size"
+
 addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
     doubleTyConKey, floatPrimTyConKey, floatTyConKey, funTyConKey,
-    intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
+    intTyConKey, int8TyConKey, int16TyConKey,
     int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
     int64PrimTyConKey, int64TyConKey,
     integerTyConKey, naturalTyConKey,
@@ -1677,14 +1690,6 @@ doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
 funTyConKey                             = mkPreludeTyConUnique 13
-intPrimTyConKey                         =
-#if WORD_SIZE_IN_BITS == 32
-  int32PrimTyConKey
-#elif WORD_SIZE_IN_BITS == 64
-  int64PrimTyConKey
-#else
-#  error "unsupported word size"
-#endif
 -- TODO decrement rest?
 intTyConKey                             = mkPreludeTyConUnique 15
 int8PrimTyConKey                        = mkPreludeTyConUnique 16
@@ -1718,7 +1723,7 @@ mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 43
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
-    wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
+    wordTyConKey, word8PrimTyConKey, word8TyConKey,
     word16PrimTyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
     word64PrimTyConKey, word64TyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
@@ -1735,7 +1740,7 @@ eqPhantPrimTyConKey                     = mkPreludeTyConUnique 55
 mutVarPrimTyConKey                      = mkPreludeTyConUnique 56
 ioTyConKey                              = mkPreludeTyConUnique 57
 voidPrimTyConKey                        = mkPreludeTyConUnique 58
-wordPrimTyConKey                        = mkPreludeTyConUnique 59
+-- TODO decrement rest?
 wordTyConKey                            = mkPreludeTyConUnique 60
 word8PrimTyConKey                       = mkPreludeTyConUnique 61
 word8TyConKey                           = mkPreludeTyConUnique 62
