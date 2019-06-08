@@ -87,7 +87,6 @@
 - ignore: {name: "Collapse lambdas"}
 - ignore: {name: "Use >>"}
 - ignore: {name: "Fuse mapM_/map"}
-- ignore: {name: "Use typeRep"}
 - ignore: {name: "Use isAsciiLower"}
 - ignore: {name: "Use mapM"}
 - ignore: {name: "Use list literal pattern"}

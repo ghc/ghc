@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, StandaloneDeriving, DeriveGeneric,
-    TupleSections, RecordWildCards, InstanceSigs, CPP #-}
+    TupleSections, RecordWildCards, InstanceSigs, CPP, TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -193,7 +193,7 @@ instance TH.Quasi GHCiQ where
   qReifyAnnotations lookup =
     map (deserializeWithData . B.unpack) <$>
       ghcCmd (ReifyAnnotations lookup typerep)
-    where typerep = typeOf (undefined :: a)
+    where typerep = typeRep (Proxy @a)
 
   qReifyModule m = ghcCmd (ReifyModule m)
   qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
@@ -207,7 +207,7 @@ instance TH.Quasi GHCiQ where
   qAddCorePlugin str = ghcCmd (AddCorePlugin str)
   qGetQ = GHCiQ $ \s ->
     let lookup :: forall a. Typeable a => Map TypeRep Dynamic -> Maybe a
-        lookup m = fromDynamic =<< M.lookup (typeOf (undefined::a)) m
+        lookup m = fromDynamic =<< M.lookup (typeRep (Proxy @a)) m
     in return (lookup (qsMap s), s)
   qPutQ k = GHCiQ $ \s ->
     return ((), s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })

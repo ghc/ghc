@@ -6,7 +6,9 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Bag (
         Bag, -- abstract type
@@ -339,7 +341,7 @@ instance (Outputable a) => Outputable (Bag a) where
 
 instance Data a => Data (Bag a) where
   gfoldl k z b = z listToBag `k` bagToList b -- traverse abstract type abstractly
-  toConstr _   = abstractConstr $ "Bag("++show (typeOf (undefined::a))++")"
+  toConstr _   = abstractConstr $ "Bag("++show (typeRep (Proxy @a))++")"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
