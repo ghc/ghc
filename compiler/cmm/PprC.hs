@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, DeriveFunctor, GADTs, PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 --
@@ -61,7 +61,7 @@ import Data.Map (Map)
 import Data.Word
 import System.IO
 import qualified Data.Map as Map
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
 
@@ -1078,10 +1078,7 @@ pprExternDecl lbl
         <> semi
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
-newtype TE a = TE { unTE :: TEState -> (a, TEState) }
-
-instance Functor TE where
-      fmap = liftM
+newtype TE a = TE { unTE :: TEState -> (a, TEState) } deriving (Functor)
 
 instance Applicative TE where
       pure a = TE $ \s -> (a, s)

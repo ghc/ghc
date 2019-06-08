@@ -12,7 +12,8 @@ ToDo:
    (i1 + i2) only if it results in a valid Float.
 -}
 
-{-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards #-}
+{-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards,
+    DeriveFunctor #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
 module PrelRules
@@ -739,9 +740,7 @@ mkBasicRule op_name n_args rm
 
 newtype RuleM r = RuleM
   { runRuleM :: DynFlags -> InScopeEnv -> [CoreExpr] -> Maybe r }
-
-instance Functor RuleM where
-    fmap = liftM
+  deriving (Functor)
 
 instance Applicative RuleM where
     pure x = RuleM $ \_ _ _ -> Just x

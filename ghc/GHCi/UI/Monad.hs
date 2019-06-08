@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -247,15 +247,13 @@ recordBreak brkLoc = do
       return (False, oldCounter)
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
+    deriving (Functor)
 
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
 
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
-
-instance Functor GHCi where
-    fmap = liftM
 
 instance Applicative GHCi where
     pure a = GHCi $ \_ -> pure a

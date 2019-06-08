@@ -6,7 +6,8 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
+    DeriveFunctor #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -1042,9 +1043,7 @@ data OptMResult a = OptMResult !a ![CLabel]
 #endif
 
 newtype CmmOptM a = CmmOptM (DynFlags -> Module -> [CLabel] -> OptMResult a)
-
-instance Functor CmmOptM where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative CmmOptM where
     pure x = CmmOptM $ \_ _ imports -> OptMResult x imports

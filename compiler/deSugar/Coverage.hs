@@ -6,6 +6,7 @@
 {-# LANGUAGE NondecreasingIndentation, RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Coverage (addTicksToBinds, hpcInitCode) where
 
@@ -1071,11 +1072,9 @@ noFVs = emptyOccEnv
 --   over what free variables we track.
 
 data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
+    deriving (Functor)
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).
-
-instance Functor TM where
-    fmap = liftM
 
 instance Applicative TM where
     pure a = TM $ \ _env st -> (a,noFVs,st)

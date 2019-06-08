@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 -- | Our extended FCode monad.
 
 -- We add a mapping from names to CmmExpr, to support local variable names in
@@ -53,7 +54,7 @@ import UniqFM
 import Unique
 import UniqSupply
 
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 
 -- | The environment contains variable definitions or blockids.
 data Named
@@ -73,6 +74,7 @@ type Decls      = [(FastString,Named)]
 --      and a list of local declarations. Returns the resulting list of declarations.
 newtype CmmParse a
         = EC { unEC :: String -> Env -> Decls -> FCode (Decls, a) }
+    deriving (Functor)
 
 type ExtCode = CmmParse ()
 
@@ -81,9 +83,6 @@ returnExtFC a   = EC $ \_ _ s -> return (s, a)
 
 thenExtFC :: CmmParse a -> (a -> CmmParse b) -> CmmParse b
 thenExtFC (EC m) k = EC $ \c e s -> do (s',r) <- m c e s; unEC (k r) c e s'
-
-instance Functor CmmParse where
-      fmap = liftM
 
 instance Applicative CmmParse where
       pure = returnExtFC
