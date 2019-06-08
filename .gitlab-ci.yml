@@ -108,8 +108,8 @@ lint-submods-mr:
 lint-submods-branch:
   extends: .lint-submods
   script:
-    - "echo Linting submodule changes for $CI_COMMIT_SHA"
-    - submodchecker .git $CI_COMMIT_SHA
+    - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+    - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
   only:
     refs:
       - master
