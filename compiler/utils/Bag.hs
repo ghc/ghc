@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, CPP, DeriveFunctor #-}
 
 module Bag (
         Bag, -- abstract type
@@ -45,6 +45,7 @@ data Bag a
   | UnitBag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag [a]             -- INVARIANT: the list is non-empty
+  deriving (Functor)
 
 emptyBag :: Bag a
 emptyBag = EmptyBag
@@ -221,10 +222,7 @@ foldlBagM k z (TwoBags b1 b2) = do { z' <- foldlBagM k z b1; foldlBagM k z' b2 }
 foldlBagM k z (ListBag xs)    = foldlM k z xs
 
 mapBag :: (a -> b) -> Bag a -> Bag b
-mapBag _ EmptyBag        = EmptyBag
-mapBag f (UnitBag x)     = UnitBag (f x)
-mapBag f (TwoBags b1 b2) = TwoBags (mapBag f b1) (mapBag f b2)
-mapBag f (ListBag xs)    = ListBag (map f xs)
+mapBag = fmap
 
 concatMapBag :: (a -> Bag b) -> Bag a -> Bag b
 concatMapBag _ EmptyBag        = EmptyBag
@@ -343,9 +341,6 @@ instance Data a => Data (Bag a) where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
-
-instance Functor Bag where
-    fmap = mapBag
 
 instance Foldable.Foldable Bag where
     foldr = foldrBag

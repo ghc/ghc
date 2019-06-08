@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -231,9 +232,7 @@ data HscStatus
 -- The Hsc monad: Passing an environment and warning state
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-
-instance Functor Hsc where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)

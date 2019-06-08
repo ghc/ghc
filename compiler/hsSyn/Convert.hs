@@ -6,6 +6,7 @@
 This module converts Template Haskell syntax into HsSyn
 -}
 
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -40,7 +41,7 @@ import Outputable
 import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless, liftM, ap )
+import Control.Monad( unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
@@ -71,6 +72,7 @@ convertToHsType loc t
 
 -------------------------------------------------------------------
 newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
+    deriving (Functor)
         -- Push down the source location;
         -- Can fail, with a single error message
 
@@ -82,9 +84,6 @@ newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
 -- Use the loc everywhere, for lack of anything better
 -- In particular, we want it on binding locations, so that variables bound in
 -- the spliced-in declarations get a location that at least relates to the splice point
-
-instance Functor CvtM where
-    fmap = liftM
 
 instance Applicative CvtM where
     pure x = CvtM $ \loc -> Right (loc,x)

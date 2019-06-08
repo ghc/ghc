@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 module State where
@@ -5,10 +6,7 @@ module State where
 import GhcPrelude
 
 newtype State s a = State { runState' :: s -> (# a, s #) }
-
-instance Functor (State s) where
-    fmap f m  = State $ \s -> case runState' m s of
-                              (# r, s' #) -> (# f r, s' #)
+    deriving (Functor)
 
 instance Applicative (State s) where
    pure x   = State $ \s -> (# x, s #)

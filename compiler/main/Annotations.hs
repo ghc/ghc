@@ -4,6 +4,7 @@
 -- (c) The University of Glasgow 2006
 -- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 --
+{-# LANGUAGE DeriveFunctor #-}
 module Annotations (
         -- * Main Annotation data types
         Annotation(..), AnnPayload,
@@ -49,13 +50,10 @@ data AnnTarget name
   = NamedTarget name          -- ^ We are annotating something with a name:
                               --      a type or identifier
   | ModuleTarget Module       -- ^ We are annotating a particular module
+  deriving (Functor)
 
 -- | The kind of annotation target found in the middle end of the compiler
 type CoreAnnTarget = AnnTarget Name
-
-instance Functor AnnTarget where
-    fmap f (NamedTarget nm) = NamedTarget (f nm)
-    fmap _ (ModuleTarget mod) = ModuleTarget mod
 
 -- | Get the 'name' of an annotation target if it exists.
 getAnnTargetName_maybe :: AnnTarget name -> Maybe name

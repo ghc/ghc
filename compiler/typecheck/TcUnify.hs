@@ -6,7 +6,8 @@
 Type subsumption and unification
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, TupleSections, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveFunctor, MultiWayIf, TupleSections,
+    ScopedTypeVariables #-}
 
 module TcUnify (
   -- Full-blown subsumption
@@ -2119,9 +2120,7 @@ data MetaTyVarUpdateResult a
   = MTVU_OK a
   | MTVU_Bad     -- Forall, predicate, or type family
   | MTVU_Occurs
-
-instance Functor MetaTyVarUpdateResult where
-      fmap = liftM
+    deriving (Functor)
 
 instance Applicative MetaTyVarUpdateResult where
       pure = MTVU_OK
