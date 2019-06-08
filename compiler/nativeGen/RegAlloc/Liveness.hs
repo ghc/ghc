@@ -1008,9 +1008,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             not_a_branch = null targets
 
             targetLiveRegs target
-                  = case mapLookup target blockmap of
-                                Just ra -> ra
-                                Nothing -> emptyRegSet
+                  = fromMaybe emptyRegSet (mapLookup target blockmap)
 
             live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
 

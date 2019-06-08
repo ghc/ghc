@@ -39,6 +39,7 @@ import Foreign
 import Foreign.ForeignPtr.Unsafe
 import Data.Char
 import qualified Data.Char as Char
+import Data.Maybe
 import Numeric
 import GHC.IO
 
@@ -250,9 +251,7 @@ type EncodedString = String     -- Encoded form
 
 
 zEncodeString :: UserString -> EncodedString
-zEncodeString cs = case maybe_tuple cs of
-                Just n  -> n            -- Tuples go to Z2T etc
-                Nothing -> go cs
+zEncodeString cs = fromMaybe (go cs) (maybe_tuple cs) -- Tuples go to Z2T etc
           where
                 go []     = []
                 go (c:cs) = encode_digit_ch c ++ concatMap encode_ch cs

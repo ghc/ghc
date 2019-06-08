@@ -7,6 +7,7 @@ module CostCentreState ( CostCentreState, newCostCentreState
 import GhcPrelude
 import FastString
 import FastStringEnv
+import Maybes
 
 import Data.Data
 import Binary
@@ -32,5 +33,5 @@ getCCIndex nm (CostCentreState m) =
     (CostCentreIndex idx, CostCentreState m')
   where
     m_idx = lookupFsEnv m nm
-    idx = maybe 0 id m_idx
+    idx = fromMaybe 0 m_idx
     m' = extendFsEnv m nm (idx + 1)

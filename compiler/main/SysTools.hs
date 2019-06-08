@@ -50,6 +50,7 @@ import Util
 import DynFlags
 import Fingerprint
 import ToolSettings
+import Maybes
 
 import System.FilePath
 import System.IO
@@ -491,9 +492,7 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------
             -- Making a DLL
             -------------------------------------------------------------
-            let output_fn = case o_file of
-                            Just s -> s
-                            Nothing -> "HSdll.dll"
+            let output_fn = fromMaybe "HSdll.dll" o_file
 
             runLink dflags (
                     map Option verbFlags
@@ -550,7 +549,7 @@ linkDynLib dflags0 o_files dep_packages
             --   this.
             -------------------------------------------------------------------
 
-            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+            let output_fn = fromMaybe "a.out" o_file
 
             instName <- case dylibInstallName dflags of
                 Just n -> return n
@@ -582,7 +581,7 @@ linkDynLib dflags0 o_files dep_packages
             -- Making a DSO
             -------------------------------------------------------------------
 
-            let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+            let output_fn = fromMaybe "a.out" o_file
                 unregisterised = platformUnregisterised (targetPlatform dflags)
             let bsymbolicFlag = -- we need symbolic linking to resolve
                                 -- non-PIC intra-package-relocations for

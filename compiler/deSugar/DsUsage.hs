@@ -352,9 +352,9 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
         ent_hashs = Map.fromList (map lookup_occ used_occs)
 
         lookup_occ occ =
-            case hash_env occ of
-                Nothing -> pprPanic "mkUsage" (ppr mod <+> ppr occ <+> ppr used_names)
-                Just r  -> r
+            fromMaybe
+                (pprPanic "mkUsage" $ ppr mod <+> ppr occ <+> ppr used_names)
+                (hash_env occ)
 
         depend_on_exports = is_direct_import
         {- True

@@ -31,7 +31,7 @@ import Data.Char (toLower)
 import Data.List (stripPrefix)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Numeric (readHex)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess), exitFailure)
@@ -738,7 +738,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "#pragma GCC poison sizeof"
                      ]
 
-          objdumpProgam = maybe (error "no objdump program given") id mobjdumpProgram
+          objdumpProgam = fromMaybe (error "no objdump program given") mobjdumpProgram
 
           prefix = "derivedConstant"
           mkFullName name = prefix ++ name

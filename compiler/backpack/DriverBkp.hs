@@ -797,9 +797,8 @@ hsModuleToModSummary pn hsc_src modname
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
-            ms_hspp_file = (case hiDir dflags of
-                            Nothing -> ""
-                            Just d -> d) </> ".." </> moduleNameSlashes modname <.> "hi",
+            ms_hspp_file = fromMaybe "" (hiDir dflags)
+                           </> ".." </> moduleNameSlashes modname <.> "hi",
             ms_hspp_opts = dflags,
             ms_hspp_buf = Nothing,
             ms_srcimps = map convImport src_idecls,

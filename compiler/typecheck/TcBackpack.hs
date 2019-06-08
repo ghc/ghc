@@ -91,9 +91,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     -- implementation cases.
     checkBootDeclM False sig_thing real_thing
     real_fixity <- lookupFixityRn name
-    let sig_fixity = case mi_fix_fn sig_iface (occName name) of
-                        Nothing -> defaultFixity
-                        Just f -> f
+    let sig_fixity = fromMaybe defaultFixity (mi_fix_fn sig_iface $ occName name)
     when (real_fixity /= sig_fixity) $
       addErrAt (nameSrcSpan name)
         (fixityMisMatch real_thing real_fixity sig_fixity)

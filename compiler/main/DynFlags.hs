@@ -2629,10 +2629,7 @@ thisComponentId dflags =
         Nothing -> ComponentId (unitIdFS (thisPackage dflags))
 
 thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
-thisUnitIdInsts dflags =
-    case thisUnitIdInsts_ dflags of
-        Just insts -> insts
-        Nothing    -> []
+thisUnitIdInsts dflags = fromMaybe [] (thisUnitIdInsts_ dflags)
 
 thisPackage :: DynFlags -> UnitId
 thisPackage dflags =

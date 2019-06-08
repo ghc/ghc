@@ -16,6 +16,7 @@ import CoreSyn
 import CoreUnfold       ( couldBeSmallEnoughToInline )
 import TysWiredIn       ( unitDataConId )
 import Id
+import Maybes
 import VarEnv
 import Util             ( notNull )
 
@@ -364,18 +365,14 @@ addScrutedVar env@(LibCaseEnv { lc_lvl = lvl, lc_lvl_env = lvl_env,
   | otherwise = env
   where
     scruts'  = (scrut_var, bind_lvl, lvl) : scruts
-    bind_lvl = case lookupVarEnv lvl_env scrut_var of
-                 Just lvl -> lvl
-                 Nothing  -> topLevel
+    bind_lvl = fromMaybe topLevel (lookupVarEnv lvl_env scrut_var)
 
 lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBind
 lookupRecId env id = lookupVarEnv (lc_rec_env env) id
 
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
 lookupLevel env id
-  = case lookupVarEnv (lc_lvl_env env) id of
-      Just lvl -> lvl
-      Nothing  -> topLevel
+  = fromMaybe topLevel (lookupVarEnv (lc_lvl_env env) id)
 
 {-
 ************************************************************************

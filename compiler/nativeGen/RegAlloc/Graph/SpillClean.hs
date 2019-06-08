@@ -121,10 +121,7 @@ cleanBlockForward platform (BasicBlock blockId instrs)
  = do
         -- See if we have a valid association for the entry to this block.
         jumpValid       <- gets sJumpValid
-        let assoc       = case lookupUFM jumpValid blockId of
-                                Just assoc      -> assoc
-                                Nothing         -> emptyAssoc
-
+        let assoc       = fromMaybe emptyAssoc (lookupUFM jumpValid blockId)
         instrs_reload   <- cleanForward platform blockId assoc [] instrs
         return  $ BasicBlock blockId instrs_reload
 
@@ -598,10 +595,7 @@ closeAssoc a assoc
                  -- haven't seen this node before,
                  --     remember to visit all its neighbors
                  |  otherwise
-                 -> let neighbors
-                         = case lookupUFM assoc x of
-                                Nothing         -> emptyUniqSet
-                                Just set        -> set
+                 -> let neighbors = fromMaybe emptyUniqSet (lookupUFM assoc x)
 
                    in closeAssoc' assoc
                         (addOneToUniqSet visited x)

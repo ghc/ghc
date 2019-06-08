@@ -467,7 +467,7 @@ runit verbosity cli nonopts = do
     ["dot"] -> do
         showPackageDot verbosity cli
     ["find-module", mod_name] -> do
-        let match = maybe (==mod_name) id (substringCheck mod_name)
+        let match = fromMaybe (==mod_name) (substringCheck mod_name)
         listPackages verbosity cli Nothing (Just match)
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str

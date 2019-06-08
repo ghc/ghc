@@ -30,6 +30,7 @@ import OccName hiding (occName)
 import Var
 import Module
 import Outputable
+import Maybes
 
 import qualified Data.ByteString as B
 
@@ -208,7 +209,7 @@ ext1 :: (Data a, Typeable t)
      => c a
      -> (forall d. Data d => c (t d))
      -> c a
-ext1 def ext = maybe def id (dataCast1 ext)
+ext1 def ext = fromMaybe def (dataCast1 ext)
 
 
 
@@ -217,4 +218,4 @@ ext2 :: (Data a, Typeable t)
      => c a
      -> (forall d1 d2. (Data d1, Data d2) => c (t d1 d2))
      -> c a
-ext2 def ext = maybe def id (dataCast2 ext)
+ext2 def ext = fromMaybe def (dataCast2 ext)

@@ -279,10 +279,7 @@ mkWorkerArgs dflags args res_ty
            -- see Note [Protecting the last value argument]
 
       -- Might the result be lifted?
-      lifted =
-        case isLiftedType_maybe res_ty of
-          Just lifted -> lifted
-          Nothing     -> True
+      lifted = fromMaybe True (isLiftedType_maybe res_ty)
 
 {-
 Note [Protecting the last value argument]

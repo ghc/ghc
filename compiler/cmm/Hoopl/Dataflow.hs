@@ -358,8 +358,7 @@ out that always recording a change is faster.
 
 -- Fact lookup: the fact `orelse` bottom
 getFact  :: DataflowLattice f -> Label -> FactBase f -> f
-getFact lat l fb = case lookupFact l fb of Just  f -> f
-                                           Nothing -> fact_bot lat
+getFact lat l fb = fromMaybe (fact_bot lat) (lookupFact l fb)
 
 -- | Returns the result of joining the facts from all the successors of the
 -- provided node or block.

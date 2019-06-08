@@ -69,7 +69,7 @@ import Data.ByteString (ByteString)
 import Data.Int
 import Data.Word
 import Data.Char
-import Data.Maybe ( isJust )
+import Data.Maybe ( fromMaybe, isJust )
 import Data.Data ( Data )
 import Data.Proxy
 import Numeric ( fromRat )
@@ -467,9 +467,10 @@ isZeroLit _                 = False
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
 litValue  :: Literal -> Integer
-litValue l = case isLitValue_maybe l of
-   Just x  -> x
-   Nothing -> pprPanic "litValue" (ppr l)
+litValue l =
+    fromMaybe
+        (pprPanic "litValue" $ ppr l)
+        (isLitValue_maybe l)
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char' and numbers.

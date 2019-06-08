@@ -12,6 +12,7 @@ import SrcLoc
 import Module
 import FastString
 import Outputable
+import Maybes
 
 import HieTypes
 import HieBin
@@ -130,9 +131,7 @@ validateScopes asts = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
     valid (Right n) refs = concatMap inScope refs
       where
         mapRef = foldMap getScopeFromContext . identInfo . snd
-        scopes = case foldMap mapRef refs of
-          Just xs -> xs
-          Nothing -> []
+        scopes = fromMaybe [] (foldMap mapRef refs)
         inScope (sp, dets)
           |  definedInAsts asts n
           && any isOccurrence (identInfo dets)

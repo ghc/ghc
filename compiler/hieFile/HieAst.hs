@@ -48,7 +48,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
-import Data.Maybe                 ( listToMaybe )
+import Data.Maybe                 ( fromMaybe, listToMaybe )
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 
@@ -386,9 +386,7 @@ instance ToHie (Context (Located Var)) where
       C context (L (RealSrcSpan span) name')
         -> do
         m <- asks name_remapping
-        let name = case lookupNameEnv m (varName name') of
-              Just var -> var
-              Nothing-> name'
+        let name = fromMaybe name' (lookupNameEnv m $ varName name')
         pure
           [Node
             (NodeInfo S.empty [] $

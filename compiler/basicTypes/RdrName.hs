@@ -712,9 +712,7 @@ gresToAvailInfo gres
         , done `extendNameSet` name )
       where
         name = gre_name gre
-        key = case greParent_maybe gre of
-                 Just parent -> parent
-                 Nothing     -> gre_name gre
+        key = fromMaybe (gre_name gre) (greParent_maybe gre)
 
         -- We want to insert the child `k` into a list of children but
         -- need to maintain the invariant that the parent is first.
@@ -780,9 +778,7 @@ pprGlobalRdrEnv locals_only env
         occ = nameOccName (gre_name (head gres))
 
 lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
-lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
-                                  Nothing   -> []
-                                  Just gres -> gres
+lookupGlobalRdrEnv env occ_name = fromMaybe [] $ lookupOccEnv env occ_name
 
 greOccName :: GlobalRdrElt -> OccName
 greOccName (GRE{gre_par = FldParent{par_lbl = Just lbl}}) = mkVarOccFS lbl

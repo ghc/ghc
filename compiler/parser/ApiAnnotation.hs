@@ -142,9 +142,7 @@ type ApiAnnKey = (SrcSpan,AnnKeywordId)
 -- of the annotated AST element, and the known type of the annotation.
 getAnnotation :: ApiAnns -> SrcSpan -> AnnKeywordId -> [SrcSpan]
 getAnnotation (anns,_) span ann
-   = case Map.lookup (span,ann) anns of
-       Nothing -> []
-       Just ss -> ss
+   = Map.findWithDefault [] (span,ann) anns
 
 -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
 -- of the annotated AST element, and the known type of the annotation.
@@ -161,10 +159,8 @@ getAndRemoveAnnotation (anns,cs) span ann
 --  Note: A given 'SrcSpan' may appear in multiple AST elements,
 --  beware of duplicates
 getAnnotationComments :: ApiAnns -> SrcSpan -> [Located AnnotationComment]
-getAnnotationComments (_,anns) span =
-  case Map.lookup span anns of
-    Just cs -> cs
-    Nothing -> []
+getAnnotationComments (_,anns) span
+  = Map.findWithDefault [] span anns
 
 -- |Retrieve the comments allocated to the current 'SrcSpan', and
 -- remove them from the annotations

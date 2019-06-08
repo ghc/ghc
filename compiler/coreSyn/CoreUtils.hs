@@ -131,10 +131,10 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
 coreAltType alt@(_,bs,rhs)
-  = case occCheckExpand bs rhs_ty of
-      -- Note [Existential variables and silly type synonyms]
-      Just ty -> ty
-      Nothing -> pprPanic "coreAltType" (pprCoreAlt alt $$ ppr rhs_ty)
+  = fromMaybe
+        (pprPanic "coreAltType" (pprCoreAlt alt $$ ppr rhs_ty))
+        (occCheckExpand bs rhs_ty)
+    -- Note [Existential variables and silly type synonyms]
   where
     rhs_ty = exprType rhs
 

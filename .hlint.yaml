@@ -12,7 +12,6 @@
 - ignore: {name: "Redundant bracket"}
 - ignore: {name: "Reduce duplication"}
 - ignore: {name: "Eta reduce"}
-- ignore: {name: "Use fromMaybe"}
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Parse error"}
 - ignore: {name: "Use camelCase"}
@@ -164,6 +163,9 @@
 
 # Not much gain in readability.
 - ignore: {name: "Fuse foldr/map"}
+
+# The warning for e.g. (maybe f id) is great, the other suggestions less so...
+- ignore: {name: "Use fromMaybe"}
 
 
 # Define some custom infix operators

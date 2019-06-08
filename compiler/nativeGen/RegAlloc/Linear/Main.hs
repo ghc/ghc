@@ -555,10 +555,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
         patched_instr
                 = patchRegsOfInstr adjusted_instr patchLookup
 
-        patchLookup x
-                = case lookupUFM patch_map x of
-                        Nothing -> x
-                        Just y  -> y
+        patchLookup x = fromMaybe x (lookupUFM patch_map x)
 
 
     -- (j) free up stack slots for dead spilled regs

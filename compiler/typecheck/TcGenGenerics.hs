@@ -48,7 +48,7 @@ import Util
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromMaybe)
 
 #include "HsVersions.h"
 
@@ -488,7 +488,7 @@ argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
                             ata_comp = mkComp}) =
   -- mkRec0 is the default; use it if there is no interesting structure
   -- (e.g. occurrences of parameters or recursive occurrences)
-  \t -> maybe (mkRec0 t) id $ go t where
+  \t -> fromMaybe (mkRec0 t) (go t) where
   go :: Type -> -- type to fold through
         Maybe a -- the result (e.g. representation type), unless it's trivial
   go t = isParam `mplus` isApp where

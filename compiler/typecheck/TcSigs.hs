@@ -52,8 +52,7 @@ import NameEnv
 import Outputable
 import SrcLoc
 import Util( singleton )
-import Maybes( orElse )
-import Data.Maybe( mapMaybe )
+import Maybes( mapMaybe, fromMaybe, orElse )
 import Control.Monad( unless )
 
 
@@ -234,9 +233,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = return (PartialSig { psig_name = name, psig_hs_ty = hs_sig_ty
                        , sig_ctxt = ctxt_F, sig_loc = loc })
   where
-    name   = case mb_name of
-               Just n  -> n
-               Nothing -> mkUnboundName (mkVarOcc "<expression>")
+    name   = fromMaybe (mkUnboundName $ mkVarOcc "<expression>") mb_name
     ctxt_F = case mb_name of
                Just n  -> FunSigCtxt n False
                Nothing -> ExprSigCtxt
