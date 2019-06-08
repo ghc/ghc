@@ -426,7 +426,7 @@ data DsMetaVal
 --
 -- This data type really should be in HscTypes, but it needs
 -- to have a TcGblEnv which is only defined here.
-data FrontendResult
+newtype FrontendResult
         = FrontendTypecheck TcGblEnv
 
 -- Note [Identity versus semantic module]
