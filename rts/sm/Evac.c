@@ -130,12 +130,9 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         }
     }
 #else
-    // if somebody else reads the forwarding pointer, we better make
-    // sure there's a closure at the end of it.
-    write_barrier();
-    *p = TAG_CLOSURE(tag,(StgClosure*)to);
     src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
-#endif
+    *p = TAG_CLOSURE(tag,(StgClosure*)to);
+#endif  /* defined(PARALLEL_GC) */
 
 #if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
