@@ -234,7 +234,7 @@ static bool tidyWeakList(generation *gen)
     last_w = &gen->old_weak_ptr_list;
     for (w = gen->old_weak_ptr_list; w != NULL; w = next_w) {
 
-        info = get_itbl((StgClosure *)w);
+        info = w->header.info;
         load_load_barrier();
 
         /* There might be a DEAD_WEAK on the list if finalizeWeak# was
@@ -246,6 +246,7 @@ static bool tidyWeakList(generation *gen)
             continue;
         }
 
+        info = INFO_PTR_TO_STRUCT(info);
         switch (info->type) {
 
         case WEAK:
