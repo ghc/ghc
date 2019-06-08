@@ -39,6 +39,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
 import qualified Data.Semigroup as Semigroup
+import Control.Monad ( mapAndUnzipM )
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
@@ -75,7 +76,7 @@ basicBlocksCodeGen live (entryBlock:cmmBlocks)
 
        -- Generate code
        (BasicBlock bid entry, entryTops) <- basicBlockCodeGen entryBlock
-       (blocks, topss) <- fmap unzip $ mapM basicBlockCodeGen cmmBlocks
+       (blocks, topss) <- mapAndUnzipM basicBlockCodeGen cmmBlocks
 
        -- Compose
        let entryBlock = BasicBlock bid (fromOL prologue ++ entry)
@@ -105,7 +106,7 @@ type StmtData = (LlvmStatements, [LlvmCmmDecl])
 -- | Convert a list of CmmNode's to LlvmStatement's
 stmtsToInstrs :: [CmmNode e x] -> LlvmM StmtData
 stmtsToInstrs stmts
-   = do (instrss, topss) <- fmap unzip $ mapM stmtToInstrs stmts
+   = do (instrss, topss) <- mapAndUnzipM stmtToInstrs stmts
         return (concatOL instrss, concat topss)
 
 

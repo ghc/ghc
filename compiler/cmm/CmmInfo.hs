@@ -149,7 +149,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
   | otherwise
   = do
     (top_declss, raw_infos) <-
-       unzip `fmap` mapM do_one_info (mapToList (info_tbls infos))
+       mapAndUnzipM do_one_info (mapToList (info_tbls infos))
     return (concat top_declss ++
             [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
 

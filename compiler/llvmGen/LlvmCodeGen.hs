@@ -34,7 +34,7 @@ import UniqSupply
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
-import Control.Monad ( when )
+import Control.Monad ( mapAndUnzipM, when )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
@@ -180,7 +180,7 @@ cmmLlvmGen cmm@CmmProc{} = do
     llvmBC <- withClearVars $ genLlvmProc fixed_cmm
 
     -- pretty print
-    (docs, ivars) <- fmap unzip $ mapM pprLlvmCmmDecl llvmBC
+    (docs, ivars) <- mapAndUnzipM pprLlvmCmmDecl llvmBC
 
     -- Output, note down used variables
     renderLlvm (vcat docs)

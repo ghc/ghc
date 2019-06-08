@@ -784,7 +784,7 @@ checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 checkTyVars pp_what equals_or_where tc tparms
-  = do { (tvs, anns) <- fmap unzip $ mapM check tparms
+  = do { (tvs, anns) <- mapAndUnzipM check tparms
        ; return (mkHsQTvs tvs, concat anns) }
   where
     check (HsTypeArg _ ki@(L loc _))
