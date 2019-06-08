@@ -8,6 +8,9 @@ variables:
   # .gitlab/win32-init.sh.
   WINDOWS_TOOLCHAIN_VERSION: 1
 
+  # Disable shallow clones; they break our linting rules
+  GIT_DEPTH: 0
+
 before_script:
   - python3 .gitlab/fix-submodules.py
   - git submodule sync --recursive
@@ -52,13 +55,7 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    # Note [Unshallow clone for linting]
-    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    # GitLab creates a shallow clone which means that we may not have the base
-    # commit of the MR being tested (e.g. if the MR is quite old), causing `git
-    # merge-base` to fail.  Passing `--unshallow` to `git fetch` ensures that
-    # we have the entire history.
-    - git fetch --unshallow "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Linting changes between $base..$CI_COMMIT_SHA"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
@@ -80,8 +77,7 @@ ghc-linters:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    # See Note [Unshallow clone for linting]
-    - git fetch --unshallow "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Linting changes between $base..$CI_COMMIT_SHA"
     - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
