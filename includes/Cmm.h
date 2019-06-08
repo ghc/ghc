@@ -309,6 +309,8 @@
  again:                                                 \
   W_ info;                                              \
   LOAD_INFO(ret,x)                                      \
+  /* See Note [Heap memory barriers] in SMP.h */        \
+  prim_read_barrier();                                  \
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]            \
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {       \
   case                                                  \
