@@ -140,10 +140,6 @@ else
 DYNAMIC_BY_DEFAULT = YES
 endif
 
-# For now, we unconditionally disable dynamic-by-default, as the
-# cabal-install's that are in the wild don't handle it properly.
-DYNAMIC_BY_DEFAULT = NO
-
 # If building both v and dyn ways, then use -dynamic-too to build them.
 # This makes the build faster.
 DYNAMIC_TOO = YES
