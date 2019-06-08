@@ -489,7 +489,7 @@ concern things that the renamer can't handle.
 -- not-patterns.
 --
 -- To find out where the mode is used, search for 'mode_level'
-newtype TcTyMode = TcTyMode { mode_level :: TypeOrKind }
+data TcTyMode = TcTyMode { mode_level :: TypeOrKind }
 
 typeLevelMode :: TcTyMode
 typeLevelMode = TcTyMode { mode_level = TypeLevel }
