@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module TcCanonical(
      canonicalize,
@@ -2198,10 +2199,7 @@ data StopOrContinue a
   | Stop CtEvidence   -- The (rewritten) constraint was solved
          SDoc         -- Tells how it was solved
                       -- Any new sub-goals have been put on the work list
-
-instance Functor StopOrContinue where
-  fmap f (ContinueWith x) = ContinueWith (f x)
-  fmap _ (Stop ev s)      = Stop ev s
+  deriving (Functor)
 
 instance Outputable a => Outputable (StopOrContinue a) where
   ppr (Stop ev s)      = text "Stop" <> parens s <+> ppr ev

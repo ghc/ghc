@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE NamedFieldPuns #-}
 -- | The CompPipeline monad and associated ops
 --
@@ -22,12 +23,10 @@ import FileCleanup (TempFileLifetime)
 import Control.Monad
 
 newtype CompPipeline a = P { unP :: PipeEnv -> PipeState -> IO (PipeState, a) }
+    deriving (Functor)
 
 evalP :: CompPipeline a -> PipeEnv -> PipeState -> IO a
 evalP f env st = liftM snd $ unP f env st
-
-instance Functor CompPipeline where
-    fmap = liftM
 
 instance Applicative CompPipeline where
     pure a = P $ \_env state -> return (state, a)

@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
@@ -148,19 +149,17 @@ pattern UniqResult x y = (# x, y #)
 #else
 
 data UniqResult result = UniqResult !result {-# UNPACK #-} !UniqSupply
+  deriving (Functor)
 
 #endif
 
 -- | A monad which just gives the ability to obtain 'Unique's
 newtype UniqSM result = USM { unUSM :: UniqSupply -> UniqResult result }
+    deriving (Functor)
 
 instance Monad UniqSM where
   (>>=) = thenUs
   (>>)  = (*>)
-
-instance Functor UniqSM where
-    fmap f (USM x) = USM (\us0 -> case x us0 of
-                                 UniqResult r us1 -> UniqResult (f r) us1)
 
 instance Applicative UniqSM where
     pure = returnUs

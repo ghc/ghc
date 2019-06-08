@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, PatternSynonyms #-}
+{-# LANGUAGE CPP, PatternSynonyms, DeriveFunctor #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -50,7 +50,7 @@ import DynFlags
 import Unique
 import UniqSupply
 
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 
 -- Avoids using unboxed tuples when loading into GHCi
 #if !defined(GHC_LOADED_INTO_GHCI)
@@ -63,15 +63,14 @@ pattern RA_Result a b = (# a, b #)
 #else
 
 data RA_Result freeRegs a = RA_Result {-# UNPACK #-} !(RA_State freeRegs) !a
+  deriving (Functor)
 
 #endif
 
 -- | The register allocator monad type.
 newtype RegM freeRegs a
         = RegM { unReg :: RA_State freeRegs -> RA_Result freeRegs a }
-
-instance Functor (RegM freeRegs) where
-      fmap = liftM
+        deriving (Functor)
 
 instance Applicative (RegM freeRegs) where
       pure a  =  RegM $ \s -> RA_Result s a

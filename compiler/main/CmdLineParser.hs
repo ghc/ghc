@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -------------------------------------------------------------------------------
 --
@@ -166,9 +167,7 @@ liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
 -- (CmdLineP s) typically instantiates the 'm' in (EwM m) and (OptKind m)
 newtype CmdLineP s a = CmdLineP { runCmdLine :: s -> (a, s) }
-
-instance Functor (CmdLineP s) where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative (CmdLineP s) where
     pure a = CmdLineP $ \s -> (a, s)

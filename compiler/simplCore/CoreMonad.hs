@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module CoreMonad (
     -- * Configuration of the core-to-core passes
@@ -582,9 +583,7 @@ type CoreIOEnv = IOEnv CoreReader
 -- | The monad used by Core-to-Core passes to access common state, register simplification
 -- statistics and so on
 newtype CoreM a = CoreM { unCoreM :: CoreState -> CoreIOEnv (a, CoreState, CoreWriter) }
-
-instance Functor CoreM where
-    fmap = liftM
+    deriving (Functor)
 
 instance Monad CoreM where
     mx >>= f = CoreM $ \s -> do

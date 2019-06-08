@@ -1,7 +1,9 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Hoopl.Block
     ( C
     , O
@@ -64,14 +66,8 @@ data MaybeC ex t where
   JustC    :: t -> MaybeC C t
   NothingC ::      MaybeC O t
 
-
-instance Functor (MaybeO ex) where
-  fmap _ NothingO = NothingO
-  fmap f (JustO a) = JustO (f a)
-
-instance Functor (MaybeC ex) where
-  fmap _ NothingC = NothingC
-  fmap f (JustC a) = JustC (f a)
+deriving instance Functor (MaybeO ex)
+deriving instance Functor (MaybeC ex)
 
 -- -----------------------------------------------------------------------------
 -- The Block type

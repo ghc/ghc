@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
 
 -- Type definitions for the constraint solver
 module TcSMonad (
@@ -2601,10 +2601,7 @@ data TcSEnv
     }
 
 ---------------
-newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
-
-instance Functor TcS where
-  fmap f m = TcS $ fmap f . unTcS m
+newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
 
 instance Applicative TcS where
   pure x = TcS (\_ -> return x)

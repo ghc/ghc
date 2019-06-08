@@ -5,6 +5,7 @@
 -- CmmLint: checking the correctness of Cmm statements and expressions
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 module CmmLint (
     cmmLint, cmmLintGraph
@@ -24,7 +25,7 @@ import PprCmm ()
 import Outputable
 import DynFlags
 
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 
 -- Things to check:
 --     - invariant on CmmBlock in CmmExpr (see comment there)
@@ -212,9 +213,7 @@ checkCond _ expr
 -- just a basic error monad:
 
 newtype CmmLint a = CmmLint { unCL :: DynFlags -> Either SDoc a }
-
-instance Functor CmmLint where
-      fmap = liftM
+    deriving (Functor)
 
 instance Applicative CmmLint where
       pure a = CmmLint (\_ -> Right a)

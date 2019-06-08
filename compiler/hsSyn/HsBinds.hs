@@ -8,6 +8,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -1262,7 +1263,7 @@ data RecordPatSynField a
       , recordPatSynPatVar :: a
       -- Filled in by renamer, the name used internally
       -- by the pattern
-      } deriving Data
+      } deriving (Data, Functor)
 
 
 
@@ -1287,12 +1288,6 @@ when we have a different name for the local and top-level binder
 the distinction between the two names clear
 
 -}
-instance Functor RecordPatSynField where
-    fmap f (RecordPatSynField { recordPatSynSelectorId = visible
-                              , recordPatSynPatVar = hidden })
-      = RecordPatSynField { recordPatSynSelectorId = f visible
-                          , recordPatSynPatVar = f hidden }
-
 instance Outputable a => Outputable (RecordPatSynField a) where
     ppr (RecordPatSynField { recordPatSynSelectorId = v }) = ppr v
 

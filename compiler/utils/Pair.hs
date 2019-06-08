@@ -4,6 +4,7 @@ Traversable instances.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Pair ( Pair(..), unPair, toPair, swap, pLiftFst, pLiftSnd ) where
 
@@ -15,14 +16,13 @@ import Outputable
 import qualified Data.Semigroup as Semi
 
 data Pair a = Pair { pFst :: a, pSnd :: a }
+  deriving (Functor)
 -- Note that Pair is a *unary* type constructor
 -- whereas (,) is binary
 
 -- The important thing about Pair is that it has a *homogeneous*
 -- Functor instance, so you can easily apply the same function
 -- to both components
-instance Functor Pair where
-  fmap f (Pair x y) = Pair (f x) (f y)
 
 instance Applicative Pair where
   pure x = Pair x x

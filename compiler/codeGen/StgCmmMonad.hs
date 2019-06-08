@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
@@ -111,9 +112,7 @@ import Data.List
 --------------------------------------------------------
 
 newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
-
-instance Functor FCode where
-    fmap f (FCode g) = FCode $ \i s -> case g i s of (a, s') -> (f a, s')
+    deriving (Functor)
 
 instance Applicative FCode where
     pure val = FCode (\_info_down state -> (val, state))

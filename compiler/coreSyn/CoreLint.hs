@@ -7,6 +7,7 @@ A ``lint'' pass to check for Core correctness
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module CoreLint (
     lintCoreBindings, lintUnfolding,
@@ -2076,6 +2077,7 @@ newtype LintM a =
             LintEnv ->
             WarnsAndErrs ->           -- Warning and error messages so far
             (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
+   deriving (Functor)
 
 type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
 
@@ -2145,9 +2147,6 @@ we behave as follows (#15057, #T15664):
   lint the result.  Reason: want to check that synonyms are saturated
   when the type is expanded.
 -}
-
-instance Functor LintM where
-      fmap = liftM
 
 instance Applicative LintM where
       pure x = LintM $ \ _ errs -> (Just x, errs)

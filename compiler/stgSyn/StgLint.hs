@@ -32,7 +32,8 @@ Since then there were some attempts at enabling it again, as summarised in
 basic properties listed above.
 -}
 
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
+  DeriveFunctor #-}
 
 module StgLint ( lintStgTopBindings ) where
 
@@ -258,6 +259,7 @@ newtype LintM a = LintM
               -> Bag MsgDoc        -- Error messages so far
               -> (a, Bag MsgDoc)   -- Result and error messages (if any)
     }
+    deriving (Functor)
 
 data LintFlags = LintFlags { lf_unarised :: !Bool
                              -- ^ have we run the unariser yet?
@@ -292,9 +294,6 @@ initL this_mod unarised locals (LintM m) = do
       Nothing
   else
       Just (vcat (punctuate blankLine (bagToList errs)))
-
-instance Functor LintM where
-      fmap = liftM
 
 instance Applicative LintM where
       pure a = LintM $ \_mod _lf _loc _scope errs -> (a, errs)

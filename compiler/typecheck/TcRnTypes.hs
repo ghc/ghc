@@ -16,7 +16,7 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
-{-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
+{-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
              ViewPatterns #-}
 
 module TcRnTypes(
@@ -195,7 +195,7 @@ import Util
 import PrelNames ( isUnboundName )
 import CostCentreState
 
-import Control.Monad (ap, liftM, msum)
+import Control.Monad (ap, msum)
 import qualified Control.Monad.Fail as MonadFail
 import Data.Set      ( Set )
 import qualified Data.Set as S
@@ -3823,10 +3823,7 @@ type TcPluginSolver = [Ct]    -- given
                    -> [Ct]    -- wanted
                    -> TcPluginM TcPluginResult
 
-newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a)
-
-instance Functor TcPluginM where
-  fmap = liftM
+newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a) deriving (Functor)
 
 instance Applicative TcPluginM where
   pure x = TcPluginM (const $ pure x)
