@@ -80,7 +80,6 @@
 - ignore: {name: "Use isOctDigit"}
 - ignore: {name: "Use isAsciiUpper"}
 - ignore: {name: "Use $>"}
-- ignore: {name: "Use any"}
 - ignore: {name: "Use negate"}
 - ignore: {name: "Collapse lambdas"}
 - ignore: {name: "Use isAsciiLower"}
