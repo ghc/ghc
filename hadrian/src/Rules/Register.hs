@@ -75,12 +75,13 @@ registerPackageRules rs stage = do
 
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
+        liftIO $ print conf
         historyDisable
         let libpath = takeDirectory (takeDirectory conf)
             settings = libpath -/- "settings"
             platformConstants = libpath -/- "platformConstants"
 
-        need [settings, platformConstants]
+        --need [settings, platformConstants]
 
         pkgName <- getPackageNameFromConfFile conf
         let pkg = unsafeFindPackageByName pkgName
@@ -91,9 +92,14 @@ registerPackageRules rs stage = do
             Stage0 | isBoot -> copyConf  rs ctx conf
             _               -> buildConf rs ctx conf
 
+mungeGhc "ghc" = "ghc1"
+mungeGhc x = x
+
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} conf = do
-    depPkgIds <- cabalDependencies context
+    liftIO $ print conf
+    depPkgIds <- map mungeGhc <$> cabalDependencies context
+    liftIO $ print depPkgIds
     ensureConfigured context
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
