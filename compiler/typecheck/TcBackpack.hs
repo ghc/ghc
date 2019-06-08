@@ -113,7 +113,7 @@ checkHsigIface tcg_env gr sig_iface
                md_types = sig_type_env, md_exports = sig_exports   } = do
     traceTc "checkHsigIface" $ vcat
         [ ppr sig_type_env, ppr sig_insts, ppr sig_exports ]
-    mapM_ check_export (map availName sig_exports)
+    mapM_ (check_export . availName) sig_exports
     unless (null sig_fam_insts) $
         panic ("TcRnDriver.checkHsigIface: Cannot handle family " ++
                "instances in hsig files yet...")
@@ -789,7 +789,7 @@ mergeSignatures
               -- eventually.
               | otherwise
               = return ()
-        mapM_ check_export (map availName exports)
+        mapM_ (check_export . availName) exports
 
         -- Note [Signature merging instances]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
