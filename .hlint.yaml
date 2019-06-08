@@ -88,7 +88,6 @@
 - ignore: {name: "Use list literal pattern"}
 - ignore: {name: "Use &&"}
 - ignore: {name: "Use null"}
-- ignore: {name: "Use Just"}
 - ignore: {name: "Redundant as"}
 - ignore: {name: "Use mapM_"}
 - ignore: {name: "Redundant case"}

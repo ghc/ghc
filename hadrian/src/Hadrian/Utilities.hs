@@ -432,7 +432,7 @@ putColoured code msg = do
         then putNormal $ "\ESC[" ++ code ++ "m" ++ msg ++ "\ESC[0m"
         else putNormal msg
   where
-    isDumb = maybe False (== "dumb") <$> lookupEnv "TERM"
+    isDumb = (== Just "dumb") <$> lookupEnv "TERM"
 
 newtype BuildProgressColour = BuildProgressColour String
     deriving Typeable

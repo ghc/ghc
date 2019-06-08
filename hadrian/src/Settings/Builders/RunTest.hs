@@ -73,8 +73,8 @@ runTestBuilderArgs = builder RunTest ? do
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
     (acceptPlatform, acceptOS) <- expr . liftIO $
-        (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
-            <*> (maybe False (=="YES") <$> lookupEnv "OS")
+        (,) <$> ((== Just "YES") <$> lookupEnv "PLATFORM")
+            <*> ((== Just "YES") <$> lookupEnv "OS")
 
     windows     <- expr windowsHost
     darwin      <- expr osxHost
