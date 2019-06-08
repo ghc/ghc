@@ -551,7 +551,7 @@ foldExp :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
 foldExp _ (CmmEntry {}) z                         = z
 foldExp _ (CmmComment {}) z                       = z
 foldExp _ (CmmTick {}) z                          = z
-foldExp f (CmmUnwind xs) z                        = foldr (maybe id f) z (map snd xs)
+foldExp f (CmmUnwind xs) z                        = foldr (maybe id f . snd) z xs
 foldExp f (CmmAssign _ e) z                       = f e z
 foldExp f (CmmStore addr e) z                     = f addr $ f e z
 foldExp f (CmmUnsafeForeignCall t _ as) z         = foldr f (foldExpForeignTarget f t z) as

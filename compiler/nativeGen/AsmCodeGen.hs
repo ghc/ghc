@@ -487,8 +487,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
                       }
         go us' cmms ngs' (count + 1)
 
-    seqString []            = ()
-    seqString (x:xs)        = x `seq` seqString xs
+    seqString s = seqList s ()
 
 
 emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()

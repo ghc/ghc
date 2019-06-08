@@ -19,7 +19,6 @@
 - ignore: {name: "Use /="}
 - ignore: {name: "Use :"}
 - ignore: {name: "Redundant $"}
-- ignore: {name: "Use foldr"}
 - ignore: {name: "Use id"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Move brackets to avoid $"}
@@ -33,7 +32,6 @@
 - ignore: {name: "Use section"}
 - ignore: {name: "Move guards forward"}
 - ignore: {name: "Use mapMaybe"}
-- ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Use void"}
 - ignore: {name: "Use fewer imports"}
 - ignore: {name: "Use unless"}
@@ -163,6 +161,9 @@
 - ignore: {name: "Redundant lambda"}
 
 - ignore: {name: "Avoid lambda"}
+
+# Not much gain in readability.
+- ignore: {name: "Fuse foldr/map"}
 
 
 # Define some custom infix operators

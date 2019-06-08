@@ -998,8 +998,7 @@ unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 
 seqList :: [a] -> b -> b
-seqList [] b = b
-seqList (x:xs) b = x `seq` seqList xs b
+seqList as b = foldr seq b as
 
 
 {-

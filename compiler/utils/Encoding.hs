@@ -255,9 +255,7 @@ zEncodeString cs = case maybe_tuple cs of
                 Nothing -> go cs
           where
                 go []     = []
-                go (c:cs) = encode_digit_ch c ++ go' cs
-                go' []     = []
-                go' (c:cs) = encode_ch c ++ go' cs
+                go (c:cs) = encode_digit_ch c ++ concatMap encode_ch cs
 
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar 'Z' = False

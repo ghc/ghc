@@ -21,6 +21,7 @@ import Var( varType, tyVarKind )
 import Type( seqType, isTyVar )
 import Coercion( seqCo )
 import Id( Id, idInfo )
+import Util( seqList )
 
 -- | Evaluate all the fields of the 'IdInfo' that are generally demanded by the
 -- compiler
@@ -66,8 +67,7 @@ seqExpr (Type t)        = seqType t
 seqExpr (Coercion co)   = seqCo co
 
 seqExprs :: [CoreExpr] -> ()
-seqExprs [] = ()
-seqExprs (e:es) = seqExpr e `seq` seqExprs es
+seqExprs es = seqList (map seqExpr es) ()
 
 seqTickish :: Tickish Id -> ()
 seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
@@ -81,8 +81,7 @@ seqBndr b | isTyVar b = seqType (tyVarKind b)
                         megaSeqIdInfo (idInfo b)
 
 seqBndrs :: [CoreBndr] -> ()
-seqBndrs [] = ()
-seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
+seqBndrs bs = seqList (map seqBndr bs) ()
 
 seqBinds :: [Bind CoreBndr] -> ()
 seqBinds bs = foldr (seq . seqBind) () bs

@@ -298,7 +298,7 @@ copyTicks env g
               CmmEntry  _   scp0        = firstNode from
               (CmmEntry lbl scp1, code) = blockSplitHead to
           in CmmEntry lbl (combineTickScopes scp0 scp1) `blockJoinHead`
-             foldr blockCons code (map CmmTick ticks)
+             foldr (blockCons . CmmTick) code ticks
 
 -- Group by [Label]
 -- See Note [Compressed TrieMap] in coreSyn/TrieMap about the usage of GenMap.

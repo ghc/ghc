@@ -54,6 +54,7 @@ import GHC.IORef             ( IORef, newIORef, readIORef, writeIORef )
 import GHC.List              ( elem, length )
 import GHC.Num               ( Num(..) )
 
+import Data.Foldable         ( traverse_ )
 import Data.OldList          ( delete )
 import Foreign.Marshal.Alloc ( mallocBytes, reallocBytes, free )
 import Foreign.Marshal.Array ( pokeArray, pokeArray0 )
@@ -79,9 +80,7 @@ newPool = liftM Pool (newIORef [])
 -- pool itself.
 
 freePool :: Pool -> IO ()
-freePool (Pool pool) = readIORef pool >>= freeAll
-   where freeAll []     = return ()
-         freeAll (p:ps) = free p >> freeAll ps
+freePool (Pool pool) = readIORef pool >>= traverse_ free
 
 -- | Execute an action with a fresh memory pool, which gets automatically
 -- deallocated (including its contents) after the action has finished.

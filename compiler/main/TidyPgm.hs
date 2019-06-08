@@ -1341,8 +1341,7 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   cafRefsE (Coercion _)        = False
 
   cafRefsEs :: [Expr a] -> Bool
-  cafRefsEs []     = False
-  cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
+  cafRefsEs = any cafRefsE
 
   cafRefsL :: Literal -> Bool
   -- Don't forget that mk_integer id might have Caf refs!

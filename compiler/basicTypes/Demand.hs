@@ -292,8 +292,7 @@ seqStrDmd (SCall s)    = seqStrDmd s
 seqStrDmd _            = ()
 
 seqStrDmdList :: [ArgStr] -> ()
-seqStrDmdList [] = ()
-seqStrDmdList (d:ds) = seqArgStr d `seq` seqStrDmdList ds
+seqStrDmdList ds = seqList (map seqArgStr ds) ()
 
 seqArgStr :: ArgStr -> ()
 seqArgStr Lazy    = ()
@@ -586,8 +585,7 @@ seqUseDmd (UCall c d)  = c `seq` seqUseDmd d
 seqUseDmd _            = ()
 
 seqArgUseList :: [ArgUse] -> ()
-seqArgUseList []     = ()
-seqArgUseList (d:ds) = seqArgUse d `seq` seqArgUseList ds
+seqArgUseList ds = seqList (map seqArgUse ds) ()
 
 seqArgUse :: ArgUse -> ()
 seqArgUse (Use c u)  = c `seq` seqUseDmd u
@@ -770,8 +768,7 @@ seqDemand :: Demand -> ()
 seqDemand (JD {sd = s, ud = u}) = seqArgStr s `seq` seqArgUse u
 
 seqDemandList :: [Demand] -> ()
-seqDemandList [] = ()
-seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
+seqDemandList ds = seqList (map seqDemand ds) ()
 
 isStrictDmd :: JointDmd (Str s) (Use u) -> Bool
 -- See Note [Strict demands]
@@ -1779,8 +1776,7 @@ argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
   where
     unsaturated_call = arg_ds `lengthExceeds` n_val_args
 
-    go []               = []
-    go (arg_d : arg_ds) = argOneShots arg_d `cons` go arg_ds
+    go = foldr (cons . argOneShots) []
 
     -- Avoid list tail like [ [], [], [] ]
     cons [] [] = []

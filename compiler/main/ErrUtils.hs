@@ -107,8 +107,7 @@ andValid v _       = v
 
 -- | If they aren't all valid, return the first
 allValid :: [Validity] -> Validity
-allValid []       = IsValid
-allValid (v : vs) = v `andValid` allValid vs
+allValid = foldr andValid IsValid
 
 getInvalids :: [Validity] -> [MsgDoc]
 getInvalids vs = [d | NotValid d <- vs]

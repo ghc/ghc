@@ -748,7 +748,7 @@ memConflicts _         _         = True
 
 exprMem :: DynFlags -> CmmExpr -> AbsMem
 exprMem dflags (CmmLoad addr w)  = bothMems (loadAddr dflags addr (typeWidth w)) (exprMem dflags addr)
-exprMem dflags (CmmMachOp _ es)  = foldr bothMems NoMem (map (exprMem dflags) es)
+exprMem dflags (CmmMachOp _ es)  = foldr (bothMems . exprMem dflags) NoMem es
 exprMem _      _                 = NoMem
 
 loadAddr :: DynFlags -> CmmExpr -> Width -> AbsMem
