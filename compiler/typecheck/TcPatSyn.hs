@@ -806,7 +806,6 @@ mkPatSynBuilderId dir (dL->L _ name)
              builder_id'    = modifyIdInfo (`setLevityInfoWithType` pat_ty) builder_id
 
        ; return (Just (builder_id', need_dummy_arg)) }
-  where
 
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)

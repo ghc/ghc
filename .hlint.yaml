@@ -27,7 +27,6 @@
 - ignore: {name: "Use sortOn"}
 - ignore: {name: "Use list comprehension"}
 - ignore: {name: "Fuse concatMap/map"}
-- ignore: {name: "Redundant where"}
 - ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Use guards"}
