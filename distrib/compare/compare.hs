@@ -151,7 +151,7 @@ mkContents mWays tls
     = case runStateT (mapM f tls) (emptyBuildInfo mWays) of
       Nothing -> Left ["Can't happen: mkContents: Nothing"]
       Just (xs, finalBuildInfo) ->
-          case concat $ map (checkContent finalBuildInfo) xs of
+          case concatMap (checkContent finalBuildInfo) xs of
           []   -> Right (xs, biThingVersionMap finalBuildInfo)
           errs -> Left errs
     where f tl = do fnd <- mkFilePathDescr (tlFileName tl)

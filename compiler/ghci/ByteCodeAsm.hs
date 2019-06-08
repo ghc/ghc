@@ -101,7 +101,7 @@ assembleBCOs hsc_env proto_bcos tycons top_strs modbreaks = do
   return CompiledByteCode
     { bc_bcos = bcos'
     , bc_itbls =  itblenv
-    , bc_ffis = concat (map protoBCOFFIs proto_bcos)
+    , bc_ffis = concatMap protoBCOFFIs proto_bcos
     , bc_strs = top_strs ++ ptrs
     , bc_breaks = modbreaks
     }

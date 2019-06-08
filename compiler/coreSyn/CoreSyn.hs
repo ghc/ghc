@@ -1993,7 +1993,7 @@ bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
 -- | 'bindersOf' applied to a list of binding groups
 bindersOfBinds :: [Bind b] -> [b]
-bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
+bindersOfBinds = concatMap bindersOf
 
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]

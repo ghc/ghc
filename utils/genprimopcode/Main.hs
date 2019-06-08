@@ -437,7 +437,7 @@ gen_latex_doc (Info defaults entries)
    = "\\primopdefaults{"
          ++ mk_options defaults
          ++ "}\n"
-     ++ (concat (map mk_entry entries))
+     ++ concatMap mk_entry entries
      where mk_entry (PrimOpSpec {cons=constr,name=n,ty=t,cat=c,desc=d,opts=o}) =
                  "\\primopdesc{"
                  ++ latex_encode constr ++ "}{"
@@ -476,7 +476,7 @@ gen_latex_doc (Info defaults entries)
              where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
                    pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
-                   pbty (TyApp tc ts) = show tc ++ (concat (map (' ':) (map paty ts)))
+                   pbty (TyApp tc ts) = show tc ++ concatMap ((' ':) . paty) ts
                    pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
                    pbty t = paty t
                    paty (TyVar tv) = tv
@@ -486,8 +486,8 @@ gen_latex_doc (Info defaults entries)
              where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
                    pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
-                   pbty (TyApp tc ts) = (zencode (show tc)) ++ (concat (map (' ':) (map paty ts)))
-                   pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
+                   pbty (TyApp tc ts) = zencode (show tc) ++ concatMap ((' ':) . paty) ts
+                   pbty (TyUTup ts) = zencode (utuplenm (length ts)) ++ concatMap ((' ':) . paty) ts
                    pbty t = paty t
                    paty (TyVar tv) = zencode tv
                    paty (TyApp tc []) = zencode (show tc)
@@ -546,7 +546,7 @@ gen_latex_doc (Info defaults entries)
            zencode xs =
              case maybe_tuple xs of
                 Just n  -> n            -- Tuples go to Z2T etc
-                Nothing -> concat (map encode_ch xs)
+                Nothing -> concatMap encode_ch xs
              where
                maybe_tuple "(# #)" = Just("Z1H")
                maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of

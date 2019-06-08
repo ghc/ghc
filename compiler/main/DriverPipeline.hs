@@ -1422,8 +1422,8 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
                   then map SysTools.Option $ words llvmOpts
                   else []
 
-        defaultOptions = map SysTools.Option . concat . fmap words . fst
-                       $ unzip (llvmOptions dflags)
+        defaultOptions = map SysTools.Option . concatMap (words . fst)
+                       $ llvmOptions dflags
 
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
@@ -1496,8 +1496,8 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
               then map SysTools.Option $ words llvmOpts
               else []
 
-    defaultOptions = map SysTools.Option . concat . fmap words . snd
-                   $ unzip (llvmOptions dflags)
+    defaultOptions = map SysTools.Option . concatMap (words . snd)
+                   $ llvmOptions dflags
 
 
 -----------------------------------------------------------------------------

@@ -25,7 +25,6 @@
 - ignore: {name: "Move brackets to avoid $"}
 - ignore: {name: "Use sortOn"}
 - ignore: {name: "Use list comprehension"}
-- ignore: {name: "Fuse concatMap/map"}
 - ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Use guards"}
@@ -50,7 +49,6 @@
 - ignore: {name: "Use when"}
 - ignore: {name: "Use const"}
 - ignore: {name: "Use uncurry"}
-- ignore: {name: "Use concatMap"}
 - ignore: {name: "Use map once"}
 - ignore: {name: "Use zipWithM"}
 - ignore: {name: "Move map inside list comprehension"}

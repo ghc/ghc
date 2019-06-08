@@ -421,8 +421,8 @@ type IntGraph = G.Graph
 -}
 
 -- Data.Tree has flatten for Tree, but nothing for Forest
-preorderF           :: Forest a -> [a]
-preorderF ts         = concat (map flatten ts)
+preorderF :: Forest a -> [a]
+preorderF = concatMap flatten
 
 {-
 ------------------------------------------------------------

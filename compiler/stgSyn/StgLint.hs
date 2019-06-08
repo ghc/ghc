@@ -240,7 +240,7 @@ bindersOfTop (StgTopLifted bind) = bindersOf bind
 bindersOfTop (StgTopStringLit binder _) = [binder]
 
 bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
+bindersOfTopBinds = concatMap bindersOfTop
 
 {-
 ************************************************************************
