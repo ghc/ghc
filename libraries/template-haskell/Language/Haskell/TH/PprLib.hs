@@ -118,7 +118,7 @@ punctuate :: Doc -> [Doc] -> [Doc]
 -- The "implementation"
 
 type State = (Map Name Name, Uniq)
-data PprM a = PprM { runPprM :: State -> (a, State) }
+newtype PprM a = PprM { runPprM :: State -> (a, State) }
 
 pprName :: Name -> Doc
 pprName = pprName' Alone

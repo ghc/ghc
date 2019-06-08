@@ -364,7 +364,7 @@ accSpillSL (r1, s1, l1) (_, s2, l2)
 -- Spiller stats --------------------------------------------------------------
 -- | Spiller statistics.
 --   Tells us what registers were spilled.
-data SpillStats
+newtype SpillStats
         = SpillStats
         { spillStoreLoad        :: UniqFM (Reg, Int, Int) }
 

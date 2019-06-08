@@ -233,7 +233,7 @@ sameNat x y
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
-data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
+newtype WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 
 -- See Note [magicDictId magic] in "basicType/MkId.hs"
 withSNat :: (KnownNat a => Proxy a -> b)

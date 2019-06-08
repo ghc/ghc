@@ -139,7 +139,7 @@ data LoadedPlugin = LoadedPlugin
 
 -- | A static plugin with its arguments. For registering compiled-in plugins
 -- through the GHC API.
-data StaticPlugin = StaticPlugin
+newtype StaticPlugin = StaticPlugin
   { spPlugin :: PluginWithArgs
   -- ^ the actual plugin together with its commandline arguments
   }
@@ -234,7 +234,7 @@ withPlugins_ df transformation input
           (plugins df)
 
 type FrontendPluginAction = [String] -> [(String, Maybe Phase)] -> Ghc ()
-data FrontendPlugin = FrontendPlugin {
+newtype FrontendPlugin = FrontendPlugin {
       frontend :: FrontendPluginAction
     }
 defaultFrontendPlugin :: FrontendPlugin

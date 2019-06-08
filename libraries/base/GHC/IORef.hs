@@ -104,6 +104,7 @@ atomicSwapIORef (IORef (STRef ref)) new = IO $ \s ->
   case atomicModifyMutVar2# ref (\_old -> Box new) s of
     (# s', old, Box _new #) -> (# s', old #)
 
+{- HLINT ignore Box -} -- We don't want to make 'Box' a newtype!
 data Box a = Box a
 
 -- | Strict version of 'Data.IORef.atomicModifyIORef'. This forces both
