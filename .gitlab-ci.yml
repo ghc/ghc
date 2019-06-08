@@ -79,18 +79,11 @@ ghc-linters:
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
-    - "echo Linting changes between $base..$CI_COMMIT_SHA"
+    - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
     - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
   tags:
     - lint
-
-lint-submods:
-  extends: .lint-submods
-  only:
-    refs:
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
 
 lint-submods-marge:
   extends: .lint-submods
@@ -111,6 +104,16 @@ lint-submods-mr:
   except:
     variables:
       - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
+
+lint-submods-branch:
+  extends: .lint-submods
+  script:
+    - "echo Linting submodule changes for $CI_COMMIT_SHA"
+    - submodchecker .git $CI_COMMIT_SHA
+  only:
+    refs:
+      - master
+      - /ghc-[0-9]+\.[0-9]+/
 
 .lint-changelogs:
   stage: lint
