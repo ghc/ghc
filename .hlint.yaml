@@ -83,7 +83,6 @@
 - ignore: {name: "Use any"}
 - ignore: {name: "Use negate"}
 - ignore: {name: "Collapse lambdas"}
-- ignore: {name: "Use >>"}
 - ignore: {name: "Use isAsciiLower"}
 - ignore: {name: "Use mapM"}
 - ignore: {name: "Use list literal pattern"}
