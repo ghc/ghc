@@ -114,12 +114,14 @@ configurePackage context@Context {..} = do
     gpd     <- pkgGenericDescription package
     cFile <- pkgCabalFile package
     depPkgs <- packageDependencies <$> readPackageData package
+    liftIO $ print depPkgs
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
     -- We'll need those packages in our package database.
     deps <- sequence [ pkgConfFile (context { package = pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
+    liftIO $ print deps
     need deps
 
     -- Figure out what hooks we need.

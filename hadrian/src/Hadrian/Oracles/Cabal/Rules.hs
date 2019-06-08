@@ -51,6 +51,7 @@ cabalOracle = do
         -- this indirection? Going via @setup-config@ allows us to cache the
         -- configuration step, i.e. not to repeat it if it's already been done.
         setupConfig <- pkgSetupConfigFile context
+        liftIO $ print setupConfig
         need [setupConfig]
         resolveContextData context
 
