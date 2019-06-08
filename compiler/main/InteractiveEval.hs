@@ -598,8 +598,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
            [id | id <- tmp_ids
                , not $ noSkolems id
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   hsc_env' <- foldM improveTypes hsc_env (map idName incompletelyTypedIds)
-   return hsc_env'
+   foldM improveTypes hsc_env (map idName incompletelyTypedIds)
     where
      noSkolems = noFreeVarsOfType . idType
      improveTypes hsc_env@HscEnv{hsc_IC=ic} name = do

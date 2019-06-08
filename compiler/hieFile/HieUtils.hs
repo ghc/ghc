@@ -29,7 +29,6 @@ import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
 import Data.Maybe                 ( maybeToList )
 import Data.Monoid
-import Data.Traversable           ( for )
 import Control.Monad.Trans.State.Strict hiding (get)
 
 
@@ -117,9 +116,7 @@ compressTypes
 compressTypes asts = (a, arr)
   where
     (a, (HTS _ m i)) = flip runState initialHTS $
-      for asts $ \typ -> do
-        i <- getTypeIndex typ
-        return i
+      traverse getTypeIndex asts
     arr = A.array (0,i-1) (IM.toList m)
 
 recoverFullType :: TypeIndex -> A.Array TypeIndex HieTypeFlat -> HieTypeFix

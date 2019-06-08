@@ -709,8 +709,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                               ++ "to 'configure'.\n"
              Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
 
-         rs <- mapM (lookupResult m) (wanteds os)
-         return rs
+         mapM (lookupResult m) (wanteds os)
     where headers = ["#define IN_STG_CODE 0",
                      "",
                      "/*",

@@ -70,7 +70,6 @@ startSlave' verbose base_path port = do
     when verbose $ trace "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
     when verbose $ trace "serv ended"
-    return ()
 
 -- | The iserv library may need access to files, specifically
 -- archives and object files to be linked. If ghc and the slave

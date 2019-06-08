@@ -214,8 +214,7 @@ withArrayLen0 :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
 withArrayLen0 marker vals f  =
   allocaArray0 len $ \ptr -> do
       pokeArray0 marker ptr vals
-      res <- f len ptr
-      return res
+      f len ptr
   where
     len = length vals
 

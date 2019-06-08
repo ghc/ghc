@@ -734,7 +734,6 @@ doMake srcs  = do
     ok_flag <- GHC.load LoadAllTargets
 
     when (failed ok_flag) (liftIO $ exitWith (ExitFailure 1))
-    return ()
 
 
 -- ---------------------------------------------------------------------------

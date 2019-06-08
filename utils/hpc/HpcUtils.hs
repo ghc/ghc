@@ -31,6 +31,5 @@ readFileFromPath err filename path0 = readTheFile path0
         readTheFile [] = err $ "could not find " ++ show filename
                                  ++ " in path " ++ show path0
         readTheFile (dir:dirs) =
-                catchIO (do str <- readFile (dir </> filename)
-                            return str)
+                catchIO (readFile (dir </> filename))
                         (\ _ -> readTheFile dirs)

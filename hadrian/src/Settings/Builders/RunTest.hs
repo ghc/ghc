@@ -235,8 +235,7 @@ inferLibraryWays compiler = do
     [bindir </> "ghc-pkg" <.> exe]
     ["field", "ghc-prim", "library-dirs", "--simple-output"]
   let ghcPrimLibdir = fixup ghcPrimLibdirDirty
-  ways <- catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
-  return ways
+  catMaybes <$> traverse (lookForWay ghcPrimLibdir) candidateWays
 
   where lookForWay dir (hifile, w) = do
           exists <- doesFileExist (dir -/- hifile)

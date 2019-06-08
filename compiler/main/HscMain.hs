@@ -509,34 +509,28 @@ tcRnModule' sum save_rn_syntax mod = do
     let allSafeOK = safeInferred dflags && tcSafeOK
 
     -- end of the safe haskell line, how to respond to user?
-    res <- if not (safeHaskellOn dflags)
-                || (safeInferOn dflags && not allSafeOK)
-             -- if safe Haskell off or safe infer failed, mark unsafe
-             then markUnsafeInfer tcg_res whyUnsafe
+    if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
+        -- if safe Haskell off or safe infer failed, mark unsafe
+        then markUnsafeInfer tcg_res whyUnsafe
 
-             -- module (could be) safe, throw warning if needed
-             else do
-                 tcg_res' <- hscCheckSafeImports tcg_res
-                 safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
-                 when safe $ do
-                   case wopt Opt_WarnSafe dflags of
-                     True -> (logWarnings $ unitBag $
-                              makeIntoWarning (Reason Opt_WarnSafe) $
-                              mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
-                              errSafe tcg_res')
-                     False | safeHaskell dflags == Sf_Trustworthy &&
-                             wopt Opt_WarnTrustworthySafe dflags ->
-                             (logWarnings $ unitBag $
-                              makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
-                              mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
-                              errTwthySafe tcg_res')
-                     False -> return ()
-                 return tcg_res'
-
-    -- apply plugins to the type checking result
-
-
-    return res
+        -- module (could be) safe, throw warning if needed
+        else do
+            tcg_res' <- hscCheckSafeImports tcg_res
+            safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
+            when safe $ do
+              case wopt Opt_WarnSafe dflags of
+                True -> (logWarnings $ unitBag $
+                         makeIntoWarning (Reason Opt_WarnSafe) $
+                         mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
+                         errSafe tcg_res')
+                False | safeHaskell dflags == Sf_Trustworthy &&
+                        wopt Opt_WarnTrustworthySafe dflags ->
+                        (logWarnings $ unitBag $
+                         makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
+                         mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
+                         errTwthySafe tcg_res')
+                False -> return ()
+            return tcg_res'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
@@ -1159,10 +1153,9 @@ hscCheckSafe' m l = do
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk
-        iface' <- case iface of
+        case iface of
             Just _  -> return iface
             Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
-        return iface'
 
 
     isHomePkg :: DynFlags -> Module -> Bool
@@ -1847,9 +1840,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
                      (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
            {- link it -}
-         ; hval <- linkExpr hsc_env srcspan bcos
-
-         ; return hval }
+         ; linkExpr hsc_env srcspan bcos }
 
 
 {- **********************************************************************

@@ -205,38 +205,37 @@ figureLlvmVersion dflags = do
       -- of the options they've specified. llc doesn't care what other
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
-  ver <- catchIO (do
-              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
-                                              Nothing Nothing
-              {- > llc -version
-                  LLVM (http://llvm.org/):
-                    LLVM version 3.5.2
-                    ...
-              -}
-              hSetBinaryMode pout False
-              _     <- hGetLine pout
-              vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
-              v     <- case span (/= '.') vline of
-                        ("",_)  -> fail "no digits!"
-                        (x,y) -> return (read x
-                                        , read $ takeWhile isDigit $ drop 1 y)
+  catchIO
+      (do (pin, pout, perr, _) <- runInteractiveProcess pgm args'
+                                          Nothing Nothing
+          {- > llc -version
+              LLVM (http://llvm.org/):
+                LLVM version 3.5.2
+                ...
+          -}
+          hSetBinaryMode pout False
+          _     <- hGetLine pout
+          vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
+          v     <- case span (/= '.') vline of
+                    ("",_)  -> fail "no digits!"
+                    (x,y) -> return (read x
+                                    , read $ takeWhile isDigit $ drop 1 y)
 
-              hClose pin
-              hClose pout
-              hClose perr
-              return $ Just v
-            )
-            (\err -> do
-                debugTraceMsg dflags 2
-                    (text "Error (figuring out LLVM version):" <+>
-                      text (show err))
-                errorMsg dflags $ vcat
-                    [ text "Warning:", nest 9 $
-                          text "Couldn't figure out LLVM version!" $$
-                          text ("Make sure you have installed LLVM " ++
-                                llvmVersionStr supportedLlvmVersion) ]
-                return Nothing)
-  return ver
+          hClose pin
+          hClose pout
+          hClose perr
+          return $ Just v
+      )
+      (\err -> do
+          debugTraceMsg dflags 2
+              (text "Error (figuring out LLVM version):" <+>
+                text (show err))
+          errorMsg dflags $ vcat
+              [ text "Warning:", nest 9 $
+                    text "Couldn't figure out LLVM version!" $$
+                    text ("Make sure you have installed LLVM " ++
+                          llvmVersionStr supportedLlvmVersion) ]
+          return Nothing)
 
 
 runLink :: DynFlags -> [Option] -> IO ()

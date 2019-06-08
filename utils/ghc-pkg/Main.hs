@@ -2187,9 +2187,8 @@ installSignalHandlers = do
                                     (Exception.ErrorCall "interrupted")
   --
 #if !defined(mingw32_HOST_OS)
-  _ <- installHandler sigQUIT (Catch interrupt) Nothing
-  _ <- installHandler sigINT  (Catch interrupt) Nothing
-  return ()
+  void $ installHandler sigQUIT (Catch interrupt) Nothing
+  void $ installHandler sigINT  (Catch interrupt) Nothing
 #else
   -- GHC 6.3+ has support for console events on Windows
   -- NOTE: running GHCi under a bash shell for some reason requires
@@ -2200,8 +2199,7 @@ installSignalHandlers = do
       sig_handler Break    = interrupt
       sig_handler _        = return ()
 
-  _ <- installHandler (Catch sig_handler)
-  return ()
+  void $ installHandler (Catch sig_handler)
 #endif
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a

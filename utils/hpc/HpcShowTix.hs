@@ -59,6 +59,3 @@ showtix_main flags (prog:modNames) = do
                    , Mix _file _timestamp _hash2 _tab entries
                    ) <- tixs_mixs
                  ]
-
-       return ()
-

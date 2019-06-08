@@ -400,7 +400,6 @@ searchPathExts
   -> IO InstalledFindResult
 
 searchPathExts paths mod exts
-   = do result <- search to_search
 {-
         hPutStrLn stderr (showSDoc $
                 vcat [text "Search" <+> ppr mod <+> sep (map (text. fst) exts)
@@ -409,7 +408,7 @@ searchPathExts paths mod exts
                         Succeeded (loc, p) -> text "Found" <+> ppr loc
                         Failed fs          -> text "not found"])
 -}
-        return result
+   = search to_search
 
   where
     basename = moduleNameSlashes (installedModuleName mod)

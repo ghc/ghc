@@ -293,9 +293,8 @@ readPackageDbForGhc file =
     getDbForGhc = do
       _version    <- getHeader
       _ghcPartLen <- get :: Get Word32
-      ghcPart     <- get
       -- the next part is for ghc-pkg, but we stop here.
-      return ghcPart
+      get
 
 -- | Read the part of the package DB that ghc-pkg is interested in
 --
@@ -318,8 +317,7 @@ readPackageDbForGhcPkg file mode =
       ghcPartLen  <- get :: Get Word32
       _ghcPart    <- skip (fromIntegral ghcPartLen)
       -- the next part is for ghc-pkg
-      ghcPkgPart  <- get
-      return ghcPkgPart
+      get
 
 -- | Write the whole of the package DB, both parts.
 --

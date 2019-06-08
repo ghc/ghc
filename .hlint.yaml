@@ -39,7 +39,9 @@
 - ignore: {name: "Use fewer imports"}
 - ignore: {name: "Use unless"}
 - ignore: {name: "Use tuple-section"}
-- ignore: {name: "Redundant return"}
+- ignore: {name: "Redundant return"} # FastString.stringTable and
+                                     # GHCi.InfoTable.newExecConItbl
+                                     # return behind CPP
 - ignore: {name: "Use let"}
 - ignore: {name: "Use isNothing"}
 - ignore: {name: "Avoid lambda using `infix`"}

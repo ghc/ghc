@@ -1271,10 +1271,8 @@ getLHsInstDeclHead inst_ty
 getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
                           -> Maybe (Located (IdP (GhcPass p)))
 -- Works on (HsSigType RdrName)
-getLHsInstDeclClass_maybe inst_ty
-  = do { let head_ty = getLHsInstDeclHead inst_ty
-       ; cls <- hsTyGetAppHead_maybe head_ty
-       ; return cls }
+getLHsInstDeclClass_maybe
+  = hsTyGetAppHead_maybe . getLHsInstDeclHead
 
 {-
 ************************************************************************
