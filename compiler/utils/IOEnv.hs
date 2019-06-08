@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -51,7 +52,7 @@ import Control.Applicative (Alternative(..))
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a)
+newtype IOEnv env a = IOEnv (env -> IO a) deriving (Functor)
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
@@ -70,9 +71,6 @@ instance Applicative (IOEnv m) where
     pure = returnM
     IOEnv f <*> IOEnv x = IOEnv (\ env -> f env <*> x env )
     (*>) = thenM_
-
-instance Functor (IOEnv m) where
-    fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
 
 returnM :: a -> IOEnv env a
 returnM a = IOEnv (\ _ -> return a)

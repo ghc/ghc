@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -- ----------------------------------------------------------------------------
 -- | Base LLVM Code Generation module
@@ -209,10 +210,7 @@ type LlvmEnvMap = UniqFM LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
-
-instance Functor LlvmM where
-    fmap f m = LlvmM $ \env -> do (x, env') <- runLlvmM m env
-                                  return (f x, env')
+    deriving (Functor)
 
 instance Applicative LlvmM where
     pure x = LlvmM $ \env -> return (x, env)

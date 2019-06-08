@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -59,7 +60,7 @@ import Unique           ( Unique )
 import DynFlags
 import Module
 
-import Control.Monad    ( liftM, ap )
+import Control.Monad    ( ap )
 
 import Instruction
 import Outputable (SDoc, pprPanic, ppr)
@@ -113,6 +114,7 @@ data NatM_State
 type DwarfFiles = UniqFM (FastString, Int)
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
+    deriving (Functor)
 
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a
@@ -137,9 +139,6 @@ mkNatM_State us delta dflags this_mod
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
         = case unNat m init_st of { (r,st) -> (r,st) }
-
-instance Functor NatM where
-      fmap = liftM
 
 instance Applicative NatM where
       pure = returnNat

@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, RecordWildCards #-}
+{-# LANGUAGE BangPatterns, CPP, DeriveFunctor, MagicHash, RecordWildCards #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -224,9 +224,7 @@ data Assembler a
   | AllocLabel Word16 (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
-
-instance Functor Assembler where
-    fmap = liftM
+  deriving (Functor)
 
 instance Applicative Assembler where
     pure = NullAsm
