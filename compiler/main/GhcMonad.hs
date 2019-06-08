@@ -96,7 +96,7 @@ newtype Ghc a = Ghc { unGhc :: Session -> IO a }
 -- session.  A compilation session consists of a set of modules
 -- constituting the current program or library, the context for
 -- interactive evaluation, and various caches.
-newtype Session = Session (IORef HscEnv)
+data Session = Session !(IORef HscEnv)
 
 instance Functor Ghc where
   fmap f m = Ghc $ \s -> f `fmap` unGhc m s

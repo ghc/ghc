@@ -259,9 +259,9 @@ newtype LintM a = LintM
               -> (a, Bag MsgDoc)   -- Result and error messages (if any)
     }
 
-newtype LintFlags = LintFlags { lf_unarised :: Bool
-                                -- ^ have we run the unariser yet?
-                              }
+data LintFlags = LintFlags { lf_unarised :: !Bool
+                             -- ^ have we run the unariser yet?
+                           }
 
 data LintLocInfo
   = RhsOf Id            -- The variable bound

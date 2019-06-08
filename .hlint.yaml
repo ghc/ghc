@@ -59,6 +59,7 @@
 - ignore: {name: "Use lambda-case"}
 - ignore: {name: "Redundant guard"}
 - ignore: {name: "Use ++"}
+- ignore: {name: "Use newtype instead of data"}
 - ignore: {name: "Use replicateM"}
 - ignore: {name: "Use forM"}
 - ignore: {name: "Use <$"}
