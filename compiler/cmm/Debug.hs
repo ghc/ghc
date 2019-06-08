@@ -252,7 +252,7 @@ cmmDebugLink :: [Label] -> LabelMap [UnwindPoint]
              -> [DebugBlock] -> [DebugBlock]
 cmmDebugLink labels unwindPts blocks = map link blocks
   where blockPos :: LabelMap Int
-        blockPos = mapFromList $ flip zip [0..] labels
+        blockPos = mapFromList $ zip labels [0..]
         link block = block { dblPosition = mapLookup (dblLabel block) blockPos
                            , dblBlocks   = map link (dblBlocks block)
                            , dblUnwind   = fromMaybe mempty

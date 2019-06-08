@@ -42,7 +42,6 @@
 - ignore: {name: "Use let"}
 - ignore: {name: "Use isNothing"}
 - ignore: {name: "Avoid lambda using `infix`"}
-- ignore: {name: "Redundant flip"}
 - ignore: {name: "Redundant lambda"}
 - ignore: {name: "Use if"}
 - ignore: {name: "Use replicate"}
