@@ -182,28 +182,37 @@ Mutex linker_unloaded_mutex;
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
 
-/* Link objects into the lower 2Gb on x86_64.  GHC assumes the
+/* Link objects into the lower 2Gb on x86_64 and AArch64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
  * -mcmodel=small).
  *
  * MAP_32BIT not available on OpenBSD/amd64
  */
-#if defined(x86_64_HOST_ARCH) && defined(MAP_32BIT)
+#if defined(MAP_32BIT) && defined(x86_64_HOST_ARCH)
+#define MAP_LOW_MEM
 #define TRY_MAP_32BIT MAP_32BIT
 #else
 #define TRY_MAP_32BIT 0
 #endif
 
+#if defined(aarch64_HOST_ARCH)
+// On AArch64 MAP_32BIT is not available but we are still bound by the small
+// memory model. Consequently we still try using the MAP_LOW_MEM allocation
+// strategy.
+#define MAP_LOW_MEM
+#endif
+
 /*
- * Due to the small memory model (see above), on x86_64 we have to map
- * all our non-PIC object files into the low 2Gb of the address space
- * (why 2Gb and not 4Gb?  Because all addresses must be reachable
- * using a 32-bit signed PC-relative offset). On Linux we can do this
- * using the MAP_32BIT flag to mmap(), however on other OSs
- * (e.g. *BSD, see #2063, and also on Linux inside Xen, see #2512), we
- * can't do this.  So on these systems, we have to pick a base address
- * in the low 2Gb of the address space and try to allocate memory from
- * there.
+ * Note [MAP_LOW_MEM]
+ * ~~~~~~~~~~~~~~~~~~
+ * Due to the small memory model (see above), on x86_64 and AArch64 we have to
+ * map all our non-PIC object files into the low 2Gb of the address space (why
+ * 2Gb and not 4Gb?  Because all addresses must be reachable using a 32-bit
+ * signed PC-relative offset). On x86_64 Linux we can do this using the
+ * MAP_32BIT flag to mmap(), however on other OSs (e.g. *BSD, see #2063, and
+ * also on Linux inside Xen, see #2512), we can't do this.  So on these
+ * systems, we have to pick a base address in the low 2Gb of the address space
+ * and try to allocate memory from there.
  *
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
@@ -1006,7 +1015,7 @@ mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset)
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
 
-#if defined(x86_64_HOST_ARCH)
+#if defined(MAP_LOW_MEM)
 mmap_again:
 #endif
 
@@ -1031,7 +1040,7 @@ mmap_again:
        return NULL;
    }
 
-#if defined(x86_64_HOST_ARCH)
+#if defined(MAP_LOW_MEM)
    if (RtsFlags.MiscFlags.linkerAlwaysPic) {
    } else if (mmap_32bit_base != 0) {
        if (result == map_addr) {
