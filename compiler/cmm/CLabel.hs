@@ -1032,8 +1032,12 @@ labelDynamic dflags this_mod lbl =
    LocalBlockLabel _    -> False
 
    ForeignLabel _ _ source _  ->
-       if os == OSMinGW32
-       then case source of
+       -- On Mac OS X and on ELF platforms, false positives are OK, so we claim
+       -- that all foreign imports come from dynamic libraries
+       os /= OSMinGW32
+
+          -- Windows
+       || case source of
             -- Foreign label is in some un-named foreign package (or DLL).
             ForeignLabelInExternalPackage -> True
 
@@ -1046,11 +1050,6 @@ labelDynamic dflags this_mod lbl =
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
                 externalDynamicRefs && (this_pkg /= pkgId)
-
-       else -- On Mac OS X and on ELF platforms, false positives are OK,
-            -- so we claim that all foreign imports come from dynamic
-            -- libraries
-            True
 
    CC_Label cc ->
      externalDynamicRefs && not (ccFromThisModule cc this_mod)

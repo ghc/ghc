@@ -258,10 +258,10 @@ isSmall _ = False
 isTrivial :: DynFlags -> CmmExpr -> Bool
 isTrivial _ (CmmReg (CmmLocal _)) = True
 isTrivial dflags (CmmReg (CmmGlobal r)) = -- see Note [Inline GlobalRegs?]
-  if isARM (platformArch (targetPlatform dflags))
-  then True -- CodeGen.Platform.ARM does not have globalRegMaybe
-  else isJust (globalRegMaybe (targetPlatform dflags) r)
-  -- GlobalRegs that are loads from BaseReg are not trivial
+  isARM (platformArch (targetPlatform dflags))
+     -- CodeGen.Platform.ARM does not have globalRegMaybe
+  || isJust (globalRegMaybe (targetPlatform dflags) r)
+     -- GlobalRegs that are loads from BaseReg are not trivial
 isTrivial _ (CmmLit _) = True
 isTrivial _ _          = False
 

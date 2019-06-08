@@ -1020,8 +1020,7 @@ ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
           ppr expr ]
 
 ppr_expr (HsWrap _ co_fn e)
-  = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
-                                             else pprExpr e)
+  = pprHsWrapper co_fn (const (pprExpr e))
 
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b

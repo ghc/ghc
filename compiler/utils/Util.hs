@@ -1129,13 +1129,8 @@ toArgs str
 
 exactLog2 :: Integer -> Maybe Integer
 exactLog2 x
-  = if (x <= 0 || x >= 2147483648) then
-       Nothing
-    else
-       if (x .&. (-x)) /= x then
-          Nothing
-       else
-          Just (pow2 x)
+  | x <= 0 || x >= 2147483648 || (x .&. (-x)) /= x = Nothing
+  | otherwise                                      = Just (pow2 x)
   where
     pow2 x | x == 1 = 0
            | otherwise = 1 + pow2 (x `shiftR` 1)

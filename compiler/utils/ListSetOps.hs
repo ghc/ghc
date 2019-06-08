@@ -132,9 +132,7 @@ hasNoDups :: (Eq a) => [a] -> Bool
 hasNoDups xs = f [] xs
   where
     f _           []     = True
-    f seen_so_far (x:xs) = if x `is_elem` seen_so_far
-                           then False
-                           else f (x:seen_so_far) xs
+    f seen_so_far (x:xs) = not (x `is_elem` seen_so_far) && f (x:seen_so_far) xs
 
     is_elem = isIn "hasNoDups"
 

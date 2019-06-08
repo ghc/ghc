@@ -1242,13 +1242,15 @@ getNonClobberedOperand (CmmLit lit) = do
 
 getNonClobberedOperand (CmmLoad mem pk) = do
   is32Bit <- is32BitPlatform
-  -- this logic could be simplified
-  -- TODO FIXME
-  if   (if is32Bit then not (isWord64 pk) else True)
-      -- if 32bit and pk is at float/double/simd value
-      -- or if 64bit
-      --  this could use some eyeballs or i'll need to stare at it more later
-    then do
+
+  if is32Bit && isWord64 pk
+
+    -- if it's a word or gcptr on 32bit
+    then getNonClobberedOperand_generic (CmmLoad mem pk)
+
+    -- if 32bit and pk is at float/double/simd value
+    -- or if 64bit
+    else do
       dflags <- getDynFlags
       let platform = targetPlatform dflags
       Amode src mem_code <- getAmode mem
@@ -1263,9 +1265,6 @@ getNonClobberedOperand (CmmLoad mem pk) = do
                 else
                    return (src, nilOL)
       return (OpAddr src', mem_code `appOL` save_code)
-    else do
-      -- if its a word or gcptr on 32bit?
-      getNonClobberedOperand_generic (CmmLoad mem pk)
 
 getNonClobberedOperand e = getNonClobberedOperand_generic e
 
@@ -1303,7 +1302,7 @@ getOperand (CmmLit lit) = do
 getOperand (CmmLoad mem pk) = do
   is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
-  if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
+  if (not (isFloatType pk) || use_sse2) && not (is32Bit && isWord64 pk)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)
@@ -1378,7 +1377,7 @@ getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
 getRegOrMem e@(CmmLoad mem pk) = do
   is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
-  if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
+  if (not (isFloatType pk) || use_sse2) && not (is32Bit && isWord64 pk)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)

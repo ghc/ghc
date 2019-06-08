@@ -29,7 +29,8 @@
 - ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Use guards"}
-- ignore: {name: "Redundant if"}
+- ignore: {name: "Redundant if"} # Due to PprCmmExpr.pprLocalReg which has some
+                                 # rather confusing comments
 - ignore: {name: "Use section"}
 - ignore: {name: "Move guards forward"}
 - ignore: {name: "Use mapMaybe"}
