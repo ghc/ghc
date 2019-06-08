@@ -765,8 +765,6 @@ bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 
     q = mvar->head;
 loop:
-    qinfo = q->header.info;
-    load_load_barrier();
     if (q == (StgMVarTSOQueue*)&stg_END_TSO_QUEUE_closure) {
         /* No further takes, the MVar is now full. */
         if (info == &stg_MVAR_CLEAN_info) {
@@ -777,6 +775,9 @@ loop:
         unlockClosure((StgClosure*)mvar, &stg_MVAR_DIRTY_info);
         return true;
     }
+
+    qinfo = q->header.info;
+    load_load_barrier();
     if (qinfo == &stg_IND_info ||
         qinfo == &stg_MSG_NULL_info) {
         q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
