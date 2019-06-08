@@ -88,7 +88,6 @@
 - ignore: {name: "Use mapM"}
 - ignore: {name: "Use list literal pattern"}
 - ignore: {name: "Use &&"}
-- ignore: {name: "Fuse mapM/map"}
 - ignore: {name: "Use null"}
 - ignore: {name: "Use Just"}
 - ignore: {name: "Redundant as"}
