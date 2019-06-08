@@ -39,7 +39,6 @@
 - ignore: {name: "Use void"}
 - ignore: {name: "Use mapAndUnzipM"}
 - ignore: {name: "Use fewer imports"}
-- ignore: {name: "Too strict maybe"}
 - ignore: {name: "Use unless"}
 - ignore: {name: "Use tuple-section"}
 - ignore: {name: "Redundant return"}

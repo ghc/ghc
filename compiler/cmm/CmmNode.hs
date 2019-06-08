@@ -490,8 +490,8 @@ mapForeignTargetM _ (PrimTarget _)      = Nothing
 wrapRecExpM :: (CmmExpr -> Maybe CmmExpr) -> (CmmExpr -> Maybe CmmExpr)
 -- (wrapRecExpM f e) first recursively applies itself to sub-expressions of e
 --                   then  gives f a chance to rewrite the resulting expression
-wrapRecExpM f n@(CmmMachOp op es)  = maybe (f n) (f . CmmMachOp op)    (mapListM (wrapRecExpM f) es)
-wrapRecExpM f n@(CmmLoad addr ty)  = maybe (f n) (f . flip CmmLoad ty) (wrapRecExpM f addr)
+wrapRecExpM f n@(CmmMachOp op es)  = f $ maybe n (CmmMachOp op)    $ mapListM (wrapRecExpM f) es
+wrapRecExpM f n@(CmmLoad addr ty)  = f $ maybe n (flip CmmLoad ty) $ wrapRecExpM f addr
 wrapRecExpM f e                    = f e
 
 mapExpM :: (CmmExpr -> Maybe CmmExpr) -> CmmNode e x -> Maybe (CmmNode e x)
