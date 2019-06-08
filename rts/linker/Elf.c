@@ -732,12 +732,8 @@ ocGetNames_ELF ( ObjectCode* oc )
           unsigned nstubs = numberOfStubsForSection(oc, i);
           unsigned stub_space = STUB_SIZE * nstubs;
 
-          void * mem = mmap(NULL, size+stub_space,
-                            PROT_READ | PROT_WRITE | PROT_EXEC,
-                            MAP_ANON | MAP_PRIVATE,
-                            -1, 0);
-
-          if( mem == MAP_FAILED ) {
+          void * mem = mmapForLinker(size+stub_space, MAP_ANON, -1, 0);
+          if( mem == NULL ) {
               barf("failed to mmap allocated memory to load section %d. "
                    "errno = %d", i, errno);
           }
