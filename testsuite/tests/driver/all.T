@@ -170,7 +170,7 @@ test( 'T4114d', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_r
 test('T5584', [], makefile_test, [])
 test('T5198', [], makefile_test, [])
 test('T7060', [], makefile_test, [])
-test('T7130', normal, compile_fail, ['-fflul-laziness'])
+test('T7130', normal, compile_fail, ['-ffull-laziness'])
 test('T7563', when(unregisterised(), skip), makefile_test, [])
 test('T6037',
      # The testsuite doesn't know how to set a non-Unicode locale on Windows or Mac OS X
