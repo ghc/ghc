@@ -73,13 +73,14 @@ class RegexpLinter(LineLinter):
     A :class:`RegexpLinter` produces the given warning message for
     all lines matching the given regular expression.
     """
-    def __init__(self, regex, message):
+    def __init__(self, regex, message, path_filter=lambda path: True):
         LineLinter.__init__(self)
         self.re = re.compile(regex)
         self.message = message
+        self.path_filter = path_filter
 
     def lint_line(self, path, line_no, line):
-        if self.re.search(line):
+        if self.path_filter(path) and self.re.search(line):
             w = Warning(path=path, line_no=line_no, line_content=line[:-1],
                         message=self.message)
             self.add_warning(w)
