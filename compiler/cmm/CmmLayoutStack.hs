@@ -1051,9 +1051,9 @@ insertReloadsAsNeeded dflags procpoints final_stackmaps entry blocks = do
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
         let entry_label = entryLabel e_node
-            stackmap = fromMaybe
-                           (panic "insertReloadsAsNeeded: rewriteCC: stackmap")
-                           (mapLookup entry_label final_stackmaps)
+            stackmap = case mapLookup entry_label final_stackmaps of
+                Just sm -> sm
+                Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
 
             -- Merge the liveness from successor blocks and analyse the last
             -- node.

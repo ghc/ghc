@@ -503,8 +503,9 @@ restrictVarEnv env vs = filterVarEnv_Directly keep env
     keep u _ = u `elemVarSetByKey` vs
 
 zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
-lookupVarEnv_NF env id = fromMaybe (panic "lookupVarEnv_NF: Nothing")
-                                   (lookupVarEnv env id)
+lookupVarEnv_NF env id = case lookupVarEnv env id of
+                         Just xx -> xx
+                         Nothing -> panic "lookupVarEnv_NF: Nothing"
 
 {-
 @modifyVarEnv@: Look up a thing in the VarEnv,

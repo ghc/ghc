@@ -2000,12 +2000,12 @@ forkM_maybe doc thing_inside
         }}
 
 forkM :: SDoc -> IfL a -> IfL a
-forkM doc thing_inside = do
-    mb_res <- forkM_maybe doc thing_inside
-    return $
-        fromMaybe 
-            (pgmError "Cannot continue after interface file error")
-            mb_res
+forkM doc thing_inside
+ = do   { mb_res <- forkM_maybe doc thing_inside
+        ; return (case mb_res of
+                        Nothing -> pgmError "Cannot continue after interface file error"
+                                   -- pprPanic "forkM" doc
+                        Just r  -> r) }
 
 setImplicitEnvM :: TypeEnv -> IfL a -> IfL a
 setImplicitEnvM tenv m = updLclEnv (\lcl -> lcl

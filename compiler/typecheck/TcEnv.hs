@@ -109,7 +109,7 @@ import FastString
 import ListSetOps
 import ErrUtils
 import Util
-import Maybes( MaybeErr(..), orElse, fromMaybe )
+import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -235,9 +235,9 @@ tcLookupGlobal name
 tcLookupGlobalOnly :: Name -> TcM TyThing
 tcLookupGlobalOnly name
   = do { env <- getGblEnv
-       ; return $ fromMaybe
-                      (pprPanic "tcLookupGlobalOnly" (ppr name))
-                      (lookupNameEnv (tcg_type_env env) name) }
+       ; return $ case lookupNameEnv (tcg_type_env env) name of
+                    Just thing -> thing
+                    Nothing    -> pprPanic "tcLookupGlobalOnly" (ppr name) }
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon name = do

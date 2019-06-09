@@ -73,7 +73,7 @@ import FastString
 import ListSetOps
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Maybe       ( fromMaybe, maybeToList )
+import Data.Maybe       ( maybeToList )
 
 {-
 ************************************************************************
@@ -669,10 +669,10 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
       = ASSERT( isSingleton orig_arg_tys )
         [HsLazy] -- See Note [HsImplBangs for newtypes]
       | otherwise
-      = fromMaybe
-            (zipWith (dataConSrcToImplBang dflags fam_envs)
-                     orig_arg_tys orig_bangs)
-            mb_bangs
+      = case mb_bangs of
+          Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
+                                orig_arg_tys orig_bangs
+          Just bangs -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))

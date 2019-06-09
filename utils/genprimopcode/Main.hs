@@ -9,7 +9,7 @@ import Syntax
 
 import Data.Char
 import Data.List
-import Data.Maybe ( catMaybes, fromMaybe )
+import Data.Maybe ( catMaybes )
 import System.Environment ( getArgs )
 
 vecOptions :: Entry -> [(String,String,Int)]
@@ -544,7 +544,9 @@ gen_latex_doc (Info defaults entries)
              _ -> ""
 
            zencode xs =
-             fromMaybe (concatMap encode_ch xs) (maybe_tuple xs) -- Tuples go to Z2T etc
+             case maybe_tuple xs of
+                Just n  -> n            -- Tuples go to Z2T etc
+                Nothing -> concatMap encode_ch xs
              where
                maybe_tuple "(# #)" = Just("Z1H")
                maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of

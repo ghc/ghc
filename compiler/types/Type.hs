@@ -271,7 +271,7 @@ import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Unique ( nonDetCmpUnique )
 
-import Maybes           ( fromMaybe, isJust, orElse )
+import Maybes           ( isJust, orElse )
 import Control.Monad    ( guard )
 
 -- $type_classification
@@ -794,7 +794,9 @@ tcRepSplitAppTy_maybe _other = Nothing
 splitAppTy :: Type -> (Type, Type)
 -- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
 -- and panics if this is not possible
-splitAppTy ty = fromMaybe (panic "splitAppTy") (splitAppTy_maybe ty)
+splitAppTy ty = case splitAppTy_maybe ty of
+                Just pr -> pr
+                Nothing -> panic "splitAppTy"
 
 -------------
 splitAppTys :: Type -> (Type, [Type])

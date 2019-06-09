@@ -47,7 +47,9 @@ getNode
         -> k -> Node k cls color
 
 getNode graph k
- = fromMaybe (panic "GraphOps.getNode: not found") (lookupUFM (graphMap graph) k)
+ = case lookupUFM (graphMap graph) k of
+        Just node       -> node
+        Nothing         -> panic "ColorOps.getNode: not found"
 
 
 -- | Add a node to the graph, linking up its edges

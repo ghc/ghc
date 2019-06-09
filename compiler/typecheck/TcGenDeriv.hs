@@ -75,7 +75,6 @@ import Lexeme
 import FastString
 import Pair
 import Bag
-import Maybes
 
 import Data.List  ( find, partition, intersperse )
 
@@ -810,7 +809,9 @@ gen_Ix_binds loc tycon = do
       = listToBag [single_con_range, single_con_index, single_con_inRange]
 
     data_con
-      = fromMaybe (panic "get_Ix_binds") (tyConSingleDataCon_maybe tycon) -- just checking...
+      = case tyConSingleDataCon_maybe tycon of -- just checking...
+          Nothing -> panic "get_Ix_binds"
+          Just dc -> dc
 
     con_arity    = dataConSourceArity data_con
     data_con_RDR = getRdrName data_con
