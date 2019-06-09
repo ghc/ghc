@@ -866,7 +866,7 @@ case $TargetPlatform in
       esac ;;
     i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
     x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
-    *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
+    *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#if defined(HAVE_NLIST_H)
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
@@ -876,7 +876,7 @@ int main(argc, argv)
 int argc;
 char **argv;
 {
-#ifdef HAVE_NLIST_H
+#if defined(HAVE_NLIST_H)
     if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
         exit(1);
     if(nlist(argv[0], xYzzY2) == 0 && xYzzY2[0].n_value != 0)
@@ -1650,16 +1650,16 @@ then
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
-#ifdef HAVE_STDLIB_H
+#if defined(HAVE_STDLIB_H)
 #include <stdlib.h>
 #endif
-#ifdef HAVE_TIME_H
+#if defined(HAVE_TIME_H)
 #include <time.h>
 #endif
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 #include <signal.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 

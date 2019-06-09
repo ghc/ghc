@@ -233,7 +233,7 @@ generateGhcPlatformH = do
     targetVendor   <- getSetting TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
     return . unlines $
-        [ "#ifndef __GHCPLATFORM_H__"
+        [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
@@ -386,7 +386,7 @@ generateGhcAutoconfH = do
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend
     return . unlines $
-        [ "#ifndef __GHCAUTOCONF_H__"
+        [ "#if !defined(__GHCAUTOCONF_H__)"
         , "#define __GHCAUTOCONF_H__" ]
         ++ configHContents ++
         [ "\n#define TABLES_NEXT_TO_CODE 1" | tablesNextToCode && not ghcUnreg ]
@@ -422,7 +422,7 @@ generateGhcBootPlatformH = do
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     return $ unlines
-        [ "#ifndef __PLATFORM_H__"
+        [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
@@ -464,10 +464,10 @@ generateGhcVersionH = do
     patchLevel1 <- getSetting ProjectPatchLevel1
     patchLevel2 <- getSetting ProjectPatchLevel2
     return . unlines $
-        [ "#ifndef __GHCVERSION_H__"
+        [ "#if !defined(__GHCVERSION_H__)"
         , "#define __GHCVERSION_H__"
         , ""
-        , "#ifndef __GLASGOW_HASKELL__"
+        , "#if !defined(__GLASGOW_HASKELL__)"
         , "# define __GLASGOW_HASKELL__ " ++ version
         , "#endif"
         , ""]

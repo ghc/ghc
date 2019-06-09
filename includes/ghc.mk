@@ -57,7 +57,7 @@ endif
 
 $(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCVERSION_H__"  > $@
+	@echo "#if !defined(__GHCVERSION_H__)"  > $@
 	@echo "#define __GHCVERSION_H__" >> $@
 	@echo >> $@
 	@echo "#define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
@@ -92,7 +92,7 @@ else
 
 $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
+	@echo "#if !defined(__GHCAUTOCONF_H__)"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
 #
 #	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
@@ -125,7 +125,7 @@ endif
 $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCPLATFORM_H__"  >$@
+	@echo "#if !defined(__GHCPLATFORM_H__)"  >$@
 	@echo "#define __GHCPLATFORM_H__" >>$@
 	@echo >> $@
 	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
