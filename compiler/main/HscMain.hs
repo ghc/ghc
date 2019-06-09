@@ -510,27 +510,27 @@ tcRnModule' sum save_rn_syntax mod = do
 
     -- end of the safe haskell line, how to respond to user?
     if not (safeHaskellOn dflags) || (safeInferOn dflags && not allSafeOK)
-        -- if safe Haskell off or safe infer failed, mark unsafe
-        then markUnsafeInfer tcg_res whyUnsafe
+             -- if safe Haskell off or safe infer failed, mark unsafe
+             then markUnsafeInfer tcg_res whyUnsafe
 
-        -- module (could be) safe, throw warning if needed
-        else do
-            tcg_res' <- hscCheckSafeImports tcg_res
-            safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
-            when safe $ do
-              case wopt Opt_WarnSafe dflags of
-                True -> (logWarnings $ unitBag $
-                         makeIntoWarning (Reason Opt_WarnSafe) $
-                         mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
-                         errSafe tcg_res')
-                False | safeHaskell dflags == Sf_Trustworthy &&
-                        wopt Opt_WarnTrustworthySafe dflags ->
-                        (logWarnings $ unitBag $
-                         makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
-                         mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
-                         errTwthySafe tcg_res')
-                False -> return ()
-            return tcg_res'
+             -- module (could be) safe, throw warning if needed
+             else do
+                 tcg_res' <- hscCheckSafeImports tcg_res
+                 safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
+                 when safe $ do
+                   case wopt Opt_WarnSafe dflags of
+                     True -> (logWarnings $ unitBag $
+                              makeIntoWarning (Reason Opt_WarnSafe) $
+                              mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
+                              errSafe tcg_res')
+                     False | safeHaskell dflags == Sf_Trustworthy &&
+                             wopt Opt_WarnTrustworthySafe dflags ->
+                             (logWarnings $ unitBag $
+                              makeIntoWarning (Reason Opt_WarnTrustworthySafe) $
+                              mkPlainWarnMsg dflags (trustworthyOnLoc dflags) $
+                              errTwthySafe tcg_res')
+                     False -> return ()
+                 return tcg_res'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
