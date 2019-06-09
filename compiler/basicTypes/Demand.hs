@@ -292,7 +292,7 @@ seqStrDmd (SCall s)    = seqStrDmd s
 seqStrDmd _            = ()
 
 seqStrDmdList :: [ArgStr] -> ()
-seqStrDmdList ds = seqList (map seqArgStr ds) ()
+seqStrDmdList = seqListWith seqArgStr ()
 
 seqArgStr :: ArgStr -> ()
 seqArgStr Lazy    = ()
@@ -585,7 +585,7 @@ seqUseDmd (UCall c d)  = c `seq` seqUseDmd d
 seqUseDmd _            = ()
 
 seqArgUseList :: [ArgUse] -> ()
-seqArgUseList ds = seqList (map seqArgUse ds) ()
+seqArgUseList = seqListWith seqArgUse ()
 
 seqArgUse :: ArgUse -> ()
 seqArgUse (Use c u)  = c `seq` seqUseDmd u
@@ -768,7 +768,7 @@ seqDemand :: Demand -> ()
 seqDemand (JD {sd = s, ud = u}) = seqArgStr s `seq` seqArgUse u
 
 seqDemandList :: [Demand] -> ()
-seqDemandList ds = seqList (map seqDemand ds) ()
+seqDemandList = seqListWith seqDemand ()
 
 isStrictDmd :: JointDmd (Str s) (Use u) -> Bool
 -- See Note [Strict demands]
