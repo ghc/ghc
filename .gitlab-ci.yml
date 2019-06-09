@@ -80,6 +80,7 @@ ghc-linters:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
+    - git submodule foreach git remote update
     - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
   tags:
@@ -109,6 +110,7 @@ lint-submods-branch:
   extends: .lint-submods
   script:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+    - git submodule foreach git remote update
     - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
   only:
     refs:
