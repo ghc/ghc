@@ -107,7 +107,7 @@ tcProc pat cmd exp_ty
 type CmdType    = (CmdArgType, TcTauType)    -- cmd_type
 type CmdArgType = TcTauType                  -- carg_type, a nested tuple
 
-data CmdEnv
+newtype CmdEnv
   = CmdEnv {
         cmd_arr :: TcType -- arrow type constructor, of kind *->*->*
     }

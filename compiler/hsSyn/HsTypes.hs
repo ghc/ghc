@@ -694,7 +694,7 @@ data HsType pass
   | XHsType
       (XXType pass)
 
-data NewHsTypeX
+newtype NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
                    -- Core Type through HsSyn.
     deriving Data

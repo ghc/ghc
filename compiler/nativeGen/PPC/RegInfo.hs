@@ -31,7 +31,7 @@ import CLabel
 import Unique
 import Outputable (ppr, text, Outputable, (<>))
 
-data JumpDest = DestBlockId BlockId
+newtype JumpDest = DestBlockId BlockId
 
 -- Debug Instance
 instance Outputable JumpDest where

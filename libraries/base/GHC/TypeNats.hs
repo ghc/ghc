@@ -233,6 +233,7 @@ sameNat x y
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
+{- HLINT ignore WrapN -} -- No, we don't want to make WrapN a newtype.
 data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 
 -- See Note [magicDictId magic] in "basicType/MkId.hs"
