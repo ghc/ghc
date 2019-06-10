@@ -663,6 +663,40 @@ void rts_unpause (RtsPaused paused)
     freeTask(paused.task);
 }
 
+void rts_listThreads(ListThreadsCb cb, void *user)
+{
+    ASSERT(rts_paused);
+    for (int g=0; g < RtsFlags.GcFlags.generations; g++) {
+        StgTSO *tso = generations[g].threads;
+        while (tso != END_TSO_QUEUE) {
+            cb(user, tso);
+            tso = tso->global_link;
+        }
+    }
+}
+
+struct list_roots_ctx {
+    ListRootsCb cb;
+    void *user;
+}
+
+// This is an evac_fn.
+static list_roots_helper(void *user, StgClosure **p) {
+    struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
+    ctx->cb(ctx->user, *p);
+}
+
+void rts_listMiscRoots (ListRootsCb cb, void *user)
+{
+    struct list_roots_ctx ctx;
+    ctx.cb = cb;
+    ctx.user = user;
+
+    ASSERT(rts_paused);
+    threadStableNameTable(cb, ctx);
+    threadStablePointerTable(cb, ctx);
+}
+
 void rts_done (Capability *cap)
 {
     freeMyTask();
