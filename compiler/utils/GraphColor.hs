@@ -309,8 +309,7 @@ selectColor colors graph u
         -- find colors we can't use because they're already being used
         --      by a node that conflicts with this one.
         Just nsConflicts
-                        = sequence
-                        $ map (lookupNode graph)
+                        = traverse (lookupNode graph)
                         $ nonDetEltsUniqSet
                         $ nodeConflicts node
                         -- See Note [Unique Determinism and code generation]

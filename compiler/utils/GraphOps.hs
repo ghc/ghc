@@ -610,7 +610,7 @@ checkNode
 
 checkNode graph node
         | Just color            <- nodeColor node
-        , Just neighbors        <- sequence $ map (lookupNode graph)
+        , Just neighbors        <- traverse (lookupNode graph)
                                 $  nonDetEltsUniqSet $ nodeConflicts node
             -- See Note [Unique Determinism and code generation]
 
