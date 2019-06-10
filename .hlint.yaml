@@ -16,7 +16,6 @@
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Parse error"}
 - ignore: {name: "Use camelCase"}
-- ignore: {name: "Use /="}
 - ignore: {name: "Use :"}
 - ignore: {name: "Redundant $"}
 - ignore: {name: "Use id"}

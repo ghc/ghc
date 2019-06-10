@@ -873,7 +873,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
                        | d <- unbound_vars, isDictId d ]
        unbound_vars  = [ v | v <- exprsFreeVarsList args
                            , not (v `elemVarSet` orig_bndr_set)
-                           , not (v == fn_id) ]
+                           , v /= fn_id ]
          -- fn_id: do not quantify over the function itself, which may
          -- itself be a dictionary (in pathological cases, #10251)
 

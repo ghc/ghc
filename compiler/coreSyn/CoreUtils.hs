@@ -556,7 +556,7 @@ findAlt con alts
       = case con `cmpAltCon` con1 of
           LT -> deflt   -- Missed it already; the alts are in increasing order
           EQ -> Just alt
-          GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
+          GT -> ASSERT( con1 /= DEFAULT ) go alts deflt
 
 {- Note [Unreachable code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

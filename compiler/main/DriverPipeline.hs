@@ -663,7 +663,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          -- path, then rerun the pipeline for the dyn way
          let dflags = hsc_dflags hsc_env
          -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $ do
+         when (platformOS (targetPlatform dflags) /= OSMinGW32) $ do
            when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
                debugTraceMsg dflags 4
                    (text "Running the pipeline again for -dynamic-too")

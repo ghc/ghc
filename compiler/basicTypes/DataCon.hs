@@ -711,7 +711,7 @@ filterEqSpec :: [EqSpec] -> [TyVar] -> [TyVar]
 filterEqSpec eq_spec
   = filter not_in_eq_spec
   where
-    not_in_eq_spec var = all (not . (== var) . eqSpecTyVar) eq_spec
+    not_in_eq_spec var = all ((/= var) . eqSpecTyVar) eq_spec
 
 instance Outputable EqSpec where
   ppr (EqSpec tv ty) = ppr (tv, ty)

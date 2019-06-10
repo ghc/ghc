@@ -376,7 +376,7 @@ hscParse' mod_summary
             --
             let n_hspp  = FilePath.normalise src_filename
                 srcs0 = nub $ filter (not . (tmpDir dflags `isPrefixOf`))
-                            $ filter (not . (== n_hspp))
+                            $ filter (/= n_hspp)
                             $ map FilePath.normalise
                             $ filter (not . isPrefixOf "<")
                             $ map unpackFS
