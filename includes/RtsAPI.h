@@ -444,6 +444,17 @@ void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
+
+// Various bits of information that need to be persisted between rts_pause and
+// rts_unpause.
+typedef struct {
+    Task *pausing_task;
+    Capability *capabilities;
+} RtsPaused;
+
+RtsPaused rts_pause (void);
+void rts_unpause (RtsPaused paused);
+
 /*
  * The RTS allocates some thread-local data when you make a call into
  * Haskell using one of the rts_eval() functions.  This data is not
