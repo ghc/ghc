@@ -63,6 +63,9 @@ module BasicTypes(
         noOneShotInfo, hasNoOneShotInfo, isOneShotInfo,
         bestOneShot, worstOneShot,
 
+        ExtensionalityInfo(..),
+        isExtensional,
+
         OccInfo(..), noOccInfo, seqOccInfo, zapFragileOcc, isOneOcc,
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         strongLoopBreaker, weakLoopBreaker,
@@ -276,6 +279,32 @@ pprOneShotInfo OneShotLam    = text "OneShot"
 
 instance Outputable OneShotInfo where
     ppr = pprOneShotInfo
+
+{-
+************************************************************************
+*                                                                      *
+           Extensionality information
+*                                                                      *
+************************************************************************
+-}
+
+data ExtensionalityInfo
+  = IsExtensional    -- in other words:
+                     --   * has a call-by-name kind
+                     --   * does NOT share
+                     --   * chained function calls will fuse
+  | IsNotExtensional
+
+isExtensional :: ExtensionalityInfo -> Bool
+isExtensional IsExtensional    = True
+isExtensional IsNotExtensional = False
+
+pprExtensionalityInfo :: ExtensionalityInfo -> SDoc
+pprExtensionalityInfo IsExtensional    = text "Extensional"
+pprExtensionalityInfo IsNotExtensional = empty
+
+instance Outputable ExtensionalityInfo where
+  ppr = pprExtensionalityInfo
 
 {-
 ************************************************************************
