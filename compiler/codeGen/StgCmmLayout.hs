@@ -540,7 +540,7 @@ mkArgDescr dflags args
 argBits :: DynFlags -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
 argBits _      []           = []
 argBits dflags (P   : args) = False : argBits dflags args
-argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
+argBits dflags (arg : args) = replicate (argRepSizeW dflags arg) True
                     ++ argBits dflags args
 
 ----------------------

@@ -47,8 +47,8 @@ showtix_main flags (prog:modNames) = do
                , allowModule hpcflags1 (tixModuleName tix)
                ]
 
-       let rjust n str = take (n - length str) (repeat ' ') ++ str
-       let ljust n str = str ++ take (n - length str) (repeat ' ')
+       let rjust n str = replicate (n - length str) ' ' ++ str
+       let ljust n str = str ++ replicate (n - length str) ' '
 
        sequence_ [ sequence_ [ putStrLn (rjust 5 (show ix) ++ " " ++
                                          rjust 10 (show count) ++ " " ++

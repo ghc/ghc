@@ -791,7 +791,7 @@ mkConstraintTupleStr 1  = "Unit%"   -- See Note [One-tuples]
 mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
 
 commas :: Arity -> String
-commas ar = take (ar-1) (repeat ',')
+commas ar = replicate (ar-1) ','
 
 cTupleTyConName :: Arity -> Name
 cTupleTyConName arity

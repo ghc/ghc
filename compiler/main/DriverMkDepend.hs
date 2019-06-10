@@ -397,7 +397,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           groups =
             GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
 
-    pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
+    pp_ms summary = text mod_str <> text (replicate (20 - length mod_str) ' ')
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$
                             pp_imps (text "{-# SOURCE #-}") (map snd (ms_srcimps summary)))
         where

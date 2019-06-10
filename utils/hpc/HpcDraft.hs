@@ -107,7 +107,7 @@ makeDraft hpcflags tix = do
 
       showPleaseTicks d pleases = unlines (map (showPleaseTick d) pleases)
 
-      spaces d = take d (repeat ' ')
+      spaces d = replicate d ' '
 
   return $ "module " ++ show (fixPackageSuffix modu) ++ " {\n" ++
          showPleaseTicks 2 non_ticked ++ "}"
