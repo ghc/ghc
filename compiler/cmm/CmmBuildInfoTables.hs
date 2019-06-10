@@ -709,7 +709,7 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
     -- Implements the [Inline] optimisation.
     resolved =
        Set.fromList $
-       catMaybes (map (resolveCAF srtMap) (Set.toList nonRec))
+       mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =

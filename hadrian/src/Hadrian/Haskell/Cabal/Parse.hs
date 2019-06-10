@@ -66,7 +66,7 @@ parsePackageData pkg = do
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
-        depPkgs = catMaybes $ map findPackageByName deps
+        depPkgs = mapMaybe findPackageByName deps
     return $ PackageData name version (C.synopsis pd) (C.description pd) depPkgs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals

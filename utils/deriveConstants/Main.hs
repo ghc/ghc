@@ -697,7 +697,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
          let ls = lines xs
              m = Map.fromList $ case os of
                  "aix" -> parseAixObjdump ls
-                 _     -> catMaybes $ map parseNmLine ls
+                 _     -> mapMaybe parseNmLine ls
 
          case Map.lookup "CONTROL_GROUP_CONST_291" m of
              Just 292   -> return () -- OK

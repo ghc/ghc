@@ -759,7 +759,7 @@ gen_data_decl (Info _ entries) =
 gen_switch_from_attribs :: String -> String -> Info -> String
 gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
    = let defv = lookup_attrib attrib_name defaults
-         alternatives = catMaybes (map mkAlt (filter is_primop entries))
+         alternatives = mapMaybe mkAlt (filter is_primop entries)
 
          getAltRhs (OptionFalse _)    = "False"
          getAltRhs (OptionTrue _)     = "True"
