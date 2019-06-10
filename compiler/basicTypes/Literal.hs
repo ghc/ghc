@@ -267,7 +267,7 @@ instance Binary Literal where
                     return (LitRubbish)
 
 instance Outputable Literal where
-    ppr lit = pprLiteral (\d -> d) lit
+    ppr lit = pprLiteral id lit
 
 instance Eq Literal where
     a == b = case (a `compare` b) of { EQ -> True;   _ -> False }

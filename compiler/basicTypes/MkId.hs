@@ -941,7 +941,7 @@ seqUnboxer :: Unboxer
 seqUnboxer v = return ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
 
 unitUnboxer :: Unboxer
-unitUnboxer v = return ([v], \e -> e)
+unitUnboxer v = return ([v], id)
 
 unitBoxer :: Boxer
 unitBoxer = UnitBox

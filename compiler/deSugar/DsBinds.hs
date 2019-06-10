@@ -1114,7 +1114,7 @@ So for now, we ban them altogether as requested by #13290. See also #7398.
 -}
 
 dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
-dsHsWrapper WpHole            = return $ \e -> e
+dsHsWrapper WpHole            = return id
 dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
 dsHsWrapper (WpEvLam ev)      = return $ Lam ev
 dsHsWrapper (WpTyLam tv)      = return $ Lam tv

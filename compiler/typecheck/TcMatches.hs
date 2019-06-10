@@ -490,12 +490,12 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
 
          -- n_app :: Type -> Type   -- Wraps a 'ty' into '[ty]' for GroupForm
        ; let n_app = case form of
-                       ThenForm -> (\ty -> ty)
+                       ThenForm -> id
                        _        -> m_app
 
              by_arrow :: Type -> Type     -- Wraps 'ty' to '(a->t) -> ty' if the By is present
              by_arrow = case by' of
-                          Nothing       -> \ty -> ty
+                          Nothing       -> id
                           Just (_,e_ty) -> \ty -> (alphaTy `mkVisFunTy` e_ty) `mkVisFunTy` ty
 
              tup_ty        = mkBigCoreVarTupTy bndr_ids
@@ -624,14 +624,14 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
          -- n_app :: Type -> Type   -- Wraps a 'ty' into '(n ty)' for GroupForm
        ; n_app <- case form of
-                    ThenForm -> return (\ty -> ty)
+                    ThenForm -> return id
                     _        -> do { n_ty <- newFlexiTyVarTy star_star_kind
                                    ; return (n_ty `mkAppTy`) }
        ; let by_arrow :: Type -> Type
              -- (by_arrow res) produces ((alpha->e_ty) -> res)     ('by' present)
              --                          or res                    ('by' absent)
              by_arrow = case by of
-                          Nothing -> \res -> res
+                          Nothing -> id
                           Just {} -> \res -> (alphaTy `mkVisFunTy` by_e_ty) `mkVisFunTy` res
 
              poly_arg_ty  = m1_ty `mkAppTy` alphaTy
