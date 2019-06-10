@@ -56,7 +56,6 @@
 - ignore: {name: "Use <$"}
 - ignore: {name: "Use String"}
 - ignore: {name: "Use withFile"}
-- ignore: {name: "Use map"}
 - ignore: {name: "Use intercalate"}
 - ignore: {name: "Use maybe"}
 - ignore: {name: "Use =<<"}

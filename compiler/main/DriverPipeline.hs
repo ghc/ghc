@@ -1205,9 +1205,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
         pkg_include_dirs <- liftIO $ getPackageIncludePath dflags pkgs
-        let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+        let include_paths_global = map ("-I" ++)
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
-        let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+        let include_paths_quote = map ("-iquote" ++)
               (includePathsQuote cmdline_include_paths)
         let include_paths = include_paths_quote ++ include_paths_global
 
@@ -1951,9 +1951,9 @@ doCpp dflags raw input_fn output_fn = do
     let cmdline_include_paths = includePaths dflags
 
     pkg_include_dirs <- getPackageIncludePath dflags []
-    let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
+    let include_paths_global = map ("-I" ++)
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
-    let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
+    let include_paths_quote = map ("-iquote" ++)
           (includePathsQuote cmdline_include_paths)
     let include_paths = include_paths_quote ++ include_paths_global
 
