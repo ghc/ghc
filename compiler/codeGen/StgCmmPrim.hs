@@ -71,7 +71,7 @@ cgOpApp :: StgOp        -- The op
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall ty _) stg_args res_ty
+cgOpApp (StgFCallOp fcall ty) stg_args res_ty
   = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
 
