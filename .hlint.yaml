@@ -63,7 +63,6 @@
 - ignore: {name: "Use $>"}
 - ignore: {name: "Use negate"}
 - ignore: {name: "Collapse lambdas"}
-- ignore: {name: "Use >>"}
 - ignore: {name: "Use list literal pattern"}
 - ignore: {name: "Use &&"}
 - ignore: {name: "Use null"}
@@ -149,6 +148,8 @@
 - ignore: {name: "Use traverse", within: Data.Traversable}
 - ignore: {name: "Use zipWithM", within: GHC.Event.Thread} # Import cycle
 - ignore: {name: "Use isDigit", within: GHC.Show} # Import cycle
+- ignore: {name: "Use >>", within: [CoreMonad, GHC.ST]} # Using (>>) to define (*>) would
+                                                        # run counter to the MRP.
 
 
 # Define some custom infix operators
