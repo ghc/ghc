@@ -67,7 +67,6 @@
 - ignore: {name: "Use negate"}
 - ignore: {name: "Collapse lambdas"}
 - ignore: {name: "Use >>"}
-- ignore: {name: "Use isAsciiLower"}
 - ignore: {name: "Use list literal pattern"}
 - ignore: {name: "Use &&"}
 - ignore: {name: "Use null"}

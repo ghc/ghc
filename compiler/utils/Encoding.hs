@@ -259,7 +259,7 @@ zEncodeString cs = fromMaybe (go cs) (maybe_tuple cs) -- Tuples go to Z2T etc
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar 'Z' = False
 unencodedChar 'z' = False
-unencodedChar c   =  c >= 'a' && c <= 'z'
+unencodedChar c   =  isAsciiLower c
                   || c >= 'A' && c <= 'Z'
                   || c >= '0' && c <= '9'
 
