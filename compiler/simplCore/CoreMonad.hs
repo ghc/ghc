@@ -598,7 +598,7 @@ instance Monad CoreM where
 instance Applicative CoreM where
     pure x = CoreM $ \s -> nop s x
     (<*>) = ap
-    m *> k = m >> k
+    m *> k = m >>= \_ -> k
 
 instance Alternative CoreM where
     empty   = CoreM (const Control.Applicative.empty)

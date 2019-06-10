@@ -64,7 +64,7 @@ instance Applicative (ST s) where
     {-# INLINE pure #-}
     {-# INLINE (*>)   #-}
     pure x = ST (\ s -> (# s, x #))
-    m *> k = m >> k
+    m *> k = m >>= \ _ -> k
     (<*>) = ap
     liftA2 = liftM2
 
