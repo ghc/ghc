@@ -504,12 +504,6 @@ finish:
 bdescr *
 allocAlignedGroupOnNode (uint32_t node, W_ n)
 {
-    // To make sure we don't allocate megablocks in allocGroup below we need to
-    // check here that we ask for at most BLOCKS_PER_MBLOCK/4 blocks.
-    if (4*n > BLOCKS_PER_MBLOCK) {
-        barf("allocAlignedGroupOnNode: allocating more than a megablock: %" FMT_Word, 4*n);
-    }
-
     // allocate enough blocks to have enough space aligned at n-block boundary
     // free any slops on the low and high side of this space
 
@@ -518,9 +512,8 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
     W_ group_size = n * BLOCK_SIZE;
 
     // To reduce splitting and fragmentation we use allocLargeChunkOnNode here.
-    // `max` parameter is `BLOCKS_PER_MBLOCK / 2` to avoid allocating
-    // megablocks while checking all free lists.
-    bdescr *bd = allocLargeChunkOnNode(node, num_blocks, BLOCKS_PER_MBLOCK / 2);
+    bdescr *bd = allocLargeChunkOnNode(node, num_blocks, num_blocks*3);
+
     // We may allocate more than num_blocks, so update it
     num_blocks = bd->blocks;
 
