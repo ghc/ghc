@@ -445,6 +445,9 @@ which will generate a @case@ if necessary
 The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
 coreSyn/MkCore.
 
+For discussion of some implications of the let/app invariant primops see
+Note [Checking versus non-checking primops] in PrimOp.
+
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and

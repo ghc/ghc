@@ -475,8 +475,7 @@ shiftRule shift_op
              -> return e1
              -- See Note [Guarding against silly shifts]
              | shift_len < 0 || shift_len > wordSizeInBits dflags
-             -> return $ mkRuntimeErrorApp rUNTIME_ERROR_ID wordPrimTy
-                           ("Bad shift length " ++ show shift_len)
+             -> return $ Lit $ mkLitNumberWrap dflags LitNumInt 0 (exprType e1)
 
            -- Do the shift at type Integer, but shift length is Int
            Lit (LitNumber nt x t)
@@ -701,7 +700,27 @@ can't constant fold it, but if it gets to the assember we get
      Error: operand type mismatch for `shl'
 
 So the best thing to do is to rewrite the shift with a call to error,
-when the second arg is stupid.
+when the second arg is large. However, in general we cannot do this; consider
+this case
+
+    let x = I# (uncheckedIShiftL# n 80)
+    in ...
+
+Here x contains an invalid shift and consequently we would like to rewrite it
+as follows:
+
+    let x = I# (error "invalid shift)
+    in ...
+
+This was originally done in the fix to #16449 but this breaks the let/app
+invariant (see Note [CoreSyn let/app invariant] in CoreSyn) as noted in #16742.
+For the reasons discussed in Note [Checking versus non-checking primops] (in
+the PrimOp module) there is no safe way rewrite the argument of I# such that
+it bottoms.
+
+Consequently we instead take advantage of the fact that large shifts are
+undefined behavior (see associated documentation in primops.txt.pp) and
+transform the invalid shift into an "obviously incorrect" value.
 
 There are two cases:
 
