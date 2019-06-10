@@ -177,7 +177,7 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> generatedGhcDependencies Stage0
+        Ghc _ Stage0 -> return [] -- generatedGhcDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             win <- windowsHost

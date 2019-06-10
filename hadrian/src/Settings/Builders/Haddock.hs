@@ -36,11 +36,11 @@ haddockBuilderArgs = mconcat
         pkg      <- getPackage
         root     <- getBuildRoot
         context  <- getContext
-        version  <- expr $ pkgVersion  pkg
+        version  <- expr $ pkgVersionString  pkg
         synopsis <- expr $ pkgSynopsis pkg
         deps     <- getContextData depNames
         haddocks <- expr $ haddockDependencies context
-        hVersion <- expr $ pkgVersion haddock
+        hVersion <- expr $ pkgVersionString haddock
         statsDir <- expr $ haddockStatsFilesDir
         ghcOpts  <- haddockGhcArgs
         mconcat
