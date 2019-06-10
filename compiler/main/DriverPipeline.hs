@@ -1992,7 +1992,7 @@ doCpp dflags raw input_fn output_fn = do
 
     -- MIN_VERSION macros
     let uids = explicitPackages (pkgState dflags)
-        pkgs = catMaybes (map (lookupPackage dflags) uids)
+        pkgs = mapMaybe (lookupPackage dflags) uids
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName dflags TFL_CurrentModule "h"

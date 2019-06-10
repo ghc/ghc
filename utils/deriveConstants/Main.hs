@@ -31,7 +31,7 @@ import Data.Char (toLower)
 import Data.List (stripPrefix)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Numeric (readHex)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess), exitFailure)
@@ -697,7 +697,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
          let ls = lines xs
              m = Map.fromList $ case os of
                  "aix" -> parseAixObjdump ls
-                 _     -> catMaybes $ map parseNmLine ls
+                 _     -> mapMaybe parseNmLine ls
 
          case Map.lookup "CONTROL_GROUP_CONST_291" m of
              Just 292   -> return () -- OK

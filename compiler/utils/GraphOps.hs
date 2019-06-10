@@ -614,7 +614,7 @@ checkNode graph node
                                 $  nonDetEltsUniqSet $ nodeConflicts node
             -- See Note [Unique Determinism and code generation]
 
-        , neighbourColors       <- catMaybes $ map nodeColor neighbors
+        , neighbourColors       <- mapMaybe nodeColor neighbors
         , elem color neighbourColors
         = False
 

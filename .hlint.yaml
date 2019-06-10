@@ -29,7 +29,6 @@
                                  # rather confusing comments
 - ignore: {name: "Use section"}
 - ignore: {name: "Move guards forward"}
-- ignore: {name: "Use mapMaybe"}
 - ignore: {name: "Use void"}
 - ignore: {name: "Use fewer imports"}
 - ignore: {name: "Use unless"}
