@@ -73,7 +73,6 @@
 - ignore: {name: "Use null"}
 - ignore: {name: "Redundant as"}
 - ignore: {name: "Redundant case"}
-- ignore: {name: "Use traverse"}
 - ignore: {name: "Use <=<"}
 - ignore: {name: "Use otherwise"}
 - ignore: {name: "Use -"}
@@ -151,6 +150,7 @@
 
 - ignore: {name: "Use elem", within: Data.Foldable}
 - ignore: {name: "Use fold", within: Data.Foldable}
+- ignore: {name: "Use traverse", within: Data.Traversable}
 - ignore: {name: "Use zipWithM", within: GHC.Event.Thread} # Import cycle
 
 
