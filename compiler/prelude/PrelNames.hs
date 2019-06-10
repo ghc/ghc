@@ -2024,7 +2024,7 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
-  = map mkPreludeDataConUnique [74..86]
+  = map mkPreludeDataConUnique [74..88]
 
 unliftedRepDataConKeys = vecRepDataConKey :
                          tupleRepDataConKey :
@@ -2034,29 +2034,29 @@ unliftedRepDataConKeys = vecRepDataConKey :
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [87..92]
+vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [93..102]
+vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 103
-kindRepVarDataConKey      = mkPreludeDataConUnique 104
-kindRepAppDataConKey      = mkPreludeDataConUnique 105
-kindRepFunDataConKey      = mkPreludeDataConUnique 106
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 107
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 108
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 109
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 105
+kindRepVarDataConKey      = mkPreludeDataConUnique 106
+kindRepAppDataConKey      = mkPreludeDataConUnique 107
+kindRepFunDataConKey      = mkPreludeDataConUnique 108
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 110
-typeLitNatDataConKey      = mkPreludeDataConUnique 111
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
+typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
 
 ---------------- Template Haskell -------------------
