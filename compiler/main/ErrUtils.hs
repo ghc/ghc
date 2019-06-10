@@ -78,7 +78,6 @@ import System.FilePath  ( takeDirectory, (</>) )
 import Data.List
 import qualified Data.Set as Set
 import Data.IORef
-import Data.Maybe       ( fromMaybe )
 import Data.Ord
 import Data.Time
 import Debug.Trace
@@ -403,13 +402,11 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
     mkLocMessage sev s (formatErrDoc dflags doc)
 
 sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
-sortMsgBag dflags = maybeLimit . sortBy (maybeFlip cmp) . bagToList
-  where maybeFlip :: (a -> a -> b) -> (a -> a -> b)
-        maybeFlip
-          | fromMaybe False (fmap reverseErrors dflags) = flip
-          | otherwise                                   = id
-        cmp = comparing errMsgSpan
-        maybeLimit = case join (fmap maxErrors dflags) of
+sortMsgBag dflags = maybeLimit . sort' . bagToList
+  where sort' = case reverseErrors <$> dflags of
+          Just True -> sortOn (Down . errMsgSpan)
+          _         -> sortOn errMsgSpan
+        maybeLimit = case dflags >>= maxErrors of
           Nothing        -> id
           Just err_limit -> take err_limit
 
