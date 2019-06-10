@@ -151,7 +151,6 @@ lint-release-changelogs:
 
 .validate-hadrian:
   <<: *only-default
-  allow_failure: true
   script:
     - cabal update
     - git clean -xdf && git submodule foreach git clean -xdf
