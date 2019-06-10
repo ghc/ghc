@@ -260,7 +260,7 @@ unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar 'Z' = False
 unencodedChar 'z' = False
 unencodedChar c   =  isAsciiLower c
-                  || c >= 'A' && c <= 'Z'
+                  || isAsciiUpper c
                   || c >= '0' && c <= '9'
 
 -- If a digit is at the start of a symbol then we need to encode it.

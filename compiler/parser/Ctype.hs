@@ -19,7 +19,7 @@ module Ctype
 import GhcPrelude
 
 import Data.Bits        ( Bits((.&.),(.|.)) )
-import Data.Char        ( ord, chr )
+import Data.Char        ( ord, chr, isAsciiUpper )
 import Data.Word
 import Panic
 
@@ -79,7 +79,7 @@ is_bindigit c = c == '0' || c == '1'
 
 to_lower :: Char -> Char
 to_lower c
-  | c >=  'A' && c <= 'Z' = chr (ord c - (ord 'A' - ord 'a'))
+  | isAsciiUpper c = chr (ord c - (ord 'A' - ord 'a'))
   | otherwise = c
 
 charType :: Char -> Word8
