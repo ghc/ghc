@@ -63,6 +63,7 @@ import qualified Text.Read.Lex as L
 import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
+import Data.Tuple (fst)
 
 import GHC.Unicode
 import GHC.Num
@@ -621,7 +622,7 @@ instance Read Integer where
 -- | @since 4.8.0.0
 instance Read Natural where
   readsPrec d = map (\(n, s) -> (fromInteger n, s))
-                  . filter ((>= 0) . (\(x,_)->x)) . readsPrec d
+                  . filter ((>= 0) . fst) . readsPrec d
 
 -- | @since 2.01
 instance Read Float where
