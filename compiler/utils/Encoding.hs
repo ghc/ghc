@@ -261,13 +261,13 @@ unencodedChar 'Z' = False
 unencodedChar 'z' = False
 unencodedChar c   =  isAsciiLower c
                   || isAsciiUpper c
-                  || c >= '0' && c <= '9'
+                  || isDigit c
 
 -- If a digit is at the start of a symbol then we need to encode it.
 -- Otherwise package names like 9pH-0.1 give linker errors.
 encode_digit_ch :: Char -> EncodedString
-encode_digit_ch c | c >= '0' && c <= '9' = encode_as_unicode_char c
-encode_digit_ch c | otherwise            = encode_ch c
+encode_digit_ch c | isDigit c = encode_as_unicode_char c
+encode_digit_ch c | otherwise = encode_ch c
 
 encode_ch :: Char -> EncodedString
 encode_ch c | unencodedChar c = [c]     -- Common case first

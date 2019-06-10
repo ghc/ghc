@@ -19,7 +19,7 @@ module Ctype
 import GhcPrelude
 
 import Data.Bits        ( Bits((.&.),(.|.)) )
-import Data.Char        ( ord, chr, isAsciiUpper )
+import Data.Char        ( ord, chr, isAsciiUpper, isDigit )
 import Data.Word
 import Panic
 
@@ -62,8 +62,7 @@ octDecDigit :: Char -> Int
 octDecDigit c = ord c - ord '0'
 
 is_decdigit :: Char -> Bool
-is_decdigit c
-        =  c >= '0' && c <= '9'
+is_decdigit = isDigit
 
 is_hexdigit :: Char -> Bool
 is_hexdigit c

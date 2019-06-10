@@ -60,7 +60,6 @@
 - ignore: {name: "Use catMaybes"}
 - ignore: {name: "Use ||"}
 - ignore: {name: "Use infix"}
-- ignore: {name: "Use isDigit"}
 - ignore: {name: "Use isOctDigit"}
 - ignore: {name: "Use $>"}
 - ignore: {name: "Use negate"}
@@ -150,6 +149,7 @@
 - ignore: {name: "Use fold", within: Data.Foldable}
 - ignore: {name: "Use traverse", within: Data.Traversable}
 - ignore: {name: "Use zipWithM", within: GHC.Event.Thread} # Import cycle
+- ignore: {name: "Use isDigit", within: GHC.Show} # Import cycle
 
 
 # Define some custom infix operators
