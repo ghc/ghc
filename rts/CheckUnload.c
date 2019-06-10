@@ -335,7 +335,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
                 break;
 
             default:
-                barf("heapCensus, unknown object: %d", info->type);
+                barf("searchHeapBlocks, unknown object: %d", info->type);
             }
 
             if (!prim) {
