@@ -197,7 +197,7 @@ lookupUniqMap :: Uniquable k => UniqMap k a -> k -> Maybe a
 lookupUniqMap (UniqMap m) k = fmap snd (lookupUFM m k)
 
 lookupWithDefaultUniqMap :: Uniquable k => UniqMap k a -> a -> k -> a
-lookupWithDefaultUniqMap (UniqMap m) a k = fromMaybe a (fmap snd (lookupUFM m k))
+lookupWithDefaultUniqMap m a k = fromMaybe a $ lookupUniqMap m k
 
 anyUniqMap :: (a -> Bool) -> UniqMap k a -> Bool
 anyUniqMap f (UniqMap m) = anyUFM (f . snd) m
