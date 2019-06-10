@@ -38,7 +38,6 @@
                                      # GHCi.InfoTable.newExecConItbl
                                      # return behind CPP
 - ignore: {name: "Use let"}
-- ignore: {name: "Use isNothing"}
 - ignore: {name: "Avoid lambda using `infix`"}
 - ignore: {name: "Use if"}
 - ignore: {name: "Use replicate"}
@@ -158,6 +157,7 @@
 # Not much gain in readability.
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Functor law"}
+- ignore: {name: "Use isNothing"}
 
 - ignore: {name: "Use elem", within: Data.Foldable}
 - ignore: {name: "Use fold", within: Data.Foldable}

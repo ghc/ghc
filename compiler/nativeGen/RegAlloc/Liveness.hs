@@ -555,7 +555,7 @@ eraseDeltasLive cmm
  where
         eraseBlock (BasicBlock id lis)
                 = BasicBlock id
-                $ filter (\(LiveInstr i _) -> not $ isJust $ takeDeltaInstr i)
+                $ filter (\(LiveInstr i _) -> isNothing $ takeDeltaInstr i)
                 $ lis
 
 

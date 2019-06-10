@@ -2806,7 +2806,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   let chooseOutput
         | isJust (outputFile dflags3)          -- Only iff user specified -o ...
-        , not (isJust (dynOutputFile dflags3)) -- but not -dyno
+        , isNothing (dynOutputFile dflags3)    -- but not -dyno
         = return $ dflags3 { dynOutputFile = Just $ dynamicOutputFile dflags3 outFile }
         | otherwise
         = return dflags3
