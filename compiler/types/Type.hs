@@ -2464,7 +2464,8 @@ seqType (CastTy ty co)              = seqType ty `seq` seqCo co
 seqType (CoercionTy co)             = seqCo co
 
 seqTypes :: [Type] -> ()
-seqTypes = seqListWith seqType ()
+seqTypes []       = ()
+seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
 
 {-
 ************************************************************************

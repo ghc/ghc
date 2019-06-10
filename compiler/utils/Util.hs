@@ -76,7 +76,7 @@ module Util (
         transitiveClosure,
 
         -- * Strictness
-        seqList, seqListWith,
+        seqList,
 
         -- * Module names
         looksLikeModuleName,
@@ -998,11 +998,8 @@ unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
 
 seqList :: [a] -> b -> b
-seqList as b = seqListWith id b as
-
-seqListWith :: (a -> b) -> c -> [a] -> c
-seqListWith f c as = foldr (seq . f) c as
-{-# INLINE seqListWith #-}
+seqList [] b = b
+seqList (x:xs) b = x `seq` seqList xs b
 
 {-
 ************************************************************************
