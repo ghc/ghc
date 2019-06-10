@@ -645,7 +645,25 @@ rts_unlock (Capability *cap)
     }
 }
 
-void rts_done (void)
+static bool rts_paused = false;
+// Halt execution of all Haskell threads.
+RtsPaused rts_pause (void)
+{
+    struct RtsPaused paused;
+    paused.pausing_task = newBoundTask();
+    stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    rts_paused = true;
+    return paused;
+}
+
+void rts_unpause (RtsPaused paused)
+{
+    rts_paused = false;
+    releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
+    freeTask(paused.task);
+}
+
+void rts_done (Capability *cap)
 {
     freeMyTask();
 }
