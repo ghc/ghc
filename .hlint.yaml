@@ -87,7 +87,6 @@
 - ignore: {name: "Use <=<"}
 - ignore: {name: "Use otherwise"}
 - ignore: {name: "Use -"}
-- ignore: {name: "Use isJust"}
 - ignore: {name: "Use list literal"}
 - ignore: {name: "Use =="}
 - ignore: {name: "Redundant list comprehension"}

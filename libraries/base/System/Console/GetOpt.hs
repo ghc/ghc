@@ -62,7 +62,7 @@ module System.Console.GetOpt (
    -- $example2
 ) where
 
-import Data.List ( isPrefixOf, find )
+import Data.List ( isPrefixOf )
 
 -- |What to do with options following non-options
 data ArgOrder a
@@ -210,7 +210,7 @@ longOpt :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
 longOpt ls rs optDescr = long ads arg rs
    where (opt,arg) = break (=='=') ls
          getWith p = [ o | o@(Option _ xs _ _) <- optDescr
-                         , find (p opt) xs /= Nothing ]
+                         , any (p opt) xs ]
          exact     = getWith (==)
          options   = if null exact then getWith isPrefixOf else exact
          ads       = [ ad | Option _ _ ad _ <- options ]
