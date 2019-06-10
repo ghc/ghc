@@ -43,7 +43,6 @@
 - ignore: {name: "Use const"}
 - ignore: {name: "Use uncurry"}
 - ignore: {name: "Use map once"}
-- ignore: {name: "Use zipWithM"}
 - ignore: {name: "Move map inside list comprehension"}
 - ignore: {name: "Use >=>"}
 - ignore: {name: "Use lambda-case"}
@@ -153,6 +152,7 @@
 
 - ignore: {name: "Use elem", within: Data.Foldable}
 - ignore: {name: "Use fold", within: Data.Foldable}
+- ignore: {name: "Use zipWithM", within: GHC.Event.Thread} # Import cycle
 
 
 # Define some custom infix operators

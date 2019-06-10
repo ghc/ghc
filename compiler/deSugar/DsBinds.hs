@@ -1241,7 +1241,7 @@ ds_ev_typeable ty (EvTypeableTyCon tc kind_ev)
              toSomeTypeRep t ev = do
                  rep <- getRep ev t
                  return $ mkCoreConApps someTypeRepDataCon [Type (typeKind t), Type t, rep]
-       ; kind_arg_reps <- sequence $ zipWith toSomeTypeRep ks kind_ev   -- :: TypeRep t
+       ; kind_arg_reps <- zipWithM toSomeTypeRep ks kind_ev   -- :: TypeRep t
        ; let -- :: [SomeTypeRep]
              kind_args = mkListExpr (mkTyConTy someTypeRepTyCon) kind_arg_reps
 

@@ -25,6 +25,8 @@ import StgCmmClosure    ( tagForCon, NonVoid (..) )
 import Util
 import Panic
 
+import Control.Monad    ( zipWithM )
+
 {-
   Manufacturing of info tables for DataCons
 -}
@@ -50,7 +52,7 @@ mkItblEnv pairs = mkNameEnv [(n, (n,p)) | (n,p) <- pairs]
 -- Assumes constructors are numbered from zero, not one
 make_constr_itbls :: HscEnv -> [DataCon] -> IO ItblEnv
 make_constr_itbls hsc_env cons =
-  mkItblEnv <$> mapM (uncurry mk_itbl) (zip cons [0..])
+  mkItblEnv <$> zipWithM mk_itbl cons [0..]
  where
   dflags = hsc_dflags hsc_env
 

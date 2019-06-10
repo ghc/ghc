@@ -777,7 +777,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                            tag = showPpr dflags dcname
                        vars     <- replicateM (length pArgs)
                                               (newVar liftedTypeKind)
-                       subTerms <- sequence $ zipWith (\x tv ->
+                       subTerms <- zipWithM (\x tv ->
                            go (pred max_depth) tv tv x) pArgs vars
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
