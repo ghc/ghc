@@ -60,7 +60,6 @@
 - ignore: {name: "Use catMaybes"}
 - ignore: {name: "Use ||"}
 - ignore: {name: "Use infix"}
-- ignore: {name: "Use isOctDigit"}
 - ignore: {name: "Use $>"}
 - ignore: {name: "Use negate"}
 - ignore: {name: "Collapse lambdas"}

@@ -19,7 +19,7 @@ module Ctype
 import GhcPrelude
 
 import Data.Bits        ( Bits((.&.),(.|.)) )
-import Data.Char        ( ord, chr, isAsciiUpper, isDigit )
+import Data.Char        ( ord, chr, isAsciiUpper, isDigit, isOctDigit )
 import Data.Word
 import Panic
 
@@ -71,7 +71,7 @@ is_hexdigit c
         || (c >= 'A' && c <= 'F')
 
 is_octdigit :: Char -> Bool
-is_octdigit c = c >= '0' && c <= '7'
+is_octdigit = isOctDigit
 
 is_bindigit :: Char -> Bool
 is_bindigit c = c == '0' || c == '1'
