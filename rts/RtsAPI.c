@@ -18,6 +18,7 @@
 #include "StablePtr.h"
 #include "Threads.h"
 #include "Weak.h"
+#include "StableName.h"
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -644,6 +645,93 @@ rts_unlock (Capability *cap)
       traceTaskDelete(task);
     }
 }
+
+#if defined(THREADED_RTS)
+static bool rts_paused = false;
+// Halt execution of all Haskell threads.
+// It is different to rts_lock because it pauses all capabilities. rts_lock
+// only pauses a single capability.
+RtsPaused rts_pause (void)
+{
+    struct RtsPaused_ paused;
+    paused.pausing_task = newBoundTask();
+    stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    rts_paused = true;
+    return paused;
+}
+
+void rts_unpause (RtsPaused  paused)
+{
+    rts_paused = false;
+    releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
+    freeTask(paused.pausing_task);
+}
+
+
+void rts_listThreads(ListThreadsCb cb, void *user)
+{
+    ASSERT(rts_paused);
+    for (uint32_t g=0; g < RtsFlags.GcFlags.generations; g++) {
+        StgTSO *tso = generations[g].threads;
+        while (tso != END_TSO_QUEUE) {
+            cb(user, tso);
+            tso = tso->global_link;
+        }
+    }
+}
+
+struct list_roots_ctx {
+    ListRootsCb cb;
+    void *user;
+};
+
+// This is an evac_fn.
+static void list_roots_helper(void *user, StgClosure **p) {
+    struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
+    ctx->cb(ctx->user, *p);
+}
+
+void rts_listMiscRoots (ListRootsCb cb, void *user)
+{
+    struct list_roots_ctx ctx;
+    ctx.cb = cb;
+    ctx.user = user;
+
+    ASSERT(rts_paused);
+    threadStableNameTable(&list_roots_helper, (void *)&ctx);
+    threadStablePtrTable(&list_roots_helper, (void *)&ctx);
+}
+
+#else
+RtsPaused rts_pause (void)
+{
+    errorBelch("Warning: Pausing the RTS is only possible for "
+               "multithreaded RTS.");
+    struct RtsPaused_ paused;
+    paused.pausing_task = NULL;
+    paused.capabilities = NULL;
+    return paused;
+}
+
+void rts_unpause (RtsPaused  paused STG_UNUSED)
+{
+    errorBelch("Warning: Unpausing the RTS is only possible for "
+               "multithreaded RTS.");
+}
+
+
+void rts_listThreads(ListThreadsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+    errorBelch("Warning: Listing RTS-threads is only possible for "
+               "multithreaded RTS.");
+}
+
+void rts_listMiscRoots (ListRootsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+    errorBelch("Warning: Listing MiscRoots is only possible for "
+               "multithreaded RTS.");
+}
+#endif
 
 void rts_done (void)
 {
