@@ -317,6 +317,8 @@ skipSpaces =
   skip (c:s) | isSpace c = do _ <- get; skip s
   skip _                 = do return ()
 
+{- HLINT ignore count -} -- Depending on Control.Monad.replicateM would cause
+                         -- an import cycle
 count :: Int -> ReadP a -> ReadP [a]
 -- ^ @count n p@ parses @n@ occurrences of @p@ in sequence. A list of
 --   results is returned.

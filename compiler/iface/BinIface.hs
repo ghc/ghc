@@ -283,7 +283,7 @@ putSymbolTable bh next_off symtab = do
 getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
 getSymbolTable bh ncu = do
     sz <- get bh
-    od_names <- sequence (replicate sz (get bh))
+    od_names <- replicateM sz (get bh)
     updateNameCache ncu $ \namecache ->
         runST $ flip State.evalStateT namecache $ do
             mut_arr <- lift $ newSTArray_ (0, sz-1)
