@@ -120,6 +120,7 @@ void interruptStgRts (void);
 
 void resurrectThreads (StgTSO *);
 
+
 /* -----------------------------------------------------------------------------
  * Some convenient macros/inline functions...
  */
@@ -253,5 +254,6 @@ emptyThreadQueues(Capability *cap)
 }
 
 #endif /* !IN_STG_CODE */
+
 
 #include "EndPrivate.h"
