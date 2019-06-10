@@ -320,6 +320,7 @@ foreign import ccall "&rts_breakpoint_io_action"
 
 noBreakStablePtr :: StablePtr BreakpointCallback
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
+{-# NOINLINE noBreakStablePtr #-}
 
 noBreakAction :: BreakpointCallback
 noBreakAction _ _ False _ = putStrLn "*** Ignoring breakpoint"

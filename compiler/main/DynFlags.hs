@@ -286,7 +286,6 @@ import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
 
-import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
@@ -5859,7 +5858,7 @@ SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags
 #endif
 
 unsafeGlobalDynFlags :: DynFlags
-unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags
+unsafeGlobalDynFlags = unsafeDupablePerformIO $ readIORef v_unsafeGlobalDynFlags
 
 setUnsafeGlobalDynFlags :: DynFlags -> IO ()
 setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags

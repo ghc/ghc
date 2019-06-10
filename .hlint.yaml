@@ -62,7 +62,6 @@
 - ignore: {name: "Use elem"}
 - ignore: {name: "Use map"}
 - ignore: {name: "Use intercalate"}
-- ignore: {name: "Missing NOINLINE pragma"}
 - ignore: {name: "Use maybe"}
 - ignore: {name: "Use =<<"}
 - ignore: {name: "Use exitSuccess"}
