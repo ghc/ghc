@@ -1453,8 +1453,6 @@ isGcPtrRep _           = False
 -- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
 -- layed out.
 primRepSizeB :: DynFlags -> PrimRep -> Int
-primRepSizeB dflags IntRep           = wORD_SIZE dflags
-primRepSizeB dflags WordRep          = wORD_SIZE dflags
 primRepSizeB _      Int8Rep          = 1
 primRepSizeB _      Int16Rep         = 2
 primRepSizeB _      Int32Rep         = 4

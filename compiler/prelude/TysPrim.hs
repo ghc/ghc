@@ -94,9 +94,7 @@ import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy
-  , intRepDataConTy
   , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
-  , wordRepDataConTy
   , word16RepDataConTy, word8RepDataConTy, word32RepDataConTy, word64RepDataConTy
   , addrRepDataConTy
   , floatRepDataConTy, doubleRepDataConTy
@@ -118,6 +116,7 @@ import FastString
 import Outputable
 import TyCoRep   -- Doesn't need special access, but this is easier to avoid
                  -- import loops which show up if you import Type instead
+import Platform
 
 import Data.Char
 
@@ -129,8 +128,8 @@ import Data.Char
 ************************************************************************
 -}
 
-primTyCons :: [TyCon]
-primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
+primTyCons :: Platform -> [TyCon]
+primTyCons platform = unexposedPrimTyCons ++ exposedPrimTyCons platform
 
 -- | Primitive 'TyCon's that are defined in "GHC.Prim" but not exposed.
 -- It's important to keep these separate as we don't want users to be able to
@@ -144,8 +143,8 @@ unexposedPrimTyCons
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, "GHC.Prim".
-exposedPrimTyCons :: [TyCon]
-exposedPrimTyCons
+exposedPrimTyCons :: Platform -> [TyCon]
+exposedPrimTyCons platform
   = [ addrPrimTyCon
     , arrayPrimTyCon
     , byteArrayPrimTyCon
@@ -154,7 +153,7 @@ exposedPrimTyCons
     , charPrimTyCon
     , doublePrimTyCon
     , floatPrimTyCon
-    , intPrimTyCon
+    , intPrimTyCon platform
     , int8PrimTyCon
     , int16PrimTyCon
     , int32PrimTyCon
@@ -176,7 +175,7 @@ exposedPrimTyCons
     , voidPrimTyCon
     , proxyPrimTyCon
     , threadIdPrimTyCon
-    , wordPrimTyCon
+    , wordPrimTyCon platform
     , word8PrimTyCon
     , word16PrimTyCon
     , word32PrimTyCon
@@ -201,15 +200,18 @@ mkBuiltInPrimTc fs unique tycon
                   (ATyCon tycon)        -- Relevant TyCon
                   BuiltInSyntax
 
+intPrimTyConName, wordPrimTyConName :: Platform -> Name
+intPrimTyConName platform = mkPrimTc (fsLit "Int#") intPrimTyConKey $
+  intPrimTyCon platform
+wordPrimTyConName platform = mkPrimTc (fsLit "Word#") wordPrimTyConKey $
+  wordPrimTyCon platform
 
-charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
+charPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
-intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
 int16PrimTyConName            = mkPrimTc (fsLit "Int16#") int16PrimTyConKey int16PrimTyCon
 int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
 int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey int64PrimTyCon
-wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey wordPrimTyCon
 word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey word8PrimTyCon
 word16PrimTyConName           = mkPrimTc (fsLit "Word16#") word16PrimTyConKey word16PrimTyCon
 word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey word32PrimTyCon
@@ -532,12 +534,10 @@ primRepToRuntimeRep rep = case rep of
   VoidRep       -> TyConApp tupleRepDataConTyCon [mkPromotedListTy runtimeRepTy []]
   LiftedRep     -> liftedRepDataConTy
   UnliftedRep   -> unliftedRepDataConTy
-  IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy
   Int32Rep      -> int32RepDataConTy
   Int64Rep      -> int64RepDataConTy
-  WordRep       -> wordRepDataConTy
   Word8Rep      -> word8RepDataConTy
   Word16Rep     -> word16RepDataConTy
   Word32Rep     -> word32RepDataConTy
@@ -575,12 +575,16 @@ pcPrimTyCon0 name rep
 charPrimTy :: Type
 charPrimTy      = mkTyConTy charPrimTyCon
 charPrimTyCon :: TyCon
-charPrimTyCon   = pcPrimTyCon0 charPrimTyConName WordRep
+charPrimTyCon   = pcPrimTyCon0 charPrimTyConName Word32Rep
 
-intPrimTy :: Type
-intPrimTy       = mkTyConTy intPrimTyCon
-intPrimTyCon :: TyCon
-intPrimTyCon    = pcPrimTyCon0 intPrimTyConName IntRep
+intPrimTy :: Platform -> Type
+intPrimTy platform = mkTyConTy $ intPrimTyCon platform
+intPrimTyCon :: Platform -> TyCon
+intPrimTyCon platform = pcPrimTyCon0 (intPrimTyConName platform) runtimeRep
+  where runtimeRep
+          | platformWordSize platform == 32 = Int32Rep
+          | platformWordSize platform == 64 = Int64Rep
+          | otherwise = panic "intPrimTyCon: Invalid word size"
 
 int8PrimTy :: Type
 int8PrimTy     = mkTyConTy int8PrimTyCon
@@ -602,10 +606,14 @@ int64PrimTy     = mkTyConTy int64PrimTyCon
 int64PrimTyCon :: TyCon
 int64PrimTyCon  = pcPrimTyCon0 int64PrimTyConName Int64Rep
 
-wordPrimTy :: Type
-wordPrimTy      = mkTyConTy wordPrimTyCon
-wordPrimTyCon :: TyCon
-wordPrimTyCon   = pcPrimTyCon0 wordPrimTyConName WordRep
+wordPrimTy :: Platform -> Type
+wordPrimTy platform = mkTyConTy $ wordPrimTyCon platform
+wordPrimTyCon :: Platform -> TyCon
+wordPrimTyCon platform = pcPrimTyCon0 (wordPrimTyConName platform) runtimeRep
+  where runtimeRep
+          | platformWordSize platform == 32 = Word32Rep
+          | platformWordSize platform == 64 = Word64Rep
+          | otherwise = panic "intPrimTyCon: Invalid word size"
 
 word8PrimTy :: Type
 word8PrimTy     = mkTyConTy word8PrimTyCon

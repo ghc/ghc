@@ -345,17 +345,17 @@ mkLitNumber dflags nt i t =
 -- | Creates a 'Literal' of type @Int#@
 mkLitInt :: DynFlags -> Integer -> Literal
 mkLitInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
-                       (mkLitIntUnchecked x)
+                       (mkLitIntUnchecked (targetPlatform dflags) x)
 
 -- | Creates a 'Literal' of type @Int#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
 mkLitIntWrap :: DynFlags -> Integer -> Literal
-mkLitIntWrap dflags i = wrapLitNumber dflags $ mkLitIntUnchecked i
+mkLitIntWrap dflags i = wrapLitNumber dflags $ mkLitIntUnchecked (targetPlatform dflags) i
 
 -- | Creates a 'Literal' of type @Int#@ without checking its range.
-mkLitIntUnchecked :: Integer -> Literal
-mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
+mkLitIntUnchecked :: Platform -> Integer -> Literal
+mkLitIntUnchecked platform i = LitNumber LitNumInt i $ intPrimTy platform
 
 -- | Creates a 'Literal' of type @Int#@, as well as a 'Bool'ean flag indicating
 --   overflow. That is, if the argument is out of the (target-dependent) range
@@ -369,17 +369,18 @@ mkLitIntWrapC dflags i = (n, i /= i')
 -- | Creates a 'Literal' of type @Word#@
 mkLitWord :: DynFlags -> Integer -> Literal
 mkLitWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
-                        (mkLitWordUnchecked x)
+                        (mkLitWordUnchecked (targetPlatform dflags) x)
 
 -- | Creates a 'Literal' of type @Word#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
 mkLitWordWrap :: DynFlags -> Integer -> Literal
-mkLitWordWrap dflags i = wrapLitNumber dflags $ mkLitWordUnchecked i
+mkLitWordWrap dflags i = wrapLitNumber dflags $
+  mkLitWordUnchecked (targetPlatform dflags) i
 
 -- | Creates a 'Literal' of type @Word#@ without checking its range.
-mkLitWordUnchecked :: Integer -> Literal
-mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
+mkLitWordUnchecked :: Platform -> Integer -> Literal
+mkLitWordUnchecked platform i = LitNumber LitNumWord i $ wordPrimTy platform
 
 -- | Creates a 'Literal' of type @Word#@, as well as a 'Bool'ean flag indicating
 --   carry. That is, if the argument is out of the (target-dependent) range
@@ -502,10 +503,12 @@ isLitValue = isJust . isLitValue_maybe
 
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
-  char2IntLit, int2CharLit,
-  float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
+  int2CharLit,
+  int2FloatLit, int2DoubleLit,
   float2DoubleLit, double2FloatLit
   :: Literal -> Literal
+
+char2IntLit, float2IntLit, double2IntLit :: Platform -> Literal -> Literal
 
 word2IntLit, int2WordLit :: DynFlags -> Literal -> Literal
 word2IntLit dflags (LitNumber LitNumWord w _)
@@ -536,18 +539,18 @@ narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
 narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
 narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
 
-char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
-char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
+char2IntLit platform (LitChar c)       = mkLitIntUnchecked platform (toInteger (ord c))
+char2IntLit _        l                 = pprPanic "char2IntLit" (ppr l)
 int2CharLit (LitNumber _ i _) = LitChar (chr (fromInteger i))
 int2CharLit l                 = pprPanic "int2CharLit" (ppr l)
 
-float2IntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
-float2IntLit l                 = pprPanic "float2IntLit" (ppr l)
+float2IntLit platform (LitFloat f)      = mkLitIntUnchecked platform (truncate f)
+float2IntLit _        l                 = pprPanic "float2IntLit" (ppr l)
 int2FloatLit (LitNumber _ i _) = LitFloat (fromInteger i)
 int2FloatLit l                 = pprPanic "int2FloatLit" (ppr l)
 
-double2IntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
-double2IntLit l                 = pprPanic "double2IntLit" (ppr l)
+double2IntLit platform (LitDouble f)     = mkLitIntUnchecked platform (truncate f)
+double2IntLit _        l                 = pprPanic "double2IntLit" (ppr l)
 int2DoubleLit (LitNumber _ i _) = LitDouble (fromInteger i)
 int2DoubleLit l                 = pprPanic "int2DoubleLit" (ppr l)
 
@@ -659,20 +662,21 @@ literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
-absentLiteralOf :: TyCon -> Maybe Literal
+absentLiteralOf :: Platform -> TyCon -> Maybe Literal
 -- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
 -- Rubbish literals are handled in WwLib, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
-absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
+absentLiteralOf platform tc = lookupUFM (absent_lits platform) (tyConName tc)
 
-absent_lits :: UniqFM Literal
-absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
+absent_lits :: Platform -> UniqFM Literal
+absent_lits platform = listToUFM
+                        [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
-                        , (intPrimTyConKey,     mkLitIntUnchecked 0)
+                        , (intPrimTyConKey, mkLitIntUnchecked platform 0)
                         , (int64PrimTyConKey,   mkLitInt64Unchecked 0)
-                        , (wordPrimTyConKey,    mkLitWordUnchecked 0)
+                        , (wordPrimTyConKey, mkLitWordUnchecked platform 0)
                         , (word64PrimTyConKey,  mkLitWord64Unchecked 0)
                         , (floatPrimTyConKey,   LitFloat 0)
                         , (doublePrimTyConKey,  LitDouble 0)

@@ -20,9 +20,7 @@ runtimeRepTy :: Type
 liftedRepDataConTyCon, vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
 
 liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy,
   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
-  wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
   addrRepDataConTy,
   floatRepDataConTy, doubleRepDataConTy :: Type
@@ -30,10 +28,9 @@ liftedRepDataConTy, unliftedRepDataConTy,
 vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
   vec64DataConTy :: Type
 
-int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
-  int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
-  word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-  doubleElemRepDataConTy :: Type
+int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy, int64ElemRepDataConTy,
+  word8ElemRepDataConTy, word16ElemRepDataConTy, word32ElemRepDataConTy, word64ElemRepDataConTy,
+  floatElemRepDataConTy, doubleElemRepDataConTy :: Type
 
 anyTypeOfKind :: Kind -> Type
 unboxedTupleKind :: [Type] -> Type
