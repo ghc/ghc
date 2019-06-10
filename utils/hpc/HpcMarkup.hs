@@ -225,7 +225,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
 
   let content' = markup tabStop info content
   let addLine n xs = "<span class=\"lineno\">" ++ padLeft 5 ' ' (show n) ++ " </span>" ++ xs
-  let addLines = unlines . map (uncurry addLine) . zip [1 :: Int ..] . lines
+  let addLines = unlines . zipWith addLine [1 :: Int ..] . lines
   let fileName = modName0 <.> "hs" <.> "html"
   unless (verbosity flags < Normal) $
             putStrLn $ "Writing: " ++ fileName
