@@ -30,7 +30,6 @@
 - ignore: {name: "Use section"}
 - ignore: {name: "Move guards forward"}
 - ignore: {name: "Use void"}
-- ignore: {name: "Use fewer imports"}
 - ignore: {name: "Use unless"}
 - ignore: {name: "Use tuple-section"}
 - ignore: {name: "Redundant return"} # FastString.stringTable and
@@ -150,6 +149,8 @@
 - ignore: {name: "Use isDigit", within: GHC.Show} # Import cycle
 - ignore: {name: "Use >>", within: [CoreMonad, GHC.ST]} # Using (>>) to define (*>) would
                                                         # run counter to the MRP.
+- ignore: {name: "Use fewer imports", within: [RtClosureInspect, PprTyThing, Main,
+                                               GHC.Magic]}
 
 
 # Define some custom infix operators

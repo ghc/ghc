@@ -18,7 +18,8 @@ import GhcPrelude
 
 import HsSyn
 import TcPat
-import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
+import Type( tidyTyCoVarBinders, tidyTypes, tidyType
+           , PredTree(..), EqRel(..), classifyPredType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -40,7 +41,6 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
-import Type( PredTree(..), EqRel(..), classifyPredType )
 import TysWiredIn
 import TcType
 import TcEvidence

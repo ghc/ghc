@@ -18,11 +18,7 @@ import Prelude -- See note [Why do we import Prelude here?]
 
 import System.FilePath
 
--- Windows
-#if defined(mingw32_HOST_OS)
-import System.Environment (getExecutablePath)
--- POSIX
-#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 import System.Environment (getExecutablePath)
 #endif
 

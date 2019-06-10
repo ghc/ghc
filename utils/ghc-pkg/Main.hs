@@ -51,7 +51,9 @@ import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
-                          getModificationTime )
+                          getModificationTime, doesDirectoryExist,
+                          getDirectoryContents, doesFileExist, removeFile,
+                          getCurrentDirectory )
 import Text.Printf
 
 import Prelude
@@ -62,9 +64,6 @@ import Data.Maybe
 
 import Data.Char ( toLower )
 import Control.Monad
-import System.Directory ( doesDirectoryExist, getDirectoryContents,
-                          doesFileExist, removeFile,
-                          getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO

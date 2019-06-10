@@ -58,7 +58,7 @@ import TcType
 import Type
 import TyCon
 import DataCon( DataCon, dataConWrapId )
-import Class( Class )
+import Class( Class, classSCSelId )
 import PrelNames
 import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
@@ -67,7 +67,6 @@ import Name
 import Pair
 
 import CoreSyn
-import Class ( classSCSelId )
 import Id ( isEvVar )
 import CoreFVs ( exprSomeFreeVars )
 

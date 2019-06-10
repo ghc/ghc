@@ -5,7 +5,7 @@ module CmmLayoutStack (
 
 import GhcPrelude hiding ((<*>))
 
-import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
+import StgCmmUtils      ( newTemp, callerSaveVolatileRegs ) -- XXX layering violation
 import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
 import BasicTypes
@@ -25,7 +25,6 @@ import Hoopl.Dataflow
 import Hoopl.Graph
 import Hoopl.Label
 import UniqSupply
-import StgCmmUtils      ( newTemp )
 import Maybes
 import UniqFM
 import Util
