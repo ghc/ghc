@@ -67,7 +67,6 @@
 - ignore: {name: "Use exitSuccess"}
 - ignore: {name: "Evaluate"}
 - ignore: {name: "Use notElem"}
-- ignore: {name: "Functor law"}
 - ignore: {name: "Use catMaybes"}
 - ignore: {name: "Use ||"}
 - ignore: {name: "Use infix"}
@@ -164,6 +163,7 @@
 
 # Not much gain in readability.
 - ignore: {name: "Fuse foldr/map"}
+- ignore: {name: "Functor law"}
 
 
 # Define some custom infix operators
