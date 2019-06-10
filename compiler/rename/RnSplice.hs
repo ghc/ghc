@@ -35,16 +35,15 @@ import Control.Monad    ( unless, when )
 
 import {-# SOURCE #-} RnExpr   ( rnLExpr )
 
-import TcEnv            ( checkWellStaged )
-import THNames          ( liftName )
+import TcEnv            ( checkWellStaged, tcMetaTy )
 
 import DynFlags
 import FastString
 import ErrUtils         ( dumpIfSet_dyn_printer )
-import TcEnv            ( tcMetaTy )
 import Hooks
 import THNames          ( quoteExpName, quotePatName, quoteDecName, quoteTypeName
-                        , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName, )
+                        , decsQTyConName, expQTyConName, patQTyConName, typeQTyConName
+                        , liftName )
 
 import {-# SOURCE #-} TcExpr   ( tcPolyExpr )
 import {-# SOURCE #-} TcSplice

@@ -65,9 +65,7 @@ import Cmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
-                          labelDynamic, externallyVisibleCLabel )
-
-import CLabel           ( mkForeignLabel )
+                          labelDynamic, externallyVisibleCLabel, mkForeignLabel )
 
 
 import BasicTypes

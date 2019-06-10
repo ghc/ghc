@@ -22,11 +22,10 @@ import TcRnMonad
 import FamInst
 import TcDerivInfer
 import TcDerivUtils
-import TcValidity( allDistinctTyVars )
+import TcValidity( allDistinctTyVars, checkValidInstHead )
 import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
-import TcValidity( checkValidInstHead )
 import InstEnv
 import Inst
 import FamInstEnv

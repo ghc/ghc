@@ -75,11 +75,11 @@ import TcUnify
 import TcIface
 import TcSimplify
 import TcHsSyn
-import TyCoRep  ( Type(..) )
+import TyCoRep  ( Type(..)
+                , TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import TyCoRep( TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
 import Type
 import TysPrim
 import Coercion

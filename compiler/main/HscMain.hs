@@ -93,8 +93,7 @@ import GHCi.RemoteTypes ( ForeignHValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
 import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import {- Kind parts of -} Type         ( Kind )
+import Type             ( Kind, Type )
 import CoreLint         ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
 import Panic
