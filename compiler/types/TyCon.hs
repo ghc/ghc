@@ -1403,12 +1403,14 @@ data PrimRep
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
-  | IntRep        -- ^ Signed, word-sized value
-  | WordRep       -- ^ Unsigned, word-sized value
+  | Int32Rep      -- ^ Signed, 32-bit value
   | Int64Rep      -- ^ Signed, 64 bit value (with 32-bit words only)
+  | IntRep        -- ^ Signed, word-sized value
   | Word8Rep      -- ^ Unsigned, 8 bit value
-  | Word16Rep      -- ^ Unsigned, 16 bit value
+  | Word16Rep     -- ^ Unsigned, 16 bit value
+  | Word32Rep     -- ^ Unsigned, 32 bit value
   | Word64Rep     -- ^ Unsigned, 64 bit value (with 32-bit words only)
+  | WordRep       -- ^ Unsigned, word-sized value
   | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use '(Un)liftedRep')
   | FloatRep
   | DoubleRep
@@ -1455,9 +1457,11 @@ primRepSizeB dflags IntRep           = wORD_SIZE dflags
 primRepSizeB dflags WordRep          = wORD_SIZE dflags
 primRepSizeB _      Int8Rep          = 1
 primRepSizeB _      Int16Rep         = 2
+primRepSizeB _      Int32Rep         = 4
 primRepSizeB _      Int64Rep         = wORD64_SIZE
 primRepSizeB _      Word8Rep         = 1
 primRepSizeB _      Word16Rep        = 2
+primRepSizeB _      Word32Rep        = 4
 primRepSizeB _      Word64Rep        = wORD64_SIZE
 primRepSizeB _      FloatRep         = fLOAT_SIZE
 primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
