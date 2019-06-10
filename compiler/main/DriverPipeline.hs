@@ -257,8 +257,8 @@ compileOne' m_tc_result mHscMessage
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
+       isDynWay    = WayDyn `elem` ways dflags0
+       isProfWay   = WayProf `elem` ways dflags0
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
 
        src_flavour = ms_hsc_src summary
@@ -1370,7 +1370,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
                        ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
-                       ++ (if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
+                       ++ (if ccInfo `elem` [Clang, AppleClang, AppleClang51]
                             then [SysTools.Option "-Qunused-arguments"]
                             else [])
                        ++ [ SysTools.Option "-x"
@@ -2120,7 +2120,7 @@ joinObjectFiles dflags o_files output_fn = do
                           then [SysTools.Option "-no-pie"]
                           else [])
 
-                     ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
+                     ++ (if cc `elem` [Clang, AppleClang, AppleClang51]
                           then []
                           else [SysTools.Option "-nodefaultlibs"])
                      ++ (if osInfo == OSFreeBSD

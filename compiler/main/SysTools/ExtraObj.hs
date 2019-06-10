@@ -61,7 +61,7 @@ mkExtraObj dflags extn xs
       -- compiler is Clang, we add an extra argument to tell Clang to ignore
       -- unused command line options. See trac #11684.
       asmOpts ccInfo =
-            if any (ccInfo ==) [Clang, AppleClang, AppleClang51]
+            if ccInfo `elem` [Clang, AppleClang, AppleClang51]
                 then [Option "-Qunused-arguments"]
                 else []
 

@@ -64,7 +64,7 @@ elemBag :: Eq a => a -> Bag a -> Bool
 elemBag _ EmptyBag        = False
 elemBag x (UnitBag y)     = x == y
 elemBag x (TwoBags b1 b2) = x `elemBag` b1 || x `elemBag` b2
-elemBag x (ListBag ys)    = any (x ==) ys
+elemBag x (ListBag ys)    = x `elem` ys
 
 unionManyBags :: [Bag a] -> Bag a
 unionManyBags xs = foldr unionBags EmptyBag xs

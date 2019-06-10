@@ -58,7 +58,6 @@
 - ignore: {name: "Use <$"}
 - ignore: {name: "Use String"}
 - ignore: {name: "Use withFile"}
-- ignore: {name: "Use elem"}
 - ignore: {name: "Use map"}
 - ignore: {name: "Use intercalate"}
 - ignore: {name: "Use maybe"}
@@ -163,6 +162,8 @@
 # Not much gain in readability.
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Functor law"}
+
+- ignore: {name: "Use elem", within: Data.Foldable}
 
 
 # Define some custom infix operators

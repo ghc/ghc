@@ -3264,7 +3264,7 @@ genTrivialCode rep instr a b = do
 
 regClashesWithOp :: Reg -> Operand -> Bool
 reg `regClashesWithOp` OpReg reg2   = reg == reg2
-reg `regClashesWithOp` OpAddr amode = any (==reg) (addrModeRegs amode)
+reg `regClashesWithOp` OpAddr amode = reg `elem` addrModeRegs amode
 _   `regClashesWithOp` _            = False
 
 -----------
