@@ -84,7 +84,6 @@
 - ignore: {name: "Use mapM_"}
 - ignore: {name: "Redundant case"}
 - ignore: {name: "Use shows"}
-- ignore: {name: "Use fold"}
 - ignore: {name: "Use traverse"}
 - ignore: {name: "Use <=<"}
 - ignore: {name: "Use otherwise"}
@@ -164,6 +163,7 @@
 - ignore: {name: "Functor law"}
 
 - ignore: {name: "Use elem", within: Data.Foldable}
+- ignore: {name: "Use fold", within: Data.Foldable}
 
 
 # Define some custom infix operators
