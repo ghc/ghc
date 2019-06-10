@@ -122,7 +122,7 @@ testRules = do
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk
             -- which is in turn included by all test 'Makefile's.
-            setEnv "ghc-config-mk" (top -/- root -/- ghcConfigPath)
+            setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
