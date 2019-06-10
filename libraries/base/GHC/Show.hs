@@ -476,7 +476,7 @@ instance Show Integer where
         -- in the not-uncommon case where the p argument
         -- is a constant
         | otherwise = integerToString n r
-    showList = showList__ (showsPrec 0)
+    showList = showList__ shows
 
 -- | @since 4.8.0.0
 instance Show Natural where

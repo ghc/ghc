@@ -79,7 +79,7 @@ instance Show Dynamic where
    -- the instance just prints the type representation.
    showsPrec _ (Dynamic t _) =
           showString "<<" .
-          showsPrec 0 t   .
+          shows t   .
           showString ">>"
 
 -- here so that it isn't an orphan:

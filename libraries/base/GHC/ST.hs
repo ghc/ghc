@@ -128,7 +128,7 @@ unsafeDupableInterleaveST (ST m) = ST ( \ s ->
 -- | @since 2.01
 instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
-    showList       = showList__ (showsPrec 0)
+    showList       = showList__ shows
 
 {-# INLINE runST #-}
 -- | Return the value computed by a state thread.
