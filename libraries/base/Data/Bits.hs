@@ -369,7 +369,7 @@ class Bits b => FiniteBits b where
 --
 -- @since 4.6.0.0
 bitDefault :: (Bits a, Num a) => Int -> a
-bitDefault = shiftL 1
+bitDefault i = 1 `shiftL` i
 {-# INLINE bitDefault #-}
 
 -- | Default implementation for 'testBit'.
