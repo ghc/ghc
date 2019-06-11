@@ -86,6 +86,7 @@ import Control.Monad.IO.Class
 import System.IO
 import System.IO.Error  ( catchIOError )
 import GHC.Conc         ( getAllocationCounter )
+import GHC.Exts         ( sortWith )
 import System.CPUTime
 
 -------------------------
@@ -404,8 +405,8 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
 sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
 sortMsgBag dflags = maybeLimit . sort' . bagToList
   where sort' = case reverseErrors <$> dflags of
-          Just True -> sortOn (Down . errMsgSpan)
-          _         -> sortOn errMsgSpan
+          Just True -> sortWith (Down . errMsgSpan)
+          _         -> sortWith errMsgSpan
         maybeLimit = case dflags >>= maxErrors of
           Nothing        -> id
           Just err_limit -> take err_limit
