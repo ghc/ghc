@@ -177,7 +177,6 @@ compileHsObjectAndHi rs objpath = do
   ctxPath <- contextPath ctx
   (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
   need (src:deps)
-  needLibrary =<< contextDependencies ctx
 
   -- The .dependencies file lists indicating inputs. ghc will
   -- generally read more *.hi and *.hi-boot files (direct inputs).
