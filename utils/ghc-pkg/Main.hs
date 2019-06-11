@@ -415,7 +415,7 @@ runit verbosity cli nonopts = do
           (_,o,_,_) <- runInteractiveCommand ("glob "++x)
           txt <- hGetContents o
           return (read txt)
-        glob x | otherwise = return [x]
+        glob x = return [x]
 #endif
   --
   -- first, parse the command

@@ -273,7 +273,7 @@ ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
     return (char '_' <+> whenPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
 --  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
-  | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
+    = return$ parens$ ppr n <> text "::" <> ppr ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"

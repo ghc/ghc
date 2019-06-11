@@ -125,8 +125,7 @@ recoverFullType i m = go i
     go i = Roll $ fmap go (m A.! i)
 
 getTypeIndex :: Type -> State HieTypeState TypeIndex
-getTypeIndex t
-  | otherwise = do
+getTypeIndex t = do
       tm <- gets tyMap
       case lookupTypeMap tm t of
         Just i -> return i
