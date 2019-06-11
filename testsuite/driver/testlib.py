@@ -434,6 +434,14 @@ def unless(b, f):
 def doing_ghci():
     return 'ghci' in config.run_ways
 
+def requires_th(name, opts):
+    """
+    Mark a test as requiring TemplateHaskell. Currently this means
+    that we don't run the test in the profasm when when GHC is
+    dynamically-linked since we can't load profiled objects in this case.
+    """
+    return when(ghc_dynamic(), omit_ways(['profasm']))
+
 def ghc_dynamic():
     return config.ghc_dynamic
 
