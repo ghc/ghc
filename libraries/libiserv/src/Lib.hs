@@ -81,6 +81,6 @@ serv verbose hook pipe restore = loop
     when verbose $ trace "discardCtrlC"
     r <- try $ restore $ return ()
     case r of
-      Left UserInterrupt -> return () >> discardCtrlC
+      Left UserInterrupt -> discardCtrlC
       Left e -> throwIO e
       _ -> return ()

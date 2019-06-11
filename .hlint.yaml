@@ -153,8 +153,7 @@
 - ignore: {name: "Use replicateM", within: Text.ParserCombinators.ReadP.count} # Import cycle
 - ignore: {name: "Redundant if", within: PprCmmExpr.pprLocalReg}
 - ignore: {name: "Redundant return",
-           within: [FastString.stringTable, GHCi.InfoTable.newExecConItbl, # CPP
-                    Lib.serv]} # TODO
+           within: [FastString.stringTable, GHCi.InfoTable.newExecConItbl]} # CPP
 
 
 # Define some custom infix operators
