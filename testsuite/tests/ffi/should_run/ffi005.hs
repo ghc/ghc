@@ -21,6 +21,7 @@ main = do
 
   putStrLn "\nTesting puts (and withString)"
   withCString "Test successful" puts
+  c_fflush c_stdout
 
   putStrLn "\nTesting peekArray0"
   s <- withCString "Test successful" (peekArray0 (castCharToCChar '\0'))
@@ -71,6 +72,8 @@ withBuffer sz m = do
   return s
 
 foreign import ccall puts :: CString -> IO CInt
+foreign import ccall "fflush" c_fflush :: Ptr () -> IO CInt
+foreign import ccall "stdio.h stdout" c_stdout :: Ptr ()
 
 -- foreign import ccall "open" open'  :: CString -> CInt -> IO CInt
 -- foreign import ccall "open" open2' :: CString -> CInt -> CInt -> IO CInt
