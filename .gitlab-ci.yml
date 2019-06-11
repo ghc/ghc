@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: ac65f31dcffb09cd7ca7aaa70f447fcbb19f427f
+  DOCKER_REV: 9f6aae0874b01ac062ebc88193a6e444c281ad5f
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
@@ -531,6 +531,28 @@ release-x86_64-linux-deb8:
     - tags
   cache:
     key: linux-x86_64-deb8
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+#################################
+# x86_64-linux-alpine
+#################################
+
+release-x86_64-linux-alpine:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
+  variables:
+    BUILD_SPHINX_PDF: "NO"
+    TEST_ENV: "x86_64-linux-alpine"
+    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-alpine-linux.tar.xz"
+    # Can't use ld.gold due to #13958.
+    CONFIGURE_ARGS: "--disable-ld-override"
+  only:
+    - tags
+  cache:
+    key: linux-x86_64-alpine
   artifacts:
     when: always
     expire_in: 2 week
