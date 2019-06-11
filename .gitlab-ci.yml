@@ -154,7 +154,7 @@ lint-release-changelogs:
   script:
     - cabal update
     - git clean -xdf && git submodule foreach git clean -xdf
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
@@ -205,7 +205,7 @@ hadrian-ghc-in-ghci:
     - cabal update
     - cd hadrian; cabal new-build --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
@@ -353,7 +353,7 @@ validate-x86_64-darwin:
         echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
       fi
 
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
