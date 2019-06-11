@@ -10,7 +10,6 @@ import Rules.Generate
 import Settings
 import Target
 import Utilities
-import Rules.Library
 
 import qualified Text.Parsec as Parsec
 
@@ -177,7 +176,6 @@ compileHsObjectAndHi rs objpath = do
   ctxPath <- contextPath ctx
   (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
   need (src:deps)
-  needLibrary =<< contextDependencies ctx
 
   -- The .dependencies file lists indicating inputs. ghc will
   -- generally read more *.hi and *.hi-boot files (direct inputs).
