@@ -26,7 +26,7 @@ desugarVectorSpec i              = case vecOptions i of
     genVecEntry (con,repCon,n) =
         case i of
           PrimOpSpec {} ->
-              PrimVecOpSpec { cons    = "(" ++ concat (intersperse " " [cons i, vecCat, show n, vecWidth]) ++ ")"
+              PrimVecOpSpec { cons    = "(" ++ unwords [cons i, vecCat, show n, vecWidth] ++ ")"
                             , name    = name'
                             , prefix  = pfx
                             , veclen  = n

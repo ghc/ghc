@@ -453,15 +453,15 @@ instance Show RealSrcLoc where
 instance Show RealSrcSpan where
   show span@(RealSrcSpan' file sl sc el ec)
     | isPointRealSpan span
-    = "SrcSpanPoint " ++ show file ++ " " ++ intercalate " " (map show [sl,sc])
+    = "SrcSpanPoint " ++ show file ++ " " ++ unwords (map show [sl,sc])
 
     | isOneLineRealSpan span
     = "SrcSpanOneLine " ++ show file ++ " "
-                        ++ intercalate " " (map show [sl,sc,ec])
+                        ++ unwords (map show [sl,sc,ec])
 
     | otherwise
     = "SrcSpanMultiLine " ++ show file ++ " "
-                          ++ intercalate " " (map show [sl,sc,el,ec])
+                          ++ unwords (map show [sl,sc,el,ec])
 
 
 instance Outputable RealSrcSpan where

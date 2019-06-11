@@ -19,7 +19,6 @@
 - ignore: {name: "Move brackets to avoid $"}
 - ignore: {name: "Use sortOn"}
 - ignore: {name: "Use list comprehension"}
-- ignore: {name: "Use unwords"}
 - ignore: {name: "Use fmap"}
 - ignore: {name: "Use guards"}
 - ignore: {name: "Use section"}

@@ -1582,7 +1582,7 @@ simplePackageList my_flags pkgs = do
                                                   else display
        strs = map showPkg $ map mungedId pkgs
    when (not (null pkgs)) $
-      hPutStrLn stdout $ concat $ intersperse " " strs
+      hPutStrLn stdout $ unwords strs
 
 showPackageDot :: Verbosity -> [Flag] -> IO ()
 showPackageDot verbosity myflags = do
