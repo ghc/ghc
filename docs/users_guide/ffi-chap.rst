@@ -87,7 +87,7 @@ Newtype wrapping of the IO monad
 The FFI spec requires the IO monad to appear in various places, but it
 can sometimes be convenient to wrap the IO monad in a ``newtype``, thus: ::
 
-      newtype MyIO a = MIO (IO a)
+       newtype MyIO a = MIO (IO a)
 
 (A reason for doing so might be to prevent the programmer from calling
 arbitrary IO procedures in some part of the program.)
@@ -112,15 +112,15 @@ The type variables in the type of a foreign declaration may be quantified with
 an explicit ``forall`` by using the :extension:`ExplicitForAll` language
 extension, as in the following example: ::
 
-    {-# LANGUAGE ExplicitForAll #-}
-    foreign import ccall "mmap" c_mmap :: forall a. CSize -> IO (Ptr a)
+       {-# LANGUAGE ExplicitForAll #-}
+       foreign import ccall "mmap" c_mmap :: forall a. CSize -> IO (Ptr a)
 
 Note that an explicit ``forall`` must appear at the front of the type signature
 and is not permitted to appear nested within the type, as in the following
 (erroneous) examples: ::
 
-    foreign import ccall "mmap" c_mmap' :: CSize -> forall a. IO (Ptr a)
-    foreign import ccall quux :: (forall a. Ptr a) -> IO ()
+       foreign import ccall "mmap" c_mmap' :: CSize -> forall a. IO (Ptr a)
+       foreign import ccall quux :: (forall a. Ptr a) -> IO ()
 
 .. _ffi-prim:
 
