@@ -29,7 +29,6 @@
 - ignore: {name: "Use let"}
 - ignore: {name: "Avoid lambda using `infix`"}
 - ignore: {name: "Use if"}
-- ignore: {name: "Use when"}
 - ignore: {name: "Use const"}
 - ignore: {name: "Use uncurry"}
 - ignore: {name: "Use map once"}

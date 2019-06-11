@@ -117,9 +117,8 @@ threadWait evt fd = mask_ $ do
   mgr <- getSystemEventManager_
   reg <- registerFd mgr (\_ e -> putMVar m e) fd evt M.OneShot
   evt' <- takeMVar m `onException` unregisterFd_ mgr reg
-  if evt' `eventIs` evtClose
-    then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
-    else return ()
+  when (evt' `eventIs` evtClose) $
+    ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
 
 -- used at least by RTS in 'select()' IO manager backend
 blockedOnBadFD :: SomeException
@@ -135,9 +134,8 @@ threadWaitSTM evt fd = mask_ $ do
            case mevt of
              Nothing -> retry
              Just evt' ->
-               if evt' `eventIs` evtClose
-               then throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
-               else return ()
+               when (evt' `eventIs` evtClose) $
+                 throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
   return (waitAction, unregisterFd_ mgr reg >> return ())
 
 -- | Allows a thread to use an STM action to wait for a file descriptor to be readable.

@@ -164,9 +164,8 @@ modReport hpcflags tix@(TixModule moduleName _ _ _) = do
     then putStrLn $ "  <module name = " ++ show moduleName  ++ ">"
     else putStrLn ("-----<module "++moduleName++">-----")
   printModInfo hpcflags mi
-  if xmlOutput hpcflags
-    then putStrLn $ "  </module>"
-    else return ()
+  when (xmlOutput hpcflags) $
+    putStrLn "  </module>"
 
 printModInfo :: Flags -> ModInfo -> IO ()
 printModInfo hpcflags mi | xmlOutput hpcflags = do
@@ -234,9 +233,8 @@ makeReport :: Flags -> String -> [TixModule] -> IO ()
 makeReport hpcflags progName modTcs | xmlOutput hpcflags = do
   putStrLn $ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
   putStrLn $ "<coverage name=" ++ show progName ++ ">"
-  if perModule hpcflags
-    then mapM_ (modReport hpcflags) modTcs
-    else return ()
+  when (perModule hpcflags) $
+    mapM_ (modReport hpcflags) modTcs
   mis <- mapM (modInfo hpcflags True) modTcs
   putStrLn $ "  <summary>"
   printModInfo hpcflags (foldr miPlus miZero mis)

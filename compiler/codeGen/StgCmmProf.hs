@@ -175,19 +175,16 @@ enterCostCentreThunk closure =
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
 enterCostCentreFun ccs closure =
   ifProfiling $ do
-    if isCurrentCCS ccs
-       then do dflags <- getDynFlags
+    when (isCurrentCCS ccs) $
+            do dflags <- getDynFlags
                emitRtsCall rtsUnitId (fsLit "enterFunCCS")
                    [(baseExpr, AddrHint),
                     (costCentreFrom dflags closure, AddrHint)] False
-       else return () -- top-level function, nothing to do
 
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
   = do dflags <- getDynFlags
-       if gopt Opt_SccProfilingOn dflags
-           then code
-           else return ()
+       when (gopt Opt_SccProfilingOn dflags) code
 
 ifProfilingL :: DynFlags -> [a] -> [a]
 ifProfilingL dflags xs

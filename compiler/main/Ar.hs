@@ -177,9 +177,8 @@ putArchEntry (ArchiveEntry name time own grp mode st_size file) = do
 getArchMagic :: Get ()
 getArchMagic = do
   magic <- liftM C.unpack $ getByteString 8
-  if magic /= "!<arch>\n"
-    then fail $ "Invalid magic number " ++ show magic
-    else return ()
+  unless (magic == "!<arch>\n") $
+    fail $ "Invalid magic number " ++ show magic
 
 putArchMagic :: Put
 putArchMagic = putByteString $ C.pack "!<arch>\n"
