@@ -62,7 +62,6 @@
 - ignore: {name: "Use =="}
 - ignore: {name: "Redundant list comprehension"}
 - ignore: {name: "Use putStrLn"}
-- ignore: {name: "Use print"}
 
 
 # Specify additional command line arguments

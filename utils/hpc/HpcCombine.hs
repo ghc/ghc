@@ -85,7 +85,7 @@ sum_main flags (first_file:more_files) = do
                 more_files
 
   case outputFile flags of
-    "-" -> putStrLn (show tix')
+    "-" -> print tix'
     out -> writeTix out tix'
 
 combine_main :: Flags -> [String] -> IO ()
@@ -101,7 +101,7 @@ combine_main flags [first_file,second_file] = do
                      (filterTix flags tix2)
 
   case outputFile flags of
-    "-" -> putStrLn (show tix)
+    "-" -> print tix
     out -> writeTix out tix
 combine_main _     _ = hpcError combine_plugin $ "need exactly two .tix files to combine"
 
@@ -117,7 +117,7 @@ map_main flags [first_file] = do
                  ]
 
   case outputFile flags of
-    "-" -> putStrLn (show tix')
+    "-" -> print tix'
     out -> writeTix out tix'
 map_main _     [] = hpcError map_plugin $ "no .tix file specified"
 map_main _     _  = hpcError map_plugin $ "to many .tix files specified"

@@ -46,7 +46,7 @@ overlay_main flags files = do
   let tix = Tix $ mod_info
 
   case outputFile flags of
-    "-" -> putStrLn (show tix)
+    "-" -> print tix
     out -> writeFile out (show tix)
 
 
