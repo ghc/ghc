@@ -154,6 +154,7 @@
 - ignore: {name: "Use newtype instead of data",
            within: [GHC.IORef.Box, GHC.TypeNats.WrapN,
                     Language.Haskell.TH.PprLib.PprM]} # See #16791
+- ignore: {name: "Use replicateM", within: Text.ParserCombinators.ReadP.count} # Import cycle
 
 
 # Define some custom infix operators
