@@ -20,10 +20,12 @@ main = do
 --  putStrLn $ "errno == " ++ show err
 
   putStrLn "\nTesting puts (and withString)"
-  withCString "Test successful" puts
+  hFlush stdout
+  withCString "Test puts successful" puts
+  flushStdout  -- Flush the libc output buffer
 
   putStrLn "\nTesting peekArray0"
-  s <- withCString "Test successful" (peekArray0 (castCharToCChar '\0'))
+  s <- withCString "Test peekArray0 successful" (peekArray0 (castCharToCChar '\0'))
   putStr (map castCCharToChar s)
 
 -- disabled due to use of non-portable constants in arguments to open:
@@ -71,6 +73,7 @@ withBuffer sz m = do
   return s
 
 foreign import ccall puts :: CString -> IO CInt
+foreign import ccall "flush_stdout" flushStdout :: IO ()
 
 -- foreign import ccall "open" open'  :: CString -> CInt -> IO CInt
 -- foreign import ccall "open" open2' :: CString -> CInt -> CInt -> IO CInt
