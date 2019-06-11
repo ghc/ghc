@@ -12,5 +12,6 @@ test (W_ r1,
  {
     foreign "C" printf("%d  %d  %d  %d  %d  %d  %d  %d  %d  %d\n",
                         r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
+    foreign "C" fflush(W_[stdout]);
     return (r10);
  }
