@@ -28,11 +28,11 @@ test('ffi004', skip, compile_and_run, [''])
 # On x86, the test suffers from floating-point differences due to the
 # use of 80-bit internal precision when using the native code generator.
 #
-test('ffi005', [ omit_ways(prof_ways),
+test('ffi005', [ omit_ways(prof_ways + ['ghci']),
                  when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3) ],
-               compile_and_run, [''])
+               compile_and_run, ['ffi005_c.c'])
 
 test('ffi006', normal, compile_and_run, [''])
 
