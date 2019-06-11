@@ -12,7 +12,6 @@
 - ignore: {name: "Redundant bracket"}
 - ignore: {name: "Reduce duplication"}
 - ignore: {name: "Eta reduce"}
-- ignore: {name: "Use fromMaybe"}
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Parse error"}
 - ignore: {name: "Use camelCase"}
@@ -141,6 +140,7 @@
 - ignore: {name: "Fuse foldr/map"}
 - ignore: {name: "Functor law"}
 - ignore: {name: "Use isNothing"}
+- ignore: {name: "Replace case with fromMaybe"}
 
 - ignore: {name: "Use elem", within: Data.Foldable}
 - ignore: {name: "Use fold", within: Data.Foldable}
