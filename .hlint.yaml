@@ -11,7 +11,6 @@
 - ignore: {name: "Redundant do"}
 - ignore: {name: "Redundant bracket"}
 - ignore: {name: "Reduce duplication"}
-- ignore: {name: "Eta reduce"}
 - ignore: {name: "Use <$>"}
 - ignore: {name: "Parse error"}
 - ignore: {name: "Use camelCase"}
@@ -135,6 +134,7 @@
 - ignore: {name: "Functor law"}
 - ignore: {name: "Use isNothing"}
 - ignore: {name: "Replace case with fromMaybe"}
+- ignore: {name: "Eta reduce"}
 
 # Exceptions for specific definitions or modules
 - ignore: {name: "Use elem", within: Data.Foldable.Foldable}
