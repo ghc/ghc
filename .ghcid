@@ -3,4 +3,3 @@
 --reload ghc
 --reload includes
 --restart hadrian/
---restart utils/
