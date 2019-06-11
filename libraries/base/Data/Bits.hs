@@ -369,7 +369,7 @@ class Bits b => FiniteBits b where
 --
 -- @since 4.6.0.0
 bitDefault :: (Bits a, Num a) => Int -> a
-bitDefault i = 1 `shiftL` i
+bitDefault = \i -> 1 `shiftL` i
 {-# INLINE bitDefault #-}
 
 -- | Default implementation for 'testBit'.
@@ -378,7 +378,7 @@ bitDefault i = 1 `shiftL` i
 --
 -- @since 4.6.0.0
 testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
-testBitDefault x i = (x .&. bit i) /= 0
+testBitDefault = \x i -> (x .&. bit i) /= 0
 {-# INLINE testBitDefault #-}
 
 -- | Default implementation for 'popCount'.
