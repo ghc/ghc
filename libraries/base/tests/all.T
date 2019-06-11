@@ -94,13 +94,26 @@ test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_
 test('dynamic005',      normal, compile_and_run, [''])
 
 enum_setups = [when(fast(), skip)]
-test('enum01',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum02',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum03',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum04',          normal, compile_and_run, [''])
+def enum_test(name):
+    """
+    These tests have a funky Python preprocessor which require some headstands
+    to run on Windows.
+    """
+    test(name,
+         [when(opsys('mingw32'), extra_files(['enum_processor.bat']))),
+          extra_files(['enum_processor.py']),
+          when(opsys('mingw32'),
+               extra_compile_opts('-F -pgmF ./enum_processor.bat'))),
+          when(not opsys('mingw32'),
+               extra_compile_opts('-F -pgmF ./enum_processor.py')))
+         ],
+         compile_and_run,
+         [''])
+
+enum_test('enum01')
+enum_test('enum02')
+enum_test('enum03')
+test('enum04', normal, compile_and_run, [''])
 
 test('exceptionsrun001',        normal, compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
