@@ -24,6 +24,7 @@ TARGETS=(
     # Linux ARM
     "arm-unknown-linux-gnueabihf" "armv6-unknown-linux-gnueabihf" "armv6l-unknown-linux-gnueabihf"
     "armv7-unknown-linux-gnueabihf" "armv7a-unknown-linux-gnueabi" "armv7l-unknown-linux-gnueabihf"
+    "armv7l-unknown-linux-gnueabi"
     "aarch64-unknown-linux-gnu" "aarch64-unknown-linux"
     # Linux x86
     "i386-unknown-linux-gnu" "i386-unknown-linux" "x86_64-unknown-linux-gnu" "x86_64-unknown-linux"
