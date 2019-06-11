@@ -233,7 +233,9 @@ sameNat x y
 
 newtype SNat    (n :: Nat)    = SNat    Natural
 
-{- HLINT ignore WrapN -} -- No, we don't want to make WrapN a newtype.
+-- NB: WrapN mustn't be a newtype. Otherwise you'll see
+--
+-- > ld.lld: error: undefined symbol: ghczmprim_GHCziPrim_magicDict_closure
 data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 
 -- See Note [magicDictId magic] in "basicType/MkId.hs"

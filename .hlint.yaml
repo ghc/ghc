@@ -151,6 +151,9 @@
                                                         # run counter to the MRP.
 - ignore: {name: "Use fewer imports", within: [RtClosureInspect, PprTyThing, Main,
                                                GHC.Magic]}
+- ignore: {name: "Use newtype instead of data",
+           within: [GHC.IORef.Box, GHC.TypeNats.WrapN,
+                    Language.Haskell.TH.PprLib.PprM]} # See #16791
 
 
 # Define some custom infix operators

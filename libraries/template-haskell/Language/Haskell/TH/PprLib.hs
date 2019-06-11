@@ -119,9 +119,7 @@ punctuate :: Doc -> [Doc] -> [Doc]
 
 type State = (Map Name Name, Uniq)
 
-{- HLINT ignore PprM -} -- Turning PprM into a newtype seems to trigger TH test
-                        -- failures with ext-interp on LLVM. See
-                        -- https://gitlab.haskell.org/ghc/ghc/merge_requests/1133#note_204555
+-- NB: Don't turn PprM into a newtype. See #16791.
 data PprM a = PprM { runPprM :: State -> (a, State) }
 
 pprName :: Name -> Doc
