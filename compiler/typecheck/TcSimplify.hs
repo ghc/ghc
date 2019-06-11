@@ -534,7 +534,7 @@ simplifyAmbiguityCheck ty wanteds
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
        ; unless (allow_ambiguous && not (insolubleWC final_wc))
-                (discardResult (reportUnsolved final_wc))
+                (void (reportUnsolved final_wc))
        ; traceTc "reportUnsolved(ambig) }" empty
 
        ; return () }

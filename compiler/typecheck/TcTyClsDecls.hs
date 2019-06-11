@@ -1143,7 +1143,7 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
 
 kcTyClDecl (SynDecl { tcdLName = dL->L _ name, tcdRhs = rhs })
   = bindTyClTyVars name $ \ _ res_kind ->
-    discardResult $ tcCheckLHsType rhs res_kind
+    void $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
         -- in getInitialKinds.
 
@@ -1174,7 +1174,7 @@ kcConDecl :: ConDecl GhcRn -> TcM ()
 kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
-    discardResult                   $
+    void $
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
        ; traceTc "kcConDecl {" (ppr name $$ ppr args)
@@ -1197,7 +1197,7 @@ kcConDecl (ConDeclGADT { con_names = names
     -- If we don't look at MkT we won't get the correct kind
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
-    discardResult $
+    void $
     bindImplicitTKBndrs_Tv implicit_tkv_nms $
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
@@ -1933,7 +1933,7 @@ kcTyFamInstEqn tc_fam_tc
        ; let vis_pats = numVisibleArgs hs_pats
        ; checkTc (vis_pats == vis_arity) $
                   wrongNumberOfParmsErr vis_arity
-       ; discardResult $
+       ; void $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats

@@ -267,7 +267,7 @@ mapBagM f (ListBag    xs) = do rs <- mapM f xs
 
 mapBagM_ :: Monad m => (a -> m b) -> Bag a -> m ()
 mapBagM_ _ EmptyBag        = return ()
-mapBagM_ f (UnitBag x)     = f x >> return ()
+mapBagM_ f (UnitBag x)     = void $ f x
 mapBagM_ f (TwoBags b1 b2) = mapBagM_ f b1 >> mapBagM_ f b2
 mapBagM_ f (ListBag    xs) = mapM_ f xs
 

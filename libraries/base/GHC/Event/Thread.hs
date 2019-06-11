@@ -18,6 +18,7 @@ module GHC.Event.Thread
 
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
+import Data.Functor (void)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
@@ -136,7 +137,7 @@ threadWaitSTM evt fd = mask_ $ do
              Just evt' ->
                when (evt' `eventIs` evtClose) $
                  throwSTM $ errnoToIOError "threadWaitSTM" eBADF Nothing Nothing
-  return (waitAction, unregisterFd_ mgr reg >> return ())
+  return (waitAction, void (unregisterFd_ mgr reg))
 
 -- | Allows a thread to use an STM action to wait for a file descriptor to be readable.
 -- The STM action will retry until the file descriptor has data ready.

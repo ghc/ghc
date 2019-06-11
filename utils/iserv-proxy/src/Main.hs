@@ -279,7 +279,7 @@ proxy verbose local remote = loop
           resp <- fwdLoadCall verbose local remote msg'
           reply resp
           loop
-        Shutdown{}    -> fwdCall msg' >> return ()
+        Shutdown{}    -> void $ fwdCall msg'
         _other        -> fwdCall msg' >>= reply >> loop
 
 

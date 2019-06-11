@@ -73,7 +73,7 @@ import GHC.Integer.Simple.Internals
 #endif
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
-import Foreign
+import Foreign hiding (void)
 import System.IO.Unsafe
 
 
@@ -139,7 +139,7 @@ constrClosToName hsc_env ConstrClosure{pkg=pkg,modl=mod,name=occ} = do
        modName = mkModule (stringToUnitId pkg) (mkModuleName mod)
    Right `fmap` lookupOrigIO hsc_env modName occName
 constrClosToName _hsc_env clos =
-   return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (fmap (const ()) clos)))
+   return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (void clos)))
 
 -----------------------------------
 -- * Traversals for Terms
@@ -625,7 +625,7 @@ addConstraint actual expected = do
     traceTR (text "add constraint:" <+> fsep [ppr actual, equals, ppr expected])
     recoverTR (traceTR $ fsep [text "Failed to unify", ppr actual,
                                     text "with", ppr expected]) $
-      discardResult $
+      void $
       captureConstraints $
       do { (ty1, ty2) <- congruenceNewtypes actual expected
          ; unifyType Nothing ty1 ty2 }
@@ -716,7 +716,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
     case clos of
 -- Thunks we may want to force
       t | isThunk t && force -> do
-         traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
+         traceTR (text "Forcing a " <> text (show $ void t))
          liftIO $ GHCi.seqHValue hsc_env a
          go (pred max_depth) my_ty old_ty a
 -- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE. If
@@ -796,7 +796,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       _ -> do
          traceTR (text "Unknown closure:" <+>
-                  text (show (fmap (const ()) clos)))
+                  text (show $ void clos))
          return (Suspension (tipe (info clos)) my_ty a Nothing)
 
   -- insert NewtypeWraps around newtypes

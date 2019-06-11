@@ -24,7 +24,7 @@ import PprCmm ()
 import Outputable
 import DynFlags
 
-import Control.Monad (liftM, ap)
+import Control.Monad (liftM, ap, void)
 
 -- Things to check:
 --     - invariant on CmmBlock in CmmExpr (see comment there)
@@ -195,7 +195,7 @@ lintCmmLast labels node = case node of
 
 
 lintTarget :: ForeignTarget -> CmmLint ()
-lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
+lintTarget (ForeignTarget e _) = void $ lintCmmExpr e
 lintTarget (PrimTarget {})     = return ()
 
 

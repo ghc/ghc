@@ -23,7 +23,6 @@
 - ignore: {name: "Use guards"}
 - ignore: {name: "Use section"}
 - ignore: {name: "Move guards forward"}
-- ignore: {name: "Use void"}
 - ignore: {name: "Use unless"}
 - ignore: {name: "Use tuple-section"}
 - ignore: {name: "Use let"}
@@ -151,6 +150,8 @@
 - ignore: {name: "Redundant if", within: PprCmmExpr.pprLocalReg}
 - ignore: {name: "Redundant return",
            within: [FastString.stringTable, GHCi.InfoTable.newExecConItbl]} # CPP
+- ignore: {name: "Use void",
+           within: [GHC.Event.IntTable, GHC.Pack, Text.ParserCombinators.ReadP]} # Import cycles
 
 
 # Define some custom infix operators

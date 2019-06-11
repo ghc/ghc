@@ -243,7 +243,7 @@ foldM_         :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m ()
 {-# INLINABLE foldM_ #-}
 {-# SPECIALISE foldM_ :: (a -> b -> IO a) -> a -> [b] -> IO () #-}
 {-# SPECIALISE foldM_ :: (a -> b -> Maybe a) -> a -> [b] -> Maybe () #-}
-foldM_ f a xs  = foldlM f a xs >> return ()
+foldM_ f a xs  = void $ foldlM f a xs
 
 {-
 Note [Worker/wrapper transform on replicateM/replicateM_]

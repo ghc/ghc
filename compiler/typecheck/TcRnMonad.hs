@@ -16,7 +16,6 @@ module TcRnMonad(
   initTc, initTcWithGbl, initTcInteractive, initTcRnIf,
 
   -- * Simple accessors
-  discardResult,
   getTopEnv, updTopEnv, getGblEnv, updGblEnv,
   setGblEnv, getLclEnv, updLclEnv, setLclEnv,
   getEnvs, setEnvs,
@@ -425,9 +424,6 @@ initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
 *                                                                      *
 ************************************************************************
 -}
-
-discardResult :: TcM a -> TcM ()
-discardResult a = a >> return ()
 
 getTopEnv :: TcRnIf gbl lcl HscEnv
 getTopEnv = do { env <- getEnv; return (env_top env) }

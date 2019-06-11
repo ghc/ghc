@@ -56,6 +56,7 @@ import Outputable
 
 import Data.ByteString (ByteString)
 import Data.Bits
+import Data.Functor
 
 -- When we split at proc points, we need an empty info table.
 mkEmptyContInfoTable :: CLabel -> CmmInfoTable
@@ -74,7 +75,7 @@ cmmToRawCmm dflags cmms
                 case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                   (b,uniqs') -> return (uniqs',b)
                   -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-       ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
+       ; return (void $ Stream.mapAccumL do_one uniqs cmms)
        }
 
 -- Make a concrete info table, represented as a list of CmmStatic

@@ -190,7 +190,7 @@ tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 kcHsSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcHsSigType names (HsIB { hsib_body = hs_ty
                                   , hsib_ext = sig_vars })
-  = discardResult                        $
+  = void                                 $
     addSigCtxt (funsSigCtxt names) hs_ty $
     bindImplicitTKBndrs_Skol sig_vars    $
     tc_lhs_type typeLevelMode hs_ty liftedTypeKind
@@ -2161,8 +2161,7 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
        ; mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
            Just (ATyVar _ tv)
-             -> do { discardResult $ unifyKind (Just hs_tv)
-                                        kind (tyVarKind tv)
+             -> do { void $ unifyKind (Just hs_tv) kind (tyVarKind tv)
                        -- This unify rejects:
                        --    class C (m :: * -> *) where
                        --      type F (m :: *) = ...
