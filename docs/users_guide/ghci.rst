@@ -2582,21 +2582,22 @@ commonly used commands.
     For example:
 
     .. code-block:: none
-      >:instances Maybe (Maybe Int)
-      instance Eq (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
-      instance Ord (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
-      instance Show (Maybe (Maybe Int)) -- Defined in ‘GHC.Show’
-      instance Read (Maybe (Maybe Int)) -- Defined in ‘GHC.Read’
 
-      >:set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+         > :instances Maybe (Maybe Int)
+         instance Eq (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
+         instance Ord (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
+         instance Show (Maybe (Maybe Int)) -- Defined in ‘GHC.Show’
+         instance Read (Maybe (Maybe Int)) -- Defined in ‘GHC.Read’
 
-      >:instances Maybe _
-      instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
-      instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
-      instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
-      instance Semigroup _ => Semigroup (Maybe _) -- Defined in ‘GHC.Base’
-      instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
-      instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
+         > :set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+
+         > :instances Maybe _
+         instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
+         instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
+         instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
+         instance Semigroup _ => Semigroup (Maybe _) -- Defined in ‘GHC.Base’
+         instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
+         instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
 
 .. ghci-cmd:: :main; ⟨arg1⟩ ... ⟨argn⟩
 
