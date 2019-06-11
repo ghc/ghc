@@ -16,6 +16,7 @@ int main(int argc, char *argv[])
     usleep(100000);
 #endif
     printf("exiting...\n");
+    fflush(stdout);
     hs_exit();
     printf("exited.\n");
 #if mingw32_HOST_OS
