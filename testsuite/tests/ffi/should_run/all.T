@@ -169,7 +169,10 @@ test('ffi_parsing_001', [omit_ways(['ghci'])], compile_and_run,
 
 test('capi_value', [omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
 
-test('T7170', exit_code(1), compile_and_run, [''])
+test('T7170',
+     [when(opsys('mingw32'), fragile(16801)),
+      exit_code(1)],
+     compile_and_run, [''])
 
 test('T4012', [expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
      ['T4012', ''])
