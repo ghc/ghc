@@ -1,9 +1,9 @@
 and#
 or#
 uncheckedShift.*#
-\+#
-\-#
-\*#
++#
+-#
+*#
 quotInt#
 remInt#
 plusFloat#
