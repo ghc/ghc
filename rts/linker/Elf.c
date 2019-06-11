@@ -1030,6 +1030,9 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
     * - GOT_ORG is the addressing origin of the Global Offset Table (the indirection table for imported data addresses).
     *        This value must always be word-aligned.  See §4.6.1.8, Proxy generating relocations.
     * - GOT(S) is the address of the GOT entry for the symbol S.
+    *
+    * See the ELF for "ARM Specification" for details:
+    * https://developer.arm.com/architectures/system-architectures/software-standards/abi
     */
 
    for (j = 0; j < nent; j++) {
