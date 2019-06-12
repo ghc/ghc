@@ -27,6 +27,7 @@ stages:
   - hackage    # head.hackage testing
   - deploy     # push documentation
 
+# N.B.Don't run on wip/ branches, instead on run on merge requests.
 .only-default: &only-default
   only:
     - master
@@ -70,7 +71,18 @@ ghc-linters:
     refs:
       - merge_requests
 
+lint-linters:
+  <<: *only-default
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  script:
+    - mypy .gitlab/linters/*.py
+  dependencies: []
+  tags:
+    - lint
+
 lint-testsuite:
+  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
@@ -83,6 +95,7 @@ lint-testsuite:
 # accomodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
+  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
@@ -127,6 +140,7 @@ lint-submods-branch:
       - /ghc-[0-9]+\.[0-9]+/
 
 .lint-changelogs:
+  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []

@@ -8,10 +8,10 @@ import re
 import textwrap
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Sequence
 from collections import namedtuple
 
-def lint_failure(file, line_no, line_content, message):
+def lint_failure(file, line_no: int, line_content: str, message: str):
     """ Print a lint failure message. """
     wrapper = textwrap.TextWrapper(initial_indent='  ',
                                    subsequent_indent='    ')
@@ -30,7 +30,7 @@ def lint_failure(file, line_no, line_content, message):
 
     print(textwrap.dedent(msg))
 
-def get_changed_files(base_commit, head_commit,
+def get_changed_files(base_commit: str, head_commit: str,
                       subdir: str = '.'):
     """ Get the files changed by the given range of commits. """
     cmd = ['git', 'diff', '--name-only',
@@ -56,11 +56,11 @@ class Linter(object):
         self.path_filters.append(f)
         return self
 
-    def do_lint(self, path):
+    def do_lint(self, path: Path):
         if all(f(path) for f in self.path_filters):
             self.lint(path)
 
-    def lint(self, path):
+    def lint(self, path: Path):
         raise NotImplementedError
 
 class LineLinter(Linter):
@@ -69,13 +69,13 @@ class LineLinter(Linter):
     the given line from a file and calls :func:`add_warning` for any lint
     issues found.
     """
-    def lint(self, path):
-        if os.path.isfile(path):
-            with open(path, 'r') as f:
+    def lint(self, path: Path):
+        if path.is_file():
+            with path.open('r') as f:
                 for line_no, line in enumerate(f):
                     self.lint_line(path, line_no+1, line)
 
-    def lint_line(self, path, line_no, line):
+    def lint_line(self, path: Path, line_no: int, line: str):
         raise NotImplementedError
 
 class RegexpLinter(LineLinter):
@@ -83,19 +83,18 @@ class RegexpLinter(LineLinter):
     A :class:`RegexpLinter` produces the given warning message for
     all lines matching the given regular expression.
     """
-    def __init__(self, regex, message, path_filter=lambda path: True):
+    def __init__(self, regex: str, message: str):
         LineLinter.__init__(self)
         self.re = re.compile(regex)
         self.message = message
-        self.path_filter = path_filter
 
-    def lint_line(self, path, line_no, line):
-        if self.path_filter(path) and self.re.search(line):
+    def lint_line(self, path: Path, line_no: int, line: str):
+        if self.re.search(line):
             w = Warning(path=path, line_no=line_no, line_content=line[:-1],
                         message=self.message)
             self.add_warning(w)
 
-def run_linters(linters: List[Linter],
+def run_linters(linters: Sequence[Linter],
                 subdir: str = '.') -> None:
     import argparse
     parser = argparse.ArgumentParser()
@@ -107,7 +106,7 @@ def run_linters(linters: List[Linter],
         if path.startswith('.gitlab/linters'):
             continue
         for linter in linters:
-            linter.do_lint(path)
+            linter.do_lint(Path(path))
 
     warnings = [warning
                 for linter in linters
