@@ -70,6 +70,15 @@ ghc-linters:
     refs:
       - merge_requests
 
+lint-testsuite:
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  script:
+    - make -Ctestsuite list_broken TEST_HC=ghc
+  dependencies: []
+  tags:
+    - lint
+
 # We allow the submodule checker to fail when run on merge requests (to
 # accomodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
