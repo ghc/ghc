@@ -2041,7 +2041,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        rootSummariesOk <- reportImportErrors rootSummaries
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
-       map0 <- loop (concatMap calcDeps rootSummariesOk) root_map
+       (map0, _nothings) <- loop (concatMap calcDeps rootSummariesOk) root_map Set.empty
        -- if we have been passed -fno-code, we enable code generation
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
@@ -2102,26 +2102,29 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO (NodeMap [Either ErrorMessages ModSummary])
+             -> Set.Set NodeKey
+             -> IO ((NodeMap [Either ErrorMessages ModSummary], Set.Set NodeKey))
                         -- The result is the completed NodeMap
-        loop [] done = return done
-        loop ((wanted_mod, is_boot) : ss) done
+        loop [] done nothings = return (done, nothings)
+        loop ((wanted_mod, is_boot) : ss) done nothings
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
-                loop ss done
+                loop ss done nothings
             else
-                do { multiRootsErr dflags (rights summs); return Map.empty }
+                do { multiRootsErr dflags (rights summs); return (Map.empty, Set.empty) }
+          | Set.member key nothings
+          = loop ss done nothings
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
                                        is_boot wanted_mod True
                                        Nothing excl_mods
                case mb_s of
-                   Nothing -> loop ss done
-                   Just (Left e) -> loop ss (Map.insert key [Left e] done)
+                   Nothing -> loop ss done (Set.insert key nothings)
+                   Just (Left e) -> loop ss (Map.insert key [Left e] done) nothings
                    Just (Right s)-> do
-                     new_map <-
-                       loop (calcDeps s) (Map.insert key [Right s] done)
-                     loop ss new_map
+                     (new_map, new_nothings) <-
+                       loop (calcDeps s) (Map.insert key [Right s] done) nothings
+                     loop ss new_map new_nothings
           where
             key = (unLoc wanted_mod, is_boot)
 
