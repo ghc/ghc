@@ -7,7 +7,8 @@ import sys
 import re
 import textwrap
 import subprocess
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Callable
 from collections import namedtuple
 
 def lint_failure(file, line_no, line_content, message):
@@ -46,12 +47,21 @@ class Linter(object):
     """
     def __init__(self):
         self.warnings = [] # type: List[Warning]
+        self.path_filters = [] # type: List[Callable[[Path], bool]]
 
     def add_warning(self, w: Warning):
         self.warnings.append(w)
 
+    def add_path_filter(self, f: Callable[[Path], bool]) -> "Linter":
+        self.path_filters.append(f)
+        return self
+
+    def do_lint(self, path):
+        if all(f(path) for f in self.path_filters):
+            self.lint(path)
+
     def lint(self, path):
-        pass
+        raise NotImplementedError
 
 class LineLinter(Linter):
     """
@@ -66,7 +76,7 @@ class LineLinter(Linter):
                     self.lint_line(path, line_no+1, line)
 
     def lint_line(self, path, line_no, line):
-        pass
+        raise NotImplementedError
 
 class RegexpLinter(LineLinter):
     """
@@ -97,7 +107,7 @@ def run_linters(linters: List[Linter],
         if path.startswith('.gitlab/linters'):
             continue
         for linter in linters:
-            linter.lint(path)
+            linter.do_lint(path)
 
     warnings = [warning
                 for linter in linters
