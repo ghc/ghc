@@ -469,12 +469,23 @@ validate-x86_64-linux-deb9-debug:
     TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
 
-validate-x86_64-linux-deb9-llvm:
+# Disabled to alleviate CI load
+.validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
+
+nightly-x86_64-linux-deb9-llvm:
+  extends: .build-x86_64-linux-deb9
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb9-llvm"
+  only:
+    variables:
+      - $NIGHTLY
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
