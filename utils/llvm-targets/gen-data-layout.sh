@@ -18,35 +18,73 @@
 
 # Target sets for which to generate the llvm-targets file
 TARGETS=(
+    #########################
+    # Windows
+    #########################
+
     # Windows x86
-    "i386-unknown-windows" "i686-unknown-windows" "x86_64-unknown-windows"
+    "i386-unknown-windows"
+    "i686-unknown-windows"
+    "x86_64-unknown-windows"
+
+    #########################
+    # Linux
+    #########################
 
     # Linux ARM
-    "arm-unknown-linux-gnueabihf" "armv6-unknown-linux-gnueabihf" "armv6l-unknown-linux-gnueabihf"
-    "armv7-unknown-linux-gnueabihf" "armv7a-unknown-linux-gnueabi" "armv7l-unknown-linux-gnueabihf"
+    "arm-unknown-linux-gnueabihf"
+    "armv6-unknown-linux-gnueabihf"
+    "armv6l-unknown-linux-gnueabihf"
+    "armv7-unknown-linux-gnueabihf"
+    "armv7a-unknown-linux-gnueabi"
+    "armv7a-unknown-linux-gnueabihf"
     "armv7l-unknown-linux-gnueabi"
-    "aarch64-unknown-linux-gnu" "aarch64-unknown-linux"
+    "armv7l-unknown-linux-gnueabihf"
+    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux"
     # Linux x86
-    "i386-unknown-linux-gnu" "i386-unknown-linux" "x86_64-unknown-linux-gnu" "x86_64-unknown-linux"
+    "i386-unknown-linux-gnu"
+    "i386-unknown-linux"
+    "x86_64-unknown-linux-gnu"
+    "x86_64-unknown-linux"
     # Linux Android
-    "x86_64-unknown-linux-android" "armv7-unknown-linux-androideabi" "aarch64-unknown-linux-android"
+    "x86_64-unknown-linux-android"
+    "armv7-unknown-linux-androideabi"
+    "aarch64-unknown-linux-android"
+    "armv7a-unknown-linux-androideabi"
     # Linux ppc64le
     "powerpc64le-unknown-linux"
+
+    #########################
+    # Darwin
+    #########################
+
+    # macOS
+    "i386-apple-darwin"
+    "x86_64-apple-darwin"
+    # iOS
+    "armv7-apple-ios arm64-apple-ios"
+    "i386-apple-ios x86_64-apple-ios"
+
+    #########################
+    # FreeBSD
+    #########################
 
     # FreeBSD amd64
     "amd64-portbld-freebsd"
     "x86_64-unknown-freebsd" # See #15718
 
+    # FreeBSD ARM
+    "aarch64-unknown-freebsd"
+    "armv6-unknown-freebsd-gnueabihf"
+    "armv7-unknown-freebsd-gnueabihf"
+
+    #########################
+    # Other
+    #########################
+
     # QNX
     "arm-unknown-nto-qnx-eabi"
-
-    # macOS
-    "i386-apple-darwin" "x86_64-apple-darwin"
-    # iOS
-    "armv7-apple-ios arm64-apple-ios" "i386-apple-ios x86_64-apple-ios"
-
-    # FreeBSD ARM
-    "aarch64-unknown-freebsd" "armv6-unknown-freebsd-gnueabihf" "armv7-unknown-freebsd-gnueabihf"
 )
 
 # given the call to clang -c11 that clang --target -v generates,
