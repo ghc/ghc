@@ -28,11 +28,13 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreFVs
+import {-#SOURCE #-} CoreUnfold ( mkUnfolding )
 import MkCore ( FloatBind(..) )
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
+import IdInfo   ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
@@ -153,7 +155,7 @@ simpleOptPgm dflags this_mod binds rules
              -- hence paying just a substitution
 
     do_one (env, binds') bind
-      = case simple_opt_bind env bind of
+      = case simple_opt_bind env bind TopLevel of
           (env', Nothing)    -> (env', binds')
           (env', Just bind') -> (env', bind':binds')
 
@@ -200,7 +202,7 @@ simple_opt_clo :: SimpleOptEnv -> SimpleClo -> OutExpr
 simple_opt_clo env (e_env, e)
   = simple_opt_expr (soeSetInScope env e_env) e
 
-simple_opt_expr :: SimpleOptEnv -> InExpr -> OutExpr
+simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
   = go expr
   where
@@ -224,9 +226,9 @@ simple_opt_expr env expr
                         where
                           co' = optCoercion (soe_dflags env) (getTCvSubst subst) co
 
-    go (Let bind body) = case simple_opt_bind env bind of
-                           (env', Nothing)   -> simple_opt_expr env' body
-                           (env', Just bind) -> Let bind (simple_opt_expr env' body)
+    go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
+                             (env', Nothing)   -> simple_opt_expr env' body
+                             (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
     go lam@(Lam {})     = go_lam env [] lam
     go (Case e b ty as)
@@ -239,7 +241,7 @@ simple_opt_expr env expr
           DEFAULT -> go rhs
           _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
             where
-              (env', mb_prs) = mapAccumL simple_out_bind env $
+              (env', mb_prs) = mapAccumL (simple_out_bind NotTopLevel) env $
                                zipEqual "simpleOptExpr" bs es
 
          -- Note [Getting the map/coerce RULE to work]
@@ -301,7 +303,7 @@ simple_app env (App e1 e2) as
 simple_app env (Lam b e) (a:as)
   = wrapLet mb_pr (simple_app env' e as)
   where
-     (env', mb_pr) = simple_bind_pair env b Nothing a
+     (env', mb_pr) = simple_bind_pair env b Nothing a NotTopLevel
 
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
@@ -316,7 +318,7 @@ simple_app env (Tick t e) as
 -- However, do /not/ do this transformation for join points
 --    See Note [simple_app and join points]
 simple_app env (Let bind body) args
-  = case simple_opt_bind env bind of
+  = case simple_opt_bind env bind NotTopLevel of
       (env', Nothing)   -> simple_app env' body args
       (env', Just bind')
         | isJoinBind bind' -> finish_app env expr' args
@@ -334,17 +336,17 @@ finish_app env fun (arg:args)
   = finish_app env (App fun (simple_opt_clo env arg)) args
 
 ----------------------
-simple_opt_bind :: SimpleOptEnv -> InBind
+simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
-simple_opt_bind env (NonRec b r)
+simple_opt_bind env (NonRec b r) top_level
   = (env', case mb_pr of
             Nothing    -> Nothing
             Just (b,r) -> Just (NonRec b r))
   where
     (b', r') = joinPointBinding_maybe b r `orElse` (b, r)
-    (env', mb_pr) = simple_bind_pair env b' Nothing (env,r')
+    (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
 
-simple_opt_bind env (Rec prs)
+simple_opt_bind env (Rec prs) top_level
   = (env'', res_bind)
   where
     res_bind          = Just (Rec (reverse rev_prs'))
@@ -356,18 +358,20 @@ simple_opt_bind env (Rec prs)
                   Just pr -> pr : prs
                   Nothing -> prs)
        where
-         (env', mb_pr) = simple_bind_pair env b (Just b') (env,r)
+         (env', mb_pr) = simple_bind_pair env b (Just b') (env,r) top_level
 
 ----------------------
 simple_bind_pair :: SimpleOptEnv
                  -> InVar -> Maybe OutVar
                  -> SimpleClo
+                 -> TopLevelFlag
                  -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
     -- (simple_bind_pair subst in_var out_rhs)
     --   either extends subst with (in_var -> out_rhs)
     --   or     returns Nothing
 simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
+                 top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
   = ASSERT( isTyVar in_bndr )
@@ -386,7 +390,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
   | otherwise
   = simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
-                         occ active stable_unf
+                         occ active stable_unf top_level
   where
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
@@ -421,9 +425,11 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     safe_to_inline (ManyOccs {})        = False
 
 -------------------
-simple_out_bind :: SimpleOptEnv -> (InVar, OutExpr)
+simple_out_bind :: TopLevelFlag
+                -> SimpleOptEnv
+                -> (InVar, OutExpr)
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
-simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
+simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
   = ASSERT( isTyVar in_bndr )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
@@ -434,15 +440,15 @@ simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
 
   | otherwise
   = simple_out_bind_pair env in_bndr Nothing out_rhs
-                         (idOccInfo in_bndr) True False
+                         (idOccInfo in_bndr) True False top_level
 
 -------------------
 simple_out_bind_pair :: SimpleOptEnv
                      -> InId -> Maybe OutId -> OutExpr
-                     -> OccInfo -> Bool -> Bool
+                     -> OccInfo -> Bool -> Bool -> TopLevelFlag
                      -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
-                     occ_info active stable_unf
+                     occ_info active stable_unf top_level
   | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
     -- Type and coercion bindings are caught earlier
     -- See Note [CoreSyn type and coercion invariant]
@@ -456,7 +462,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
     (env', bndr1) = case mb_out_bndr of
                       Just out_bndr -> (env, out_bndr)
                       Nothing       -> subst_opt_bndr env in_bndr
-    out_bndr = add_info env' in_bndr bndr1
+    out_bndr = add_info env' in_bndr top_level out_rhs bndr1
 
     post_inline_unconditionally :: Bool
     post_inline_unconditionally
@@ -528,6 +534,25 @@ But not for join points!  For two reasons:
 
 The simple thing to do is to disable this transformation
 for join points in the simple optimiser
+
+Note [The Let-Unfoldings Invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A program has the Let-Unfoldings property iff:
+
+- For every let-bound variable f, whether top-level or nested, whether
+  recursive or not:
+  - Both the binding Id of f, and every occurence Id of f, has an idUnfolding.
+  - For non-INLINE things, that unfolding will be f's right hand sids
+  - For INLINE things (which have a "stable" unfolding) that unfolding is
+    semantically equivalent to f's RHS, but derived from the original RHS of f
+    rather that its current RHS.
+
+Informally, we can say that in a program that has the Let-Unfoldings property,
+all let-bound Id's have an explicit unfolding attached to them.
+
+Currently, the simplifier guarantees the Let-Unfoldings invariant for anything
+it outputs.
+
 -}
 
 ----------------------
@@ -545,8 +570,9 @@ subst_opt_bndr env bndr
     (subst_cv, cv') = substCoVarBndr subst bndr
 
 subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
--- Nuke all fragile IdInfo, unfolding, and RULES;
---    it gets added back later by add_info
+-- Nuke all fragile IdInfo, unfolding, and RULES; it gets added back later by
+-- add_info.
+--
 -- Rather like SimplEnv.substIdBndr
 --
 -- It's important to zap fragile OccInfo (which CoreSubst.substIdBndr
@@ -577,13 +603,35 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
     new_inl   = delVarEnv inl old_id
 
 ----------------------
-add_info :: SimpleOptEnv -> InVar -> OutVar -> OutVar
-add_info env old_bndr new_bndr
+add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
+add_info env old_bndr top_level new_rhs new_bndr
  | isTyVar old_bndr = new_bndr
- | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
+ | otherwise        = lazySetIdInfo new_bndr new_info
  where
-   subst = soe_subst env
-   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+   subst    = soe_subst env
+   dflags   = soe_dflags env
+   old_info = idInfo old_bndr
+
+   -- Add back in the rules and unfolding which were
+   -- removed by zapFragileIdInfo in subst_opt_id_bndr.
+   --
+   -- See Note [The Let-Unfoldings Invariant]
+   new_info = idInfo new_bndr `setRuleInfo`      new_rules
+                              `setUnfoldingInfo` new_unfolding
+
+   old_rules = ruleInfo old_info
+   new_rules = substSpec subst new_bndr old_rules
+
+   old_unfolding = unfoldingInfo old_info
+   new_unfolding | isStableUnfolding old_unfolding
+                 = substUnfolding subst old_unfolding
+                 | otherwise
+                 = unfolding_from_rhs
+
+   unfolding_from_rhs = mkUnfolding dflags InlineRhs
+                                    (isTopLevel top_level)
+                                    False -- may be bottom or not
+                                    new_rhs
 
 simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id
@@ -1413,10 +1461,13 @@ collectBindersPushingCo e
 
       | otherwise = (reverse bs, mkCast (Lam b e) co)
 
-{- Note [collectBindersPushingCo]
+{-
+
+Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
    <type> -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
+
 -}
