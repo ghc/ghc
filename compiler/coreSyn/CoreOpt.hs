@@ -28,11 +28,13 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreFVs
+import {-#SOURCE #-} CoreUnfold ( mkUnfolding )
 import MkCore ( FloatBind(..) )
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
+import IdInfo   ( unfoldingInfo, setUnfoldingInfo, IdInfo )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
@@ -153,7 +155,7 @@ simpleOptPgm dflags this_mod binds rules
              -- hence paying just a substitution
 
     do_one (env, binds') bind
-      = case simple_opt_bind env bind of
+      = case simple_opt_bind env bind TopLevel of
           (env', Nothing)    -> (env', binds')
           (env', Just bind') -> (env', bind':binds')
 
@@ -200,14 +202,63 @@ simple_opt_clo :: SimpleOptEnv -> SimpleClo -> OutExpr
 simple_opt_clo env (e_env, e)
   = simple_opt_expr (soeSetInScope env e_env) e
 
-simple_opt_expr :: SimpleOptEnv -> InExpr -> OutExpr
+has_unfolding :: Id -> Bool
+has_unfolding i = case unfoldingInfo . idInfo $ i of
+  NoUnfolding -> False
+  _ -> True
+
+-- | Recursively check that all let-bound variables in a CoreExpr have explicit
+-- unfoldings attached to them. See Note [The Let-Unfoldings Invariant].
+expr_has_let_unfoldings :: HasCallStack => CoreExpr -> Bool
+expr_has_let_unfoldings (App e a) =
+  -- For a function application, check both the argument and the body.
+  expr_has_let_unfoldings e && expr_has_let_unfoldings a
+expr_has_let_unfoldings (Lam _ body) =
+  -- We are not interested in the lambda argument, only the body. (Are we?)
+  expr_has_let_unfoldings body
+expr_has_let_unfoldings (Let (NonRec b _) _) =
+  -- non-rec let bindings can be checked directly
+  has_unfolding b
+expr_has_let_unfoldings (Let (Rec xs) _) =
+  -- for recursive let bindings, we check the entire list
+  all (has_unfolding . fst) xs
+expr_has_let_unfoldings (Case scrutinee _ _ alts) =
+  -- for case expressions, check the scrutinee and all branches; we are only
+  -- interested in the branch bodies though, not the variables captured from
+  -- patterns.
+  expr_has_let_unfoldings scrutinee && all expr_has_let_unfoldings [ e | (_, _, e) <- alts ]
+-- Cast and Tick just forward to their arguments
+expr_has_let_unfoldings (Cast e _) =
+  expr_has_let_unfoldings e
+expr_has_let_unfoldings (Tick _ e) =
+  expr_has_let_unfoldings e
+
+expr_has_let_unfoldings (Var _) =
+  -- For a Var, we can't tell whether it was originally let-bound, or
+  -- came about in some other way (imported or lambda-bound), so we'll
+  -- have to take it at face value.
+  True
+-- Anything else cannot possibly contain binders and thus trivially satisfies
+-- the invariant.
+expr_has_let_unfoldings _ =
+  True
+
+simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
-  = go expr
+  = let out = go expr
+    in -- ASSERT(expr_has_let_unfoldings out)
+       out
   where
+    subst        :: Subst
     subst        = soe_subst env
+
+    in_scope     :: InScopeSet
     in_scope     = substInScope subst
+
+    in_scope_env :: (InScopeSet, IdUnfoldingFun)
     in_scope_env = (in_scope, simpleUnfoldingFun)
 
+    go :: InExpr -> OutExpr
     go (Var v)
        | Just clo <- lookupVarEnv (soe_inl env) v
        = simple_opt_clo env clo
@@ -224,9 +275,17 @@ simple_opt_expr env expr
                         where
                           co' = optCoercion (soe_dflags env) (getTCvSubst subst) co
 
-    go (Let bind body) = case simple_opt_bind env bind of
-                           (env', Nothing)   -> simple_opt_expr env' body
-                           (env', Just bind) -> Let bind (simple_opt_expr env' body)
+    go (Let bind body) = let env_mbind :: (SimpleOptEnv, Maybe OutBind)
+                             env_mbind = simple_opt_bind env bind NotTopLevel
+
+                             out :: OutExpr
+                             out = case env_mbind of
+                                     (env', Nothing)   -> simple_opt_expr env' body
+                                     (env', Just bind) -> Let bind (simple_opt_expr env' body)
+                         -- For reasons as of yet unknown to me, the following
+                         -- assert fails in some parts of the test suite:
+                         -- in ASSERT(expr_has_let_unfoldings out) out
+                         in out
 
     go lam@(Lam {})     = go_lam env [] lam
     go (Case e b ty as)
@@ -239,7 +298,8 @@ simple_opt_expr env expr
           DEFAULT -> go rhs
           _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
             where
-              (env', mb_prs) = mapAccumL simple_out_bind env $
+              env' :: SimpleOptEnv
+              (env', mb_prs) = mapAccumL (\env ve -> simple_out_bind env ve NotTopLevel) env $
                                zipEqual "simpleOptExpr" bs es
 
          -- Note [Getting the map/coerce RULE to work]
@@ -301,7 +361,7 @@ simple_app env (App e1 e2) as
 simple_app env (Lam b e) (a:as)
   = wrapLet mb_pr (simple_app env' e as)
   where
-     (env', mb_pr) = simple_bind_pair env b Nothing a
+     (env', mb_pr) = simple_bind_pair env b Nothing a NotTopLevel
 
 simple_app env (Tick t e) as
   -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
@@ -314,7 +374,7 @@ simple_app env (Tick t e) as
 --        in f a1 a2
 -- (#13208)
 simple_app env (Let bind body) as
-  = case simple_opt_bind env bind of
+  = case simple_opt_bind env bind NotTopLevel of
       (env', Nothing)   -> simple_app env' body as
       (env', Just bind) -> Let bind (simple_app env' body as)
 
@@ -328,17 +388,17 @@ finish_app env fun (arg:args)
   = finish_app env (App fun (simple_opt_clo env arg)) args
 
 ----------------------
-simple_opt_bind :: SimpleOptEnv -> InBind
+simple_opt_bind :: SimpleOptEnv -> InBind -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe OutBind)
-simple_opt_bind env (NonRec b r)
+simple_opt_bind env (NonRec b r) top_level
   = (env', case mb_pr of
             Nothing    -> Nothing
             Just (b,r) -> Just (NonRec b r))
   where
     (b', r') = joinPointBinding_maybe b r `orElse` (b, r)
-    (env', mb_pr) = simple_bind_pair env b' Nothing (env,r')
+    (env', mb_pr) = simple_bind_pair env b' Nothing (env,r') top_level
 
-simple_opt_bind env (Rec prs)
+simple_opt_bind env (Rec prs) top_level
   = (env'', res_bind)
   where
     res_bind          = Just (Rec (reverse rev_prs'))
@@ -350,18 +410,20 @@ simple_opt_bind env (Rec prs)
                   Just pr -> pr : prs
                   Nothing -> prs)
        where
-         (env', mb_pr) = simple_bind_pair env b (Just b') (env,r)
+         (env', mb_pr) = simple_bind_pair env b (Just b') (env,r) top_level
 
 ----------------------
 simple_bind_pair :: SimpleOptEnv
                  -> InVar -> Maybe OutVar
                  -> SimpleClo
+                 -> TopLevelFlag
                  -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
     -- (simple_bind_pair subst in_var out_rhs)
     --   either extends subst with (in_var -> out_rhs)
     --   or     returns Nothing
 simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
+                 top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
   = ASSERT( isTyVar in_bndr )
@@ -380,7 +442,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
   | otherwise
   = simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
-                         occ active stable_unf
+                         occ active stable_unf top_level
   where
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
@@ -415,9 +477,11 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     safe_to_inline (ManyOccs {})        = False
 
 -------------------
-simple_out_bind :: SimpleOptEnv -> (InVar, OutExpr)
+simple_out_bind :: SimpleOptEnv
+                -> (InVar, OutExpr)
+                -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
-simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
+simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs) top_level
   | Type out_ty <- out_rhs
   = ASSERT( isTyVar in_bndr )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
@@ -428,15 +492,15 @@ simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
 
   | otherwise
   = simple_out_bind_pair env in_bndr Nothing out_rhs
-                         (idOccInfo in_bndr) True False
+                         (idOccInfo in_bndr) True False top_level
 
 -------------------
 simple_out_bind_pair :: SimpleOptEnv
                      -> InId -> Maybe OutId -> OutExpr
-                     -> OccInfo -> Bool -> Bool
+                     -> OccInfo -> Bool -> Bool -> TopLevelFlag
                      -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
-                     occ_info active stable_unf
+                     occ_info active stable_unf top_level
   | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
     -- Type and coercion bindings are caught earlier
     -- See Note [CoreSyn type and coercion invariant]
@@ -450,7 +514,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
     (env', bndr1) = case mb_out_bndr of
                       Just out_bndr -> (env, out_bndr)
                       Nothing       -> subst_opt_bndr env in_bndr
-    out_bndr = add_info env' in_bndr bndr1
+    out_bndr = add_info env' in_bndr top_level out_rhs bndr1
 
     post_inline_unconditionally :: Bool
     post_inline_unconditionally
@@ -543,13 +607,32 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
     new_inl   = delVarEnv inl old_id
 
 ----------------------
-add_info :: SimpleOptEnv -> InVar -> OutVar -> OutVar
-add_info env old_bndr new_bndr
+add_info :: SimpleOptEnv -> InVar -> TopLevelFlag -> OutExpr -> OutVar -> OutVar
+add_info env old_bndr top_level new_rhs new_bndr
  | isTyVar old_bndr = new_bndr
- | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
+ | otherwise        = lazySetIdInfo new_bndr new_info
  where
    subst = soe_subst env
+   dflags = soe_dflags env
+
+   -- mb_new_info is Just for stable unfoldings, Nothing for unstable
    mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+
+   -- For unstable unfoldings (i.e., all let(rec) bound variables that do not
+   -- come from INLINE pragmas), attach the RHS; for stable ones, use the
+   -- unfolding we already have.
+   new_info :: IdInfo
+   new_info = case mb_new_info of
+    Just info -> info
+    Nothing ->
+      let new_unfolding =
+                mkUnfolding
+                  dflags
+                  InlineRhs
+                  (isTopLevel top_level)
+                  False -- may be bottom or not
+                  new_rhs
+      in idInfo old_bndr `setUnfoldingInfo` new_unfolding
 
 simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id
@@ -1379,10 +1462,31 @@ collectBindersPushingCo e
 
       | otherwise = (reverse bs, mkCast (Lam b e) co)
 
-{- Note [collectBindersPushingCo]
+{-
+
+Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
    <type> -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
+
+Note [The Let-Unfoldings Invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A program has the Let-Unfoldings property iff:
+
+- For every let-bound variable f, whether top-level or nested, whether
+  recursive or not:
+  - Both the binding Id of f, and every occurence Id of f, has an idUnfolding.
+  - For non-INLINE things, that unfolding will be f's right hand sids
+  - For INLINE things (which have a "stable" unfolding) that unfolding is
+    semantically equivalent to f's RHS, but derived from the original RHS of f
+    rather that its current RHS.
+
+Informally, we can say that in a program that has the Let-Unfoldings property,
+all let-bound Id's have an explicit unfolding attached to them.
+
+Currently, the simplifier guarantees the Let-Unfoldings invariant for anything
+it outputs.
+
 -}
