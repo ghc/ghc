@@ -18,44 +18,49 @@ import Prelude -- See note [Why do we import Prelude here?]
 
 import System.FilePath
 
--- Windows
-#if defined(mingw32_HOST_OS)
-import System.Environment (getExecutablePath)
--- POSIX
-#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
+-- Windows and POSIX
+#if defined(mingw32_HOST_OS) || \
+    defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 import System.Environment (getExecutablePath)
 #endif
 
 -- | Calculate the location of the base dir
 getBaseDir :: IO (Maybe String)
-#if defined(mingw32_HOST_OS)
-getBaseDir = Just . (\p -> p </> "lib") . rootDir <$> getExecutablePath
-  where
-    -- locate the "base dir" when given the path
-    -- to the real ghc executable (as opposed to symlink)
-    -- that is running this function.
-    rootDir :: FilePath -> FilePath
-    rootDir = takeDirectory . takeDirectory . normalise
-#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
--- on unix, this is a bit more confusing.
--- The layout right now is something like
+#if defined(mingw32_HOST_OS) || \
+    defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
+-- Note [How GHC finds topdir relocatably].
 --
---   /bin/ghc-X.Y.Z <- wrapper script (1)
---   /bin/ghc       <- symlink to wrapper script (2)
---   /lib/ghc-X.Y.Z/bin/ghc <- ghc executable (3)
+-- On Windows, this is straight forward:
+--
+--   $topdir/<foo>/<something>.exe (3) <- ghc executable (3)
+--   $topdir/ <- $topdir (4)
+--
+-- On Unix, this is a bit more confusing. The layout right now is
+-- something like:
+--
+--   /bin/<something>-X.Y.Z <- wrapper script (1)
+--   /bin/<something> <- symlink to wrapper script (2)
+--   /lib/ghc-X.Y.Z/bin/<something> <- ghc or other executable (3)
 --   /lib/ghc-X.Y.Z <- $topdir (4)
 --
--- As such, we first need to find the absolute location to the
--- binary.
+-- As such, we first need to find the absolute location to the binary,
+-- then go up two directories.
 --
--- getExecutablePath will return (3). One takeDirectory will
--- give use /lib/ghc-X.Y.Z/bin, and another will give us (4).
+-- `getExecutablePath` will return the real exacutable. One
+-- `takeDirectory` will give use /lib/ghc-X.Y.Z/bin or its Windows
+-- equivalent, and another will give us (4).
 --
--- This of course only works due to the current layout. If
--- the layout is changed, such that we have ghc-X.Y.Z/{bin,lib}
--- this would need to be changed accordingly.
---
-getBaseDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
+-- This of course only works due to the current layout. If the layout is
+-- changed, such that we have ghc-X.Y.Z/{bin,lib} this would need to be
+-- changed accordingly.
+getBaseDir = Just . (\p -> p </> "lib") . rootDir <$> getExecutablePath
+  where
+    -- Locate the "base dir" when given the path to the real ghc
+    -- executable (as opposed to symlink) that is running this function.
+    -- `normalise` is harmless in the Windows no-symlink case so no need
+    -- to special-case.
+    rootDir :: FilePath -> FilePath
+    rootDir = takeDirectory . takeDirectory . normalise
 #else
 getBaseDir = return Nothing
 #endif

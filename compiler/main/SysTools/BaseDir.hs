@@ -52,18 +52,15 @@ GHC needs various support files (library packages, RTS etc), plus
 various auxiliary programs (cp, gcc, etc).  It starts by finding topdir,
 the root of GHC's support files
 
-On Unix:
-  - ghc always has a shell wrapper that passes a -B<dir> option
+On Unix, ghc usually has a shell wrapper that passes a `-B<dir>` option.
+That is the top dir. But on Windows, and relocatable Unix, ghc never has
+a shell wrapper, so `-B<dir>` cannot be relied upon. When it is not
+passed, the top dir is guessed from the binaries location.
 
-On Windows:
-  - ghc never has a shell wrapper.
-  - we can find the location of the ghc binary, which is
-        $topdir/<foo>/<something>.exe
-    where <something> may be "ghc", "ghc-stage2", or similar
-  - we strip off the "<foo>/<something>.exe" to leave $topdir.
+See note [How GHC finds topdir relocatably] for how the fallback logic
+works.
 
-from topdir we can find package.conf, ghc-asm, etc.
-
+From the top dir we can find package.conf, ghc-asm, etc.
 
 Note [tooldir: How GHC finds mingw on Windows]
 
@@ -117,7 +114,7 @@ findTopDir Nothing
                  -- Get directory of executable
                  maybe_exec_dir <- getBaseDir
                  case maybe_exec_dir of
-                     -- "Just" on Windows, "Nothing" on unix
+                     -- "Just" on Windows, and Unix.
                      Nothing -> throwGhcExceptionIO $
                          InstallationError "missing -B<dir> option"
                      Just dir -> return dir
