@@ -388,10 +388,11 @@ generate directory distdir config_args
           libraryDirs = forDeps Installed.libraryDirs
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
-          mkLibraryRelDir "rts"   = "rts/dist/build"
-          mkLibraryRelDir "ghc"   = "compiler/stage2/build"
-          mkLibraryRelDir "Cabal" = "libraries/Cabal/Cabal/dist-install/build"
-          mkLibraryRelDir l       = "libraries/" ++ l ++ "/dist-install/build"
+          mkLibraryRelDir "rts"        = "rts/dist/build"
+          mkLibraryRelDir "ghc"        = "compiler/stage2/build"
+          mkLibraryRelDir "Cabal"      = "libraries/Cabal/Cabal/dist-install/build"
+          mkLibraryRelDir "containers" = "libraries/containers/containers/dist-install/build"
+          mkLibraryRelDir l            = "libraries/" ++ l ++ "/dist-install/build"
           libraryRelDirs = map mkLibraryRelDir transitiveDepNames
 
           -- this is a hack to accommodate Cabal 2.2+ more hygenic
