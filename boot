@@ -16,6 +16,11 @@ parser.add_argument('--validate', action='store_true', help='Run in validate mod
 parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
 args = parser.parse_args()
 
+# Libraries whose LICENSE file isn't in the submodule root
+LICENSE_PATH_EXCEPTIONS = {
+    'libraries/containers': 'libraries/containers/containers/LICENSE'
+}
+
 def print_err(s):
     print(dedent(s), file=sys.stderr)
 
@@ -78,7 +83,7 @@ def check_boot_packages():
             # but in an lndir tree we avoid making .git directories,
             # so it doesn't exist. We therefore require that every repo
             # has a LICENSE file instead.
-            license_path = os.path.join(dir_, 'LICENSE')
+            license_path = LICENSE_PATH_EXCEPTIONS.get(dir_, os.path.join(dir_, 'LICENSE'))
             if not os.path.isfile(license_path):
                 die("""\
                     Error: %s doesn't exist
