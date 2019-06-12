@@ -8,7 +8,7 @@ import re
 import textwrap
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Sequence
 from collections import namedtuple
 
 def lint_failure(file, line_no, line_content, message):
@@ -94,7 +94,7 @@ class RegexpLinter(LineLinter):
                         message=self.message)
             self.add_warning(w)
 
-def run_linters(linters: List[Linter],
+def run_linters(linters: Sequence[Linter],
                 subdir: str = '.') -> None:
     import argparse
     parser = argparse.ArgumentParser()
