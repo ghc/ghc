@@ -74,7 +74,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     useSystemFfi <- expr (flag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
-    debugged <- ghcDebugged <$> expr flavour
+    flav <- expr flavour
+    let debugged = ghcDebugged flav
+        logged = ghcLogged flav
 
     let
         dynamic = Dynamic `wayUnit` way
@@ -129,7 +131,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
-
+            , logged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
+              arg "-eventlog"
+              -- should we restrict this to some packages only?
             ]
 
 findHsDependencies :: Args

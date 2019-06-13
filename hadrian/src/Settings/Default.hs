@@ -218,6 +218,7 @@ defaultFlavour = Flavour
     , ghciWithDebugger   = False
     , ghcProfiled        = False
     , ghcDebugged        = False
+    , ghcLogged          = False
     , ghcDocs            = cmdDocsArgs }
 
 -- | Default logic for determining whether to build

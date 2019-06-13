@@ -31,6 +31,8 @@ data Flavour = Flavour {
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
     ghcDebugged :: Bool
+    -- | Build a GHC capable of emitting event logs.
+    ghcLogged :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets }
