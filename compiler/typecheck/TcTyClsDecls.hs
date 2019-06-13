@@ -2597,13 +2597,13 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
                  ; let (arg_tys, stricts) = unzip btys
-                 ; (res_ty, res_ki) <- tcLHsType hs_res_ty
+                 ; res_ty <- tcHsOpenType hs_res_ty
                    -- See Note [Implementation of unlifted newtypes]
                  ; dflags <- getDynFlags
                  ; final_arg_tys <-
                      unifyNewtypeKind dflags new_or_data
                                       (hsConDeclArgTys hs_args)
-                                      arg_tys res_ki
+                                      arg_tys (typeKind res_ty)
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, final_arg_tys, res_ty, field_lbls, stricts)
                  }
