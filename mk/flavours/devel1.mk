@@ -10,3 +10,7 @@ BUILD_SPHINX_PDF   = NO
 BUILD_MAN          = NO
 
 LAX_DEPENDENCIES   = YES
+
+# Reduce optimisation when building Cabal; this makes a significant difference
+# in overall build time. See #16817.
+libraries/Cabal_dist-install_HC_OPTS += -O0
