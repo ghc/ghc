@@ -30,6 +30,7 @@ BuildFlavour=$BUILD_FLAVOUR
 ifneq "\$(BuildFlavour)" ""
 include mk/flavours/\$(BuildFlavour).mk
 endif
+GhcLibHcOpts+=-haddock
 EOF
 
 case "$(uname)" in
