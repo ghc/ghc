@@ -1,8 +1,8 @@
 packages: ./
           ../libraries/Cabal/Cabal/
 
-# N.B. Compile with -O0 since this is not a performance-critical executable
-# and the Cabal takes nearly twice as long to build with -O1. See #16817.
+-- N.B. Compile with -O0 since this is not a performance-critical executable
+-- and the Cabal takes nearly twice as long to build with -O1. See #16817.
 package Cabal
   optimization: False
 
