@@ -13,15 +13,19 @@ import Settings
 import Target
 import Utilities
 import Rules.Library
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
 import qualified Distribution.Types.PackageName as Cabal
 import qualified Distribution.Types.PackageId as Cabal
+import qualified Distribution.Version as Cabal
 
 import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 import qualified System.Directory            as IO
 import qualified Text.Parsec                 as Parsec
+import qualified Distribution.Compat.CharParsing as P
 
 -- * Configuring
 
@@ -75,7 +79,7 @@ registerPackageRules rs stage = do
 
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
-        liftIO $ print conf
+        liftIO $ print ("Needing", conf)
         historyDisable
         let libpath = takeDirectory (takeDirectory conf)
             settings = libpath -/- "settings"
@@ -83,21 +87,29 @@ registerPackageRules rs stage = do
 
         --need [settings, platformConstants]
 
-        pkgName <- getPackageNameFromConfFile conf
+        (pkgName, v) <- getPackageNameFromConfFileV conf
         let pkg = unsafeFindPackageByName pkgName
-        isBoot <- (pkg `notElem`) <$> stagePackages Stage0
-
         let ctx = Context stage pkg vanilla
-        case stage of
-            Stage0 | isBoot -> copyConf  rs ctx conf
-            _               -> buildConf rs ctx conf
+        if pkgLocation pkg == Boot
+          then copyConf rs ctx conf
+          else do
+            pd <- readPackageData pkg
+            liftIO $ print (version pd, v, pkgName)
+            let verMismatch = version pd /= v
+            isBoot <- (pkg `notElem`) <$> stagePackages Stage0
+            stagePackages Stage0 >>= liftIO . print
+            liftIO $ print (conf, isBoot)
+
+            case stage of
+                Stage0 | isBoot || verMismatch -> copyConf  rs ctx conf
+                _               -> buildConf rs ctx conf
 
 mungeGhc "ghc" = "ghc1"
 mungeGhc x = x
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} conf = do
-    liftIO $ print conf
+    liftIO $ print ("Building", conf)
     depPkgIds <- map mungeGhc <$> cabalDependencies context
     liftIO $ print depPkgIds
     ensureConfigured context
@@ -145,9 +157,11 @@ buildConf _ context@Context {..} conf = do
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
+    liftIO $ print ("Copying conf", conf)
     depPkgIds <- fmap stdOutToPkgIds . askWithResources rs $
         target context (GhcPkg Dependencies stage) [pkgName package] []
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
+    liftIO $ print ("Deps", depPkgIds)
+    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <> "&boot" <.> "conf")) depPkgIds
     -- We should unregister if the file exists since @ghc-pkg@ will complain
     -- about existing package: https://github.com/snowleopard/hadrian/issues/543.
     -- Also, we don't always do the unregistration + registration to avoid
@@ -172,8 +186,17 @@ getPackageNameFromConfFile conf
                             takeBaseName conf ++ ": " ++ err
         Right (name, _) -> return name
 
+getPackageNameFromConfFileV :: FilePath -> Action (String, Version)
+getPackageNameFromConfFileV conf
+    | takeBaseName conf == "rts" = return ("rts", Cabal.mkVersion [1,0])
+    | otherwise = case parseCabalName (takeBaseName conf) of
+        Left err -> error $ "getPackageNameFromConfFile: Couldn't parse " ++
+                            takeBaseName conf ++ ": " ++ err
+        Right (name, version) -> return (name, version)
+
 parseCabalName :: String -> Either String (String, Version)
-parseCabalName = fmap f . Cabal.eitherParsec
+parseCabalName =
+    fmap f . Cabal.explicitEitherParsec ((,) <$> Cabal.parsec <*> optional (P.string "&boot"))
   where
-    f :: Cabal.PackageId -> (String, Version)
-    f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
+    f :: (Cabal.PackageId, Maybe String) -> (String, Version)
+    f (pkg_id, b) = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)

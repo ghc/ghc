@@ -32,7 +32,7 @@ ghcWarningsArgs = do
         , package base         ? pure [ "-Wno-trustworthy-safe" ]
         , package binary       ? pure [ "-Wno-deprecations" ]
         , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
-        , package compiler     ? pure [ "-Wcpp-undef" ]
+        --, package compiler     ? pure [ "-Wcpp-undef" ]
         , package directory    ? pure [ "-Wno-unused-imports" ]
         , package ghc          ? pure [ "-Wcpp-undef" ]
         , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]

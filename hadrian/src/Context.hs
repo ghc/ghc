@@ -119,8 +119,9 @@ pkgGhciLibraryFile context@Context {..} = do
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile Context {..} = do
     pid  <- pkgIdentifier package
+    let bootSuffix = if pkgLocation package == Boot then "-boot" else ""
     dbPath <- packageDbPath stage
-    return $ dbPath -/- pid <.> "conf"
+    return $ dbPath -/- pid <> bootSuffix <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:

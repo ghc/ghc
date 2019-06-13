@@ -164,6 +164,7 @@ realPkgPath p = do
   case pkgLocation p of
     Internal f -> return f
     External v -> downloadedPath <&> (-/- (pkgName p ++ "-" ++ v))
+    Boot -> error $ "No source for" ++ show p
 
 -- | Relative path to where to put result files
 resPkgPath :: Package -> FilePath
@@ -171,5 +172,6 @@ resPkgPath p =
   case pkgLocation p of
     Internal f -> f
     External {} -> "gen" </>  pkgName p
+    Boot -> "boot" </> pkgName p
 
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : Hadrian.Haskell.Cabal.Parse
@@ -62,13 +63,14 @@ parsePackageData pkg = do
     let pd      = C.packageDescription gpd
         pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
-        version = C.display (C.pkgVersion pkgId)
+        version = C.pkgVersion pkgId
         libDeps = collectDeps (C.condLibrary gpd)
         exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
         depPkgs = catMaybes $ map findPackageByName deps
+    liftIO $ print ("parsePackageData", depPkgs, deps)
     return $ PackageData name version (C.synopsis pd) (C.description pd) depPkgs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
@@ -101,6 +103,7 @@ biModules pd = go [ comp | comp@(bi,_,_) <-
                        Just (C.main, C.modulePath exe))
     go []  = error "No buildable component found."
     go [x] = x
+    go (x:_) = x
     go _   = error "Cannot handle more than one buildinfo yet."
 
 -- TODO: Track command line arguments and package configuration flags.
@@ -115,12 +118,17 @@ configurePackage context@Context {..} = do
     cFile <- pkgCabalFile package
     depPkgs <- packageDependencies <$> readPackageData package
     liftIO $ print depPkgs
+    let
+      depPkgs' = if pkgName package == "graphmod-plugin" then
+                (compilerBoot :) . delete compiler $ depPkgs
+                else depPkgs
 
+    liftIO $ print depPkgs'
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
     -- We'll need those packages in our package database.
     deps <- sequence [ pkgConfFile (context { package = pkg })
-                     | pkg <- depPkgs, pkg `elem` stagePkgs ]
+                     | pkg <- depPkgs', pkg `elem` stagePkgs ]
     liftIO $ print deps
     need deps
 
@@ -167,10 +175,13 @@ copyPackage context@Context {..} = do
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
     verbosity <- getVerbosity
+    let comp = if | isLibrary package -> "lib:" ++ pkgName package
+                  | isProgram package -> "exe:" ++ pkgName package
+                  | otherwise -> ""
     let v = if verbosity >= Loud then "-v3" else "-v0"
     traced "cabal-copy" $
         C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
-            [ "copy", "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
+            [ "copy", comp, "--builddir", ctxPath, "--target-package-db", pkgDbPath, v ]
 
 -- | Register the 'Package' of a given 'Context' into the package database.
 registerPackage :: Context -> Action ()

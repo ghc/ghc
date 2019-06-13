@@ -16,7 +16,7 @@ module Hadrian.Package (
     Package (..), PackageName, PackageType, PackageLocation(..),
 
     -- * Construction and properties
-    library, program, external, dummyPackage
+    library, program, external, dummyPackage, boot
     , isLibrary, isProgram
 
     ) where
@@ -32,6 +32,7 @@ data PackageLocation =
           Internal FilePath -- ^ Path to the file contents relative to
                             --   root directory.
         | External String   -- ^ Version string to fetch package from Hackage.
+        | Boot              -- ^ A package already in the boot package db
         deriving (Eq, Generic, Ord, Show)
 
 type PackageName = String
@@ -52,6 +53,9 @@ data Package = Package {
 -- | Construct a library package.
 library :: PackageName -> FilePath -> Package
 library p fp = Package Library p (Internal fp)
+
+boot :: PackageName -> Package
+boot pn = Package Library pn Boot
 
 external :: PackageName -> String -> Package
 external p v = Package Library p (External v)

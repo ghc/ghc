@@ -11,28 +11,33 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
     pkgVersion, pkgIdentifier, pkgSynopsis, pkgDescription, pkgDependencies,
-    pkgGenericDescription, cabalArchString, cabalOsString,
+    pkgGenericDescription, cabalArchString, cabalOsString, pkgVersionString
     ) where
 
 import Development.Shake
 import Distribution.PackageDescription (GenericPackageDescription)
+import Distribution.Version
 
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Package
+import Distribution.Pretty
 
 -- | Read a Cabal file and return the package version. The Cabal file is tracked.
-pkgVersion :: Package -> Action String
+pkgVersion :: Package -> Action Version
 pkgVersion = fmap version . readPackageData
+
+pkgVersionString :: Package -> Action String
+pkgVersionString = fmap prettyShow . pkgVersion
 
 -- | Read a Cabal file and return the package identifier, e.g. @base-4.10.0.0@.
 -- The Cabal file is tracked.
 pkgIdentifier :: Package -> Action String
 pkgIdentifier package = do
     cabal <- readPackageData package
-    return $ if null (version cabal)
+    return $ if null (versionNumbers $ version cabal)
         then name cabal
-        else name cabal ++ "-" ++ version cabal
+        else name cabal ++ "-" ++ prettyShow (version cabal)
 
 -- | Read a Cabal file and return the package synopsis. The Cabal file is tracked.
 pkgSynopsis :: Package -> Action String
