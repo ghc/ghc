@@ -178,7 +178,7 @@ There are some restrictions on the use of primitive types:
 
          newtype A = MkA Int#
 
-   However, this restriction can be relaxed by enabling `-XUnliftedNewtypes`.
+   However, this restriction can be relaxed by enabling :extension:`-XUnliftedNewtypes`.
    The `section on unlifted newtypes <#unlifted-newtypes>`__ details the
    behavior of such types.
 
