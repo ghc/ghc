@@ -20,7 +20,20 @@
 typedef struct {
   CostCentreStack *ccs;
   union {
-    struct _RetainerSet *rs;  /* Retainer Set */
+
+    union {
+      /* Accessor for the least significant bit of the entire union. Invariant:
+       * This must be at least as large as the largest field in this union for
+       * this to work. If you add more fields make sure you maintain this.
+       *
+       * See Note [Profiling heap traversal visited bit].
+       */
+      StgWord lsb;
+
+      /* Retainer Set */
+      struct _RetainerSet *rs;
+    } trav;
+
     StgWord ldvw;             /* Lag/Drag/Void Word */
   } hp;
 } StgProfHeader;
