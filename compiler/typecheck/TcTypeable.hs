@@ -17,10 +17,11 @@ import GhcPrelude
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
-import TyCoRep( Type(..), TyLit(..), isLiftedTypeKind )
+import TyCoRep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
+import TcTypeableValidity
 import HscTypes ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
@@ -45,7 +46,6 @@ import FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class (lift)
-import Data.Maybe ( isJust )
 import Data.Word( Word64 )
 
 {- Note [Grand plan for Typeable]
@@ -411,38 +411,6 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
        let tycon_rep_rhs = mkTyConRepTyConRHS stuff todo tycon kind_rep
            tycon_rep_bind = mkVarBind tycon_rep_id tycon_rep_rhs
        return $ unitBag tycon_rep_bind
-
--- | Here is where we define the set of Typeable types. These exclude type
--- families and polytypes.
-tyConIsTypeable :: TyCon -> Bool
-tyConIsTypeable tc =
-       isJust (tyConRepName_maybe tc)
-    && typeIsTypeable (dropForAlls $ tyConKind tc)
-      -- Ensure that the kind of the TyCon, with its initial foralls removed,
-      -- is representable (e.g. has no higher-rank polymorphism or type
-      -- synonyms).
-
--- | Is a particular 'Type' representable by @Typeable@? Here we look for
--- polytypes and types containing casts (which may be, for instance, a type
--- family).
-typeIsTypeable :: Type -> Bool
--- We handle types of the form (TYPE LiftedRep) specifically to avoid
--- looping on (tyConIsTypeable RuntimeRep). We used to consider (TYPE rr)
--- to be typeable without inspecting rr, but this exhibits bad behavior
--- when rr is a type family.
-typeIsTypeable ty
-  | Just ty' <- coreView ty         = typeIsTypeable ty'
-typeIsTypeable ty
-  | isLiftedTypeKind ty             = True
-typeIsTypeable (TyVarTy _)          = True
-typeIsTypeable (AppTy a b)          = typeIsTypeable a && typeIsTypeable b
-typeIsTypeable (FunTy _ a b)        = typeIsTypeable a && typeIsTypeable b
-typeIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
-                                   && all typeIsTypeable args
-typeIsTypeable (ForAllTy{})         = False
-typeIsTypeable (LitTy _)            = True
-typeIsTypeable (CastTy{})           = False
-typeIsTypeable (CoercionTy{})       = False
 
 -- | Maps kinds to 'KindRep' bindings. This binding may either be defined in
 -- some other module (in which case the @Maybe (LHsExpr Id@ will be 'Nothing')
