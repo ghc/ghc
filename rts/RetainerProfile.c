@@ -38,7 +38,7 @@
    ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Retainer profiling is a profiling technique that gives information why
 objects can't be freed and lists the consumers that hold pointers to
-the heap objects. It does not list all the objects that keeps references
+the heap objects. It does not list all the objects that keep references
 to the other, because then we would keep too much information that will
 make the report unusable, for example the cons element of the list would keep
 all the tail cells. As a result we are keeping only the objects of the
