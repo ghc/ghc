@@ -17,8 +17,8 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
-test('conc071', omit_ways(['threaded2']), compile_and_run, [''])
-test('conc072', only_ways(['threaded2']), compile_and_run, [''])
+test('conc071', omit_ways(concurrent_ways), compile_and_run, [''])
+test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 # vector code must get inlined to become non-allocating
@@ -67,7 +67,7 @@ test('allowinterrupt001', normal, compile_and_run, [''])
 
 # try hard to provoke the error by running the test 100 times
 test('T5558',
-     [ only_ways(['threaded2']),
+     [ only_ways(concurrent_ways),
        cmd_wrapper(
          lambda c: "for i in %s; do %s || break; done"  %
            (" ".join(str(i) for i in range(1,101)), c)) ],
@@ -88,7 +88,7 @@ test('T7970', normal, compile_and_run, [''])
 test('AtomicPrimops', normal, compile_and_run, [''])
 
 # test uses 2 threads and yield, scheduling can vary with threaded2
-test('threadstatus-9333', [fragile_for(16555, ['ghci']), omit_ways(['threaded2'])], compile_and_run, [''])
+test('threadstatus-9333', [fragile_for(16555, ['ghci']), omit_ways(concurrent_ways)], compile_and_run, [''])
 
 test('T9379', normal, compile_and_run, [''])
 
@@ -132,7 +132,7 @@ test('conc013', normal, compile_and_run, [''])
 test('conc014', normal, compile_and_run, [''])
 test('conc015', normal, compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
-test('conc016', omit_ways(['threaded2']), # see comment in conc016.hs
+test('conc016', omit_ways(concurrent_ways), # see comment in conc016.hs
                 compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
