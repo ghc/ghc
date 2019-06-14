@@ -1,3 +1,6 @@
+-- Ensure we don't expose any unfoldings to guarantee quick rebuilds
+{-# OPTIONS_GHC -O0 #-}
+
 -- If you want to customise your build you should copy this file from
 -- hadrian/src/UserSettings.hs to hadrian/UserSettings.hs and edit your copy.
 -- If you don't copy the file your changes will be tracked by git and you can
