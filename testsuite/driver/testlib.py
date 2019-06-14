@@ -204,6 +204,7 @@ def use_specs( specs ):
          ['A B', '-O -prof -fno-prof-count-entries -v0'])
 
     """
+    assert isinstance(specs, dict)
     return lambda name, opts, s=specs: _use_specs( name, opts, s )
 
 def _use_specs( name, opts, specs ):
@@ -213,6 +214,7 @@ def _use_specs( name, opts, specs ):
 # -----
 
 def expect_fail_for( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
 def _expect_fail_for( name, opts, ways ):
@@ -228,6 +230,7 @@ def _expect_broken( name, opts, bug ):
     opts.expect = 'fail';
 
 def expect_broken_for( bug, ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
@@ -271,6 +274,7 @@ def fragile_for( bug, ways ):
 # -----
 
 def omit_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
 def _omit_ways( name, opts, ways ):
@@ -280,6 +284,7 @@ def _omit_ways( name, opts, ways ):
 # -----
 
 def only_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
 def _only_ways( name, opts, ways ):
@@ -288,6 +293,7 @@ def _only_ways( name, opts, ways ):
 # -----
 
 def extra_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
 def _extra_ways( name, opts, ways ):

@@ -45,7 +45,7 @@ test('T14999',
 # Verify that we optimize away redundant jumps for unordered comparisons.
 test('T15196',
   [ unless(arch('x86_64'), skip),
-    only_ways('normal'),
+    only_ways(['normal']),
   ], makefile_test, [])
 
 test('T15723',
