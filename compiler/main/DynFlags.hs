@@ -5664,10 +5664,6 @@ compilerInfo dflags
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
-       ("Support SMP",                 showBool $ platformMisc_ghcWithSMP $ platformMisc dflags),
-       ("Tables next to code",         showBool $ platformMisc_tablesNextToCode $ platformMisc dflags),
-       ("RTS ways",                    platformMisc_ghcRTSWays $ platformMisc dflags),
-       ("RTS expects libdw",           showBool $ platformMisc_ghcRtsWithLibdw $ platformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5694,7 +5690,6 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Leading underscore",          showBool $ platformMisc_leadingUnderscore $ platformMisc dflags),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
