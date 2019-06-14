@@ -633,6 +633,9 @@
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
+// Memory barriers.
+// For discussion of how these are used to fence heap object
+// accesses see Note [Heap memory barriers] in SMP.h.
 #if defined(THREADED_RTS)
 #define prim_read_barrier prim %read_barrier()
 #else

@@ -219,9 +219,10 @@ threadPaused(Capability *cap, StgTSO *tso)
 
     frame = (StgClosure *)tso->stackobj->sp;
 
+    // N.B. We know that the TSO is owned by the current capability so no
+    // memory barriers are needed here.
     while ((P_)frame < stack_end) {
         info = get_ret_itbl(frame);
-        load_load_barrier();
 
         switch (info->i.type) {
 
@@ -229,8 +230,6 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             // If we've already marked this frame, then stop here.
             frame_info = frame->header.info;
-            // Ensure that read from frame->updatee below sees any pending writes
-            load_load_barrier();
             if (frame_info == (StgInfoTable *)&stg_marked_upd_frame_info) {
                 if (prev_was_update_frame) {
                     words_to_squeeze += sizeofW(StgUpdateFrame);
@@ -244,7 +243,6 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
-            load_load_barrier(); // XXX: Why is this needed?
 
 #if defined(THREADED_RTS)
         retry:

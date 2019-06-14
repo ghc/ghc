@@ -111,7 +111,6 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
     {
         const StgInfoTable *new_info;
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, (W_)info, MK_FORWARDING_PTR(to));
-        load_load_barrier();
         if (new_info != info) {
 #if defined(PROFILING)
             // We copied this object at the same time as another
@@ -195,7 +194,7 @@ spin:
         if (info == (W_)&stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
             whitehole_gc_spin++;
-#endif
+#endif /* PROF_SPIN */
             busy_wait_nop();
             goto spin;
         }
@@ -206,8 +205,7 @@ spin:
     }
 #else
     info = (W_)src->header.info;
-    load_load_barrier();
-#endif
+#endif /* PARALLEL_GC */
 
     to = alloc_for_copy(size_to_reserve, gen_no);
 
@@ -612,7 +610,6 @@ loop:
   gen_no = bd->dest_no;
 
   info = q->header.info;
-  load_load_barrier();
   if (IS_FORWARDING_PTR(info))
   {
     /* Already evacuated, just return the forwarding address.
@@ -723,14 +720,11 @@ loop:
       StgClosure *r;
       const StgInfoTable *i;
       r = ((StgInd*)q)->indirectee;
-      load_load_barrier();
       if (GET_CLOSURE_TAG(r) == 0) {
           i = r->header.info;
-          load_load_barrier();
           if (IS_FORWARDING_PTR(i)) {
               r = (StgClosure *)UN_FORWARDING_PTR(i);
               i = r->header.info;
-              load_load_barrier();
           }
           if (i == &stg_TSO_info
               || i == &stg_WHITEHOLE_info
@@ -923,7 +917,6 @@ evacuate_BLACKHOLE(StgClosure **p)
     }
     gen_no = bd->dest_no;
     info = q->header.info;
-    load_load_barrier();
     if (IS_FORWARDING_PTR(info))
     {
         StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
@@ -1116,9 +1109,8 @@ selector_chain:
 #else
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
-    load_load_barrier();
     SET_INFO((StgClosure *)p,&stg_WHITEHOLE_info);
-#endif
+#endif /* THREADED_RTS */
 
     field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
 
@@ -1135,7 +1127,6 @@ selector_loop:
     // that evacuate() doesn't mind if it gets passed a to-space pointer.
 
     info = (StgInfoTable*)selectee->header.info;
-    load_load_barrier();
 
     if (IS_FORWARDING_PTR(info)) {
         // We don't follow pointers into to-space; the constructor
@@ -1145,7 +1136,6 @@ selector_loop:
     }
 
     info = INFO_PTR_TO_STRUCT(info);
-    load_load_barrier();
     switch (info->type) {
       case WHITEHOLE:
           goto bale_out; // about to be evacuated by another thread (or a loop).
@@ -1190,7 +1180,6 @@ selector_loop:
               if (!IS_FORWARDING_PTR(info_ptr))
               {
                   info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
-                  load_load_barrier();
                   switch (info->type) {
                   case IND:
                   case IND_STATIC:
@@ -1242,11 +1231,9 @@ selector_loop:
           // indirection, as in evacuate().
           if (GET_CLOSURE_TAG(r) == 0) {
               i = r->header.info;
-              load_load_barrier();
               if (IS_FORWARDING_PTR(i)) {
                   r = (StgClosure *)UN_FORWARDING_PTR(i);
                   i = r->header.info;
-                  load_load_barrier();
               }
               if (i == &stg_TSO_info
                   || i == &stg_WHITEHOLE_info

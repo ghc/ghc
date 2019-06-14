@@ -123,18 +123,18 @@ EXTERN_INLINE void load_load_barrier(void);
  * has jumped off into the abyss. Speculative execution can also cause us
  * issues, consider:
  *
- * - An observer is about to case on a value in closure's info table.
- * - The observer speculatively reads one or more of closure's fields.
- * - An updater writes to closure's info table.
- * - The observer takes a branch based on the new info table value, but with the
+ * - an observer is about to case on a value in closure's info table.
+ * - the observer speculatively reads one or more of closure's fields.
+ * - an updater writes to closure's info table.
+ * - the observer takes a branch based on the new info table value, but with the
  *   old closure fields!
- * - The updater writes to the closure's other fields, but its too late.
+ * - the updater writes to the closure's other fields, but its too late.
  *
  * Because of these effects, reads and writes to a closure's info table must be
  * ordered carefully with respect to reads and writes to the closure's other
  * fields, and memory barriers must be placed to ensure that reads and writes
- * occur in program order. Specifically, updates to a closure must follow the
- * following pattern:
+ * occur in program order. Specifically, updates to an already existing closure
+ * must follow the following pattern:
  *
  * - Update the closure's (non-info table) fields.
  * - Write barrier.
@@ -220,9 +220,23 @@ EXTERN_INLINE void load_load_barrier(void);
  * the capability-local mut_list. Consequently this does not require any memory
  * barrier.
  *
- * During parallel GC cores are each scavenging disjoint sets of blocks and
- * consequently no barriers are needed.
+ * During parallel GC we need to be careful during evacuation: before replacing
+ * a closure with a forwarding pointer we must commit a write barrier to ensure
+ * that the copy we made in to-space is visible to other cores.
  *
+ * However, we can be a bit lax when *reading* during GC. Specifically, the GC
+ * can only make a very limited set of changes to existing closures:
+ *
+ *  - it can replace a closure's info table with stg_WHITEHOLE.
+ *  - it can replace a previously-whitehole'd closure's info table with a
+ *    forwarding pointer
+ *  - it can replace a previously-whitehole'd closure's info table with a
+ *    valid info table pointer (done in eval_thunk_selector)
+ *  - it can update the value of a pointer field after evacuating it
+ *
+ * This is quite nice since we don't need to worry about an interleaving
+ * of writes producing an invalid state: a closure's fields remain valid after
+ * an update of its info table pointer and vice-versa.
  */
 
 /* ----------------------------------------------------------------------------

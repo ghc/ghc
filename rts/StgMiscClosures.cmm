@@ -379,7 +379,6 @@ INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
 loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
-    prim_read_barrier;
     if (info == stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
         W_[whitehole_lockClosure_spin] =

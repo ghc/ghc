@@ -1683,8 +1683,8 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
-        prim_write_barrier;
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        prim_write_barrier;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -1876,8 +1876,8 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
         StgMVarTSOQueue_link(q) = StgMVar_head(mvar);
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
-        prim_write_barrier;
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
+        prim_write_barrier;
 
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
@@ -1943,6 +1943,9 @@ stg_makeStableNamezh ( P_ obj )
                                         BYTES_TO_WDS(SIZEOF_StgStableName));
         SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
         StgStableName_sn(sn_obj) = index;
+        // This will make the StableName# object visible to other threads;
+        // be sure that its completely visible to other cores.
+        // See Note [Heap memory barriers] in SMP.h.
         prim_write_barrier;
         snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
