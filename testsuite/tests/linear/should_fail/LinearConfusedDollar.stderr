@@ -1,0 +1,11 @@
+
+LinearConfusedDollar.hs:12:7: error:
+    • Nontrivial multiplicity equalities are currently not supported
+    • In the expression: f $ x
+      In an equation for ‘g’: g x = f $ x
+
+LinearConfusedDollar.hs:12:7: error:
+    • Couldn't match type ‘'Omega’ with ‘'One’
+        arising from an application
+    • In the expression: f $ x
+      In an equation for ‘g’: g x = f $ x

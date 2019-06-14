@@ -66,6 +66,7 @@ import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
 import Type
+import Multiplicity
 import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
@@ -130,7 +131,7 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   where
     (_, res_ty) = splitFunTy fun_ty
 mkCoreAppTyped d (fun, fun_ty) arg
-  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr fun_ty $$ ppr arg $$ d )
     (mk_val_app fun arg arg_ty res_ty, res_ty)
   where
     (arg_ty, res_ty) = splitFunTy fun_ty
@@ -161,19 +162,19 @@ mkCoreApps fun args
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
-mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+mk_val_app :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [CoreSyn let/app invariant]
-mk_val_app fun arg arg_ty res_ty
+mk_val_app fun arg (Scaled w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
 
   | otherwise
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
   where
-    arg_id = mkWildValBinder arg_ty
+    arg_id = mkWildValBinder w arg_ty
         -- Lots of shadowing, but it doesn't matter,
         -- because 'fun ' should not have a free wild-id
         --
@@ -185,26 +186,26 @@ mk_val_app fun arg arg_ty res_ty
 
 -----------
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder pred
+mkWildEvBinder pred = mkWildValBinder Omega pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
-mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkLocalIdOrCoVar wildCardName ty
+mkWildValBinder :: Mult -> Type -> Id
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
 
-mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
+mkWildCase :: CoreExpr -> Scaled Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
-mkWildCase scrut scrut_ty res_ty alts
-  = Case scrut (mkWildValBinder scrut_ty) res_ty alts
+mkWildCase scrut (Scaled w scrut_ty) res_ty alts
+  = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
 -- Not going to be refining, so okay to take the type of the "then" clause
-  = mkWildCase guard boolTy (exprType then_expr)
+  = mkWildCase guard (linear boolTy) (exprType then_expr)
          [ (DataAlt falseDataCon, [], else_expr),       -- Increasing order of tag!
            (DataAlt trueDataCon,  [], then_expr) ]
 
@@ -214,7 +215,7 @@ castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- See Note [Empty case alternatives] in CoreSyn
 castBottomExpr e res_ty
   | e_ty `eqType` res_ty = e
-  | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
+  | otherwise            = Case e (mkWildValBinder One e_ty) res_ty []
   where
     e_ty = exprType e
 
@@ -352,7 +353,7 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 -- | Build a small tuple holding the specified expressions
 -- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
-mkCoreTup []  = Var unitDataConId
+mkCoreTup []  = unitExpr
 mkCoreTup [c] = c
 mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
                               (map (Type . exprType) cs ++ cs)
@@ -516,7 +517,7 @@ mkTupleCase uniqs vars body scrut_var scrut
 
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
-            scrut_var = mkSysLocal (fsLit "ds") uniq
+            scrut_var = mkSysLocal (fsLit "ds") uniq Omega
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
@@ -622,8 +623,8 @@ mkBuildExpr :: (MonadFail.MonadFail m, MonadThings m, MonadUnique m)
 mkBuildExpr elt_ty mk_build_inside = do
     [n_tyvar] <- newTyVars [alphaTyVar]
     let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkVisFunTys [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
+        c_ty = mkVisFunTysOm [elt_ty, n_ty] n_ty
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") Omega c_ty, mkSysLocalM (fsLit "n") Omega n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 
@@ -804,7 +805,7 @@ runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
-                                 (mkVisFunTy addrPrimTy openAlphaTy)
+                                 (mkVisFunTyOm addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -894,7 +895,7 @@ be relying on anything from it.
 aBSENT_ERROR_ID
  = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
  where
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTy addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkVisFunTyOm addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
    arity_info = vanillaIdInfo `setArityInfo` 1

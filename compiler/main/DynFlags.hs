@@ -4450,6 +4450,7 @@ xFlagsDeps = [
   flagSpec "KindSignatures"                   LangExt.KindSignatures,
   flagSpec "LambdaCase"                       LangExt.LambdaCase,
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
+  flagSpec "LinearTypes"                      LangExt.LinearTypes,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring

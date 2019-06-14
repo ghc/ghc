@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, PatternSynonyms #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -34,6 +34,7 @@ import PprCore
 import Literal
 import PrimOp
 import CoreFVs
+import Multiplicity ( pattern Omega )
 import Type
 import RepType
 import Kind            ( isLiftedTypeKind )
@@ -163,7 +164,7 @@ coreExprToBCOs hsc_env this_mod expr
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
-          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
+          invented_id    = Id.mkLocalId invented_name Omega (panic "invented_id's type")
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
@@ -623,7 +624,7 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           -- Here (k n) :: a :: Type r, so we don't know if it's lifted
           -- or not; but that should be fine provided we add that void arg.
 
-          id <- newId (mkVisFunTy realWorldStatePrimTy ty)
+          id <- newId (mkVisFunTyOm realWorldStatePrimTy ty)
           st <- newId realWorldStatePrimTy
           let letExp = AnnLet (AnnNonRec id (fvs, AnnLam st (emptyDVarSet, exp)))
                               (emptyDVarSet, (AnnApp (emptyDVarSet, AnnVar id)
@@ -1954,7 +1955,7 @@ getTopStrings = BcM $ \st -> return (st, topStrings st)
 newId :: Type -> BcM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal tickFS uniq ty
+    return $ mkSysLocal tickFS uniq Omega ty
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

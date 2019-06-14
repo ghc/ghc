@@ -71,11 +71,13 @@ import Name
 import VarSet
 import Var
 import Type
+import Multiplicity
 import TyCoRep
 import TyCon
 import CoAxiom
 import FamInstEnv
 import TysPrim( funTyConName )
+import TysWiredIn( unrestrictedFunTyConName, omegaDataConTy )
 import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
@@ -349,13 +351,25 @@ orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
                 -- Look through type synonyms (#4912)
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
-orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
+orphNamesOfType (TyConApp tycon tys) = func
+                                       `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
+        where func = case tys of -- Detect FUN 'Omega as an application of (->),
+                                 -- so that :i (->) works as expected (see T8535)
+                                 -- Issue #16475 describes a more robust solution
+                       arg:_ | tycon == funTyCon, arg `eqType` omegaDataConTy ->
+                            unitNameSet unrestrictedFunTyConName
+                       _ -> emptyNameSet
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy _ arg res)    = unitNameSet funTyConName    -- NB!  See #8535
+orphNamesOfType (FunTy _ w arg res)  = func
+                                       `unionNameSet` unitNameSet funTyConName
+                                       `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
+        where func = case w of  -- NB!  See #8535
+                       Omega -> unitNameSet unrestrictedFunTyConName
+                       _ -> emptyNameSet
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
 orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co
 orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
@@ -377,7 +391,7 @@ orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` or
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ kind_co co)
   = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo _ co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (FunCo _ co_mult co1 co2) = orphNamesOfCo co_mult `unionNameSet` orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
 orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
@@ -711,9 +725,10 @@ freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
     go (Var v)
-      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs, AnnVar v)
+      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` mult_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
+        mult_vars = tyCoVarsOfTypeDSet (varMult v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 

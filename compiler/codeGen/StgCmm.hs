@@ -40,6 +40,7 @@ import IdInfo
 import RepType
 import DataCon
 import TyCon
+import Multiplicity
 import Module
 import Outputable
 import Stream
@@ -203,7 +204,7 @@ cgDataCon data_con
             arg_reps :: [NonVoid PrimRep]
             arg_reps = [ NonVoid rep_ty
                        | ty <- dataConRepArgTys data_con
-                       , rep_ty <- typePrimRep ty
+                       , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
 
         ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $

@@ -550,7 +550,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon tys') }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map hsLinear tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -562,7 +562,8 @@ cvtConstr (InfixC st1 c st2)
   = do  { c'   <- cNameL c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon st1' st2') }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon (hsLinear st1')
+                                                              (hsLinear st2')) }
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
@@ -602,7 +603,7 @@ cvtConstr (RecGadtC c varstrtys ty)
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy noExt
-                                           (noLoc $ HsRecTy noExt rec_flds) ty')
+                                           HsUnrestrictedArrow (noLoc $ HsRecTy noExt rec_flds) ty')
         ; returnL $ fst $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
@@ -1374,10 +1375,10 @@ cvtTypeKind ty_str ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnL (HsFunTy noExt x'' y'')
+                 returnL (HsFunTy noExt HsUnrestrictedArrow x'' y'')
              | otherwise
              -> mk_apps
-                (HsTyVar noExt NotPromoted (noLoc (getRdrName funTyCon)))
+                (HsTyVar noExt NotPromoted (noLoc (getRdrName unrestrictedFunTyCon)))
                 tys'
            ListT
              | Just normals <- m_normals
@@ -1572,7 +1573,7 @@ mk_arr_apps :: [LHsType GhcPs] -> HsType GhcPs -> CvtM (LHsType GhcPs)
 mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
     where go :: LHsType GhcPs -> HsType GhcPs -> CvtM (HsType GhcPs)
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
-                             ; return (HsFunTy noExt arg ret_ty_l) }
+                             ; return (HsFunTy noExt HsUnrestrictedArrow arg ret_ty_l) }
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []

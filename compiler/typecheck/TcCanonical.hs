@@ -22,6 +22,7 @@ import TcEvidence
 import TcEvTerm
 import Class
 import TyCon
+import Multiplicity
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
 import Coercion
 import CoreSyn
@@ -1075,11 +1076,12 @@ zonk_eq_types = go
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
     go ty1 ty2
-      | Just (arg1, res1) <- split1
-      , Just (arg2, res2) <- split2
+      | Just (Scaled w1 arg1, res1) <- split1
+      , Just (Scaled w2 arg2, res2) <- split2
+      , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkVisFunTy res_b res_a
+           ; return $ combine_rev (mkVisFunTy w1) res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2
@@ -2381,10 +2383,11 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
-           ; return (mkFunCo role co_s co_t) }
+           ; co_w <- unifyWanted loc Nominal w1 w2
+           ; return (mkFunCo role co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
@@ -2432,9 +2435,10 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { unify_derived loc role s1 s2
-           ; unify_derived loc role t1 t2 }
+           ; unify_derived loc role t1 t2
+           ; unify_derived loc role w1 w2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role
