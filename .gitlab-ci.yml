@@ -546,11 +546,10 @@ release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  allow_failure: true
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
-    TEST_ENV: "x86_64-linux-deb9"
+    TEST_ENV: "x86_64-linux-deb9-dwarf"
   artifacts:
     when: always
     expire_in: 2 week
