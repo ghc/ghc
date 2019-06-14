@@ -140,7 +140,8 @@ EXTERN_INLINE void load_load_barrier(void);
  * - Write barrier.
  * - Update the closure's info table.
  *
- * Observing a closure's fields must follow the following pattern:
+ * Observing the fields of an updateable closure (e.g. a THUNK) must follow the
+ * following pattern:
  *
  * - Read the closure's info pointer.
  * - Read barrier.
@@ -237,6 +238,15 @@ EXTERN_INLINE void load_load_barrier(void);
  * This is quite nice since we don't need to worry about an interleaving
  * of writes producing an invalid state: a closure's fields remain valid after
  * an update of its info table pointer and vice-versa.
+ *
+ * After a round of parallel scavenging we must also ensure that any writes the
+ * GC thread workers made are visible to the main GC thread. This is ensured by
+ * the full barrier implied by the atomic decrement in
+ * GC.c:scavenge_until_all_done.
+ *
+ * The work-stealing queue (WSDeque) also requires barriers; these are
+ * documented in WSDeque.c.
+ *
  */
 
 /* ----------------------------------------------------------------------------

@@ -76,7 +76,6 @@ isAlive(StgClosure *p)
     }
 
     info = q->header.info;
-    load_load_barrier();
 
     if (IS_FORWARDING_PTR(info)) {
         // alive!

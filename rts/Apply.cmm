@@ -66,7 +66,6 @@ again:
     // Note [Heap memory barriers] in SMP.h.
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
-    prim_read_barrier;
     switch [INVALID_OBJECT .. N_CLOSURE_TYPES]
         (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {
         case
@@ -285,7 +284,6 @@ for:
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
-      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }
@@ -364,7 +362,6 @@ for:
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
-      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }
@@ -429,14 +426,12 @@ for:
   TICK_ENT_VIA_NODE();
 
 #if defined(NO_ARG_REGS)
-  prim_read_barrier;
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
-      prim_read_barrier;
       if (type == ARG_GEN) {
           jump StgFunInfoExtra_slow_apply(info) [R1];
       }

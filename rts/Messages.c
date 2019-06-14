@@ -28,7 +28,6 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 #if defined(DEBUG)
     {
         const StgInfoTable *i = msg->header.info;
-        load_load_barrier();  // See Note [Heap memory barriers] in SMP.h
         if (i != &stg_MSG_THROWTO_info &&
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
@@ -71,7 +70,6 @@ executeMessage (Capability *cap, Message *m)
 loop:
     write_barrier(); // allow m->header to be modified by another thread
     i = m->header.info;
-    load_load_barrier();  // See Note [Heap memory barriers] in SMP.h
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
@@ -331,7 +329,6 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     StgClosure *p;
 
     info = bh->header.info;
-    load_load_barrier(); // XXX
 
     if (info != &stg_BLACKHOLE_info &&
         info != &stg_CAF_BLACKHOLE_info &&
@@ -347,7 +344,6 @@ loop:
     // and turns this into an infinite loop.
     p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
-    load_load_barrier(); // XXX
 
     if (info == &stg_IND_info) goto loop;
 

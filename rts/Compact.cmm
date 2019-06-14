@@ -72,7 +72,6 @@ eval:
     tag = GETTAG(p);
     p = UNTAG(p);
     info  = %INFO_PTR(p);
-    prim_read_barrier;
     type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
 
     switch [0 .. N_CLOSURE_TYPES] type {

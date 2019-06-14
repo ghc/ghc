@@ -1529,7 +1529,6 @@ run_BCO:
             int o_itbl         = BCO_GET_LARGE_ARG;
             int n_words        = BCO_NEXT;
             StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
-            load_load_barrier();
             int request        = CONSTR_sizeW( itbl->layout.payload.ptrs,
                                                itbl->layout.payload.nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);

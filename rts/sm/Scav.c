@@ -374,7 +374,6 @@ scavenge_thunk_srt(const StgInfoTable *info)
     if (!major_gc) return;
 
     thunk_info = itbl_to_thunk_itbl(info);
-    load_load_barrier();
     if (thunk_info->i.srt) {
         StgClosure *srt = (StgClosure*)GET_SRT(thunk_info);
         evacuate(&srt);
@@ -389,7 +388,6 @@ scavenge_fun_srt(const StgInfoTable *info)
     if (!major_gc) return;
 
     fun_info = itbl_to_fun_itbl(info);
-    load_load_barrier();
     if (fun_info->i.srt) {
         StgClosure *srt = (StgClosure*)GET_FUN_SRT(fun_info);
         evacuate(&srt);
@@ -1603,7 +1601,6 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 mutlist_TREC_CHUNK++; break;
             case MUT_PRIM:
                 pinfo = ((StgClosure*)p)->header.info;
-                load_load_barrier();
                 if (pinfo == &stg_TVAR_WATCH_QUEUE_info)
                     mutlist_TVAR_WATCH_QUEUE++;
                 else if (pinfo == &stg_TREC_HEADER_info)
