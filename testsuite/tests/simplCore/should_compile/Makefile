@@ -111,8 +111,7 @@ T4903:
 T4918:
 	$(RM) -f T4918.hi T4918.o T4918a.hi T4918a.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918a.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -dsuppress-ticks --show-iface T4918.hi | grep 'C#'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4918.hs -ddump-simpl -dsuppress-all 2>&1 | grep 'C#'
 
 EvalTest:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd' | sed 's/^ *//'

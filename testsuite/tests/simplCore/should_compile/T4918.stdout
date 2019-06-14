@@ -1,2 +1,3 @@
-  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Types.C# 'p'#) -}
-  {- HasNoCafRefs, Strictness: m, Unfolding: (GHC.Types.C# 'q'#) -}
+f4 = C# 'p'#
+f5 = C# 'q'#
+
