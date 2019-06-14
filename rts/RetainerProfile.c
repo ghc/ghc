@@ -81,19 +81,40 @@ static uint32_t numObjectVisited;    // total number of objects visited
 static uint32_t timesAnyObjectVisited;  // number of times any objects are
                                         // visited
 
-/*
-  The rs field in the profile header of any object points to its retainer
-  set in an indirect way: if flip is 0, it points to the retainer set;
-  if flip is 1, it points to the next byte after the retainer set (even
-  for NULL pointers). Therefore, with flip 1, (rs ^ 1) is the actual
-  pointer. See retainerSetOf().
+/** Note [Profiling heap traversal visited bit]
+ *
+ * If the RTS is compiled with profiling enabled StgProfHeader can be used by
+ * profiling code to store per-heap object information.
+ *
+ * When using the generic heap traversal code we use this field to store
+ * profiler specific information. However we reserve the LSB of the *entire*
+ * 'trav' union (which will overlap with the other fields) for the generic
+ * traversal code. We use the bit to decide whether we've already visited this
+ * closure in this pass or not. We do this as the heap may contain cyclic
+ * references, it being a graph and all, so we would likely just infinite loop
+ * if we didn't.
+ *
+ * We assume that at least the LSB of the largest field in the corresponding
+ * union is insignificant. This is true at least for the word aligned pointers
+ * which the retainer profiler currently stores there and should be maintained
+ * by new users of the 'trav' union.
+ *
+ * Now the way the traversal works is that the interpretation of the "visited?"
+ * bit depends on the value of the global 'flip' variable. We don't want to have
+ * to do another pass over the heap just to reset the bit to zero so instead on
+ * each traversal (i.e. each run of the profiling code) we invert the value of
+ * the global 'flip' variable. We interpret this as resetting all the "visited?"
+ * flags on the heap.
+ *
+ * There is one exception to this rule, namely: static objects. There we do just
+ * go over the heap and reset the bit manually. See
+ * 'resetStaticObjectForRetainerProfiling'.
  */
-
 StgWord flip = 0;     // flip bit
                       // must be 0 if DEBUG_RETAINER is on (for static closures)
 
-#define setRetainerSetToNull(c)   \
-  (c)->header.prof.hp.rs = (RetainerSet *)((StgWord)NULL | flip)
+#define setTravDataToZero(c) \
+  (c)->header.prof.hp.trav.lsb = flip
 
 #if defined(DEBUG_RETAINER)
 static uint32_t sumOfNewCost;        // sum of the cost of each object, computed
@@ -1017,10 +1038,10 @@ endRetainerProfiling( void )
  *    The reason is that we do not know when a closure is visited last.
  * -------------------------------------------------------------------------- */
 static INLINE void
-maybeInitRetainerSet( StgClosure *c )
+maybeInitTravData( StgClosure *c )
 {
-    if (!isRetainerSetFieldValid(c)) {
-        setRetainerSetToNull(c);
+    if (!isTravDataValid(c)) {
+        setTravDataToZero(c);
     }
 }
 
@@ -1570,7 +1591,7 @@ inner_loop:
     timesAnyObjectVisited++;
 
     // If this is the first visit to c, initialize its retainer set.
-    maybeInitRetainerSet(c);
+    maybeInitTravData(c);
     retainerSetOfc = retainerSetOf(c);
 
     // Now compute s:
@@ -1720,7 +1741,7 @@ retainRoot(void *user, StgClosure **tl)
     ts->currentStackBoundary = ts->stackTop;
 
     c = UNTAG_CLOSURE(*tl);
-    maybeInitRetainerSet(c);
+    maybeInitTravData(c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
         retainClosure(ts, c, c, getRetainerFrom(c));
     } else {
@@ -1786,7 +1807,7 @@ computeRetainerSet( traverseState *ts )
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
             for (ml = bd->start; ml < bd->free; ml++) {
 
-                maybeInitRetainerSet((StgClosure *)*ml);
+                maybeInitTravData((StgClosure *)*ml);
 
 #if defined(DEBUG_RETAINER)
                 rtl = retainerSetOf((StgClosure *)*ml);
@@ -1818,7 +1839,7 @@ computeRetainerSet( traverseState *ts )
 /* -----------------------------------------------------------------------------
  *  Traverse all static objects for which we compute retainer sets,
  *  and reset their rs fields to NULL, which is accomplished by
- *  invoking maybeInitRetainerSet(). This function must be called
+ *  invoking maybeInitTravData(). This function must be called
  *  before zeroing all objects reachable from scavenged_static_objects
  *  in the case of major garbage collections. See GarbageCollect() in
  *  GC.c.
@@ -1834,9 +1855,9 @@ computeRetainerSet( traverseState *ts )
  * SDM (20/7/2011): I don't think this is doing anything sensible,
  * because it happens before retainerProfile() and at the beginning of
  * retainerProfil() we change the sense of 'flip'.  So all of the
- * calls to maybeInitRetainerSet() here are initialising retainer sets
+ * calls to maybeInitTravData() here are initialising retainer sets
  * with the wrong flip.  Also, I don't see why this is necessary.  I
- * added a maybeInitRetainerSet() call to retainRoot(), and that seems
+ * added a maybeInitTravData() call to retainRoot(), and that seems
  * to have fixed the assertion failure in retainerSetOf() I was
  * encountering.
  * -------------------------------------------------------------------------- */
@@ -1865,7 +1886,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
             p = (StgClosure*)*IND_STATIC_LINK(p);
             break;
         case THUNK_STATIC:
-            maybeInitRetainerSet(p);
+            maybeInitTravData(p);
             p = (StgClosure*)*THUNK_STATIC_LINK(p);
             break;
         case FUN_STATIC:
@@ -1874,7 +1895,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
         case CONSTR_2_0:
         case CONSTR_1_1:
         case CONSTR_NOCAF:
-            maybeInitRetainerSet(p);
+            maybeInitTravData(p);
             p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
             break;
         default:
