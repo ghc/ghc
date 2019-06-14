@@ -6,6 +6,7 @@
            , MultiParamTypeClasses
            , OverloadedLabels
            , ScopedTypeVariables
+           , StandaloneDeriving
            , TypeApplications
            , TypeOperators
            , UndecidableInstances
@@ -15,20 +16,29 @@ import GHC.OverloadedLabels
 import GHC.Records
 import GHC.TypeLits
 import Data.Kind
+import Data.Proxy
 
 data Label (x :: Symbol) = Label
+
+instance KnownSymbol x => Show (Label x) where
+  show _ = "#" ++ symbolVal (Proxy @x)
+
 data Labelled x a = Label x := a
+  deriving Show
 
 data Rec :: forall k. [(k, Type)] -> Type where
   Nil  :: Rec '[]
   (:>) :: Labelled x a -> Rec xs -> Rec ('(x, a) ': xs)
+instance Show (Rec '[]) where
+  show Nil = "Nil"
+deriving instance (KnownSymbol x, Show a, Show (Rec xs)) => Show (Rec ('(x, a) ': xs))
 infixr 5 :>
 
 instance {-# OVERLAPS #-} a ~ b => HasField foo (Rec ('(foo, a) ': xs)) b where
-  getField ((_ := v) :> _) = v
+  hasField ((l := v) :> xs) = (\ v' -> (l := v') :> xs, v)
 
 instance HasField foo (Rec xs) b => HasField foo (Rec ('(bar, a) ': xs)) b where
-  getField (_ :> vs) = getField @foo vs
+  hasField (x :> vs) = (\ v -> x :> setField @foo vs v, getField @foo vs)
 
 instance y ~ x => IsLabel y (Label x) where
   fromLabel = Label
@@ -44,3 +54,4 @@ y = #bar := 'x' :> undefined
 main = do print (#foo x)
           print (#bar x)
           print (#bar y)
+          print (setField @"foo" x 11)

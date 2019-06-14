@@ -1,13 +1,18 @@
 
-hasfieldfail02.hs:10:5: error:
-    • No instance for (HasField "foo" T a1)
+hasfieldfail02.hs:12:5: error:
+    • No instance for (HasField "foo" T a2)
         arising from a use of ‘getField’
     • In the expression: getField @"foo" (MkT id)
-      In an equation for ‘x’:
-          x = getField @"foo" (MkT id)
+      In an equation for ‘x’: x = getField @"foo" (MkT id)
 
-hasfieldfail02.hs:14:5: error:
-    • No instance for (HasField "bar" U a0)
+hasfieldfail02.hs:16:5: error:
+    • No instance for (HasField "bar" U a1)
         arising from a use of ‘getField’
     • In the expression: getField @"bar" (MkU True)
       In an equation for ‘y’: y = getField @"bar" (MkU True)
+
+hasfieldfail02.hs:19:5: error:
+    • No instance for (HasField "baz" V a0)
+        arising from a use of ‘getField’
+    • In the expression: getField @"baz" (MkV 3#)
+      In an equation for ‘z’: z = getField @"baz" (MkV 3#)
