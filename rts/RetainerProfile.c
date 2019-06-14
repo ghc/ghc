@@ -69,6 +69,8 @@ information about the retainers is still applicable.
     (4) printRetainer() and printRetainerSetShort() in RetainerSet.c.
  */
 
+// TODO: Change references to c_child_r in comments to 'data'.
+
 /* -----------------------------------------------------------------------------
  * Declarations...
  * -------------------------------------------------------------------------- */
@@ -155,15 +157,20 @@ typedef struct {
     nextPos next;
 } stackPos;
 
+typedef union {
+     /**
+      * Most recent retainer for the corresponding closure on the stack.
+      */
+    retainer c_child_r;
+} stackData;
+
 // Element in the traverse stack, keeps the element, information
 // how to continue processing the element, and it's retainer set.
 typedef struct {
-    StgClosure *c;
-    // parent of the current object, used
-    // when posTypeFresh is set
-    StgClosure *parent;
-    retainer c_child_r;
     stackPos info;
+    StgClosure *c;
+    StgClosure *cp; // parent of 'c'
+    stackData data;
 } stackElement;
 
 typedef struct {
@@ -216,9 +223,9 @@ typedef struct {
 traverseState g_retainerTraverseState;
 
 
-static void retainStack(traverseState *, StgClosure *, retainer, StgPtr, StgPtr);
+static void retainStack(traverseState *, StgClosure *, stackData, StgPtr, StgPtr);
 static void retainClosure(traverseState *, StgClosure *, StgClosure *, retainer);
-static void retainPushClosure(traverseState *, StgClosure *, StgClosure *, retainer);
+static void retainPushClosure(traverseState *, StgClosure *, StgClosure *, stackData);
 static void retainActualPush(traverseState *, stackElement *);
 
 #if defined(DEBUG_RETAINER)
@@ -436,17 +443,17 @@ retainActualPush(traverseState *ts, stackElement *se) {
  * instead of calling retainClosure(), it exists in order to use an
  * explicit stack instead of direct recursion.
  *
- *  *p - object's parent
+ *  *cp - object's parent
  *  *c - closure
  *  c_child_r - closure retainer.
  */
 static INLINE void
-retainPushClosure( traverseState *ts, StgClosure *c, StgClosure *p, retainer c_child_r) {
+retainPushClosure( traverseState *ts, StgClosure *c, StgClosure *cp, stackData data) {
     stackElement se;
 
     se.c = c;
-    se.c_child_r = c_child_r;
-    se.parent = p;
+    se.cp = cp;
+    se.data = data;
     se.info.type = posTypeFresh;
 
     retainActualPush(ts, &se);
@@ -468,7 +475,7 @@ retainPushClosure( traverseState *ts, StgClosure *c, StgClosure *p, retainer c_c
  *  Note: SRTs are considered to  be children as well.
  * -------------------------------------------------------------------------- */
 static INLINE void
-push( traverseState *ts, StgClosure *c, retainer c_child_r, StgClosure **first_child )
+push( traverseState *ts, StgClosure *c, stackData data, StgClosure **first_child )
 {
     stackElement se;
     bdescr *nbd;      // Next Block Descriptor
@@ -485,7 +492,8 @@ push( traverseState *ts, StgClosure *c, retainer c_child_r, StgClosure **first_c
     //
 
     se.c = c;
-    se.c_child_r = c_child_r;
+    se.data = data;
+    // Note: se.cp ommitted on purpose, only retainPushClosure uses that.
 
     // fill in se.info
     switch (get_itbl(c)->type) {
@@ -667,6 +675,10 @@ push( traverseState *ts, StgClosure *c, retainer c_child_r, StgClosure **first_c
         return;
     }
 
+    // se.cp has to be initialized when type==posTypeFresh. We don't do that
+    // here though. So type must be !=posTypeFresh.
+    ASSERT(se.info.type != posTypeFresh);
+
     retainActualPush(ts, &se);
 }
 
@@ -757,9 +769,9 @@ popOff(traverseState *ts) {
  *  this object is returned as-is. Otherwise Test if the topmost stack
  *  element indicates that more objects are left,
  *  and if so, retrieve the first object and store its pointer to *c. Also,
- *  set *cp and *r appropriately, both of which are stored in the stack element.
- *  The topmost stack element then is overwritten so as for it to now denote
- *  the next object.
+ *  set *cp and *data appropriately, both of which are stored in the stack
+ *  element.  The topmost stack element then is overwritten so as for it to now
+ *  denote the next object.
  *  If the topmost stack element indicates no more objects are left, pop
  *  off the stack element until either an object can be retrieved or
  *  the current stack chunk becomes empty, indicated by true returned by
@@ -769,7 +781,7 @@ popOff(traverseState *ts) {
  *    is empty.
  * -------------------------------------------------------------------------- */
 static INLINE void
-pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
+pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
 {
     stackElement *se;
 
@@ -787,9 +799,9 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
 
         // If this is a top-level element, you should pop that out.
         if (se->info.type == posTypeFresh) {
-            *cp = se->parent;
+            *cp = se->cp;
             *c = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             popOff(ts);
             return;
         }
@@ -800,7 +812,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
         case CONSTR_2_0:
             *c = se->c->payload[1];
             *cp = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             popOff(ts);
             return;
 
@@ -817,7 +829,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 popOff(ts);
             }
             *cp = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             return;
 
             // three children (fixed), no SRT
@@ -831,7 +843,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 popOff(ts);
             }
             *cp = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             return;
 
         case TREC_CHUNK: {
@@ -857,7 +869,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 *c = entry->new_value;
             }
             *cp = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             se->info.next.step++;
             return;
         }
@@ -882,7 +894,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 break;
             }
             *cp = se->c;
-            *r = se->c_child_r;
+            *data = se->data;
             return;
 
             // layout.payload.ptrs, SRT
@@ -893,7 +905,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
                     *cp = se->c;
-                    *r = se->c_child_r;
+                    *data = se->data;
                     return;
                 }
                 init_srt_fun(&se->info, get_fun_itbl(se->c));
@@ -906,7 +918,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
                     *cp = se->c;
-                    *r = se->c_child_r;
+                    *data = se->data;
                     return;
                 }
                 init_srt_thunk(&se->info, get_thunk_itbl(se->c));
@@ -927,7 +939,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, retainer *r )
             *c = find_srt(&se->info);
             if (*c != NULL) {
                 *cp = se->c;
-                *r = se->c_child_r;
+                *data = se->data;
                 return;
             }
             popOff(ts);
@@ -1176,7 +1188,7 @@ associate( StgClosure *c, RetainerSet *s )
 
 static void
 retain_large_bitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
-                     uint32_t size, StgClosure *c, retainer c_child_r)
+                     uint32_t size, StgClosure *c, stackData data)
 {
     uint32_t i, b;
     StgWord bitmap;
@@ -1185,7 +1197,7 @@ retain_large_bitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
         if ((bitmap & 1) == 0) {
-            retainPushClosure(ts, (StgClosure *)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure *)*p, c, data);
         }
         i++;
         p++;
@@ -1200,11 +1212,11 @@ retain_large_bitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
 
 static INLINE StgPtr
 retain_small_bitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
-                     StgClosure *c, retainer c_child_r)
+                     StgClosure *c, stackData data)
 {
     while (size > 0) {
         if ((bitmap & 1) == 0) {
-            retainPushClosure(ts, (StgClosure *)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure *)*p, c, data);
         }
         p++;
         bitmap = bitmap >> 1;
@@ -1232,7 +1244,7 @@ retain_small_bitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
  *    retainPushClosure() is invoked instead of evacuate().
  * -------------------------------------------------------------------------- */
 static void
-retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
+retainStack( traverseState *ts, StgClosure *c, stackData data,
              StgPtr stackStart, StgPtr stackEnd )
 {
     stackElement *oldStackBoundary;
@@ -1264,7 +1276,7 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
         switch(info->i.type) {
 
         case UPDATE_FRAME:
-            retainPushClosure(ts, ((StgUpdateFrame *)p)->updatee, c, c_child_r);
+            retainPushClosure(ts, ((StgUpdateFrame *)p)->updatee, c, data);
             p += sizeofW(StgUpdateFrame);
             continue;
 
@@ -1278,11 +1290,11 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
             p++;
-            p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
+            p = retain_small_bitmap(ts, p, size, bitmap, c, data);
 
         follow_srt:
             if (info->i.srt) {
-                retainPushClosure(ts, GET_SRT(info), c, c_child_r);
+                retainPushClosure(ts, GET_SRT(info), c, data);
             }
             continue;
 
@@ -1290,11 +1302,11 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
             StgBCO *bco;
 
             p++;
-            retainPushClosure(ts, (StgClosure*)*p, c, c_child_r);
+            retainPushClosure(ts, (StgClosure*)*p, c, data);
             bco = (StgBCO *)*p;
             p++;
             size = BCO_BITMAP_SIZE(bco);
-            retain_large_bitmap(ts, p, BCO_BITMAP(bco), size, c, c_child_r);
+            retain_large_bitmap(ts, p, BCO_BITMAP(bco), size, c, data);
             p += size;
             continue;
         }
@@ -1304,7 +1316,7 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
             size = GET_LARGE_BITMAP(&info->i)->size;
             p++;
             retain_large_bitmap(ts, p, GET_LARGE_BITMAP(&info->i),
-                                size, c, c_child_r);
+                                size, c, data);
             p += size;
             // and don't forget to follow the SRT
             goto follow_srt;
@@ -1313,7 +1325,7 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
             StgRetFun *ret_fun = (StgRetFun *)p;
             const StgFunInfoTable *fun_info;
 
-            retainPushClosure(ts, ret_fun->fun, c, c_child_r);
+            retainPushClosure(ts, ret_fun->fun, c, data);
             fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(ret_fun->fun));
 
             p = (P_)&ret_fun->payload;
@@ -1321,18 +1333,18 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
             case ARG_GEN:
                 bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
                 size = BITMAP_SIZE(fun_info->f.b.bitmap);
-                p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
+                p = retain_small_bitmap(ts, p, size, bitmap, c, data);
                 break;
             case ARG_GEN_BIG:
                 size = GET_FUN_LARGE_BITMAP(fun_info)->size;
                 retain_large_bitmap(ts, p, GET_FUN_LARGE_BITMAP(fun_info),
-                                    size, c, c_child_r);
+                                    size, c, data);
                 p += size;
                 break;
             default:
                 bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
                 size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
-                p = retain_small_bitmap(ts, p, size, bitmap, c, c_child_r);
+                p = retain_small_bitmap(ts, p, size, bitmap, c, data);
                 break;
             }
             goto follow_srt;
@@ -1359,7 +1371,7 @@ retainStack( traverseState *ts, StgClosure *c, retainer c_child_r,
 static INLINE StgPtr
 retain_PAP_payload (traverseState *ts,
                     StgClosure *pap,    /* NOT tagged */
-                    retainer c_child_r, /* NOT tagged */
+                    stackData data,
                     StgClosure *fun,    /* tagged */
                     StgClosure** payload, StgWord n_args)
 {
@@ -1367,7 +1379,7 @@ retain_PAP_payload (traverseState *ts,
     StgWord bitmap;
     const StgFunInfoTable *fun_info;
 
-    retainPushClosure(ts, fun, pap, c_child_r);
+    retainPushClosure(ts, fun, pap, data);
     fun = UNTAG_CLOSURE(fun);
     fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
@@ -1378,21 +1390,21 @@ retain_PAP_payload (traverseState *ts,
     case ARG_GEN:
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
         p = retain_small_bitmap(ts, p, n_args, bitmap,
-                                pap, c_child_r);
+                                pap, data);
         break;
     case ARG_GEN_BIG:
         retain_large_bitmap(ts, p, GET_FUN_LARGE_BITMAP(fun_info),
-                            n_args, pap, c_child_r);
+                            n_args, pap, data);
         p += n_args;
         break;
     case ARG_BCO:
         retain_large_bitmap(ts, (StgPtr)payload, BCO_BITMAP(fun),
-                            n_args, pap, c_child_r);
+                            n_args, pap, data);
         p += n_args;
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
-        p = retain_small_bitmap(ts, p, n_args, bitmap, pap, c_child_r);
+        p = retain_small_bitmap(ts, p, n_args, bitmap, pap, data);
         break;
     }
     return p;
@@ -1426,7 +1438,7 @@ retainClosure( traverseState *ts, StgClosure *c0, StgClosure *cp0, retainer r0 )
     RetainerSet *s, *retainerSetOfc;
     retainer r, c_child_r;
     StgWord typeOfc;
-    retainPushClosure(ts, c0, cp0, r0);
+    retainPushClosure(ts, c0, cp0, (stackData)r0);
 
 #if defined(DEBUG_RETAINER)
     StgPtr oldStackTop;
@@ -1622,7 +1634,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
-        retainStack(ts, c, c_child_r,
+        retainStack(ts, c, (stackData)c_child_r,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
         goto loop;
@@ -1631,16 +1643,16 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        retainPushClosure(ts, (StgClosure *) tso->stackobj, c, c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->bq, c, c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->trec, c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->stackobj, c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->bq, c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->trec, c, (stackData)c_child_r);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {
-            retainPushClosure(ts, tso->block_info.closure, c, c_child_r);
+            retainPushClosure(ts, tso->block_info.closure, c, (stackData)c_child_r);
         }
         goto loop;
     }
@@ -1648,36 +1660,36 @@ inner_loop:
     case BLOCKING_QUEUE:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
-        retainPushClosure(ts, (StgClosure *) bq->link,            c, c_child_r);
-        retainPushClosure(ts, (StgClosure *) bq->bh,              c, c_child_r);
-        retainPushClosure(ts, (StgClosure *) bq->owner,           c, c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->link,            c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->bh,              c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->owner,           c, (stackData)c_child_r);
         goto loop;
     }
 
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
-        retain_PAP_payload(ts, c, c_child_r, pap->fun, pap->payload, pap->n_args);
+        retain_PAP_payload(ts, c, (stackData)c_child_r, pap->fun, pap->payload, pap->n_args);
         goto loop;
     }
 
     case AP:
     {
         StgAP *ap = (StgAP *)c;
-        retain_PAP_payload(ts, c, c_child_r, ap->fun, ap->payload, ap->n_args);
+        retain_PAP_payload(ts, c, (stackData)c_child_r, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
-        retainPushClosure(ts, ((StgAP_STACK *)c)->fun, c, c_child_r);
-        retainStack(ts, c, c_child_r,
+        retainPushClosure(ts, ((StgAP_STACK *)c)->fun, c, (stackData)c_child_r);
+        retainStack(ts, c, (stackData)c_child_r,
                     (StgPtr)((StgAP_STACK *)c)->payload,
                     (StgPtr)((StgAP_STACK *)c)->payload +
                              ((StgAP_STACK *)c)->size);
         goto loop;
     }
 
-    push(ts, c, c_child_r, &first_child);
+    push(ts, c, (stackData)c_child_r, &first_child);
 
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
