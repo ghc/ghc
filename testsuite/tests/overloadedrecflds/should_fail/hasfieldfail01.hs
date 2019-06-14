@@ -2,7 +2,7 @@
 
 import HasFieldFail01_A (T(MkT))
 
-import GHC.Records (HasField(..))
+import GHC.Records (HasField, getField)
 
 -- This should fail to solve the HasField constraint, because foo is
 -- not in scope.

@@ -1,8 +1,18 @@
+Right True
 42
+11
 True
+False
 'x'
+MkU {baf = 'y'}
 "virtual"
+MkU {baf = 'x'}
 (42,'x',True,False)
+(40,'y',False,True)
 True
+False
 True
+MkX {xoo = False}
+True
+False
 True

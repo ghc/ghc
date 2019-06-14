@@ -1,3 +1,4 @@
 42
 True
 'x'
+#foo := 11 :> (#bar := True :> Nil)
