@@ -52,10 +52,6 @@
 #include "CNF.h"
 #include "RtsFlags.h"
 
-#if defined(PROFILING)
-#include "RetainerProfile.h"
-#endif
-
 #include <string.h> // for memset()
 #include <unistd.h>
 
