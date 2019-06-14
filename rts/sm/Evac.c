@@ -1167,6 +1167,9 @@ selector_loop:
                   OVERWRITING_CLOSURE((StgClosure*)p);
                   SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
                   write_barrier();
+#if defined(PARALLEL_GC)
+                  abort();  // LDV is incompatible with parallel GC
+#endif
               }
 #endif
 
