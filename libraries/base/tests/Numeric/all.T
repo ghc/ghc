@@ -13,7 +13,7 @@ test('num009', [ when(fast(), skip)
                , when(platform('powerpc64le-unknown-linux'), expect_broken(13634))],
              compile_and_run, [opts])
 test('num010',
-     when(platform('i386-apple-darwin'), expect_broken_for(7043, 'ghci')),
+     when(platform('i386-apple-darwin'), expect_broken_for(7043, ['ghci'])),
      compile_and_run,
      [''])
 test('sqrt', normal, compile_and_run, [''])

@@ -316,7 +316,7 @@ test('T11788', when(ghc_dynamic(), skip),
 
 test('T10296a', [req_smp], makefile_test, ['T10296a'])
 
-test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
+test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 
 test('numa001', [ extra_run_opts('8'), unless(unregisterised(), extra_ways(['debug_numa'])) ]
                 , compile_and_run, [''])
