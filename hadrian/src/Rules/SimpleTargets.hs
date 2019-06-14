@@ -1,4 +1,4 @@
-module Rules.SimpleTargets (simplePackageTargets) where
+module Rules.SimpleTargets (simplePackageTargets, simpleTargetString) where
 
 import Base
 import Context
@@ -6,6 +6,29 @@ import Packages
 import Settings
 
 import Data.Foldable
+
+import Base
+import Context
+import Hadrian.BuildPath
+import Hadrian.Expression
+import Hadrian.Haskell.Cabal
+import Oracles.Setting
+import Packages
+import Rules.Gmp
+import Rules.Rts
+import Settings
+import Target
+import Utilities
+import Rules.Library
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
+
+import Distribution.Version (Version)
+import qualified Distribution.Parsec as Cabal
+import qualified Distribution.Types.PackageName as Cabal
+import qualified Distribution.Types.PackageId as Cabal
+import qualified Distribution.Version as Cabal
+
 
 -- | Simple aliases for library and executable targets.
 --
@@ -15,29 +38,35 @@ import Data.Foldable
 --  - @stage<N>:exe:<name>@ will build executable @name@
 --    with the stage N-1 compiler, putting the result under
 --    @<build root>/stage<N-1>/bin.
-simplePackageTargets :: Rules ()
-simplePackageTargets = traverse_ simpleTarget targets
+simplePackageTargets :: [(Resource, Int)] -> Rules ()
+simplePackageTargets rs = traverse_ (simpleTarget rs) targets
 
-  where targets = [ (stage, target)
+  where targets = [ (stage, target, boot)
                   | stage <- [minBound..maxBound]
                   , target <- knownPackages
+                  , boot <- if isLibrary target then [False, True] else [False]
                   ]
 
-simpleTarget :: (Stage, Package) -> Rules ()
-simpleTarget (stage, target) = do
-  let tgt = intercalate ":" [stagestr, typ, pkgname]
-  tgt ~> do
-    p <- getTargetPath stage target
-    need [ p ]
-
-  where typ = if isLibrary target then "lib" else "exe"
+simpleTargetString :: Bool -> Stage -> Package -> String
+simpleTargetString boot stage target =
+  intercalate ":" [stagestr, typ, pkgname]
+  where typ = if isLibrary target then (if boot then "boot" else "lib") else "exe"
         stagestr = stageString stage
         pkgname = pkgName target
 
-getTargetPath :: Stage -> Package -> Action FilePath
-getTargetPath stage pkg
-  | isLibrary pkg = getLibraryPath stage pkg
-  | otherwise     = getProgramPath stage pkg
+
+
+simpleTarget :: [(Resource, Int)] -> (Stage, Package, Bool) -> Rules ()
+simpleTarget rs (stage, target, boot) = do
+  let tgt = simpleTargetString boot stage target
+  tgt ~> do
+    getTargetPath rs boot stage target
+
+
+getTargetPath :: [(Resource, Int)] -> Bool -> Stage -> Package -> Action ()
+getTargetPath rs boot stage pkg
+  | isLibrary pkg = libraryRule rs boot stage pkg
+  | otherwise     = getProgramPath stage pkg >>= \p -> need [p]
 
 getLibraryPath :: Stage -> Package -> Action FilePath
 getLibraryPath stage pkg = pkgConfFile (vanillaContext stage pkg)
@@ -47,3 +76,23 @@ getProgramPath Stage0 _ =
   error ("Cannot build a stage 0 executable target: " ++
          "it is the boot compiler's toolchain")
 getProgramPath stage pkg = programPath (vanillaContext (pred stage) pkg)
+
+libraryRule rs boot stage pkg = do
+  conf <- getLibraryPath stage pkg
+  produces [conf]
+  liftIO $ print ("Needing", conf)
+  historyDisable
+  let libpath = takeDirectory (takeDirectory conf)
+      settings = libpath -/- "settings"
+      platformConstants = libpath -/- "platformConstants"
+
+  --need [settings, platformConstants]
+
+  let ctx = Context stage pkg vanilla
+  if boot
+     then copyConf rs ctx conf
+     else do
+        pd <- readPackageData pkg
+        buildConf rs ctx conf
+
+

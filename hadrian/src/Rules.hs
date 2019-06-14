@@ -152,7 +152,7 @@ packageRules = do
     let vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
     forM_ vanillaContexts Rules.Generate.generatePackageCode
-    Rules.SimpleTargets.simplePackageTargets
+    Rules.SimpleTargets.simplePackageTargets readPackageDb
 
 buildRules :: Rules ()
 buildRules = do
