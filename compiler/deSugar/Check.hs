@@ -2580,7 +2580,7 @@ warnPmIters dflags (DsMatchContext kind loc)
     msg is = fsep [ text "Pattern match checker exceeded"
                   , parens (ppr is), text "iterations in", ctxt <> dot
                   , text "(Use -fmax-pmcheck-iterations=n"
-                  , text "to set the maximun number of iterations to n)" ]
+                  , text "to set the maximum number of iterations to n)" ]
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
