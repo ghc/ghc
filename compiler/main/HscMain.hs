@@ -507,7 +507,9 @@ tcRnModule' sum save_rn_syntax mod = do
                  safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
                  when safe $ do
                    case wopt Opt_WarnSafe dflags of
-                     True -> (logWarnings $ unitBag $
+                     True
+                       | safeHaskell dflags == Sf_Safe -> return ()
+                       | otherwise -> (logWarnings $ unitBag $
                               makeIntoWarning (Reason Opt_WarnSafe) $
                               mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
                               errSafe tcg_res')
