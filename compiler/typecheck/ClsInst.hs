@@ -16,6 +16,7 @@ import TcRnMonad
 import TcType
 import TcMType
 import TcEvidence
+import TcTypeableValidity
 import RnEnv( addUsedGRE )
 import RdrName( lookupGRE_FieldLabel )
 import InstEnv
@@ -432,7 +433,7 @@ doFunTy clas ty arg_ty ret_ty
 -- of monomorphic kind (e.g. all kind variables have been instantiated).
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
-  | Just _ <- tyConRepName_maybe tc
+  | tyConIsTypeable tc
   = return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
