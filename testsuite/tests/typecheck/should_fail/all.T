@@ -503,6 +503,7 @@ test('T15797', normal, compile_fail, [''])
 test('T15799', normal, compile_fail, [''])
 test('T15801', normal, compile_fail, [''])
 test('T15816', normal, compile_fail, [''])
+test('T15862', normal, compile_fail, [''])
 test('T16059a', normal, compile_fail, [''])
 test('T16059c', [extra_files(['T16059b.hs'])], multimod_compile_fail,
     ['T16059c', '-v0'])
