@@ -20,21 +20,20 @@ void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
 void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
 
-// flip is either 1 or 0, changed at the beginning of retainerProfile()
-// It is used to tell whether a retainer set has been touched so far
-// during this pass.
+/* See Note [Profiling heap traversal visited bit]. */
 extern StgWord flip;
 
 // extract the retainer set field from c
-#define RSET(c)   ((c)->header.prof.hp.rs)
+#define RSET(c)   ((c)->header.prof.hp.trav.rs)
 
-#define isRetainerSetFieldValid(c) \
-  ((((StgWord)(c)->header.prof.hp.rs & 1) ^ flip) == 0)
+
+#define isTravDataValid(c) \
+  ((((StgWord)(c)->header.prof.hp.trav.lsb & 1) ^ flip) == 0)
 
 static inline RetainerSet *
 retainerSetOf( const StgClosure *c )
 {
-    ASSERT( isRetainerSetFieldValid(c) );
+    ASSERT( isTravDataValid(c) );
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
     return (RetainerSet *)((StgWord)RSET(c) ^ flip);
