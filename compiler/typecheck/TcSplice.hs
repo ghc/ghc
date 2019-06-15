@@ -39,6 +39,7 @@ import Finder
 import Name
 import TcRnMonad
 import TcType
+import Multiplicity
 
 import Outputable
 import TcExpr
@@ -1590,7 +1591,7 @@ reifyDataCon isGadtDataCon tys dc
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
        ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst g_arg_tys'
+             g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
@@ -1839,9 +1840,10 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
+reifyType ty@(FunTy { ft_af = af, ft_mult = Omega, ft_arg = t1, ft_res = t2 })
   | InvisArg <- af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+reifyType ty@(FunTy {})  = noTH (sLit "non-Omega multiplicity") (ppr ty)
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
@@ -1867,7 +1869,7 @@ reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
@@ -1920,7 +1922,7 @@ reify_tc_app tc tys
                                             else TH.TupleT arity
          | tc `hasKey` constraintKindTyConKey
                                           = TH.ConstraintT
-         | tc `hasKey` funTyConKey        = TH.ArrowT
+         | tc `hasKey` unrestrictedFunTyConKey = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT
          | tc `hasKey` consDataConKey     = TH.PromotedConsT

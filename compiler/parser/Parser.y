@@ -68,7 +68,7 @@ import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( funTyCon )
+import Type             ( unrestrictedFunTyCon, Mult(..) )
 import Kind             ( Kind )
 import Class            ( FunDep )
 
@@ -86,7 +86,8 @@ import ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
+                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR,
+                          omegaDataConTyCon)
 
 -- compiler/utils
 import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
@@ -539,6 +540,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
+ '->.'          { L _ (ITlolly _) }
+ '-->.'         { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '=>'           { L _ (ITdarrow _) }
@@ -643,7 +646,7 @@ identifier :: { Located RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
+    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                [mop $1,mu AnnRarrow $2,mcp $3] }
     | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
                                [mop $1,mj AnnTilde $2,mcp $3] }
@@ -1968,8 +1971,18 @@ is connected to the first type too.
 type :: { LHsType GhcPs }
         : btype                        { $1 }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
+                                       >> ams (sLL $1 $> $ HsFunTy noExt HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
+
+        | btype '->.' ctype             {% hintLinear (getLoc $2) >>
+                                         ams (sLL $1 $> $ HsFunTy noExt HsLinearArrow $1 $3)
+                                             [mu AnnRarrow $2] }
+        | btype '-->.' '(' mult ')' ctype  {% hintLinear (getLoc $2) >>
+                                              ams (sLL $1 $> $ HsFunTy noExt (HsExplicitMult $4) $1 $6)
+                                                  [mu AnnRarrow $2] }
+
+mult :: { LHsType GhcPs }
+        : btype                  { $1 }
 
 
 typedoc :: { LHsType GhcPs }
@@ -1977,18 +1990,28 @@ typedoc :: { LHsType GhcPs }
         | btype docprev                  { sLL $1 $> $ HsDocTy noExt $1 $2 }
         | docnext btype                  { sLL $1 $> $ HsDocTy noExt $2 $1 }
         | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
+                                         >> ams (sLL $1 $> $ HsFunTy noExt HsUnrestrictedArrow $1 $3)
                                                 [mu AnnRarrow $2] }
         | btype docprev '->' ctypedoc    {% ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
-                                                 HsFunTy noExt (cL (comb2 $1 $2)
-                                                            (HsDocTy noExt $1 $2))
-                                                         $4)
+                                                 HsFunTy noExt HsUnrestrictedArrow
+                                                         (cL (comb2 $1 $2) (HsDocTy noExt $1 $2)) $4)
                                                 [mu AnnRarrow $3] }
+        | btype '->.'     ctypedoc       {% hintLinear (getLoc $2) >>
+                                           ams (sLL $1 $> $ HsFunTy noExt HsLinearArrow $1 $3)
+                                                [mu AnnRarrow $2] }
+        | btype docprev '->.' ctypedoc   {% hintLinear (getLoc $2) >>
+                                           ams (sLL $1 $> $
+                                                 HsFunTy noExt HsLinearArrow
+                                                         (cL (comb2 $1 $2) (HsDocTy noExt $1 $2)) $4)
+                                                [mu AnnRarrow $3] }
+        | btype '-->.' '(' mult ')' ctypedoc  {% hintLinear (getLoc $2) >>
+                                                 ams (sLL $1 $> $ HsFunTy noExt (HsExplicitMult $4) $1 $6)
+                                                     [mu AnnRarrow $2] }
         | docnext btype '->' ctypedoc    {% ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
-                                                 HsFunTy noExt (cL (comb2 $1 $2)
-                                                            (HsDocTy noExt $2 $1))
+                                                 HsFunTy noExt HsUnrestrictedArrow
+                                                         (cL (comb2 $1 $2) (HsDocTy noExt $2 $1))
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
@@ -3433,7 +3456,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
+        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
@@ -3516,7 +3539,7 @@ tyconsym :: { Located RdrName }
 op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
-        | '->'                  { sL1 $1 $ getRdrName funTyCon }
+        | '->'                  { sL1 $1 $ getRdrName unrestrictedFunTyCon }
         | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }
@@ -3941,6 +3964,13 @@ fileSrcSpan = do
   l <- getRealSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
+
+-- Hint about linear types
+hintLinear :: SrcSpan -> P ()
+hintLinear span = do
+  linearEnabled <- getBit LinearTypesBit
+  unless linearEnabled $ addError span $
+    text "Enable LinearTypes to allow linear functions"
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()

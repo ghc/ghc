@@ -30,6 +30,7 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
 import Name
 import Id
 import Type
+import Multiplicity
 import TyCon
 import DataCon
 import Module
@@ -345,7 +346,7 @@ mkPrimTypeableTodos
 -- Note [Built-in syntax and the OrigNameCache] in IfaceEnv for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]
+    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon]
     , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons
@@ -434,7 +435,7 @@ typeIsTypeable ty
   | isJust (kindRep_maybe ty)       = True
 typeIsTypeable (TyVarTy _)          = True
 typeIsTypeable (AppTy a b)          = typeIsTypeable a && typeIsTypeable b
-typeIsTypeable (FunTy _ a b)        = typeIsTypeable a && typeIsTypeable b
+typeIsTypeable (FunTy _ w a b)      = typeIsTypeable w && typeIsTypeable a && typeIsTypeable b
 typeIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
                                    && all typeIsTypeable args
 typeIsTypeable (ForAllTy{})         = False
@@ -462,8 +463,8 @@ liftTc = KindRepM . lift
 builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
-    , (mkVisFunTy star star, starArrStarKindRepName)
-    , (mkVisFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkVisFunTyOm star star, starArrStarKindRepName)
+    , (mkVisFunTysOm [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind
@@ -533,7 +534,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") Omega (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do
@@ -587,7 +588,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ t1 t2)
+    new_kind_rep (FunTy _ _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

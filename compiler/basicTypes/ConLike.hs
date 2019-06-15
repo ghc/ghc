@@ -38,6 +38,7 @@ import BasicTypes
 import TyCoRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
+import Multiplicity
 
 import qualified Data.Data as Data
 
@@ -107,11 +108,11 @@ conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)
-conLikeInstOrigArgTys :: ConLike -> [Type] -> [Type]
+conLikeInstOrigArgTys :: ConLike -> [Type] -> [Scaled Type]
 conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
-    patSynInstArgTys pat_syn tys
+    map unrestricted $ patSynInstArgTys pat_syn tys
 
 -- | Existentially quantified type/coercion variables
 conLikeExTyCoVars :: ConLike -> [TyCoVar]
@@ -168,7 +169,7 @@ conLikeFullSig :: ConLike
                -> ([TyVar], [TyCoVar], [EqSpec]
                    -- Why tyvars for universal but tycovars for existential?
                    -- See Note [Existential coercion variables] in DataCon
-                  , ThetaType, ThetaType, [Type], Type)
+                  , ThetaType, ThetaType, [Scaled Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional
