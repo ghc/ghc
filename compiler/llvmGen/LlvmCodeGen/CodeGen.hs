@@ -47,15 +47,22 @@ type LlvmStatements = OrdList LlvmStatement
 
 data Signage = Signed | Unsigned deriving (Eq, Show)
 
+-- | A label to an unreachable basic block
+type UnreachableBBLabel = BlockId
+
+
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM proc Code generator
 --
 genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
 genLlvmProc (CmmProc infos lbl live graph) = do
     let blocks = toBlockListEntryFirstFalseFallthrough graph
-    (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
+    ublbl <- mkBlockId <$> getUniqueM
+    let ubblock = BasicBlock ublbl [Unreachable]
+    (lmblocks, lmdata) <- basicBlocksCodeGen ublbl live blocks
     let info = mapLookup (g_entry graph) infos
-        proc = CmmProc info lbl live (ListGraph lmblocks)
+        (entry:lmblocks') = lmblocks
+        proc = CmmProc info lbl live (ListGraph $ entry:ubblock:lmblocks')
     return (proc:lmdata)
 
 genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
@@ -67,15 +74,15 @@ genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
 -- point and will get the prologue.
-basicBlocksCodeGen :: LiveGlobalRegs -> [CmmBlock]
+basicBlocksCodeGen :: UnreachableBBLabel -> LiveGlobalRegs -> [CmmBlock]
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
-basicBlocksCodeGen _    []                     = panic "no entry block!"
-basicBlocksCodeGen live (entryBlock:cmmBlocks)
+basicBlocksCodeGen _ _    []                     = panic "no entry block!"
+basicBlocksCodeGen ubblbl live (entryBlock:cmmBlocks)
   = do (prologue, prologueTops) <- funPrologue live (entryBlock:cmmBlocks)
 
        -- Generate code
-       (BasicBlock bid entry, entryTops) <- basicBlockCodeGen entryBlock
-       (blocks, topss) <- fmap unzip $ mapM basicBlockCodeGen cmmBlocks
+       (BasicBlock bid entry, entryTops) <- basicBlockCodeGen ubblbl entryBlock
+       (blocks, topss) <- fmap unzip $ mapM (basicBlockCodeGen ubblbl) cmmBlocks
 
        -- Compose
        let entryBlock = BasicBlock bid (fromOL prologue ++ entry)
@@ -83,12 +90,12 @@ basicBlocksCodeGen live (entryBlock:cmmBlocks)
 
 
 -- | Generate code for one block
-basicBlockCodeGen :: CmmBlock -> LlvmM ( LlvmBasicBlock, [LlvmCmmDecl] )
-basicBlockCodeGen block
+basicBlockCodeGen :: UnreachableBBLabel -> CmmBlock -> LlvmM ( LlvmBasicBlock, [LlvmCmmDecl] )
+basicBlockCodeGen ubblbl block
   = do let (_, nodes, tail)  = blockSplit block
            id = entryLabel block
-       (mid_instrs, top) <- stmtsToInstrs $ blockToList nodes
-       (tail_instrs, top')  <- stmtToInstrs tail
+       (mid_instrs, top) <- stmtsToInstrs ubblbl $ blockToList nodes
+       (tail_instrs, top')  <- stmtToInstrs ubblbl tail
        let instrs = fromOL (mid_instrs `appOL` tail_instrs)
        return (BasicBlock id instrs, top' ++ top)
 
@@ -103,15 +110,15 @@ type StmtData = (LlvmStatements, [LlvmCmmDecl])
 
 
 -- | Convert a list of CmmNode's to LlvmStatement's
-stmtsToInstrs :: [CmmNode e x] -> LlvmM StmtData
-stmtsToInstrs stmts
-   = do (instrss, topss) <- fmap unzip $ mapM stmtToInstrs stmts
+stmtsToInstrs :: UnreachableBBLabel -> [CmmNode e x] -> LlvmM StmtData
+stmtsToInstrs ublbl stmts
+   = do (instrss, topss) <- fmap unzip $ mapM (stmtToInstrs ublbl) stmts
         return (concatOL instrss, concat topss)
 
 
 -- | Convert a CmmStmt to a list of LlvmStatement's
-stmtToInstrs :: CmmNode e x -> LlvmM StmtData
-stmtToInstrs stmt = case stmt of
+stmtToInstrs :: UnreachableBBLabel -> CmmNode e x -> LlvmM StmtData
+stmtToInstrs ubblbl stmt = case stmt of
 
     CmmComment _         -> return (nilOL, []) -- nuke comments
     CmmTick    _         -> return (nilOL, [])
@@ -123,7 +130,7 @@ stmtToInstrs stmt = case stmt of
     CmmBranch id         -> genBranch id
     CmmCondBranch arg true false likely
                          -> genCondBranch arg true false likely
-    CmmSwitch arg ids    -> genSwitch arg ids
+    CmmSwitch arg ids    -> genSwitch ubblbl arg ids
 
     -- Foreign Call
     CmmUnsafeForeignCall target res args
@@ -1090,18 +1097,20 @@ For a real example of this, see ./rts/StgStdThunks.cmm
 -}
 
 
-
 -- | Switch branch
-genSwitch :: CmmExpr -> SwitchTargets -> LlvmM StmtData
-genSwitch cond ids = do
+genSwitch :: UnreachableBBLabel -> CmmExpr  -> SwitchTargets -> LlvmM StmtData
+genSwitch ubblbl cond ids = do
     (vc, stmts, top) <- exprToVar cond
     let ty = getVarType vc
 
     let labels = [ (mkIntLit ty ix, blockIdToLlvm b)
                  | (ix, b) <- switchTargetsCases ids ]
     -- out of range is undefined, so let's just branch to first label
+    -- > I need some help with the LLVM codegen :)  Are you free?
+    -- Basically, I want to create a new BB and pass it to this function.
+    -- For this, I need to know how to get a new BB id. Any idea how?
     let defLbl | Just l <- switchTargetsDefault ids = blockIdToLlvm l
-               | otherwise                          = snd (head labels)
+               | otherwise                          = blockIdToLlvm  ubblbl -- snd (head labels)
 
     let s1 = Switch vc defLbl labels
     return $ (stmts `snocOL` s1, top)
