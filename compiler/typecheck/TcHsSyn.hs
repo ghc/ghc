@@ -58,6 +58,7 @@ import TcType
 import TcMType
 import TcEnv   ( tcLookupGlobalOnly )
 import TcEvidence
+import TcWarnings
 import TysPrim
 import TyCon
 import TysWiredIn
@@ -771,7 +772,7 @@ zonkExpr _ (HsLit x lit)
   = return (HsLit x lit)
 
 zonkExpr env (HsOverLit x lit)
-  = do  { lit' <- zonkOverLit env lit
+  = do  { lit' <- zonkOverLit env False lit
         ; return (HsOverLit x lit') }
 
 zonkExpr env (HsLam x matches)
@@ -817,6 +818,9 @@ zonkExpr env (OpApp fixity e1 op e2)
 zonkExpr env (NegApp x expr op)
   = do (env', new_op) <- zonkSyntaxExpr env op
        new_expr <- zonkLExpr env' expr
+       case dL new_expr of
+         L _ (HsOverLit _ lit) -> warnAboutOverflowedOverLit True lit
+         _ -> return ()
        return (NegApp x new_expr new_op)
 
 zonkExpr env (HsPar x e)
@@ -957,7 +961,10 @@ zonkExpr env (HsStatic fvs expr)
 zonkExpr env (HsWrap x co_fn expr)
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
        new_expr <- zonkExpr env1 expr
-       return (HsWrap x new_co_fn new_expr)
+       let wrap = HsWrap x new_co_fn new_expr
+       dflags <- getDynFlags
+       warnAboutIdentities dflags new_expr new_co_fn
+       return wrap
 
 zonkExpr _ e@(HsUnboundVar {}) = return e
 
@@ -1104,13 +1111,15 @@ zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
 
 -------------------------------------------------------------------------
-zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
-zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
+zonkOverLit :: ZonkEnv -> Bool -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
+zonkOverLit env is_neg lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; e' <- zonkExpr env e
-        ; return (lit { ol_witness = e', ol_ext = OverLitTc r ty' }) }
+        ; let lit' = (lit { ol_witness = e', ol_ext = OverLitTc r ty' })
+        ; warnAboutOverflowedOverLit is_neg lit'
+        ; return lit' }
 
-zonkOverLit _ XOverLit{} = panic "zonkOverLit"
+zonkOverLit _ _ XOverLit{} = panic "zonkOverLit"
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo GhcTcId -> TcM (ArithSeqInfo GhcTc)
@@ -1127,12 +1136,16 @@ zonkArithSeq env (FromThen e1 e2)
 zonkArithSeq env (FromTo e1 e2)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
+       dflags <- getDynFlags
+       warnAboutEmptyEnumerations dflags new_e1 Nothing new_e2
        return (FromTo new_e1 new_e2)
 
 zonkArithSeq env (FromThenTo e1 e2 e3)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
        new_e3 <- zonkLExpr env e3
+       dflags <- getDynFlags
+       warnAboutEmptyEnumerations dflags new_e1 (Just new_e2) new_e3
        return (FromThenTo new_e1 new_e2 new_e3)
 
 
@@ -1432,7 +1445,9 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys
   where
     doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
-zonk_pat env (LitPat x lit) = return (env, LitPat x lit)
+zonk_pat env (LitPat x lit)
+  = do  { warnAboutOverflowedLit lit
+        ; return (env, LitPat x lit) }
 
 zonk_pat env (SigPat ty pat hs_ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
@@ -1445,7 +1460,7 @@ zonk_pat env (NPat ty (dL->L l lit) mb_neg eq_expr)
             Nothing -> return (env1, Nothing)
             Just n  -> second Just <$> zonkSyntaxExpr env1 n
 
-        ; lit' <- zonkOverLit env2 lit
+        ; lit' <- zonkOverLit env2 (isJust mb_neg) lit
         ; ty' <- zonkTcTypeToTypeX env2 ty
         ; return (env2, NPat ty' (cL l lit') mb_neg' eq_expr') }
 
@@ -1453,8 +1468,8 @@ zonk_pat env (NPlusKPat ty (dL->L loc n) (dL->L l lit1) lit2 e1 e2)
   = do  { (env1, e1') <- zonkSyntaxExpr env  e1
         ; (env2, e2') <- zonkSyntaxExpr env1 e2
         ; n' <- zonkIdBndr env2 n
-        ; lit1' <- zonkOverLit env2 lit1
-        ; lit2' <- zonkOverLit env2 lit2
+        ; lit1' <- zonkOverLit env2 False lit1
+        ; lit2' <- zonkOverLit env2 False lit2
         ; ty' <- zonkTcTypeToTypeX env2 ty
         ; return (extendIdZonkEnv1 env2 n',
                   NPlusKPat ty' (cL loc n') (cL l lit1') lit2' e1' e2') }

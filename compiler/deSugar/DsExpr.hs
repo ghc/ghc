@@ -266,33 +266,17 @@ ds_expr w (HsConLikeOut _ con)   = dsConLike w con
 ds_expr _ (HsIPVar {})           = panic "dsExpr: HsIPVar"
 ds_expr _ (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 
-ds_expr _ (HsLit _ lit)
-  = do { warnAboutOverflowedLit lit
-       ; dsLit (convertLit lit) }
-
-ds_expr _ (HsOverLit _ lit)
-  = do { warnAboutOverflowedOverLit lit
-       ; dsOverLit lit }
+ds_expr _ (HsLit _ lit)          = dsLit (convertLit lit)
+ds_expr _ (HsOverLit _ lit)      = dsOverLit lit
 
 ds_expr _ (HsWrap _ co_fn e)
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
-       ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'
              wrapped_ty = exprType wrapped_e
        ; checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
-       ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
-
-ds_expr _ (NegApp _ (dL->L loc
-                      (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
-                  neg_expr)
-  = do { expr' <- putSrcSpanDs loc $ do
-          { warnAboutOverflowedOverLit
-              (lit { ol_val = HsIntegral (negateIntegralLit i) })
-          ; dsOverLit lit }
-       ; dsSyntaxExpr neg_expr [expr'] }
 
 ds_expr _ (NegApp _ expr neg_expr)
   = do { expr' <- dsLExpr expr
@@ -865,18 +849,14 @@ dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)
   = App <$> dsExpr expr <*> dsLExprNoLP from
 dsArithSeq expr (FromTo from to)
-  = do dflags <- getDynFlags
-       warnAboutEmptyEnumerations dflags from Nothing to
-       expr' <- dsExpr expr
+  = do expr' <- dsExpr expr
        from' <- dsLExprNoLP from
        to'   <- dsLExprNoLP to
        return $ mkApps expr' [from', to']
 dsArithSeq expr (FromThen from thn)
   = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn]
 dsArithSeq expr (FromThenTo from thn to)
-  = do dflags <- getDynFlags
-       warnAboutEmptyEnumerations dflags from (Just thn) to
-       expr' <- dsExpr expr
+  = do expr' <- dsExpr expr
        from' <- dsLExprNoLP from
        thn'  <- dsLExprNoLP thn
        to'   <- dsLExprNoLP to

@@ -466,25 +466,11 @@ tidy1 _ _ (SumPat tys pat alt arity)
     sum_ConPat = mkPrefixConPat (sumDataCon alt arity) [pat] tys
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ o (LitPat _ lit)
-  = do { unless (isGenerated o) $
-           warnAboutOverflowedLit lit
-       ; return (idDsWrapper, tidyLitPat lit) }
+tidy1 _ _ (LitPat _ lit) = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ o (NPat ty (dL->L _ lit@OverLit { ol_val = v }) mb_neg eq)
-  = do { unless (isGenerated o) $
-           let lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
-                    | otherwise = lit
-           in warnAboutOverflowedOverLit lit'
-       ; return (idDsWrapper, tidyNPat lit mb_neg eq ty) }
-
--- NPlusKPat: we may want to warn about the literals
-tidy1 _ o n@(NPlusKPat _ _ (dL->L _ lit1) lit2 _ _)
-  = do { unless (isGenerated o) $ do
-           warnAboutOverflowedOverLit lit1
-           warnAboutOverflowedOverLit lit2
-       ; return (idDsWrapper, n) }
+  = return (idDsWrapper, tidyNPat lit mb_neg eq ty)
 
 -- Everything else goes through unchanged...
 tidy1 _ _ non_interesting_pat
