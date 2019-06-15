@@ -92,6 +92,11 @@ read over this page carefully:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/building/using>
 
+A web based code explorer for the GHC source code with semantic analysis
+and type information of the GHC sources:
+
+<https://haskell-code-explorer.mfix.io/package/ghc-8.4.3/s>
+
 How to communicate with us
 ==========================
 
