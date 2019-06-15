@@ -13,9 +13,11 @@ Highlights
 
 The highlights, since the 8.6.1 release, are:
 
-- Many, many bug fixes.
+- GHC now supports :ref:`visible type applications <visible-type-application>`.
+- Type variables in type family instances and rewrite rules can now be explicitly ``forall``-bound.
 - A new code layout algorithm for x86.
-
+- The final phase of the ``MonadFail`` proposal has been implemented.
+- Many, many bug fixes.
 
 Full details
 ------------
@@ -31,7 +33,8 @@ Language
 
 - GHC now allows explicitly binding type variables in type family instances and
   rewrite rules, as described in
-  `GHC proposal #7 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0007-instance-foralls.rst>`__. For instance: ::
+  `GHC proposal #7 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0007-instance-foralls.rst>`__.
+  For instance: ::
 
     type family G a b where
       forall x y. G [x] (Proxy y) = Double
