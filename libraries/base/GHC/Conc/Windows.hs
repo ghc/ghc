@@ -13,13 +13,15 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
--- Windows I/O manager
+-- Windows I/O manager interfaces. Depending on which I/O Subsystem is used
+-- requests will be routed to different places.
 --
 -----------------------------------------------------------------------------
 
 -- #not-home
 module GHC.Conc.Windows
        ( ensureIOManagerIsRunning
+       , interruptIOManager
 
        -- * Waiting
        , threadDelay
@@ -33,19 +35,19 @@ module GHC.Conc.Windows
        , asyncReadBA
        , asyncWriteBA
 
-       , ConsoleEvent(..)
-       , win32ConsoleHandler
-       , toWin32ConsoleEvent
+       -- * Console event handler
+       , module GHC.Event.Windows.ConsoleEvent
        ) where
 
-import Data.Bits (shiftR)
+
+#include "windows_cconv.h"
+
 import GHC.Base
 import GHC.Conc.Sync
-import GHC.Enum (Enum)
-import GHC.IO (unsafePerformIO)
-import GHC.IORef
-import GHC.MVar
-import GHC.Num (Num(..))
+import qualified GHC.Conc.POSIX as POSIX
+import qualified GHC.Conc.IOCP as WINIO
+import GHC.Event.Windows.ConsoleEvent
+import GHC.IO.SubSystem ((<!>))
 import GHC.Ptr
 import GHC.Read (Read)
 import GHC.Real (div, fromIntegral)
@@ -53,16 +55,6 @@ import GHC.Show (Show)
 import GHC.Word (Word32, Word64)
 import GHC.Windows
 import Unsafe.Coerce ( unsafeCoerceUnlifted )
-
-#if defined(mingw32_HOST_OS)
-# if defined(i386_HOST_ARCH)
-#  define WINDOWS_CCONV stdcall
-# elif defined(x86_64_HOST_ARCH)
-#  define WINDOWS_CCONV ccall
-# else
-#  error Unknown mingw32 arch
-# endif
-#endif
 
 -- ----------------------------------------------------------------------------
 -- Thread waiting
@@ -111,232 +103,19 @@ asyncWriteBA fd isSock len off bufB =
 -- run /earlier/ than specified.
 --
 threadDelay :: Int -> IO ()
-threadDelay time
-  | threaded  = waitForDelayEvent time
-  | otherwise = IO $ \s ->
-        case time of { I# time# ->
-        case delay# time# s of { s' -> (# s', () #)
-        }}
+threadDelay = POSIX.threadDelay <!> WINIO.threadDelay
 
 -- | Set the value of returned TVar to True after a given number of
 -- microseconds. The caveats associated with threadDelay also apply.
 --
 registerDelay :: Int -> IO (TVar Bool)
-registerDelay usecs
-  | threaded = waitForDelayEventSTM usecs
-  | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"
-
-foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
-
-waitForDelayEvent :: Int -> IO ()
-waitForDelayEvent usecs = do
-  m <- newEmptyMVar
-  target <- calculateTarget usecs
-  _ <- atomicModifyIORef'_ pendingDelays (\xs -> Delay target m : xs)
-  prodServiceThread
-  takeMVar m
-
--- Delays for use in STM
-waitForDelayEventSTM :: Int -> IO (TVar Bool)
-waitForDelayEventSTM usecs = do
-   t <- atomically $ newTVar False
-   target <- calculateTarget usecs
-   _ <- atomicModifyIORef'_ pendingDelays (\xs -> DelaySTM target t : xs)
-   prodServiceThread
-   return t
-
-calculateTarget :: Int -> IO USecs
-calculateTarget usecs = do
-    now <- getMonotonicUSec
-    return $ now + (fromIntegral usecs)
-
-data DelayReq
-  = Delay    {-# UNPACK #-} !USecs {-# UNPACK #-} !(MVar ())
-  | DelaySTM {-# UNPACK #-} !USecs {-# UNPACK #-} !(TVar Bool)
-
-{-# NOINLINE pendingDelays #-}
-pendingDelays :: IORef [DelayReq]
-pendingDelays = unsafePerformIO $ do
-   m <- newIORef []
-   sharedCAF m getOrSetGHCConcWindowsPendingDelaysStore
-
-foreign import ccall unsafe "getOrSetGHCConcWindowsPendingDelaysStore"
-    getOrSetGHCConcWindowsPendingDelaysStore :: Ptr a -> IO (Ptr a)
-
-{-# NOINLINE ioManagerThread #-}
-ioManagerThread :: MVar (Maybe ThreadId)
-ioManagerThread = unsafePerformIO $ do
-   m <- newMVar Nothing
-   sharedCAF m getOrSetGHCConcWindowsIOManagerThreadStore
-
-foreign import ccall unsafe "getOrSetGHCConcWindowsIOManagerThreadStore"
-    getOrSetGHCConcWindowsIOManagerThreadStore :: Ptr a -> IO (Ptr a)
+registerDelay = POSIX.registerDelay <!> WINIO.registerDelay
 
 ensureIOManagerIsRunning :: IO ()
-ensureIOManagerIsRunning
-  | threaded  = startIOManagerThread
-  | otherwise = return ()
+ensureIOManagerIsRunning =  POSIX.ensureIOManagerIsRunning
+                        <!> WINIO.ensureIOManagerIsRunning
 
-startIOManagerThread :: IO ()
-startIOManagerThread = do
-  modifyMVar_ ioManagerThread $ \old -> do
-    let create = do t <- forkIO ioManager; return (Just t)
-    case old of
-      Nothing -> create
-      Just t  -> do
-        s <- threadStatus t
-        case s of
-          ThreadFinished -> create
-          ThreadDied     -> create
-          _other         -> return (Just t)
+interruptIOManager :: IO ()
+interruptIOManager = POSIX.interruptIOManager <!> WINIO.interruptIOManager
 
-insertDelay :: DelayReq -> [DelayReq] -> [DelayReq]
-insertDelay d [] = [d]
-insertDelay d1 ds@(d2 : rest)
-  | delayTime d1 <= delayTime d2 = d1 : ds
-  | otherwise                    = d2 : insertDelay d1 rest
-
-delayTime :: DelayReq -> USecs
-delayTime (Delay t _) = t
-delayTime (DelaySTM t _) = t
-
-type USecs = Word64
-type NSecs = Word64
-
-foreign import ccall unsafe "getMonotonicNSec"
-  getMonotonicNSec :: IO NSecs
-
-getMonotonicUSec :: IO USecs
-getMonotonicUSec = fmap (`div` 1000) getMonotonicNSec
-
-{-# NOINLINE prodding #-}
-prodding :: IORef Bool
-prodding = unsafePerformIO $ do
-   r <- newIORef False
-   sharedCAF r getOrSetGHCConcWindowsProddingStore
-
-foreign import ccall unsafe "getOrSetGHCConcWindowsProddingStore"
-    getOrSetGHCConcWindowsProddingStore :: Ptr a -> IO (Ptr a)
-
-prodServiceThread :: IO ()
-prodServiceThread = do
-  -- NB. use atomicSwapIORef here, otherwise there are race
-  -- conditions in which prodding is left at True but the server is
-  -- blocked in select().
-  was_set <- atomicSwapIORef prodding True
-  when (not was_set) wakeupIOManager
-
--- ----------------------------------------------------------------------------
--- Windows IO manager thread
-
-ioManager :: IO ()
-ioManager = do
-  wakeup <- c_getIOManagerEvent
-  service_loop wakeup []
-
-service_loop :: HANDLE          -- read end of pipe
-             -> [DelayReq]      -- current delay requests
-             -> IO ()
-
-service_loop wakeup old_delays = do
-  -- pick up new delay requests
-  new_delays <- atomicSwapIORef pendingDelays []
-  let  delays = foldr insertDelay old_delays new_delays
-
-  now <- getMonotonicUSec
-  (delays', timeout) <- getDelay now delays
-
-  r <- c_WaitForSingleObject wakeup timeout
-  case r of
-    0xffffffff -> do throwGetLastError "service_loop"
-    0 -> do
-        r2 <- c_readIOManagerEvent
-        exit <-
-              case r2 of
-                _ | r2 == io_MANAGER_WAKEUP -> return False
-                _ | r2 == io_MANAGER_DIE    -> return True
-                0 -> return False -- spurious wakeup
-                _ -> do start_console_handler (r2 `shiftR` 1); return False
-        when (not exit) $ service_cont wakeup delays'
-
-    _other -> service_cont wakeup delays' -- probably timeout
-
-service_cont :: HANDLE -> [DelayReq] -> IO ()
-service_cont wakeup delays = do
-  _ <- atomicSwapIORef prodding False
-  service_loop wakeup delays
-
--- must agree with rts/win32/ThrIOManager.c
-io_MANAGER_WAKEUP, io_MANAGER_DIE :: Word32
-io_MANAGER_WAKEUP = 0xffffffff
-io_MANAGER_DIE    = 0xfffffffe
-
-data ConsoleEvent
- = ControlC
- | Break
- | Close
-    -- these are sent to Services only.
- | Logoff
- | Shutdown
- deriving ( Eq   -- ^ @since 4.3.0.0
-          , Ord  -- ^ @since 4.3.0.0
-          , Enum -- ^ @since 4.3.0.0
-          , Show -- ^ @since 4.3.0.0
-          , Read -- ^ @since 4.3.0.0
-          )
-
-start_console_handler :: Word32 -> IO ()
-start_console_handler r =
-  case toWin32ConsoleEvent r of
-     Just x  -> withMVar win32ConsoleHandler $ \handler -> do
-                    _ <- forkIO (handler x)
-                    return ()
-     Nothing -> return ()
-
-toWin32ConsoleEvent :: (Eq a, Num a) => a -> Maybe ConsoleEvent
-toWin32ConsoleEvent ev =
-   case ev of
-       0 {- CTRL_C_EVENT-}        -> Just ControlC
-       1 {- CTRL_BREAK_EVENT-}    -> Just Break
-       2 {- CTRL_CLOSE_EVENT-}    -> Just Close
-       5 {- CTRL_LOGOFF_EVENT-}   -> Just Logoff
-       6 {- CTRL_SHUTDOWN_EVENT-} -> Just Shutdown
-       _ -> Nothing
-
-win32ConsoleHandler :: MVar (ConsoleEvent -> IO ())
-win32ConsoleHandler = unsafePerformIO (newMVar (errorWithoutStackTrace "win32ConsoleHandler"))
-
-wakeupIOManager :: IO ()
-wakeupIOManager = c_sendIOManagerEvent io_MANAGER_WAKEUP
-
--- Walk the queue of pending delays, waking up any that have passed
--- and return the smallest delay to wait for.  The queue of pending
--- delays is kept ordered.
-getDelay :: USecs -> [DelayReq] -> IO ([DelayReq], DWORD)
-getDelay _   [] = return ([], iNFINITE)
-getDelay now all@(d : rest)
-  = case d of
-     Delay time m | now >= time -> do
-        putMVar m ()
-        getDelay now rest
-     DelaySTM time t | now >= time -> do
-        atomically $ writeTVar t True
-        getDelay now rest
-     _otherwise ->
-        -- delay is in millisecs for WaitForSingleObject
-        let micro_seconds = delayTime d - now
-            milli_seconds = (micro_seconds + 999) `div` 1000
-        in return (all, fromIntegral milli_seconds)
-
-foreign import ccall unsafe "getIOManagerEvent" -- in the RTS (ThrIOManager.c)
-  c_getIOManagerEvent :: IO HANDLE
-
-foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
-  c_readIOManagerEvent :: IO Word32
-
-foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
-  c_sendIOManagerEvent :: Word32 -> IO ()
-
-foreign import WINDOWS_CCONV "WaitForSingleObject"
-   c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
 
