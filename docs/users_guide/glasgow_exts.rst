@@ -410,25 +410,25 @@ And with `UnboxedSums <#unboxed-sums>`__ enabled ::
     newtype Maybe# :: forall (r :: RuntimeRep). TYPE r -> TYPE (SumRep '[r, TupleRep '[]]) where
       MkMaybe# :: forall (r :: RuntimeRep) (a :: TYPE r). (# a | (# #) #) -> Maybe# a
 
-This extension also relaxes some of the restrictions around data families.
-It must be enabled in modules where either of the following occur:
+This extension also relaxes some of the restrictions around data family
+instances. In particular, :extension:`UnliftedNewtypes` permits a
+``newtype instance`` to be given a return kind of ``TYPE r``, not just
+``Type``. For example, the following ``newtype instance`` declarations would be
+permitted: ::
 
-- A data family is declared with a kind other than ``Type``. Both ``Foo``
-  and ``Bar``, defined below, fall into this category:
-  ::
      class Foo a where
        data FooKey a :: TYPE 'IntRep
      class Bar (r :: RuntimeRep) where
        data BarType r :: TYPE r
 
-- A ``newtype instance`` is written with a kind other than ``Type``. The
-  following instances of ``Foo`` and ``Bar`` as defined above fall into
-  this category.
-  ::
      instance Foo Bool where
        newtype FooKey Bool = FooKeyBoolC Int#
      instance Bar 'WordRep where
        newtype BarType 'WordRep = BarTypeWordRepC Word#
+
+It is worth noting that :extension:`UnliftedNewtypes` is *not* required to give
+the data families themselves return kinds involving ``TYPE``; the extension is
+only required for the ``newtype instance`` declarations.
 
 This extension impacts the determination of whether or not a newtype has
 a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
@@ -7648,9 +7648,10 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
     data family Array :: Type -> Type
 
 Unlike with ordinary data definitions, the result kind of a data family
-does not need to be ``Type``: it can alternatively be a kind variable
-(with :extension:`PolyKinds`). Data instances' kinds must end in
-``Type``, however.
+does not need to be ``Type``: it can alternatively be of the form ``TYPE r``
+(see :ref:`runtime-rep`) or a kind variable (with :extension:`PolyKinds`).
+Data instances' kinds must end in ``Type``, however, unless the
+:extension:`UnliftedNewtypes` extension is enabled.
 
 .. _data-instance-declarations:
 
