@@ -9,13 +9,11 @@ instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
 instance Semigroup _ => Semigroup (Maybe _)
   -- Defined in ‘GHC.Base’
 instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
-instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
 instance Eq _ => Eq [_] -- Defined in ‘GHC.Classes’
 instance Monoid [_] -- Defined in ‘GHC.Base’
 instance Ord _ => Ord [_] -- Defined in ‘GHC.Classes’
 instance Semigroup [_] -- Defined in ‘GHC.Base’
 instance Show _ => Show [_] -- Defined in ‘GHC.Show’
-instance Read _ => Read [_] -- Defined in ‘GHC.Read’
 instance [safe] MyShow _ => MyShow [_]
   -- Defined at ghci064.hs:7:10
 instance Monoid [T] -- Defined in ‘GHC.Base’
@@ -24,12 +22,8 @@ instance [safe] MyShow [T] -- Defined at ghci064.hs:7:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:15:10
 instance Eq Bool -- Defined in ‘GHC.Classes’
 instance Ord Bool -- Defined in ‘GHC.Classes’
-instance Show Bool -- Defined in ‘GHC.Show’
-instance Read Bool -- Defined in ‘GHC.Read’
 instance Enum Bool -- Defined in ‘GHC.Enum’
+instance Show Bool -- Defined in ‘GHC.Show’
 instance Bounded Bool -- Defined in ‘GHC.Enum’
-instance Data.Bits.Bits Bool -- Defined in ‘Data.Bits’
-instance Data.Bits.FiniteBits Bool -- Defined in ‘Data.Bits’
-instance GHC.Arr.Ix Bool -- Defined in ‘GHC.Arr’
 instance Functor ((,) Int) -- Defined in ‘GHC.Base’
 instance Foldable ((,) Int) -- Defined in ‘Data.Foldable’
