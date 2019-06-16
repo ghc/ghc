@@ -308,6 +308,8 @@ Library
         Type.Reflection
         Type.Reflection.Unsafe
         Unsafe.Coerce
+        -- TODO: remove
+        GHC.IOPort
 
     reexported-modules:
           GHC.Num.Integer
@@ -328,6 +330,8 @@ Library
         GHC.IO.Handle.Lock.NoOp
         GHC.IO.Handle.Lock.Windows
         GHC.StaticPtr.Internal
+        GHC.Event.Internal.Types
+        -- GHC.IOPort -- TODO: hide again after debug
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
