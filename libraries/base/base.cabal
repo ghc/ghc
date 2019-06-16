@@ -37,6 +37,7 @@ extra-source-files:
     include/ieee-flpt.h
     include/md5.h
     include/fs.h
+    include/winio_structs.h
     install-sh
 
 source-repository head
@@ -200,6 +201,7 @@ Library
         GHC.Enum
         GHC.Environment
         GHC.Err
+        GHC.Event.TimeOut
         GHC.Exception
         GHC.Exception.Type
         GHC.ExecutionStack
@@ -387,8 +389,25 @@ Library
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
             GHC.Conc.Windows
+            GHC.Conc.IOCP
+            GHC.Conc.POSIX
+            GHC.Conc.POSIX.Const
             GHC.Windows
+            GHC.Event.Windows
+            GHC.Event.Windows.Clock
+            GHC.Event.Windows.ConsoleEvent
+            GHC.Event.Windows.FFI
+            GHC.Event.Windows.ManagedThreadPool
+            GHC.Event.Windows.Thread
+            GHC.IO.Windows.Handle
+            GHC.IO.Windows.Encoding
+            GHC.IO.Windows.Paths
         other-modules:
+            GHC.Event.Arr
+            GHC.Event.Array
+            GHC.Event.IntTable
+            GHC.Event.PSQ
+            GHC.Event.Unique
             System.CPUTime.Windows
     else
         exposed-modules:
