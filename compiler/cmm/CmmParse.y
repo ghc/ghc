@@ -198,6 +198,8 @@ necessary to the stack to accommodate it (e.g. 2).
 ----------------------------------------------------------------------------- -}
 
 {
+{-# LANGUAGE TupleSections #-}
+
 module CmmParse ( parseCmmFile ) where
 
 import GhcPrelude
@@ -808,7 +810,7 @@ foreign_formals :: { [CmmParse (LocalReg, ForeignHint)] }
         | foreign_formal ',' foreign_formals    { $1 : $3 }
 
 foreign_formal :: { CmmParse (LocalReg, ForeignHint) }
-        : local_lreg            { do e <- $1; return (e, (inferCmmHint (CmmReg (CmmLocal e)))) }
+        : local_lreg            { do e <- $1; return (e, inferCmmHint (CmmReg (CmmLocal e))) }
         | STRING local_lreg     {% do h <- parseCmmHint $1;
                                       return $ do
                                          e <- $2; return (e,h) }
@@ -999,36 +1001,36 @@ machOps = listToUFM $
 callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
-        ( "write_barrier", (,) MO_WriteBarrier ),
+        ( "write_barrier", (MO_WriteBarrier,)),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
         ( "memcmp", memcpyLikeTweakArgs MO_Memcmp ),
 
-        ("prefetch0", (,) $ MO_Prefetch_Data 0),
-        ("prefetch1", (,) $ MO_Prefetch_Data 1),
-        ("prefetch2", (,) $ MO_Prefetch_Data 2),
-        ("prefetch3", (,) $ MO_Prefetch_Data 3),
+        ("prefetch0", (MO_Prefetch_Data 0,)),
+        ("prefetch1", (MO_Prefetch_Data 1,)),
+        ("prefetch2", (MO_Prefetch_Data 2,)),
+        ("prefetch3", (MO_Prefetch_Data 3,)),
 
-        ( "popcnt8",  (,) $ MO_PopCnt W8  ),
-        ( "popcnt16", (,) $ MO_PopCnt W16 ),
-        ( "popcnt32", (,) $ MO_PopCnt W32 ),
-        ( "popcnt64", (,) $ MO_PopCnt W64 ),
+        ( "popcnt8",  (MO_PopCnt W8,)),
+        ( "popcnt16", (MO_PopCnt W16,)),
+        ( "popcnt32", (MO_PopCnt W32,)),
+        ( "popcnt64", (MO_PopCnt W64,)),
 
-        ( "pdep8",  (,) $ MO_Pdep W8  ),
-        ( "pdep16", (,) $ MO_Pdep W16 ),
-        ( "pdep32", (,) $ MO_Pdep W32 ),
-        ( "pdep64", (,) $ MO_Pdep W64 ),
+        ( "pdep8",  (MO_Pdep W8,)),
+        ( "pdep16", (MO_Pdep W16,)),
+        ( "pdep32", (MO_Pdep W32,)),
+        ( "pdep64", (MO_Pdep W64,)),
 
-        ( "pext8",  (,) $ MO_Pext W8  ),
-        ( "pext16", (,) $ MO_Pext W16 ),
-        ( "pext32", (,) $ MO_Pext W32 ),
-        ( "pext64", (,) $ MO_Pext W64 ),
+        ( "pext8",  (MO_Pext W8,)),
+        ( "pext16", (MO_Pext W16,)),
+        ( "pext32", (MO_Pext W32,)),
+        ( "pext64", (MO_Pext W64,)),
 
-        ( "cmpxchg8",  (,) $ MO_Cmpxchg W8  ),
-        ( "cmpxchg16", (,) $ MO_Cmpxchg W16 ),
-        ( "cmpxchg32", (,) $ MO_Cmpxchg W32 ),
-        ( "cmpxchg64", (,) $ MO_Cmpxchg W64 )
+        ( "cmpxchg8",  (MO_Cmpxchg W8,)),
+        ( "cmpxchg16", (MO_Cmpxchg W16,)),
+        ( "cmpxchg32", (MO_Cmpxchg W32,)),
+        ( "cmpxchg64", (MO_Cmpxchg W64,))
 
         -- ToDo: the rest, maybe
         -- edit: which rest?
