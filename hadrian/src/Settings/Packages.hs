@@ -366,7 +366,6 @@ rtsPackageArgs = package rts ? do
 
             , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
-            , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
             -- libffi's ffi.h triggers various warnings
             , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
@@ -453,12 +452,3 @@ rtsWarnings = mconcat
     , arg "-Wredundant-decls"
     , arg "-Wundef"
     , arg "-fno-strict-aliasing" ]
-
--- These numbers can be found at:
--- https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
--- If we're compiling on windows, enforce that we only support Vista SP1+
--- Adding this here means it doesn't have to be done in individual .c files
--- and also centralizes the versioning.
--- | Minimum supported Windows version.
-windowsVersion :: String
-windowsVersion = "0x06010000"
