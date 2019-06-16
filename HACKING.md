@@ -86,9 +86,20 @@ read over this page carefully:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/building/using>
 
+A web based code explorer for the GHC source code with semantic analysis
+and type information of the GHC sources is available at:
+
+<https://haskell-code-explorer.mfix.io/>
+
+Look for `GHC` in `Package-name`. For example, here is the link to
+[GHC-8.6.5](https://haskell-code-explorer.mfix.io/package/ghc-8.6.5).
+
+
+
 If you want to watch issues and code review activities, the following page is a good start:
 
 <https://gitlab.haskell.org/ghc/ghc/activity>
+
 
 How to communicate with us
 ==========================
