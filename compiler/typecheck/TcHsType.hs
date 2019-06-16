@@ -49,7 +49,7 @@ module TcHsType (
         kindGeneralize, checkExpectedKind_pp,
 
         -- Sort-checking kinds
-        tcLHsKindSig, badKindSig,
+        tcLHsKindSig, checkDataDeclKindSig, checkDataFamilyKindSig,
 
         -- Zonking and promoting
         zonkPromoteType,
@@ -105,7 +105,7 @@ import UniqSupply
 import Outputable
 import FastString
 import PrelNames hiding ( wildCardName )
-import DynFlags ( WarningFlag (Opt_WarnPartialTypeSignatures) )
+import DynFlags ( WarningFlag (Opt_WarnPartialTypeSignatures), getDynFlags, xopt )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
@@ -2401,12 +2401,74 @@ etaExpandAlgTyCon tc_bndrs kind
               (subst', tv') = substTyVarBndr subst tv
               tcb = Bndr tv' (NamedTCB vis)
 
-badKindSig :: Bool -> Kind -> SDoc
-badKindSig check_for_type kind
- = hang (sep [ text "Kind signature on data type declaration has non-*"
-             , (if check_for_type then empty else text "and non-variable") <+>
-               text "return kind" ])
-        2 (ppr kind)
+-- | Checks that a @data@, @newtype@, @data instance@, or @newtype instance@
+-- declaration's return kind is of the form @Type@. If the declaration is a
+-- @newtype@ or @newtype instance@ and the @UnliftedNewtypes@ extension is
+-- enabled, this check is slightly relaxed and permits a return kind of the
+-- form @TYPE r@ (for some @r@).
+-- See @Note [Implementation of UnliftedNewtypes]@ in "TcTyClsDecls".
+checkDataDeclKindSig :: Bool -- 'True' if this is a data/newtype instance
+                     -> NewOrData -> Kind -> TcM ()
+checkDataDeclKindSig is_data_instance new_or_data kind = do
+  dflags <- getDynFlags
+  let pp_dec :: SDoc
+      pp_dec = text $
+        case new_or_data of
+          DataType -> if is_data_instance then "data instance"    else "data type"
+          NewType  -> if is_data_instance then "newtype instance" else "newtype"
+
+      is_newtype, tYPE_ok :: Bool
+      is_newtype = new_or_data == NewType
+      tYPE_ok    = is_newtype && xopt LangExt.UnliftedNewtypes dflags
+  check_data_kind_sig pp_dec tYPE_ok False is_newtype kind
+
+-- | Checks that a data family declaration's return kind is either of the form:
+--
+-- 1. @TYPE r@ (for some @r@), or
+--
+-- 2. @k@ (where @k@ is a bare kind variable)
+checkDataFamilyKindSig :: Kind -> TcM ()
+checkDataFamilyKindSig =
+  check_data_kind_sig (text "data family")
+    True -- Unlike in checkDataDeclKindSig, we don't need to check if
+         -- UnliftedNewtypes is enabled, since data family declarations can
+         -- have return kind `TYPE r` unconditionally (#16827).
+    True False
+
+-- | Workhorse for 'checkDataDeclKindSig' and 'checkDataFamilyKindSig'.
+check_data_kind_sig ::
+     SDoc -- ^ The sort of declaration is the kind signature attached to
+  -> Bool -- ^ Is the return kind permitted to be @TYPE r@?
+  -> Bool -- ^ Is the return kind permitted to be a bare kind variable?
+  -> Bool -- ^ Should @UnliftedNewtypes@ be recommended if not enabled?
+  -> Kind -> TcM ()
+check_data_kind_sig pp_dec tYPE_ok kind_var_ok try_unlifted_newtypes kind =
+  checkTc (is_TYPE_or_Type || is_kind_var) err_msg
+  where
+    is_TYPE :: Bool
+    is_TYPE = tcIsRuntimeTypeKind kind
+
+    is_TYPE_or_Type, is_kind_var :: Bool
+    -- With UnliftedNewtypes, we allow kinds other than Type, but they
+    -- must still be of the form `TYPE r` since we don't want to accept
+    -- Constraint or Nat.
+    -- See Note [Implementation of UnliftedNewtypes] in TcTyClsDecls.
+    is_TYPE_or_Type | tYPE_ok   = is_TYPE
+                    | otherwise = tcIsLiftedTypeKind kind
+    is_kind_var | kind_var_ok = isJust (tcGetCastedTyVar_maybe kind)
+                | otherwise   = False
+
+    err_msg :: SDoc
+    err_msg = sdocWithDynFlags $ \dflags ->
+              sep [ (sep [ text "Kind signature on" <+> pp_dec <+>
+                           text "declaration has non-" <>
+                           (if tYPE_ok then text "TYPE" else ppr liftedTypeKind)
+                         , (if kind_var_ok then text "and non-variable" else empty) <+>
+                           text "return kind" <+> quotes (ppr kind) ])
+                  , if not tYPE_ok && is_TYPE && try_unlifted_newtypes &&
+                       not (xopt LangExt.UnliftedNewtypes dflags)
+                    then text "Perhaps you intended to use UnliftedNewtypes"
+                    else empty ]
 
 tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
 -- Result is in 1-1 correpondence with orig_args
