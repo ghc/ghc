@@ -1118,7 +1118,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
   return new_pls
   where
     unloadObjs :: Linkable -> IO ()
-    unloadObjs lnk
+    unloadObjs _lnk
       | dynamicGhc = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
