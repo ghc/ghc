@@ -5,14 +5,17 @@
    ------------------------------------------------------------------------- */
 
 #if defined(_WIN32)
+/* Use Mingw's C99 print functions.  */
+#define __USE_MINGW_ANSI_STDIO 1
+/* Using Secure APIs */
+#define MINGW_HAS_SECURE_API 1
 
 #include "HsBase.h"
 #include <stdbool.h>
 #include <stdint.h>
-/* Using Secure APIs */
-#define MINGW_HAS_SECURE_API 1
 #include <wchar.h>
 #include <windows.h>
+#include <io.h>
 
 /* This is the error table that defines the mapping between OS error
    codes and errno values */
@@ -131,9 +134,8 @@ LPWSTR base_getErrorMessage(DWORD err)
     return what;
 }
 
-int get_unique_file_info(int fd, HsWord64 *dev, HsWord64 *ino)
+int get_unique_file_info_hwnd(HANDLE h, HsWord64 *dev, HsWord64 *ino)
 {
-    HANDLE h = (HANDLE)_get_osfhandle(fd);
     BY_HANDLE_FILE_INFORMATION info;
 
     if (GetFileInformationByHandle(h, &info))
@@ -146,6 +148,12 @@ int get_unique_file_info(int fd, HsWord64 *dev, HsWord64 *ino)
     }
 
     return -1;
+}
+
+int get_unique_file_info(int fd, HsWord64 *dev, HsWord64 *ino)
+{
+    HANDLE h = (HANDLE)_get_osfhandle(fd);
+    return get_unique_file_info_hwnd (h, dev, ino);
 }
 
 BOOL file_exists(LPCTSTR path)
