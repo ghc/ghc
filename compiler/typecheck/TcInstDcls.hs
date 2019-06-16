@@ -687,17 +687,7 @@ tcDataFamInstDecl mb_clsinfo
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; let allowUnlifted = unlifted_newtypes && new_or_data == NewType
-         -- With UnliftedNewtypes, we allow kinds other than Type, but they
-         -- must still be of the form `TYPE r` since we don't want to accept
-         -- Constraint or Nat. See Note [Implementation of UnliftedNewtypes].
-       ; checkTc
-           (if allowUnlifted
-              then tcIsRuntimeTypeKind final_res_kind
-              else tcIsLiftedTypeKind final_res_kind
-           )
-           (badKindSig True res_kind)
+       ; checkDataKindSig (DataInstanceSort new_or_data) final_res_kind
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats `chkAppend` extra_pats
              orig_res_ty = mkTyConApp fam_tc all_pats
