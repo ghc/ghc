@@ -124,6 +124,10 @@ Compiler
   only convenient workaround was to enable `-fobject-code` for all
   modules.
 
+- Add support for generating a new type of output: extended interfaces files.
+  Generation of these files, which sport a ``.hie`` suffix, is enabled via the
+  :ghc-flag:`-fwrite-ide-info` flag. See :ref:`hie-options` for more information.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -142,10 +146,6 @@ Runtime system
 
 - The output filename used for :ref:`eventlog output <rts-eventlog>` can now be
   specified with the :rts-flag:`-ol` flag.
-
-- Add support for generating a new type of output: extended interfaces files.
-  Generation of these files, which sport a ``.hie`` suffix, is enabled via the
-  ``-fwrite-ide-info`` flag. See :ref:`hie-options` for more information.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
