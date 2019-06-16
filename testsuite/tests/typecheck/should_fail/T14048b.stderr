@@ -1,6 +1,5 @@
 
 T14048b.hs:7:1: error:
-    • Kind signature on data type declaration has non-*
-      and non-variable return kind
-        Constraint
+    • Kind signature on data family declaration has non-TYPE
+      and non-variable return kind ‘Constraint’
     • In the data family declaration for ‘Foo’
