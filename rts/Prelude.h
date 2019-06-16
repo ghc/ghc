@@ -50,8 +50,12 @@ PRELUDE_CLOSURE(base_GHCziEventziThread_blockedOnBadFD_closure);
 
 PRELUDE_CLOSURE(base_GHCziConcziSync_runSparks_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
+PRELUDE_CLOSURE(base_GHCziConcziIO_interruptIOManager_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure);
 PRELUDE_CLOSURE(base_GHCziConcziSignal_runHandlersPtr_closure);
+#if defined(mingw32_HOST_OS)
+PRELUDE_CLOSURE(base_GHCziEventziWindows_processRemoteCompletion_closure);
+#endif
 
 PRELUDE_CLOSURE(base_GHCziTopHandler_flushStdHandles_closure);
 PRELUDE_CLOSURE(base_GHCziTopHandler_runMainIO_closure);
@@ -83,8 +87,12 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 
 #define runSparks_closure         DLL_IMPORT_DATA_REF(base_GHCziConcziSync_runSparks_closure)
 #define ensureIOManagerIsRunning_closure DLL_IMPORT_DATA_REF(base_GHCziConcziIO_ensureIOManagerIsRunning_closure)
+#define interruptIOManager_closure DLL_IMPORT_DATA_REF(base_GHCziConcziIO_interruptIOManager_closure)
 #define ioManagerCapabilitiesChanged_closure DLL_IMPORT_DATA_REF(base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure)
 #define runHandlersPtr_closure       DLL_IMPORT_DATA_REF(base_GHCziConcziSignal_runHandlersPtr_closure)
+#if defined(mingw32_HOST_OS)
+#define processRemoteCompletion_closure DLL_IMPORT_DATA_REF(base_GHCziEventziWindows_processRemoteCompletion_closure)
+#endif
 
 #define flushStdHandles_closure   DLL_IMPORT_DATA_REF(base_GHCziTopHandler_flushStdHandles_closure)
 #define runMainIO_closure   DLL_IMPORT_DATA_REF(base_GHCziTopHandler_runMainIO_closure)

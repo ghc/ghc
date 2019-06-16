@@ -3,6 +3,9 @@
  * Non-blocking / asynchronous I/O for Win32.
  *
  * (c) sof, 2002-2003
+ *
+ * NOTE: This is the MIO manager, only used for --io-manager=posix.
+ *       For the WINIO manager see base in the GHC.Event modules.
  */
 
 #pragma once
@@ -102,3 +105,5 @@ extern int AddProcRequest ( void*          proc,
                             CompletionProc onCompletion);
 
 extern void abandonWorkRequest ( int reqID );
+
+extern void interruptIOManagerEvent ( void );

@@ -1,13 +1,15 @@
 /*
  * Console control handler support.
  *
+ * NOTE: This is the MIO manager, only used for --io-manager=posix.
+ *       For the WINIO manager see base in the GHC.Event modules.
  */
 #include "Rts.h"
 #include <windows.h>
 #include "ConsoleHandler.h"
 #include "Schedule.h"
 #include "RtsUtils.h"
-#include "AsyncIO.h"
+#include "AsyncMIO.h"
 #include "RtsSignals.h"
 
 extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
@@ -86,7 +88,6 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
         return false;
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
-
         // If we're already trying to interrupt the RTS, terminate with
         // extreme prejudice.  So the first ^C tries to exit the program
         // cleanly, and the second one just kills it.
@@ -223,12 +224,12 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
 
 #if defined(THREADED_RTS)
         sendIOManagerEvent((StgWord8) ((dwCtrlType<<1) | 1));
+        interruptIOManagerEvent ();
 #else
         if ( stg_pending_events < N_PENDING_EVENTS ) {
             stg_pending_buf[stg_pending_events] = dwCtrlType;
             stg_pending_events++;
         }
-
         // we need to wake up awaitEvent()
         abandonRequestWait();
 #endif

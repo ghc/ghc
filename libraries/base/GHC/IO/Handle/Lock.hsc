@@ -27,14 +27,7 @@ import GHC.IO.Handle.FD
 
 #elif defined(mingw32_HOST_OS)
 
-#if defined(i386_HOST_ARCH)
-## define WINDOWS_CCONV stdcall
-#elif defined(x86_64_HOST_ARCH)
-## define WINDOWS_CCONV ccall
-#else
-# error Unknown mingw32 arch
-#endif
-
+##include <windows_cconv.h>
 #include <windows.h>
 
 import Data.Bits
@@ -43,10 +36,14 @@ import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
+import qualified GHC.Event.Windows as Mgr
+import GHC.Event.Windows (LPOVERLAPPED, withOverlapped)
 import GHC.IO.FD
 import GHC.IO.Handle.FD
-import GHC.Ptr
+import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.IO.SubSystem
 import GHC.Windows
+
 
 #else
 
@@ -203,7 +200,39 @@ foreign import ccall interruptible "flock"
 #elif defined(mingw32_HOST_OS)
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
-lockImpl h ctx mode block = do
+lockImpl = lockImplPOSIX <!> lockImplWinIO
+
+lockImplWinIO :: Handle -> String -> LockMode -> Bool -> IO Bool
+lockImplWinIO h ctx mode block = do
+  wh      <- handleToHANDLE h
+  fix $ \retry ->
+          do retcode <- Mgr.withException ctx $
+                          withOverlapped ctx wh 0 (startCB wh) completionCB
+             case () of
+              _ | retcode == #{const ERROR_OPERATION_ABORTED} -> retry
+                | retcode == #{const ERROR_SUCCESS}           -> return True
+                | retcode == #{const ERROR_LOCK_VIOLATION} && not block
+                    -> return False
+                | otherwise -> failWith ctx retcode
+    where
+      cmode = case mode of
+                SharedLock    -> 0
+                ExclusiveLock -> #{const LOCKFILE_EXCLUSIVE_LOCK}
+      flags = if block
+                 then cmode
+                 else cmode .|. #{const LOCKFILE_FAIL_IMMEDIATELY}
+
+      startCB wh lpOverlapped = do
+        ret <- c_LockFileEx wh flags 0 #{const INFINITE} #{const INFINITE}
+                            lpOverlapped
+        return $ Mgr.CbNone ret
+
+      completionCB err _dwBytes
+        | err == #{const ERROR_SUCCESS} = Mgr.ioSuccess 0
+        | otherwise                     = Mgr.ioFailed err
+
+lockImplPOSIX :: Handle -> String -> LockMode -> Bool -> IO Bool
+lockImplPOSIX h ctx mode block = do
   FD{fdFD = fd} <- handleToFd h
   wh <- throwErrnoIf (== iNVALID_HANDLE_VALUE) ctx $ c_get_osfhandle fd
   allocaBytes sizeof_OVERLAPPED $ \ovrlpd -> do
@@ -214,12 +243,13 @@ lockImpl h ctx mode block = do
     -- "locking a region that goes beyond the current end-of-file position is
     -- not an error", hence we pass maximum value as the number of bytes to
     -- lock.
-    fix $ \retry -> c_LockFileEx wh flags 0 0xffffffff 0xffffffff ovrlpd >>= \case
+    fix $ \retry -> c_LockFileEx wh flags 0 #{const INFINITE} #{const INFINITE}
+                                 ovrlpd >>= \case
       True  -> return True
       False -> getLastError >>= \err -> if
         | not block && err == #{const ERROR_LOCK_VIOLATION} -> return False
-        | err == #{const ERROR_OPERATION_ABORTED} -> retry
-        | otherwise -> failWith ctx err
+        | err == #{const ERROR_OPERATION_ABORTED}           -> retry
+        | otherwise                                         -> failWith ctx err
   where
     sizeof_OVERLAPPED = #{size OVERLAPPED}
 
@@ -228,12 +258,31 @@ lockImpl h ctx mode block = do
       ExclusiveLock -> #{const LOCKFILE_EXCLUSIVE_LOCK}
 
 unlockImpl :: Handle -> IO ()
-unlockImpl h = do
+unlockImpl = unlockImplPOSIX <!> unlockImplWinIO
+
+unlockImplWinIO :: Handle -> IO ()
+unlockImplWinIO h = do
+  wh <- handleToHANDLE h
+  _ <- Mgr.withException "unlockImpl" $
+          withOverlapped "unlockImpl" wh 0 (startCB wh) completionCB
+  return ()
+    where
+      startCB wh lpOverlapped = do
+        ret <- c_UnlockFileEx wh 0 #{const INFINITE} #{const INFINITE}
+                              lpOverlapped
+        return $ Mgr.CbNone ret
+
+      completionCB err _dwBytes
+        | err == #{const ERROR_SUCCESS} = Mgr.ioSuccess 0
+        | otherwise                     = Mgr.ioFailed err
+
+unlockImplPOSIX :: Handle -> IO ()
+unlockImplPOSIX h = do
   FD{fdFD = fd} <- handleToFd h
   wh <- throwErrnoIf (== iNVALID_HANDLE_VALUE) "hUnlock" $ c_get_osfhandle fd
   allocaBytes sizeof_OVERLAPPED $ \ovrlpd -> do
     fillBytes ovrlpd 0 sizeof_OVERLAPPED
-    c_UnlockFileEx wh 0 0xffffffff 0xffffffff ovrlpd >>= \case
+    c_UnlockFileEx wh 0 #{const INFINITE} #{const INFINITE} ovrlpd >>= \case
       True  -> return ()
       False -> getLastError >>= failWith "hUnlock"
   where
@@ -245,11 +294,12 @@ foreign import ccall unsafe "_get_osfhandle"
 
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365203.aspx
 foreign import WINDOWS_CCONV interruptible "LockFileEx"
-  c_LockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> DWORD -> Ptr () -> IO BOOL
+  c_LockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> DWORD -> LPOVERLAPPED
+               -> IO BOOL
 
 -- https://msdn.microsoft.com/en-us/library/windows/desktop/aa365716.aspx
 foreign import WINDOWS_CCONV interruptible "UnlockFileEx"
-  c_UnlockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> Ptr () -> IO BOOL
+  c_UnlockFileEx :: HANDLE -> DWORD -> DWORD -> DWORD -> LPOVERLAPPED -> IO BOOL
 
 #else
 

@@ -97,6 +97,7 @@ library
           dbghelp
           -- for process information
           psapi
+       -- TODO: Hadrian will use this cabal file, so drop WINVER from Hadrian's configs.
        -- Minimum supported Windows version.
        -- These numbers can be found at:
        --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
@@ -231,6 +232,7 @@ library
          "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
          "-Wl,-u,_base_GHCziConcziSync_runSparks_closure"
          "-Wl,-u,_base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,_base_GHCziConcziIO_interruptIOManager_closure"
          "-Wl,-u,_base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          "-Wl,-u,_base_GHCziConcziSignal_runHandlersPtr_closure"
          "-Wl,-u,_base_GHCziTopHandler_flushStdHandles_closure"
@@ -308,6 +310,7 @@ library
          "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
          "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
          "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+         "-Wl,-u,base_GHCziConcziIO_interruptIOManager_closure"
          "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
          "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"
          "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
@@ -361,6 +364,17 @@ library
         -- This symbol is useful in gdb, but not referred to anywhere,
         -- so we need to force it to be included in the binary.
         ld-options: "-Wl,-u,findPtr"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,findPtr"
+
+    if os(windows)
+      if flag(leading-underscore)
+        ld-options:
+           "-Wl,-u,_base_GHCziEventziWindows_processRemoteCompletion_closure"
+      else
+        ld-options:
+           "-Wl,-u,base_GHCziEventziWindows_processRemoteCompletion_closure"
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
@@ -485,7 +499,8 @@ library
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)
-       c-sources: win32/AsyncIO.c
+       c-sources: win32/AsyncMIO.c
+                  win32/AsyncWinIO.c
                   win32/AwaitEvent.c
                   win32/ConsoleHandler.c
                   win32/GetEnv.c

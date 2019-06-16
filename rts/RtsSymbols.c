@@ -25,6 +25,7 @@
 #include <io.h>
 #include <windows.h>
 #include <shfolder.h> /* SHGetFolderPathW */
+#include "win32/AsyncWinIO.h"
 #endif
 
 #if defined(openbsd_HOST_OS)
@@ -112,7 +113,9 @@
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
-      SymI_HasProto(_unlock_file)
+      SymI_HasProto(_unlock_file)                        \
+      SymI_HasProto(__mingw_vsnwprintf)
+      /* ^^ Need to figure out why this is needed.  */
 
 #define RTS_MINGW_COMPAT_SYMBOLS                         \
       SymI_HasProto_deprecated(access)                   \
@@ -303,11 +306,16 @@
    SymI_HasProto(blockUserSignals)      \
    SymI_HasProto(unblockUserSignals)
 #else
-#define RTS_USER_SIGNALS_SYMBOLS        \
-   SymI_HasProto(ioManagerWakeup)       \
-   SymI_HasProto(sendIOManagerEvent)    \
-   SymI_HasProto(readIOManagerEvent)    \
-   SymI_HasProto(getIOManagerEvent)     \
+#define RTS_USER_SIGNALS_SYMBOLS             \
+   SymI_HasProto(registerNewIOCPHandle)      \
+   SymI_HasProto(getOverlappedEntries)       \
+   SymI_HasProto(servicedIOEntries)          \
+   SymI_HasProto(completeSynchronousRequest) \
+   SymI_HasProto(registerAlertableWait)      \
+   SymI_HasProto(ioManagerWakeup)            \
+   SymI_HasProto(sendIOManagerEvent)         \
+   SymI_HasProto(readIOManagerEvent)         \
+   SymI_HasProto(getIOManagerEvent)          \
    SymI_HasProto(console_handler)
 #endif
 

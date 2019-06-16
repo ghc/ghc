@@ -25,10 +25,10 @@ typedef struct {
 
 // Two hash tables.  The first maps objects (device/inode pairs) to
 // Lock objects containing the number of active readers or writers.  The
-// second maps file descriptors to lock objects, so that we can unlock
-// by FD without needing to fstat() again.
+// second maps file descriptors or file handles to lock objects, so that we can
+// unlock by FD or HANDLE without needing to fstat() again.
 static HashTable *obj_hash;
-static HashTable *fd_hash;
+static HashTable *key_hash;
 
 #if defined(THREADED_RTS)
 static Mutex file_lock_mutex;
@@ -53,7 +53,7 @@ void
 initFileLocking(void)
 {
     obj_hash = allocHashTable_(hashLock, cmpLocks);
-    fd_hash  = allocHashTable(); /* ordinary word-based table */
+    key_hash  = allocHashTable(); /* ordinary word-based table */
 #if defined(THREADED_RTS)
     initMutex(&file_lock_mutex);
 #endif
@@ -69,14 +69,14 @@ void
 freeFileLocking(void)
 {
     freeHashTable(obj_hash, freeLock);
-    freeHashTable(fd_hash,  NULL);
+    freeHashTable(key_hash,  NULL);
 #if defined(THREADED_RTS)
     closeMutex(&file_lock_mutex);
 #endif
 }
 
 int
-lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
+lockFile(StgWord id, StgWord64 dev, StgWord64 ino, int for_writing)
 {
     Lock key, *lock;
 
@@ -94,7 +94,7 @@ lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
         lock->inode  = ino;
         lock->readers = for_writing ? -1 : 1;
         insertHashTable(obj_hash, (StgWord)lock, (void *)lock);
-        insertHashTable(fd_hash, fd, lock);
+        insertHashTable(key_hash, id, lock);
         RELEASE_LOCK(&file_lock_mutex);
         return 0;
     }
@@ -105,7 +105,7 @@ lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
             RELEASE_LOCK(&file_lock_mutex);
             return -1;
         }
-        insertHashTable(fd_hash, fd, lock);
+        insertHashTable(key_hash, id, lock);
         lock->readers++;
         RELEASE_LOCK(&file_lock_mutex);
         return 0;
@@ -113,15 +113,15 @@ lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing)
 }
 
 int
-unlockFile(int fd)
+unlockFile(StgWord id)
 {
     Lock *lock;
 
     ACQUIRE_LOCK(&file_lock_mutex);
 
-    lock = lookupHashTable(fd_hash, fd);
+    lock = lookupHashTable(key_hash, id);
     if (lock == NULL) {
-        // errorBelch("unlockFile: fd %d not found", fd);
+        // errorBelch("unlockFile: key %d not found", key);
         // This is normal: we didn't know when calling unlockFile
         // whether this FD referred to a locked file or not.
         RELEASE_LOCK(&file_lock_mutex);
@@ -138,7 +138,7 @@ unlockFile(int fd)
         removeHashTable(obj_hash, (StgWord)lock, NULL);
         stgFree(lock);
     }
-    removeHashTable(fd_hash, fd, NULL);
+    removeHashTable(key_hash, id, NULL);
 
     RELEASE_LOCK(&file_lock_mutex);
     return 0;
