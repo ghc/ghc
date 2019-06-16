@@ -230,6 +230,7 @@ Library
         GHC.Foreign
         GHC.ForeignPtr
         GHC.GHCi
+        GHC.GHCi.Helpers
         GHC.Generics
         GHC.IO
         GHC.IO.Buffer

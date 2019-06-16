@@ -3,9 +3,9 @@ instance Eq () -- Defined in ‘GHC.Classes’
 instance Monoid () -- Defined in ‘GHC.Base’
 instance Ord () -- Defined in ‘GHC.Classes’
 instance Semigroup () -- Defined in ‘GHC.Base’
+instance Enum () -- Defined in ‘GHC.Enum’
 instance Show () -- Defined in ‘GHC.Show’
 instance Read () -- Defined in ‘GHC.Read’
-instance Enum () -- Defined in ‘GHC.Enum’
 instance Bounded () -- Defined in ‘GHC.Enum’
 data (##) = (##) 	-- Defined in ‘GHC.Prim’
 () :: ()
