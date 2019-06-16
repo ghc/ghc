@@ -241,6 +241,21 @@ typedef struct {
 #endif
 } traverseState;
 
+/* Callback called when heap traversal visits a closure.
+ *
+ * Before this callback is called the profiling header of the visited closure
+ * 'c' is zero'd with 'setTravDataToZero' if this closure hasn't been visited in
+ * this run yet. See Note [Profiling heap traversal visited bit].
+ *
+ * Return 'true' when this is not the first visit to this element. The generic
+ * traversal code will then skip traversing the children.
+ */
+typedef bool (*visitClosure_cb) (
+    const StgClosure *c,
+    const StgClosure *cp,
+    const stackData data,
+    stackData *child_data);
+
 traverseState g_retainerTraverseState;
 
 
@@ -1431,6 +1446,84 @@ retain_PAP_payload (traverseState *ts,
     return p;
 }
 
+static bool
+retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, stackData *out_data )
+{
+    retainer r = data.c_child_r;
+    RetainerSet *s, *retainerSetOfc;
+    retainerSetOfc = retainerSetOf(c);
+
+    timesAnyObjectVisited++;
+
+    // c  = current closure under consideration,
+    // cp = current closure's parent,
+    // r  = current closure's most recent retainer
+    //
+    // Loop invariants (on the meaning of c, cp, r, and their retainer sets):
+    //   RSET(cp) and RSET(r) are valid.
+    //   RSET(c) is valid only if c has been visited before.
+    //
+    // Loop invariants (on the relation between c, cp, and r)
+    //   if cp is not a retainer, r belongs to RSET(cp).
+    //   if cp is a retainer, r == cp.
+
+    // Now compute s:
+    //    isRetainer(cp) == true => s == NULL
+    //    isRetainer(cp) == false => s == cp.retainer
+    if (isRetainer(cp))
+        s = NULL;
+    else
+        s = retainerSetOf(cp);
+
+    // (c, cp, r, s) is available.
+
+    // (c, cp, r, s, R_r) is available, so compute the retainer set for *c.
+    if (retainerSetOfc == NULL) {
+        // This is the first visit to *c.
+        numObjectVisited++;
+
+        if (s == NULL)
+            associate(c, singleton(r));
+        else
+            // s is actually the retainer set of *c!
+            associate(c, s);
+
+        // compute c_child_r
+        out_data->c_child_r = isRetainer(c) ? getRetainerFrom(c) : r;
+    } else {
+        // This is not the first visit to *c.
+        if (isMember(r, retainerSetOfc))
+            return 1;          // no need to process child
+
+        if (s == NULL)
+            associate(c, addElement(r, retainerSetOfc));
+        else {
+            // s is not NULL and cp is not a retainer. This means that
+            // each time *cp is visited, so is *c. Thus, if s has
+            // exactly one more element in its retainer set than c, s
+            // is also the new retainer set for *c.
+            if (s->num == retainerSetOfc->num + 1) {
+                associate(c, s);
+            }
+            // Otherwise, just add R_r to the current retainer set of *c.
+            else {
+                associate(c, addElement(r, retainerSetOfc));
+            }
+        }
+
+        if (isRetainer(c))
+            return 1;          // no need to process child
+
+        // compute c_child_r
+        out_data->c_child_r = r;
+    }
+
+    // now, RSET() of all of *c, *cp, and *r is valid.
+    // (c, c_child_r) are available.
+
+    return 0;
+}
+
 /* -----------------------------------------------------------------------------
  *  Compute the retainer set of *c0 and all its desecents by traversing.
  *  *cp0 is the parent of *c0, and *r0 is the most recent retainer of *c0.
@@ -1448,62 +1541,26 @@ retain_PAP_payload (traverseState *ts,
  *    *c0 can be TSO (as well as AP_STACK).
  * -------------------------------------------------------------------------- */
 static void
-retainClosure( traverseState *ts, StgClosure *c0, StgClosure *cp0, retainer r0 )
+traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
 {
-    // c = Current closure                          (possibly tagged)
-    // cp = Current closure's Parent                (NOT tagged)
-    // r = current closures' most recent Retainer   (NOT tagged)
-    // c_child_r = current closure's children's most recent retainer
     // first_child = first child of c
     StgClosure *c, *cp, *first_child;
-    RetainerSet *s, *retainerSetOfc;
-    retainer r, c_child_r;
+    stackData data, child_data;
     StgWord typeOfc;
-    retainPushClosure(ts, c0, cp0, (stackData)r0);
 
-#if defined(DEBUG_RETAINER)
-    StgPtr oldStackTop;
-#endif
-
-#if defined(DEBUG_RETAINER)
-    oldStackTop = ts->stackTop;
-    debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n"
-        , c0, cp0, r0);
-#endif
+    // c = Current closure                           (possibly tagged)
+    // cp = Current closure's Parent                 (NOT tagged)
+    // data = current closures' associated data      (NOT tagged)
+    // data_out = data to associate with current closure's children
 
 loop:
-#if defined(DEBUG_RETAINER)
-    debugBelch("loop");
-#endif
-    // pop to (c, cp, r);
-    pop(ts, &c, &cp, &r);
+    pop(ts, &c, &cp, &data);
 
     if (c == NULL) {
-#if defined(DEBUG_RETAINER)
-        debugBelch("retainClosure() ends: oldStackTop = 0x%x,stackTop = 0x%x\n",
-            oldStackTop, ts->stackTop);
-#endif
         return;
     }
-
-#if defined(DEBUG_RETAINER)
-    debugBelch("inner_loop");
-#endif
-
 inner_loop:
     c = UNTAG_CLOSURE(c);
-
-    // c  = current closure under consideration,
-    // cp = current closure's parent,
-    // r  = current closure's most recent retainer
-    //
-    // Loop invariants (on the meaning of c, cp, r, and their retainer sets):
-    //   RSET(cp) and RSET(r) are valid.
-    //   RSET(c) is valid only if c has been visited before.
-    //
-    // Loop invariants (on the relation between c, cp, and r)
-    //   if cp is not a retainer, r belongs to RSET(cp).
-    //   if cp is a retainer, r == cp.
 
     typeOfc = get_itbl(c)->type;
 
@@ -1536,20 +1593,22 @@ inner_loop:
         break;
 
     case IND_STATIC:
-        // We just skip IND_STATIC, so its retainer set is never computed.
+        // We just skip IND_STATIC, so it's never visited.
         c = ((StgIndStatic *)c)->indirectee;
         goto inner_loop;
-        // static objects with no pointers out, so goto loop.
+
     case CONSTR_NOCAF:
-        // It is not just enough not to compute the retainer set for *c; it is
+        // static objects with no pointers out, so goto loop.
+
+        // It is not just enough not to visit *c; it is
         // mandatory because CONSTR_NOCAF are not reachable from
         // scavenged_static_objects, the list from which is assumed to traverse
         // all static objects after major garbage collections.
         goto loop;
+
     case THUNK_STATIC:
         if (get_itbl(c)->srt == 0) {
-            // No need to compute the retainer set; no dynamic objects
-            // are reachable from *c.
+            // No need to visit *c; no dynamic objects are reachable from it.
             //
             // Static objects: if we traverse all the live closures,
             // including static closures, during each heap census then
@@ -1574,6 +1633,7 @@ inner_loop:
             // reachable static objects.
             goto loop;
         }
+
     case FUN_STATIC: {
         StgInfoTable *info = get_itbl(c);
         if (info->srt == 0 && info->layout.payload.ptrs == 0) {
@@ -1582,71 +1642,16 @@ inner_loop:
             break;
         }
     }
+
     default:
         break;
     }
 
-    // The above objects are ignored in computing the average number of times
-    // an object is visited.
-    timesAnyObjectVisited++;
-
-    // If this is the first visit to c, initialize its retainer set.
+    // If this is the first visit to c, initialize its data.
     maybeInitTravData(c);
-    retainerSetOfc = retainerSetOf(c);
 
-    // Now compute s:
-    //    isRetainer(cp) == true => s == NULL
-    //    isRetainer(cp) == false => s == cp.retainer
-    if (isRetainer(cp))
-        s = NULL;
-    else
-        s = retainerSetOf(cp);
-
-    // (c, cp, r, s) is available.
-
-    // (c, cp, r, s, R_r) is available, so compute the retainer set for *c.
-    if (retainerSetOfc == NULL) {
-        // This is the first visit to *c.
-        numObjectVisited++;
-
-        if (s == NULL)
-            associate(c, singleton(r));
-        else
-            // s is actually the retainer set of *c!
-            associate(c, s);
-
-        // compute c_child_r
-        c_child_r = isRetainer(c) ? getRetainerFrom(c) : r;
-    } else {
-        // This is not the first visit to *c.
-        if (isMember(r, retainerSetOfc))
-            goto loop;          // no need to process child
-
-        if (s == NULL)
-            associate(c, addElement(r, retainerSetOfc));
-        else {
-            // s is not NULL and cp is not a retainer. This means that
-            // each time *cp is visited, so is *c. Thus, if s has
-            // exactly one more element in its retainer set than c, s
-            // is also the new retainer set for *c.
-            if (s->num == retainerSetOfc->num + 1) {
-                associate(c, s);
-            }
-            // Otherwise, just add R_r to the current retainer set of *c.
-            else {
-                associate(c, addElement(r, retainerSetOfc));
-            }
-        }
-
-        if (isRetainer(c))
-            goto loop;          // no need to process child
-
-        // compute c_child_r
-        c_child_r = r;
-    }
-
-    // now, RSET() of all of *c, *cp, and *r is valid.
-    // (c, c_child_r) are available.
+    if(visit_cb(c, cp, data, (stackData*)&child_data))
+        goto loop;
 
     // process child
 
@@ -1655,7 +1660,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
-        retainStack(ts, c, (stackData)c_child_r,
+        retainStack(ts, c, child_data,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
         goto loop;
@@ -1664,16 +1669,16 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        retainPushClosure(ts, (StgClosure *) tso->stackobj, c, (stackData)c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, (stackData)c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->bq, c, (stackData)c_child_r);
-        retainPushClosure(ts, (StgClosure *) tso->trec, c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) tso->stackobj, c, child_data);
+        retainPushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, child_data);
+        retainPushClosure(ts, (StgClosure *) tso->bq, c, child_data);
+        retainPushClosure(ts, (StgClosure *) tso->trec, c, child_data);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {
-            retainPushClosure(ts, tso->block_info.closure, c, (stackData)c_child_r);
+            retainPushClosure(ts, tso->block_info.closure, c, child_data);
         }
         goto loop;
     }
@@ -1681,36 +1686,36 @@ inner_loop:
     case BLOCKING_QUEUE:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
-        retainPushClosure(ts, (StgClosure *) bq->link,            c, (stackData)c_child_r);
-        retainPushClosure(ts, (StgClosure *) bq->bh,              c, (stackData)c_child_r);
-        retainPushClosure(ts, (StgClosure *) bq->owner,           c, (stackData)c_child_r);
+        retainPushClosure(ts, (StgClosure *) bq->link,  c, child_data);
+        retainPushClosure(ts, (StgClosure *) bq->bh,    c, child_data);
+        retainPushClosure(ts, (StgClosure *) bq->owner, c, child_data);
         goto loop;
     }
 
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
-        retain_PAP_payload(ts, c, (stackData)c_child_r, pap->fun, pap->payload, pap->n_args);
+        retain_PAP_payload(ts, c, child_data, pap->fun, pap->payload, pap->n_args);
         goto loop;
     }
 
     case AP:
     {
         StgAP *ap = (StgAP *)c;
-        retain_PAP_payload(ts, c, (stackData)c_child_r, ap->fun, ap->payload, ap->n_args);
+        retain_PAP_payload(ts, c, child_data, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
-        retainPushClosure(ts, ((StgAP_STACK *)c)->fun, c, (stackData)c_child_r);
-        retainStack(ts, c, (stackData)c_child_r,
+        retainPushClosure(ts, ((StgAP_STACK *)c)->fun, c, child_data);
+        retainStack(ts, c, child_data,
                     (StgPtr)((StgAP_STACK *)c)->payload,
                     (StgPtr)((StgAP_STACK *)c)->payload +
                              ((StgAP_STACK *)c)->size);
         goto loop;
     }
 
-    push(ts, c, (stackData)c_child_r, &first_child);
+    push(ts, c, child_data, &first_child);
 
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
@@ -1718,8 +1723,8 @@ inner_loop:
     if (first_child == NULL)
         goto loop;
 
-    // (c, cp, r) = (first_child, c, c_child_r)
-    r = c_child_r;
+    // (c, cp, data) = (first_child, c, child_data)
+    data = child_data;
     cp = c;
     c = first_child;
     goto inner_loop;
@@ -1743,10 +1748,11 @@ retainRoot(void *user, StgClosure **tl)
     c = UNTAG_CLOSURE(*tl);
     maybeInitTravData(c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
-        retainClosure(ts, c, c, getRetainerFrom(c));
+        retainPushClosure(ts, c, c, (stackData)getRetainerFrom(c));
     } else {
-        retainClosure(ts, c, c, CCS_SYSTEM);
+        retainPushClosure(ts, c, c, (stackData)CCS_SYSTEM);
     }
+    traverseWorkStack(ts, &retainVisitClosure);
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
     // *tl might be a TSO which is ThreadComplete, in which
