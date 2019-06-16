@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.13.0.0 *TBA*
-  * Bundled with GHC *TBA*
+## 4.13.0.0 *July 2019*
+  * Bundled with GHC 8.8.1
 
   * The final phase of the `MonadFail` proposal has been implemented:
 
