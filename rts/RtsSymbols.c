@@ -706,6 +706,9 @@
       SymI_HasProto(stg_newMVarzh)                                      \
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
+      SymI_HasProto(stg_readIOPortzh)                                   \
+      SymI_HasProto(stg_writeIOPortzh)                                  \
+      SymI_HasProto(stg_newIOPortzh)                                    \
       SymI_HasProto(stg_noDuplicatezh)                                  \
       SymI_HasProto(stg_atomicModifyMutVar2zh)                          \
       SymI_HasProto(stg_atomicModifyMutVarzuzh)                         \

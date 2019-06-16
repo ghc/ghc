@@ -1320,6 +1320,7 @@ emitPrimOp dflags primop = case primop of
 
   SameMutVarOp            -> \args -> opTranslate args (mo_wordEq platform)
   SameMVarOp              -> \args -> opTranslate args (mo_wordEq platform)
+  SameIOPortOp            -> \args -> opTranslate args (mo_wordEq platform)
   SameMutableArrayOp      -> \args -> opTranslate args (mo_wordEq platform)
   SameMutableByteArrayOp  -> \args -> opTranslate args (mo_wordEq platform)
   SameMutableArrayArrayOp -> \args -> opTranslate args (mo_wordEq platform)
@@ -1467,6 +1468,9 @@ emitPrimOp dflags primop = case primop of
   ReadMVarOp -> alwaysExternal
   TryReadMVarOp -> alwaysExternal
   IsEmptyMVarOp -> alwaysExternal
+  NewIOPortrOp -> alwaysExternal
+  ReadIOPortOp -> alwaysExternal
+  WriteIOPortOp -> alwaysExternal
   DelayOp -> alwaysExternal
   WaitReadOp -> alwaysExternal
   WaitWriteOp -> alwaysExternal
