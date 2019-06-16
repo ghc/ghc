@@ -179,7 +179,7 @@ There are some restrictions on the use of primitive types:
          newtype A = MkA Int#
 
    However, this restriction can be relaxed by enabling
-   :extension:`-XUnliftedNewtypes`.  The `section on unlifted newtypes
+   :extension:`UnliftedNewtypes`.  The `section on unlifted newtypes
    <#unlifted-newtypes>`__ details the behavior of such types.
 
 -  You cannot bind a variable with an unboxed type in a *top-level*
@@ -375,7 +375,9 @@ Unlifted Newtypes
 
     Enable the use of newtypes over types with non-lifted runtime representations.
 
-``-XUnliftedNewtypes`` relaxes the restrictions around what types can appear inside
+GHC implements an :extension:`UnliftedNewtypes` extension as specified in
+`this GHC proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`_.
+:extension:`UnliftedNewtypes` relaxes the restrictions around what types can appear inside
 of a `newtype`. For example, the type ::
 
     newtype A = MkA Int#
@@ -410,27 +412,27 @@ And with `UnboxedSums <#unboxed-sums>`__ enabled ::
     newtype Maybe# :: forall (r :: RuntimeRep). TYPE r -> TYPE (SumRep '[r, TupleRep '[]]) where
       MkMaybe# :: forall (r :: RuntimeRep) (a :: TYPE r). (# a | (# #) #) -> Maybe# a
 
-This extension also relaxes some of the restrictions around data families.
-It must be enabled in modules where either of the following occur:
-
-- A data family is declared with a kind other than ``Type``. Both ``Foo``
-  and ``Bar``, defined below, fall into this category:
-  ::
+This extension also relaxes some of the restrictions around data family
+instances. In particular, :extension:`UnliftedNewtypes` permits a
+``newtype instance`` to be given a return kind of ``TYPE r``, not just
+``Type``. For example, the following ``newtype instance`` declarations would be
+permitted: ::
 
      class Foo a where
        data FooKey a :: TYPE 'IntRep
      class Bar (r :: RuntimeRep) where
        data BarType r :: TYPE r
 
-- A ``newtype instance`` is written with a kind other than ``Type``. The
-  following instances of ``Foo`` and ``Bar`` as defined above fall into
-  this category.
-  ::
-
      instance Foo Bool where
        newtype FooKey Bool = FooKeyBoolC Int#
      instance Bar 'WordRep where
        newtype BarType 'WordRep = BarTypeWordRepC Word#
+
+It is worth noting that :extension:`UnliftedNewtypes` is *not* required to give
+the data families themselves return kinds involving ``TYPE``, such as the
+``FooKey`` and ``BarType`` examples above. The extension is
+only required for ``newtype instance`` declarations, such as ``FooKeyBoolC``
+and ``BarTypeWorkRepC`` above.
 
 This extension impacts the determination of whether or not a newtype has
 a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
@@ -7650,9 +7652,26 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
     data family Array :: Type -> Type
 
 Unlike with ordinary data definitions, the result kind of a data family
-does not need to be ``Type``: it can alternatively be a kind variable
-(with :extension:`PolyKinds`). Data instances' kinds must end in
-``Type``, however.
+does not need to be ``Type``. It can alternatively be:
+
+* Of the form ``TYPE r`` for some ``r`` (see :ref:`runtime-rep`).
+  For example: ::
+
+    data family DF1 :: TYPE IntRep
+    data family DF2 (r :: RuntimeRep)  :: TYPE r
+    data family DF3 :: Type -> TYPE WordRep
+
+* A bare kind variable (with :extension:`PolyKinds` enabled).
+  For example: ::
+
+    data family DF4 :: k
+    data family DF5 (a :: k) :: k
+    data family DF6 :: (k -> Type) -> k
+
+Data instances' kinds must end in ``Type``, however. This restriction is
+slightly relaxed when the :extension:`UnliftedNewtypes` extension is enabled,
+as it permits a ``newtype instance``'s kind to end in ``TYPE r`` for some
+``r``.
 
 .. _data-instance-declarations:
 

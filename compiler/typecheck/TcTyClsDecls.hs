@@ -1877,15 +1877,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   -- When UnliftedNewtypes is enabled, we loosen this restriction
   -- on the return kind. See Note [Implementation of UnliftedNewtypes], wrinkle (1).
   ; let (_, final_res_kind) = splitPiTys res_kind
-  ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-  ; checkTc
-      (  (if unlifted_newtypes
-            then tcIsRuntimeTypeKind final_res_kind
-            else tcIsLiftedTypeKind final_res_kind
-         )
-      || isJust (tcGetCastedTyVar_maybe final_res_kind)
-      )
-      (badKindSig False res_kind)
+  ; checkDataKindSig DataFamilySort final_res_kind
   ; tc_rep_name <- newTyConRepName tc_name
   ; let tycon = mkFamilyTyCon tc_name binders
                               res_kind
@@ -2033,15 +2025,8 @@ tcDataDefn roles_info
        ; tcg_env <- getGblEnv
        ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon tycon_binders res_kind
        ; let hsc_src = tcg_src tcg_env
-       ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-       ; let allowUnlifted = unlifted_newtypes && new_or_data == NewType
-       ; unless (mk_permissive_kind hsc_src cons || allowUnlifted) $
-           checkTc
-             (if allowUnlifted
-                then tcIsRuntimeTypeKind final_res_kind
-                else tcIsLiftedTypeKind final_res_kind
-             )
-             (badKindSig True res_kind)
+       ; unless (mk_permissive_kind hsc_src cons) $
+           checkDataKindSig (DataDeclSort new_or_data) final_res_kind
 
        ; stupid_tc_theta <- pushTcLevelM_ $ solveEqualities $ tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
@@ -2077,7 +2062,12 @@ tcDataDefn roles_info
   where
     -- Abstract data types in hsig files can have arbitrary kinds,
     -- because they may be implemented by type synonyms
-    -- (which themselves can have arbitrary kinds, not just *)
+    -- (which themselves can have arbitrary kinds, not just *). See #13955.
+    --
+    -- Note that this is only a property that data type declarations possess,
+    -- so one could not have, say, a data family instance in an hsig file that
+    -- has kind `Bool`. Therfore, this check need only occur in the code that
+    -- typechecks data type declarations.
     mk_permissive_kind HsigFile [] = True
     mk_permissive_kind _ _ = False
 
@@ -2600,7 +2590,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; btys <- tcConArgs hs_args
                  ; let (arg_tys, stricts) = unzip btys
                  ; res_ty <- tcHsOpenType hs_res_ty
-                   -- See Note [Implementation of unlifted newtypes]
+                   -- See Note [Implementation of UnliftedNewtypes]
                  ; dflags <- getDynFlags
                  ; final_arg_tys <-
                      unifyNewtypeKind dflags new_or_data
