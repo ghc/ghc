@@ -33,11 +33,8 @@ import TyCon
 import DataCon
 import TcHsSyn ( shortCutLit )
 import TcType
-import Name
-import Type
 import PrelNames
 import TysWiredIn
-import TysPrim
 import Literal
 import SrcLoc
 import Data.Ratio
@@ -46,12 +43,6 @@ import BasicTypes
 import DynFlags
 import Util
 import FastString
-import qualified GHC.LanguageExtensions as LangExt
-
-import Control.Monad
-import Data.Int
-import Data.Word
-import Data.Proxy
 
 {-
 ************************************************************************
