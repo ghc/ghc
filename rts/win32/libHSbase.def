@@ -27,8 +27,10 @@ EXPORTS
 	base_GHCziPtr_FunPtr_con_info
 
 	base_GHCziConcziIO_ensureIOManagerIsRunning_closure
+	base_GHCziConcziIO_interruptIOManager_closure
 	base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure
 	base_GHCziConcziSync_runSparks_closure
+	base_GHCziEventziWindows_processRemoteCompletion_closure
 
 	base_GHCziTopHandler_flushStdHandles_closure
 

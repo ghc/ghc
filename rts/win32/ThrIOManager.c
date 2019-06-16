@@ -5,6 +5,7 @@
  * The IO manager thread in THREADED_RTS.
  * See also libraries/base/GHC/Conc.hs.
  *
+ * NOTE: This is used by both MIO and WINIO
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -15,28 +16,14 @@
 // Here's the Event that we use to wake up the IO manager thread
 static HANDLE io_manager_event = INVALID_HANDLE_VALUE;
 
-// must agree with values in GHC.Conc:
-#define IO_MANAGER_WAKEUP 0xffffffff
-#define IO_MANAGER_DIE    0xfffffffe
-// spurious wakeups are returned as zero.
-// console events are ((event<<1) | 1)
-
-#if defined(THREADED_RTS)
-
 #define EVENT_BUFSIZ 256
 Mutex event_buf_mutex;
 StgWord32 event_buf[EVENT_BUFSIZ];
 uint32_t next_event;
 
-#endif
-
 HANDLE
 getIOManagerEvent (void)
 {
-    // This function has to exist even in the non-THREADED_RTS,
-    // because code in GHC.Conc refers to it.  It won't ever be called
-    // unless we're in the threaded RTS, however.
-#if defined(THREADED_RTS)
     HANDLE hRes;
 
     ACQUIRE_LOCK(&event_buf_mutex);
@@ -57,18 +44,12 @@ getIOManagerEvent (void)
 
     RELEASE_LOCK(&event_buf_mutex);
     return hRes;
-#else
-    return NULL;
-#endif
 }
 
 
 HsWord32
 readIOManagerEvent (void)
 {
-    // This function must exist even in non-THREADED_RTS,
-    // see getIOManagerEvent() above.
-#if defined(THREADED_RTS)
     HsWord32 res;
 
     ACQUIRE_LOCK(&event_buf_mutex);
@@ -77,7 +58,11 @@ readIOManagerEvent (void)
         if (next_event == 0) {
             res = 0; // no event to return
         } else {
-            res = (HsWord32)(event_buf[--next_event]);
+            do {
+               // Dequeue as many wakeup events as possible.
+                res = (HsWord32)(event_buf[--next_event]);
+            } while (res == IO_MANAGER_WAKEUP && next_event);
+
             if (next_event == 0) {
                 if (!ResetEvent(io_manager_event)) {
                     sysErrorBelch("readIOManagerEvent");
@@ -91,34 +76,45 @@ readIOManagerEvent (void)
 
     RELEASE_LOCK(&event_buf_mutex);
 
-    // debugBelch("readIOManagerEvent: %d\n", res);
+    //debugBelch("readIOManagerEvent: %d\n", res);
     return res;
-#else
-    return 0;
-#endif
 }
 
 void
 sendIOManagerEvent (HsWord32 event)
 {
-#if defined(THREADED_RTS)
     ACQUIRE_LOCK(&event_buf_mutex);
 
-    // debugBelch("sendIOManagerEvent: %d\n", event);
+    //debugBelch("sendIOManagerEvent: %d to %p\n", event, io_manager_event);
     if (io_manager_event != INVALID_HANDLE_VALUE) {
         if (next_event == EVENT_BUFSIZ) {
             errorBelch("event buffer overflowed; event dropped");
         } else {
+            event_buf[next_event++] = (StgWord32)event;
             if (!SetEvent(io_manager_event)) {
-                sysErrorBelch("sendIOManagerEvent");
+                sysErrorBelch("sendIOManagerEvent: SetEvent");
                 stg_exit(EXIT_FAILURE);
             }
-            event_buf[next_event++] = (StgWord32)event;
         }
     }
 
     RELEASE_LOCK(&event_buf_mutex);
-#endif
+}
+
+void
+interruptIOManagerEvent (void)
+{
+  if (is_io_mng_native_p ()) {
+    ACQUIRE_LOCK(&event_buf_mutex);
+
+    /* How expensive is this??.  */
+    Capability *cap;
+    cap = rts_lock();
+    rts_evalIO(&cap, interruptIOManager_closure, NULL);
+    rts_unlock(cap);
+
+    RELEASE_LOCK(&event_buf_mutex);
+  }
 }
 
 void
@@ -127,7 +123,6 @@ ioManagerWakeup (void)
     sendIOManagerEvent(IO_MANAGER_WAKEUP);
 }
 
-#if defined(THREADED_RTS)
 void
 ioManagerDie (void)
 {
@@ -145,7 +140,9 @@ ioManagerDie (void)
 void
 ioManagerStart (void)
 {
+#if defined(THREADED_RTS)
     initMutex(&event_buf_mutex);
+#endif
     next_event = 0;
 
     // Make sure the IO manager thread is running
@@ -156,4 +153,3 @@ ioManagerStart (void)
         rts_unlock(cap);
     }
 }
-#endif
