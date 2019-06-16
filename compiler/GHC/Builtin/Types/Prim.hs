@@ -59,6 +59,7 @@ module GHC.Builtin.Types.Prim(
         mutVarPrimTyCon, mkMutVarPrimTy,
 
         mVarPrimTyCon,                  mkMVarPrimTy,
+        ioPortPrimTyCon,                mkIOPortPrimTy,
         tVarPrimTyCon,                  mkTVarPrimTy,
         stablePtrPrimTyCon,             mkStablePtrPrimTy,
         stableNamePrimTyCon,            mkStableNamePrimTy,
@@ -168,6 +169,7 @@ exposedPrimTyCons
     , mutableArrayArrayPrimTyCon
     , smallMutableArrayPrimTyCon
     , mVarPrimTyCon
+    , ioPortPrimTyCon
     , tVarPrimTyCon
     , mutVarPrimTyCon
     , realWorldTyCon
@@ -204,7 +206,7 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, ioPortPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
@@ -235,6 +237,7 @@ mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByte
 mutableArrayArrayPrimTyConName= mkPrimTc (fsLit "MutableArrayArray#") mutableArrayArrayPrimTyConKey mutableArrayArrayPrimTyCon
 smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey smallMutableArrayPrimTyCon
 mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
+ioPortPrimTyConName           = mkPrimTc (fsLit "IOPort#") ioPortPrimTyConKey ioPortPrimTyCon
 mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey mVarPrimTyCon
 tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPrimTyCon
 stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
@@ -994,7 +997,22 @@ mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [s, elt]
 {-
 ************************************************************************
 *                                                                      *
+\subsection[TysPrim-io-port-var]{The synchronizing I/O Port type}
+*                                                                      *
+************************************************************************
+-}
+
+ioPortPrimTyCon :: TyCon
+ioPortPrimTyCon = pcPrimTyCon ioPortPrimTyConName [Nominal, Representational] UnliftedRep
+
+mkIOPortPrimTy :: Type -> Type -> Type
+mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [s, elt]
+
+{-
+************************************************************************
+*                                                                      *
    The synchronizing variable type
+\subsection[TysPrim-synch-var]{The synchronizing variable type}
 *                                                                      *
 ************************************************************************
 -}
