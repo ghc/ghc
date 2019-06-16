@@ -41,14 +41,18 @@ import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
+import OccName
 import DynFlags
 import FastString
 import HscTypes
 import SrcLoc
 import Module
+import RdrName (mkOrig)
+import PrelNames (gHC_GHCI_HELPERS)
 import GHCi
 import GHCi.RemoteTypes
 import HsSyn (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
+import HsUtils
 import Util
 
 import Exception
@@ -488,13 +492,12 @@ revertCAFs = do
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
-  nobuf <- compileGHCiExpr $
-   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
-  flush <- compileGHCiExpr $
-   "do { System.IO.hFlush System.IO.stdout; " ++
-       " System.IO.hFlush System.IO.stderr }"
+  let mkHelperExpr :: OccName -> Ghc ForeignHValue
+      mkHelperExpr occ =
+        GHC.compileParsedExprRemote
+        $ GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS occ
+  nobuf <- mkHelperExpr $ mkVarOcc "disableBuffering"
+  flush <- mkHelperExpr $ mkVarOcc "flushAll"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
@@ -517,9 +520,13 @@ turnOffBuffering_ fhv = do
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
 mkEvalWrapper progname args =
-  compileGHCiExpr $
-    "\\m -> System.Environment.withProgName " ++ show progname ++
-    "(System.Environment.withArgs " ++ show args ++ " m)"
+  GHC.compileParsedExprRemote
+  $ evalWrapper `GHC.mkHsApp` nlHsString progname
+                `GHC.mkHsApp` nlList (map nlHsString args)
+  where
+    nlHsString = nlHsLit . mkHsString
+    evalWrapper =
+      GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOcc "evalWrapper")
 
 compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
 compileGHCiExpr expr =
