@@ -542,7 +542,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
+        mkSpecForAllTys tyvars (mkVisFunTysOm arg_tys res_ty)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
@@ -609,9 +609,9 @@ commutableOp :: PrimOp -> Bool
 -- Utils:
 
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
-dyadic_fun_ty  ty = mkVisFunTys [ty, ty] ty
-monadic_fun_ty ty = mkVisFunTy  ty ty
-compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
+dyadic_fun_ty  ty = mkVisFunTysOm [ty, ty] ty
+monadic_fun_ty ty = mkVisFunTyOm  ty ty
+compare_fun_ty ty = mkVisFunTysOm [ty, ty] intPrimTy
 
 -- Output stuff:
 

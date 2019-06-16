@@ -1,0 +1,11 @@
+MkT :: a -> T a
+MkT :: a -->.(n) T a
+data T a where
+  MkT :: a ->. a -> T a
+  	-- Defined at <interactive>:6:1
+MkT
+  :: forall {o :: GHC.Types.Multiplicity}
+            {p :: GHC.Types.Multiplicity} {q :: GHC.Types.Multiplicity}
+            {s :: GHC.Types.Multiplicity} {t :: GHC.Types.Multiplicity} a b m n
+            r.
+     a -->.(o) b -->.(p) m -->.(q) n -->.(s) r -->.(t) T a b m n r

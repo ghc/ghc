@@ -16,8 +16,13 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module HsTypes (
+        Mult, HsScaled(..),
+        HsArrow(..), arrowToHsType,
+        hsLinear, hsUnrestricted, isUnrestricted,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
         LHsQTyVars(..),
@@ -81,6 +86,7 @@ import Name( Name )
 import RdrName ( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
+import TysWiredIn( unrestrictedFunTyConName, omegaDataConName, oneDataConName )
 import TysPrim( funTyConName )
 import Type
 import HsDoc
@@ -557,6 +563,7 @@ data HsType pass
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
+                        (HsArrow pass)
                         (LHsType pass)   -- function type
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
@@ -749,6 +756,56 @@ data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
     deriving Data
+
+oneDataConHsTy :: HsType GhcRn
+oneDataConHsTy = HsTyVar noExt NotPromoted (noLoc oneDataConName)
+
+omegaDataConHsTy :: HsType GhcRn
+omegaDataConHsTy = HsTyVar noExt NotPromoted (noLoc omegaDataConName)
+
+isUnrestricted :: HsArrow GhcRn -> Bool
+isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == omegaDataConName
+isUnrestricted _ = False
+
+-- | Denotes the type of arrows in the surface language
+data HsArrow pass
+  = HsUnrestrictedArrow
+    -- ^ a -> b
+  | HsLinearArrow
+    -- ^ a ->. b
+  | HsExplicitMult (LHsType pass)
+    -- ^ a -->.(m) b (very much including `a -->.(Omega) b`! This is how the
+    -- programmer wrote it). It is stored as an `HsType` so as to preserve the
+    -- syntax as written in the program.
+
+-- | Convert an arrow into its corresponding multiplicity. In essence this
+-- erases the information of whether the programmer wrote an explicit
+-- multiplicity or a shorthand.
+arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
+arrowToHsType HsUnrestrictedArrow = noLoc omegaDataConHsTy
+arrowToHsType HsLinearArrow = noLoc oneDataConHsTy
+arrowToHsType (HsExplicitMult p) = p
+
+-- | This is used in the syntax. In constructor declaration. It must keep the
+-- arrow representation.
+data HsScaled pass a = HsScaled { hsMult :: HsArrow pass, hsThing :: a }
+
+-- | When creating syntax we use the shorthands. It's better for printing, also,
+-- the shorthands work trivially at each pass.
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsUnrestrictedArrow
+hsLinear = HsScaled HsLinearArrow
+
+instance Outputable a => Outputable (HsScaled pass a) where
+   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+instance
+      (OutputableBndrId (GhcPass pass)) =>
+      Outputable (HsArrow (GhcPass pass)) where
+  ppr HsUnrestrictedArrow = parens arrow
+  ppr HsLinearArrow = parens lollipop
+  ppr (HsExplicitMult p) = parens (mulArrow (ppr p))
 
 
 {-
@@ -1074,23 +1131,27 @@ mkHsAppKindTy ext ty k
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see #9096)
-splitHsFunType :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy _ x y))
+splitHsFunType (L _ (HsFunTy _ mult x y))
   | (args, res) <- splitHsFunType y
-  = (x:args, res)
+  = (HsScaled mult x:args, res)
 {- This is not so correct, because it won't work with visible kind app, in case
   someone wants to write '(->) @k1 @k2 t1 t2'. Fixing this would require changing
   ConDeclGADT abstract syntax -}
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == unrestrictedFunTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = (t1:args, res)
+                                 = (hsUnrestricted t1:args, res)
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName
+                                 , [tm,t1,t2] <- tys
+                                 , (args, res) <- splitHsFunType t2
+                                 = (HsScaled (HsExplicitMult tm) t1:args, res)
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                       _   = ([], orig_ty)  -- Failure to match
@@ -1521,7 +1582,7 @@ ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
 ppr_mono_ty (HsTyVar _ prom (L _ name))
   | isPromoted prom = quote (pprPrefixOcc name)
   | otherwise       = pprPrefixOcc name
-ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
+ppr_mono_ty (HsFunTy _ mult ty1 ty2)   = ppr_fun_ty mult ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
@@ -1567,12 +1628,16 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
-ppr_fun_ty ty1 ty2
+           => HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+ppr_fun_ty mult ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
+        arr = case mult of
+          HsLinearArrow -> lollipop
+          HsUnrestrictedArrow -> arrow
+          HsExplicitMult p -> mulArrow (ppr p)
     in
-    sep [p1, arrow <+> p2]
+    sep [p1, arr <+> p2]
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
@@ -1631,7 +1696,7 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
     go (HsTyVar _ p _)       = isPromoted p
-    go (HsFunTy _ arg _)     = goL arg
+    go (HsFunTy _ _ arg _)   = goL arg
     go (HsListTy{})          = False
     go (HsTupleTy{})         = False
     go (HsSumTy{})           = False

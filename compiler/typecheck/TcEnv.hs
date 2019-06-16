@@ -33,6 +33,7 @@ module TcEnv(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
+        tcEmitBindingUsage, tcCollectingUsage, tcScalingUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
@@ -78,7 +79,10 @@ import HsSyn
 import IfaceEnv
 import TcRnMonad
 import TcMType
+import Multiplicity
+import UsageEnv
 import TcType
+import {-# SOURCE #-} TcUnify ( tcSubMult )
 import LoadIface
 import PrelNames
 import TysWiredIn
@@ -492,41 +496,44 @@ isTypeClosedLetBndr :: Id -> Bool
 -- See Note [Bindings with closed types] in TcRnTypes
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
-tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
+tcExtendRecIds :: [(Name, Scaled TcId)] -> TcM a -> TcM a
 -- Used for binding the recurive uses of Ids in a binding
 -- both top-level value bindings and and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
           [ (name, ATcId { tct_id   = let_id
+                         , tct_mult = let_mult
                          , tct_info = NonClosedLet emptyNameSet False })
-          | (name, let_id) <- pairs ] $
+          | (name, Scaled let_mult let_id) <- pairs ] $
     thing_inside
 
-tcExtendSigIds :: TopLevelFlag -> [TcId] -> TcM a -> TcM a
+tcExtendSigIds :: TopLevelFlag -> [Scaled TcId] -> TcM a -> TcM a
 -- Used for binding the Ids that have a complete user type signature
 -- Does not extend the TcBinderStack
 tcExtendSigIds top_lvl sig_ids thing_inside
   = tc_extend_local_env top_lvl
           [ (idName id, ATcId { tct_id   = id
+                              , tct_mult = id_mult
                               , tct_info = info })
-          | id <- sig_ids
+          | Scaled id_mult id <- sig_ids
           , let closed = isTypeClosedLetBndr id
                 info   = NonClosedLet emptyNameSet closed ]
      thing_inside
 
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
-                  -> [TcId] -> TcM a -> TcM a
+                  -> [Scaled TcId] -> TcM a -> TcM a
 -- Used for both top-level value bindings and and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
-  = tcExtendBinderStack [TcIdBndr id top_lvl | id <- ids] $
+  = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
           [ (idName id, ATcId { tct_id   = id
+                              , tct_mult = id_mult
                               , tct_info = mk_tct_info id })
-          | id <- ids ]
+          | Scaled id_mult id <- ids ]
     thing_inside
   where
     mk_tct_info id
@@ -538,28 +545,30 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
         type_closed = isTypeClosedLetBndr id &&
                       (fv_type_closed || hasCompleteSig sig_fn name)
 
-tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
+tcExtendIdEnv :: [Scaled TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids
 -- Extends the TcBinderStack as well
 tcExtendIdEnv ids thing_inside
-  = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
+  = tcExtendIdEnv2 [(idName (scaledThing id), id) | id <- ids] thing_inside
 
-tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
+tcExtendIdEnv1 :: Name -> Scaled TcId -> TcM a -> TcM a
 -- Exactly like tcExtendIdEnv2, but for a single (name,id) pair
 tcExtendIdEnv1 name id thing_inside
   = tcExtendIdEnv2 [(name,id)] thing_inside
 
-tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
+tcExtendIdEnv2 :: [(Name,Scaled TcId)] -> TcM a -> TcM a
 tcExtendIdEnv2 names_w_ids thing_inside
   = tcExtendBinderStack [ TcIdBndr mono_id NotTopLevel
-                        | (_,mono_id) <- names_w_ids ] $
-    tc_extend_local_env NotTopLevel
-            [ (name, ATcId { tct_id = id
-                           , tct_info    = NotLetBound })
-            | (name,id) <- names_w_ids]
-    thing_inside
+                    | (_,Scaled _ mono_id) <- names_w_ids ] $
+    do  { tc_extend_local_env NotTopLevel
+                              [ (name, ATcId { tct_id = id
+                                             , tct_mult = w
+                                             , tct_info = NotLetBound })
+                              | (name, Scaled w id) <- names_w_ids] $
+          thing_inside }
 
-tc_extend_local_env :: TopLevelFlag -> [(Name, TcTyThing)] -> TcM a -> TcM a
+tc_extend_local_env :: TopLevelFlag -> [(Name, TcTyThing)]
+                    -> TcM a -> TcM a
 tc_extend_local_env top_lvl extra_env thing_inside
 -- Precondition: the argument list extra_env has TcTyThings
 --               that ATcId or ATyVar, but nothing else
@@ -579,7 +588,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
         ; env1 <- tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
-        ; setLclEnv env2 thing_inside }
+        ; (local_usage,result) <- setLclEnv env2 (tcCollectingUsage thing_inside)
+        ; check_then_add_usage local_usage
+        ; return result }
   where
     extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
     -- Extend the local LocalRdrEnv and Template Haskell staging env simultaneously
@@ -593,6 +604,32 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                 -- (GlobalRdrEnv handles the top level)
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, ATcId {}) <- pairs] }
+
+    check_then_add_usage :: UsageEnv -> TcM ()
+    -- Checks that the usage of the newly introduced binders is compatible with
+    -- their multiplicity. If so, combines the usage of non-new binders to |uenv|
+    check_then_add_usage u0
+      = do { uok <- foldM check_binder u0 extra_env
+           ; env <- getLclEnv
+           ; let usage = tcl_usage env
+           ; updTcRef usage (addUE uok) }
+
+    check_binder :: UsageEnv -> (Name, TcTyThing) -> TcM UsageEnv
+    check_binder uenv (id_name, ATcId {tct_mult = w}) = do
+      let actual_w = usageToMult (lookupUE uenv id_name)
+      traceTc "check_binder" (ppr w $$ ppr actual_w)
+      case submult actual_w w of
+        Submult -> return ()
+        Unknown -> tcSubMult (UsageEnvironmentOf id_name) actual_w w
+        NotSubmult  ->
+          addErrTc $ text "Couldn't match expected multiplicity" <+> quotes (ppr w) <+>
+                     text "of variable" <+> quotes (ppr id_name) <+>
+                     text "with actual multiplicity" <+> quotes (ppr actual_w)
+          -- In case of error, recover by pretending that the multiplicity usage was correct
+      return $ deleteUE uenv id_name
+    check_binder uenv (id_name, _) = return $ deleteUE uenv id_name
+
+
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
@@ -640,6 +677,32 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
+-- information which was collected as part of the execution of
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
+-- report any usage information, it's up to the caller to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; (local_usage_ref,env1) <- push_fresh_usage env0
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; return (local_usage,result) }
+  where
+    push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
+    push_fresh_usage env
+      = do { usage <- newTcRef zeroUE
+           ; return ( usage , env { tcl_usage = usage } ) }
+
+-- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @mult@.
+tcScalingUsage :: Mult -> TcM a -> TcM a
+tcScalingUsage mult thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; traceTc "tsScalingUsage" (ppr mult)
+       ; tcEmitBindingUsage $ scaleUE mult usage
+       ; return result }
 
 {- *********************************************************************
 *                                                                      *
@@ -652,6 +715,12 @@ tcExtendBinderStack bndrs thing_inside
   = do { traceTc "tcExtendBinderStack" (ppr bndrs)
        ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
 
 tcInitTidyEnv :: TcM TidyEnv
 -- We initialise the "tidy-env", used for tidying types before printing,

@@ -8,7 +8,7 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
   pprHsWrapper,
 
   -- Evidence bindings
@@ -78,6 +78,7 @@ import Outputable
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
+import Multiplicity
 
 {-
 Note [TcCoercions]
@@ -106,7 +107,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -187,8 +188,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType SDoc
-       -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Scaled TcType) SDoc
+       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
@@ -273,7 +274,7 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: HsWrapper -> HsWrapper -> Scaled TcType -> HsWrapper
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -281,32 +282,20 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
+multRefl :: Mult -> TcCoercion
+multRefl w = mkReflCo Nominal w
+
 mkWpFun :: HsWrapper -> HsWrapper
-        -> TcType    -- the "from" type of the first wrapper
+        -> (Scaled TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
-
--- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
--- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
--- @wrap3 :: ty3 "->" ty3'@ and @ty_res@ is /either/ @ty3@ or @ty3'@,
--- gives a wrapper @(ty1' -> ty2' -> ty3) "->" (ty1 -> ty2 -> ty3')@.
--- Notice that the result wrapper goes the other way round to all
--- the others. This is a result of sub-typing contravariance.
--- The SDoc is a description of what you were doing when you called mkWpFuns.
-mkWpFuns :: [(TcType, HsWrapper)] -> TcType -> HsWrapper -> SDoc -> HsWrapper
-mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
-  where
-    go [] res_ty res_wrap = (res_ty, res_wrap)
-    go ((arg_ty, arg_wrap) : args) res_ty res_wrap
-      = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkVisFunTy` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty doc)
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
@@ -592,7 +581,7 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm
+  | EvTypeableTrFun EvTerm EvTerm EvTerm
     -- ^ Dictionary for @Typeable (s -> t)@,
     -- given a dictionaries for @s@ and @t@.
 
@@ -877,10 +866,10 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e   -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTyLit e     -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
+    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
+    EvTypeableTyLit e        -> evVarsOfTerm e
 
 
 {- Note [Free vars of EvFun]
@@ -922,7 +911,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
@@ -977,7 +966,7 @@ instance Outputable EvCallStack where
 instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (ppr tm) <+> ppr t2)
   ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 

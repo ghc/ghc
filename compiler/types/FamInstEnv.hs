@@ -1399,14 +1399,14 @@ normalise_type ty
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})     = do { r <- getRole
                               ; return (mkReflCo r ty, ty) }
-
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go ty@(FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
+           ; (wco, wty) <- go w
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
+           ; return (mkFunCo r wco co1 co2, ty { ft_mult = wty, ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1625,10 +1625,11 @@ coreFlattenTy = go
       = let (env', tys') = coreFlattenTys env tys in
         (env', mkTyConApp tc tys')
 
-    go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go env ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
       = let (env1, ty1') = go env  ty1
-            (env2, ty2') = go env1 ty2 in
-        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+            (env2, ty2') = go env1 ty2
+            (env3, mult') = go env2 mult in
+        (env3, ty { ft_mult = mult', ft_arg = ty1', ft_res = ty2' })
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv
@@ -1643,6 +1644,7 @@ coreFlattenTy = go
 
     go env (CoercionTy co) = let (env', co') = coreFlattenCo env co in
                              (env', CoercionTy co')
+
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type
@@ -1709,7 +1711,7 @@ allTyCoVarsInTy = go
     go (TyVarTy tv)      = unitVarSet tv
     go (TyConApp _ tys)  = allTyCoVarsInTys tys
     go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
-    go (FunTy _ ty1 ty2) = (go ty1) `unionVarSet` (go ty2)
+    go (FunTy _ w ty1 ty2) = (go w) `unionVarSet` (go ty1) `unionVarSet` (go ty2)
     go (ForAllTy (Bndr tv _) ty) = unitVarSet tv     `unionVarSet`
                                    go (tyVarKind tv) `unionVarSet`
                                    go ty
@@ -1727,7 +1729,7 @@ allTyCoVarsInTy = go
     go_co (AppCo co arg)        = go_co co `unionVarSet` go_co arg
     go_co (ForAllCo tv h co)
       = unionVarSets [unitVarSet tv, go_co co, go_co h]
-    go_co (FunCo _ c1 c2)       = go_co c1 `unionVarSet` go_co c2
+    go_co (FunCo _ co_mult c1 c2) = go_co co_mult `unionVarSet` go_co c1 `unionVarSet` go_co c2
     go_co (CoVarCo cv)          = unitVarSet cv
     go_co (HoleCo h)            = unitVarSet (coHoleCoVar h)
     go_co (AxiomInstCo _ _ cos) = go_cos cos

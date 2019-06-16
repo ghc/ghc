@@ -47,9 +47,20 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
+
+  This can only work if @wild@ is an unrestricted binder. Indeed, even with the
+  extended typing rule (in the linter) for case expressions, if
+       case x of wild # 1 { p -> e}
+  is well-typed, then
+       case x of wild # 1 { p -> e[wild\x] }
+  is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
+  at all). In which case, it is, of course, pointless to do the substitution
+  anyway. So for a linear binder (and really anything which isn't unrestricted),
+  doing this substitution would either produce ill-typed terms or be the
+  identity.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms #-}
 module SetLevels (
         setLevels,
 
@@ -89,6 +100,7 @@ import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increa
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType, closeOverKindsDSet )
+import Multiplicity     ( pattern Omega )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -1522,6 +1534,7 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
+    | Omega <- varMult case_bndr
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
@@ -1623,7 +1636,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
                              transfer_join_info bndr $
-                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
+                             mkSysLocalOrCoVar (mkFastString str) uniq (idMult bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
@@ -1658,7 +1671,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocalOrCoVar (mkFastString "lvl") uniq Omega rhs_ty
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })

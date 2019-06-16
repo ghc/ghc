@@ -20,7 +20,7 @@ module MkId (
         mkPrimOpId, mkFCallId,
 
         unwrapNewTypeBody, wrapFamInstBody,
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), mkDataConRep, mkDataConRepSimple, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -43,6 +43,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import Multiplicity
 import FamInstEnv
 import Coercion
 import TcType
@@ -74,6 +75,7 @@ import ListSetOps
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
+import Data.Functor.Identity
 
 {-
 ************************************************************************
@@ -376,8 +378,8 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkForAllTys tyvars $
-             mkInvisFunTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             getNth arg_tys val_index
+             mkInvisFunTyOm (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             scaledThing (getNth arg_tys val_index)
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
@@ -402,7 +404,7 @@ mkDictSelId name clas
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
                        , ru_fn    = name
-                       , ru_nargs = n_ty_args + 1
+                       , ru_nargs = n_ty_args + 1 -- +1 for the type
                        , ru_try   = dictSelRule val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
@@ -431,7 +433,7 @@ mkDictSelRhs clas val_index
     the_arg_id     = getNth arg_ids val_index
     pred           = mkClassPred clas (mkTyVarTys tyvars)
     dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 arg_tys
+    arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
@@ -513,7 +515,7 @@ mkDataConWorkId wkr_name data_con
                   `setInlinePragInfo`     alwaysInlinePragma
                   `setUnfoldingInfo`      newtype_unf
                   `setLevityInfoWithType` wkr_ty
-    id_arg1      = mkTemplateLocal 1 (head arg_tys)
+    id_arg1      = mkTemplateLocalW 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
                             isSingleton arg_tys
@@ -597,22 +599,56 @@ But if we inline the wrapper, we get
 and now case-of-known-constructor eliminates the redundant allocation.
 -}
 
-mkDataConRep :: DynFlags
+mkDataConRepSimple :: Name -> DataCon -> DataConRep
+mkDataConRepSimple n dc =
+  runIdentity $
+    mkDataConRepX
+      (\tys -> Identity $ zipWith mkTemplateLocalW [1..] tys)
+      (\idus ini -> return (mkVarApps ini (map fst idus))) -- They are all going to be unitUnboxer
+      emptyFamInstEnvs
+      n
+      (Right (map (const HsLazy) (dataConOrigArgTys dc)))
+      dc
+
+
+mkDataConRep :: DynFlags -> FamInstEnvs -> Name -> Maybe [HsImplBang] -> DataCon
+             -> UniqSM DataConRep
+mkDataConRep dflags fam_envs wrap_name mb_bangs data_con =
+  mkDataConRepX
+    (mapM newLocal)
+    mk_rep_app
+    fam_envs
+    wrap_name
+    (maybe (Left dflags) Right mb_bangs)
+    data_con
+  where
+    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
+    mk_rep_app [] con_app
+      = return con_app
+    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
+      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
+           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
+           ; return (unbox_fn expr) }
+
+
+
+mkDataConRepX :: Monad m =>
+                ([Scaled Type] -> m [Id])
+             -> ([(Id, Unboxer)] -> CoreExpr -> m CoreExpr)
              -> FamInstEnvs
              -> Name
-             -> Maybe [HsImplBang]
+             -> (Either DynFlags [HsImplBang])
                 -- See Note [Bangs on imported data constructors]
              -> DataCon
-             -> UniqSM DataConRep
-mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
-  | not wrapper_reqd
-  = return NoDataConRep
+             -> m DataConRep
+mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
+ | not wrapper_reqd
+ = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal wrap_arg_tys
-       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
+  = do { wrap_args <- mkArgs wrap_arg_tys
+       ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
-
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
                          `setArityInfo`         wrap_arity
@@ -651,10 +687,13 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
                       | otherwise        = mkInlineUnfolding wrap_rhs
+
+             casted_body = wrapFamInstBody tycon res_ty_args $
+                                        wrap_body
+
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
-                        wrapFamInstBody tycon res_ty_args $
-                        wrap_body
+                        casted_body
 
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
@@ -667,17 +706,18 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
-    wrap_tvs     = dataConUserTyVars data_con
+    (mult_vars, scaled_arg_tys)    = dataConMulVars data_con
+    wrap_tvs     = mult_vars ++ dataConUserTyVars data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConUserType data_con
     ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = ev_tys ++ orig_arg_tys
+    all_arg_tys  = (map unrestricted ev_tys) ++ orig_arg_tys
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = theta ++ orig_arg_tys
+    wrap_arg_tys = (map unrestricted theta) ++ scaled_arg_tys
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -686,13 +726,15 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     new_tycon = isNewTyCon tycon
     arg_ibangs
       | new_tycon
-      = ASSERT( isSingleton orig_arg_tys )
-        [HsLazy] -- See Note [HsImplBangs for newtypes]
+      = map (const HsLazy) orig_arg_tys -- See Note [HsImplBangs for newtypes]
+                                        -- orig_arg_tys should be a singleton, but
+                                        -- if a user declared a wrong newtype we
+                                        -- detect this later (see test T2334A)
       | otherwise
       = case mb_bangs of
-          Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
+          Left dflags -> zipWith (dataConSrcToImplBang dflags fam_envs)
                                 orig_arg_tys orig_bangs
-          Just bangs -> bangs
+          Right bangs -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
@@ -701,19 +743,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
     wrapper_reqd =
-        (not new_tycon
-                     -- (Most) newtypes have only a worker, with the exception
-                     -- of some newtypes written with GADT syntax. See below.
-         && (any isBanged (ev_ibangs ++ arg_ibangs)
-                     -- Some forcing/unboxing (includes eq_spec)
-             || (not $ null eq_spec))) -- GADT
-      || isFamInstTyCon tycon -- Cast result
-      || dataConUserTyVarsArePermuted data_con
-                     -- If the data type was written with GADT syntax and
-                     -- orders the type variables differently from what the
-                     -- worker expects, it needs a data con wrapper to reorder
-                     -- the type variables.
-                     -- See Note [Data con wrappers and GADT syntax].
+      not (isClassTyCon tycon || isTcLevPoly tycon)
 
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args
@@ -739,13 +769,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
-    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
-    mk_rep_app [] con_app
-      = return con_app
-    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
-      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
-           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
-           ; return (unbox_fn expr) }
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -834,6 +857,12 @@ Again, this needs a wrapper data con to reorder the type variables. It does
 mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
 
+Note [Wrapper multiplicities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we make the wrapper for a data type with fields of different multiplicities,
+we only want to make the ones which are linear multiplicity polymorphic. If we
+do not do this then the wrapper will not be well-typed.
+
 Note [HsImplBangs for newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Most of the time, we use the dataConSrctoImplBang function to decide what
@@ -859,9 +888,9 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 -}
 
 -------------------------
-newLocal :: Type -> UniqSM Var
-newLocal ty = do { uniq <- getUniqueM
-                 ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
+newLocal :: Scaled Type -> UniqSM Var
+newLocal (Scaled w ty) = do { uniq <- getUniqueM
+                            ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
 
 -- | Unpack/Strictness decisions from source module.
 --
@@ -871,7 +900,7 @@ newLocal ty = do { uniq <- getUniqueM
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
-   -> Type
+   -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
@@ -888,17 +917,17 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 
 dataConSrcToImplBang dflags fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
-  | isUnliftedType arg_ty
+  | isUnliftedType (scaledThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType_maybe fam_envs arg_ty
+  , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> ty; Nothing -> arg_ty }
-  , isUnpackableType dflags fam_envs arg_ty'
+        arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->
@@ -917,9 +946,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Type
+  :: Scaled Type
   -> HsImplBang
-  -> ([(Type,StrictnessMark)] -- Rep types
+  -> ([(Scaled Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
 dataConArgRep arg_ty HsLazy
@@ -932,9 +961,9 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
   = (rep_tys, wrappers)
 
-dataConArgRep _ (HsUnpack (Just co))
+dataConArgRep (Scaled w _) (HsUnpack (Just co))
   | let co_rep_ty = pSnd (coercionKind co)
-  , (rep_tys, wrappers) <- dataConArgUnpack co_rep_ty
+  , (rep_tys, wrappers) <- dataConArgUnpack (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -943,14 +972,14 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal rep_ty
+    unboxer arg_id = do { rep_id <- newLocal (Scaled (idMult arg_id) rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (linear $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
@@ -968,28 +997,29 @@ unitBoxer = UnitBox
 
 -------------------------
 dataConArgUnpack
-   :: Type
-   ->  ( [(Type, StrictnessMark)]   -- Rep types
+   :: Scaled Type
+   ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack arg_ty
+dataConArgUnpack (Scaled arg_mult arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyCoVars con) )
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
+          ; let r_mult = idMult arg_id
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, rep_ids, body)]
+                         [(DataAlt con, map (flip scaleIdBy r_mult) rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
+       do { rep_ids <- mapM (newLocal . mapScaledType (TcType.substTyUnchecked subst)) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
@@ -1021,7 +1051,7 @@ isUnpackableType dflags fam_envs ty
          dc_name = getName con
          dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (ty, bang)
+    ok_arg dcs (Scaled _ ty, bang)
       = not (attempt_unpack bang) || ok_ty dcs norm_ty
       where
         norm_ty = topNormaliseType fam_envs ty
@@ -1180,7 +1210,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
+    ty   = mkSpecForAllTys tyvars (mkVisFunTysOm arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
@@ -1340,7 +1370,7 @@ unsafeCoerceId
 
     [_, _, a, b] = mkTyVarTys bndrs
 
-    ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
+    ty  = mkSpecForAllTys bndrs (mkVisFunTyOm a b)
 
     [x] = mkTemplateLocals [a]
     rhs = mkLams (bndrs ++ [x]) $
@@ -1374,7 +1404,7 @@ seqId = pcMiscPrelId seqName ty info
                   -- see Note [seqId magic]
 
     ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
-                          (mkVisFunTy alphaTy (mkVisFunTy betaTy betaTy))
+                          (mkVisFunTyOm alphaTy (mkVisFunTyOm betaTy betaTy))
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
@@ -1384,13 +1414,13 @@ lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTy alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyOm alphaTy alphaTy)
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTy alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyOm alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
@@ -1399,8 +1429,8 @@ oneShotId = pcMiscPrelId oneShotName ty info
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
     ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
-                          (mkVisFunTy fun_ty fun_ty)
-    fun_ty = mkVisFunTy openAlphaTy openBetaTy
+                          (mkVisFunTyOm fun_ty fun_ty)
+    fun_ty = mkVisFunTyOm openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
@@ -1430,12 +1460,12 @@ coerceId = pcMiscPrelId coerceName ty info
                                            , liftedTypeKind
                                            , alphaTy, betaTy ]
     ty        = mkSpecForAllTys [alphaTyVar, betaTyVar] $
-                mkInvisFunTy eqRTy                      $
-                mkVisFunTy alphaTy betaTy
+                mkInvisFunTyOm eqRTy                    $
+                mkVisFunTyOm alphaTy betaTy
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
     rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $
-          mkWildCase (Var eqR) eqRTy betaTy $
+          mkWildCase (Var eqR) (unrestricted eqRTy) betaTy $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
@@ -1668,7 +1698,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
                              `setNeverLevPoly`  voidPrimTy)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Omega voidPrimTy
 
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG

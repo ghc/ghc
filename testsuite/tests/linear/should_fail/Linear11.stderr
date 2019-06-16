@@ -1,0 +1,11 @@
+
+Linear11.hs:9:23: error:
+    • Couldn't match expected multiplicity ‘'One’ of variable ‘a’ with actual multiplicity ‘'Omega’
+    • In an equation for ‘incorrectUnrestricted’:
+          incorrectUnrestricted a = Unrestricted a
+
+Linear11.hs:14:43: error:
+    • Couldn't match expected multiplicity ‘'One’ of variable ‘a’ with actual multiplicity ‘'Omega’
+    • In the pattern: NotUnrestricted a
+      In an equation for ‘incorrectUnrestrictedDup’:
+          incorrectUnrestrictedDup (NotUnrestricted a) = (a, a)

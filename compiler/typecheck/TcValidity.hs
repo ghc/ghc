@@ -29,7 +29,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
-import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
+import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName, omegaDataConTy )
 import PrelNames
 import Type
 import Unify      ( tcMatchTyX_BM, BindFlag(..) )
@@ -695,7 +695,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
     (theta, tau)  = tcSplitPhiTy phi
     (env', tvbs') = tidyTyCoVarBinders env tvbs
 
-check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy _ arg_ty res_ty)
+check_type (ve@ValidityEnv{ve_rank = rank}) (FunTy _ _ arg_ty res_ty)
   = do  { check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
   where
@@ -1621,17 +1621,24 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 tcInstHeadTyNotSynonym ty
   = case ty of  -- Do not use splitTyConApp,
                 -- because that expands synonyms!
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == unrestrictedFunTyCon
+                -- Allow (->), e.g. instance Category (->),
+                -- even though it's a type synonym for FUN 'Omega
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must be a constructor applied to type variable arguments
 -- or a type-level literal.
--- But we allow kind instantiations.
+-- But we allow
+-- 1) kind instantiations
+-- 2) the type (->) = FUN 'Omega, even though it's not in this form.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
-  = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
+  = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
+        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` omegaDataConTy = tys_t
+              | otherwise = tys'
+    in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (#13833)
   | otherwise
   = False
@@ -1649,7 +1656,7 @@ dropCasts :: Type -> Type
 -- To consider: drop only HoleCo casts
 dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
-dropCasts ty@(FunTy _ t1 t2)  = ty { ft_arg = dropCasts t1, ft_res = dropCasts t2 }
+dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
 dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
@@ -2769,7 +2776,7 @@ fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
 fvType (AppTy fun arg)       = fvType fun ++ fvType arg
-fvType (FunTy _ arg res)     = fvType arg ++ fvType res
+fvType (FunTy _ w arg res)   = fvType w ++ fvType arg ++ fvType res
 fvType (ForAllTy (Bndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
@@ -2786,7 +2793,7 @@ sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
 sizeType (LitTy {})        = 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
-sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
+sizeType (FunTy _ w arg res) = sizeType w + sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
 sizeType (CoercionTy _)    = 0

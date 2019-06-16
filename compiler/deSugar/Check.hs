@@ -54,6 +54,7 @@ import ErrUtils
 import Var           (EvVar)
 import TyCoRep
 import Type
+import Multiplicity
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
 import Maybes        (expectJust)
@@ -1229,7 +1230,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated)
-    arg_tys = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys = map scaledThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -1647,7 +1648,7 @@ mkOneConFull x con = do
 
   (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
-  let arg_tys' = substTys subst arg_tys
+  let arg_tys' = substTys subst (map scaledThing arg_tys)
   -- Fresh term variables (VAs) as arguments to the constructor
   arguments <-  mapM mkPmVar arg_tys'
   -- All constraints bound by the constructor (alpha-renamed)
@@ -1705,7 +1706,7 @@ mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalId name ty)
+  in  return (mkLocalId name Omega ty)
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
@@ -1871,7 +1872,7 @@ the scrutinee type, SBool z.
 -- * Types and constraints
 
 newEvVar :: Name -> Type -> EvVar
-newEvVar name ty = mkLocalId name ty
+newEvVar name ty = mkLocalId name Omega ty
 
 nameType :: String -> Type -> DsM EvVar
 nameType name ty = do
@@ -2076,7 +2077,7 @@ pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
           | tv1 == tv2 = pure Nothing
           | otherwise  = Just <$> to_evvar tv1 tv2
     evvars <- (listToBag . catMaybes) <$>
-              ASSERT(ex_tvs1 `equalLength` ex_tvs2)
+              ASSERT2(ex_tvs1 `equalLength` ex_tvs2, ppr c1 <+> ppr ex_tvs1 <+> ppr ex_tvs2)
               liftD (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
     let delta' = delta { delta_ty_cs = evvars `unionBags` delta_ty_cs delta }
     kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)

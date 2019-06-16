@@ -1,0 +1,8 @@
+
+Linear7.hs:7:16: error:
+    • Couldn't match expected multiplicity ‘'One’ of variable ‘n’ with actual multiplicity ‘'Omega’
+    • In an equation for ‘incorrectLCase’:
+          incorrectLCase n
+            = \case
+                True -> n
+                False -> 0
