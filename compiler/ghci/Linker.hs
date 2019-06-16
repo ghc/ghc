@@ -1124,7 +1124,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
       | otherwise
-      = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
+      = return () -- mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
                 --
