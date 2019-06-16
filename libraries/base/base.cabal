@@ -323,6 +323,8 @@ Library
         Type.Reflection
         Type.Reflection.Unsafe
         Unsafe.Coerce
+        -- TODO: remove
+        GHC.IOPort
 
     other-modules:
         Control.Monad.ST.Imp
@@ -338,6 +340,8 @@ Library
         GHC.IO.Handle.Lock.NoOp
         GHC.IO.Handle.Lock.Windows
         GHC.StaticPtr.Internal
+        GHC.Event.Internal.Types
+        -- GHC.IOPort -- TODO: hide again after debug
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
