@@ -653,22 +653,6 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
        -> Located TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
 dsSpec mb_poly_rhs (dL->L loc (SpecPrag poly_id spec_co spec_inl))
-  | isJust (isClassOpId_maybe poly_id)
-  = putSrcSpanDs loc $
-    do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for class method selector"
-                          <+> quotes (ppr poly_id))
-       ; return Nothing  }  -- There is no point in trying to specialise a class op
-                            -- Moreover, classops don't (currently) have an inl_sat arity set
-                            -- (it would be Just 0) and that in turn makes makeCorePair bleat
-
-  | no_act_spec && isNeverActive rule_act
-  = putSrcSpanDs loc $
-    do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
-                          <+> quotes (ppr poly_id))
-       ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
-                            -- See Note [Activation pragmas for SPECIALISE]
-
-  | otherwise
   = putSrcSpanDs loc $
     do { uniq <- newUnique
        ; let poly_name = idName poly_id
@@ -746,6 +730,7 @@ dsSpec mb_poly_rhs (dL->L loc (SpecPrag poly_id spec_co spec_inl))
     -- See Note [Activation pragmas for SPECIALISE]
     -- no_act_spec is True if the user didn't write an explicit
     -- phase specification in the SPECIALISE pragma
+    -- Keep this in sync with 'TcWarnings.warnUnusedSpecialisePragma'
     no_act_spec = case inlinePragmaSpec spec_inl of
                     NoInline -> isNeverActive  spec_prag_act
                     _        -> isAlwaysActive spec_prag_act

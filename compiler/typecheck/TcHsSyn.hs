@@ -682,7 +682,9 @@ zonkLTcSpecPrags env ps
   where
     zonk_prag (dL->L loc (SpecPrag id co_fn inl))
         = do { (_, co_fn') <- zonkCoFn env co_fn
-             ; return (cL loc (SpecPrag (zonkIdOcc env id) co_fn' inl)) }
+             ; let prag = cL loc (SpecPrag (zonkIdOcc env id) co_fn' inl)
+             ; warnUselessSpecialisePragma prag
+             ; return prag }
 
 {-
 ************************************************************************

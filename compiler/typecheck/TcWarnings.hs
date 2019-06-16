@@ -9,7 +9,10 @@ module TcWarnings (
     warnAboutEmptyEnumerations,
 
     -- * Discarded do bindings
-    warnDiscardedDoBindings
+    warnDiscardedDoBindings,
+
+    -- * Useless pragmas
+    warnUselessSpecialisePragma
   ) where
 
 import GhcPrelude
@@ -274,3 +277,27 @@ badMonadBind rhs elt_ty
          , hang (text "Suppress this warning by saying")
               2 (quotes $ text "_ <-" <+> ppr rhs)
          ]
+
+warnUselessSpecialisePragma :: LTcSpecPrag -> TcM ()
+warnUselessSpecialisePragma (dL->L loc (SpecPrag id _ spec_inl))
+  | Just _ <- isClassOpId_maybe id
+  = setSrcSpan loc (warn_useless "class method selector")
+  | no_act_spec && isNeverActive id_rule_act
+  -- Function is NOINLINE, and the specialisation inherits that
+  -- See Note [Activation pragmas for SPECIALISE] in DsBinds
+  = setSrcSpan loc (warn_useless "NOINLINE function")
+  | otherwise
+  = return ()
+  where
+    warn_useless what = warnTc NoReason True $ hsep
+      [ text "Ignoring useless SPECIALISE pragma for"
+      , ppr what
+      , quotes (ppr id)
+      ]
+    -- See Note [Activation pragmas for SPECIALISE] in DsBinds
+    -- no_act_spec is True if the user didn't write an explicit
+    -- phase specification in the SPECIALISE pragma
+    no_act_spec = case inlinePragmaSpec spec_inl of
+                    NoInline -> isNeverActive  (inlinePragmaActivation spec_inl)
+                    _        -> isAlwaysActive (inlinePragmaActivation spec_inl)
+    id_rule_act = inlinePragmaActivation (idInlinePragma id)
