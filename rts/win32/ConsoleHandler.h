@@ -1,6 +1,8 @@
 /*
  * Console control handler support.
  *
+ * NOTE: This is the MIO manager, only used for --io-manager=posix.
+ *       For the WINIO manager see base in the GHC.Event modules.
  */
 
 #pragma once
@@ -16,24 +18,24 @@
  */
 
 #if !defined(THREADED_RTS)
-/* 
+/*
  * under THREADED_RTS, console events are passed to the IO manager
  * thread, which starts up the handler.  See ThrIOManager.c.
  */
 
 /*
- * Function: signals_pending() 
- * 
+ * Function: signals_pending()
+ *
  * Used by the RTS to check whether new signals have been 'recently' reported.
- * If so, the RTS arranges for the delivered signals to be handled by 
- * de-queueing them from their table, running the associated Haskell 
+ * If so, the RTS arranges for the delivered signals to be handled by
+ * de-queueing them from their table, running the associated Haskell
  * signal handler.
  */
 extern StgInt stg_pending_events;
 
 #define signals_pending() ( stg_pending_events > 0)
 
-/* 
+/*
  * Function: anyUserHandlers()
  *
  * Used by the Scheduler to decide whether its worth its while to stick
