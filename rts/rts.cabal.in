@@ -97,6 +97,14 @@ library
           dbghelp
           -- for process information
           psapi
+       -- Minimum supported Windows version.
+       -- These numbers can be found at:
+       --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+       -- If we're compiling on windows, enforce that we only support Windows 7+
+       -- Adding this here means it doesn't have to be done in individual .c files
+       -- and also centralizes the versioning.
+       cpp-options: -D_WIN32_WINNT=0x06010000
+       cc-options: -D_WIN32_WINNT=0x06010000
     if flag(need-pthread)
        -- for pthread_getthreadid_np, pthread_create, ...
        extra-libraries: pthread
