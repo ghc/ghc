@@ -427,8 +427,7 @@ instance Show IOException where
       showsPrec p iot .
       (case errno of
         Nothing -> id
-        Just no -> showString " (" . showsPrec p no . showString ")" 
-      ) . 
+        Just no -> showString " (" . showsPrec p no . showString ")") .
       (case s of
          "" -> id
          _  -> showString " (" . showString s . showString ")")
