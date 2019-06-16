@@ -36,6 +36,7 @@ import GHC.Show
 import GHC.Enum
 
 import GHC.IO
+import GHC.IO.Types
 import GHC.IO.IOMode
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO
@@ -257,7 +258,8 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
            -- On Windows we need an additional call to get a unique device id
            -- and inode, since fstat just returns 0 for both.
            (unique_dev, unique_ino) <- getUniqueFileInfo fd dev ino
-           r <- lockFile fd unique_dev unique_ino (fromBool write)
+           r <- lockFile (fromIntegral fd) unique_dev unique_ino
+                         (fromBool write)
            when (r == -1)  $
                 ioException (IOError Nothing ResourceBusy "openFile"
                                    "file is locked" Nothing Nothing)
@@ -322,20 +324,20 @@ close fd =
            throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
 #if defined(mingw32_HOST_OS)
            if fdIsSocket fd then
-             c_closesocket (fromIntegral realFd)
+             c_closesocket (fromIntegral $ toFd realFd)
            else
 #endif
-             c_close (fromIntegral realFd)
+             c_close (fromIntegral $ toFd realFd)
 
      -- release the lock *first*, because otherwise if we're preempted
      -- after closing but before releasing, the FD may have been reused.
      -- (#7646)
      release fd
 
-     closeFdWith closer (fromIntegral (fdFD fd))
+     closeWith closer (fromIntegral (fdFD fd) :: Fd)
 
 release :: FD -> IO ()
-release fd = do _ <- unlockFile (fdFD fd)
+release fd = do _ <- unlockFile (fromIntegral $ fdFD fd)
                 return ()
 
 #if defined(mingw32_HOST_OS)
@@ -348,10 +350,10 @@ isSeekable fd = do
   t <- devType fd
   return (t == RegularFile || t == RawDevice)
 
-seek :: FD -> SeekMode -> Integer -> IO ()
-seek fd mode off = do
-  throwErrnoIfMinus1Retry_ "seek" $
-     c_lseek (fdFD fd) (fromIntegral off) seektype
+seek :: FD -> SeekMode -> Integer -> IO Integer
+seek fd mode off = fromIntegral `fmap`
+  (throwErrnoIfMinus1Retry "seek" $
+     c_lseek (fdFD fd) (fromIntegral off) seektype)
  where
     seektype :: CInt
     seektype = case mode of
@@ -688,10 +690,10 @@ throwErrnoIfMinus1RetryOnBlock loc f on_block  =
 -- Locking/unlocking
 
 foreign import ccall unsafe "lockFile"
-  lockFile :: CInt -> Word64 -> Word64 -> CInt -> IO CInt
+  lockFile :: Word64 -> Word64 -> Word64 -> CInt -> IO CInt
 
 foreign import ccall unsafe "unlockFile"
-  unlockFile :: CInt -> IO CInt
+  unlockFile :: Word64 -> IO CInt
 
 #if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "get_unique_file_info"

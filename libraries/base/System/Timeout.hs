@@ -15,7 +15,7 @@
 -- Attach a timeout event to arbitrary 'IO' computations.
 --
 -------------------------------------------------------------------------------
-
+-- TODO: Inspect is still suitable.
 module System.Timeout ( Timeout, timeout ) where
 
 #if !defined(mingw32_HOST_OS)
