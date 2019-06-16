@@ -1250,6 +1250,7 @@ inner_loop:
         traversePushClosure(ts, (StgClosure *) tso->trec, c, child_data);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
+               || tso->why_blocked == BlockedOnIOCompletion
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {
