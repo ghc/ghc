@@ -28,7 +28,6 @@ import DsMonad
 import Check ( checkGuardMatches )
 import Name
 import NameEnv
-import FamInstEnv( topNormaliseType )
 import DsMeta
 import HsSyn
 
@@ -881,7 +880,6 @@ dsDo stmts
 
     go _ (BodyStmt _ rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
-           ; warnDiscardedDoBindings rhs (exprType rhs2)
            ; rest <- goL stmts
            ; dsSyntaxExpr then_expr [rhs2, rest] }
 
@@ -1014,51 +1012,6 @@ dsConLike _ (PatSynCon ps)   = return $ case patSynBuilder ps of
     | add_void  -> mkCoreApp (text "dsConLike" <+> ppr ps) (Var id) (Var voidPrimId)
     | otherwise -> Var id
   _ -> pprPanic "dsConLike" (ppr ps)
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Errors and contexts}
-*                                                                      *
-************************************************************************
--}
-
--- Warn about certain types of values discarded in monadic bindings (#3263)
-warnDiscardedDoBindings :: LHsExpr GhcTc -> Type -> DsM ()
-warnDiscardedDoBindings rhs rhs_ty
-  | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
-  = do { warn_unused <- woptM Opt_WarnUnusedDoBind
-       ; warn_wrong <- woptM Opt_WarnWrongDoBind
-       ; when (warn_unused || warn_wrong) $
-    do { fam_inst_envs <- dsGetFamInstEnvs
-       ; let norm_elt_ty = topNormaliseType fam_inst_envs elt_ty
-
-           -- Warn about discarding non-() things in 'monadic' binding
-       ; if warn_unused && not (isUnitTy norm_elt_ty)
-         then warnDs (Reason Opt_WarnUnusedDoBind)
-                     (badMonadBind rhs elt_ty)
-         else
-
-           -- Warn about discarding m a things in 'monadic' binding of the same type,
-           -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
-           when warn_wrong $
-                do { case tcSplitAppTy_maybe norm_elt_ty of
-                         Just (elt_m_ty, _)
-                            | m_ty `eqType` topNormaliseType fam_inst_envs elt_m_ty
-                            -> warnDs (Reason Opt_WarnWrongDoBind)
-                                      (badMonadBind rhs elt_ty)
-                         _ -> return () } } }
-
-  | otherwise   -- RHS does have type of form (m ty), which is weird
-  = return ()   -- but at lesat this warning is irrelevant
-
-badMonadBind :: LHsExpr GhcTc -> Type -> SDoc
-badMonadBind rhs elt_ty
-  = vcat [ hang (text "A do-notation statement discarded a result of type")
-              2 (quotes (ppr elt_ty))
-         , hang (text "Suppress this warning by saying")
-              2 (quotes $ text "_ <-" <+> ppr rhs)
-         ]
 
 {-
 ************************************************************************

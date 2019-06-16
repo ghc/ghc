@@ -1150,7 +1150,8 @@ zonkArithSeq env (FromThenTo e1 e2 e3)
 
 
 -------------------------------------------------------------------------
-zonkStmts :: ZonkEnv
+zonkStmts :: Outputable (body GhcTc)
+          => ZonkEnv
           -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
           -> [LStmt GhcTcId (Located (body GhcTcId))]
           -> TcM (ZonkEnv, [LStmt GhcTc (Located (body GhcTc))])
@@ -1159,7 +1160,8 @@ zonkStmts env zBody (s:ss) = do { (env1, s')  <- wrapLocSndM (zonkStmt env zBody
                                 ; (env2, ss') <- zonkStmts env1 zBody ss
                                 ; return (env2, s' : ss') }
 
-zonkStmt :: ZonkEnv
+zonkStmt :: Outputable (body GhcTc) -- for warnings
+         => ZonkEnv
          -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
          -> Stmt GhcTcId (Located (body GhcTcId))
          -> TcM (ZonkEnv, Stmt GhcTc (Located (body GhcTc)))
@@ -1217,6 +1219,7 @@ zonkStmt env zBody (BodyStmt ty body then_op guard_op)
        (env2, new_guard_op) <- zonkSyntaxExpr env1 guard_op
        new_body <- zBody env2 body
        new_ty   <- zonkTcTypeToTypeX env2 ty
+       warnDiscardedDoBindings new_body new_ty
        return (env2, BodyStmt new_ty new_body new_then_op new_guard_op)
 
 zonkStmt env zBody (LastStmt x body noret ret_op)
