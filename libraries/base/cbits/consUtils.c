@@ -1,4 +1,4 @@
-/* 
+/*
  * (c) The University of Glasgow 2002
  *
  * Win32 Console API support
@@ -46,7 +46,7 @@ set_console_buffering__(int fd, int cooked)
        leave ECHO_INPUT enabled without also having LINE_INPUT,
        so we have to turn both off here. */
     DWORD flgs = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT;
-    
+
     if ( (h = (HANDLE)_get_osfhandle(fd)) != INVALID_HANDLE_VALUE ) {
 	if ( GetConsoleMode(h,&st) &&
 	     SetConsoleMode(h, cooked ? (st | ENABLE_LINE_INPUT) : st & ~flgs)  ) {
