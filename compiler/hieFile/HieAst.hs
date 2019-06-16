@@ -1259,6 +1259,9 @@ instance ToHie (Located (DerivStrategy GhcRn)) where
 instance ToHie (Located OverlapMode) where
   toHie (L span _) = pure $ locOnly span
 
+instance ToHie a => ToHie (HsScaled GhcRn a) where
+  toHie (HsScaled w t) = concatM [toHie (arrowToHsType w), toHie t]
+
 instance ToHie (LConDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       ConDeclGADT { con_names = names, con_qvars = qvars
@@ -1286,9 +1289,10 @@ instance ToHie (LConDecl GhcRn) where
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = condecl_scope dets
       XConDecl _ -> []
-    where condecl_scope args = case args of
-            PrefixCon xs -> foldr combineScopes NoScope $ map mkLScope xs
-            InfixCon a b -> combineScopes (mkLScope a) (mkLScope b)
+    where condecl_scope :: HsConDeclDetails p -> Scope
+          condecl_scope args = case args of
+            PrefixCon xs -> foldr combineScopes NoScope $ map (mkLScope . hsThing) xs
+            InfixCon a b -> combineScopes (mkLScope (hsThing a)) (mkLScope (hsThing b))
             RecCon x -> mkLScope x
 
 instance ToHie (Located [LConDeclField GhcRn]) where
@@ -1385,8 +1389,9 @@ instance ToHie (TScoped (LHsType GhcRn)) where
         [ toHie ty
         , toHie $ TS (ResolvedScopes []) ki
         ]
-      HsFunTy _ a b ->
-        [ toHie a
+      HsFunTy _ w a b ->
+        [ toHie (arrowToHsType w)
+        , toHie a
         , toHie b
         ]
       HsListTy _ a ->

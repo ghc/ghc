@@ -1,0 +1,4 @@
+
+LinearSeq.hs:6:5: error:
+    • Couldn't match expected multiplicity ‘'One’ of variable ‘x’ with actual multiplicity ‘'Omega’
+    • In an equation for ‘bad’: bad x = seq x ()

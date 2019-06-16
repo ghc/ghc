@@ -1,3 +1,21 @@
+     Int# -->.(n) Float# -->.(o) Double# -->.(p) N
+                 (dt [Occ=Once] :: Int#)
+                 (dt [Occ=Once] :: Float#)
+                 (dt [Occ=Once] :: Double#) ->
+      (dt [Occ=Once] :: Int#)
+      (dt [Occ=Once] :: Float#)
+      (dt [Occ=Once] :: Double#) ->
+     Int# -->.(n) Float# -->.(o) Double# -->.(p) Char# -->.(q) Word# -->.(r) P
+                 (dt [Occ=Once] :: Int#)
+                 (dt [Occ=Once] :: Float#)
+                 (dt [Occ=Once] :: Double#)
+                 (dt [Occ=Once] :: Char#)
+                 (dt [Occ=Once] :: Word#) ->
+      (dt [Occ=Once] :: Int#)
+      (dt [Occ=Once] :: Float#)
+      (dt [Occ=Once] :: Double#)
+      (dt [Occ=Once] :: Char#)
+      (dt [Occ=Once] :: Word#) ->
 p = T8274.Positives 42# 4.23# 4.23## '4'# 4##
 n = T8274.Negatives -4# -4.0# -4.0##
 T8274.$trModule4 :: Addr#
