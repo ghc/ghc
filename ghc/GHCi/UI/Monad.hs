@@ -488,13 +488,11 @@ revertCAFs = do
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
-  nobuf <- compileGHCiExpr $
-   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
-  flush <- compileGHCiExpr $
-   "do { System.IO.hFlush System.IO.stdout; " ++
-       " System.IO.hFlush System.IO.stderr }"
+  let mkHelperExpr :: OccName -> Ghc ForeignHValue
+      mkHelperExpr occ =
+        compileParsedExprRemote $ nlHsVar $ mkOrig gHC_GHCI_HELPERS occ
+  nobuf <- mkHelperExpr $ mkVarOcc "disableBuffering"
+  flush <- mkHelperExpr $ mkVarOcc "flushAll"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
