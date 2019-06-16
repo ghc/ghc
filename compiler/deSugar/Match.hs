@@ -469,7 +469,7 @@ tidy1 _ _ (SumPat tys pat alt arity)
 tidy1 _ _ (LitPat _ lit) = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ o (NPat ty (dL->L _ lit@OverLit { ol_val = v }) mb_neg eq)
+tidy1 _ _ (NPat ty (dL->L _ lit@OverLit{}) mb_neg eq)
   = return (idDsWrapper, tidyNPat lit mb_neg eq ty)
 
 -- Everything else goes through unchanged...
