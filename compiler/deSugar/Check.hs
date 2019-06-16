@@ -43,7 +43,6 @@ import Util
 import Outputable
 import FastString
 import DataCon
-import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 
@@ -60,7 +59,7 @@ import DsUtils       (isTrueLHsExpr)
 import Maybes        (MaybeT (..), expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List     (find, (\\))
+import Data.List     (find)
 import Data.Maybe    (catMaybes, isJust, fromMaybe)
 import Control.Monad (forM, when, guard, forM_, zipWithM, filterM)
 import Control.Monad.Trans.Class (lift)
@@ -612,65 +611,59 @@ tmTyCsAreSatisfiable
                                                  , delta_tm_cs = term_cs }
            _unsat               -> Nothing
 
--- | Tests whether the 'Id' can inhabit the given 'ConLike' in the context
--- expressed by the 'Delta'.
-type InhabitationTest = Delta -> Id -> ConLike -> PmM Bool
-
--- | An 'InhabitationTest' consulting 'mkOneSatisfiableConFull'. Precise, but
--- expensive.
-isConSatisfiable :: InhabitationTest
-isConSatisfiable delta x con = do
-  tracePm "conInhabitsId" (ppr con <+> ppr x <+> ppr (delta_tm_cs delta))
-  isJust <$> mkOneSatisfiableConFull delta x con
-
--- | Cheap 'InhabitationTest', always returning @True@.
-cheapInhabitationTest :: InhabitationTest
-cheapInhabitationTest _ _ _ = pure True
-
-normaliseValAbs :: InhabitationTest -> Delta -> ValAbs -> PmM (Maybe (Delta, ValAbs))
-normaliseValAbs is_con_inh delta = runMaybeT . go_va delta
+normaliseValAbs :: Delta -> ValAbs -> PmM (Maybe (Delta, ValAbs))
+normaliseValAbs delta = runMaybeT . go_va delta
   where
     go_va :: Delta -> ValAbs -> MaybeT PmM (Delta, ValAbs)
     go_va delta pm@PmCon{ pm_con_args = args } = do
       (delta', args') <- mapAccumLM go_va delta args
       pure (delta', pm { pm_con_args = args' })
-    go_va delta va@(PmVar x)
-      | let (ty, pacs) = lookupRefutableAltCons (delta_tm_cs delta) x
-      -- TODO: Even if ncons is empty, we might have a complete match ('Void',
-      --       constraints). Figure out how to the complete matches solely from
-      --       @ty@.
-      , ncons@(cl:_) <- [ cl | PmAltConLike cl <- pacs ] = do
-          grps <- lift (allCompleteMatches cl ty)
-          let is_grp_inh = filterM (lift . is_con_inh delta x) . (\\ ncons)
-          incomplete_grps <- traverse is_grp_inh grps
-          -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
-          lift $ tracePm "normaliseValAbs" (ppr x <+> ppr (idType x) <+> ppr grps <+> ppr incomplete_grps)
-          guard (all notNull incomplete_grps)
-          -- If there's a unique singleton incomplete group, turn it into a
-          -- @PmCon@ for better readability of warning messages.
-          case incomplete_grps of
-            [[con]] -> do
-              -- We don't want to simplify to a @PmCon@ (which won't normalise
-              -- any further) when @p@ is just the 'cheapInhabitationTest'.
-              -- Thus, we have to assert satisfiability here, even if the
-              -- expensive 'isConSatisfiable' already did so. Also, we have to
-              -- store the constraints in @delta@.
-              (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
-              lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
-              pure (delta', ic_val_abs ic)
-            _        -> pure (delta, va)
+    go_va delta va@(PmVar x) = do
+      grps <- lift (allCompleteMatches (idType x))
+      incomplete_grps <- traverse (go_grp 0 x delta) grps
+      -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
+      lift $ tracePm "normaliseValAbs" (ppr x <+> ppr (idType x) <+> ppr grps <+> ppr incomplete_grps)
+      guard (all notNull incomplete_grps)
+      -- If there's a unique singleton incomplete group, turn it into a
+      -- @PmCon@ for better readability of warning messages.
+      case incomplete_grps of
+        [[con]] -> do
+          -- We don't want to simplify to a @PmCon@ (which won't normalise
+          -- any further) when @p@ is just the 'cheapInhabitationTest'.
+          -- Thus, we have to assert satisfiability here, even if the
+          -- expensive 'isConSatisfiable' already did so. Also, we have to
+          -- store the constraints in @delta@.
+          (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
+          lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
+          pure (delta', ic_val_abs ic)
+        _        -> pure (delta, va)
     go_va delta va = pure (delta, va)
+
+    go_grp :: Int -> Id -> Delta -> [ConLike] -> MaybeT PmM [ConLike]
+    go_grp _ _ _ []
+      = pure []
+    go_grp n_inh _ _ group
+      | n_inh > 1
+      -- Don't attempt to reduce the group any further when there is more than
+      -- one inhabitant! There's nothing to gain from this information.
+      -- For huge groups, this saves a lot of unnecessary oracle queries!
+      = pure group
+    go_grp n_inh x delta (con:group) = do
+      mb_delta_ic <- lift (mkOneSatisfiableConFull delta x con)
+      case mb_delta_ic of
+        Nothing -> go_grp n_inh x delta group
+        Just _  -> (con:) <$> go_grp (n_inh + 1) x delta group
 
 -- | Something that normalises a 'ValVec' by consulting the given
 -- 'InhabitationTest' to weed out vacuous 'ValAbs'.
 -- See also 'normaliseValVecHead' and 'normaliseValVec'.
-type ValVecNormaliser = InhabitationTest -> ValVec -> PmM (Maybe ValVec)
+type ValVecNormaliser = ValVec -> PmM (Maybe ValVec)
 
 -- | A 'ValVecNormaliser' that normalises all components of a 'ValVec'. This is
 -- the 'ValVecNormaliser' to choose once at the end.
 normaliseValVec :: ValVecNormaliser
-normaliseValVec test (ValVec vva delta) = runMaybeT $ do
-  (delta', vva') <- mapAccumLM ((MaybeT .) . normaliseValAbs test) delta vva
+normaliseValVec (ValVec vva delta) = runMaybeT $ do
+  (delta', vva') <- mapAccumLM ((MaybeT .) . normaliseValAbs) delta vva
   pure (ValVec vva' delta')
 
 -- | A 'ValVecNormaliser' that only tries to normalise the head of each
@@ -679,26 +672,23 @@ normaliseValVec test (ValVec vva delta) = runMaybeT $ do
 -- Of course we could 'normaliseValVec' instead, but that's unnecessarily
 -- expensive.
 normaliseValVecHead :: ValVecNormaliser
-normaliseValVecHead _    vva@(ValVec []       _)     = pure (Just vva)
-normaliseValVecHead test     (ValVec (va:vva) delta) = runMaybeT $ do
-  (delta', va') <- MaybeT (normaliseValAbs test delta va)
+normaliseValVecHead vva@(ValVec []       _) = pure (Just vva)
+normaliseValVecHead (ValVec (va:vva) delta) = runMaybeT $ do
+  (delta', va') <- MaybeT (normaliseValAbs delta va)
   pure (ValVec (va':vva) delta')
 
 -- | This weeds out 'ValVec's with 'PmVar's where at least one COMPLETE set is
 -- rendered vacuous by equality constraints, by calling out the given
--- 'ValVecNormaliser' with different 'InhabitationTest's.
+-- 'ValVecNormaliser'.
 --
 -- This is quite costly due to the many oracle queries, so we only call this at
 -- the last possible moment. I.e., with 'normaliseValVecHead' when leaving a
 -- pattern guard and with 'normaliseValVec' on the final uncovered set.
 normaliseUncovered :: ValVecNormaliser -> Uncovered -> PmM Uncovered
 normaliseUncovered normalise_val_vec us = do
-  -- We'll first do a cheap sweep without consulting the oracles
-  us1 <- mapMaybeM (normalise_val_vec cheapInhabitationTest) us
-  -- Then we'll do another pass trying to weed out the rest with (in)equalities
-  us2 <- mapMaybeM (normalise_val_vec isConSatisfiable) us1
-  tracePm "normaliseUncovered" (vcat (map ppr us2))
-  pure us2
+  us' <- mapMaybeM normalise_val_vec us
+  tracePm "normaliseUncovered" (vcat (map ppr us'))
+  pure us'
 
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of
@@ -1077,7 +1067,7 @@ translatePat fam_insts pat = case pat of
             , pat_tvs     = ex_tvs
             , pat_args    = ps } -> do
     let ty = conLikeResTy con arg_tys
-    groups <- allCompleteMatches con ty
+    groups <- allCompleteMatches ty
     case groups of
       [] -> mkCanFailPmPat ty
       _  -> do
@@ -1841,7 +1831,7 @@ coercePmPat PmFake     = [] -- drop the guards
 -- 'allCompleteMatches' and Note [Single match constructors].
 singleMatchConstructor :: ConLike -> [Type] -> PmM Bool
 singleMatchConstructor cl tys =
-  any isSingleton <$> allCompleteMatches cl (conLikeResTy cl tys)
+  any isSingleton <$> allCompleteMatches (conLikeResTy cl tys)
 
 {-
 Note [Single match constructors]
@@ -1868,39 +1858,35 @@ the single-match property. We currently don't (can't) check this in the
 translation step. See #15753 for why this yields surprising results.
 -}
 
--- | For a given conlike, finds all the sets of patterns which could
--- be relevant to that conlike by consulting the result type.
+-- | For a given type, finds all the COMPLETE sets of conlikes that inhabit it.
 --
 -- These come from two places.
 --  1. From data constructors defined with the result type constructor.
 --  2. From `COMPLETE` pragmas which have the same type as the result
 --     type constructor. Note that we only use `COMPLETE` pragmas
 --     *all* of whose pattern types match. See #14135
-allCompleteMatches :: ConLike -> Type -> DsM [[ConLike]]
-allCompleteMatches cl ty = do
-  let fam = case cl of
-           RealDataCon dc ->
-            [map RealDataCon (tyConDataCons (dataConTyCon dc))]
-           PatSynCon _    -> []
-  pragmas <- case splitTyConApp_maybe ty of
-               Just (tc, _) -> dsGetCompleteMatches tc
-               Nothing      -> return []
-  let fams cm = mapM dsLookupConLike (completeMatchConLikes cm)
-  from_pragma <- filter (isValidCompleteMatch ty) <$> mapM fams pragmas
-  let final_groups = fam ++ from_pragma
-  return final_groups
-    where
-      -- Check that all the pattern synonym return types in a `COMPLETE`
-      -- pragma subsume the type we're matching.
-      -- See Note [Filtering out non-matching COMPLETE sets]
-      isValidCompleteMatch :: Type -> [ConLike] -> Bool
-      isValidCompleteMatch ty = all go
-        where
-          go (RealDataCon {}) = True
-          go (PatSynCon psc)  = isJust $ flip tcMatchTy ty $ patSynResTy
-                                       $ patSynSig psc
-
-          patSynResTy (_, _, _, _, _, res_ty) = res_ty
+allCompleteMatches :: Type -> DsM [[ConLike]]
+allCompleteMatches ty = case splitTyConApp_maybe ty of
+  Nothing -> pure [] -- NB: We don't know any COMPLETE set, as opposed to [[]]
+  Just (tc, _) -> do
+    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc
+    let maybe_to_list = maybe [] (:[])
+    let rdcs = maybe_to_list mb_rdcs
+    pragmas <- dsGetCompleteMatches tc
+    let fams = mapM dsLookupConLike . completeMatchConLikes
+    pscs <- mapM fams pragmas
+    let candidates = rdcs ++ pscs
+    -- Check that all the pattern synonym return types in a `COMPLETE`
+    -- pragma subsume the type we're matching.
+    -- See Note [Filtering out non-matching COMPLETE sets]
+    -- TODO: Check if we need to do this any longer
+    pure (filter (isValidCompleteMatch ty) candidates)
+      where
+        isValidCompleteMatch :: Type -> [ConLike] -> Bool
+        isValidCompleteMatch ty = all p
+          where
+            p = isJust . flip tcMatchTy ty . projResTy . conLikeFullSig
+            projResTy (_, _, _, _, _, _, res_ty) = res_ty
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -2436,7 +2422,7 @@ mkUnmatched x nalt (ValVec vva delta) =
       -- otherwise
       --  * hide redundant pattern match warnings
       --  * turn redundant pattern match warnings into inaccessible RHS
-      res <- normaliseValAbs isConSatisfiable (delta {delta_tm_cs = tms}) (PmVar x)
+      res <- normaliseValAbs (delta {delta_tm_cs = tms}) (PmVar x)
       case res of
         Nothing            -> pure mempty
         Just (delta', va') -> pure (usimple [ValVec (va':vva) delta'])
