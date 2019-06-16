@@ -20,8 +20,8 @@ _result :: a
 f :: Integer -> a
 x :: Integer
 xs :: [t] = []
-f :: Integer -> a = _
 x :: Integer = 2
+f :: Integer -> a = _
 _result :: a = _
 _result = 3
 Logged breakpoint at Test3.hs:2:18-31
