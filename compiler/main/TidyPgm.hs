@@ -205,9 +205,7 @@ globaliseAndTidyId :: Id -> Id
 --     * unchanged details
 --     * VanillaIdInfo (makes a conservative assumption about Caf-hood)
 globaliseAndTidyId id
-  = Id.setIdType (globaliseId id) tidy_type
-  where
-    tidy_type = tidyTopType (idType id)
+  = Id.updateIdTypeAndMult tidyTopType (globaliseId id)
 
 {-
 ************************************************************************

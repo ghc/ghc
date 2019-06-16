@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds #-}
+             PolyKinds, NegativeLiterals #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -40,12 +40,27 @@ module GHC.Types (
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr
+        KindRep(..), KindBndr,
+
+        -- * Multiplicity Types
+        Multiplicity(..)
     ) where
 
 import GHC.Prim
 
 infixr 5 :
+
+
+{- *********************************************************************
+*                                                                      *
+                  Functions
+*                                                                      *
+********************************************************************* -}
+
+infixr -1 -> -- issue #10145
+
+-- | The built-in function type.
+type (->) = FUN 'Omega
 
 {- *********************************************************************
 *                                                                      *
@@ -58,6 +73,8 @@ data Constraint
 
 -- | The kind of types with values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
+
+data Multiplicity = Omega | One
 
 {- *********************************************************************
 *                                                                      *
@@ -185,13 +202,6 @@ or the 'Prelude.>>' and 'Prelude.>>=' operations from the 'Prelude.Monad'
 class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-type role IO representational
-
-{- The 'type role' role annotation for IO is redundant but is included
-because this role is significant in the normalisation of FFI
-types. Specifically, if this role were to become nominal (which would
-be very strange, indeed!), changes elsewhere in GHC would be
-necessary. See [FFI type roles] in TcForeign.  -}
 
 
 {- *********************************************************************

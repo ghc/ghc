@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Exitify ( exitifyProgram ) where
 
 {-
@@ -48,6 +50,7 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
+import Multiplicity ( pattern Omega )
 import Util( mapSnd )
 
 import Data.Bifunctor
@@ -265,7 +268,7 @@ mkExitJoinId in_scope ty join_arity = do
                          `extendInScopeSet` exit_id_tmpl -- just cosmetics
     return (uniqAway avoid exit_id_tmpl)
   where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ty
+    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique Omega ty
                     `asJoinId` join_arity
 
 addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId

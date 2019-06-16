@@ -38,6 +38,8 @@ import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE )
 import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
+import Multiplicity
+import UsageEnv
 import TcArrows
 import TcMatches
 import TcHsType
@@ -61,7 +63,7 @@ import TcEvidence
 import VarSet
 import MkId( seqId )
 import TysWiredIn
-import TysPrim( intPrimTy, mkTemplateTyVars, tYPE )
+import TysPrim( intPrimTy, multiplicityTyVarList, mkTemplateTyVars, tYPE )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -197,8 +199,8 @@ tcExpr (HsOverLit x lit) res_ty
 tcExpr (NegApp x expr neg_expr) res_ty
   = do  { (expr', neg_expr')
             <- tcSyntaxOp NegateOrigin neg_expr [SynAny] res_ty $
-               \[arg_ty] ->
-               tcMonoExpr expr (mkCheckExpType arg_ty)
+               \[arg_ty] [arg_mult] ->
+               tcScalingUsage arg_mult $ tcMonoExpr expr (mkCheckExpType arg_ty)
         ; return (NegApp x expr' neg_expr') }
 
 tcExpr e@(HsIPVar _ x) res_ty
@@ -355,9 +357,12 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
   = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
        ; let arg2_exp_ty = res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
+       ; arg1' <- tcArg op arg1 (unrestricted arg1_ty) 1
        ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
+                  tcScalingUsage Omega $ tc_poly_expr_nc arg2 arg2_exp_ty
+                  -- It is not necessary, but for the sake of least surprise,
+                  -- seq is unrestricted in its second argument. It can (and,
+                  -- probably, should) be refined later.
        ; arg2_ty <- readExpType arg2_exp_ty
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
@@ -374,6 +379,11 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
+       ; tcSubMult AppOrigin Omega (scaledMult arg2_sigma)
+         -- When ($) becomes multiplicity-polymorphic, then the above check will
+         -- need to go. But in the meantime, it would produce ill-typed
+         -- desugared code to accept linear functions to the left of a ($).
+
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
@@ -387,8 +397,8 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        --
        -- The *result* type can have any kind (#8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
-                        (tcTypeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy (scaledThing arg2_sigma)))
+                        (tcTypeKind (scaledThing arg2_sigma)) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -399,8 +409,9 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
+
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
-                                               , arg2_sigma
+                                               , scaledThing arg2_sigma
                                                , res_ty])
                                    (HsVar noExt (L lv op_id)))
              -- arg1' :: arg1_ty
@@ -409,6 +420,9 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
+             -- The second multiplicity is not used.
+             --
+             -- We need to zonk here as well, see Dollar2 for an example
              wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
@@ -436,10 +450,10 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
 tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
+       ; (wrap_fun, [Scaled w arg1_ty, arg2_ty], op_res_ty) <-
+           matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkVisFunTy arg1_ty op_res_ty) res_ty
+                                 (mkVisFunTy w arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
                   SectionR x (mkLHsWrap wrap_fun op') arg2' ) }
@@ -490,8 +504,13 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; arg_tys <- case boxity of
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
-       ; let actual_res_ty
-                 = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+       ; let missing_tys = [ty | (ty, L _ (Missing _)) <- zip arg_tys tup_args]
+             w_tyvars = multiplicityTyVarList (length missing_tys) []
+             w_tvb = map (mkTyVarBinder Inferred) w_tyvars
+             actual_res_ty
+                 =  mkForAllTys w_tvb $
+                    mkVisFunTys [ mkScaled (mkTyVarTy w_ty) ty |
+                              (ty, w_ty) <- zip missing_tys w_tyvars]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -523,9 +542,9 @@ tcExpr (ExplicitList _ witness exprs) res_ty
       Just fln -> do { ((exprs', elt_ty), fln')
                          <- tcSyntaxOp ListOrigin fln
                                        [synKnownType intTy, SynList] res_ty $
-                            \ [elt_ty] ->
+                            \ [elt_ty] _ ->
                             do { exprs' <-
-                                    mapM (tc_elt elt_ty) exprs
+                                    mapM (tcScalingUsage Omega . tc_elt elt_ty) exprs
                                ; return (exprs', elt_ty) }
 
                      ; return $ ExplicitList elt_ty (Just fln') exprs' }
@@ -554,10 +573,13 @@ tcExpr (HsCase x scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          (scrut', scrut_ty) <- tcInferRho scrut
+          let mult = Omega
+            -- There is not yet syntax or inference mechanism for case
+            -- expressions to be anything else than unrestricted.
+        ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+        ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
@@ -569,14 +591,15 @@ tcExpr (HsIf x Nothing pred b1 b2) res_ty    -- Ordinary 'if'
            -- Just like Note [Case branches must never infer a non-tau type]
            -- in TcMatches (See #10619)
 
-       ; b1' <- tcMonoExpr b1 res_ty
-       ; b2' <- tcMonoExpr b2 res_ty
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoExpr b1 res_ty
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoExpr b2 res_ty
+       ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x Nothing pred' b1' b2') }
 
 tcExpr (HsIf x (Just fun) pred b1 b2) res_ty
   = do { ((pred', b1', b2'), fun')
            <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] ->
+              \ [pred_ty, b1_ty, b2_ty] _ ->
               do { pred' <- tcPolyExpr pred pred_ty
                  ; b1'   <- tcPolyExpr b1   b1_ty
                  ; b2'   <- tcPolyExpr b2   b2_ty
@@ -675,7 +698,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                Just con_id -> do {
                   res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
                                           (Just expr) actual_res_ty res_ty
-                ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
+                ; rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
                 ; return $
                   mkHsWrap res_wrap $
                   RecordCon { rcon_ext = RecordConTc
@@ -822,7 +845,18 @@ following.
 tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
-          (record_expr', record_rho) <- tcInferRho record_expr
+          (record_expr', record_rho) <- tcScalingUsage Omega $ tcInferRho record_expr
+            -- Record update drops some of the content of the record (namely the
+            -- content of the field being updated). As a consequence, it
+            -- requires an unrestricted record.
+            --
+            -- Consider the following example:
+            --
+            -- data R a = R { self :: a }
+            -- bad :: a ⊸ ()
+            -- bad x = let r = R x in r { self = () }
+            --
+            -- This should definitely *not* typecheck.
 
         -- STEP -1  See Note [Disambiguating record fields]
         -- After this we know that rbinds is unambiguous
@@ -879,8 +913,12 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Take apart a representative constructor
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _)
+              (con1_tvs, _, _, _prov_theta, req_theta, scaled_con1_arg_tys, _)
                  = conLikeFullSig con1
+              con1_arg_tys = map scaledThing scaled_con1_arg_tys
+                -- Remark: we can safely drop the multiplicity of field because it's
+                -- always 1, this way we don't need to handle it in the rest of
+                -- the function
               con1_flds   = map flLabel $ conLikeFieldLabels con1
               con1_tv_tys = mkTyVarTys con1_tvs
               con1_res_ty = case mtycon of
@@ -1083,7 +1121,7 @@ arithSeqEltType Nothing res_ty
 arithSeqEltType (Just fl) res_ty
   = do { (elt_ty, fl')
            <- tcSyntaxOp ListOrigin fl [SynList] res_ty $
-              \ [elt_ty] -> return elt_ty
+              \ [elt_ty] _ -> return elt_ty
        ; return (idHsWrapper, elt_ty, Just fl') }
 
 {-
@@ -1170,7 +1208,7 @@ tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
   = do { rep <- newFlexiTyVarTy runtimeRepTy
        ; let [alpha, beta] = mkTemplateTyVars [liftedTypeKind, tYPE rep]
              seq_ty = mkSpecForAllTys [alpha,beta]
-                      (mkTyVarTy alpha `mkVisFunTy` mkTyVarTy beta `mkVisFunTy` mkTyVarTy beta)
+                      (mkTyVarTy alpha `mkVisFunTyOm` mkTyVarTy beta `mkVisFunTyOm` mkTyVarTy beta)
              seq_fun = L loc (HsVar noExt (L loc seqId))
              -- seq_ty = forall (a:*) (b:TYPE r). a -> b -> b
              -- where 'r' is a meta type variable
@@ -1410,13 +1448,13 @@ and we had the visible type application
 -}
 
 ----------------
-tcArg :: LHsExpr GhcRn                   -- The function (for error messages)
-      -> LHsExpr GhcRn                   -- Actual arguments
-      -> TcRhoType                       -- expected arg type
-      -> Int                             -- # of argument
-      -> TcM (LHsExpr GhcTcId)           -- Resulting argument
-tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcPolyExprNC arg ty
+tcArg :: LHsExpr GhcRn                    -- The function (for error messages)
+      -> LHsExpr GhcRn                    -- Actual arguments
+      -> Scaled TcRhoType                 -- expected (scaled) arg type
+      -> Int                              -- # of argument
+      -> TcM (LHsExpr GhcTcId)            -- Resulting argument
+tcArg fun arg (Scaled mult ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
+                          tcScalingUsage mult $ tcPolyExprNC arg ty
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]
@@ -1434,7 +1472,7 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExpr GhcRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpRhoType               -- ^ overall result type
-           -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExpr GhcTcId)
 -- ^ Typecheck a syntax operator
 -- The operator is a variable or a lambda at this stage (i.e. renamer
@@ -1448,7 +1486,7 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxExpr GhcRn
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> TcM a)
+              -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExpr GhcTcId)
 tcSyntaxOpGen orig op arg_tys res_ty thing_inside
   = do { (expr, sigma) <- tcInferSigma $ noLoc $ syn_expr op
@@ -1476,7 +1514,7 @@ two tcSynArgs.
 tcSynArgE :: CtOrigin
           -> TcSigmaType
           -> SyntaxOpType                -- ^ shape it is expected to have
-          -> ([TcSigmaType] -> TcM a)    -- ^ check the arguments
+          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper)
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig sigma_ty syn_ty thing_inside
@@ -1486,26 +1524,26 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
     go rho_ty SynAny
-      = do { result <- thing_inside [rho_ty]
+      = do { result <- thing_inside [rho_ty] []
            ; return (result, idHsWrapper) }
 
     go rho_ty SynRho   -- same as SynAny, because we skolemise eagerly
-      = do { result <- thing_inside [rho_ty]
+      = do { result <- thing_inside [rho_ty] []
            ; return (result, idHsWrapper) }
 
     go rho_ty SynList
       = do { (list_co, elt_ty) <- matchExpectedListTy rho_ty
-           ; result <- thing_inside [elt_ty]
+           ; result <- thing_inside [elt_ty] []
            ; return (result, mkWpCastN list_co) }
 
     go rho_ty (SynFun arg_shape res_shape)
-      = do { ( ( ( (result, arg_ty, res_ty)
+      = do { ( ( ( (result, arg_ty, res_ty, op_mult, _res_mult)
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
                <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
-                  do { arg_tc_ty <- expTypeToType arg_ty
+                  do { arg_tc_ty <- expTypeToType (scaledThing arg_ty)
                      ; res_tc_ty <- expTypeToType res_ty
 
                          -- another nested arrow is too much for now,
@@ -1516,24 +1554,25 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                                , text "Too many nested arrows in SyntaxOpType" $$
                                  pprCtOrigin orig )
 
+                     ; let arg_mult = scaledMult arg_ty
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
-                       \ arg_results ->
+                       \ arg_results arg_res_mults ->
                        tcSynArgE orig res_tc_ty res_shape $
-                       \ res_results ->
-                       do { result <- thing_inside (arg_results ++ res_results)
-                          ; return (result, arg_tc_ty, res_tc_ty) }}
+                       \ res_results res_res_mults ->
+                       do { result <- thing_inside (arg_results ++ res_results) ([arg_mult] ++ arg_res_mults ++ res_res_mults)
+                          ; return (result, arg_tc_ty, res_tc_ty, arg_mult, arg_mult) }}
 
            ; return ( result
                     , match_wrapper <.>
                       mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              arg_ty res_ty doc ) }
+                              (Scaled op_mult arg_ty) res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"
         doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypeET orig GenSigCtxt the_ty rho_ty
-           ; result <- thing_inside []
+           ; result <- thing_inside [] []
            ; return (result, wrap) }
 
 -- works on "actual" types, instantiating where necessary
@@ -1542,7 +1581,7 @@ tcSynArgA :: CtOrigin
           -> TcSigmaType
           -> [SyntaxOpType]              -- ^ argument shapes
           -> SyntaxOpType                -- ^ result shape
-          -> ([TcSigmaType] -> TcM a)    -- ^ check the arguments
+          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper, [HsWrapper], HsWrapper)
             -- ^ returns a wrapper to be applied to the original function,
             -- wrappers to be applied to arguments
@@ -1552,24 +1591,24 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
            <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
-           <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->
+           <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_mults ->
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
-              thing_inside (arg_results ++ res_results)
+              thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_mults)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
     herald = text "This rebindable syntax expects a function with"
 
     tc_syn_args_e :: [TcSigmaType] -> [SyntaxOpType]
-                  -> ([TcSigmaType] -> TcM a)
+                  -> ([TcSigmaType] -> [Mult] -> TcM a)
                   -> TcM (a, [HsWrapper])
                     -- the wrappers are for arguments
     tc_syn_args_e (arg_ty : arg_tys) (arg_shape : arg_shapes) thing_inside
       = do { ((result, arg_wraps), arg_wrap)
-               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results ->
-                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results ->
-                  thing_inside (arg1_results ++ args_results)
+               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results arg1_mults ->
+                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results args_mults ->
+                  thing_inside (arg1_results ++ args_results) (arg1_mults ++ args_mults)
            ; return (result, arg_wrap : arg_wraps) }
-    tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside []
+    tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside [] []
 
     tc_syn_arg :: TcSigmaType -> SyntaxOpType
                -> ([TcSigmaType] -> TcM a)
@@ -1740,9 +1779,8 @@ tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty
 tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
-      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
-                          ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl)
-                                                    res_ty }
+      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (scaledThing arg)
+                          ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl) res_ty }
 tcCheckRecSelId _ (XAmbiguousFieldOcc _) _ = panic "tcCheckRecSelId"
 
 ------------------------
@@ -1791,6 +1829,7 @@ tc_infer_id lbl id_name
              ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
                      ; checkThLocalId id
+                     ; tcEmitBindingUsage $ unitUE id_name One
                      ; return_id id }
 
              AGlobal (AnId id)
@@ -1822,7 +1861,12 @@ tc_infer_id lbl id_name
                  theta' = substTheta subst theta
                  rho'   = substTy subst rho
            ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
-           ; addDataConStupidTheta con tys'
+           ; addDataConStupidTheta con (drop (length (fst $ dataConMulVars con)) tys')
+           -- The first K arguments of `tys'` are multiplicities.
+           -- They are followed by the dictionaries which are the stupid
+           -- theta. Thus, we ignore the first K arguments as we just want to
+           -- instantiate dictionary arguments in `addDataConStupidTheta`.
+           -- It might be better to use `dataConRepType` in `con_ty` below.
            ; return ( mkHsWrap wrap (HsConLikeOut noExt (RealDataCon con))
                     , rho') }
 
@@ -1848,7 +1892,7 @@ tcUnboundId rn_expr unbound res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
-      ; let ev = mkLocalId name ty
+      ; let ev = mkLocalId name Omega ty
       ; can <- newHoleCt (ExprHole unbound) ev ty
       ; emitInsoluble can
       ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExt (noLoc ev))
@@ -2099,7 +2143,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                                      ++ prov_theta
                                      ++ req_theta
                             flds = conLikeFieldLabels con
-                            fixed_tvs = exactTyCoVarsOfTypes fixed_tys
+                            fixed_tvs = exactTyCoVarsOfTypes (map scaledThing fixed_tys)
                                     -- fixed_tys: See Note [Type of a record update]
                                         `unionVarSet` tyCoVarsOfTypes theta
                                     -- Universally-quantified tyvars that
@@ -2442,7 +2486,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
         do { rhs' <- tcPolyExprNC rhs field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        field_ty loc
+                                        Omega field_ty loc
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

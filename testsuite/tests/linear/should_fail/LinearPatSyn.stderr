@@ -1,0 +1,11 @@
+
+LinearPatSyn.hs:14:4: error:
+    • Nontrivial multiplicity equalities are currently not supported
+    • In the pattern: P y x
+      In an equation for ‘s’: s (P y x) = (y, x)
+
+LinearPatSyn.hs:14:4: error:
+    • Couldn't match type ‘'Omega’ with ‘'One’
+        arising from a non-linear pattern
+    • In the pattern: P y x
+      In an equation for ‘s’: s (P y x) = (y, x)

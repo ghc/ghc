@@ -50,6 +50,7 @@ import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
 import Type
+import Multiplicity
 import TyCoRep
 import TcType
 import HscTypes
@@ -151,7 +152,7 @@ deeplySkolemise ty
 
     go subst ty
       | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-      = do { let arg_tys' = substTys subst arg_tys
+      = do { let arg_tys' = substScaledTys subst arg_tys
            ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
            ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
@@ -263,7 +264,7 @@ deeply_instantiate :: CtOrigin
 deeply_instantiate orig subst ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; let arg_tys' = substTys   subst' arg_tys
+       ; let arg_tys' = substScaledTys subst' arg_tys
              theta'   = substTheta subst' theta
        ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
@@ -443,7 +444,7 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
        ; return (subst', mkTyVarTy tv') }
 
 tcInstInvisibleTyBinder subst (Anon af ty)
-  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst ty)
+  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
     -- Equality is the *only* constraint currently handled in types.
     -- See Note [Constraints in kinds] in TyCoRep
   = ASSERT( af == InvisArg )
@@ -550,7 +551,7 @@ newNonTrivialOverloadedLit orig
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
-                      \_ -> return ()
+                      \_ _ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness
