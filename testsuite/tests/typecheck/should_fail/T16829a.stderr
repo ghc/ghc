@@ -1,0 +1,6 @@
+
+T16829a.hs:9:1: error:
+    • Kind signature on newtype declaration has non-*
+      return kind ‘TYPE 'IntRep’
+      Perhaps you intended to use UnliftedNewtypes
+    • In the newtype declaration for ‘T’
