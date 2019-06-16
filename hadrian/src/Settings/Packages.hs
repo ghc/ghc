@@ -34,7 +34,7 @@ packageArgs = do
 
         ------------------------------ bytestring ------------------------------
         , package bytestring ?
-          builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"
+          builder (Cabal Flags) ? intLib /= integerGmp ? arg "-integer-gmp"
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -173,8 +173,8 @@ packageArgs = do
         -- detects the same integer library again, even though we don't build it
         -- in Stage1, and at that point the configuration is just wrong.
         , package text ?
-          builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure ["+integer-simple", "-bytestring-builder"] ]
+          builder (Cabal Flags) ? notStage0 ? intLib /= integerGmp ? arg "-integer-gmp"
+        ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
