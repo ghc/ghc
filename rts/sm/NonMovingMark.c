@@ -382,6 +382,11 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
 void
 markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 {
+    /* We should not make it here if we are doing a deadlock detect GC.
+     * See Note [Deadlock detection under nonmoving collector].
+     */
+    ASSERT(!deadlock_detect_gc);
+
     // Are we at the end of the block?
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.

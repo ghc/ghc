@@ -104,6 +104,7 @@
  */
 uint32_t N;
 bool major_gc;
+bool deadlock_detect_gc;
 
 /* Data used for allocation area sizing.
  */
@@ -194,6 +195,7 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 void
 GarbageCollect (uint32_t collect_gen,
                 const bool do_heap_census,
+                const bool deadlock_detect,
                 uint32_t gc_type USED_IF_THREADS,
                 Capability *cap,
                 bool idle_cap[])
@@ -262,6 +264,9 @@ GarbageCollect (uint32_t collect_gen,
    */
   N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
+
+  /* See Note [Deadlock detection under nonmoving collector]. */
+  deadlock_detect_gc = deadlock_detect;
 
   /* N.B. The nonmoving collector works a bit differently. See
    * Note [Static objects under the nonmoving collector].
