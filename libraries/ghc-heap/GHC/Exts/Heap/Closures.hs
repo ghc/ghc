@@ -229,7 +229,15 @@ data GenClosure b
         }
 
     -- | An @MVar#@, with a queue of thread state objects blocking on them
-  | MVarClosure
+    | MVarClosure
+    { info       :: !StgInfoTable
+    , queueHead  :: !b              -- ^ Pointer to head of queue
+    , queueTail  :: !b              -- ^ Pointer to tail of queue
+    , value      :: !b              -- ^ Pointer to closure
+    }
+
+    -- | An @IOPort#@, with a queue of thread state objects blocking on them
+  | IOPortClosure
         { info       :: !StgInfoTable
         , queueHead  :: !b              -- ^ Pointer to head of queue
         , queueTail  :: !b              -- ^ Pointer to tail of queue
@@ -340,6 +348,7 @@ allClosures (MutArrClosure {..}) = mccPayload
 allClosures (SmallMutArrClosure {..}) = mccPayload
 allClosures (MutVarClosure {..}) = [var]
 allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
+allClosures (IOPortClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer, link]

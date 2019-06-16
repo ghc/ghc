@@ -1745,7 +1745,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     weakPrimTyConKey, mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
-    stablePtrTyConKey, eqTyConKey, heqTyConKey,
+    stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
     stringTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
@@ -1781,11 +1781,12 @@ mutableArrayPrimTyConKey                = mkPreludeTyConUnique 30
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 31
 orderingTyConKey                        = mkPreludeTyConUnique 32
 mVarPrimTyConKey                        = mkPreludeTyConUnique 33
-ratioTyConKey                           = mkPreludeTyConUnique 34
-rationalTyConKey                        = mkPreludeTyConUnique 35
-realWorldTyConKey                       = mkPreludeTyConUnique 36
-stablePtrPrimTyConKey                   = mkPreludeTyConUnique 37
-stablePtrTyConKey                       = mkPreludeTyConUnique 38
+ioPortPrimTyConKey                      = mkPreludeTyConUnique 34
+ratioTyConKey                           = mkPreludeTyConUnique 35
+rationalTyConKey                        = mkPreludeTyConUnique 36
+realWorldTyConKey                       = mkPreludeTyConUnique 37
+stablePtrPrimTyConKey                   = mkPreludeTyConUnique 38
+stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
 arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 42
