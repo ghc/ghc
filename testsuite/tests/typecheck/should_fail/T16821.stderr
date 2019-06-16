@@ -1,0 +1,5 @@
+
+T16821.hs:11:1: error:
+    • Kind signature on newtype declaration has non-*
+      return kind ‘Id *’
+    • In the newtype declaration for ‘T’
