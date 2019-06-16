@@ -254,7 +254,11 @@
    by tryWakeupThread() */
 #define ThreadMigrating     13
 
-/* WARNING WARNING top number is BlockedOnMVarRead 14, not 13!! */
+/* Lightweight non-deadlock checked version of MVar.  Used for the why_blocked
+   field of a TSO.  */
+#define BlockedOnIOCompletion  15
+
+/* Next number is 16.  */
 
 /*
  * These constants are returned to the scheduler by a thread that has

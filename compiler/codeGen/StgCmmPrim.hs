@@ -1477,6 +1477,7 @@ translateOp _      Double2FloatOp = Just (MO_FF_Conv W64 W32)
 
 translateOp dflags SameMutVarOp           = Just (mo_wordEq dflags)
 translateOp dflags SameMVarOp             = Just (mo_wordEq dflags)
+translateOp dflags SameIOPortOp           = Just (mo_wordEq dflags)
 translateOp dflags SameMutableArrayOp     = Just (mo_wordEq dflags)
 translateOp dflags SameMutableByteArrayOp = Just (mo_wordEq dflags)
 translateOp dflags SameMutableArrayArrayOp= Just (mo_wordEq dflags)

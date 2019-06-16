@@ -2758,6 +2758,45 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+
+------------------------------------------------------------------------
+section "Synchronized I/O Ports"
+        {Operations on {\tt IOPort\#}s. }
+------------------------------------------------------------------------
+
+primtype IOPort# s a
+        { A shared I/O port is almost the same as a {\tt MVar\#}!).
+        The main difference is that IOPort has no deadlock detection or
+        deadlock breaking code that forcibly releases the lock. }
+
+primop  NewIOPortrOp "newIOPort#"  GenPrimOp
+   State# s -> (# State# s, IOPort# s a #)
+   {Create new {\tt IOPort\#}; initially empty.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  ReadIOPortOp "readIOPort#" GenPrimOp
+   IOPort# s a -> State# s -> (# State# s, a #)
+   {If {\tt IOPort\#} is empty, block until it becomes full.
+   Then remove and return its contents, and set it empty.}
+   with
+   out_of_line      = True
+   has_side_effects = True
+
+primop  WriteIOPortOp "writeIOPort#" GenPrimOp
+   IOPort# s a -> a -> State# s -> (# State# s, Int# #)
+   {If {\tt IOPort\#} is full, immediately return with integer 0.
+    Otherwise, store value arg as {\tt IOPort\#}'s new contents,
+    and return with integer 1. }
+   with
+   out_of_line      = True
+   has_side_effects = True
+
+primop  SameIOPortOp "sameIOPort#" GenPrimOp
+   IOPort# s a -> IOPort# s a -> Int#
+
+
 ------------------------------------------------------------------------
 section "Delay/wait operations"
 ------------------------------------------------------------------------

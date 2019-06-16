@@ -1648,6 +1648,7 @@ inner_loop:
         retainPushClosure((StgClosure *) tso->trec, c, c_child_r);
         if (   tso->why_blocked == BlockedOnMVar
                || tso->why_blocked == BlockedOnMVarRead
+               || tso->why_blocked == BlockedOnIOCompletion
                || tso->why_blocked == BlockedOnBlackHole
                || tso->why_blocked == BlockedOnMsgThrowTo
             ) {

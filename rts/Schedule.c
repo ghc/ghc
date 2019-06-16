@@ -183,6 +183,7 @@ schedule (Capability *initialCapability, Task *task)
   bool ready_to_gc;
 
   cap = initialCapability;
+  t = NULL;
 
   // Pre-condition: this task owns initialCapability.
   // The sched_mutex is *NOT* held
@@ -286,8 +287,13 @@ schedule (Capability *initialCapability, Task *task)
     // Additionally, it is not fatal for the
     // threaded RTS to reach here with no threads to run.
     //
+    // Since IOPorts have no deadlock avoidance guarantees you may also reach
+    // this point when blocked on an IO Port.  If this is the case the only
+    // thing that could unblock it is an I/O event.
+    //
     // win32: might be here due to awaitEvent() being abandoned
-    // as a result of a console event having been delivered.
+    // as a result of a console event having been delivered or as a result of
+    // waiting on an async I/O to complete with WinIO.
 
 #if defined(THREADED_RTS)
     scheduleYield(&cap,task);
@@ -295,9 +301,23 @@ schedule (Capability *initialCapability, Task *task)
     if (emptyRunQueue(cap)) continue; // look for work again
 #endif
 
-#if !defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
+#if !defined(THREADED_RTS)
     if ( emptyRunQueue(cap) ) {
+        /* On the non-threaded RTS if the queue is empty and the last action was
+            blocked on an I/O completion port, then just wait till we're woken
+            up by the RTS with more work.  */
+        if (t && t->why_blocked == BlockedOnIOCompletion)
+            {
+                fprintf (stderr, "waiting: %d.\n", t->why_blocked);
+                awaitEvent (emptyRunQueue(cap));
+                fprintf (stderr, "running: %d.\n", t->why_blocked);
+                continue;
+            }
+        continue;
+
+#if !defined(mingw32_HOST_OS)
         ASSERT(sched_state >= SCHED_INTERRUPTING);
+#endif
     }
 #endif
 
@@ -913,6 +933,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          */
         if (recent_activity != ACTIVITY_INACTIVE) return;
 #endif
+        if (task->incall->tso->why_blocked == BlockedOnIOCompletion) return;
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
 
@@ -964,6 +985,10 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
             case BlockedOnMVarRead:
                 throwToSingleThreaded(cap, task->incall->tso,
                                       (StgClosure *)nonTermination_closure);
+                return;
+            case BlockedOnIOCompletion:
+                /* We're blocked waiting for an external I/O call, let's just
+                   chill for a bit.  */
                 return;
             default:
                 barf("deadlock: main thread blocked in a strange way");
@@ -2623,9 +2648,10 @@ initScheduler(void)
   sched_state    = SCHED_RUNNING;
   recent_activity = ACTIVITY_YES;
 
-#if defined(THREADED_RTS)
+
   /* Initialise the mutex and condition variables used by
    * the scheduler. */
+#if defined(THREADED_RTS)
   initMutex(&sched_mutex);
 #endif
 
@@ -3042,6 +3068,11 @@ resurrectThreads (StgTSO *threads)
             throwToSingleThreaded(cap, tso,
                                   (StgClosure *)blockedIndefinitelyOnSTM_closure);
             break;
+        case BlockedOnIOCompletion:
+            /* I/O Ports may not be reachable by the GC as they may be getting
+             * notified by the RTS.  As such this call should be treated as if
+             * it is masking the exception.  */
+            continue;
         case NotBlocked:
             /* This might happen if the thread was blocked on a black hole
              * belonging to a thread that we've just woken up (raiseAsync
