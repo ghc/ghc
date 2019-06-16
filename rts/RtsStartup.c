@@ -46,7 +46,8 @@
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-#include "win32/AsyncIO.h"
+#include "win32/AsyncMIO.h"
+#include "win32/AsyncWinIO.h"
 #endif
 
 #if defined(mingw32_HOST_OS)
@@ -299,10 +300,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)nestedAtomically_closure);
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
+    getStablePtr((StgPtr)interruptIOManager_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
 #if !defined(mingw32_HOST_OS)
     getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlersPtr_closure);
+#else
+    getStablePtr((StgPtr)processRemoteCompletion_closure);
 #endif
 
     // Initialize the top-level handler system
@@ -338,7 +342,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    startupAsyncIO();
+   if (is_io_mng_native_p())
+      startupAsyncWinIO();
+    else
+      startupAsyncIO();
 #endif
 
     x86_init_fpu();
@@ -520,7 +527,10 @@ hs_exit_(bool wait_foreign)
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    shutdownAsyncIO(wait_foreign);
+    if (is_io_mng_native_p())
+      shutdownAsyncWinIO(wait_foreign);
+    else
+      shutdownAsyncIO(wait_foreign);
 #endif
 
     /* free hash table storage */

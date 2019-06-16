@@ -15,7 +15,7 @@ module GHC.Event.Thread
     , registerDelay
     , blockedOnBadFD -- used by RTS
     ) where
-
+-- TODO: Use new Windows I/O manager
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
