@@ -10,6 +10,7 @@
 #include "Printer.h"
 #include "TraceDump.h"
 #include "MarkWeak.h" // scavengeLiveWeak
+#include "Trace.h"
 
 void
 nonmovingScavengeOne (StgClosure *q)
@@ -134,7 +135,7 @@ nonmovingScavengeOne (StgClosure *q)
         // moving heap which may be long gone by the time we call
         // nonmovingTidyWeaks.
         StgWeak *weak = (StgWeak *) p;
-        debugBelch("nonmovingScav: evac key %p (gen=%d) of weak %p\n",
+        debugTrace(DEBUG_weak, "nonmovingScav: evac key %p (gen=%d) of weak %p\n",
                    weak->key, Bdescr(weak->key)->gen_no, weak);
         //gct->eager_promotion = true;
         //evacuate(&weak->key);

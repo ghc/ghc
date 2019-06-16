@@ -3074,7 +3074,7 @@ resurrectThreads (StgTSO *threads)
 
     for (tso = threads; tso != END_TSO_QUEUE; tso = next) {
         next = tso->global_link;
-        debugBelch("resurrect %p\n", tso);
+        debugTrace(DEBUG_weak, "resurrect %p\n", tso);
 
         gen = Bdescr((P_)tso)->gen;
         tso->global_link = gen->threads;
