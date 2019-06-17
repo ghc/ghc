@@ -639,6 +639,22 @@ else
 fi
 AC_SUBST([DlltoolCmd])
 
+
+dnl ** which windres to use?
+dnl --------------------------------------------------------------
+# The host normalization on Windows breaks autoconf, it no longer
+# thinks that target == host so it never checks the unqualified
+# tools for Windows. See #14274.
+if test "$HostOS" = "mingw32"
+then
+    AC_PATH_PROG([Windres],[windres])
+    WindresCmd="$(cygpath -m $Windres)"
+else
+    AC_CHECK_TARGET_TOOL([Windres], [windres])
+    WindresCmd="$Windres"
+fi
+AC_SUBST([WindresCmd])
+
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
