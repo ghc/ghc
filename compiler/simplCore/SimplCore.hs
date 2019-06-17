@@ -488,11 +488,12 @@ ruleCheckPass current_phase pat guts =
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
+    ; ruleFunEnv <- getRuleFunEnv
     ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
                         ++ (mg_rules guts)
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    (defaultDumpStyle dflags)
-                   (ruleCheckProgram current_phase pat
+                   (ruleCheckProgram ruleFunEnv current_phase pat
                       rule_fn (mg_binds guts))
     ; return guts }
 
@@ -554,21 +555,21 @@ observe do_pass = doPassM $ \binds -> do
 ************************************************************************
 -}
 
-simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
+simplifyExpr :: HscEnv -- it's dflags includes spec of what core-to-core passes to do
              -> CoreExpr
              -> IO CoreExpr
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
 --
 -- Also used by Template Haskell
-simplifyExpr dflags expr
+simplifyExpr hscEnv expr
   = withTiming dflags (text "Simplify [expr]") (const ()) $
     do  {
         ; us <-  mkSplitUniqSupply 's'
 
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl dflags emptyRuleEnv
+        ; (expr', counts) <- initSmpl hscEnv emptyRuleEnv
                                emptyFamInstEnvs us sz
                                (simplExprGently (simplEnvForGHCi dflags) expr)
 
@@ -580,6 +581,8 @@ simplifyExpr dflags expr
 
         ; return expr'
         }
+  where
+    dflags = hsc_dflags hscEnv
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- Simplifies an expression
@@ -704,7 +707,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
                 -- Simplify the program
            ((binds1, rules1), counts1) <-
-             initSmpl dflags (mkRuleEnv rule_base2 vis_orphs) fam_envs us1 sz $
+             initSmpl hsc_env (mkRuleEnv rule_base2 vis_orphs) fam_envs us1 sz $
                do { (floats, env1) <- {-# SCC "SimplTopBinds" #-}
                                       simplTopBinds simpl_env tagged_binds
 

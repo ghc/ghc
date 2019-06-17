@@ -86,7 +86,7 @@ module CoreSyn (
 
         -- * Core rule data types
         CoreRule(..), RuleBase,
-        RuleName, RuleFun, IdUnfoldingFun, InScopeEnv,
+        RuleName, RuleFun, RuleFunEnv(..), IdUnfoldingFun, InScopeEnv,
         RuleEnv(..), mkRuleEnv, emptyRuleEnv,
 
         -- ** Operations on 'CoreRule's
@@ -117,6 +117,7 @@ import Util
 import UniqSet
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
+import {-# SOURCE #-} HscTypes
 
 import Data.Data hiding (TyCon)
 import Data.Int
@@ -1385,7 +1386,13 @@ data CoreRule
     }
                 -- See Note [Extra args in rule matching] in Rules.hs
 
-type RuleFun = DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+data RuleFunEnv = RuleFunEnv {
+  dynFlags         :: DynFlags,
+  homePackageTable :: HomePackageTable,
+  packageTypeEnv   :: PackageTypeEnv
+  }
+
+type RuleFun = RuleFunEnv -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
 type InScopeEnv = (InScopeSet, IdUnfoldingFun)
 
 type IdUnfoldingFun = Id -> Unfolding

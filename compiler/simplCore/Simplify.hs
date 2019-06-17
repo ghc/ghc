@@ -32,7 +32,7 @@ import FamInstEnv       ( topNormaliseType_maybe )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
                         , dataConRepArgTys, isUnboxedTupleCon
                         , StrictnessMark (..) )
-import CoreMonad        ( Tick(..), SimplMode(..) )
+import CoreMonad        ( Tick(..), SimplMode(..), getRuleFunEnv )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
 import PprCore          ( pprCoreExpr )
@@ -55,7 +55,6 @@ import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
 import PrimOp          ( PrimOp (SeqOp) )
-
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -2016,29 +2015,30 @@ tryRules env rules fn args call_cont
       ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
 -}
 
-  | Just (rule, rule_rhs) <- lookupRule dflags (getUnfoldingInRuleMatch env)
-                                        (activeRule (getMode env)) fn
-                                        (argInfoAppArgs args) rules
-  -- Fire a rule for the function
-  = do { checkedTick (RuleFired (ruleName rule))
-       ; let cont' = pushSimplifiedArgs zapped_env
-                                        (drop (ruleArity rule) args)
-                                        call_cont
-                     -- (ruleArity rule) says how
-                     -- many args the rule consumed
+  | otherwise = do
+      ruleRunEnv <- getRuleFunEnv
+      case (lookupRule ruleRunEnv (getUnfoldingInRuleMatch env)
+                       (activeRule (getMode env)) fn
+                       (argInfoAppArgs args) rules) of
+       -- Fire a rule for the function
+       Just (rule, rule_rhs) -> do { checkedTick (RuleFired (ruleName rule))
+           ; let cont' = pushSimplifiedArgs zapped_env
+                                            (drop (ruleArity rule) args)
+                                            call_cont
+                         -- (ruleArity rule) says how
+                         -- many args the rule consumed
 
-             occ_anald_rhs = occurAnalyseExpr rule_rhs
-                 -- See Note [Occurrence-analyse after rule firing]
-       ; dump rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
-            -- The occ_anald_rhs and cont' are all Out things
-            -- hence zapping the environment
+                 occ_anald_rhs = occurAnalyseExpr rule_rhs
+                     -- See Note [Occurrence-analyse after rule firing]
+           ; dump rule rule_rhs
+           ; return (Just (zapped_env, occ_anald_rhs, cont')) }
+                -- The occ_anald_rhs and cont' are all Out things
+                -- hence zapping the environment
 
-  | otherwise  -- No rule fires
-  = do { nodump  -- This ensures that an empty file is written
-       ; return Nothing }
-
-  where
+        -- No rule fires
+       _ -> do { nodump  -- This ensures that an empty file is written
+              ; return Nothing }
+   where
     dflags     = seDynFlags env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 

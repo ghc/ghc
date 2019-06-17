@@ -221,9 +221,6 @@ clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 logWarnings :: WarningMessages -> Hsc ()
 logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
-getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w)
-
 handleWarnings :: Hsc ()
 handleWarnings = do
     dflags <- getDynFlags
@@ -1876,7 +1873,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}
-         ; simpl_expr <- simplifyExpr dflags ds_expr
+         ; simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
          ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr

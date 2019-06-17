@@ -7,9 +7,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 module SimplMonad (
         -- The monad
-        SimplM,
+        SimplM(..),
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs,
+        getSimplRules, getFamEnvs, getHscEnv,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -40,6 +40,7 @@ import Util                ( count )
 import Panic               (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
+import HscTypes
 
 {-
 ************************************************************************
@@ -62,24 +63,25 @@ newtype SimplM result
     deriving (Functor)
 
 data SimplTopEnv
-  = STE { st_flags     :: DynFlags
+  = STE { st_hsc_env   :: HscEnv
         , st_max_ticks :: IntWithInf  -- Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
         , st_fams      :: (FamInstEnv, FamInstEnv) }
 
-initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
+initSmpl :: HscEnv -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
          -> Int                 -- Size of the bindings, used to limit
                                 -- the number of ticks we allow
          -> SimplM a
          -> IO (a, SimplCount)
 
-initSmpl dflags rules fam_envs us size m
-  = do (result, _, count) <- unSM m env us (zeroSimplCount dflags)
+initSmpl hscEnv rules fam_envs us size m
+  = do (result, _, count) <- unSM m env us (zeroSimplCount (hsc_dflags hscEnv))
        return (result, count)
   where
-    env = STE { st_flags = dflags, st_rules = rules
-              , st_max_ticks = computeMaxTicks dflags size
+    env = STE { st_hsc_env = hscEnv
+              , st_rules = rules
+              , st_max_ticks = computeMaxTicks (hsc_dflags hscEnv) size
               , st_fams = fam_envs }
 
 computeMaxTicks :: DynFlags -> Int -> IntWithInf
@@ -165,7 +167,10 @@ instance MonadUnique SimplM where
                                 (us1, us2) -> return (uniqsFromSupply us1, us2, sc))
 
 instance HasDynFlags SimplM where
-    getDynFlags = SM (\st_env us sc -> return (st_flags st_env, us, sc))
+    getDynFlags = SM (\st_env us sc -> return (hsc_dflags (st_hsc_env st_env), us, sc))
+
+instance HasHscEnv SimplM where
+    getHscEnv = SM (\st_env us sc -> return (st_hsc_env st_env, us, sc))
 
 instance MonadIO SimplM where
     liftIO m = SM $ \_ us sc -> do
@@ -208,8 +213,10 @@ getSimplCount :: SimplM SimplCount
 getSimplCount = SM (\_st_env us sc -> return (sc, us, sc))
 
 tick :: Tick -> SimplM ()
-tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
-                              in sc' `seq` return ((), us, sc'))
+tick t = SM (\st_env us sc ->
+               let dflags = hsc_dflags (st_hsc_env st_env)
+                   sc' = doSimplTick dflags t sc
+               in sc' `seq` return ((), us, sc'))
 
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
@@ -218,7 +225,7 @@ checkedTick t
            if st_max_ticks st_env <= mkIntWithInf (simplCountN sc)
            then throwGhcExceptionIO $
                   PprProgramError "Simplifier ticks exhausted" (msg sc)
-           else let sc' = doSimplTick (st_flags st_env) t sc
+           else let sc' = doSimplTick (hsc_dflags (st_hsc_env st_env)) t sc
                 in sc' `seq` return ((), us, sc'))
   where
     msg sc = vcat

@@ -345,6 +345,8 @@ test ('T15164',
       compile,
       ['-v0 -O'])
 
+test('T15842', normal, makefile_test, ['T15842'])
+
 # See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_186960
 test ('WWRec',
       [ collect_compiler_stats('bytes allocated',2)
