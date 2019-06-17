@@ -28,6 +28,64 @@ import GHC.Show
 import GHC.Generics
 import GHC.Real
 
+infixr 6 <>
+
+-- | The class of semigroups (types with an associative binary operation).
+--
+-- Instances should satisfy the following:
+--
+-- [Associativity] @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
+--
+-- @since 4.9.0.0
+class Semigroup a where
+        -- | An associative operation.
+        (<>) :: a -> a -> a
+
+        -- | Reduce a non-empty list with '<>'
+        --
+        -- The default definition should be sufficient, but this can be
+        -- overridden for efficiency.
+        --
+        sconcat :: NonEmpty a -> a
+        sconcat = sconcatDefault
+
+        -- | Repeat a value @n@ times.
+        --
+        -- Given that this works on a 'Semigroup' it is allowed to fail if
+        -- you request 0 or fewer repetitions, and the default definition
+        -- will do so.
+        --
+        -- By making this a member of the class, idempotent semigroups
+        -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
+        -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
+        -- 'stimesIdempotentMonoid'@ respectively.
+        stimes :: Integral b => b -> a -> a
+        stimes = stimesDefault
+        -- Inline after the built-in rule 'stimes_IntegerToWord' had a chance to
+        -- fire.
+        {-# NOINLINE [2] stimes #-}
+
+-- | Calls 'stimes' with @n@ specialised to 'Word'.
+--
+-- This is mainly intended to be used by the built-in rule
+-- @stimes_IntegerToWord@. It enables the usage of @Word@-based arithmetic,
+-- which is much cheaper than @Integer@-based arithmetic.
+wordStimes :: forall a . Semigroup a => Word -> a -> a
+wordStimes n x = stimes n x
+
+sconcatDefault :: forall a . Semigroup a => NonEmpty a -> a
+sconcatDefault (a :| as) = go a as where
+  go b (c:cs) = b <> go c cs
+  go b []     = b
+
+-- | @since 4.9.0.0
+instance Semigroup [a] where
+        (<>) = (++)
+        {-# INLINE (<>) #-}
+
+        stimes = stimesList
+        {-# NOINLINE [2] stimes #-}
+
 -- | This is a valid definition of 'stimes' for an idempotent 'Semigroup'.
 --
 -- When @x <> x = x@, this definition should be preferred, because it

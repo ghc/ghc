@@ -29,7 +29,7 @@ module CoreMonad (
     getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
     getVisibleOrphanMods, getUniqMask,
-    getPrintUnqualified, getSrcSpanM,
+    getPrintUnqualified, getSrcSpanM, getRuleFunEnv,
 
     -- ** Writing to the monad
     addSimplCount,
@@ -675,9 +675,6 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 ************************************************************************
 -}
 
-getHscEnv :: CoreM HscEnv
-getHscEnv = read cr_hsc_env
-
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
 
@@ -704,6 +701,9 @@ instance HasDynFlags CoreM where
 instance HasModule CoreM where
     getModule = read cr_module
 
+instance HasHscEnv CoreM where
+  getHscEnv = read cr_hsc_env
+
 -- | The original name cache is the current mapping from 'Module' and
 -- 'OccName' to a compiler-wide unique 'Name'
 getOrigNameCache :: CoreM OrigNameCache
@@ -716,6 +716,25 @@ getPackageFamInstEnv = do
     hsc_env <- getHscEnv
     eps <- liftIO $ hscEPS hsc_env
     return $ eps_fam_inst_env eps
+
+getRuleFunEnv :: (HasHscEnv m, MonadIO m) => m RuleFunEnv
+getRuleFunEnv = do
+  hscEnv <- getHscEnv
+  packageTypeEnv <- getPackageTypeEnv
+  return RuleFunEnv {
+    dynFlags = hsc_dflags hscEnv,
+    homePackageTable = hsc_HPT hscEnv,
+    packageTypeEnv = packageTypeEnv }
+  where
+    getPackageTypeEnv :: (HasHscEnv m, MonadIO m) => m PackageTypeEnv
+    getPackageTypeEnv = do
+      eps <- getEPS
+      return $ eps_PTE eps
+
+    getEPS :: (HasHscEnv m, MonadIO m) => m ExternalPackageState
+    getEPS = do
+      hscEnv <- getHscEnv
+      liftIO . readIORef $ hsc_EPS hscEnv
 
 {-
 ************************************************************************
