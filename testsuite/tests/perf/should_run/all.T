@@ -367,3 +367,11 @@ test('T15578',
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
+
+# Test performance of creating Uniques.
+test('UniqLoop',
+     [collect_stats('bytes allocated',5),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O -package ghc'])

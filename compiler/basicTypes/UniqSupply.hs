@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE BangPatterns #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -88,7 +89,7 @@ takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
 
 mkSplitUniqSupply c
   = case ord c `shiftL` uNIQUE_BITS of
-     mask -> let
+     !mask -> let
         -- here comes THE MAGIC:
 
         -- This is one of the most hammered bits in the whole compiler
