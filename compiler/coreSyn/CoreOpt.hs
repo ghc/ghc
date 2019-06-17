@@ -623,16 +623,19 @@ add_info env old_bndr top_level new_rhs new_bndr
    -- unfolding we already have.
    new_info :: IdInfo
    new_info = case mb_new_info of
-    Just info -> info
+    Just info ->
+      info `setUnfoldingInfo` new_unfolding
     Nothing ->
-      let new_unfolding =
-                mkUnfolding
-                  dflags
-                  InlineRhs
-                  (isTopLevel top_level)
-                  False -- may be bottom or not
-                  new_rhs
-      in idInfo old_bndr `setUnfoldingInfo` new_unfolding
+      idInfo old_bndr `setUnfoldingInfo` new_unfolding
+
+    where
+      new_unfolding =
+        mkUnfolding
+          dflags
+          InlineRhs
+          (isTopLevel top_level)
+          False -- may be bottom or not
+          new_rhs
 
 simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id
