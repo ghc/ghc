@@ -105,8 +105,6 @@ module Data.Semigroup (
 
 import           Prelude             hiding (foldr1)
 
-import GHC.Base (Semigroup(..))
-
 import           Data.Semigroup.Internal
 
 import           Control.Applicative

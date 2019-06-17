@@ -678,6 +678,23 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 "^5/Integer"    forall x. x ^ (5 :: Integer) = let u = x in u*u*u*u*u
   #-}
 
+-- | Calls '^' with power specialised to 'Word'.
+--
+-- This is mainly intended to be used by the built-in rule
+-- @numExponentiation_IntegerToWord@. It enables the usage of @Word@-based
+-- arithmetic, which is much cheaper than @Integer@-based arithmetic.
+numWordExponentiation :: Num a => a -> Word -> a
+numWordExponentiation = (^)
+
+-- | Calls '^^' with power specialised to 'Word'.
+--
+-- This is mainly intended to be used by the built-in rule
+-- @fractionalExponentiation_IntegerToWord@. It enables the usage of
+-- @Word@-based arithmetic, which is much cheaper than @Integer@-based
+-- arithmetic.
+fractionalWordExponentiation :: Fractional a => a -> Word -> a
+fractionalWordExponentiation = (^^)
+
 -------------------------------------------------------
 -- Special power functions for Rational
 --

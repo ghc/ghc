@@ -118,8 +118,9 @@ module GHC.Base
         module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
         module GHC.Prim.Ext,    -- to avoid lots of people having to
         module GHC.Err,         -- import it explicitly
-        module GHC.Maybe
-  )
+        module GHC.Maybe,
+        module Data.Semigroup.Internal
+        )
         where
 
 import GHC.Types
@@ -142,6 +143,7 @@ import {-# SOURCE #-} Data.Semigroup.Internal ( stimesDefault
                                               , stimesMaybe
                                               , stimesList
                                               , stimesIdempotentMonoid
+                                              , Semigroup(..)
                                               )
 
 infixr 9  .
@@ -210,51 +212,6 @@ build = errorWithoutStackTrace "urk"
 foldr = errorWithoutStackTrace "urk"
 #endif
 
-infixr 6 <>
-
--- | The class of semigroups (types with an associative binary operation).
---
--- Instances should satisfy the following:
---
--- [Associativity] @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
---
--- @since 4.9.0.0
-class Semigroup a where
-        -- | An associative operation.
-        --
-        -- >>> [1,2,3] <> [4,5,6]
-        -- [1,2,3,4,5,6]
-        (<>) :: a -> a -> a
-
-        -- | Reduce a non-empty list with '<>'
-        --
-        -- The default definition should be sufficient, but this can be
-        -- overridden for efficiency.
-        --
-        -- >>> import Data.List.NonEmpty
-        -- >>> sconcat $ "Hello" :| [" ", "Haskell", "!"]
-        -- "Hello Haskell!"
-        sconcat :: NonEmpty a -> a
-        sconcat (a :| as) = go a as where
-          go b (c:cs) = b <> go c cs
-          go b []     = b
-
-        -- | Repeat a value @n@ times.
-        --
-        -- Given that this works on a 'Semigroup' it is allowed to fail if
-        -- you request 0 or fewer repetitions, and the default definition
-        -- will do so.
-        --
-        -- By making this a member of the class, idempotent semigroups
-        -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
-        -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
-        -- 'stimesIdempotentMonoid'@ respectively.
-        --
-        -- >>> stimes 4 [1]
-        -- [1,1,1,1]
-        stimes :: Integral b => b -> a -> a
-        stimes = stimesDefault
-
 
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following:
@@ -301,13 +258,6 @@ class Semigroup a => Monoid a where
         -- "Hello Haskell!"
         mconcat :: [a] -> a
         mconcat = foldr mappend mempty
-
--- | @since 4.9.0.0
-instance Semigroup [a] where
-        (<>) = (++)
-        {-# INLINE (<>) #-}
-
-        stimes = stimesList
 
 -- | @since 2.01
 instance Monoid [a] where

@@ -395,6 +395,13 @@ basicKnownKeyNames
         rationalToFloatName,
         rationalToDoubleName,
 
+        -- Real
+        numIntegralExponentiationName, fractionalIntegralExponentiationName,
+        numWordExponentiationName, fractionalWordExponentiationName,
+
+        -- Data.Semigroup
+        wordStimesName, integralStimesName,
+
         -- Other classes
         randomClassName, randomGenClassName, monadPlusClassName,
 
@@ -510,7 +517,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
-    dATA_COERCE, dEBUG_TRACE :: Module
+    dATA_COERCE, dEBUG_TRACE, dATA_SEMIGROUP_INTERNAL :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -549,6 +556,7 @@ gHC_FLOAT       = mkBaseModule (fsLit "GHC.Float")
 gHC_TOP_HANDLER = mkBaseModule (fsLit "GHC.TopHandler")
 sYSTEM_IO       = mkBaseModule (fsLit "System.IO")
 dYNAMIC         = mkBaseModule (fsLit "Data.Dynamic")
+dATA_SEMIGROUP_INTERNAL = mkBaseModule (fsLit "Data.Semigroup.Internal")
 tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
 tYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.Typeable.Internal")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
@@ -1186,9 +1194,10 @@ wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNa
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
-    integralClassName, realFracClassName, fractionalClassName,
-    fromRationalName, toIntegerName, toRationalName, fromIntegralName,
-    realToFracName :: Name
+    integralClassName, realFracClassName, fractionalClassName, fromRationalName,
+    toIntegerName, toRationalName, fromIntegralName, realToFracName,
+    numIntegralExponentiationName, fractionalIntegralExponentiationName,
+    numWordExponentiationName, fractionalWordExponentiationName :: Name
 rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
 ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
 ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
@@ -1201,6 +1210,15 @@ toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKe
 toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
 fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
 realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
+numIntegralExponentiationName        = varQual gHC_REAL (fsLit "^")                            numIntegralExponentiationIdKey
+fractionalIntegralExponentiationName = varQual gHC_REAL (fsLit "^^")                           fractionalIntegralExponentiationIdKey
+numWordExponentiationName            = varQual gHC_REAL (fsLit "numWordExponentiation")        numWordExponentiationIdKey
+fractionalWordExponentiationName     = varQual gHC_REAL (fsLit "fractionalWordExponentiation") fractionalWordExponentiationIdKey
+
+-- Data.Semigroup functions
+wordStimesName, integralStimesName :: Name
+wordStimesName     = varQual dATA_SEMIGROUP_INTERNAL (fsLit "wordStimes") wordStimesIdKey
+integralStimesName = varQual dATA_SEMIGROUP_INTERNAL (fsLit "stimes")     integralStimesIdKey
 
 -- PrelFloat classes
 floatingClassName, realFloatClassName :: Name
@@ -2322,6 +2340,19 @@ toListClassOpKey = mkPreludeMiscIdUnique 501
 
 proxyHashKey :: Unique
 proxyHashKey = mkPreludeMiscIdUnique 502
+
+-- Real
+numIntegralExponentiationIdKey, fractionalIntegralExponentiationIdKey,
+  numWordExponentiationIdKey, fractionalWordExponentiationIdKey :: Unique
+numIntegralExponentiationIdKey = mkPreludeMiscIdUnique 570
+fractionalIntegralExponentiationIdKey = mkPreludeMiscIdUnique 571
+numWordExponentiationIdKey = mkPreludeMiscIdUnique 572
+fractionalWordExponentiationIdKey = mkPreludeMiscIdUnique 573
+
+-- Data.Semigroup
+wordStimesIdKey, integralStimesIdKey :: Unique
+wordStimesIdKey = mkPreludeMiscIdUnique 574
+integralStimesIdKey = mkPreludeMiscIdUnique 575
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES IdUniques 200-499
