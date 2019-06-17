@@ -18,7 +18,7 @@
 -- | Types for the per-module compiler
 module HscTypes (
         -- * compilation state
-        HscEnv(..), hscEPS,
+        HscEnv(..), HasHscEnv, getHscEnv, hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
@@ -281,6 +281,9 @@ instance MonadIO Hsc where
 
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+
+instance HasHscEnv Hsc where
+    getHscEnv = Hsc $ \e w -> return (e, w)
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -581,6 +584,9 @@ pprTargetId (TargetFile f _) = text f
 
 instance Outputable TargetId where
     ppr = pprTargetId
+
+class Monad m => HasHscEnv m where
+  getHscEnv :: m HscEnv
 
 {-
 ************************************************************************

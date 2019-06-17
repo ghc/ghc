@@ -55,6 +55,7 @@ import DynFlags
 import GHC.Platform
 import Util
 import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
+import HscTypes
 
 import Control.Applicative ( Alternative(..) )
 
@@ -754,10 +755,10 @@ mkBasicRule op_name n_args rm
   = BuiltinRule { ru_name = occNameFS (nameOccName op_name),
                   ru_fn = op_name,
                   ru_nargs = n_args,
-                  ru_try = \ dflags in_scope _ -> runRuleM rm dflags in_scope }
+                  ru_try = \ hscEnv in_scope _ -> runRuleM rm hscEnv in_scope }
 
 newtype RuleM r = RuleM
-  { runRuleM :: DynFlags -> InScopeEnv -> [CoreExpr] -> Maybe r }
+  { runRuleM :: RuleFunEnv -> InScopeEnv -> [CoreExpr] -> Maybe r }
   deriving (Functor)
 
 instance Applicative RuleM where
@@ -783,7 +784,7 @@ instance Alternative RuleM where
 instance MonadPlus RuleM
 
 instance HasDynFlags RuleM where
-    getDynFlags = RuleM $ \dflags _ _ -> Just dflags
+    getDynFlags = RuleM $ \ruleFunEnv _ _ -> Just $ dynFlags ruleFunEnv
 
 liftMaybe :: Maybe a -> RuleM a
 liftMaybe Nothing = mzero
@@ -1201,10 +1202,31 @@ rewriting so again we are fine.
 are explicit.)
 -}
 
+
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
-builtinRules
-  = [BuiltinRule { ru_name = fsLit "AppendLitString",
+builtinRules = builtinMiscRules
+               ++ builtinIntegerRules
+               ++ builtinNaturalRules
+{-# NOINLINE builtinRules #-}
+-- there is no benefit to inlining these yet, despite this, GHC produces
+-- unfoldings for this regardless since the floated list entries look small.
+
+builtinMiscRules :: [CoreRule]
+builtinMiscRules  =
+    [BuiltinRule { ru_name = fsLit "numExponentiation_IntegerToWord",
+                   ru_fn = numIntegralExponentiationName,
+                   ru_nargs = 6,
+                   ru_try = match_exponentiation_IntegerToWord numWordExponentiationName },
+     BuiltinRule { ru_name = fsLit "fractionalExponentiation_IntegerToWord",
+                   ru_fn = fractionalIntegralExponentiationName,
+                   ru_nargs = 6,
+                   ru_try = match_exponentiation_IntegerToWord fractionalWordExponentiationName },
+     BuiltinRule { ru_name = fsLit "stimes_IntegerToWord",
+                   ru_fn = integralStimesName,
+                   ru_nargs = 6,
+                   ru_try = match_stimes_IntegerToWord },
+     BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
@@ -1233,11 +1255,54 @@ builtinRules
             `App` arg `App` mkIntVal dflags (d - 1)
         ]
      ]
- ++ builtinIntegerRules
- ++ builtinNaturalRules
-{-# NOINLINE builtinRules #-}
--- there is no benefit to inlining these yet, despite this, GHC produces
--- unfoldings for this regardless since the floated list entries look small.
+    where
+      -- | Rewrite @a ^ b@ and @a ^^ b@ to a call to a helper function that
+      -- forces @b@ to be of type 'Word'. Of course, only if @b@ fits into word
+      -- bounds. This enables 'Word' arithmetic which is much faster than
+      -- 'Integer' arithmetic.
+      match_exponentiation_IntegerToWord :: Name -> RuleFun
+      match_exponentiation_IntegerToWord substituteOperationName
+        (RuleFunEnv dflags hpt  pte) id_unf _ [type1, _, dict1, _, xl, yl]
+        | Just y <- integerFromLiteral id_unf yl
+        , isInWordBound y
+        = case lookupType dflags hpt pte substituteOperationName of
+            Just tyThing -> Just $
+                           Var (tyThingId tyThing)
+                           `App` type1 `App` dict1
+                           `App` xl
+                           `App` mkWordExpr dflags y
+            Nothing -> Nothing
+      match_exponentiation_IntegerToWord _ _ _ _ _ = Nothing
+
+      isInWordBound :: Integer -> Bool
+      isInWordBound x = greaterMinWordBound && smallerMaxWordBound
+        where
+          greaterMinWordBound = x >= toInteger (minBound :: Word)
+          smallerMaxWordBound = x <= toInteger (maxBound :: Word)
+
+      integerFromLiteral :: InScopeEnv -> CoreExpr -> Maybe Integer
+      integerFromLiteral id_unf expr = do
+        LitNumber LitNumInteger y _ <- exprIsLiteral_maybe id_unf expr
+        return y
+
+      -- | Rewrite @stimes a b@ to a call to a helper function that forces @a@
+      -- to be of type 'Word'. Of course, only if @a@ fits into word bounds.
+      -- This enables 'Word' arithmetic which is much faster than 'Integer'
+      -- arithmetic.
+      match_stimes_IntegerToWord :: RuleFun
+      match_stimes_IntegerToWord (RuleFunEnv dflags hpt  pte)
+        id_unf _ [type1, dict1, _, _, xl, yl]
+        | Just x <- integerFromLiteral id_unf xl
+        , isInWordBound x
+        = case lookupType dflags hpt pte wordStimesName of
+            Just operation -> Just $
+                             Var (tyThingId operation)
+                             `App` type1
+                             `App` dict1
+                             `App` mkWordExpr dflags x
+                             `App` yl
+            Nothing -> Nothing
+      match_stimes_IntegerToWord _ _ _ _ = Nothing
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
@@ -1552,10 +1617,10 @@ warning in this case.
 
 match_bitInteger :: RuleFun
 -- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
-match_bitInteger dflags id_unf fn [arg]
+match_bitInteger ruleFunEnv id_unf fn [arg]
   | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf arg
   , x >= 0
-  , x <= (wordSizeInBits dflags - 1)
+  , x <= (wordSizeInBits (dynFlags ruleFunEnv) - 1)
     -- Make sure x is small enough to yield a decently small iteger
     -- Attempting to construct the Integer for
     --    (bitInteger 9223372036854775807#)
@@ -1573,9 +1638,9 @@ match_bitInteger _ _ _ _ = Nothing
 match_Integer_convert :: Num a
                       => (DynFlags -> a -> Expr CoreBndr)
                       -> RuleFun
-match_Integer_convert convert dflags id_unf _ [xl]
+match_Integer_convert convert ruleFunEnv id_unf _ [xl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert dflags (fromInteger x))
+  = Just (convert (dynFlags ruleFunEnv) (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
@@ -1650,10 +1715,12 @@ match_Integer_shift_op binop _ id_unf _ [xl,yl]
 match_Integer_shift_op _ _ _ _ _ = Nothing
 
 match_Integer_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
-match_Integer_binop_Prim binop dflags id_unf _ [xl, yl]
+match_Integer_binop_Prim binop ruleFunEnv id_unf _ [xl, yl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
   , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
   = Just (if x `binop` y then trueValInt dflags else falseValInt dflags)
+  where
+    dflags = dynFlags ruleFunEnv
 match_Integer_binop_Prim _ _ _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
@@ -1696,7 +1763,7 @@ match_rationalTo mkLit _ id_unf _ [xl, yl]
 match_rationalTo _ _ _ _ _ = Nothing
 
 match_decodeDouble :: RuleFun
-match_decodeDouble dflags id_unf fn [xl]
+match_decodeDouble ruleFunEnv id_unf fn [xl]
   | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
     Just (_, res)
@@ -1705,7 +1772,7 @@ match_decodeDouble dflags id_unf fn [xl]
            (y, z) ->
              Just $ mkCoreUbxTup [integerTy, intHashTy]
                                  [Lit (mkLitInteger y integerTy),
-                                  Lit (mkLitInt dflags (toInteger z))]
+                                  Lit (mkLitInt (dynFlags ruleFunEnv) (toInteger z))]
     _ ->
         pprPanic "match_decodeDouble: Id has the wrong type"
           (ppr fn <+> dcolon <+> ppr (idType fn))

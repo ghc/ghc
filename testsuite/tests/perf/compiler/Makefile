@@ -11,3 +11,6 @@ T16473:
 	$(RM) -f T16473.hi T16473.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-rule-firings T16473.hs
 
+T15842:
+	$(RM) -f T15842.hi T15842.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-rule-firings T15842.hs
