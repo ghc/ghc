@@ -823,12 +823,18 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
     debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
+    // Is this the last internal element? If so instead of modifying the current
+    // stackElement in place we actually remove it from the stack.
+    bool last = false;
+
     do {
         if (isOnBoundary(ts)) {     // if the current stack chunk is depleted
             *c = NULL;
             return;
         }
 
+        // Note: Below every `break`, where the loop condition is true, must be
+        // accompanied by a popOff() otherwise this is an infinite loop.
         se = ts->stackTop;
 
         // If this is a top-level element, you should pop that out.
@@ -840,15 +846,15 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             return;
         }
 
+        // Note: The first ptr of all of these was already returned as
+        // *fist_child in push(), so we always start with the second field.
         switch (get_itbl(se->c)->type) {
             // two children (fixed), no SRT
             // nothing in se.info
         case CONSTR_2_0:
             *c = se->c->payload[1];
-            *cp = se->c;
-            *data = se->data;
-            popOff(ts);
-            return;
+            last = true;
+            goto out;
 
             // three children (fixed), no SRT
             // need to push a stackElement
@@ -860,11 +866,9 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
                 // no popOff
             } else {
                 *c = ((StgMVar *)se->c)->value;
-                popOff(ts);
+                last = true;
             }
-            *cp = se->c;
-            *data = se->data;
-            return;
+            goto out;
 
             // three children (fixed), no SRT
         case WEAK:
@@ -874,11 +878,9 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
                 // no popOff
             } else {
                 *c = ((StgWeak *)se->c)->finalizer;
-                popOff(ts);
+                last = true;
             }
-            *cp = se->c;
-            *data = se->data;
-            return;
+            goto out;
 
         case TREC_CHUNK: {
             // These are pretty complicated: we have N entries, each
@@ -892,7 +894,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
                 *c = NULL;
                 popOff(ts);
-                break;
+                break; // this breaks out of the switch not the loop
             }
             entry = &((StgTRecChunk *)se->c)->entries[entry_no];
             if (field_no == 0) {
@@ -902,10 +904,8 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             } else {
                 *c = entry->new_value;
             }
-            *cp = se->c;
-            *data = se->data;
             se->info.next.step++;
-            return;
+            goto out;
         }
 
         case TVAR:
@@ -925,11 +925,9 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
                 popOff(ts);
-                break;
+                break; // this breaks out of the switch not the loop
             }
-            *cp = se->c;
-            *data = se->data;
-            return;
+            goto out;
 
             // layout.payload.ptrs, SRT
         case FUN:         // always a heap object
@@ -938,9 +936,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             if (se->info.type == posTypePtrs) {
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
-                    *cp = se->c;
-                    *data = se->data;
-                    return;
+                    goto out;
                 }
                 init_srt_fun(&se->info, get_fun_itbl(se->c));
             }
@@ -951,9 +947,7 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             if (se->info.type == posTypePtrs) {
                 *c = find_ptrs(&se->info);
                 if (*c != NULL) {
-                    *cp = se->c;
-                    *data = se->data;
-                    return;
+                    goto out;
                 }
                 init_srt_thunk(&se->info, get_thunk_itbl(se->c));
             }
@@ -971,13 +965,11 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
         case THUNK_1_0:
         case THUNK_1_1:
             *c = find_srt(&se->info);
-            if (*c != NULL) {
-                *cp = se->c;
-                *data = se->data;
-                return;
+            if(*c == NULL) {
+                popOff(ts);
+                break; // this breaks out of the switch not the loop
             }
-            popOff(ts);
-            break;
+            goto out;
 
             // no child (fixed), no SRT
         case CONSTR_0_1:
@@ -1011,7 +1003,20 @@ pop( traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data )
             barf("Invalid object *c in pop(): %d", get_itbl(se->c)->type);
             return;
         }
-    } while (true);
+    } while (*c == NULL);
+
+out:
+
+    ASSERT(*c != NULL);
+
+    *cp = se->c;
+    *data = se->data;
+
+    if(last)
+        popOff(ts);
+
+    return;
+
 }
 
 /* -----------------------------------------------------------------------------
