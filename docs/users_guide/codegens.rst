@@ -76,6 +76,13 @@ C Code Generator (``-fvia-C``)
    single: C code generator
    single: -fvia-C
 
+.. ghc-flag:: -fvia-C
+    :shortdesc: use the C code generator
+    :type: dynamic
+    :category: warnings
+
+    Use the C code generator. Only supposed in unregisterised GHC builds.
+
 This is the oldest code generator in GHC and is generally not included
 any more having been deprecated around GHC 7.0. Select it with the
 :ghc-flag:`-fvia-C` flag.

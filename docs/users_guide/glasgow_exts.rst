@@ -416,6 +416,7 @@ It must be enabled in modules where either of the following occur:
 - A data family is declared with a kind other than ``Type``. Both ``Foo``
   and ``Bar``, defined below, fall into this category:
   ::
+
      class Foo a where
        data FooKey a :: TYPE 'IntRep
      class Bar (r :: RuntimeRep) where
@@ -425,6 +426,7 @@ It must be enabled in modules where either of the following occur:
   following instances of ``Foo`` and ``Bar`` as defined above fall into
   this category.
   ::
+
      instance Foo Bool where
        newtype FooKey Bool = FooKeyBoolC Int#
      instance Bar 'WordRep where
