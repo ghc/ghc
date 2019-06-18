@@ -553,7 +553,7 @@ Bugs in GHC
          To increase the limit, use -fsimpl-tick-factor=N (default 100)
 
    with the panic being reported no matter how high a
-   :ghc-flag:`-fsimpl-tick-factor` you supply.
+   :ghc-flag:`-fsimpl-tick-factor <-fsimpl-tick-factor=⟨n⟩>` you supply.
 
    We have never found another class of programs, other than this
    contrived one, that makes GHC diverge, and fixing the problem would
@@ -585,7 +585,7 @@ Bugs in GHC
    libraries that come with GHC are probably built without this option,
    unless you built GHC yourself.
 
--  The :ghc-flag:`state hack <-fstate-hack>` optimization can result in
+-  The :ghc-flag:`state hack <-fno-state-hack>` optimization can result in
    non-obvious changes in evaluation ordering which may hide exceptions, even
    with :ghc-flag:`-fpedantic-bottoms` (see, e.g., :ghc-ticket:`7411`). For
    instance, ::
