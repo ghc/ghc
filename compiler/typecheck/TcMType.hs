@@ -351,7 +351,7 @@ checkCoercionHole cv co
 
   where
     (Pair t1 t2, role) = coercionKindRole co
-    ok cv_ty | EqPred cv_rel cv_t1 cv_t2 <- classifyPredType cv_ty
+    ok cv_ty | EqPred cv_rel _ _ cv_t1 cv_t2 <- classifyPredType cv_ty
              =  t1 `eqType` cv_t1
              && t2 `eqType` cv_t2
              && role == eqRelRole cv_rel

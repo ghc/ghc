@@ -1103,15 +1103,15 @@ check_pred_help under_syn env dflags ctxt pred
         | isCTupleClass cls   -> check_tuple_pred under_syn env dflags ctxt pred tys
         | otherwise           -> check_class_pred env dflags ctxt pred cls tys
 
-      EqPred NomEq _ _  -> -- a ~# b
-                           check_eq_pred env dflags pred
+      EqPred NomEq _ _ _ _  -> -- a ~# b
+                               check_eq_pred env dflags pred
 
-      EqPred ReprEq _ _ -> -- Ugh!  When inferring types we may get
-                           -- f :: (a ~R# b) => blha
-                           -- And we want to treat that like (Coercible a b)
-                           -- We should probably check argument shapes, but we
-                           -- didn't do so before, so I'm leaving it for now
-                           return ()
+      EqPred ReprEq _ _ _ _ -> -- Ugh!  When inferring types we may get
+                               -- f :: (a ~R# b) => blha
+                               -- And we want to treat that like (Coercible a b)
+                               -- We should probably check argument shapes, but we
+                               -- didn't do so before, so I'm leaving it for now
+                               return ()
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
       IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred

@@ -360,7 +360,7 @@ instCallConstraints orig preds
   where
     go :: TcPredType -> TcM EvTerm
     go pred
-     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
+     | Just (Nominal, _, _, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
      = do  { co <- unifyType Nothing ty1 ty2
            ; return (evCoercion co) }
 
@@ -466,33 +466,30 @@ get_eq_tys_maybe :: Type
 -- See Note [Constraints in kinds] in TyCoRep
 get_eq_tys_maybe ty
   -- Lifted heterogeneous equality (~~)
-  | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
+  | Just (tc, [kk1, kk2, k1, k2]) <- splitTyConApp_maybe ty
   , tc `hasKey` heqTyConKey
-  = Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
+  = Just (\co -> mkHEqBoxTy co kk1 kk2 k1 k2, k1, k2)
 
   -- Lifted homogeneous equality (~)
-  | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
+  | Just (tc, [kk, k1, k2]) <- splitTyConApp_maybe ty
   , tc `hasKey` eqTyConKey
-  = Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
+  = Just (\co -> mkEqBoxTy co kk k1 k2, k1, k2)
 
   | otherwise
   = Nothing
 
 -- | This takes @a ~# b@ and returns @a ~~ b@.
-mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
+mkHEqBoxTy :: TcCoercion -> Kind -> Kind -> Type -> Type -> TcM Type
 -- monadic just for convenience with mkEqBoxTy
-mkHEqBoxTy co ty1 ty2
+mkHEqBoxTy co k1 k2 ty1 ty2
   = return $
     mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
-  where k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
 
 -- | This takes @a ~# b@ and returns @a ~ b@.
-mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
-mkEqBoxTy co ty1 ty2
+mkEqBoxTy :: TcCoercion -> Kind -> Type -> Type -> TcM Type
+mkEqBoxTy co k ty1 ty2
   = return $
     mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
-  where k = tcTypeKind ty1
 
 {-
 ************************************************************************

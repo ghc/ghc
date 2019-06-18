@@ -559,7 +559,7 @@ oclose preds fixed_tvs
     determined :: PredType -> [([Type],[Type])]
     determined pred
        = case classifyPredType pred of
-            EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
+            EqPred NomEq _ _ t1 t2 -> [([t1],[t2]), ([t2],[t1])]
                -- See Note [Equality superclasses]
             ClassPred cls tys  -> [ instFD fd cls_tvs tys
                                   | let (cls_tvs, cls_fds) = classTvsFds cls

@@ -445,7 +445,7 @@ getRuleQuantCts wc
 
     rule_quant_ct :: TcTyCoVarSet -> Ct -> Bool
     rule_quant_ct skol_tvs ct
-      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
+      | EqPred _ _ _ t1 t2 <- classifyPredType (ctPred ct)
       , not (ok_eq t1 t2)
        = False        -- Note [RULE quantification over equalities]
       | isHoleCt ct

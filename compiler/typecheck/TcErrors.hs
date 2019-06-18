@@ -591,28 +591,28 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
        -- I think all given residuals are equalities
 
     -- Things like (Int ~N Bool)
-    utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
-    utterly_wrong _ _                      = False
+    utterly_wrong _ (EqPred NomEq _ _ ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
+    utterly_wrong _ _                          = False
 
     -- Things like (a ~N Int)
-    very_wrong _ (EqPred NomEq ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
-    very_wrong _ _                      = False
+    very_wrong _ (EqPred NomEq _ _ ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
+    very_wrong _ _                          = False
 
     -- Things like (a ~N b) or (a  ~N  F Bool)
-    skolem_eq _ (EqPred NomEq ty1 _) = isSkolemTy tc_lvl ty1
-    skolem_eq _ _                    = False
+    skolem_eq _ (EqPred NomEq _ _ ty1 _) = isSkolemTy tc_lvl ty1
+    skolem_eq _ _                        = False
 
     -- Things like (F a  ~N  Int)
-    non_tv_eq _ (EqPred NomEq ty1 _) = not (isTyVarTy ty1)
-    non_tv_eq _ _                    = False
+    non_tv_eq _ (EqPred NomEq _ _ ty1 _) = not (isTyVarTy ty1)
+    non_tv_eq _ _                        = False
 
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
 
-    is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
-    is_homo_equality _ _                  = False
+    is_homo_equality _ (EqPred _ ki1 ki2 _ _) = ki1 `tcEqType` ki2
+    is_homo_equality _ _                      = False
 
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -739,8 +739,8 @@ mkGivenErrorReporter ctxt cts
        ; traceTc "mkGivenErrorReporter" (ppr ct)
        ; reportWarning (Reason Opt_WarnInaccessibleCode) err }
   where
-    (ct : _ )  = cts    -- Never empty
-    (ty1, ty2) = getEqPredTys (ctPred ct)
+    (ct : _)         = cts    -- Never empty
+    (_, _, ty1, ty2) = getEqPredTys (ctPred ct)
 
 ignoreErrorReporter :: Reporter
 -- Discard Given errors that don't come from
@@ -795,7 +795,7 @@ mkGroupReporter mk_err ctxt cts
 eq_lhs_type :: Ct -> Ct -> Bool
 eq_lhs_type ct1 ct2
   = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
-       (EqPred eq_rel1 ty1 _, EqPred eq_rel2 ty2 _) ->
+       (EqPred eq_rel1 _ _ ty1 _, EqPred eq_rel2 _ _ ty2 _) ->
          (eq_rel1 == eq_rel2) && (ty1 `eqType` ty2)
        _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
@@ -1484,7 +1484,7 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
          then mkEqErr_help dflags ctxt report ct is_oriented ty1 ty2
          else mkErrorMsgFromCt ctxt ct report }
   where
-    (ty1, ty2) = getEqPredTys (ctPred ct)
+    (_, _, ty1, ty2) = getEqPredTys (ctPred ct)
 
        -- If the types in the error message are the same as the types
        -- we are unifying, don't add the extra expected/actual message

@@ -1689,7 +1689,7 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
          -- This has a very big effect on some programs (eg #5030)
 
        ; term' <- case getEqPredTys_maybe (idType var') of
-           Just (r, ty1, ty2) | ty1 `eqType` ty2
+           Just (r, _, _, ty1, ty2) | ty1 `eqType` ty2
                   -> return (evCoercion (mkTcReflCo r ty1))
            _other -> zonkEvTerm env term
 

@@ -715,7 +715,7 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 
 findMatchingIrreds :: Cts -> CtEvidence -> (Bag (Ct, SwapFlag), Bag Ct)
 findMatchingIrreds irreds ev
-  | EqPred eq_rel1 lty1 rty1 <- classifyPredType pred
+  | EqPred eq_rel1 _ _ lty1 rty1 <- classifyPredType pred
     -- See Note [Solving irreducible equalities]
   = partitionBagWith (match_eq eq_rel1 lty1 rty1) irreds
   | otherwise
@@ -727,7 +727,7 @@ findMatchingIrreds irreds ev
       | otherwise                            = Right ct
 
     match_eq eq_rel1 lty1 rty1 ct
-      | EqPred eq_rel2 lty2 rty2 <- classifyPredType (ctPred ct)
+      | EqPred eq_rel2 _ _ lty2 rty2 <- classifyPredType (ctPred ct)
       , eq_rel1 == eq_rel2
       , Just swap <- match_eq_help lty1 rty1 lty2 rty2
       = Left (ct, swap)
@@ -1819,9 +1819,9 @@ doTopReactOther work_item
   | isGiven ev
   = continueWith work_item
 
-  | EqPred eq_rel t1 t2 <- classifyPredType pred
+  | EqPred eq_rel k1 k2 t1 t2 <- classifyPredType pred
   = -- See Note [Looking up primitive equalities in quantified constraints]
-    case boxEqPred eq_rel t1 t2 of
+    case boxEqPred eq_rel k1 k2 t1 t2 of
       Nothing -> continueWith work_item
       Just (cls, tys)
         -> do { res <- matchLocalInst (mkClassPred cls tys) loc

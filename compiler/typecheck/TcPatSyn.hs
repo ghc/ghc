@@ -192,10 +192,8 @@ tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
 mkProvEvidence ev_id
-  | EqPred r ty1 ty2 <- classifyPredType pred
-  , let k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
-        is_homo = k1 `tcEqType` k2
+  | EqPred r k1 k2 ty1 ty2 <- classifyPredType pred
+  , let is_homo = k1 `tcEqType` k2
         homo_tys   = [k1, ty1, ty2]
         hetero_tys = [k1, k2, ty1, ty2]
   = case r of
