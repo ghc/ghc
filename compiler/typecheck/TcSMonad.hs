@@ -320,7 +320,7 @@ extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
 extendWorkListCt ct wl
  = case classifyPredType (ctPred ct) of
-     EqPred NomEq ty1 _
+     EqPred{ep_rel = NomEq, ep_ty1 = ty1}
        | Just tc <- tcTyConAppTyCon_maybe ty1
        , isTypeFamilyTyCon tc
        -> extendWorkListFunEq ct wl
@@ -3402,23 +3402,45 @@ emitNewWantedEq loc role ty1 ty2
        ; updWorkListTcS (extendWorkListEq (mkNonCanonical ev))
        ; return co }
 
--- | Make a new equality CtEvidence
+-- | Make a new equality 'CtEvidence'.
 newWantedEq :: CtLoc -> Role -> TcType -> TcType
             -> TcS (CtEvidence, Coercion)
 newWantedEq = newWantedEq_SI WDeriv
 
+-- | Make a new equality 'CtEvidence' using a specific 'ShadowInfo'.
 newWantedEq_SI :: ShadowInfo -> CtLoc -> Role
                -> TcType -> TcType
                -> TcS (CtEvidence, Coercion)
-newWantedEq_SI si loc role ty1 ty2
+newWantedEq_SI si loc role ty1 ty2 =
+  new_wanted_eq_si si loc $ mkPrimEqPredRole role ty1 ty2
+
+-- | Make a new equality 'CtEvidence' for types whose kinds are known in
+-- advance. (If the kinds are not known in advance, use 'newWantedEq'.)
+newWantedHeteroEq :: CtLoc -> Role
+                  -> TcKind -> TcKind
+                  -> TcType -> TcType
+                  -> TcS (CtEvidence, Coercion)
+newWantedHeteroEq = newWantedHeteroEq_SI WDeriv
+
+-- | Make a new equality 'CtEvidence' for types whose kinds are known in
+-- advance, using a specific 'ShadowInfo'. (If the kinds are not known in
+-- advance, use 'newWantedEq_SI'.)
+newWantedHeteroEq_SI :: ShadowInfo -> CtLoc -> Role
+                     -> TcKind -> TcKind
+                     -> TcType -> TcType
+                     -> TcS (CtEvidence, Coercion)
+newWantedHeteroEq_SI si loc role ki1 ki2 ty1 ty2 =
+  new_wanted_eq_si si loc $ mkHeteroPrimEqPredRole role ki1 ki2 ty1 ty2
+
+new_wanted_eq_si :: ShadowInfo -> CtLoc -> TcPredType
+                 -> TcS (CtEvidence, Coercion)
+new_wanted_eq_si si loc pty
   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; traceTcS "Emitting new coercion hole" (ppr hole <+> dcolon <+> ppr pty)
        ; return ( CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
                            , ctev_nosh = si
                            , ctev_loc = loc}
                 , mkHoleCo hole ) }
-  where
-    pty = mkPrimEqPredRole role ty1 ty2
 
 -- no equalities here. Use newWantedEq instead
 newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
@@ -3456,16 +3478,16 @@ newWanted = newWanted_SI WDeriv
 
 newWanted_SI :: ShadowInfo -> CtLoc -> PredType -> TcS MaybeNew
 newWanted_SI si loc pty
-  | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
-  = Fresh . fst <$> newWantedEq_SI si loc role ty1 ty2
+  | Just (role, ki1, ki2, ty1, ty2) <- getEqPredTys_maybe pty
+  = Fresh . fst <$> newWantedHeteroEq_SI si loc role ki1 ki2 ty1 ty2
   | otherwise
   = newWantedEvVar_SI si loc pty
 
 -- deals with both equalities and non equalities. Doesn't do any cache lookups.
 newWantedNC :: CtLoc -> PredType -> TcS CtEvidence
 newWantedNC loc pty
-  | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
-  = fst <$> newWantedEq loc role ty1 ty2
+  | Just (role, ki1, ki2, ty1, ty2) <- getEqPredTys_maybe pty
+  = fst <$> newWantedHeteroEq loc role ki1 ki2 ty1 ty2
   | otherwise
   = newWantedEvVarNC loc pty
 

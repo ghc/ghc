@@ -86,14 +86,16 @@ canonicalize :: Ct -> TcS (StopOrContinue Ct)
 canonicalize (CNonCanonical { cc_ev = ev })
   = {-# SCC "canNC" #-}
     case classifyPredType pred of
-      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
-                                  canClassNC ev cls tys
-      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
-                                  canEqNC    ev eq_rel ty1 ty2
-      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
-                                  canIrred ev
-      ForAllPred _ _ pred   -> do traceTcS "canEvNC:forall" (ppr pred)
-                                  canForAll ev (isClassPred pred)
+      ClassPred cls tys         -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
+                                      canClassNC ev cls tys
+      EqPred{ ep_rel = eq_rel
+            , ep_ty1 = ty1
+            , ep_ty2 = ty2 }    -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
+                                      canEqNC    ev eq_rel ty1 ty2
+      IrredPred {}              -> do traceTcS "canEvNC:irred" (ppr pred)
+                                      canIrred ev
+      ForAllPred _ _ pred       -> do traceTcS "canEvNC:forall" (ppr pred)
+                                      canForAll ev (isClassPred pred)
   where
     pred = ctEvPred ev
 
@@ -101,7 +103,8 @@ canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
   = canForAll ev pend_sc
 
 canonicalize (CIrredCan { cc_ev = ev })
-  | EqPred eq_rel ty1 ty2 <- classifyPredType (ctEvPred ev)
+  | EqPred{ ep_rel = eq_rel
+          , ep_ty1 = ty1, ep_ty2 = ty2 } <- classifyPredType (ctEvPred ev)
   = -- For insolubles (all of which are equalities, do /not/ flatten the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
@@ -634,10 +637,12 @@ canIrred ev
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
     do { -- Re-classify, in case flattening has improved its shape
        ; case classifyPredType (ctEvPred new_ev) of
-           ClassPred cls tys     -> canClassNC new_ev cls tys
-           EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
-           _                     -> continueWith $
-                                    mkIrredCt new_ev } }
+           ClassPred cls tys         -> canClassNC new_ev cls tys
+           EqPred{ ep_rel = eq_rel
+                 , ep_ty1 = ty1
+                 , ep_ty2 = ty2 }    -> canEqNC new_ev eq_rel ty1 ty2
+           _                         -> continueWith $
+                                        mkIrredCt new_ev } }
 
 canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
 canHole ev hole

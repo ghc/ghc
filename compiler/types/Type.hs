@@ -86,7 +86,7 @@ module Type (
         isDictLikeTy,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
         equalityTyCon,
-        mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
+        mkHeteroPrimEqPred, mkHeteroReprPrimEqPred, mkHeteroPrimEqPredRole,
         mkClassPred,
         isClassPred, isEqPrimPred, isEqPred, isEqPredClass,
         isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
@@ -1932,7 +1932,7 @@ Make PredTypes
 --------------------- Equality types ---------------------------------
 -}
 
--- | Makes a lifted equality predicate at the given role
+-- | Creates a primitive equality predicate at the given role
 mkPrimEqPredRole :: Role -> Type -> Type -> PredType
 mkPrimEqPredRole Nominal          = mkPrimEqPred
 mkPrimEqPredRole Representational = mkReprPrimEqPred
@@ -1947,7 +1947,7 @@ mkPrimEqPred ty1 ty2
     k1 = typeKind ty1
     k2 = typeKind ty2
 
--- | Creates a primite type equality predicate with explicit kinds
+-- | Creates a primitive type equality predicate with explicit kinds
 mkHeteroPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
 mkHeteroPrimEqPred k1 k2 ty1 ty2 = TyConApp eqPrimTyCon [k1, k2, ty1, ty2]
 
@@ -1956,6 +1956,11 @@ mkHeteroPrimEqPred k1 k2 ty1 ty2 = TyConApp eqPrimTyCon [k1, k2, ty1, ty2]
 mkHeteroReprPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
 mkHeteroReprPrimEqPred k1 k2 ty1 ty2
   = TyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
+
+mkHeteroPrimEqPredRole :: Role -> Kind -> Kind -> Type -> Type -> PredType
+mkHeteroPrimEqPredRole Nominal          = mkHeteroPrimEqPred
+mkHeteroPrimEqPredRole Representational = mkHeteroReprPrimEqPred
+mkHeteroPrimEqPredRole Phantom          = panic "mkHeteroPrimEqPredRole phantom"
 
 -- | Try to split up a coercion type into the types that it coerces
 splitCoercionType_maybe :: Type -> Maybe (Type, Type)
@@ -2039,7 +2044,17 @@ eqRelRole ReprEq = Representational
 
 data PredTree
   = ClassPred Class [Type]
-  | EqPred EqRel Type Type
+  | EqPred { ep_rel :: EqRel
+           , ep_ki1 :: Kind
+           , ep_ki2 :: Kind
+           , ep_ty1 :: Type
+           , ep_ty2 :: Type }
+    -- An EqPred represents an application of an unboxed equality type
+    -- constructor, such as (~#) or (~R#). This does /not/ encompass boxed
+    -- equalities such as (~), (~~), or Coercible (which are handled with
+    -- ClassPred).
+    --
+    -- INVARIANT: (ep_ty1 :: ep_ki1) and (eq_ty2 :: ep_ki2).
   | IrredPred PredType
   | ForAllPred [TyCoVarBinder] [PredType] PredType
      -- ForAllPred: see Note [Quantified constraints] in TcCanonical
@@ -2050,9 +2065,13 @@ data PredTree
 
 classifyPredType :: PredType -> PredTree
 classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
-    Just (tc, [_, _, ty1, ty2])
-      | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
-      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
+    Just (tc, [ki1, ki2, ty1, ty2])
+      |  tc `hasKey` eqReprPrimTyConKey
+      -> EqPred{ ep_rel = ReprEq, ep_ki1 = ki1, ep_ki2 = ki2
+               , ep_ty1 = ty1, ep_ty2 = ty2 }
+      |  tc `hasKey` eqPrimTyConKey
+      -> EqPred{ ep_rel = NomEq, ep_ki1 = ki1, ep_ki2 = ki2
+               , ep_ty1 = ty1, ep_ty2 = ty2 }
 
     Just (tc, tys)
       | Just clas <- tyConClass_maybe tc
@@ -2076,21 +2095,21 @@ getClassPredTys_maybe ty = case splitTyConApp_maybe ty of
         Just (tc, tys) | Just clas <- tyConClass_maybe tc -> Just (clas, tys)
         _ -> Nothing
 
-getEqPredTys :: PredType -> (Type, Type)
+getEqPredTys :: PredType -> (Kind, Kind, Type, Type)
 getEqPredTys ty
   = case splitTyConApp_maybe ty of
-      Just (tc, [_, _, ty1, ty2])
+      Just (tc, [ki1, ki2, ty1, ty2])
         |  tc `hasKey` eqPrimTyConKey
         || tc `hasKey` eqReprPrimTyConKey
-        -> (ty1, ty2)
+        -> (ki1, ki2, ty1, ty2)
       _ -> pprPanic "getEqPredTys" (ppr ty)
 
-getEqPredTys_maybe :: PredType -> Maybe (Role, Type, Type)
+getEqPredTys_maybe :: PredType -> Maybe (Role, Kind, Kind, Type, Type)
 getEqPredTys_maybe ty
   = case splitTyConApp_maybe ty of
-      Just (tc, [_, _, ty1, ty2])
-        | tc `hasKey` eqPrimTyConKey     -> Just (Nominal, ty1, ty2)
-        | tc `hasKey` eqReprPrimTyConKey -> Just (Representational, ty1, ty2)
+      Just (tc, [ki1, ki2, ty1, ty2])
+        | tc `hasKey` eqPrimTyConKey     -> Just (Nominal, ki1, ki2, ty1, ty2)
+        | tc `hasKey` eqReprPrimTyConKey -> Just (Representational, ki1, ki2, ty1, ty2)
       _ -> Nothing
 
 getEqPredRole :: PredType -> Role

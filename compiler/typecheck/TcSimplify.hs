@@ -2420,8 +2420,9 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     -- See Note [Which equalities to float]
     is_float_eq_candidate ct
       | pred <- ctPred ct
-      , EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , tcTypeKind ty1 `tcEqType` tcTypeKind ty2
+      , EqPred{ ep_rel = NomEq, ep_ki1 = ki1, ep_ki2 = ki2
+              , ep_ty1 = ty1, ep_ty2 = ty2 } <- classifyPredType pred
+      , ki1 `tcEqType` ki2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
           (_, Just tv2) -> float_tv_eq_candidate tv2 ty1

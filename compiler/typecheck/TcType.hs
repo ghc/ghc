@@ -1836,9 +1836,10 @@ pickQuantifiablePreds qtvs theta
             | pick_cls_pred flex_ctxt cls tys
             -> Just pred
 
-          EqPred eq_rel ty1 ty2
+          EqPred{ ep_rel = eq_rel, ep_ki1 = ki1, ep_ki2 = ki2
+                , ep_ty1 = ty1, ep_ty2 = ty2 }
             | quantify_equality eq_rel ty1 ty2
-            , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
+            , Just (cls, tys) <- boxEqPred eq_rel ki1 ki2 ty1 ty2
               -- boxEqPred: See Note [Lift equality constaints when quantifying]
             , pick_cls_pred flex_ctxt cls tys
             -> Just (mkClassPred cls tys)
@@ -1866,10 +1867,10 @@ pickQuantifiablePreds qtvs theta
                          -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
           _ -> False
 
-boxEqPred :: EqRel -> Type -> Type -> Maybe (Class, [Type])
+boxEqPred :: EqRel -> Kind -> Kind -> Type -> Type -> Maybe (Class, [Type])
 -- Given (t1 ~# t2) or (t1 ~R# t2) return the boxed version
 --       (t1 ~ t2)  or (t1 `Coercible` t2)
-boxEqPred eq_rel ty1 ty2
+boxEqPred eq_rel k1 k2 ty1 ty2
   = case eq_rel of
       NomEq  | homo_kind -> Just (eqClass,        [k1,     ty1, ty2])
              | otherwise -> Just (heqClass,       [k1, k2, ty1, ty2])
@@ -1878,8 +1879,6 @@ boxEqPred eq_rel ty1 ty2
                                     --       so we can't abstract over it
                                     -- Nothing fundamental: we could add it
  where
-   k1 = tcTypeKind ty1
-   k2 = tcTypeKind ty2
    homo_kind = k1 `tcEqType` k2
 
 pickCapturedPreds
@@ -1928,7 +1927,7 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
        -- means that the results are returned in the same
        -- order as the input, which is generally saner
    go (work_item@(p,_,_) : work_list) min_preds
-     | EqPred _ t1 t2 <- classifyPredType p
+     | EqPred{ep_ty1 = t1, ep_ty2 = t2} <- classifyPredType p
      , t1 `tcEqType` t2   -- See TcPatSyn
                           -- Note [Remove redundant provided dicts]
      = go work_list min_preds
@@ -1969,11 +1968,12 @@ isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
 isImprovementPred ty
   = case classifyPredType ty of
-      EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
-      EqPred ReprEq _ _  -> False
-      ClassPred cls _    -> classHasFds cls
-      IrredPred {}       -> True -- Might have equalities after reduction?
-      ForAllPred {}      -> False
+      EqPred{ep_rel = NomEq, ep_ty1 = t1, ep_ty2 = t2 }
+                              -> not (t1 `tcEqType` t2)
+      EqPred{ep_rel = ReprEq} -> False
+      ClassPred cls _         -> classHasFds cls
+      IrredPred {}            -> True -- Might have equalities after reduction?
+      ForAllPred {}           -> False
 
 -- | Is the equality
 --        a ~r ...a....
