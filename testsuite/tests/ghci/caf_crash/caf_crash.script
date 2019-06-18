@@ -1,0 +1,9 @@
+:set -fobject-code
+:l D.hs
+:set -fbyte-code
+:add *D
+main
+:l []
+System.Mem.performGC
+System.Mem.performGC
+3+4
