@@ -255,28 +255,29 @@ normally would.
 To achieve these properties, in the safe language dialect we disable
 completely the following features:
 
-- ``TemplateHaskell`` — Can be used to gain access to constructors and abstract
-  data types that weren't exported by a module, subverting module boundaries.
+- :extension:`TemplateHaskell` — Can be used to gain access to constructors and
+  abstract data types that weren't exported by a module, subverting module
+  boundaries.
 
 Furthermore, we restrict the following features:
 
-- ``ForeignFunctionInterface`` — Foreign import declarations that import a
-  function with a non-``IO`` type are disallowed.
+- :extension:`ForeignFunctionInterface` — Foreign import declarations that
+  import a function with a non-``IO`` type are disallowed.
 
-- ``RULES`` — Rewrite rules defined in a module M compiled with :extension:`Safe` are
-  dropped. Rules defined in Trustworthy modules that ``M`` imports are still
-  valid and will fire as usual.
+- ``RULES`` — Rewrite rules defined in a module M compiled with
+  :extension:`Safe` are dropped. Rules defined in Trustworthy modules that
+  ``M`` imports are still valid and will fire as usual.
 
-- ``OverlappingInstances`` — There is no restriction on the creation of
-  overlapping instances, but we do restrict their use at a particular call
+- :extension:`OverlappingInstances` — There is no restriction on the creation
+  of overlapping instances, but we do restrict their use at a particular call
   site. This is a detailed restriction, please refer to :ref:`Safe Overlapping
   Instances <safe-overlapping-instances>` for details.
 
-- ``GeneralisedNewtypeDeriving`` — GND is not allowed in the safe language. This
-  is due to the ability of it to violate module boundaries when module authors
-  forget to put nominal role annotations on their types as appropriate. For
-  this reason, the ``Data.Coerce`` module is also considered unsafe. We are
-  hoping to find a better solution here in the future.
+- :extension:`GeneralisedNewtypeDeriving` — GND is not allowed in the safe
+  language. This is due to the ability of it to violate module boundaries when
+  module authors forget to put nominal role annotations on their types as
+  appropriate. For this reason, the ``Data.Coerce`` module is also considered
+  unsafe. We are hoping to find a better solution here in the future.
 
 - ``GHC.Generics`` — Hand crafted instances of the ``Generic`` type class are
   not allowed in Safe Haskell. Such instances aren't strictly unsafe, but
