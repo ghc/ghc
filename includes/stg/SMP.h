@@ -176,18 +176,13 @@ EXTERN_INLINE void load_load_barrier(void);
  *    This case is protected by explicit write barriers in the the update frame
  *    entry code (see rts/Updates.h).
  *
- *  - Writing to the thread's local stack, followed by the thread blocking:
- *    This is protected by the write barrier necessary to place the thread on
- *    whichever blocking queue it is blocked on:
+ *  - Blocking on an MVar# (e.g. takeMVar#):
+ *    In this case the appropriate MVar primops (e.g. stg_takeMVarzh).  include
+ *    explicit memory barriers to ensure that the the newly-allocated
+ *    MVAR_TSO_QUEUE is visible to other cores.
  *
- *     - a BLACKHOLE's BLOCKING_QUEUE: explicit barriers in
- *       Messages.c:messageBlackHole and Messages.c:sendMessage.
- *
- *     - a TVAR's STM_TVAR_WATCH_QUEUE: The CAS in STM.c:unlock_stm, called by
- *       STM.c:stmWaitUnlock.
- *
- *     - an MVAR's MVAR_TSO_QUEUE: explicit write barriers in the appropriate
- *       MVar primops (e.g. stg_takeMVarzh).
+ *  - Write to an MVar# (e.g. putMVar#):
+ *    This protected by the full barrier implied by the CAS in putMVar#.
  *
  *  - Write to a TVar#:
  *    This is protected by the full barrier implied by the CAS in STM.c:lock_stm.
@@ -204,9 +199,6 @@ EXTERN_INLINE void load_load_barrier(void);
  *  - Write to MutVar# via atomicModifyMutVar# or casMutVar#:
  *    This is protected by the full barrier implied by the cmpxchg operations
  *    in this primops.
- *
- *  - Write to an MVar#:
- *    This protected by the full barrier implied by the CAS in putMVar#.
  *
  *  - Sending a Message to another capability:
  *    This is protected by the acquition and release of the target capability's

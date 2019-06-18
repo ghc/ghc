@@ -235,7 +235,10 @@ static bool tidyWeakList(generation *gen)
     for (w = gen->old_weak_ptr_list; w != NULL; w = next_w) {
 
         info = w->header.info;
-        load_load_barrier();
+        /* N.B. This function is executed only during the serial part of GC
+         * so consequently there is no potential for data races and therefore
+         * no need for memory barriers.
+         */
 
         /* There might be a DEAD_WEAK on the list if finalizeWeak# was
          * called on a live weak pointer object.  Just remove it.
