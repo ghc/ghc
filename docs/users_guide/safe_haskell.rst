@@ -761,7 +761,8 @@ And three warning flags:
 
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
-    inference.
+    inference. If the module is explicitly marked as safe then no warning will
+    be issued.
 
 .. ghc-flag:: -Wtrustworthy-safe
     :shortdesc: warn if the module being compiled is marked as
