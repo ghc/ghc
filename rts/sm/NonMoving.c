@@ -83,11 +83,97 @@ Mutex concurrent_coll_finished_lock;
  * was (unsurprisingly) also found to result in significant amounts of
  * unnecessary copying.
  *
- * Consequently, we now allow aging. We do this by teaching the moving
- * collector to "evacuate" objects it encounters in the non-moving heap by
- * adding them to the mark queue. Specifically, since each gc_thread holds a
- * capability we push to the capability's update remembered set (implemented
- * by markQueuePushClosureGC)
+ * Consequently, we now allow aging. Aging allows the preparatory GC leading up
+ * to a major collection to evacuate some objects into the young generation.
+ * However, this introduces the following tricky case that might arise after
+ * we have finished the preparatory GC:
+ *
+ *       moving heap  ┆  non-moving heap
+ *     ───────────────┆──────────────────
+ *                    ┆
+ *      B ←────────────── A ←─────────────── root
+ *      │             ┆     ↖─────────────── gen1 mut_list
+ *      ╰───────────────→ C
+ *                    ┆
+ *
+ * In this case C is clearly live, but the non-moving collector can only see
+ * this by walking through B, which lives in the moving heap. However, doing so
+ * would require that we synchronize with the mutator/minor GC to ensure that it
+ * isn't in the middle of moving B. What to do?
+ *
+ * The solution we use here is to teach the preparatory moving collector to
+ * "evacuate" objects it encounters in the non-moving heap by adding them to
+ * the mark queue. This is implemented by pushing the object to the update
+ * remembered set of the capability held by the evacuating gc_thread
+ * (implemented by markQueuePushClosureGC)
+ *
+ * Consequently collection of the case above would proceed as follows:
+ *
+ *  1. Initial state:
+ *      * A lives in the non-moving heap and is reachable from the root set
+ *      * A is on the oldest generation's mut_list, since it contains a pointer
+ *        to B, which lives in a younger generation
+ *      * B lives in the moving collector's from space
+ *      * C lives in the non-moving heap
+ *
+ *  2. Preparatory GC: Scavenging mut_lists:
+ *
+ *     The mut_list of the oldest generation is scavenged, resulting in B being
+ *     evacuated (aged) into the moving collector's to-space.
+ *
+ *  3. Preparatory GC: Scavenge B
+ *
+ *     B (now in to-space) is scavenged, resulting in evacuation of C.
+ *     evacuate(C) pushes a reference to C to the mark queue.
+ *
+ *  4. Non-moving GC: C is marked
+ *
+ *     The non-moving collector will come to C in the mark queue and mark it.
+ *
+ *
+ * Note [Deadlock detection under the non-moving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * In GHC the garbage collector is responsible for identifying deadlocked
+ * programs. Providing for this responsibility is slightly tricky in the
+ * non-moving collector due to the existence of aging. In particular, the
+ * non-moving collector cannot traverse objects living in a young generation
+ * but reachable from the non-moving generation, as described in Note [Aging
+ * under the non-moving collector].
+ *
+ * However, this can pose trouble for deadlock detection since it means that we
+ * may conservatively mark dead closures as live. Consider this case:
+ *
+ *       moving heap  ┆  non-moving heap
+ *     ───────────────┆──────────────────
+ *                    ┆
+ *      MVAR_QUEUE ←───── TSO ←───────────── gen1 mut_list
+ *        ↑  │  ╰────────↗  │
+ *        │  │        ┆     │
+ *        │  │        ┆     ↓
+ *        │  ╰──────────→ MVAR
+ *        ╰─────────────────╯
+ *                    ┆
+ *
+ * In this case we have a TSO blocked on a dead MVar. Because the MVAR_TSO_QUEUE on
+ * which it is blocked lives in the moving heap, the TSO is necessarily on the
+ * oldest generation's mut_list. As in Note [Aging under the non-moving
+ * collector], the MVAR_TSO_QUEUE will be evacuated. If MVAR_TSO_QUEUE is aged
+ * (e.g. evacuated to the young generation) then the MVAR will be added to the
+ * mark queue. Consequently, we will falsely conclude that the MVAR is still
+ * alive and fail to spot the deadlock.
+ *
+ * To avoid this sort of situation we disable aging when we are starting a
+ * major GC specifically for deadlock detection (as done by
+ * scheduleDetectDeadlock). This condition is recorded by the
+ * deadlock_detect_gc global variable declared in GC.h. Setting this has a few
+ * effects on the preparatory GC:
+ *
+ *  - Evac.c:alloc_for_copy forces evacuation to the non-moving generation.
+ *
+ *  - The evacuation logic usually responsible for pushing objects living in
+ *    the non-moving heap to the mark queue is disabled. This is safe because
+ *    we know that all live objects will be in the non-moving heap by the end
+ *    of the preparatory moving collection.
  *
  *
  * Note [Live data accounting in nonmoving collector]
