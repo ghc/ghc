@@ -214,7 +214,7 @@ compileOne' m_tc_result mHscMessage
         (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run
             -- so we generate a interface without codeGen info.
-            (iface, no_change) <- iface_gen
+            (iface, no_change) <- iface_gen Nothing
             -- If we interpret the code, then we can write the interface file here.
             liftIO $ hscMaybeWriteIface dflags iface no_change
                                 (ms_location summary)
@@ -245,8 +245,8 @@ compileOne' m_tc_result mHscMessage
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
             if_ref <- newIORef Nothing :: IO (IORef (Maybe ModIface))
-            let iface_gen' = do
-                    res@(iface, _no_change) <- iface_gen
+            let iface_gen' mb_caf_infos = do
+                    res@(iface, _no_change) <- iface_gen mb_caf_infos
                     writeIORef if_ref $ Just iface
                     return res
 
@@ -1185,11 +1185,10 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, caf_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
 
-
-                    (iface, no_change) <- liftIO iface_gen
+                    (iface, no_change) <- liftIO (iface_gen (Just caf_infos))
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
@@ -1201,6 +1200,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
+                    -- pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
                     return (RealPhase next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
