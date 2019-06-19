@@ -165,12 +165,13 @@ class TestResult:
     framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stderr'
-    def __init__(self, directory, testname, reason, way, stderr=None):
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
+    def __init__(self, directory, testname, reason, way, stdout=None, stderr=None):
         self.directory = directory
         self.testname = testname
         self.reason = reason
         self.way = way
+        self.stdout = stdout
         self.stderr = stderr
 
 class TestRun:
