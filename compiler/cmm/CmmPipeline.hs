@@ -81,6 +81,7 @@ cpsTop hsc_env proc =
 
        ----------- Proc points -------------------------------------------------
        let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       -- pprTrace "call_pps" (ppr g $$ ppr call_pps) (return ())
        proc_points <-
           if splitting_proc_points
              then do
