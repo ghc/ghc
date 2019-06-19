@@ -5,12 +5,10 @@ module StgDepAnal (depSortStgPgm) where
 import GhcPrelude
 
 import Id
-import IdInfo
 import Name (Name)
 import NameEnv
 import Outputable
 import StgSyn
-import Util
 import VarSet
 
 import Data.Graph (SCC (..))
