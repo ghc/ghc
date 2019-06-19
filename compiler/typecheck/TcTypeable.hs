@@ -8,20 +8,19 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcTypeable(mkTypeableBinds) where
+module TcTypeable(mkTypeableBinds, tyConIsTypeable) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
-import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
 import TyCoRep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
-import TcTypeableValidity
+import TcType
 import HscTypes ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
@@ -46,6 +45,7 @@ import FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class (lift)
+import Data.Maybe ( isJust )
 import Data.Word( Word64 )
 
 {- Note [Grand plan for Typeable]
@@ -252,7 +252,7 @@ todoForTyCons mod mod_id tycons = do
               -- Do, however, make them for their promoted datacon (see #13915).
             , not $ isFamInstTyCon tc''
             , Just rep_name <- pure $ tyConRepName_maybe tc''
-            , typeIsTypeable $ dropForAlls $ tyConKind tc''
+            , tyConIsTypeable tc''
             ]
     return TypeRepTodo { mod_rep_expr    = nlHsVar mod_id
                        , pkg_fingerprint = pkg_fpr
@@ -411,6 +411,36 @@ mkTyConRepBinds stuff todo (TypeableTyCon {..})
        let tycon_rep_rhs = mkTyConRepTyConRHS stuff todo tycon kind_rep
            tycon_rep_bind = mkVarBind tycon_rep_id tycon_rep_rhs
        return $ unitBag tycon_rep_bind
+
+-- | Is a particular 'TyCon' representable by @Typeable@?. These exclude type
+-- families and polytypes.
+tyConIsTypeable :: TyCon -> Bool
+tyConIsTypeable tc =
+       isJust (tyConRepName_maybe tc)
+    && kindIsTypeable (dropForAlls $ tyConKind tc)
+
+-- | Is a particular 'Kind' representable by @Typeable@? Here we look for
+-- polytypes and types containing casts (which may be, for instance, a type
+-- family).
+kindIsTypeable :: Kind -> Bool
+-- We handle types of the form (TYPE LiftedRep) specifically to avoid
+-- looping on (tyConIsTypeable RuntimeRep). We used to consider (TYPE rr)
+-- to be typeable without inspecting rr, but this exhibits bad behavior
+-- when rr is a type family.
+kindIsTypeable ty
+  | Just ty' <- coreView ty         = kindIsTypeable ty'
+kindIsTypeable ty
+  | isLiftedTypeKind ty             = True
+kindIsTypeable (TyVarTy _)          = True
+kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (FunTy _ a b)        = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
+                                   && all kindIsTypeable args
+kindIsTypeable (ForAllTy{})         = False
+kindIsTypeable (LitTy _)            = True
+kindIsTypeable (CastTy t _co)       = kindIsTypeable t
+  -- See Note [Typeable instances for casted types]
+kindIsTypeable (CoercionTy{})       = False
 
 -- | Maps kinds to 'KindRep' bindings. This binding may either be defined in
 -- some other module (in which case the @Maybe (LHsExpr Id@ will be 'Nothing')
@@ -573,8 +603,9 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
                  `nlHsApp` nlHsDataCon typeLitSymbolDataCon
                  `nlHsApp` nlHsLit (mkHsStringPrimLit $ mkFastString $ show s)
 
-    new_kind_rep (CastTy ty co)
-      = pprPanic "mkTyConKindRepBinds.go(cast)" (ppr ty $$ ppr co)
+    -- See Note [Typeable instances for casted types]
+    new_kind_rep (CastTy ty _co)
+      = getKindRep stuff in_scope ty
 
     new_kind_rep (CoercionTy co)
       = pprPanic "mkTyConKindRepBinds.go(coercion)" (ppr co)
@@ -671,6 +702,39 @@ polymorphic types.  So instead
                  | KindRepApp KindRep KindRep
                  | KindRepFun KindRep KindRep
                  ...
+
+Note [Typeable instances for casted types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC can support generating Typeable instances for types containing casts,
+such as in the following example (adapted from #16835):
+
+  type family F a where
+    F Int = Type
+
+  data D where
+    MkD :: forall (a :: F Int). a -> D
+
+  tr :: TypeRep (MkD True)
+  tr = typeRep
+
+This works because GHC flattens `F Int` during canonicalization, so the
+`TypeRep` you end up with for `tr` in the end is this:
+
+  axF :: F Int ~ Type
+  MkD :: forall (a :: F Int). (a |> axF) -> D
+
+  t1 :: TypeRep @(Bool -> D) (MkD @(Bool |> Sym axF) True)
+  t1 = mkTrCon $tc'MkD [SomeTypeRep (mkTrCon $tcBool [])]
+
+  tr :: TypeRep @D (MkD @(Bool |> Sym axF) True)
+  tr = typeRep (mkTrApp t1 (mkTrCon $tc'True [])
+                  `cast` (TypeRep ... ~R# Typeable ...))
+
+Here is how the cast above is added: GHC is trying to satisfy
+`Typeable @(F Int) (Bool |> Sym axF)`. Canonicalization reduces `F Int` to
+`Type`, meaning that this constraint reduces to `Typeable @Type Bool`.
+After GHC solves that constraint, it casts the
+resulting evidence term: this is the cast we see above.
 -}
 
 mkList :: Type -> [LHsExpr GhcTc] -> LHsExpr GhcTc
