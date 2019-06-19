@@ -819,7 +819,7 @@ finish summary tc_result mb_old_hash = do
             desugared_guts <- hscSimplify' plugins desugared_guts0
             (iface, no_change, details, cgguts) <-
               liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
-            return (iface, no_change, details, HscRecomp cgguts summary)
+            return (iface, no_change, details, HscRecomp cgguts summary iface)
       else mk_simple_iface
   liftIO $ hscMaybeWriteIface dflags iface no_change summary
   return
@@ -1368,7 +1368,7 @@ hscWriteIface dflags iface no_change mod_summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], ModuleSRTInfo)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1426,11 +1426,13 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps)
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, mod_srt_info)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+
+            -- pprTrace "hscGenHardCode" (text "Module CafInfos:" <+> ppr (cafInfos mod_srt_info)) $
+            return (output_filename, stub_c_exists, foreign_fps, mod_srt_info)
 
 
 hscInteractive :: HscEnv
@@ -1495,7 +1497,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroup ModuleSRTInfo)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1516,7 +1518,7 @@ doCodeGen hsc_env this_mod data_tycons
         -- CmmGroup on input may produce many CmmGroups on output due
         -- to proc-point splitting).
 
-    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
+        dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
                        "Cmm produced by codegen" (ppr a)
                      return a
 
@@ -1525,15 +1527,13 @@ doCodeGen hsc_env this_mod data_tycons
         pipeline_stream
            = {-# SCC "cmmPipeline" #-}
              let run_pipeline = cmmPipeline hsc_env
-             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+             in Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
 
-        ppr_stream2 = Stream.mapM dump2 pipeline_stream
-
-    return ppr_stream2
+    return (Stream.mapM dump2 pipeline_stream)
 
 
 

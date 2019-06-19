@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
@@ -28,6 +30,13 @@ import Control.Monad
 import Outputable
 import GHC.Platform
 
+import Name
+import NameEnv
+import NameSet
+import CLabel (hasHaskellName)
+import Data.Maybe (mapMaybe, fromJust)
+import SMRep (isStaticRep, isThunkRep)
+
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
@@ -39,25 +48,54 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo prog = withTiming (return dflags) (text "Cmm pipeline") forceRes $
+cmmPipeline hsc_env srtInfo0 prog = withTiming (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env (cafInfos srtInfo0)) prog
 
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
+     let -- Map Haskell names to whether they're CAFs.
+         -- Note that False does not mean that it's not CAFFY! It just means
+         -- it's not a CAF itself.
+         entry_names :: [(Name, Bool)]
+         entry_names = flip mapMaybe prog $ \case
+           CmmProc top_info entry _ g ->
+             let
+               entry_info = fromJust (mapLookup (g_entry g) (info_tbls top_info))
+               rep = cit_rep entry_info
+               is_caf = isStaticRep rep && isThunkRep rep
+             in
+               fmap (, is_caf) (hasHaskellName entry)
+           CmmData{} ->
+             Nothing
+
+     (srtInfo0, cmms, new_cafs) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo0 tops
+     let new_cafs_set = mkNameSet new_cafs
+     let entry_name_caf_infos =
+           flip map entry_names $ \(entry_name, is_caf) ->
+             (entry_name, (entry_name, is_caf || elemNameSet entry_name new_cafs_set))
+     let caf_infos' = extendNameEnvList (cafInfos srtInfo0) entry_name_caf_infos
+     let srtInfo1 = srtInfo0{ cafInfos = caf_infos' }
+
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-     return (srtInfo, cmms)
+{-
+     pprTrace "doSRTs" (text "entry names:" <+> ppr entry_names $$
+                        text "new cafs:" <+> ppr new_cafs $$
+                        text "caf infos:" <+> ppr caf_infos') $
+-}
+     return (srtInfo1, cmms)
 
   where forceRes (info, group) =
           info `seq` foldr (\decl r -> decl `seq` r) () group
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
-cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
-cpsTop hsc_env proc =
+cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop _ caf_infos p@(CmmData _ statics) = return (Right (cafAnalData caf_infos statics, p))
+cpsTop hsc_env caf_infos proc =
     do
+       -- pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
+
        ----------- Control-flow optimisations ----------------------------------
 
        -- The first round of control-flow optimisation speeds up the
@@ -85,7 +123,10 @@ cpsTop hsc_env proc =
        dump Opt_D_dump_cmm_switch "Post switch plan" g
 
        ----------- Proc points -------------------------------------------------
-       let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       let
+         call_pps :: ProcPointSet -- LabelMap
+         call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       -- pprTrace "call_pps" (ppr g $$ ppr call_pps) (return ())
        proc_points <-
           if splitting_proc_points
              then do
@@ -111,7 +152,7 @@ cpsTop hsc_env proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points
@@ -144,7 +185,7 @@ cpsTop hsc_env proc =
             -- See Note [unreachable blocks]
        dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-       return (cafEnv, g)
+       return (Left (cafEnv, g))
 
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
