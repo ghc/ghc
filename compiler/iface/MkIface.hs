@@ -155,16 +155,34 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameEnv (Name, Bool)) -> IO ModIface
+mkFullIface hsc_env partial_iface mb_caf_infos = do
+    let decls = updateDeclCafInfos (mi_decls partial_iface) mb_caf_infos
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface (mi_decls partial_iface)
+      addFingerprints hsc_env partial_iface decls
 
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
 
     return full_iface
+
+updateDeclCafInfos :: [IfaceDecl] -> Maybe (NameEnv (Name, Bool)) -> [IfaceDecl]
+updateDeclCafInfos decls Nothing = decls
+updateDeclCafInfos decls (Just caf_infos) = map update_decl decls
+  where
+    update_decl decl
+      | IfaceId nm ty details id_info <- decl
+      , Just (_, is_caffy) <- lookupNameEnv caf_infos nm
+      , not is_caffy
+      = IfaceId nm ty details $
+        case id_info of
+          NoInfo -> HasInfo [HsNoCafRefs]
+          HasInfo infos -> HasInfo (HsNoCafRefs : infos)
+
+      | otherwise
+      = decl
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -216,7 +234,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
-          mkFullIface hsc_env partial_iface
+          mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
