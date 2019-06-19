@@ -81,7 +81,7 @@ static void test_aligned_alloc(void)
         {
             // allocAlignedGroupOnNode does not support allocating more than
             // BLOCKS_PER_MBLOCK/2 blocks.
-            int b = rand() % (BLOCKS_PER_MBLOCK / 4);
+            int b = rand() % (BLOCKS_PER_MBLOCK / 2);
             if (b == 0) { b = 1; }
             a[j] = allocAlignedGroupOnNode(0, b);
             if ((((W_)(a[j]->start)) % (b*BLOCK_SIZE)) != 0)
