@@ -74,6 +74,10 @@ extern "C" {
 #define RTS_UNREACHABLE abort()
 #endif
 
+/* Prefetch primitives */
+#define prefetchForRead(ptr) __builtin_prefetch(ptr, 0)
+#define prefetchForWrite(ptr) __builtin_prefetch(ptr, 1)
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #if defined(mingw32_HOST_OS)
 #define __MSVCRT__ 1

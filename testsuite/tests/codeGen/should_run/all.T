@@ -1,5 +1,6 @@
 # Test +RTS -G1 here (it isn't tested anywhere else)
-setTestOpts(unless(fast(), extra_ways(['g1'])))
+# N.B. Nonmoving collector doesn't support -G1
+setTestOpts(unless(fast(), [ extra_ways(['g1']), omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])]))
 
 test('cgrun001', normal, compile_and_run, [''])
 test('cgrun002', normal, compile_and_run, [''])
@@ -191,9 +192,11 @@ test('T15696_3', normal, compile_and_run, ['-O'])
 
 test('T15892',
      [ ignore_stdout,
-        # we want to do lots of major GC to make the bug more likely to
-        # happen, so -G1 -A32k:
-        extra_run_opts('+RTS -G1 -A32k -RTS') ],
+       # -G1 is unsupported by the nonmoving GC
+       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
+       # we want to do lots of major GC to make the bug more likely to
+       # happen, so -G1 -A32k:
+       extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
 test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
