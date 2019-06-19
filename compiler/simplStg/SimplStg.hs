@@ -56,11 +56,11 @@ stg2stg dflags this_mod binds
         ; binds' <- runStgM us $
             foldM do_stg_pass binds (getStgToDo dflags)
 
-        ; let binds'' = depSortStgPgm binds'
+        ; let binds_sorted = depSortStgPgm binds'
 
-        ; dump_when Opt_D_dump_stg "STG syntax:" binds''
+        ; dump_when Opt_D_dump_stg "STG syntax:" binds_sorted
 
-        ; return binds''
+        ; return binds_sorted
    }
 
   where
