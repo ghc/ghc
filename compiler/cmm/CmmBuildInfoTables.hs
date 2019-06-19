@@ -414,13 +414,20 @@ cafLattice = DataflowLattice Set.empty add
 
 cafTransfers :: LabelSet -> Label -> CLabel -> TransferFun CAFSet
 cafTransfers contLbls entry topLbl
-  (BlockCC eNode middle xNode) fBase =
-    let joined = cafsInNode xNode $! live'
+  block@(BlockCC eNode middle xNode) fBase =
+    let joined :: CAFSet
+        joined = cafsInNode xNode $! live'
+
+        result :: CAFSet
         !result = foldNodesBwdOO cafsInNode middle joined
 
+        facts :: [Set CAFLabel]
         facts = mapMaybe successorFact (successors xNode)
+
+        live' :: CAFSet
         live' = joinFacts cafLattice facts
 
+        successorFact :: Label -> Maybe (Set CAFLabel)
         successorFact s
           -- If this is a loop back to the entry, we can refer to the
           -- entry label.
@@ -436,16 +443,26 @@ cafTransfers contLbls entry topLbl
         cafsInNode :: CmmNode e x -> CAFSet -> CAFSet
         cafsInNode node set = foldExpDeep addCaf node set
 
+        addCaf :: CmmExpr -> Set CAFLabel -> Set CAFLabel
         addCaf expr !set =
           case expr of
               CmmLit (CmmLabel c) -> add c set
               CmmLit (CmmLabelOff c _) -> add c set
               CmmLit (CmmLabelDiffOff c1 c2 _ _) -> add c1 $! add c2 set
               _ -> set
-        add l s | hasCAF l  = Set.insert (mkCAFLabel l) s
+
+        add l s | pprTrace "cafTransfers.add" (text "l:" <+> ppr l <+> text "hasCAF:" <+> ppr (hasCAF l)) False = undefined
+                | hasCAF l  = Set.insert (mkCAFLabel l) s
                 | otherwise = s
 
-    in mapSingleton (entryLabel eNode) result
+    in
+      pprTrace "cafTransfers" (text "block:" <+> ppr block $$
+                               text "contLbls:" <+> ppr contLbls $$
+                               text "entry:" <+> ppr entry $$
+                               text "topLbl:" <+> ppr topLbl $$
+                               text "cafs in exit:" <+> ppr joined $$
+                               text "result:" <+> ppr result)
+        mapSingleton (entryLabel eNode) result
 
 
 -- -----------------------------------------------------------------------------
