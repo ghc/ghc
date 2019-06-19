@@ -25,6 +25,7 @@ module TcEnv(
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, ioLookupDataCon,
+        addTypecheckedBinds,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -103,6 +104,7 @@ import Module
 import Outputable
 import Encoding
 import FastString
+import Bag
 import ListSetOps
 import ErrUtils
 import Maybes( MaybeErr(..), orElse )
@@ -183,6 +185,15 @@ ioLookupDataCon_maybe hsc_env name = do
         _                          -> Failed $
           pprTcTyThingCategory (AGlobal thing) <+> quotes (ppr name) <+>
                 text "used as a data constructor"
+
+addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
+addTypecheckedBinds tcg_env binds
+  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
+    -- Do not add the code for record-selector bindings
+    -- when compiling hs-boot files
+  | otherwise = tcg_env { tcg_binds = foldr unionBags
+                                            (tcg_binds tcg_env)
+                                            binds }
 
 {-
 ************************************************************************

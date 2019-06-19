@@ -12,7 +12,6 @@
 
 module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
                  tcHsBootSigs, tcPolyCheck,
-                 addTypecheckedBinds,
                  chooseInferredQuantifiers,
                  badBootDeclErr ) where
 
@@ -26,7 +25,6 @@ import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
 import GHC.Hs
-import HscTypes( isHsBootOrSig )
 import TcSigs
 import TcRnMonad
 import TcEnv
@@ -70,21 +68,6 @@ import Control.Monad
 import Data.Foldable (find)
 
 #include "HsVersions.h"
-
-{- *********************************************************************
-*                                                                      *
-               A useful helper function
-*                                                                      *
-********************************************************************* -}
-
-addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
-addTypecheckedBinds tcg_env binds
-  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
-    -- Do not add the code for record-selector bindings
-    -- when compiling hs-boot files
-  | otherwise = tcg_env { tcg_binds = foldr unionBags
-                                            (tcg_binds tcg_env)
-                                            binds }
 
 {-
 ************************************************************************
