@@ -23,6 +23,7 @@ from math import ceil, trunc
 
 from testutil import passed, failBecause, testing_metrics
 
+from my_typing import *
 
 # Check if "git rev-parse" can be run successfully.
 # True implies the current directory is a git repo.
@@ -73,7 +74,8 @@ def parse_perf_stat(stat_str):
 
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
-def get_perf_stats(commit='HEAD', namespace='perf'):
+def get_perf_stats(commit: GitRef=GitRef('HEAD'),
+                   namespace: str='perf'):
     try:
         log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
     except subprocess.CalledProcessError:
@@ -85,20 +87,19 @@ def get_perf_stats(commit='HEAD', namespace='perf'):
     return log
 
 # Check if a str is in a 40 character git commit hash.
-# str -> bool
 _commit_hash_re = re.compile('[0-9a-f]' * 40)
-def is_commit_hash(hash):
+def is_commit_hash(hash: str) -> bool:
     return _commit_hash_re.fullmatch(hash) != None
 
 # Convert a <ref> to a commit hash code.
-# str -> str
-def commit_hash(commit):
+def commit_hash(commit: Union[GitHash, GitRef]) -> GitHash:
     if is_commit_hash(commit):
-        return commit
-    return subprocess.check_output(['git', 'rev-parse', commit], \
+        return GitHash(commit)
+    hash = subprocess.check_output(['git', 'rev-parse', commit], \
             stderr=subprocess.STDOUT) \
             .decode() \
             .strip()
+    return GitHash(hash)
 
 # Get allowed changes to performance. This is extracted from the commit message of
 # the given commit in this form:
@@ -113,27 +114,27 @@ def commit_hash(commit):
 #                   ...
 #               }
 #   }
-_get_allowed_perf_changes_cache = {}
-def get_allowed_perf_changes(commit='HEAD'):
+_get_allowed_perf_changes_cache = {} # type: ignore
+def get_allowed_perf_changes(commit: GitRef=GitRef('HEAD')):
     global _get_allowed_perf_changes_cache
-    commit =  commit_hash(commit)
-    if not commit in _get_allowed_perf_changes_cache:
-        _get_allowed_perf_changes_cache[commit] \
-            = parse_allowed_perf_changes(get_commit_message(commit))
-    return _get_allowed_perf_changes_cache[commit]
+    chash = commit_hash(commit)
+    if not chash in _get_allowed_perf_changes_cache:
+        _get_allowed_perf_changes_cache[chash] \
+            = parse_allowed_perf_changes(get_commit_message(chash))
+    return _get_allowed_perf_changes_cache[chash]
 
 # Get the commit message of any commit <ref>.
 # This is cached (keyed on the full commit hash).
-_get_commit_message = {}
-def get_commit_message(commit='HEAD'):
+_get_commit_message = {} # type: Dict[GitHash, str]
+def get_commit_message(commit: Union[GitHash, GitRef]=GitRef('HEAD')):
     global _get_commit_message
-    commit =  commit_hash(commit)
+    commit = commit_hash(commit)
     if not commit in _get_commit_message:
         _get_commit_message[commit] = subprocess.check_output(\
             ['git', '--no-pager', 'log', '-n1', '--format=%B', commit]).decode()
     return _get_commit_message[commit]
 
-def parse_allowed_perf_changes(commitMsg):
+def parse_allowed_perf_changes(commitMsg: str):
     # Helper regex. Non-capturing unless postfixed with Cap.
     s = r"(?:\s*\n?\s+)"                                    # Space, possible new line with an indent.
     qstr = r"(?:'(?:[^'\\]|\\.)*')"                         # Quoted string.
@@ -150,7 +151,7 @@ def parse_allowed_perf_changes(commitMsg):
         )
 
     matches = re.findall(exp, commitMsg, re.M)
-    changes = {}
+    changes = {} # type: ignore
     for (direction, metrics_str, opts_str, tests_str) in matches:
         tests = tests_str.split()
         for test in tests:
@@ -300,18 +301,18 @@ def best_fit_ci_test_env():
 
     return BestFitCiTestEnv[1]
 
-_baseline_depth_commit_log = {}
+_baseline_depth_commit_log = {} # type: ignore
 
 # Get the commit hashes for the last BaselineSearchDepth commits from and
 # including the input commit. The output commits are all commit hashes.
 # str -> [str]
-def baseline_commit_log(commit):
+def baseline_commit_log(commit: GitRef):
     global _baseline_depth_commit_log
-    commit = commit_hash(commit)
+    chash = commit_hash(commit)
     if not commit in _baseline_depth_commit_log:
-        _baseline_depth_commit_log[commit] = commit_log(commit, BaselineSearchDepth)
+        _baseline_depth_commit_log[chash] = commit_log(chash, BaselineSearchDepth)
 
-    return _baseline_depth_commit_log[commit]
+    return _baseline_depth_commit_log[chash]
 
 # Get the commit hashes for the last n commits from and
 # including the input commit. The output commits are all commit hashes.
@@ -333,7 +334,7 @@ def commit_log(commitOrRange, n=None):
 # Cache of baseline values. This is a dict of dicts indexed on:
 # (useCiNamespace, commit) -> (test_env, test, metric, way) -> baseline
 # (bool          , str   ) -> (str     , str , str   , str) -> float
-_commit_metric_cache = {}
+_commit_metric_cache = {} # type: ignore
 
 # Get the baseline of a test at a given commit. This is the expected value
 # *before* the commit is applied (i.e. on the parent commit).
@@ -350,7 +351,7 @@ _commit_metric_cache = {}
 # returns: the Baseline named tuple or None if no metric was found within
 #          BaselineSearchDepth commits and since the last expected change
 #          (ignoring any expected change in the given commit).
-def baseline_metric(commit, name, test_env, metric, way):
+def baseline_metric(commit: GitRef, name: str, test_env: str, metric: str, way: str):
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
     assert is_commit_hash(commit)
@@ -556,9 +557,9 @@ if __name__ == '__main__':
 
     env = 'local'
     name = re.compile('.*')
-    # metrics is a tuple (str commit, PerfStat stat)
-    CommitAndStat = namedtuple('CommitAndStat', ['commit', 'stat'])
-    metrics = []
+    CommitAndStat = NamedTuple('CommitAndStat',
+                               [('commit', GitHash), ('stat', PerfStat)])
+    metrics = [] # type: List[CommitAndStat]
     singleton_commit = len(args.commits) == 1
 
     #
@@ -673,7 +674,7 @@ if __name__ == '__main__':
         print(\
             "<html>" + \
                 '<head>\n' + \
-                    (tooltipjsTag if tooltipjsTag != None else '') + \
+                    (tooltipjsTag if tooltipjsTag is not None else '') + \
                     chartjsTag + \
                 '</head>' + \
                 '<body style="padding: 20px"><canvas id="myChart"></canvas><script>' + \
@@ -681,7 +682,7 @@ if __name__ == '__main__':
                     "var commitMsgs = " + json.dumps(commitMsgs, indent=2) + ";" + \
                     "var chartData = " + json.dumps(chartData, indent=2) + ";" + \
                     (("var chart = new Chart(ctx, setCustomTooltip(chartData, commitMsgs));") \
-                        if tooltipjsTag != None else \
+                        if tooltipjsTag is not None else \
                      ("var chart = new Chart(ctx, chartData);")) + \
                 '</script></body>' + \
             "</html>"\

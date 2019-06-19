@@ -2,6 +2,9 @@
 # (c) Simon Marlow 2002
 #
 
+from my_typing import *
+from pathlib import Path
+
 # -----------------------------------------------------------------------------
 # Configuration info
 
@@ -36,6 +39,27 @@ class TestConfig:
 
         # File in which to save the summary
         self.summary_file = ''
+
+        # Path to Ghostscript
+        self.gs = ''
+
+        # Run tests requiring Haddock
+        self.haddock = False
+
+        # Compiler has native code generator?
+        self.have_ncg = False
+
+        # Is compiler unregisterised?
+        self.unregisterised = False
+
+        # Was the compiler executable compiled with profiling?
+        self.compiler_profiled = False
+
+        # Was the compiler compiled with DEBUG?
+        self.compiler_debugged = False
+
+        # Was the compiler compiled with LLVM?
+        self.ghc_built_by_llvm = False
 
         # Should we print the summary?
         # Disabling this is useful for Phabricator/Harbormaster
@@ -78,16 +102,16 @@ class TestConfig:
         # Which ways to run tests (when compiling and running respectively)
         # Other ways are added from the command line if we have the appropriate
         # libraries.
-        self.compile_ways = []
-        self.run_ways     = []
-        self.other_ways   = []
+        self.compile_ways = [] # type: List[WayName]
+        self.run_ways     = [] # type: List[WayName]
+        self.other_ways   = [] # type: List[WayName]
 
         # The ways selected via the command line.
-        self.cmdline_ways = []
+        self.cmdline_ways = [] # type: List[WayName]
 
         # Lists of flags for each way
-        self.way_flags = {}
-        self.way_rts_flags = {}
+        self.way_flags = {}  # type: Dict[WayName, List[str]]
+        self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
         # Do we have vanilla libraries?
         self.have_vanilla = False
@@ -116,6 +140,9 @@ class TestConfig:
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
+        # Is the compiler dynamically linked?
+        self.ghc_dynamic = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
@@ -142,7 +169,14 @@ class TestConfig:
         # Where to look up runtime stats produced by haddock, needed for
         # the haddock perf tests in testsuite/tests/perf/haddock/.
         # See Note [Haddock runtime stats files] at the bottom of this file.
-        self.stats_files_dir = '/please_set_stats_files_dir'
+        self.stats_files_dir = Path('/please_set_stats_files_dir')
+
+        # Should we cleanup after test runs?
+        self.cleanup = True
+
+        # I have no idea what this does
+        self.package_conf_cache_file = None # type: Optional[Path]
+
 
 global config
 config = TestConfig()
@@ -165,12 +199,19 @@ class TestResult:
     framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stderr'
-    def __init__(self, directory, testname, reason, way, stderr=None):
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
+    def __init__(self,
+                 directory: str,
+                 testname: TestName,
+                 reason: str,
+                 way: WayName,
+                 stdout: Optional[str]=None,
+                 stderr: Optional[str]=None):
         self.directory = directory
         self.testname = testname
         self.reason = reason
         self.way = way
+        self.stdout = stdout
         self.stderr = stderr
 
 class TestRun:
@@ -183,8 +224,7 @@ class TestRun:
        self.n_expected_passes = 0
        self.n_expected_failures = 0
 
-       # type: List[TestResult]
-       self.missing_libs = []
+       self.missing_libs = [] # type: List[TestResult]
        self.framework_failures = []
        self.framework_warnings = []
 
@@ -202,7 +242,7 @@ class TestRun:
 global t
 t = TestRun()
 
-def getTestRun():
+def getTestRun() -> TestRun:
     return t
 
 # -----------------------------------------------------------------------------
@@ -227,6 +267,9 @@ class TestOptions:
 
        # override the expected result for certain ways
        self.expect_fail_for = []
+
+       # the stdin file that this test will use (empty for <name>.stdin)
+       self.srcdir = None
 
        # the stdin file that this test will use (empty for <name>.stdin)
        self.stdin = ''
@@ -307,12 +350,12 @@ class TestOptions:
        self.compile_cmd_prefix = ''
 
        # Extra output normalisation
-       self.extra_normaliser = lambda x: x
+       self.extra_normaliser = lambda x: x # type: OutputNormalizer
 
        # Custom output checker, otherwise do a comparison with expected
        # stdout file.  Accepts two arguments: filename of actual stdout
        # output, and a normaliser function given other test options
-       self.check_stdout = None
+       self.check_stdout = None # type: Optional[Callable[Path, OutputNormalizer]]
 
        # Check .hp file when profiling libraries are available?
        self.check_hp = True
@@ -324,7 +367,7 @@ class TestOptions:
        self.keep_prof_callstacks = False
 
        # The directory the test is in
-       self.testdir = '.'
+       self.testdir = Path('.')
 
        # Should we redirect stdout and stderr to a single file?
        self.combined_output = False
@@ -333,9 +376,7 @@ class TestOptions:
        self.compile_timeout_multiplier = 1.0
        self.run_timeout_multiplier = 1.0
 
-       self.cleanup = True
-
-       # Sould we run tests in a local subdirectory (<testname>-run) or
+       # Should we run tests in a local subdirectory (<testname>-run) or
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
 
@@ -345,4 +386,4 @@ default_testopts = TestOptions()
 
 # (bug, directory, name) of tests marked broken
 global brokens
-brokens = []
+brokens = []  # type: List[Tuple[IssueNumber, str, str]]

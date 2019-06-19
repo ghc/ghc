@@ -24,7 +24,7 @@ import traceback
 import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
-from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
+from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
 import cpu_features
@@ -39,7 +39,11 @@ global config
 config = getConfig() # get it from testglobals
 
 def signal_handler(signal, frame):
-        stopNow()
+    stopNow()
+
+def get_compiler_info() -> TestConfig:
+    """ Overriddden by configuration file. """
+    raise NotImplementedError
 
 # -----------------------------------------------------------------------------
 # cmd-line options
@@ -65,6 +69,10 @@ perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip per
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 
 args = parser.parse_args()
+
+# Initialize variables that are set by the build system with -e
+windows = False
+darwin = False
 
 if args.e:
     for e in args.e:
@@ -150,7 +158,7 @@ if windows:
     import ctypes
     # Windows and mingw* Python provide windll, msys2 python provides cdll.
     if hasattr(ctypes, 'WinDLL'):
-        mydll = ctypes.WinDLL
+        mydll = ctypes.WinDLL    # type: ignore
     else:
         mydll = ctypes.CDLL
 
@@ -284,7 +292,7 @@ t_files = list(findTFiles(config.rootdirs))
 
 print('Found', len(t_files), '.T files...')
 
-t = getTestRun()
+t = getTestRun() # type: TestRun
 
 # Avoid cmd.exe built-in 'date' command on Windows
 t.start_time = time.localtime()
@@ -334,13 +342,13 @@ for file in t_files:
         exec(src)
     except Exception as e:
         traceback.print_exc()
-        framework_fail(file, '', str(e))
+        framework_fail(None, None, 'exception: %s' % e)
         t_files_ok = False
 
 for name in config.only:
     if t_files_ok:
         # See Note [Mutating config.only]
-        framework_fail(name, '', 'test not found')
+        framework_fail(name, None, 'test not found')
     else:
         # Let user fix .T file errors before reporting on unfound tests.
         # The reason the test can not be found is likely because of those
@@ -350,7 +358,8 @@ for name in config.only:
 if config.list_broken:
     print('')
     print('Broken tests:')
-    print('\n  '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
+    print('\n  '.join('#{ticket}({a}/{b})'.format(ticket=ticket, a=a, b=b)
+                      for ticket, a, b in brokens))
     print('')
 
     if t.framework_failures:
@@ -435,8 +444,8 @@ else:
     stats = [stat for (_, stat) in t.metrics]
     if hasMetricsFile:
         print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
-        with open(config.metrics_file, 'a') as file:
-            file.write("\n" + Perf.format_perf_stat(stats))
+        with open(config.metrics_file, 'a') as f:
+            f.write("\n" + Perf.format_perf_stat(stats))
     elif inside_git_repo() and any(stats):
         if is_worktree_dirty():
             print()
@@ -448,8 +457,8 @@ else:
 
     # Write summary
     if config.summary_file:
-        with open(config.summary_file, 'w') as file:
-            summary(t, file)
+        with open(config.summary_file, 'w') as f:
+            summary(t, f)
 
     if args.junit:
         junit(t).write(args.junit)
