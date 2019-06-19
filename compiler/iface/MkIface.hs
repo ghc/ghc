@@ -139,6 +139,7 @@ mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
+        -> Maybe (NameEnv (Name, Bool))
         -> IO (ModIface, -- The new one
                Bool)     -- True <=> there was an old Iface, and the
                          --          new one is identical, so no need
@@ -160,12 +161,14 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_decl_docs    = decl_docs,
                       mg_arg_docs     = arg_docs
                     }
+          mb_caf_infos
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src used_th deps rdr_env fix_env
                    warns hpc_info self_trust
                    safe_mode usages
                    doc_hdr decl_docs arg_docs
                    mod_details
+                   mb_caf_infos
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -217,6 +220,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
                    mod_details
+                   Nothing
 
 
 
@@ -230,6 +234,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
+         -> Maybe (NameEnv (Name, Bool))
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
@@ -242,15 +247,17 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
+         mb_caf_infos
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
 --      to expose in the interface
 
   = do
-    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+    let semantic_mod = canonicalizeHomeModule dflags (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl entity
+        omit_prags = gopt Opt_OmitInterfacePragmas dflags
+        decls  = [ tyThingToIfaceDecl (guard (not omit_prags) >> mb_caf_infos) entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -373,7 +380,6 @@ writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIfaceFile dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
-
 
 -- -----------------------------------------------------------------------------
 -- Look up parents and versions of Names
@@ -1761,25 +1767,42 @@ checkList (check:checks) = do recompile <- check
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: TyThing -> IfaceDecl
-tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
-tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl (AConLike cl)  = case cl of
+tyThingToIfaceDecl :: Maybe (NameEnv (Name, Bool)) -> TyThing -> IfaceDecl
+tyThingToIfaceDecl mb_caf_env (AnId id) = idToIfaceDecl mb_caf_env id
+tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl _ (ACoAxiom ax) = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl _ (AConLike cl) = case cl of
     RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
-idToIfaceDecl :: Id -> IfaceDecl
+idToIfaceDecl :: Maybe (NameEnv (Name, Bool)) -> Id -> IfaceDecl
 -- The Id is already tidied, so that locally-bound names
 -- (lambdas, for-alls) already have non-clashing OccNames
 -- We can't tidy it here, locally, because it may have
 -- free variables in its type or IdInfo
-idToIfaceDecl id
+idToIfaceDecl mb_caf_env id
   = IfaceId { ifName      = getName id,
               ifType      = toIfaceType (idType id),
               ifIdDetails = toIfaceIdDetails (idDetails id),
-              ifIdInfo    = toIfaceIdInfo (idInfo id) }
+              ifIdInfo    = toIfaceIdInfo id caf_info }
+  where
+    caf_info =
+      case mb_caf_env of
+        Nothing ->
+          -- CAF env not available, we're either not generating code (e.g.
+          -- compiling a boot file, or in interpreter),
+          -- or -domit-interface-pragmas is enabled (with -O0, or explicitly).
+          True
+        Just caf_env ->
+          case lookupNameEnv caf_env (getName id) of
+            Nothing ->
+              pprPanic "idToIfaceDecl" $
+                text "Can't find CafInfo of Name:" <+>
+                  ppr (getName id) <+> parens (text "Id:" <+> ppr id) $$
+                text "CAF env:" <+> ppr (nameEnvElts caf_env)
+            Just (_, caf_info) ->
+              caf_info
 
 --------------------------
 dataConToIfaceDecl :: DataCon -> IfaceDecl
