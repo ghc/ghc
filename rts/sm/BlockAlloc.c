@@ -501,6 +501,22 @@ finish:
     return bd;
 }
 
+// Allocate `n` blocks aligned to `n` blocks, e.g. when n = 8, the blocks will
+// be aligned at `8 * BLOCK_SIZE`. For a group with `n` blocks this can be used
+// for easily accessing the beginning of the group from a location p in the
+// group with
+//
+//     p % (BLOCK_SIZE*n)
+//
+// Used by the non-moving collector for allocating segments.
+//
+// Because the storage manager does not support aligned allocations, we have to
+// allocate `2*n - 1` blocks here to make sure we'll be able to find an aligned
+// region in the allocated blocks. After finding the aligned area we want to
+// free slop on the low and high sides, and block allocator doesn't support
+// freeing only some portion of a megablock (we can only free whole megablocks).
+// So we disallow allocating megablocks here, and allow allocating at most
+// `BLOCKS_PER_MBLOCK / 2` blocks.
 bdescr *
 allocAlignedGroupOnNode (uint32_t node, W_ n)
 {
