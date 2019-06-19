@@ -21,7 +21,7 @@ import TyCoRep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
-import TcTypeableValidity
+import TcType
 import HscTypes ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
@@ -573,8 +573,9 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
                  `nlHsApp` nlHsDataCon typeLitSymbolDataCon
                  `nlHsApp` nlHsLit (mkHsStringPrimLit $ mkFastString $ show s)
 
-    new_kind_rep (CastTy ty co)
-      = pprPanic "mkTyConKindRepBinds.go(cast)" (ppr ty $$ ppr co)
+    -- See Note [Typeable instances for casted types]
+    new_kind_rep (CastTy ty _co)
+      = getKindRep stuff in_scope ty
 
     new_kind_rep (CoercionTy co)
       = pprPanic "mkTyConKindRepBinds.go(coercion)" (ppr co)
@@ -671,6 +672,34 @@ polymorphic types.  So instead
                  | KindRepApp KindRep KindRep
                  | KindRepFun KindRep KindRep
                  ...
+
+Note [Typeable instances for casted types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC can support generating Typeable instances for types containing casts,
+such as in the following example (adapted from #16835):
+
+  type family F a where
+    F Int = Type
+
+  data D where
+    MkD :: forall (a :: F Int). a -> D
+
+  tr :: TypeRep (MkD True)
+  tr = typeRep
+
+This works because GHC flattens `F Int` during canonicalization, so the
+`TypeRep` you end up with for `tr` in the end is this:
+
+  axF :: F Int ~ Type
+
+  t1 :: TypeRep @(Bool -> D) (MkD @(Bool |> Sym axF) True)
+  t1 = mkTrCon @(Bool -> D) @(MkD @(Bool |> Sym axF))
+               $tc'MkD
+               [SomeTypeRep (mkTrCon $tcBool `cast` ...)]
+
+  tr :: TypeRep @D (MkD @(Bool |> Sym axF) True)
+  tr = mkTrApp @Bool @D @(MkD @(Bool |> Sym axF) True) @True
+               t1 (mkTrCon @tc'True [])
 -}
 
 mkList :: Type -> [LHsExpr GhcTc] -> LHsExpr GhcTc
