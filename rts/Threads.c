@@ -85,7 +85,7 @@ createThread(Capability *cap, W_ size)
     SET_HDR(stack, &stg_STACK_info, cap->r.rCCCS);
     stack->stack_size   = stack_size - sizeofW(StgStack);
     stack->sp           = stack->stack + stack->stack_size;
-    stack->dirty        = 1;
+    stack->dirty        = STACK_DIRTY;
 
     tso = (StgTSO *)allocate(cap, sizeofW(StgTSO));
     TICK_ALLOC_TSO();
@@ -788,7 +788,7 @@ loop:
     // indicate that the MVar operation has now completed.
     tso->_link = (StgTSO*)&stg_END_TSO_QUEUE_closure;
 
-    if (stack->dirty == 0) {
+    if ((stack->dirty & STACK_DIRTY) == 0) {
         dirty_STACK(cap, stack);
     }
 

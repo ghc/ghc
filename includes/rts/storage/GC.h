@@ -240,9 +240,14 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 /* (needed when dynamic libraries are used). */
 extern bool keepCAFs;
 
+#include "rts/Flags.h"
+
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
     bd->gen     = gen;
     bd->gen_no  = gen->no;
     bd->dest_no = dest->no;
+
+    ASSERT(gen->no < RtsFlags.GcFlags.generations);
+    ASSERT(dest->no < RtsFlags.GcFlags.generations);
 }

@@ -748,6 +748,8 @@ static Capability * waitForReturnCapability (Task *task)
  * result of the external call back to the Haskell thread that
  * made it.
  *
+ * pCap is strictly an output.
+ *
  * ------------------------------------------------------------------------- */
 
 void waitForCapability (Capability **pCap, Task *task)
@@ -840,9 +842,12 @@ void waitForCapability (Capability **pCap, Task *task)
  *      SYNC_GC_PAR), either to do a sequential GC, forkProcess, or
  *      setNumCapabilities.  We should give up the Capability temporarily.
  *
+ * When yieldCapability returns *pCap will have been updated to the new
+ * capability held by the caller.
+ *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
@@ -948,7 +953,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
  * get every Capability into the GC.
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 void
 prodCapability (Capability *cap, Task *task)
@@ -970,7 +975,7 @@ prodCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 bool
 tryGrabCapability (Capability *cap, Task *task)
