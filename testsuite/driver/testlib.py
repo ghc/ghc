@@ -994,7 +994,9 @@ def do_test(name, way, func, args, files):
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                result = TestResult(directory, name, reason, way, stderr=result.get('stderr'))
+                result = TestResult(directory, name, reason, way,
+                                    stdout=result.get('stdout'),
+                                    stderr=result.get('stderr'))
                 t.unexpected_failures.append(result)
         else:
             if opts.expect == 'missing-lib':
@@ -1444,9 +1446,13 @@ def simple_run(name, way, prog, extra_run_opts):
         return failBecause('bad exit code (%d)' % exit_code)
 
     if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
-        return failBecause('bad stderr')
+        return failBecause('bad stderr',
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
     if not (opts.ignore_stdout or stdout_ok(name, way)):
-        return failBecause('bad stdout')
+        return failBecause('bad stdout',
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
 
     check_hp = '-h' in my_rts_flags and opts.check_hp
     check_prof = '-p' in my_rts_flags
@@ -1528,14 +1534,20 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
         print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
         dump_stdout(name)
         dump_stderr(name)
-        return failBecause('bad exit code (%d)' % exit_code)
+        return failBecause('bad exit code (%d)' % exit_code,
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
     if not (opts.ignore_stderr or stderr_ok(name, way)):
-        return failBecause('bad stderr')
+        return failBecause('bad stderr',
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
     elif not (opts.ignore_stdout or stdout_ok(name, way)):
-        return failBecause('bad stdout')
+        return failBecause('bad stdout',
+                           stderr=read_stderr(name),
+                           stdout=read_stdout(name))
     else:
         return passed()
 
@@ -1582,12 +1594,15 @@ def stdout_ok(name, way):
    return compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
-def dump_stdout( name ):
+def read_stdout( name ):
     with open(in_testdir(name, 'run.stdout'), encoding='utf8') as f:
-        str = f.read().strip()
-        if str:
-            print("Stdout (", name, "):")
-            print(str)
+        return f.read()
+
+def dump_stdout( name ):
+    str = read_stdout(name).strip()
+    if str:
+        print("Stdout (", name, "):")
+        print(str)
 
 def stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1598,12 +1613,15 @@ def stderr_ok(name, way):
                           expected_stderr_file, actual_stderr_file,
                           whitespace_normaliser=normalise_whitespace)
 
-def dump_stderr( name ):
+def read_stderr( name ):
     with open(in_testdir(name, 'run.stderr'), encoding='utf8') as f:
-        str = f.read().strip()
-        if str:
-            print("Stderr (", name, "):")
-            print(str)
+        return f.read()
+
+def dump_stderr( name ):
+    str = read_stderr(name).strip()
+    if str:
+        print("Stderr (", name, "):")
+        print(str)
 
 def read_no_crs(file):
     str = ''
