@@ -173,6 +173,7 @@ import System.IO (fixIO)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
+import Data.Functor
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts, hie_module )
@@ -835,8 +836,8 @@ finish summary tc_result mb_old_hash = do
           (cg_guts, details) <- {-# SCC "CoreTidy" #-}
               liftIO $ tidyProgram hsc_env desugared_guts
 
-          let iface_gen :: IO (ModIface, Bool)
-              iface_gen = do
+          let iface_gen :: Maybe (NameEnv (Name, Bool)) -> IO (ModIface, Bool)
+              iface_gen mb_caf_infos = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
                   -- core if necessary.
                   -- This has to happen *after* code gen so that the back-end
@@ -846,7 +847,7 @@ finish summary tc_result mb_old_hash = do
                   -- less of the environment alive here but don't do so
                   -- currently.
                   res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts
+                          mkIface hsc_env mb_old_hash details desugared_guts mb_caf_infos
                   dumpIfaceStats hsc_env
                   return res
 
@@ -1421,7 +1422,8 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)],
+                      NameEnv (Name, Bool))
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1479,11 +1481,11 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, ())
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+            return (output_filename, stub_c_exists, foreign_fps, caf_infos)
 
 
 hscInteractive :: HscEnv
@@ -1548,7 +1550,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroup (NameEnv (Name, Bool)))
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1569,16 +1571,17 @@ doCodeGen hsc_env this_mod data_tycons
         -- CmmGroup on input may produce many CmmGroups on output due
         -- to proc-point splitting).
 
-    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
+        dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
                        "Cmm produced by codegen" (ppr a)
                      return a
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream
-           = {-# SCC "cmmPipeline" #-}
-             let run_pipeline = cmmPipeline hsc_env
-             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+        pipeline_stream :: Stream IO CmmGroup (NameEnv (Name, Bool))
+        pipeline_stream =
+          {-# SCC "cmmPipeline" #-}
+          Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
+            <&> cafInfos
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)

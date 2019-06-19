@@ -392,7 +392,8 @@ toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 toIfaceLetBndr :: Id -> IfaceLetBndr
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
-                               (toIfaceIdInfo (idInfo id))
+                               (toIfaceIdInfo id
+                                  True {- CafInfo of locals do not matter -})
                                (toIfaceJoinInfo (isJoinId_maybe id))
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
@@ -412,25 +413,32 @@ toIfaceIdDetails (RecSelId { sel_naughty = n
 toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
                          IfVanillaId   -- Unexpected; the other
 
-toIfaceIdInfo :: IdInfo -> IfaceIdInfo
-toIfaceIdInfo id_info
-  = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo,
+toIfaceIdInfo :: Id -> Bool -> IfaceIdInfo
+toIfaceIdInfo id is_caffy
+  = case catMaybes [arity_hsinfo, caf_info, strict_hsinfo,
                     inline_hsinfo,  unfold_hsinfo, levity_hsinfo] of
        []    -> NoInfo
        infos -> HasInfo infos
                -- NB: strictness and arity must appear in the list before unfolding
                -- See TcIface.tcUnfolding
   where
+    id_info = idInfo id
+
     ------------  Arity  --------------
     arity_info = arityInfo id_info
     arity_hsinfo | arity_info == 0 = Nothing
                  | otherwise       = Just (HsArity arity_info)
 
     ------------ Caf Info --------------
-    caf_info   = cafInfo id_info
-    caf_hsinfo = case caf_info of
-                   NoCafRefs -> Just HsNoCafRefs
-                   _other    -> Nothing
+    caf_info
+      | is_caffy
+      = WARN( not (mayHaveCafRefs (cafInfo id_info)),
+              text "Turning non-CAFFY Id into CAFFY:" <+> ppr id )
+        Nothing
+      | otherwise
+      = WARN( mayHaveCafRefs (cafInfo id_info),
+              text "Turning CAFFY Id into non-CAFFY:" <+> ppr id )
+        Just HsNoCafRefs
 
     ------------  Strictness  --------------
         -- No point in explicitly exporting TopSig
