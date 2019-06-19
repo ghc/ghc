@@ -82,7 +82,7 @@ module TcType (
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidTy,
+  isRigidTy, tyConIsTypeable,
 
   ---------------------------------
   -- Misc type manipulators
@@ -2246,6 +2246,35 @@ isRigidTy ty
   | isForAllTy ty                           = True
   | otherwise                               = False
 
+-- | Is a particular 'TyCon' representable by @Typeable@?. These exclude type
+-- families and polytypes.
+tyConIsTypeable :: TyCon -> Bool
+tyConIsTypeable tc =
+       isJust (tyConRepName_maybe tc)
+    && kindIsTypeable (dropForAlls $ tyConKind tc)
+
+-- | Is a particular 'Kind' representable by @Typeable@? Here we look for
+-- polytypes and types containing casts (which may be, for instance, a type
+-- family).
+kindIsTypeable :: Kind -> Bool
+-- We handle types of the form (TYPE LiftedRep) specifically to avoid
+-- looping on (tyConIsTypeable RuntimeRep). We used to consider (TYPE rr)
+-- to be typeable without inspecting rr, but this exhibits bad behavior
+-- when rr is a type family.
+kindIsTypeable ty
+  | Just ty' <- coreView ty         = kindIsTypeable ty'
+kindIsTypeable ty
+  | isLiftedTypeKind ty             = True
+kindIsTypeable (TyVarTy _)          = True
+kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (FunTy _ a b)        = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
+                                   && all kindIsTypeable args
+kindIsTypeable (ForAllTy{})         = False
+kindIsTypeable (LitTy _)            = True
+kindIsTypeable (CastTy t _co)       = kindIsTypeable t
+  -- See Note [Typeable instances for casted types] in TcTypeable
+kindIsTypeable (CoercionTy{})       = False
 
 {-
 ************************************************************************
