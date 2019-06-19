@@ -231,6 +231,9 @@ typedef struct StgTSO_ {
  *       setting the stack's mark bit (either the BF_MARKED bit for large objects
  *       or otherwise its bit in its segment's mark bitmap).
  *
+ * To ensure that mutation does not proceed until the stack is fully marked the
+ * mark phase must not set the mark bit until it has finished tracing.
+ *
  */
 
 #define STACK_DIRTY 1
