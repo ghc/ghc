@@ -321,7 +321,8 @@ freeStorage (bool free_heap)
 }
 
 /* -----------------------------------------------------------------------------
-   Note [CAF management].
+   Note [CAF management]
+   ~~~~~~~~~~~~~~~~~~~~~
 
    The entry code for every CAF does the following:
 
@@ -356,6 +357,7 @@ freeStorage (bool free_heap)
 
    ------------------
    Note [atomic CAF entry]
+   ~~~~~~~~~~~~~~~~~~~~~~~
 
    With THREADED_RTS, newCAF() is required to be atomic (see
    #5558). This is because if two threads happened to enter the same
@@ -369,6 +371,7 @@ freeStorage (bool free_heap)
 
    ------------------
    Note [GHCi CAFs]
+   ~~~~~~~~~~~~~~~~
 
    For GHCI, we have additional requirements when dealing with CAFs:
 
@@ -387,6 +390,51 @@ freeStorage (bool free_heap)
       (see GC.c:revertCAFs()).
 
       -- SDM 29/1/01
+
+   ------------------
+   Note [Static objects under the nonmoving collector]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Static object management is a bit tricky under the nonmoving collector as we
+   need to maintain a bit more state than in the moving collector. In
+   particular, the moving collector uses the low bits of the STATIC_LINK field
+   to determine whether the object has been moved to the scavenger's work list
+   (see Note [STATIC_LINK fields] in Storage.h).
+
+   However, the nonmoving collector also needs a place to keep its mark bit.
+   This is problematic as we therefore need at least three bits of state
+   but can assume only two bits are available in STATIC_LINK (due to 32-bit
+   systems).
+
+   To accomodate this we move handling of static objects entirely to the
+   oldest generation when the nonmoving collector is in use. To do this safely
+   and efficiently we allocate the blackhole created by lockCAF() directly in
+   the non-moving heap. This means that the moving collector can completely
+   ignore static objects in minor collections since they are guaranteed not to
+   have any references into the moving heap. Of course, the blackhole itself
+   likely will contain a reference into the moving heap but this is
+   significantly easier to handle, being a heap-allocated object (see Note
+   [Aging under the non-moving collector] in NonMoving.c for details).
+
+   During the moving phase of a major collection we treat static objects
+   as we do any other reference into the non-moving heap by pushing them
+   to the non-moving mark queue (see Note [Aging under the non-moving
+   collector]).
+
+   This allows the non-moving collector to have full control over the flags
+   in STATIC_LINK, which it uses as described in Note [STATIC_LINK fields]).
+   This is implemented by NonMovingMark.c:bump_static_flag.
+
+   In short, the plan is:
+
+     - lockCAF allocates its blackhole in the nonmoving heap. This is important
+       to ensure that we do not need to place the static object on the mut_list
+       lest we would need somw way to ensure that it evacuate only once during
+       a moving collection.
+
+     - evacuate_static_object adds merely pushes objects to the mark queue
+
+     - the nonmoving collector uses the flags in STATIC_LINK as its mark bit.
 
    -------------------------------------------------------------------------- */
 
@@ -430,7 +478,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // reference should be in SRTs
     ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
     // Becuase the payload is empty we just push the SRT
-    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
         StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
         if (thunk_info->i.srt) {
             updateRemembSetPushClosure(cap, GET_SRT(thunk_info));
@@ -441,7 +489,16 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     caf->saved_info = orig_info;
 
     // Allocate the blackhole indirection closure
-    bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    if (RtsFlags.GcFlags.useNonmoving) {
+        // See Note [Static objects under the nonmoving collector].
+        ACQUIRE_SM_LOCK;
+        bh = (StgInd *)nonmovingAllocate(cap, sizeofW(*bh));
+        RELEASE_SM_LOCK;
+        recordMutableCap((StgClosure*)bh,
+                         regTableToCapability(reg), oldest_gen->no);
+    } else {
+        bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    }
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
 
@@ -481,7 +538,9 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     else
     {
         // Put this CAF on the mutable list for the old generation.
-        if (oldest_gen->no != 0) {
+        // N.B. the nonmoving collector works a bit differently: see
+        // Note [Static objects under the nonmoving collector].
+        if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
             recordMutableCap((StgClosure*)caf,
                              regTableToCapability(reg), oldest_gen->no);
         }
@@ -511,6 +570,10 @@ setKeepCAFs (void)
 {
     keepCAFs = 1;
 }
+
+// A list of CAFs linked together via STATIC_LINK where new CAFs are placed
+// until the next GC.
+StgClosure *nonmoving_todo_caf_list;
 
 // An alternate version of newCAF which is used for dynamically loaded
 // object code in GHCi.  In this case we want to retain *all* CAFs in
@@ -558,7 +621,9 @@ StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
     if (!bh) return NULL;
 
     // Put this CAF on the mutable list for the old generation.
-    if (oldest_gen->no != 0) {
+    // N.B. the nonmoving collector works a bit differently:
+    // see Note [Static objects under the nonmoving collector].
+    if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
         recordMutableCap((StgClosure*)caf,
                          regTableToCapability(reg), oldest_gen->no);
     }
@@ -1140,7 +1205,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
         mvar->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap, (StgClosure *) mvar);
-        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure_(reg, old);
         }
     }
@@ -1159,7 +1224,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
-        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled != 0)) {
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, old);
         }
     }
@@ -1176,8 +1241,9 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
-        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
+        }
     }
     tso->_link = target;
 }
@@ -1188,8 +1254,9 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
-        if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
+        }
     }
     tso->block_info.prev = target;
 }
@@ -1202,8 +1269,9 @@ dirty_TSO (Capability *cap, StgTSO *tso)
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 
-    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushTSO(cap, tso);
+    }
 }
 
 void
@@ -1211,8 +1279,9 @@ dirty_STACK (Capability *cap, StgStack *stack)
 {
     // First push to upd_rem_set before we set stack->dirty since we
     // the nonmoving collector may already be marking the stack.
-    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushStack(cap, stack);
+    }
 
     if (! (stack->dirty & STACK_DIRTY)) {
         stack->dirty = STACK_DIRTY;
@@ -1236,7 +1305,7 @@ void
 update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
     Capability *cap = regTableToCapability(reg);
-    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled)) {
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
         StgMVar *mvar = (StgMVar *) p;
         updateRemembSetPushClosure(cap, old_val);
         updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
