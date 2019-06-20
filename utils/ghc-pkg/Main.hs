@@ -30,7 +30,6 @@
 
 module Main (main) where
 
-import Version ( version )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
@@ -40,6 +39,10 @@ import GHC.Platform
   ( platformArch, platformOS
   , stringEncodeArch, stringEncodeOS
   )
+import GHC.UniqueSubdir
+  ( uniqueSubdir0
+  )
+import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
@@ -229,7 +232,7 @@ deprecFlags = [
   ]
 
 ourCopyright :: String
-ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
+ourCopyright = "GHC package manager version " ++ GHC.Version.cProjectVersion ++ "\n"
 
 shortUsage :: String -> String
 shortUsage prog = "For usage information see '" ++ prog ++ " --help'."
@@ -654,7 +657,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
               case getTargetPlatform settingsFile mySettings of
                 Right platform -> pure (stringEncodeArch $ platformArch platform, stringEncodeOS $ platformOS platform)
                 Left e -> die e
-          let subdir = arch ++ '-':os ++ '-':Version.version
+          let subdir = uniqueSubdir0 arch os
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of
@@ -2016,9 +2019,9 @@ checkHSLib :: Verbosity -> [String] -> String -> Validate ()
 checkHSLib _verbosity dirs lib = do
   let filenames = ["lib" ++ lib ++ ".a",
                    "lib" ++ lib ++ "_p.a",
-                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
-                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
-                            lib ++ "-ghc" ++ Version.version ++ ".dll"]
+                   "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".so",
+                   "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
+                            lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"]
   b <- liftIO $ doesFileExistOnPath filenames dirs
   when (not b) $
     verror ForceFiles ("cannot find any of " ++ show filenames ++

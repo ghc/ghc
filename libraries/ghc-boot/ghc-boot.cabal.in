@@ -45,6 +45,12 @@ Library
             GHC.HandleEncoding
             GHC.Platform
             GHC.Settings
+            GHC.UniqueSubdir
+            GHC.Version
+
+    -- but done by Hadrian
+    -- autogen-modules:
+    --         GHC.Version
 
     build-depends: base       >= 4.7 && < 4.14,
                    binary     == 0.8.*,
