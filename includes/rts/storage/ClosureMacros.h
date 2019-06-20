@@ -126,6 +126,8 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
  retainer profiling code will just set 'rs' to NULL upon visiting a closure with
  an invalid 'flip' bit anyways.
 
+ See Note [Profiling heap traversal visited bit] for details.
+
  [1]: Technically we should set 'rs' to `NULL | flip`.
  */
 #define SET_PROF_HDR(c,ccs_)            \
