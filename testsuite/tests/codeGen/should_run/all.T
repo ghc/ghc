@@ -197,3 +197,4 @@ test('T15892',
      compile_and_run, ['-O'])
 test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
+test('T16846', exit_code(0), compile_and_run, [''])
