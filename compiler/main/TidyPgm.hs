@@ -22,7 +22,7 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CorePrep
-import CoreUtils        (rhsIsStatic)
+import CoreUtils        (rhsIsStatic, exprType)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreSeq          (seqBinds)
 import CoreLint
@@ -40,7 +40,7 @@ import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
 import FamInstEnv
-import Type             ( tidyTopType )
+import Type             ( tidyTopType, isUnliftedType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
@@ -1332,7 +1332,7 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-  cafRefsE :: Expr a -> Bool
+  cafRefsE :: CoreExpr -> Bool
   cafRefsE (Var id)            = cafRefsV id
   cafRefsE (Lit lit)           = cafRefsL lit
   cafRefsE (App f a)           = cafRefsE f || cafRefsArg a
@@ -1344,7 +1344,7 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   cafRefsE (Type _)            = False
   cafRefsE (Coercion _)        = False
 
-  cafRefsEs :: [Expr a] -> Bool
+  cafRefsEs :: [CoreExpr] -> Bool
   cafRefsEs []     = False
   cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
 
@@ -1377,9 +1377,10 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   -- While debugging this I found a similar disagreement between TidyPgm and
   -- CorePrep in the handling of ticks (see Note [Floating Ticks in CorePrep]).
   -- cafRefsArg also handles this case.
-  cafRefsArg :: Expr a -> Bool
+  cafRefsArg :: CoreExpr -> Bool
   cafRefsArg (Tick t _)
     | cpeShouldFloatTick t = True
+  cafRefsArg (Type _)      = False
   cafRefsArg e
     | isUnliftedType (exprType e) = True
     | otherwise                   = cafRefsE e
