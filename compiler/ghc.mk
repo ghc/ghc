@@ -49,33 +49,33 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo 'Creating $@ ... '
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
-	@echo 'module Config where'                                         >> $@
+	@echo 'module Config'                                               >> $@
+	@echo '  ( module GHC.Version'                                      >> $@
+	@echo '  , cBuildPlatformString'                                    >> $@
+	@echo '  , cHostPlatformString'                                     >> $@
+	@echo '  , cProjectName'                                            >> $@
+	@echo '  , cBooterVersion'                                          >> $@
+	@echo '  , cStage'                                                  >> $@
+	@echo '  ) where'                                                   >> $@
 	@echo                                                               >> $@
 	@echo 'import GhcPrelude'                                           >> $@
+	@echo                                                               >> $@
+	@echo 'import GHC.Version'                                          >> $@
 	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
+	@echo                                                               >> $@
 	@echo 'cHostPlatformString :: String'                               >> $@
 	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
 	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
-	@echo 'cProjectGitCommitId   :: String'				    >> $@
-	@echo 'cProjectGitCommitId   = "$(ProjectGitCommitId)"'		    >> $@
-	@echo 'cProjectVersion       :: String'                             >> $@
-	@echo 'cProjectVersion       = "$(ProjectVersion)"'                 >> $@
-	@echo 'cProjectVersionInt    :: String'                             >> $@
-	@echo 'cProjectVersionInt    = "$(ProjectVersionInt)"'              >> $@
-	@echo 'cProjectPatchLevel    :: String'                             >> $@
-	@echo 'cProjectPatchLevel    = "$(ProjectPatchLevel)"'              >> $@
-	@echo 'cProjectPatchLevel1   :: String'                             >> $@
-	@echo 'cProjectPatchLevel1   = "$(ProjectPatchLevel1)"'             >> $@
-	@echo 'cProjectPatchLevel2   :: String'                             >> $@
-	@echo 'cProjectPatchLevel2   = "$(ProjectPatchLevel2)"'             >> $@
+	@echo                                                               >> $@
 	@echo 'cBooterVersion        :: String'                             >> $@
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
+	@echo                                                               >> $@
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
 	@echo done.

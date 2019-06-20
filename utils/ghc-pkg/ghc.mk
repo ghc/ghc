@@ -13,13 +13,6 @@
 # -----------------------------------------------------------------------------
 # Bootstrapping ghc-pkg
 
-utils/ghc-pkg/dist/build/Version.hs \
-utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	echo "module Version where"                    >> $@
-	echo "version :: String" >> $@
-	echo "version    = \"$(ProjectVersion)\""      >> $@
-
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
 # Note [Why build certain utils twice?]
@@ -72,9 +65,6 @@ $(eval $(call build-prog,utils/ghc-pkg,dist,0))
 # is to specify global package db only.
 $(ghc-pkg_INPLACE) : | $(INPLACE_PACKAGE_CONF)/. $(INPLACE_LIB)/settings
 
-utils/ghc-pkg/dist/package-data.mk: \
-    utils/ghc-pkg/dist/build/Version.hs
-
 # -----------------------------------------------------------------------------
 # Build another copy of ghc-pkg with the stage1 compiler in the dist-install
 # directory. Don't install it inplace (we use the dist copy there), but do
@@ -92,9 +82,6 @@ utils/ghc-pkg_dist-install_INSTALL = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
-
-utils/ghc-pkg/dist-install/package-data.mk: \
-    utils/ghc-pkg/dist-install/build/Version.hs
 endif
 
 # -----------------------------------------------------------------------------
