@@ -1,0 +1,4 @@
+T16846: Prelude.undefined
+CallStack (from HasCallStack):
+  error, called at libraries/base/GHC/Err.hs:80:14 in base:GHC.Err
+  undefined, called at T16846.hs:22:3 in main:Main
