@@ -126,6 +126,9 @@ def boot_pkgs():
                 top = os.path.join(*['..'] * len(os.path.normpath(package).split(os.path.sep)))
 
                 ghc_mk = os.path.join(package, 'ghc.mk')
+                if os.path.exists(ghc_mk):
+                    print('Skipping %s which already exists' % ghc_mk)
+                    continue
                 print('Creating %s' % ghc_mk)
                 with open(ghc_mk, 'w') as f:
                     f.write(dedent(

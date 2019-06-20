@@ -250,6 +250,7 @@ module DynFlags (
 import GhcPrelude
 
 import GHC.Platform
+import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
 import PackageConfig
@@ -1499,17 +1500,8 @@ versionedAppDir dflags = do
   appdir <- tryMaybeT $ getAppUserDataDirectory (programName dflags)
   return $ appdir </> versionedFilePath dflags
 
--- | A filepath like @x86_64-linux-7.6.3@ with the platform string to use when
--- constructing platform-version-dependent files that need to co-exist.
---
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = intercalate "-"
-  [ stringEncodeArch $ platformArch $ targetPlatform dflags
-  , stringEncodeOS $ platformOS $ targetPlatform dflags
-  , projectVersion dflags
-  ]
-  -- NB: This functionality is reimplemented in Cabal, so if you
-  -- change it, be sure to update Cabal.
+versionedFilePath dflags = uniqueSubdir $ targetPlatform dflags
 
 -- | The target code type of the compilation (if any).
 --
