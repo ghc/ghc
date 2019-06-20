@@ -201,7 +201,7 @@ LdvCensusForDead( uint32_t N )
 {
     uint32_t g;
 
-    // ldvTime == 0 means that LDV profiling is currently turned off.
+    // era == 0 means that LDV profiling is currently turned off.
     if (era == 0)
         return;
 
@@ -222,7 +222,7 @@ LdvCensusForDead( uint32_t N )
  * Regard any closure in the current heap as dead or moribund and update
  * LDV statistics accordingly.
  * Called from shutdownHaskell() in RtsStartup.c.
- * Also, stops LDV profiling by resetting ldvTime to 0.
+ * Also, stops LDV profiling by resetting 'era' to 0.
  * ----------------------------------------------------------------------- */
 void
 LdvCensusKillAll( void )
