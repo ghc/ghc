@@ -1038,9 +1038,7 @@ initRetainerProfiling( void )
 void
 endRetainerProfiling( void )
 {
-#if defined(SECOND_APPROACH)
     outputAllRetainerSet(prof_file);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -1191,14 +1189,6 @@ isRetainer( StgClosure *c )
  *  This function does NOT return the retainer(s) of *c.
  *  Invariants:
  *    *c must be a retainer.
- *  Note:
- *    Depending on the definition of this function, the maintenance of retainer
- *    sets can be made easier. If most retainer sets are likely to be created
- *    again across garbage collections, refreshAllRetainerSet() in
- *    RetainerSet.c can simply do nothing.
- *    If this is not the case, we can free all the retainer sets and
- *    re-initialize the hash table.
- *    See refreshAllRetainerSet() in RetainerSet.c.
  * -------------------------------------------------------------------------- */
 static INLINE retainer
 getRetainerFrom( StgClosure *c )
@@ -1996,11 +1986,7 @@ retainerProfile(void)
     retainer sets.
    */
   initializeTraverseStack(&g_retainerTraverseState);
-#if defined(DEBUG_RETAINER)
   initializeAllRetainerSet();
-#else
-  refreshAllRetainerSet();
-#endif
   computeRetainerSet(&g_retainerTraverseState);
 
 #if defined(DEBUG_RETAINER)
@@ -2044,11 +2030,6 @@ retainerProfile(void)
 
   // post-processing
   closeTraverseStack(&g_retainerTraverseState);
-#if defined(DEBUG_RETAINER)
-  closeAllRetainerSet();
-#else
-  // Note that there is no post-processing for the retainer sets.
-#endif
   retainerGeneration++;
 
   stat_endRP(
