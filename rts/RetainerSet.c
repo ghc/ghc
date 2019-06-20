@@ -74,25 +74,6 @@ initializeAllRetainerSet(void)
 }
 
 /* -----------------------------------------------------------------------------
- * Refreshes all pools for reuse and initializes hashTable[].
- * -------------------------------------------------------------------------- */
-void
-refreshAllRetainerSet(void)
-{
-#if defined(FIRST_APPROACH)
-    int i;
-
-    // first approach: completely refresh
-    arenaFree(arena);
-    arena = newArena();
-
-    for (i = 0; i < HASH_TABLE_SIZE; i++)
-        hashTable[i] = NULL;
-    nextId = 2;
-#endif /* FIRST_APPROACH */
-}
-
-/* -----------------------------------------------------------------------------
  * Frees all pools.
  * -------------------------------------------------------------------------- */
 void
@@ -229,7 +210,6 @@ printRetainer(FILE *f, retainer ccs)
  *  printRetainerSetShort() should always display the same output for
  *  a given retainer set regardless of the time of invocation.
  * -------------------------------------------------------------------------- */
-#if defined(SECOND_APPROACH)
 void
 printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_length)
 {
@@ -265,14 +245,12 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_leng
     fputs(tmp, f);
     traceHeapProfSampleString(0, tmp, total_size);
 }
-#endif /* SECOND_APPROACH */
 
 /* -----------------------------------------------------------------------------
  * Dump the contents of each retainer set into the log file at the end
  * of the run, so the user can find out for a given retainer set ID
  * the full contents of that set.
  * -------------------------------------------------------------------------- */
-#if defined(SECOND_APPROACH)
 void
 outputAllRetainerSet(FILE *prof_file)
 {
@@ -333,6 +311,5 @@ outputAllRetainerSet(FILE *prof_file)
 
     stgFree(rsArray);
 }
-#endif /* SECOND_APPROACH */
 
 #endif /* PROFILING */
