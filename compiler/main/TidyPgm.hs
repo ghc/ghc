@@ -1302,6 +1302,10 @@ So we have to *predict* the result here, which is revolting.
 In particular CorePrep expands Integer and Natural literals. So in the
 prediction code here we resort to applying the same expansion (cvt_literal).
 Ugh!
+
+In general this has been a persistent source of bugs (see #15038, #16846)
+and consequently we hope to refactor the need for this prediction out of
+existence in the future. See #9718 for these plans.
 -}
 
 type CafRefEnv = (VarEnv Id, LitNumType -> Integer -> Maybe CoreExpr)
@@ -1331,7 +1335,7 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   cafRefsE :: Expr a -> Bool
   cafRefsE (Var id)            = cafRefsV id
   cafRefsE (Lit lit)           = cafRefsL lit
-  cafRefsE (App f a)           = cafRefsE f || cafRefsE a
+  cafRefsE (App f a)           = cafRefsE f || cafRefsArg a
   cafRefsE (Lam _ e)           = cafRefsE e
   cafRefsE (Let b e)           = cafRefsEs (rhssOfBind b) || cafRefsE e
   cafRefsE (Case e _ _ alts)   = cafRefsE e || cafRefsEs (rhssOfAlts alts)
@@ -1343,6 +1347,42 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   cafRefsEs :: [Expr a] -> Bool
   cafRefsEs []     = False
   cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
+
+  -- Note [Functions applied to unlifted arguments are CAFfy]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- This is tricky: Consider the program:
+  --
+  --   data Ty = Ty (RealWorld# -> (# RealWorld#, Int #))
+  --
+  --   -- Is this CAFfy?
+  --   x :: STM Int
+  --   x = Ty (retry# @Int)
+  --
+  -- Consider whether x is CAFfy. One might be tempted to answer "no".
+  -- Afterall, f obviously has no CAF references and the application (return#
+  -- @Int) is essentially just a variable reference at runtime.
+  --
+  -- However the ANF-isation done by CorePrep will turn x into this for
+  -- reasons described in Note [Floating unlifted arguments]:
+  --
+  --    x = \u []
+  --        let sat = retry# @Int
+  --        in Ty sat
+  --
+  -- This is obviously now a CAF. Consequently, we must consider cases like
+  -- this (where a function is applied to an unlifted argument) to be CAFfy.
+  -- This is the rule implemented by cafRefsArgs. Failing to handle this
+  -- properly was the cause of #16846.
+  --
+  -- While debugging this I found a similar disagreement between TidyPgm and
+  -- CorePrep in the handling of ticks (see Note [Floating Ticks in CorePrep]).
+  -- cafRefsArg also handles this case.
+  cafRefsArg :: Expr a -> Bool
+  cafRefsArg (Tick t _)
+    | cpeShouldFloatTick t = True
+  cafRefsArg e
+    | isUnliftedType (exprType e) = True
+    | otherwise                   = cafRefsE e
 
   cafRefsL :: Literal -> Bool
   -- Don't forget that mk_integer id might have Caf refs!

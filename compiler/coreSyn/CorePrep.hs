@@ -10,7 +10,9 @@ Core pass to saturate constructors and PrimOps
 module CorePrep (
       corePrepPgm, corePrepExpr, cvtLitInteger, cvtLitNatural,
       lookupMkIntegerName, lookupIntegerSDataConName,
-      lookupMkNaturalName, lookupNaturalSDataConName
+      lookupMkNaturalName, lookupNaturalSDataConName,
+      -- N.B. Needed by TidyPgm
+      cpeShouldFloatTick
   ) where
 
 #include "HsVersions.h"
@@ -820,8 +822,7 @@ cpeApp top_env expr
         go (Cast fun co)      as depth
             = go fun (CpeCast co : as) depth
         go (Tick tickish fun) as depth
-            | tickishPlace tickish == PlaceNonLam
-            && tickish `tickishScopesLike` SoftScope
+            | cpeShouldFloatTick tickish
             = go fun (CpeTick tickish : as) depth
         go terminal as depth = (terminal, as, depth)
 
@@ -1641,6 +1642,7 @@ newVar ty
 -- ---------------------------------------------------------------------------
 --
 -- Note [Floating Ticks in CorePrep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- It might seem counter-intuitive to float ticks by default, given
 -- that we don't actually want to move them if we can help it. On the
@@ -1666,7 +1668,17 @@ newVar ty
 -- or "bar" are (value) lambdas we have to push the annotations
 -- further inside in order to uphold our rules.
 --
--- All of this is implemented below in @wrapTicks@.
+-- All of this is implemented below in @wrapTicks@. The set of ticks which
+-- we float is determined by 'cpeShouldFloatTick'.
+--
+-- Note that this also needs to be accounted for in TidyPgm when computing
+-- CAFfy-ness. See Note [Functions applied to applications are CAFfy].
+
+
+cpeShouldFloatTick :: Tickish a -> Bool
+cpeShouldFloatTick tickish =
+    tickishPlace tickish == PlaceNonLam
+    && tickish `tickishScopesLike` SoftScope
 
 -- | Like wrapFloats, but only wraps tick floats
 wrapTicks :: Floats -> CoreExpr -> (Floats, CoreExpr)
