@@ -116,8 +116,8 @@ generatePackageCode context@(Context stage pkg _) = do
         when (pkg == ghcPrim) $ do
             root <//> dir -/- "GHC/Prim.hs" %> genPrimopCode context
             root <//> dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
-        when (pkg == ghcPkg) $
-            root <//> dir -/- "Version.hs" %> go generateVersionHs
+        when (pkg == ghcBoot) $
+            root <//> dir -/- "GHC/Version.hs" %> go generateVersionHs
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -337,42 +337,36 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
-    cProjectGitCommitId <- getSetting ProjectGitCommitId
-    cProjectVersion     <- getSetting ProjectVersion
-    cProjectVersionInt  <- getSetting ProjectVersionInt
-    cProjectPatchLevel  <- getSetting ProjectPatchLevel
-    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
-    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
-        , "module Config where"
+        , "module Config"
+        , "  ( module GHC.Version"
+        , "  , cBuildPlatformString"
+        , "  , cHostPlatformString"
+        , "  , cProjectName"
+        , "  , cBooterVersion"
+        , "  , cStage"
+        , "  ) where"
         , ""
         , "import GhcPrelude"
+        , ""
+        , "import GHC.Version"
         , ""
         , "#include \"ghc_boot_platform.h\""
         , ""
         , "cBuildPlatformString :: String"
         , "cBuildPlatformString = BuildPlatform_NAME"
+        , ""
         , "cHostPlatformString :: String"
         , "cHostPlatformString = HostPlatform_NAME"
         , ""
         , "cProjectName          :: String"
         , "cProjectName          = " ++ show cProjectName
-        , "cProjectGitCommitId   :: String"
-        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
-        , "cProjectVersion       :: String"
-        , "cProjectVersion       = " ++ show cProjectVersion
-        , "cProjectVersionInt    :: String"
-        , "cProjectVersionInt    = " ++ show cProjectVersionInt
-        , "cProjectPatchLevel    :: String"
-        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
-        , "cProjectPatchLevel1   :: String"
-        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
-        , "cProjectPatchLevel2   :: String"
-        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        , ""
         , "cBooterVersion        :: String"
         , "cBooterVersion        = " ++ show cBooterVersion
+        , ""
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         ]
@@ -492,9 +486,32 @@ generateGhcVersionH = do
 generateVersionHs :: Expr String
 generateVersionHs = do
     trackGenerateHs
-    projectVersion <- getSetting ProjectVersion
+    cProjectGitCommitId <- getSetting ProjectGitCommitId
+    cProjectVersion     <- getSetting ProjectVersion
+    cProjectVersionInt  <- getSetting ProjectVersionInt
+    cProjectPatchLevel  <- getSetting ProjectPatchLevel
+    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
+    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     return $ unlines
-        [ "module Version where"
-        , "version :: String"
-        , "version    = " ++ show projectVersion
+        [ "module GHC.Version where"
+        , ""
+        , "import Prelude -- See Note [Why do we import Prelude here?]"
+        , ""
+        , "cProjectGitCommitId   :: String"
+        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
+        , ""
+        , "cProjectVersion       :: String"
+        , "cProjectVersion       = " ++ show cProjectVersion
+        , ""
+        , "cProjectVersionInt    :: String"
+        , "cProjectVersionInt    = " ++ show cProjectVersionInt
+        , ""
+        , "cProjectPatchLevel    :: String"
+        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
+        , ""
+        , "cProjectPatchLevel1   :: String"
+        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
+        , ""
+        , "cProjectPatchLevel2   :: String"
+        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
         ]
