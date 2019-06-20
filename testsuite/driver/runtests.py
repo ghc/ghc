@@ -54,7 +54,8 @@ parser.add_argument("--rootdir", action='append', help="root of tree containing 
 parser.add_argument("--metrics-file", help="file in which to save (append) the performance test metrics. If omitted, git notes will be used.")
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
-parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
+parser.add_argument("--only", action="append", help="just this test (can give multiple --only= flags)")
+parser.add_argument("--skip", action="append", help="skip this test (can give multiple --skip= flags)")
 parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
@@ -92,6 +93,9 @@ config.no_print_summary = args.no_print_summary
 if args.only:
     config.only = args.only
     config.run_only_some_tests = True
+
+if args.skip:
+    config.skip = args.skip
 
 if args.way:
     for way in args.way:
@@ -346,6 +350,10 @@ for name in config.only:
         # The reason the test can not be found is likely because of those
         # .T file errors.
         pass
+
+for name in config.skip:
+    # See Note [Mutating config.only]
+    framework_fail(name, '', 'test not found')
 
 if config.list_broken:
     print('')

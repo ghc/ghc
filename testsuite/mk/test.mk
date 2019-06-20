@@ -357,6 +357,7 @@ test: $(TIMEOUT_PROGRAM)
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
 		$(patsubst %, --way=%, $(WAY)) \
+		$(patsubst %, --skip=%, $(SKIP_TESTS)) \
 		$(patsubst %, --skipway=%, $(SKIPWAY)) \
 		$(set_list_broken) \
 		$(setspeed) \

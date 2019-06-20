@@ -415,7 +415,7 @@ def _collect_stats(name, opts, metrics, deviation, is_compiler_stats_test=False)
     # Compiler performance numbers change when debugging is on, making the results
     # useless and confusing. Therefore, skip if debugging is on.
     if config.compiler_debugged and is_compiler_stats_test:
-        opts.skip = 1
+        opts.skip = True
 
     for metric in metrics:
         def baselineByWay(way, target_commit, metric=metric):
@@ -752,10 +752,13 @@ def test(name, setup, func, args):
             return
         else:
             # Note [Mutating config.only]
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # config.only is initially the set of tests requested by
             # the user (via 'make TEST='). We then remove all tests that
             # we've already seen (in .T files), so that we can later
             # report on any tests we couldn't find and error out.
+            #
+            # The same approach is taken for config.skip
             config.only.remove(name)
 
     # Make a deep copy of the default_testopts, as we need our own copy
@@ -764,6 +767,10 @@ def test(name, setup, func, args):
     myTestOpts = copy.deepcopy(default_testopts)
 
     executeSetups([thisdir_settings, setup], name, myTestOpts)
+    if name in config.skip:
+        # See Note [Mutating config.only]
+        config.skip.remove(name)
+        myTestOpts.skip = True
 
     thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
     if myTestOpts.alone:

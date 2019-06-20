@@ -50,6 +50,7 @@ data TestArgs = TestArgs
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
+    , testSkip       :: [String]
     , testOnly       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
@@ -69,6 +70,7 @@ defaultTestArgs = TestArgs
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
+    , testSkip       = []
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
@@ -153,11 +155,18 @@ readTestConfigFile filepath =
 readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
 
+readTestSkip :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestSkip tests = Right $ \flags ->
+  flags { testArgs = (testArgs flags) { testSkip = tests'' flags } }
+  where tests' :: [String]
+        tests' = maybe [] words tests
+        tests'' flags = testSkip (testArgs flags) ++ tests'
+
 readTestOnly :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnly tests = Right $ \flags ->
   flags { testArgs = (testArgs flags) { testOnly = tests'' flags } }
-
-  where tests' = maybe [] words tests
+  where tests' :: [String]
+        tests' = maybe [] words tests
         tests'' flags = testOnly (testArgs flags) ++ tests'
 
 readTestOnlyPerf :: Either String (CommandLineArgs -> CommandLineArgs)
@@ -247,6 +256,8 @@ optDescrs =
       "Configurations to run test, in key=value format."
     , Option [] ["summary-junit"] (OptArg readTestJUnit "TEST_SUMMARY_JUNIT")
       "Output testsuite summary in JUnit format."
+    , Option [] ["skip"] (OptArg readTestSkip "TESTS")
+      "Test cases to skip."
     , Option [] ["only"] (OptArg readTestOnly "TESTS")
       "Test cases to run."
     , Option [] ["only-perf"] (NoArg readTestOnlyPerf)
