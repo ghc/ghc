@@ -266,7 +266,7 @@ hadrian-ghc-in-ghci:
       git config user.name "GHC GitLab CI"
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE SKIP_TESTS="$SKIP_TESTS"
     - |
       # Push git notes.
       METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
@@ -592,6 +592,8 @@ release-x86_64-linux-deb8:
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
+    # Alpine doesn't have proper locale support
+    SKIP_TESTS: "encoding004"
   cache:
     key: linux-x86_64-alpine
   artifacts:
