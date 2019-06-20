@@ -232,9 +232,10 @@ be reset with the :ghc-flag:`-fclear-plugins` option.
     :category: plugins
 
     Clear the list of plugins previously specified with
-    :ghc-flag:`-fplugin`. This is useful in GHCi where simply removing the
-    :ghc-flag:`-fplugin` options from the command line is not possible. Instead
-    `:set -fclear-plugins` can be used.
+    :ghc-flag:`-fplugin <-fplugin=⟨module⟩>`. This is useful in GHCi where
+    simply removing the :ghc-flag:`-fplugin <-fplugin=⟨module⟩>` options from
+    the command line is not possible. Instead `:set -fclear-plugins` can be
+    used.
 
 
 As an example, in order to load the plugin exported by ``Foo.Plugin`` in

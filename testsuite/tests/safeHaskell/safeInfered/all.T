@@ -64,3 +64,5 @@ test('UnsafeWarn07', normal, compile, [''])
 # Chck -fwa-safe works
 test('SafeWarn01', normal, compile, [''])
 
+test('T16689', normal, compile, ['-Wsafe'])
+

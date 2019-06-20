@@ -59,6 +59,7 @@ module Type (
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
+        discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
 
@@ -137,6 +138,7 @@ module Type (
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
+        tcIsRuntimeTypeKind,
 
         -- ** Common Kind
         liftedTypeKind,
@@ -156,8 +158,8 @@ module Type (
         typeSize, occCheckExpand,
 
         -- * Well-scoped lists of variables
-        dVarSetElemsWellScoped, scopedSort, tyCoVarsOfTypeWellScoped,
-        tyCoVarsOfTypesWellScoped, tyCoVarsOfBindersWellScoped,
+        scopedSort, tyCoVarsOfTypeWellScoped,
+        tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
@@ -248,7 +250,7 @@ import UniqSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
+import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind )
 import PrelNames
@@ -1277,6 +1279,21 @@ tyConBindersTyCoBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (varType tv)
 
+-- | Drop the cast on a type, if any. If there is no
+-- cast, just return the original type. This is rarely what
+-- you want. The CastTy data constructor (in TyCoRep) has the
+-- invariant that another CastTy is not inside. See the
+-- data constructor for a full description of this invariant.
+-- Since CastTy cannot be nested, the result of discardCast
+-- cannot be a CastTy.
+discardCast :: Type -> Type
+discardCast (CastTy ty _) = ASSERT(not (isCastTy ty)) ty
+  where
+  isCastTy CastTy{} = True
+  isCastTy _        = False
+discardCast ty            = ty
+
+
 {-
 --------------------------------------------------------------------
                             CoercionTy
@@ -1827,6 +1844,17 @@ tcIsLiftedTypeKind ty
   | otherwise
   = False
 
+-- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
+--
+-- This considers 'Constraint' to be distinct from @*@.
+tcIsRuntimeTypeKind :: Kind -> Bool
+tcIsRuntimeTypeKind ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = True
+  | otherwise
+  = False
+
 tcReturnsConstraintKind :: Kind -> Bool
 -- True <=> the Kind ultimately returns a Constraint
 --   E.g.  * -> Constraint
@@ -2171,15 +2199,6 @@ scopedSort = go [] []
        -- lists not in correspondence
     insert _ _ _ = panic "scopedSort"
 
--- | Extract a well-scoped list of variables from a deterministic set of
--- variables. The result is deterministic.
--- NB: There used to exist varSetElemsWellScoped :: VarSet -> [Var] which
--- took a non-deterministic set and produced a non-deterministic
--- well-scoped list. If you care about the list being well-scoped you also
--- most likely care about it being in deterministic order.
-dVarSetElemsWellScoped :: DVarSet -> [Var]
-dVarSetElemsWellScoped = scopedSort . dVarSetElems
-
 -- | Get the free vars of a type in scoped order
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
 tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
@@ -2187,12 +2206,6 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
-
--- | Given the suffix of a telescope, returns the prefix.
--- Ex: given [(k :: j), (a :: Proxy k)], returns [(j :: *)].
-tyCoVarsOfBindersWellScoped :: [TyVar] -> [TyVar]
-tyCoVarsOfBindersWellScoped tvs
-  = tyCoVarsOfTypeWellScoped (mkInvForAllTys tvs unitTy)
 
 ------------- Closing over kinds -----------------
 

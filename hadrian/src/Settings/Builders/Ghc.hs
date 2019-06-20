@@ -1,4 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
+
+import Data.List.Extra (splitOn)
 
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
@@ -97,13 +101,24 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , arg ("-l" ++ libffiName')
             ]
 
+        -- This is the -rpath argument that is required for the bindist scenario
+        -- to work. Indeed, when you install a bindist, the actual executables
+        -- end up nested somewhere under $libdir, with the wrapper scripts
+        -- taking their place in $bindir, and 'rpath' therefore doesn't seem
+        -- to give us the right paths for such a case.
+        -- TODO: Could we get away with just one rpath...?
+        bindistRpath = "$ORIGIN" -/- ".." -/- ".." -/- originToLibsDir
+
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
                 , isLibrary pkg ? pure [ "-shared", "-dynload", "deploy" ]
-                , hostSupportsRPaths ? arg ("-optl-Wl,-rpath," ++ rpath)
-                -- The darwin linker doesn't support/require the -zorigin option
-                , hostSupportsRPaths ? not darwin ? arg "-optl-Wl,-zorigin"
+                , hostSupportsRPaths ? mconcat
+                      [ arg ("-optl-Wl,-rpath," ++ rpath)
+                      , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
+                      -- The darwin linker doesn't support/require the -zorigin option
+                      , not darwin ? arg "-optl-Wl,-zorigin"
+                      ]
                 ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
@@ -120,7 +135,16 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
+    stage <- getStage
+    ghcVersion :: [Int] <- fmap read . splitOn "." <$> expr (ghcVersionStage stage)
     mconcat [ arg "-M"
+
+            -- "-include-cpp-deps" is a new ish feature so is version gated.
+            -- Without this feature some dependencies will be missing in stage0.
+            -- TODO Remove version gate when minimum supported Stage0 compiler
+            -- is >= 8.9.0.
+            , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
+
             , commonGhcArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
@@ -165,9 +189,11 @@ wayGhcArgs = do
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
-            , (Logging   `wayUnit` way) ? arg "-eventlog"
+            , supportsEventlog way ? arg "-eventlog"
             , (way == debug || way == debugDynamic) ?
               pure ["-ticky", "-DTICKY_TICKY"] ]
+
+  where supportsEventlog w = any (`wayUnit` w) [Logging, Profiling, Debug]
 
 packageGhcArgs :: Args
 packageGhcArgs = do

@@ -1,0 +1,4 @@
+{-# LANGUAGE Safe #-}
+
+main = return ()
+

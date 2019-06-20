@@ -15,7 +15,7 @@ import GhcPrelude
 import Fingerprint
 import Binary
 import Name
-import Panic
+import PlainPanic
 import Util
 
 fingerprintBinMem :: BinHandle -> IO Fingerprint

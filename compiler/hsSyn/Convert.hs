@@ -6,6 +6,7 @@
 This module converts Template Haskell syntax into HsSyn
 -}
 
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -40,7 +41,7 @@ import Outputable
 import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless, liftM, ap )
+import Control.Monad( unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
@@ -71,6 +72,7 @@ convertToHsType loc t
 
 -------------------------------------------------------------------
 newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
+    deriving (Functor)
         -- Push down the source location;
         -- Can fail, with a single error message
 
@@ -82,9 +84,6 @@ newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
 -- Use the loc everywhere, for lack of anything better
 -- In particular, we want it on binding locations, so that variables bound in
 -- the spliced-in declarations get a location that at least relates to the splice point
-
-instance Functor CvtM where
-    fmap = liftM
 
 instance Applicative CvtM where
     pure x = CvtM $ \loc -> Right (loc,x)
@@ -243,33 +242,26 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs (text "a class declaration") decs
+        ; (binds', sigs', fams', at_defs', adts') <- cvt_ci_decs (text "a class declaration") decs
         ; unless (null adts')
             (failWith $ (text "Default data instance declarations"
                      <+> text "are not allowed:")
                    $$ (Outputable.ppr adts'))
-        ; at_defs <- mapM cvt_at_def ats'
         ; returnJustL $ TyClD noExt $
           ClassDecl { tcdCExt = noExt
                     , tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
-                    , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = [] }
+                    , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
                               -- no docs in TH ^^
         }
-  where
-    cvt_at_def :: LTyFamInstDecl GhcPs -> CvtM (LTyFamDefltEqn GhcPs)
-    -- Very similar to what happens in RdrHsSyn.mkClassDecl
-    cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
-                        Right (def, _) -> return def
-                        Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD o ctxt ty decs)
   = do  { let doc = text "an instance declaration"
         ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs doc decs
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
-        ; ctxt' <- cvtContext ctxt
+        ; ctxt' <- cvtContext funPrec ctxt
         ; (dL->L loc ty') <- cvtType ty
         ; let inst_ty' = mkHsQualTy ctxt loc ctxt' $ cL loc ty'
         ; returnJustL $ InstD noExt $ ClsInstD noExt $
@@ -365,7 +357,7 @@ cvtDec (TH.RoleAnnotD tc roles)
        ; returnJustL $ Hs.RoleAnnotD noExt (RoleAnnotDecl noExt tc' roles') }
 
 cvtDec (TH.StandaloneDerivD ds cxt ty)
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; ds'  <- traverse cvtDerivStrategy ds
        ; (dL->L loc ty') <- cvtType ty
        ; let inst_ty' = mkHsQualTy cxt loc cxt' $ cL loc ty'
@@ -471,7 +463,7 @@ cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
                      , Located RdrName
                      , LHsQTyVars GhcPs)
 cvt_tycl_hdr cxt tc tvs
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
        ; tvs' <- cvtTvs tvs
        ; return (cxt', tc', tvs')
@@ -483,7 +475,7 @@ cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
                        , Maybe [LHsTyVarBndr GhcPs]
                        , HsTyPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
-  = do { cxt' <- cvtContext cxt
+  = do { cxt' <- cvtContext funPrec cxt
        ; bndrs' <- traverse (mapM cvt_tv) bndrs
        ; (head_ty, args) <- split_ty_app tys
        ; case head_ty of
@@ -573,7 +565,7 @@ cvtConstr (InfixC st1 c st2)
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
-        ; ctxt'     <- cvtContext ctxt
+        ; ctxt'     <- cvtContext funPrec ctxt
         ; (dL->L _ con')  <- cvtConstr con
         ; returnL $ add_forall tvs' ctxt' con' }
   where
@@ -1304,8 +1296,9 @@ cvtRole TH.RepresentationalR = Just Coercion.Representational
 cvtRole TH.PhantomR          = Just Coercion.Phantom
 cvtRole TH.InferR            = Nothing
 
-cvtContext :: TH.Cxt -> CvtM (LHsContext GhcPs)
-cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
+cvtContext :: PprPrec -> TH.Cxt -> CvtM (LHsContext GhcPs)
+cvtContext p tys = do { preds' <- mapM cvtPred tys
+                      ; parenthesizeHsContext p <$> returnL preds' }
 
 cvtPred :: TH.Pred -> CvtM (LHsType GhcPs)
 cvtPred = cvtType
@@ -1313,7 +1306,7 @@ cvtPred = cvtType
 cvtDerivClause :: TH.DerivClause
                -> CvtM (LHsDerivingClause GhcPs)
 cvtDerivClause (TH.DerivClause ds ctxt)
-  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext ctxt
+  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext appPrec ctxt
        ; ds'   <- traverse cvtDerivStrategy ds
        ; returnL $ HsDerivingClause noExt ds' ctxt' }
 
@@ -1409,12 +1402,11 @@ cvtTypeKind ty_str ty
            ForallT tvs cxt ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
-                   ; cxt' <- cvtContext cxt
-                   ; let pcxt = parenthesizeHsContext funPrec cxt'
+                   ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
                    ; let hs_ty  = mkHsForAllTy tvs loc ForallInvis tvs' rho_ty
-                         rho_ty = mkHsQualTy cxt loc pcxt ty'
+                         rho_ty = mkHsQualTy cxt loc cxt' ty'
 
                    ; return hs_ty }
 
@@ -1831,8 +1823,8 @@ thRdrName loc ctxt_ns th_occ th_name
   = case th_name of
      TH.NameG th_ns pkg mod -> thOrigRdrName th_occ th_ns pkg mod
      TH.NameQ mod  -> (mkRdrQual  $! mk_mod mod) $! occ
-     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) loc)
-     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq uniq) $! occ) loc)
+     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq (fromInteger uniq)) $! occ) loc)
+     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq (fromInteger uniq)) $! occ) loc)
      TH.NameS | Just name <- isBuiltInOcc_maybe occ -> nameRdrName $! name
               | otherwise                           -> mkRdrUnqual $! occ
               -- We check for built-in syntax here, because the TH

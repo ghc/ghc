@@ -1091,7 +1091,7 @@ Note [Detecting forced eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have levity polymorphic function arguments. See
 Note [Levity polymorphism invariants] in CoreSyn. But we *can* have
-functions that take levity polymorphism arguments, as long as these
+functions that take levity polymorphic arguments, as long as these
 functions are eta-reduced. (See #12708 for an example.)
 
 However, we absolutely cannot do this for functions that have no
@@ -1162,7 +1162,11 @@ badUseOfLevPolyPrimop id ty
 
 levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
 levPolyPrimopErr primop ty bad_tys
-  = errDs $ vcat [ hang (text "Cannot use primitive with levity-polymorphic arguments:")
-                      2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
-                 , hang (text "Levity-polymorphic arguments:")
-                      2 (vcat (map (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t)) bad_tys)) ]
+  = errDs $ vcat
+    [ hang (text "Cannot use function with levity-polymorphic arguments:")
+         2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
+    , hang (text "Levity-polymorphic arguments:")
+         2 $ vcat $ map
+           (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
+           bad_tys
+    ]

@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, CPP, NondecreasingIndentation, ScopedTypeVariables #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -10,8 +10,10 @@
 --
 -- -----------------------------------------------------------------------------
 module GhcMake(
-        depanal,
+        depanal, depanalPartial,
         load, load', LoadHowMuch(..),
+
+        downsweep,
 
         topSortModuleGraph,
 
@@ -46,7 +48,7 @@ import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
 import HscMain
 
-import Bag              ( listToBag )
+import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
 import BasicTypes
 import Digraph
 import Exception        ( tryIO, gbracket, gfinally )
@@ -80,6 +82,7 @@ import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
 import Data.IORef
 import Data.List
 import qualified Data.List as List
@@ -119,6 +122,32 @@ depanal :: GhcMonad m =>
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
+    hsc_env <- getSession
+    (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
+    if isEmptyBag errs
+      then do
+        warnMissingHomeModules hsc_env mod_graph
+        setSession hsc_env { hsc_mod_graph = mod_graph }
+        return mod_graph
+      else throwErrors errs
+
+
+-- | Perform dependency analysis like 'depanal' but return a partial module
+-- graph even in the face of problems with some modules.
+--
+-- Modules which have parse errors in the module header, failing
+-- preprocessors or other issues preventing them from being summarised will
+-- simply be absent from the returned module graph.
+--
+-- Unlike 'depanal' this function will not update 'hsc_mod_graph' with the
+-- new module graph.
+depanalPartial
+    :: GhcMonad m
+    => [ModuleName]  -- ^ excluded modules
+    -> Bool          -- ^ allow duplicate roots
+    -> m (ErrorMessages, ModuleGraph)
+    -- ^ possibly empty 'Bag' of errors and a module graph.
+depanalPartial excluded_mods allow_dup_roots = do
   hsc_env <- getSession
   let
          dflags  = hsc_dflags hsc_env
@@ -138,14 +167,10 @@ depanal excluded_mods allow_dup_roots = do
 
     mod_summariesE <- liftIO $ downsweep hsc_env (mgModSummaries old_graph)
                                      excluded_mods allow_dup_roots
-    mod_summaries <- reportImportErrors mod_summariesE
-
-    let mod_graph = mkModuleGraph mod_summaries
-
-    warnMissingHomeModules hsc_env mod_graph
-
-    setSession hsc_env { hsc_mod_graph = mod_graph }
-    return mod_graph
+    let
+           (errs, mod_summaries) = partitionEithers mod_summariesE
+           mod_graph = mkModuleGraph mod_summaries
+    return (unionManyBags errs, mod_graph)
 
 -- Note [Missing home modules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,6 +209,10 @@ warnMissingHomeModules hsc_env mod_graph =
     is_my_target mod (TargetFile target_file _)
       | Just mod_file <- ml_hs_file (ms_location mod)
       = target_file == mod_file ||
+
+           --  Don't warn on B.hs-boot if B.hs is specified (#16551)
+           addBootSuffix target_file == mod_file ||
+
            --  We can get a file target even if a module name was
            --  originally specified in a command line because it can
            --  be converted in guessTarget (by appending .hs/.lhs).
@@ -238,7 +267,75 @@ data LoadHowMuch
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     mod_graph <- depanal [] False
-    load' how_much (Just batchMsg) mod_graph
+    success <- load' how_much (Just batchMsg) mod_graph
+    warnUnusedPackages
+    pure success
+
+-- Note [Unused packages]
+--
+-- Cabal passes `--package-id` flag for each direct dependency. But GHC
+-- loads them lazily, so when compilation is done, we have a list of all
+-- actually loaded packages. All the packages, specified on command line,
+-- but never loaded, are probably unused dependencies.
+
+warnUnusedPackages :: GhcMonad m => m ()
+warnUnusedPackages = do
+    hsc_env <- getSession
+    eps <- liftIO $ hscEPS hsc_env
+
+    let dflags = hsc_dflags hsc_env
+        pit = eps_PIT eps
+
+    let loadedPackages
+          = map (getPackageDetails dflags)
+          . nub . sort
+          . map moduleUnitId
+          . moduleEnvKeys
+          $ pit
+
+        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+
+        unusedArgs
+          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+                   requestedArgs
+
+    let warn = makeIntoWarning
+          (Reason Opt_WarnUnusedPackages)
+          (mkPlainErrMsg dflags noSrcSpan msg)
+        msg = hang
+          ( text "The following packages were specified "
+            <> text "via -package or -package-id flags, "
+            <> text "but were not needed for compilation: ")
+          4
+          (sep (map pprUnusedArg unusedArgs))
+
+    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
+      logWarnings (listToBag [warn])
+
+    where
+        packageArg (ExposePackage _ arg _) = Just arg
+        packageArg _ = Nothing
+
+        pprUnusedArg (PackageArg str) = text str
+        pprUnusedArg (UnitIdArg uid) = ppr uid
+
+        matchingStr :: String -> PackageConfig -> Bool
+        matchingStr str p
+                =  str == sourcePackageIdString p
+                || str == packageNameString p
+
+        matching :: DynFlags -> PackageArg -> PackageConfig -> Bool
+        matching _ (PackageArg str) p = matchingStr str p
+        matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
+
+        -- For wired-in packages, we have to unwire their id,
+        -- otherwise they won't match package flags
+        realUnitId :: DynFlags -> PackageConfig -> UnitId
+        realUnitId dflags
+          = unwireUnitId dflags
+          . DefiniteUnitId
+          . DefUnitId
+          . installedPackageConfigId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
@@ -1430,6 +1527,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                         && (not (isObjectTarget prevailing_target)
                             || not (isObjectTarget local_target))
                         && not (prevailing_target == HscNothing)
+                        && not (prevailing_target == HscInterpreted)
                         then prevailing_target
                         else local_target
 
@@ -1905,13 +2003,10 @@ warnUnnecessarySourceImports sccs = do
                  <+> quotes (ppr mod))
 
 
-reportImportErrors :: MonadIO m => [Either ErrMsg b] -> m [b]
+reportImportErrors :: MonadIO m => [Either ErrorMessages b] -> m [b]
 reportImportErrors xs | null errs = return oks
-                      | otherwise = throwManyErrors errs
+                      | otherwise = throwErrors $ unionManyBags errs
   where (errs, oks) = partitionEithers xs
-
-throwManyErrors :: MonadIO m => [ErrMsg] -> m ab
-throwManyErrors errs = liftIO $ throwIO $ mkSrcErr $ listToBag errs
 
 
 -----------------------------------------------------------------------------
@@ -1936,7 +2031,7 @@ downsweep :: HscEnv
           -> Bool               -- True <=> allow multiple targets to have
                                 --          the same module name; this is
                                 --          very useful for ghc -M
-          -> IO [Either ErrMsg ModSummary]
+          -> IO [Either ErrorMessages ModSummary]
                 -- The elts of [ModSummary] all have distinct
                 -- (Modules, IsBoot) identifiers, unless the Bool is true
                 -- in which case there can be repeats
@@ -1953,9 +2048,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- See Note [-fno-code mode] #8025
        map1 <- if hscTarget dflags == HscNothing
          then enableCodeGenForTH
-           (defaultObjectTarget (settings dflags))
+           (defaultObjectTarget dflags)
            map0
-         else return map0
+         else if hscTarget dflags == HscInterpreted
+           then enableCodeGenForUnboxedTuples
+             (defaultObjectTarget dflags)
+             map0
+           else return map0
        return $ concat $ nodeMapElts map1
      where
         calcDeps = msDeps
@@ -1966,13 +2065,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map :: NodeMap ModSummary
         old_summary_map = mkNodeMap old_summaries
 
-        getRootSummary :: Target -> IO (Either ErrMsg ModSummary)
+        getRootSummary :: Target -> IO (Either ErrorMessages ModSummary)
         getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
            = do exists <- liftIO $ doesFileExist file
-                if exists
-                    then Right `fmap` summariseFile hsc_env old_summaries file mb_phase
+                if exists || isJust maybe_buf
+                    then summariseFile hsc_env old_summaries file mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ mkPlainErrMsg dflags noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
@@ -1988,7 +2087,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         -- name, so we have to check that there aren't multiple root files
         -- defining the same module (otherwise the duplicates will be silently
         -- ignored, leading to confusing behaviour).
-        checkDuplicates :: NodeMap [Either ErrMsg ModSummary] -> IO ()
+        checkDuplicates :: NodeMap [Either ErrorMessages ModSummary] -> IO ()
         checkDuplicates root_map
            | allow_dup_roots = return ()
            | null dup_roots  = return ()
@@ -1999,11 +2098,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 
         loop :: [(Located ModuleName,IsBoot)]
                         -- Work list: process these modules
-             -> NodeMap [Either ErrMsg ModSummary]
+             -> NodeMap [Either ErrorMessages ModSummary]
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO (NodeMap [Either ErrMsg ModSummary])
+             -> IO (NodeMap [Either ErrorMessages ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
         loop ((wanted_mod, is_boot) : ss) done
@@ -2032,9 +2131,52 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
 enableCodeGenForTH :: HscTarget
-  -> NodeMap [Either ErrMsg ModSummary]
-  -> IO (NodeMap [Either ErrMsg ModSummary])
-enableCodeGenForTH target nodemap =
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
+enableCodeGenForTH =
+  enableCodeGenWhen condition should_modify TFL_CurrentModule TFL_GhcSession
+  where
+    condition = isTemplateHaskellOrQQNonBoot
+    should_modify (ModSummary { ms_hspp_opts = dflags }) =
+      hscTarget dflags == HscNothing &&
+      -- Don't enable codegen for TH on indefinite packages; we
+      -- can't compile anything anyway! See #16219.
+      not (isIndefinite dflags)
+
+-- | Update the every ModSummary that is depended on
+-- by a module that needs unboxed tuples. We enable codegen to
+-- the specified target, disable optimization and change the .hi
+-- and .o file locations to be temporary files.
+--
+-- This is used used in order to load code that uses unboxed tuples
+-- into GHCi while still allowing some code to be interpreted.
+enableCodeGenForUnboxedTuples :: HscTarget
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
+enableCodeGenForUnboxedTuples =
+  enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
+  where
+    condition ms =
+      xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
+      not (isBootSummary ms)
+    should_modify (ModSummary { ms_hspp_opts = dflags }) =
+      hscTarget dflags == HscInterpreted
+
+-- | Helper used to implement 'enableCodeGenForTH' and
+-- 'enableCodeGenForUnboxedTuples'. In particular, this enables
+-- unoptimized code generation for all modules that meet some
+-- condition (first parameter), or are dependencies of those
+-- modules. The second parameter is a condition to check before
+-- marking modules for code generation.
+enableCodeGenWhen
+  :: (ModSummary -> Bool)
+  -> (ModSummary -> Bool)
+  -> TempFileLifetime
+  -> TempFileLifetime
+  -> HscTarget
+  -> NodeMap [Either ErrorMessages ModSummary]
+  -> IO (NodeMap [Either ErrorMessages ModSummary])
+enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
     enable_code_gen ms
@@ -2042,18 +2184,15 @@ enableCodeGenForTH target nodemap =
         { ms_mod = ms_mod
         , ms_location = ms_location
         , ms_hsc_src = HsSrcFile
-        , ms_hspp_opts = dflags@DynFlags
-          {hscTarget = HscNothing}
+        , ms_hspp_opts = dflags
         } <- ms
-      -- Don't enable codegen for TH on indefinite packages; we
-      -- can't compile anything anyway! See #16219.
-      , not (isIndefinite dflags)
+      , should_modify ms
       , ms_mod `Set.member` needs_codegen_set
       = do
         let new_temp_file suf dynsuf = do
-              tn <- newTempName dflags TFL_CurrentModule suf
+              tn <- newTempName dflags staticLife suf
               let dyn_tn = tn -<.> dynsuf
-              addFilesToClean dflags TFL_GhcSession [dyn_tn]
+              addFilesToClean dflags dynLife [dyn_tn]
               return tn
           -- We don't want to create .o or .hi files unless we have been asked
           -- to by the user. But we need them, so we patch their locations in
@@ -2076,7 +2215,7 @@ enableCodeGenForTH target nodemap =
       [ ms
       | mss <- Map.elems nodemap
       , Right ms <- mss
-      , isTemplateHaskellOrQQNonBoot ms
+      , condition ms
       ]
 
     -- find the set of all transitive dependencies of a list of modules.
@@ -2098,7 +2237,7 @@ enableCodeGenForTH target nodemap =
                 new_marked_mods = Set.insert ms_mod marked_mods
             in foldl' go new_marked_mods deps
 
-mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
+mkRootMap :: [ModSummary] -> NodeMap [Either ErrorMessages ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))
                                          [ (msKey s, [Right s]) | s <- summaries ]
                                          Map.empty
@@ -2158,13 +2297,13 @@ summariseFile
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
-        -> IO ModSummary
+        -> IO (Either ErrorMessages ModSummary)
 
-summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
+summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,  But we have to look up the summary
         -- by source file, rather than module name as we do in summarise.
-   | Just old_summary <- findSummaryBySourceFile old_summaries file
+   | Just old_summary <- findSummaryBySourceFile old_summaries src_fn
    = do
         let location = ms_location old_summary
             dflags = hsc_dflags hsc_env
@@ -2176,82 +2315,44 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                 -- behaviour.
 
                 -- return the cached summary if the source didn't change
-        if ms_hs_date old_summary == src_timestamp &&
-           not (gopt Opt_ForceRecomp (hsc_dflags hsc_env))
-           then do -- update the object-file timestamp
-                  obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-                        || obj_allowed -- bug #1205
-                        then liftIO $ getObjTimestamp location NotBoot
-                        else return Nothing
-                  hi_timestamp <- maybeGetIfaceDate dflags location
-                  let hie_location = ml_hie_file location
-                  hie_timestamp <- modificationTimeIfExists hie_location
-
-                  -- We have to repopulate the Finder's cache because it
-                  -- was flushed before the downsweep.
-                  _ <- liftIO $ addHomeModuleToFinder hsc_env
-                    (moduleName (ms_mod old_summary)) (ms_location old_summary)
-
-                  return old_summary{ ms_obj_date = obj_timestamp
-                                    , ms_iface_date = hi_timestamp
-                                    , ms_hie_date = hie_timestamp }
-           else
-                new_summary src_timestamp
+        checkSummaryTimestamp
+            hsc_env dflags obj_allowed NotBoot (new_summary src_fn)
+            old_summary location src_timestamp
 
    | otherwise
    = do src_timestamp <- get_src_timestamp
-        new_summary src_timestamp
+        new_summary src_fn src_timestamp
   where
     get_src_timestamp = case maybe_buf of
                            Just (_,t) -> return t
-                           Nothing    -> liftIO $ getModificationUTCTime file
+                           Nothing    -> liftIO $ getModificationUTCTime src_fn
                         -- getModificationUTCTime may fail
 
-    new_summary src_timestamp = do
-        let dflags = hsc_dflags hsc_env
+    new_summary src_fn src_timestamp = runExceptT $ do
+        preimps@PreprocessedImports {..}
+            <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
-        let hsc_src = if isHaskellSigFilename file then HsigFile else HsSrcFile
-
-        (dflags', hspp_fn, buf)
-            <- preprocessFile hsc_env file mb_phase maybe_buf
-
-        (srcimps,the_imps, L _ mod_name) <- getImports dflags' buf hspp_fn file
 
         -- Make a ModLocation for this file
-        location <- liftIO $ mkHomeModLocation dflags mod_name file
+        location <- liftIO $ mkHomeModLocation (hsc_dflags hsc_env) pi_mod_name src_fn
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location
 
-        -- when the user asks to load a source file by name, we only
-        -- use an object file if -fobject-code is on.  See #1205.
-        obj_timestamp <-
-            if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-               || obj_allowed -- bug #1205
-                then liftIO $ modificationTimeIfExists (ml_obj_file location)
-                else return Nothing
-
-        hi_timestamp <- maybeGetIfaceDate dflags location
-        hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
-
-        extra_sig_imports <- findExtraSigImports hsc_env hsc_src mod_name
-        required_by_imports <- implicitRequirements hsc_env the_imps
-
-        return (ModSummary { ms_mod = mod,
-                             ms_hsc_src = hsc_src,
-                             ms_location = location,
-                             ms_hspp_file = hspp_fn,
-                             ms_hspp_opts = dflags',
-                             ms_hspp_buf  = Just buf,
-                             ms_parsed_mod = Nothing,
-                             ms_srcimps = srcimps,
-                             ms_textual_imps = the_imps ++ extra_sig_imports ++ required_by_imports,
-                             ms_hs_date = src_timestamp,
-                             ms_iface_date = hi_timestamp,
-                             ms_hie_date = hie_timestamp,
-                             ms_obj_date = obj_timestamp })
+        liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
+            { nms_src_fn = src_fn
+            , nms_src_timestamp = src_timestamp
+            , nms_is_boot = NotBoot
+            , nms_hsc_src =
+                if isHaskellSigFilename src_fn
+                   then HsigFile
+                   else HsSrcFile
+            , nms_location = location
+            , nms_mod = mod
+            , nms_obj_allowed = obj_allowed
+            , nms_preimps = preimps
+            }
 
 findSummaryBySourceFile :: [ModSummary] -> FilePath -> Maybe ModSummary
 findSummaryBySourceFile summaries file
@@ -2259,6 +2360,44 @@ findSummaryBySourceFile summaries file
                                  expectJust "findSummaryBySourceFile" (ml_hs_file (ms_location ms)) == file ] of
         [] -> Nothing
         (x:_) -> Just x
+
+checkSummaryTimestamp
+    :: HscEnv -> DynFlags -> Bool -> IsBoot
+    -> (UTCTime -> IO (Either e ModSummary))
+    -> ModSummary -> ModLocation -> UTCTime
+    -> IO (Either e ModSummary)
+checkSummaryTimestamp
+  hsc_env dflags obj_allowed is_boot new_summary
+  old_summary location src_timestamp
+  | ms_hs_date old_summary == src_timestamp &&
+      not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
+           -- update the object-file timestamp
+           obj_timestamp <-
+             if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+                 || obj_allowed -- bug #1205
+                 then liftIO $ getObjTimestamp location is_boot
+                 else return Nothing
+
+           -- We have to repopulate the Finder's cache for file targets
+           -- because the file might not even be on the regular serach path
+           -- and it was likely flushed in depanal. This is not technically
+           -- needed when we're called from sumariseModule but it shouldn't
+           -- hurt.
+           _ <- addHomeModuleToFinder hsc_env
+                  (moduleName (ms_mod old_summary)) location
+
+           hi_timestamp <- maybeGetIfaceDate dflags location
+           hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+
+           return $ Right old_summary
+               { ms_obj_date = obj_timestamp
+               , ms_iface_date = hi_timestamp
+               , ms_hie_date = hie_timestamp
+               }
+
+   | otherwise =
+           -- source changed: re-summarise.
+           new_summary src_timestamp
 
 -- Summarise a module, and pick up source and timestamp.
 summariseModule
@@ -2269,7 +2408,7 @@ summariseModule
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
-          -> IO (Maybe (Either ErrMsg ModSummary))      -- Its new summary
+          -> IO (Maybe (Either ErrorMessages ModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 obj_allowed maybe_buf excl_mods
@@ -2286,11 +2425,13 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- return the cached summary if it hasn't changed.  If the
                 -- file has disappeared, we need to call the Finder again.
         case maybe_buf of
-           Just (_,t) -> check_timestamp old_summary location src_fn t
+           Just (_,t) ->
+               Just <$> check_timestamp old_summary location src_fn t
            Nothing    -> do
                 m <- tryIO (getModificationUTCTime src_fn)
                 case m of
-                   Right t -> check_timestamp old_summary location src_fn t
+                   Right t ->
+                       Just <$> check_timestamp old_summary location src_fn t
                    Left e | isDoesNotExistError e -> find_it
                           | otherwise             -> ioError e
 
@@ -2298,23 +2439,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   where
     dflags = hsc_dflags hsc_env
 
-    check_timestamp old_summary location src_fn src_timestamp
-        | ms_hs_date old_summary == src_timestamp &&
-          not (gopt Opt_ForceRecomp dflags) = do
-                -- update the object-file timestamp
-                obj_timestamp <-
-                    if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-                       || obj_allowed -- bug #1205
-                       then getObjTimestamp location is_boot
-                       else return Nothing
-                hi_timestamp <- maybeGetIfaceDate dflags location
-                hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
-                return (Just (Right old_summary{ ms_obj_date = obj_timestamp
-                                               , ms_iface_date = hi_timestamp
-                                               , ms_hie_date = hie_timestamp }))
-        | otherwise =
-                -- source changed: re-summarise.
-                new_summary location (ms_mod old_summary) src_fn src_timestamp
+    check_timestamp old_summary location src_fn =
+        checkSummaryTimestamp
+          hsc_env dflags obj_allowed is_boot
+          (new_summary location (ms_mod old_summary) src_fn)
+          old_summary location
 
     find_it = do
         found <- findImportedModule hsc_env wanted_mod Nothing
@@ -2322,7 +2451,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
              Found location mod
                 | isJust (ml_hs_file location) ->
                         -- Home package
-                         just_found location mod
+                         Just <$> just_found location mod
 
              _ -> return Nothing
                         -- Not found
@@ -2340,16 +2469,13 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 -- It might have been deleted since the Finder last found it
         maybe_t <- modificationTimeIfExists src_fn
         case maybe_t of
-          Nothing -> return $ Just $ Left $ noHsFileErr dflags loc src_fn
+          Nothing -> return $ Left $ noHsFileErr dflags loc src_fn
           Just t  -> new_summary location' mod src_fn t
 
-
     new_summary location mod src_fn src_timestamp
-      = do
-        -- Preprocess the source file and get its imports
-        -- The dflags' contains the OPTIONS pragmas
-        (dflags', hspp_fn, buf) <- preprocessFile hsc_env src_fn Nothing maybe_buf
-        (srcimps, the_imps, L mod_loc mod_name) <- getImports dflags' buf hspp_fn src_fn
+      = runExceptT $ do
+        preimps@PreprocessedImports {..}
+            <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
         -- NB: Despite the fact that is_boot is a top-level parameter, we
         -- don't actually know coming into this function what the HscSource
@@ -2363,97 +2489,123 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                 _ | isHaskellSigFilename src_fn -> HsigFile
                   | otherwise -> HsSrcFile
 
-        when (mod_name /= wanted_mod) $
-                throwOneError $ mkPlainErrMsg dflags' mod_loc $
+        when (pi_mod_name /= wanted_mod) $
+                throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                               text "File name does not match module name:"
-                              $$ text "Saw:" <+> quotes (ppr mod_name)
+                              $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
-        when (hsc_src == HsigFile && isNothing (lookup mod_name (thisUnitIdInsts dflags))) $
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (thisUnitIdInsts dflags))) $
             let suggested_instantiated_with =
                     hcat (punctuate comma $
                         [ ppr k <> text "=" <> ppr v
-                        | (k,v) <- ((mod_name, mkHoleModule mod_name)
+                        | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
                                 : thisUnitIdInsts dflags)
                         ])
-            in throwOneError $ mkPlainErrMsg dflags' mod_loc $
-                text "Unexpected signature:" <+> quotes (ppr mod_name)
+            in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
+                text "Unexpected signature:" <+> quotes (ppr pi_mod_name)
                 $$ if gopt Opt_BuildingCabalPackage dflags
-                    then parens (text "Try adding" <+> quotes (ppr mod_name)
+                    then parens (text "Try adding" <+> quotes (ppr pi_mod_name)
                             <+> text "to the"
                             <+> quotes (text "signatures")
                             <+> text "field in your Cabal file.")
                     else parens (text "Try passing -instantiated-with=\"" <>
                                  suggested_instantiated_with <> text "\"" $$
-                                text "replacing <" <> ppr mod_name <> text "> as necessary.")
+                                text "replacing <" <> ppr pi_mod_name <> text "> as necessary.")
 
-                -- Find the object timestamp, and return the summary
-        obj_timestamp <-
-           if isObjectTarget (hscTarget (hsc_dflags hsc_env))
-              || obj_allowed -- bug #1205
-              then getObjTimestamp location is_boot
-              else return Nothing
+        liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
+            { nms_src_fn = src_fn
+            , nms_src_timestamp = src_timestamp
+            , nms_is_boot = is_boot
+            , nms_hsc_src = hsc_src
+            , nms_location = location
+            , nms_mod = mod
+            , nms_obj_allowed = obj_allowed
+            , nms_preimps = preimps
+            }
 
-        hi_timestamp <- maybeGetIfaceDate dflags location
-        hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
+-- | Convenience named arguments for 'makeNewModSummary' only used to make
+-- code more readable, not exported.
+data MakeNewModSummary
+  = MakeNewModSummary
+      { nms_src_fn :: FilePath
+      , nms_src_timestamp :: UTCTime
+      , nms_is_boot :: IsBoot
+      , nms_hsc_src :: HscSource
+      , nms_location :: ModLocation
+      , nms_mod :: Module
+      , nms_obj_allowed :: Bool
+      , nms_preimps :: PreprocessedImports
+      }
 
-        extra_sig_imports <- findExtraSigImports hsc_env hsc_src mod_name
-        required_by_imports <- implicitRequirements hsc_env the_imps
+makeNewModSummary :: HscEnv -> MakeNewModSummary -> IO ModSummary
+makeNewModSummary hsc_env MakeNewModSummary{..} = do
+  let PreprocessedImports{..} = nms_preimps
+  let dflags = hsc_dflags hsc_env
 
-        return (Just (Right (ModSummary { ms_mod       = mod,
-                              ms_hsc_src   = hsc_src,
-                              ms_location  = location,
-                              ms_hspp_file = hspp_fn,
-                              ms_hspp_opts = dflags',
-                              ms_hspp_buf  = Just buf,
-                              ms_parsed_mod = Nothing,
-                              ms_srcimps      = srcimps,
-                              ms_textual_imps = the_imps ++ extra_sig_imports ++ required_by_imports,
-                              ms_hs_date   = src_timestamp,
-                              ms_iface_date = hi_timestamp,
-                              ms_hie_date = hie_timestamp,
-                              ms_obj_date  = obj_timestamp })))
+  -- when the user asks to load a source file by name, we only
+  -- use an object file if -fobject-code is on.  See #1205.
+  obj_timestamp <- liftIO $
+      if isObjectTarget (hscTarget dflags)
+         || nms_obj_allowed -- bug #1205
+          then getObjTimestamp nms_location nms_is_boot
+          else return Nothing
 
+  hi_timestamp <- maybeGetIfaceDate dflags nms_location
+  hie_timestamp <- modificationTimeIfExists (ml_hie_file nms_location)
+
+  extra_sig_imports <- findExtraSigImports hsc_env nms_hsc_src pi_mod_name
+  required_by_imports <- implicitRequirements hsc_env pi_theimps
+
+  return $ ModSummary
+      { ms_mod = nms_mod
+      , ms_hsc_src = nms_hsc_src
+      , ms_location = nms_location
+      , ms_hspp_file = pi_hspp_fn
+      , ms_hspp_opts = pi_local_dflags
+      , ms_hspp_buf  = Just pi_hspp_buf
+      , ms_parsed_mod = Nothing
+      , ms_srcimps = pi_srcimps
+      , ms_textual_imps =
+          pi_theimps ++ extra_sig_imports ++ required_by_imports
+      , ms_hs_date = nms_src_timestamp
+      , ms_iface_date = hi_timestamp
+      , ms_hie_date = hie_timestamp
+      , ms_obj_date = obj_timestamp
+      }
 
 getObjTimestamp :: ModLocation -> IsBoot -> IO (Maybe UTCTime)
 getObjTimestamp location is_boot
   = if is_boot == IsBoot then return Nothing
                          else modificationTimeIfExists (ml_obj_file location)
 
+data PreprocessedImports
+  = PreprocessedImports
+      { pi_local_dflags :: DynFlags
+      , pi_srcimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_theimps  :: [(Maybe FastString, Located ModuleName)]
+      , pi_hspp_fn  :: FilePath
+      , pi_hspp_buf :: StringBuffer
+      , pi_mod_name_loc :: SrcSpan
+      , pi_mod_name :: ModuleName
+      }
 
-preprocessFile :: HscEnv
-               -> FilePath
-               -> Maybe Phase -- ^ Starting phase
-               -> Maybe (StringBuffer,UTCTime)
-               -> IO (DynFlags, FilePath, StringBuffer)
-preprocessFile hsc_env src_fn mb_phase Nothing
-  = do
-        (dflags', hspp_fn) <- preprocess hsc_env (src_fn, mb_phase)
-        buf <- hGetStringBuffer hspp_fn
-        return (dflags', hspp_fn, buf)
-
-preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
-  = do
-        let dflags = hsc_dflags hsc_env
-        let local_opts = getOptions dflags buf src_fn
-
-        (dflags', leftovers, warns)
-            <- parseDynamicFilePragma dflags local_opts
-        checkProcessArgsResult dflags leftovers
-        handleFlagWarnings dflags' warns
-
-        let needs_preprocessing
-                | Just (Unlit _) <- mb_phase    = True
-                | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
-                  -- note: local_opts is only required if there's no Unlit phase
-                | xopt LangExt.Cpp dflags'      = True
-                | gopt Opt_Pp  dflags'          = True
-                | otherwise                     = False
-
-        when needs_preprocessing $
-           throwGhcExceptionIO (ProgramError "buffer needs preprocesing; interactive check disabled")
-
-        return (dflags', src_fn, buf)
+-- Preprocess the source file and get its imports
+-- The pi_local_dflags contains the OPTIONS pragmas
+getPreprocessedImports
+    :: HscEnv
+    -> FilePath
+    -> Maybe Phase
+    -> Maybe (StringBuffer, UTCTime)
+    -- ^ optional source code buffer and modification time
+    -> ExceptT ErrorMessages IO PreprocessedImports
+getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
+  (pi_local_dflags, pi_hspp_fn)
+      <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
+  pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
+  (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
+      <- ExceptT $ getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+  return PreprocessedImports {..}
 
 
 -----------------------------------------------------------------------------
@@ -2500,13 +2652,13 @@ noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
 noModError dflags loc wanted_mod err
   = mkPlainErrMsg dflags loc $ cannotFindModule dflags wanted_mod err
 
-noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrMsg
+noHsFileErr :: DynFlags -> SrcSpan -> String -> ErrorMessages
 noHsFileErr dflags loc path
-  = mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
+  = unitBag $ mkPlainErrMsg dflags loc $ text "Can't find" <+> text path
 
-moduleNotFoundErr :: DynFlags -> ModuleName -> ErrMsg
+moduleNotFoundErr :: DynFlags -> ModuleName -> ErrorMessages
 moduleNotFoundErr dflags mod
-  = mkPlainErrMsg dflags noSrcSpan $
+  = unitBag $ mkPlainErrMsg dflags noSrcSpan $
         text "module" <+> quotes (ppr mod) <+> text "cannot be found locally"
 
 multiRootsErr :: DynFlags -> [ModSummary] -> IO ()

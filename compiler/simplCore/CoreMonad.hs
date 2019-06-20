@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module CoreMonad (
     -- * Configuration of the core-to-core passes
@@ -35,7 +36,6 @@ module CoreMonad (
 
     -- ** Lifting into the monad
     liftIO, liftIOWithCount,
-    liftIO1, liftIO2, liftIO3, liftIO4,
 
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
@@ -78,6 +78,7 @@ import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
+import Panic (throwGhcException, GhcException(..))
 
 {-
 ************************************************************************
@@ -314,7 +315,13 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
              | otherwise       = sc2
 
 plusSimplCount (VerySimplCount n) (VerySimplCount m) = VerySimplCount (n+m)
-plusSimplCount _                  _                  = panic "plusSimplCount"
+plusSimplCount lhs                rhs                =
+  throwGhcException . PprProgramError "plusSimplCount" $ vcat
+    [ text "lhs"
+    , pprSimplCount lhs
+    , text "rhs"
+    , pprSimplCount rhs
+    ]
        -- We use one or the other consistently
 
 pprSimplCount (VerySimplCount n) = text "Total ticks:" <+> int n
@@ -575,9 +582,7 @@ type CoreIOEnv = IOEnv CoreReader
 -- | The monad used by Core-to-Core passes to access common state, register simplification
 -- statistics and so on
 newtype CoreM a = CoreM { unCoreM :: CoreState -> CoreIOEnv (a, CoreState, CoreWriter) }
-
-instance Functor CoreM where
-    fmap = liftM
+    deriving (Functor)
 
 instance Monad CoreM where
     mx >>= f = CoreM $ \s -> do

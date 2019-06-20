@@ -81,8 +81,8 @@ module Outputable (
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
-        pprTrace, pprTraceDebug, pprTraceIt, warnPprTrace, pprSTrace,
-        pprTraceException, pprTraceM,
+        pprTrace, pprTraceDebug, pprTraceWith, pprTraceIt, warnPprTrace,
+        pprSTrace, pprTraceException, pprTraceM,
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen, callStackDoc,
     ) where
@@ -101,7 +101,7 @@ import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
-import Platform
+import GHC.Platform
 import qualified PprColour as Col
 import Pretty           ( Doc, Mode(..) )
 import Panic
@@ -813,6 +813,12 @@ instance Outputable Word32 where
 instance Outputable Word where
     ppr n = integer $ fromIntegral n
 
+instance Outputable Float where
+    ppr f = float f
+
+instance Outputable Double where
+    ppr f = double f
+
 instance Outputable () where
     ppr _ = text "()"
 
@@ -1196,9 +1202,15 @@ pprTrace str doc x
 pprTraceM :: Applicative f => String -> SDoc -> f ()
 pprTraceM str doc = pprTrace str doc (pure ())
 
+-- | @pprTraceWith desc f x@ is equivalent to @pprTrace desc (f x) x@.
+-- This allows you to print details from the returned value as well as from
+-- ambient variables.
+pprTraceWith :: Outputable a => String -> (a -> SDoc) -> a -> a
+pprTraceWith desc f x = pprTrace desc (f x) x
+
 -- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@
 pprTraceIt :: Outputable a => String -> a -> a
-pprTraceIt desc x = pprTrace desc (ppr x) x
+pprTraceIt desc x = pprTraceWith desc ppr x
 
 -- | @pprTraceException desc x action@ runs action, printing a message
 -- if it throws an exception.

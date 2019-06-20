@@ -350,7 +350,7 @@ for name in config.only:
 if config.list_broken:
     print('')
     print('Broken tests:')
-    print(' '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
+    print('\n  '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
     print('')
 
     if t.framework_failures:

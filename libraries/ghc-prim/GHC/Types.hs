@@ -282,7 +282,7 @@ class a ~ b
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
 --      @since 4.7.0.0
-class Coercible a b
+class Coercible (a :: k) (b :: k)
   -- See also Note [The equality types story] in TysPrim
 
 {- *********************************************************************

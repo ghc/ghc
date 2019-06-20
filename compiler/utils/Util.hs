@@ -35,7 +35,7 @@ module Util (
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
         listLengthCmp, atLength,
-        equalLength, neLength, compareLength, leLength, ltLength,
+        equalLength, compareLength, leLength, ltLength,
 
         isSingleton, only, singleton,
         notNull, snocView,
@@ -92,9 +92,6 @@ module Util (
         readRational,
         readHexRational,
 
-        -- * read helpers
-        maybeRead, maybeReadFuzzy,
-
         -- * IO-ish utilities
         doesDirNameExist,
         getModificationUTCTime,
@@ -134,7 +131,7 @@ module Util (
 import GhcPrelude
 
 import Exception
-import Panic
+import PlainPanic
 
 import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
@@ -188,7 +185,7 @@ the flags are off.
 -}
 
 ghciSupported :: Bool
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 ghciSupported = True
 #else
 ghciSupported = False
@@ -534,12 +531,6 @@ equalLength :: [a] -> [b] -> Bool
 equalLength []     []     = True
 equalLength (_:xs) (_:ys) = equalLength xs ys
 equalLength _      _      = False
-
-neLength :: [a] -> [b] -> Bool
--- ^ True if length xs /= length ys
-neLength []     []     = False
-neLength (_:xs) (_:ys) = neLength xs ys
-neLength _      _      = True
 
 compareLength :: [a] -> [b] -> Ordering
 compareLength []     []     = EQ
@@ -1259,25 +1250,6 @@ readHexRational__ ('0' : x : rest)
             | otherwise =  ([],xs)
 
 readHexRational__ _ = Nothing
-
-
-
-
------------------------------------------------------------------------------
--- read helpers
-
-maybeRead :: Read a => String -> Maybe a
-maybeRead str = case reads str of
-                [(x, "")] -> Just x
-                _         -> Nothing
-
-maybeReadFuzzy :: Read a => String -> Maybe a
-maybeReadFuzzy str = case reads str of
-                     [(x, s)]
-                      | all isSpace s ->
-                         Just x
-                     _ ->
-                         Nothing
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.

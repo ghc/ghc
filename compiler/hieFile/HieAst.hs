@@ -1,3 +1,6 @@
+{-
+Main functions for .hie file generation
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -20,7 +23,6 @@ import BooleanFormula
 import Class                      ( FunDep )
 import CoreUtils                  ( exprType )
 import ConLike                    ( conLikeName )
-import Config                     ( cProjectVersion )
 import Desugar                    ( deSugarExpr )
 import FieldLabel
 import HsSyn
@@ -42,7 +44,6 @@ import HieUtils
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
@@ -98,9 +99,7 @@ mkHieFile ms ts rs = do
   let Just src_file = ml_hs_file $ ms_location ms
   src <- liftIO $ BS.readFile src_file
   return $ HieFile
-      { hie_version = curHieVersion
-      , hie_ghc_version = BSC.pack cProjectVersion
-      , hie_hs_file = src_file
+      { hie_hs_file = src_file
       , hie_module = ms_mod ms
       , hie_types = arr
       , hie_asts = asts'
@@ -333,7 +332,7 @@ instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
 
-instance (HasLoc a, HasLoc b) => HasLoc (FamEqn s a b) where
+instance HasLoc a => HasLoc (FamEqn s a) where
   loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
   loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
                                               [loc a, loc tvs, loc b, loc c]
@@ -479,7 +478,9 @@ instance HasType (LHsExpr GhcTc) where
 
     in
     case tyOpt of
-      _ | skipDesugaring e' -> fallback
+      Just t -> makeTypeNode e' spn t
+      Nothing
+        | skipDesugaring e' -> fallback
         | otherwise -> do
             hs_env <- Hsc $ \e w -> return (e,w)
             (_,mbe) <- liftIO $ deSugarExpr hs_env e
@@ -1149,18 +1150,12 @@ instance ToHie (LTyClDecl GhcRn) where
         , toHie $ fmap (BC InstanceBind ModuleScope) meths
         , toHie typs
         , concatMapM (pure . locOnly . getLoc) deftyps
-        , toHie $ map (go . unLoc) deftyps
+        , toHie deftyps
         ]
         where
           context_scope = mkLScope context
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
-
-          go :: TyFamDefltEqn GhcRn
-             -> FamEqn GhcRn (TScoped (LHsQTyVars GhcRn)) (LHsType GhcRn)
-          go (FamEqn a var bndrs pat b rhs) =
-             FamEqn a var bndrs (TS (ResolvedScopes [mkLScope rhs]) pat) b rhs
-          go (XFamEqn NoExt) = XFamEqn NoExt
       XTyClDecl _ -> []
 
 instance ToHie (LFamilyDecl GhcRn) where
@@ -1206,15 +1201,12 @@ instance ToHie (Located (FunDep (Located Name))) where
     , toHie $ map (C Use) rhs
     ]
 
-instance (ToHie pats, ToHie rhs, HasLoc pats, HasLoc rhs)
-    => ToHie (TScoped (FamEqn GhcRn pats rhs)) where
+instance (ToHie rhs, HasLoc rhs)
+    => ToHie (TScoped (FamEqn GhcRn rhs)) where
   toHie (TS _ f) = toHie f
 
-instance ( ToHie pats
-         , ToHie rhs
-         , HasLoc pats
-         , HasLoc rhs
-         ) => ToHie (FamEqn GhcRn pats rhs) where
+instance (ToHie rhs, HasLoc rhs)
+    => ToHie (FamEqn GhcRn rhs) where
   toHie fe@(FamEqn _ var tybndrs pats _ rhs) = concatM $
     [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
     , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs

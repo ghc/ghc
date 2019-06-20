@@ -365,7 +365,7 @@ defined by your local GHC installation, the following trick is useful:
 
     .. code-block:: c
 
-        #ifdef MIN_VERSION_GLASGOW_HASKELL
+        #if defined(MIN_VERSION_GLASGOW_HASKELL)
         #if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
         /* code that applies only to GHC 7.10.2 or later */
         #endif
@@ -937,7 +937,7 @@ for example).
     :type: dynamic
     :category: linking
 
-    :default: all
+    :default: some
 
     This option affects the processing of RTS control options given
     either on the command line or via the :envvar:`GHCRTS` environment
@@ -1019,7 +1019,7 @@ for example).
     :type: dynamic
     :category: linking
 
-    On Windows, GHC normally generates a manifestmanifest file when
+    On Windows, GHC normally generates a manifest file when
     linking a binary. The manifest is placed in the file
     :file:`{prog}.exe.manifest`` where ⟨prog.exe⟩ is the name of the
     executable. The manifest file currently serves just one purpose: it

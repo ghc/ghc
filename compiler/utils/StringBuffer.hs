@@ -19,6 +19,7 @@ module StringBuffer
          -- * Creation\/destruction
         hGetStringBuffer,
         hGetStringBufferBlock,
+        hPutStringBuffer,
         appendStringBuffers,
         stringToStringBuffer,
 
@@ -50,7 +51,7 @@ import GhcPrelude
 import Encoding
 import FastString
 import FastFunctions
-import Outputable
+import PlainPanic
 import Util
 
 import Data.Maybe
@@ -120,6 +121,11 @@ hGetStringBufferBlock handle wanted
                 if r /= size
                    then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
                    else newUTF8StringBuffer buf ptr size
+
+hPutStringBuffer :: Handle -> StringBuffer -> IO ()
+hPutStringBuffer hdl (StringBuffer buf len cur)
+    = do withForeignPtr (plusForeignPtr buf cur) $ \ptr ->
+             hPutBuf hdl ptr len
 
 -- | Skip the byte-order mark if there is one (see #1744 and #6016),
 -- and return the new position of the handle in bytes.

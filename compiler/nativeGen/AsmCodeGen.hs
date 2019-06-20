@@ -6,7 +6,12 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
+    DeriveFunctor #-}
+
+#if !defined(GHC_LOADED_INTO_GHCI)
+{-# LANGUAGE UnboxedTuples #-}
+#endif
 
 module AsmCodeGen (
                     -- * Module entry point
@@ -55,7 +60,7 @@ import qualified RegAlloc.Graph.TrivColorable   as Color
 
 import AsmUtils
 import TargetReg
-import Platform
+import GHC.Platform
 import BlockLayout
 import Config
 import Instruction
@@ -1024,36 +1029,48 @@ cmmToCmm dflags this_mod (CmmProc info lbl live graph)
       do blocks' <- mapM cmmBlockConFold (toBlockList graph)
          return $ CmmProc info lbl live (ofBlockList (g_entry graph) blocks')
 
-newtype CmmOptM a = CmmOptM (DynFlags -> Module -> [CLabel] -> (# a, [CLabel] #))
+-- Avoids using unboxed tuples when loading into GHCi
+#if !defined(GHC_LOADED_INTO_GHCI)
 
-instance Functor CmmOptM where
-    fmap = liftM
+type OptMResult a = (# a, [CLabel] #)
+
+pattern OptMResult :: a -> b -> (# a, b #)
+pattern OptMResult x y = (# x, y #)
+{-# COMPLETE OptMResult #-}
+#else
+
+data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
+#endif
+
+newtype CmmOptM a = CmmOptM (DynFlags -> Module -> [CLabel] -> OptMResult a)
+    deriving (Functor)
 
 instance Applicative CmmOptM where
-    pure x = CmmOptM $ \_ _ imports -> (# x, imports #)
+    pure x = CmmOptM $ \_ _ imports -> OptMResult x imports
     (<*>) = ap
 
 instance Monad CmmOptM where
   (CmmOptM f) >>= g =
-    CmmOptM $ \dflags this_mod imports ->
-                case f dflags this_mod imports of
-                  (# x, imports' #) ->
+    CmmOptM $ \dflags this_mod imports0 ->
+                case f dflags this_mod imports0 of
+                  OptMResult x imports1 ->
                     case g x of
-                      CmmOptM g' -> g' dflags this_mod imports'
+                      CmmOptM g' -> g' dflags this_mod imports1
 
 instance CmmMakeDynamicReferenceM CmmOptM where
     addImport = addImportCmmOpt
-    getThisModule = CmmOptM $ \_ this_mod imports -> (# this_mod, imports #)
+    getThisModule = CmmOptM $ \_ this_mod imports -> OptMResult this_mod imports
 
 addImportCmmOpt :: CLabel -> CmmOptM ()
-addImportCmmOpt lbl = CmmOptM $ \_ _ imports -> (# (), lbl:imports #)
+addImportCmmOpt lbl = CmmOptM $ \_ _ imports -> OptMResult () (lbl:imports)
 
 instance HasDynFlags CmmOptM where
-    getDynFlags = CmmOptM $ \dflags _ imports -> (# dflags, imports #)
+    getDynFlags = CmmOptM $ \dflags _ imports -> OptMResult dflags imports
 
 runCmmOpt :: DynFlags -> Module -> CmmOptM a -> (a, [CLabel])
-runCmmOpt dflags this_mod (CmmOptM f) = case f dflags this_mod [] of
-                        (# result, imports #) -> (result, imports)
+runCmmOpt dflags this_mod (CmmOptM f) =
+  case f dflags this_mod [] of
+    OptMResult result imports -> (result, imports)
 
 cmmBlockConFold :: CmmBlock -> CmmOptM CmmBlock
 cmmBlockConFold block = do

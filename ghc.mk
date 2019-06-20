@@ -1021,6 +1021,8 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_LIBS) \
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
+    includes/Makefile \
+    $(includes_SETTINGS) \
     $(includes_H_FILES) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
@@ -1037,7 +1039,7 @@ $(eval $(call bindist-list,.,\
     $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out settings llvm-targets llvm-passes,$(INSTALL_LIBS)) \
+    $(filter-out llvm-targets llvm-passes,$(INSTALL_LIBS)) \
     $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
@@ -1304,6 +1306,7 @@ CLEAN_FILES += includes/DerivedConstants.h
 CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
 CLEAN_FILES += includes/ghcversion.h
+CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/prelude/primops.txt
 CLEAN_FILES += $(wildcard compiler/primop*incl)

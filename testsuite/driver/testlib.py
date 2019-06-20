@@ -19,7 +19,7 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
@@ -66,7 +66,6 @@ def isCompilerStatsTest():
 def isStatsTest():
     opts = getTestOpts()
     return opts.is_stats_test
-
 
 # This can be called at the top of a file of tests, to set default test options
 # for the following tests.
@@ -205,6 +204,7 @@ def use_specs( specs ):
          ['A B', '-O -prof -fno-prof-count-entries -v0'])
 
     """
+    assert isinstance(specs, dict)
     return lambda name, opts, s=specs: _use_specs( name, opts, s )
 
 def _use_specs( name, opts, specs ):
@@ -214,6 +214,7 @@ def _use_specs( name, opts, specs ):
 # -----
 
 def expect_fail_for( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
 def _expect_fail_for( name, opts, ways ):
@@ -229,6 +230,7 @@ def _expect_broken( name, opts, bug ):
     opts.expect = 'fail';
 
 def expect_broken_for( bug, ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
@@ -258,28 +260,31 @@ def fragile( bug ):
 
     return helper
 
-def fragile_for( name, opts, bug, ways ):
+def fragile_for( bug, ways ):
     """
     Indicates that the test should be skipped due to fragility in the given
     test ways as documented in the given ticket.
     """
     def helper( name, opts, bug=bug, ways=ways ):
         record_broken(name, opts, bug)
-        opts.omit_ways = ways
+        opts.omit_ways += ways
 
     return helper
 
 # -----
 
 def omit_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
 def _omit_ways( name, opts, ways ):
-    opts.omit_ways = ways
+    assert ways.__class__ is list
+    opts.omit_ways += ways
 
 # -----
 
 def only_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
 def _only_ways( name, opts, ways ):
@@ -288,6 +293,7 @@ def _only_ways( name, opts, ways ):
 # -----
 
 def extra_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
 def _extra_ways( name, opts, ways ):
@@ -385,9 +391,6 @@ def collect_compiler_stats(metric='all',deviation=20):
 def collect_stats(metric='all', deviation=20):
     return lambda name, opts, m=metric, d=deviation: _collect_stats(name, opts, m, d)
 
-def testing_metrics():
-    return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
-
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
 # If the boolean is set to true, it indicates that this test is one that
@@ -436,6 +439,14 @@ def unless(b, f):
 
 def doing_ghci():
     return 'ghci' in config.run_ways
+
+def requires_th(name, opts):
+    """
+    Mark a test as requiring TemplateHaskell. Currently this means
+    that we don't run the test in the profasm when when GHC is
+    dynamically-linked since we can't load profiled objects in this case.
+    """
+    return when(ghc_dynamic(), omit_ways(['profasm']))
 
 def ghc_dynamic():
     return config.ghc_dynamic
@@ -1211,7 +1222,11 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
-    return check_stats(name, way, stats_file, opts.stats_range_fields)
+    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+
+def static_stats( name, way, stats_file ):
+    opts = getTestOpts()
+    return check_stats(name, way, in_statsdir(stats_file), opts.stats_range_fields)
 
 def metric_dict(name, way, metric, value):
     return Perf.PerfStat(
@@ -1234,7 +1249,7 @@ def check_stats(name, way, stats_file, range_fields):
     result = passed()
     if range_fields:
         try:
-            f = open(in_testdir(stats_file))
+            f = open(stats_file)
         except IOError as e:
             return failBecause(str(e))
         stats_file_contents = f.read()
@@ -1357,7 +1372,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     # ToDo: if the sub-shell was killed by ^C, then exit
 
     if isCompilerStatsTest():
-        statsResult = check_stats(name, way, stats_file, opts.stats_range_fields)
+        statsResult = check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
         if badResult(statsResult):
             return statsResult
 
@@ -1442,7 +1457,7 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return check_stats(name, way, stats_file, opts.stats_range_fields)
+    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
@@ -2102,6 +2117,9 @@ def in_testdir(name, suffix=''):
 
 def in_srcdir(name, suffix=''):
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
+
+def in_statsdir(name, suffix=''):
+    return os.path.join(config.stats_files_dir, add_suffix(name, suffix))
 
 # Finding the sample output.  The filename is of the form
 #

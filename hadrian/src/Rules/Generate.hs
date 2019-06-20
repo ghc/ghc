@@ -5,6 +5,7 @@ module Rules.Generate (
     ) where
 
 import Base
+import qualified Context
 import Expression
 import Flavour
 import Hadrian.Oracles.TextFile (lookupValueOrError)
@@ -54,7 +55,7 @@ compilerDependencies = do
     rtsPath <- expr (rtsBuildPath stage)
     mconcat [ return ((root -/-) <$> derivedConstantsDependencies)
             , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
-            , notStage0 ? return ((rtsPath -/-) <$> libffiDependencies)
+            , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
@@ -80,7 +81,7 @@ generatedDependencies = do
     includes <- expr includesDependencies
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
-            , package rts      ? return (fmap (rtsPath -/-) libffiDependencies
+            , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
                 ++ includes
                 ++ fmap (root -/-) derivedConstantsDependencies)
             , stage0 ? return includes ]
@@ -232,7 +233,7 @@ generateGhcPlatformH = do
     targetVendor   <- getSetting TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
     return . unlines $
-        [ "#ifndef __GHCPLATFORM_H__"
+        [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
@@ -271,10 +272,12 @@ generateGhcPlatformH = do
 
 generateSettings :: Expr String
 generateSettings = do
+    ctx <- getContext
     settings <- traverse sequence $
         [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
         , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
         , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
+        , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
         , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
         , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
         , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
@@ -293,7 +296,7 @@ generateSettings = do
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
-        , ("unlit command", ("$topdir/bin/" <>) <$> getBuilderPath Unlit)
+        , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", expr $ lookupValueOrError configFile "haskell-target-os")
@@ -312,9 +315,9 @@ generateSettings = do
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
-        , ("RTS ways", expr $ yesNo <$> flag LeadingUnderscore)
+        , ("RTS ways", unwords . map show <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> ghcEnableTablesNextToCode)
-        , ("Leading underscore", expr $ yesNo <$> useLibFFIForAdjustors)
+        , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
         , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
         , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
@@ -384,7 +387,7 @@ generateGhcAutoconfH = do
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend
     return . unlines $
-        [ "#ifndef __GHCAUTOCONF_H__"
+        [ "#if !defined(__GHCAUTOCONF_H__)"
         , "#define __GHCAUTOCONF_H__" ]
         ++ configHContents ++
         [ "\n#define TABLES_NEXT_TO_CODE 1" | tablesNextToCode && not ghcUnreg ]
@@ -420,7 +423,7 @@ generateGhcBootPlatformH = do
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     return $ unlines
-        [ "#ifndef __PLATFORM_H__"
+        [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
@@ -462,10 +465,10 @@ generateGhcVersionH = do
     patchLevel1 <- getSetting ProjectPatchLevel1
     patchLevel2 <- getSetting ProjectPatchLevel2
     return . unlines $
-        [ "#ifndef __GHCVERSION_H__"
+        [ "#if !defined(__GHCVERSION_H__)"
         , "#define __GHCVERSION_H__"
         , ""
-        , "#ifndef __GLASGOW_HASKELL__"
+        , "#if !defined(__GLASGOW_HASKELL__)"
         , "# define __GLASGOW_HASKELL__ " ++ version
         , "#endif"
         , ""]

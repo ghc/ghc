@@ -312,14 +312,6 @@ Multiply-defined array elements not checked
 In ``Prelude`` support
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Arbitrary-sized tuples
-    Tuples are currently limited to size 100. However, standard
-    instances for tuples (``Eq``, ``Ord``, ``Bounded``, ``Ix``, ``Read``,
-    and ``Show``) are available *only* up to 16-tuples.
-
-    This limitation is easily subvertible, so please ask if you get
-    stuck on it.
-
 ``splitAt`` semantics
     ``Data.List.splitAt`` is more strict than specified in the Report.
     Specifically, the Report specifies that ::
@@ -443,7 +435,7 @@ undefined or implementation specific in Haskell 98.
     architecture; in other words it holds 32 bits on a 32-bit machine,
     and 64-bits on a 64-bit machine.
 
-    Arithmetic on ``Int`` is unchecked for overflowoverflow\ ``Int``, so
+    Arithmetic on ``Int`` is unchecked for overflow\ ``Int``, so
     all operations on ``Int`` happen modulo 2\ :sup:`⟨n⟩` where ⟨n⟩ is
     the size in bits of the ``Int`` type.
 
@@ -480,6 +472,14 @@ Unchecked floating-point arithmetic
 
     .. index::
         single: floating-point exceptions.
+
+Large tuple support
+    The Haskell Report only requires implementations to provide tuple
+    types and their accompanying standard instances up to size 15. GHC
+    limits the size of tuple types to 62 and provides instances of
+    ``Eq``, ``Ord``, ``Bounded``, ``Read``, and ``Show`` for tuples up
+    to size 15. However, ``Ix`` instances are provided only for tuples
+    up to size 5.
 
 .. _bugs:
 
@@ -553,7 +553,7 @@ Bugs in GHC
          To increase the limit, use -fsimpl-tick-factor=N (default 100)
 
    with the panic being reported no matter how high a
-   :ghc-flag:`-fsimpl-tick-factor` you supply.
+   :ghc-flag:`-fsimpl-tick-factor <-fsimpl-tick-factor=⟨n⟩>` you supply.
 
    We have never found another class of programs, other than this
    contrived one, that makes GHC diverge, and fixing the problem would
@@ -585,7 +585,7 @@ Bugs in GHC
    libraries that come with GHC are probably built without this option,
    unless you built GHC yourself.
 
--  The :ghc-flag:`state hack <-fstate-hack>` optimization can result in
+-  The :ghc-flag:`state hack <-fno-state-hack>` optimization can result in
    non-obvious changes in evaluation ordering which may hide exceptions, even
    with :ghc-flag:`-fpedantic-bottoms` (see, e.g., :ghc-ticket:`7411`). For
    instance, ::

@@ -76,13 +76,12 @@ import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
 import Packages    ( isDllName )
-import Platform
+import GHC.Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
 import RepType     ( typePrimRep1 )
-import Unique      ( Unique )
 import Util
 
 import Data.List.NonEmpty ( NonEmpty, toList )
@@ -686,10 +685,11 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Unique
-        -- The Unique is occasionally needed by the C pretty-printer
-        -- (which lacks a unique supply), notably when generating a
-        -- typedef for foreign-export-dynamic
+  | StgFCallOp ForeignCall Type
+        -- The Type, which is obtained from the foreign import declaration
+        -- itself, is needed by the stg-to-cmm pass to determine the offset to
+        -- apply to unlifted boxed arguments in StgCmmForeign. See Note
+        -- [Unlifted boxed arguments to foreign calls]
 
 {-
 ************************************************************************

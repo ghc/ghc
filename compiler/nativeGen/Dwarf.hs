@@ -12,7 +12,7 @@ import Debug
 import DynFlags
 import Module
 import Outputable
-import Platform
+import GHC.Platform
 import Unique
 import UniqSupply
 

@@ -94,8 +94,13 @@ test('pmc007', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11245', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T12949', [],  compile, ['-fwarn-overlapping-patterns'])
 test('T12957', [], compile, ['-fwarn-overlapping-patterns'])
 test('T12957a', [], compile, ['-fwarn-overlapping-patterns'])
+test('PmExprVars', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('CyclicSubst', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # EmptyCase
 test('T10746', [], compile,

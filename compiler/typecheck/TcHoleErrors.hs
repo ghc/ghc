@@ -58,7 +58,6 @@ import PrelInfo (knownKeyNames)
 
 import TcHoleFitTypes
 
-
 {-
 Note [Valid hole fits include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

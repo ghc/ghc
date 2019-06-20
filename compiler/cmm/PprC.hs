@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, DeriveFunctor, GADTs, PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 --
@@ -44,7 +44,7 @@ import CPrim
 import DynFlags
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 import UniqSet
 import UniqFM
 import Unique
@@ -61,7 +61,7 @@ import Data.Map (Map)
 import Data.Word
 import System.IO
 import qualified Data.Map as Map
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
 
@@ -788,7 +788,9 @@ pprCallishMachOp_for_C mop
         MO_F64_Acosh    -> text "acosh"
         MO_F64_Atan     -> text "atan"
         MO_F64_Log      -> text "log"
+        MO_F64_Log1P    -> text "log1p"
         MO_F64_Exp      -> text "exp"
+        MO_F64_ExpM1    -> text "expm1"
         MO_F64_Sqrt     -> text "sqrt"
         MO_F64_Fabs     -> text "fabs"
         MO_F32_Pwr      -> text "powf"
@@ -805,7 +807,9 @@ pprCallishMachOp_for_C mop
         MO_F32_Acosh    -> text "acoshf"
         MO_F32_Atanh    -> text "atanhf"
         MO_F32_Log      -> text "logf"
+        MO_F32_Log1P    -> text "log1pf"
         MO_F32_Exp      -> text "expf"
+        MO_F32_ExpM1    -> text "expm1f"
         MO_F32_Sqrt     -> text "sqrtf"
         MO_F32_Fabs     -> text "fabsf"
         MO_WriteBarrier -> text "write_barrier"
@@ -1078,10 +1082,7 @@ pprExternDecl lbl
         <> semi
 
 type TEState = (UniqSet LocalReg, Map CLabel ())
-newtype TE a = TE { unTE :: TEState -> (a, TEState) }
-
-instance Functor TE where
-      fmap = liftM
+newtype TE a = TE { unTE :: TEState -> (a, TEState) } deriving (Functor)
 
 instance Applicative TE where
       pure a = TE $ \s -> (a, s)

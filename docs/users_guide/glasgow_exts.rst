@@ -178,6 +178,10 @@ There are some restrictions on the use of primitive types:
 
          newtype A = MkA Int#
 
+   However, this restriction can be relaxed by enabling
+   :extension:`-XUnliftedNewtypes`.  The `section on unlifted newtypes
+   <#unlifted-newtypes>`__ details the behavior of such types.
+
 -  You cannot bind a variable with an unboxed type in a *top-level*
    binding.
 
@@ -358,6 +362,79 @@ layout for a sum type works like this:
   In the degenerate case where all the alternatives have zero width, such
   as the ``Bool``-like ``(# (# #) | (# #) #)``, the unboxed sum layout only
   has an ``Int32`` tag field (i.e., the whole thing is represented by an integer).
+
+.. _unlifted-newtypes:
+
+Unlifted Newtypes
+-----------------
+
+.. extension:: UnliftedNewtypes
+    :shortdesc: Enable unlifted newtypes.
+
+    :since: 8.10.1
+
+    Enable the use of newtypes over types with non-lifted runtime representations.
+
+``-XUnliftedNewtypes`` relaxes the restrictions around what types can appear inside
+of a `newtype`. For example, the type ::
+
+    newtype A = MkA Int#
+
+is accepted when this extension is enabled. This creates a type
+``A :: TYPE 'IntRep`` and a data constructor ``MkA :: Int# -> A``.
+Although the kind of ``A`` is inferred by GHC, there is nothing visually
+distictive about this type that indicated that is it not of kind ``Type``
+like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
+provide a kind signature for additional clarity ::
+
+    newtype A :: TYPE 'IntRep where
+      MkA :: Int# -> A
+
+The ``Coercible`` machinery works with unlifted newtypes just like it does with
+lifted types. In either of the equivalent formulations of ``A`` given above,
+users would additionally have access to a coercion between ``A`` and ``Int#``.
+
+As a consequence of the
+`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
+levity-polymorphic fields are disallowed in data constructors
+of data types declared using ``data``. However, since ``newtype`` data
+constructor application is implemented as a coercion instead of as function
+application, this restriction does not apply to the field inside a ``newtype``
+data constructor. Thus, the type checker accepts ::
+
+    newtype Identity# :: forall (r :: RuntimeRep). TYPE r -> TYPE r where
+      MkIdentity# :: forall (r :: RuntimeRep) (a :: TYPE r). a -> Identity# a
+
+And with `UnboxedSums <#unboxed-sums>`__ enabled ::
+
+    newtype Maybe# :: forall (r :: RuntimeRep). TYPE r -> TYPE (SumRep '[r, TupleRep '[]]) where
+      MkMaybe# :: forall (r :: RuntimeRep) (a :: TYPE r). (# a | (# #) #) -> Maybe# a
+
+This extension also relaxes some of the restrictions around data families.
+It must be enabled in modules where either of the following occur:
+
+- A data family is declared with a kind other than ``Type``. Both ``Foo``
+  and ``Bar``, defined below, fall into this category:
+  ::
+
+     class Foo a where
+       data FooKey a :: TYPE 'IntRep
+     class Bar (r :: RuntimeRep) where
+       data BarType r :: TYPE r
+
+- A ``newtype instance`` is written with a kind other than ``Type``. The
+  following instances of ``Foo`` and ``Bar`` as defined above fall into
+  this category.
+  ::
+
+     instance Foo Bool where
+       newtype FooKey Bool = FooKeyBoolC Int#
+     instance Bar 'WordRep where
+       newtype BarType 'WordRep = BarTypeWordRepC Word#
+
+This extension impacts the determination of whether or not a newtype has
+a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
+`the section on CUSKs <#complete-kind-signatures>`__.
 
 .. _syntax-extns:
 
@@ -8166,14 +8243,15 @@ Note the following points:
 -  A default declaration is not permitted for an associated *data* type.
 
 -  The default declaration must mention only type *variables* on the
-   left hand side, and the right hand side must mention only type
+   left hand side, and type variables may not be repeated on the left-hand
+   side. The right hand side must mention only type
    variables that are explicitly bound on the left hand side. This restriction
    is relaxed for *kind* variables, however, as the right hand side is allowed
    to mention kind variables that are implicitly bound on the left hand side.
 
-   Because of this, unlike :ref:`assoc-inst`, explicit binding of type/kind
-   variables in default declarations is not permitted by
-   :extension:`ExplicitForAll`.
+   Like with :ref:`assoc-inst`, it is possible to explicitly bind type and kind
+   variables in default declarations with a ``forall`` by using the
+   :extension:`ExplicitForAll` language extension.
 
 -  Unlike the associated type family declaration itself, the type variables of
    the default instance are independent of those of the parent class.
@@ -8192,25 +8270,50 @@ Here are some examples:
         type instance F2 c d = c->d  -- OK; you don't have to use 'a' in the type instance
 
         type F3 a
-        type F3 [b] = b              -- BAD; only type variables allowed on the LHS
+        type F3 [b] = b              -- BAD; only type variables allowed on the
+                                             LHS, and the argument to F3 is
+                                             instantiated to [b], which is not
+                                             a bare type variable
 
-        type F4 a
-        type F4 b = a                -- BAD; 'a' is not in scope  in the RHS
+        type F4 x y
+        type F4 x x = x              -- BAD; the type variable x is repeated on
+                                             the LHS
 
-        type F5 a :: [k]
-        type F5 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
+        type F5 a
+        type F5 b = a                -- BAD; 'a' is not in scope  in the RHS
+
+        type F6 a :: [k]
+        type F6 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
                                             bound by an invisible kind pattern
                                             on the LHS
 
-        type F6 a
-        type F6 a =
+        type F7 a
+        type F7 a =
           Proxy ('[] :: [x])         -- BAD; the kind variable x is not bound,
                                              even by an invisible kind pattern
 
-        type F7 (x :: a) :: [a]
-        type F7 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
+        type F8 (x :: a) :: [a]
+        type F8 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
                                             bound by the kind signature of the
                                             LHS type pattern
+
+        type F9 (a :: k)
+        type F9 a = Maybe a          -- BAD; the kind variable k is
+                                             instantiated to Type, which is not
+                                             a bare kind variable
+
+        type F10 (a :: j) (b :: k)
+        type F10 (a :: z) (b :: z)
+          = Proxy a                  -- BAD; the kind variable z is repeated,
+                                     -- as both j and k are instantiated to z
+
+        type F11 a b
+        type forall a b. F11 a b = a -- OK; LHS type variables can be
+                                        explicitly bound with 'forall'
+
+        type F12 (a :: k)
+        type F12 @k a = Proxy a      -- OK; visible kind application syntax is
+                                            permitted in default declarations
 
 .. _scoping-class-params:
 
@@ -9071,6 +9174,20 @@ signature" for a type constructor? These are the forms:
      data T2 :: forall k. k -> Type  -- CUSK: `k` is bound explicitly
      data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
+-  For a newtype, the rules are the same as they are for a data type
+   unless `UnliftedNewtypes <#unboxed-newtypes>`__ is enabled.
+   With `UnliftedNewtypes <#unboxed-newtypes>`__, the type constructor
+   only has a CUSK if a kind signature is present. As with a datatype
+   with a top-level ``::``, all kind variables must introduced after
+   the ``::`` must be explicitly quantified ::
+
+       {-# LANGUAGE UnliftedNewtypes #-}
+       newtype N1 where                 -- No; missing kind signature
+       newtype N2 :: TYPE 'IntRep where -- Yes; kind signature present
+       newtype N3 (a :: Type) where     -- No; missing kind signature
+       newtype N4 :: k -> Type where    -- No; `k` is not explicitly quantified
+       newtype N5 :: forall (k :: Type). k -> Type where -- Yes; good signature
+
 -  For a class, every type variable must be annotated with a kind.
 
 -  For a type synonym, every type variable and the result type must all
@@ -9590,6 +9707,8 @@ and ``Bool :: TYPE 'LiftedRep``. Anything with a type of the form
 thus say that ``->`` has type
 ``TYPE r1 -> TYPE r2 -> TYPE 'LiftedRep``. The result is always lifted
 because all functions are lifted in GHC.
+
+.. _levity-polymorphic-restrictions:
 
 No levity-polymorphic variables or arguments
 --------------------------------------------
@@ -10407,6 +10526,7 @@ function that can *never* be called, such as this one: ::
 
 Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
 For example: ::
+
       foo :: forall r. (forall i. (KnownNat i) => r) -> r
       foo f = f @1
 

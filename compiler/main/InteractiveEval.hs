@@ -30,6 +30,8 @@ module InteractiveEval (
         exprType,
         typeKind,
         parseName,
+        parseInstanceHead,
+        getInstancesForType,
         getDocs,
         GetDocsFailure(..),
         showModule,
@@ -101,6 +103,19 @@ import Control.Monad
 import GHC.Exts
 import Data.Array
 import Exception
+
+import TcRnDriver ( runTcInteractive, tcRnType )
+import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
+
+import TcEnv (tcGetInstEnvs)
+
+import Inst (instDFunType)
+import TcSimplify (solveWanteds)
+import TcRnMonad
+import TcEvidence
+import Data.Bifunctor (second)
+
+import TcSMonad (runTcS)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -357,7 +372,8 @@ handleRunStatus step expr bindings final_ids status history
     = do hsc_env <- getSession
          let final_ic = extendInteractiveContextWithIds (hsc_IC hsc_env) final_ids
              final_names = map getName final_ids
-         liftIO $ Linker.extendLinkEnv (zip final_names hvals)
+             dl = hsc_dynLinker hsc_env
+         liftIO $ Linker.extendLinkEnv dl (zip final_names hvals)
          hsc_env' <- liftIO $ rttiEnvironment hsc_env{hsc_IC=final_ic}
          setSession hsc_env'
          return (ExecComplete (Right final_names) allocs)
@@ -396,7 +412,8 @@ resumeExec canLogSpan step
             new_names = [ n | thing <- ic_tythings ic
                             , let n = getName thing
                             , not (n `elem` old_names) ]
-        liftIO $ Linker.deleteFromLinkEnv new_names
+            dl        = hsc_dynLinker hsc_env
+        liftIO $ Linker.deleteFromLinkEnv dl new_names
 
         case r of
           Resume { resumeStmt = expr, resumeContext = fhv
@@ -490,8 +507,9 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 [exn_id]
+       dl     = hsc_dynLinker hsc_env
    --
-   Linker.extendLinkEnv [(exn_name, apStack)]
+   Linker.extendLinkEnv dl [(exn_name, apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span, "<exception thrown>")
 
 -- Just case: we stopped at a breakpoint, we have information about the location
@@ -548,10 +566,11 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContextWithIds ictxt0 final_ids
        names  = map idName new_ids
+       dl     = hsc_dynLinker hsc_env
 
    let fhvs = catMaybes mb_hValues
-   Linker.extendLinkEnv (zip names fhvs)
-   when result_ok $ Linker.extendLinkEnv [(result_name, apStack_fhv)]
+   Linker.extendLinkEnv dl (zip names fhvs)
+   when result_ok $ Linker.extendLinkEnv dl [(result_name, apStack_fhv)]
    hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
    return (hsc_env1, if result_ok then result_name:names else names, span, decl)
   where
@@ -932,6 +951,161 @@ exprType mode expr = withSession $ \hsc_env -> do
 typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
 typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
+
+-- ----------------------------------------------------------------------------
+-- Getting the class instances for a type
+
+{-
+  Note [Querying instances for a type]
+
+  Here is the implementation of GHC proposal 41.
+  (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0041-ghci-instances.rst)
+
+  The objective is to take a query string representing a (partial) type, and
+  report all the class single-parameter class instances available to that type.
+  Extending this feature to multi-parameter typeclasses is left as future work.
+
+  The general outline of how we solve this is:
+
+  1. Parse the type, leaving skolems in the place of type-holes.
+  2. For every class, get a list of all instances that match with the query type.
+  3. For every matching instance, ask GHC for the context the instance dictionary needs.
+  4. Format and present the results, substituting our query into the instance
+     and simplifying the context.
+
+  For example, given the query "Maybe Int", we want to return:
+
+  instance Show (Maybe Int)
+  instance Read (Maybe Int)
+  instance Eq   (Maybe Int)
+  ....
+
+  [Holes in queries]
+
+  Often times we want to know what instances are available for a polymorphic type,
+  like `Maybe a`, and we'd like to return instances such as:
+
+  instance Show a => Show (Maybe a)
+  ....
+
+  These queries are expressed using type holes, so instead of `Maybe a` the user writes
+  `Maybe _`, we parse the type and during zonking, we skolemise it, replacing the holes
+  with (un-named) type variables.
+
+  When zonking the type holes we have two real choices: replace them with Any or replace
+  them with skolem typevars. Using skolem type variables ensures that the output is more
+  intuitive to end users, and there is no difference in the results between Any and skolems.
+
+-}
+
+-- Find all instances that match a provided type
+getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
+getInstancesForType ty = withSession $ \hsc_env -> do
+  liftIO $ runInteractiveHsc hsc_env $ do
+    ioMsgMaybe $ runTcInteractive hsc_env $ do
+      matches <- findMatchingInstances ty
+      fmap catMaybes . forM matches $ uncurry checkForExistence
+
+-- Parse a type string and turn any holes into skolems
+parseInstanceHead :: GhcMonad m => String -> m Type
+parseInstanceHead str = withSession $ \hsc_env0 -> do
+  (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
+    ty <- hscParseType str
+    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi True ty
+
+  return ty
+
+-- Get all the constraints required of a dictionary binding
+getDictionaryBindings :: PredType -> TcM WantedConstraints
+getDictionaryBindings theta = do
+  dictName <- newName (mkDictOcc (mkVarOcc "magic"))
+  let dict_var = mkVanillaGlobal dictName theta
+  loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
+  let wCs = mkSimpleWC [CtDerived
+          { ctev_pred = varType dict_var
+          , ctev_loc = loc
+          }]
+
+  return wCs
+
+{-
+  When we've found an instance that a query matches against, we still need to
+  check that all the instance's constraints are satisfiable. checkForExistence
+  creates an instance dictionary and verifies that any unsolved constraints
+  mention a type-hole, meaning it is blocked on an unknown.
+
+  If the instance satisfies this condition, then we return it with the query
+  substituted into the instance and all constraints simplified, for example given:
+
+  instance D a => C (MyType a b) where
+
+  and the query `MyType _ String`
+
+  the unsolved constraints will be [D _] so we apply the substitution:
+
+  { a -> _; b -> String}
+
+  and return the instance:
+
+  instance D _ => C (MyType _ String)
+
+-}
+
+checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
+checkForExistence res mb_inst_tys = do
+  (tys, thetas) <- instDFunType (is_dfun res) mb_inst_tys
+
+  wanteds <- forM thetas getDictionaryBindings
+  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
+
+  let all_residual_constraints = bagToList $ wc_simple residuals
+  let preds = map ctPred all_residual_constraints
+  if all isSatisfiablePred preds && (null $ wc_impl residuals)
+  then return . Just $ substInstArgs tys preds res
+  else return Nothing
+
+  where
+
+  -- Stricter version of isTyVarClassPred that requires all TyConApps to have at least
+  -- one argument or for the head to be a TyVar. The reason is that we want to ensure
+  -- that all residual constraints mention a type-hole somewhere in the constraint,
+  -- meaning that with the correct choice of a concrete type it could be possible for
+  -- the constraint to be discharged.
+  isSatisfiablePred :: PredType -> Bool
+  isSatisfiablePred ty = case getClassPredTys_maybe ty of
+      Just (_, tys@(_:_)) -> all isTyVarTy tys
+      _                   -> isTyVarTy ty
+
+  empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
+
+  {- Create a ClsInst with instantiated arguments and constraints.
+
+     The thetas are the list of constraints that couldn't be solved because
+     they mention a type-hole.
+  -}
+  substInstArgs ::  [Type] -> [PredType] -> ClsInst -> ClsInst
+  substInstArgs tys thetas inst = let
+      subst = foldl' (\a b -> uncurry (extendTvSubstAndInScope a) b) empty_subst (zip dfun_tvs tys)
+      -- Build instance head with arguments substituted in
+      tau   = mkClassPred cls (substTheta subst args)
+      -- Constrain the instance with any residual constraints
+      phi   = mkPhiTy thetas tau
+      sigma = mkForAllTys (map (\v -> Bndr v Inferred) dfun_tvs) phi
+
+    in inst { is_dfun = (is_dfun inst) { varType = sigma }}
+    where
+    (dfun_tvs, _, cls, args) = instanceSig inst
+
+-- Find instances where the head unifies with the provided type
+findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
+findMatchingInstances ty = do
+  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+
+  concat <$> mapM (\cls -> do
+    let (matches, _, _) = lookupInstEnv True ies cls [ty]
+    return matches) allClasses
 
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result

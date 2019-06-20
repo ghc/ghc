@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DeriveFunctor #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -50,7 +50,7 @@ import SrcLoc           ( mkGeneralSrcSpan )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -539,7 +539,7 @@ coreToStgApp _ f args ticks = do
 
                 -- A regular foreign call.
                 FCallId call     -> ASSERT( saturated )
-                                    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+                                    StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
@@ -813,6 +813,7 @@ newtype CtsM a = CtsM
     { unCtsM :: IdEnv HowBound
              -> a
     }
+    deriving (Functor)
 
 data HowBound
   = ImportBound         -- Used only as a response to lookupBinding; never
@@ -860,9 +861,6 @@ returnCts e = CtsM $ \_ -> e
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
 thenCts m k = CtsM $ \env
   -> unCtsM (k (unCtsM m env)) env
-
-instance Functor CtsM where
-    fmap = liftM
 
 instance Applicative CtsM where
     pure = returnCts

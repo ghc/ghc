@@ -2,11 +2,14 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: ac65f31dcffb09cd7ca7aaa70f447fcbb19f427f
+  DOCKER_REV: e517150438cd9df9564fb91adc4b42e2667b2bc1
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
   WINDOWS_TOOLCHAIN_VERSION: 1
+
+  # Disable shallow clones; they break our linting rules
+  GIT_DEPTH: 0
 
 before_script:
   - python3 .gitlab/fix-submodules.py
@@ -21,9 +24,10 @@ stages:
   - full-build # Build all the things
   - cleanup    # See Note [Cleanup after the shell executor]
   - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
+  - testing    # head.hackage correctness and compiler performance testing
   - deploy     # push documentation
 
+# N.B.Don't run on wip/ branches, instead on run on merge requests.
 .only-default: &only-default
   only:
     - master
@@ -49,13 +53,12 @@ stages:
 ############################################################
 
 ghc-linters:
-  allow_failure: true
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
     - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
-    - "echo Merge base $base"
+    - "echo Linting changes between $base..$CI_COMMIT_SHA"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
     - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
@@ -68,24 +71,42 @@ ghc-linters:
     refs:
       - merge_requests
 
-# We allow the submodule checker to fail when run on merge requests (to
-# accomodate, e.g., haddock changes not yet upstream) but not on `master` or
-# Marge jobs.
-.lint-submods:
+lint-linters:
+  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   script:
-    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+    - mypy .gitlab/linters/*.py
   dependencies: []
   tags:
     - lint
 
-lint-submods:
-  extends: .lint-submods
-  only:
-    refs:
-      - master
-      - /ghc-[0-9]+\.[0-9]+/
+lint-testsuite:
+  <<: *only-default
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  script:
+    - make -Ctestsuite list_broken TEST_HC=ghc
+  dependencies: []
+  tags:
+    - lint
+
+# We allow the submodule checker to fail when run on merge requests (to
+# accomodate, e.g., haddock changes not yet upstream) but not on `master` or
+# Marge jobs.
+.lint-submods:
+  <<: *only-default
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  script:
+    - git fetch "$CI_MERGE_REQUEST_PROJECT_URL" $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
+    - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
+    - git submodule foreach git remote update
+    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA)
+  dependencies: []
+  tags:
+    - lint
 
 lint-submods-marge:
   extends: .lint-submods
@@ -97,12 +118,29 @@ lint-submods-marge:
 
 lint-submods-mr:
   extends: .lint-submods
+  # Allow failure since any necessary submodule patches may not be upstreamed
+  # yet.
   allow_failure: true
   only:
     refs:
       - merge_requests
+  except:
+    variables:
+      - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
+
+lint-submods-branch:
+  extends: .lint-submods
+  script:
+    - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+    - git submodule foreach git remote update
+    - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
+  only:
+    refs:
+      - master
+      - /ghc-[0-9]+\.[0-9]+/
 
 .lint-changelogs:
+  <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   dependencies: []
@@ -117,6 +155,7 @@ lint-submods-mr:
 
 lint-changelogs:
   extends: .lint-changelogs
+  # Allow failure since this isn't a final release.
   allow_failure: true
   only:
     refs:
@@ -135,11 +174,10 @@ lint-release-changelogs:
 
 .validate-hadrian:
   <<: *only-default
-  allow_failure: true
   script:
     - cabal update
     - git clean -xdf && git submodule foreach git clean -xdf
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
@@ -158,10 +196,10 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-linux-deb8-hadrian:
+validate-x86_64-linux-deb9-hadrian:
   extends: .validate-hadrian
   stage: build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -176,7 +214,7 @@ validate-x86_64-linux-deb8-hadrian:
 hadrian-ghc-in-ghci:
   <<: *only-default
   stage: build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -190,7 +228,7 @@ hadrian-ghc-in-ghci:
     - cabal update
     - cd hadrian; cabal new-build --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
@@ -217,6 +255,8 @@ hadrian-ghc-in-ghci:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS WERROR=-Werror
+    - |
+      make bindisttest
     - |
       make binary-dist TAR_COMP_OPTS="-1"
     - |
@@ -278,6 +318,47 @@ validate-x86_64-darwin:
       - cabal-cache
       - toolchain
 
+# Disabled because of OS X CI capacity
+.validate-x86_64-darwin-hadrian:
+  <<: *only-default
+  stage: full-build
+  tags:
+    - x86_64-darwin
+  variables:
+    GHC_VERSION: 8.6.3
+    MACOSX_DEPLOYMENT_TARGET: "10.7"
+    ac_cv_func_clock_gettime: "no"
+    LANG: "en_US.UTF-8"
+    CONFIGURE_ARGS: --with-intree-gmp
+    TEST_ENV: "x86_64-darwin"
+  before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - python3 .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+
+    - bash .gitlab/darwin-init.sh
+    - PATH="`pwd`/toolchain/bin:$PATH"
+  script:
+    - cabal update
+    - ./boot
+    - ./configure $CONFIGURE_ARGS
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
+    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  artifacts:
+    when: always
+    expire_in: 2 week
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+
 .validate-linux:
   extends: .validate
   tags:
@@ -295,7 +376,7 @@ validate-x86_64-darwin:
         echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
       fi
 
-    - bash .circleci/prepare-system.sh
+    - .gitlab/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
@@ -318,6 +399,8 @@ validate-x86_64-darwin:
   variables:
     TEST_ENV: "aarch64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-aarch64-linux-deb9.tar.xz"
+    # Inexplicably makeindex fails
+    BUILD_SPHINX_PDF: "NO"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -384,7 +467,8 @@ nightly-i386-linux-deb9:
   cache:
     key: linux-x86_64-deb9
 
-validate-x86_64-linux-deb9:
+# Disabled to reduce CI load
+.validate-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   artifacts:
     when: always
@@ -406,14 +490,29 @@ validate-x86_64-linux-deb9-debug:
   stage: build
   variables:
     BUILD_FLAVOUR: validate
+    TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
+  artifacts:
+    when: always
+    expire_in: 2 week
 
-validate-x86_64-linux-deb9-llvm:
+# Disabled to alleviate CI load
+.validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
+
+nightly-x86_64-linux-deb9-llvm:
+  extends: .build-x86_64-linux-deb9
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: perf-llvm
+    TEST_ENV: "x86_64-linux-deb9-llvm"
+  only:
+    variables:
+      - $NIGHTLY
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
@@ -447,11 +546,10 @@ release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
-  allow_failure: true
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
-    TEST_ENV: "x86_64-linux-deb9"
+    TEST_ENV: "x86_64-linux-deb9-dwarf"
   artifacts:
     when: always
     expire_in: 2 week
@@ -477,6 +575,39 @@ release-x86_64-linux-deb8:
   artifacts:
     when: always
     expire_in: 2 week
+
+#################################
+# x86_64-linux-alpine
+#################################
+
+.build-x86_64-linux-alpine:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
+  # There are currently a few failing tests
+  allow_failure: true
+  variables:
+    BUILD_SPHINX_PDF: "NO"
+    TEST_ENV: "x86_64-linux-alpine"
+    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-alpine-linux.tar.xz"
+    # Can't use ld.gold due to #13958.
+    CONFIGURE_ARGS: "--disable-ld-override"
+  cache:
+    key: linux-x86_64-alpine
+  artifacts:
+    when: always
+    expire_in: 2 week
+
+release-x86_64-linux-alpine:
+  extends: .build-x86_64-linux-alpine
+  only:
+    - tags
+
+nightly-x86_64-linux-alpine:
+  extends: .build-x86_64-linux-alpine
+  only:
+    variables:
+      - $NIGHTLY
 
 #################################
 # x86_64-linux-centos7
@@ -552,14 +683,16 @@ validate-x86_64-linux-fedora27:
   cache:
     paths:
       - cabal-cache
-      - ghc-8.6.2
+      - ghc-8.6.5
       - ghc-tarballs
 
 .build-windows-hadrian:
   extends: .build-windows
   stage: full-build
   variables:
-    GHC_VERSION: "8.6.2"
+    GHC_VERSION: "8.6.5"
+  # due to #16574 this currently fails
+  allow_failure: true
   script:
     - |
       python boot
@@ -575,7 +708,7 @@ validate-x86_64-linux-fedora27:
     paths:
       - ghc.tar.xz
 
-.validate-x86_64-windows-hadrian:
+validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
@@ -599,14 +732,16 @@ nightly-i386-windows-hadrian:
   allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
-    GHC_VERSION: "8.6.2"
+    GHC_VERSION: "8.6.5"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-mingw32.tar.xz"
   script:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex $CONFIGURE_ARGS'
     - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
+    - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make bindisttest"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
@@ -715,7 +850,7 @@ doc-tarball:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
   dependencies:
-    - validate-x86_64-linux-deb9
+    - validate-x86_64-linux-deb9-debug
     - validate-x86_64-windows
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux.tar.xz"
@@ -777,7 +912,7 @@ source-tarball:
 
 .hackage:
   <<: *only-default
-  stage: hackage
+  stage: testing
   image: ghcci/x86_64-linux-deb9:0.2
   tags:
     - x86_64-linux
@@ -803,6 +938,47 @@ nightly-hackage:
     variables:
       - $NIGHTLY
 
+############################################################
+# Nofib testing
+############################################################
+
+perf-nofib:
+  stage: testing
+  dependencies:
+    - release-x86_64-linux-deb9-dwarf
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  only:
+    refs:
+      - merge_requests
+      - master
+      - /ghc-[0-9]+\.[0-9]+/
+  tags:
+    - x86_64-linux
+  script:
+    - root=$(pwd)/ghc
+    - |
+      mkdir tmp
+      tar -xf ghc-*-x86_64-unknown-linux.tar.xz -C tmp
+      pushd tmp/ghc-*/
+      ./configure --prefix=$root
+      make install
+      popd
+      rm -Rf tmp
+    - export BOOT_HC=$(which ghc)
+    - cabal update; cabal install -w $BOOT_HC regex-compat
+    - export PATH=$root/bin:$PATH
+    - make -C nofib boot mode=fast -j$CPUS
+    - "make -C nofib EXTRA_RUNTEST_OPTS='-cachegrind +RTS -V0 -RTS' NoFibRuns=1 mode=fast -j$CPUS 2>&1 | tee nofib.log"
+  artifacts:
+    expire_in: 12 week
+    when: always
+    paths:
+      - nofib.log
+
+############################################################
+# Documentation deployment via GitLab Pages
+############################################################
+
 pages:
   stage: deploy
   dependencies:
@@ -817,6 +993,12 @@ pages:
     - tar -xf haddock.html.tar.xz -C public/doc
     - tar -xf libraries.html.tar.xz -C public/doc
     - tar -xf users_guide.html.tar.xz -C public/doc
+    - |
+      cat >public/index.html <<EOF
+      <!DOCTYPE HTML>
+      <meta charset="UTF-8">
+      <meta http-equiv="refresh" content="1; url=doc/">
+      EOF
     - cp -f index.html public/doc
   only:
     - master

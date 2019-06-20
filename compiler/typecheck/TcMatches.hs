@@ -72,7 +72,7 @@ See Note [sig_tau may be polymorphic] in TcPat.
 
 tcMatchesFun :: Located Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
-             -> ExpRhoType     -- Expected type of function
+             -> ExpSigmaType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
 tcMatchesFun fn@(L _ fun_name) matches exp_ty

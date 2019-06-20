@@ -41,3 +41,8 @@ buildPath context = buildRoot <&> (-/- buildDir context)
 -- | The expression that evaluates to the build path of the current 'Context'.
 getBuildPath :: Expr Context b FilePath
 getBuildPath = expr . buildPath =<< getContext
+
+-- | Path to the directory containing haddock timing files, used by
+--   the haddock perf tests.
+haddockStatsFilesDir :: Action FilePath
+haddockStatsFilesDir = (-/- "stage1" -/- "haddock-timing-files") <$> buildRoot

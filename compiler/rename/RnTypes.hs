@@ -693,8 +693,8 @@ checkAnonWildCard env
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing
-               RnConstraint    -> Just constraint_msg
                RnTopConstraint -> Just constraint_msg
+               RnConstraint    -> Just constraint_msg
 
     constraint_msg = hang
                          (notAllowed pprAnonWildCard <+> text "in a constraint")
@@ -714,7 +714,10 @@ checkNamedWildCard env name
            | otherwise
            = case rtke_what env of
                RnTypeBody      -> Nothing   -- Allowed
-               RnTopConstraint -> Nothing   -- Allowed
+               RnTopConstraint -> Nothing   -- Allowed; e.g.
+                  -- f :: (Eq _a) => _a -> Int
+                  -- g :: (_a, _b) => T _a _b -> Int
+                  -- The named tyvars get filled in from elsewhere
                RnConstraint    -> Just constraint_msg
     constraint_msg = notAllowed (ppr name) <+> text "in a constraint"
 

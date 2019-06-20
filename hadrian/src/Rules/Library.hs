@@ -1,4 +1,4 @@
-module Rules.Library (libraryRules) where
+module Rules.Library (libraryRules, needLibrary, libraryTargets) where
 
 import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
@@ -11,7 +11,7 @@ import Expression hiding (way, package)
 import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
-import Rules.Libffi (libffiDependencies)
+import Rules.Register
 import Target
 import Utilities
 
@@ -85,15 +85,7 @@ buildDynamicLibUnix root suffix dynlibpath = do
     dynlib <- parsePath (parseBuildLibDyn root suffix) "<dyn lib parser>" dynlibpath
     let context = libDynContext dynlib
     deps <- contextDependencies context
-    need =<< mapM pkgRegisteredLibraryFile deps
-
-    -- TODO should this be somewhere else?
-    -- Custom build step to generate libffi.so* in the rts build directory.
-    when (package context == rts) . interpretInContext context $ do
-        stage   <- getStage
-        rtsPath <- expr (rtsBuildPath stage)
-        expr $ need ((rtsPath -/-) <$> libffiDependencies)
-
+    registerPackages deps
     objs <- libraryObjects context
     build $ target context (Ghc LinkHs $ Context.stage context) objs [dynlibpath]
 
@@ -151,6 +143,10 @@ libraryObjects context@Context{..} = do
     noHsObjs <- nonHsObjects context
     need $ noHsObjs ++ hsObjs
     return (noHsObjs ++ hsObjs)
+
+-- | Coarse-grain 'need': make sure all given libraries are fully built.
+needLibrary :: [Context] -> Action ()
+needLibrary cs = need =<< concatMapM (libraryTargets True) cs
 
 -- * Library paths types and parsers
 

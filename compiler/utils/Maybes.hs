@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -95,9 +96,7 @@ tryMaybeT action = MaybeT $ catch (Just `fmap` action) handler
 -}
 
 data MaybeErr err val = Succeeded val | Failed err
-
-instance Functor (MaybeErr err) where
-  fmap = liftM
+    deriving (Functor)
 
 instance Applicative (MaybeErr err) where
   pure  = Succeeded

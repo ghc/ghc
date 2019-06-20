@@ -106,7 +106,7 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
-
+test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -297,3 +297,4 @@ test('T14828', normal, ghci_script, ['T14828.script'])
 test('T16376', normal, ghci_script, ['T16376.script'])
 test('T16527', normal, ghci_script, ['T16527.script'])
 test('T16569', normal, ghci_script, ['T16569.script'])
+test('T16767', normal, ghci_script, ['T16767.script'])

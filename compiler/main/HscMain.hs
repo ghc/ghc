@@ -67,6 +67,7 @@ module HscMain
     , hscDecls, hscParseDeclsWithLocation, hscDeclsWithLocation, hscParsedDecls
     , hscTcExpr, TcRnExprMode(..), hscImport, hscKcType
     , hscParseExpr
+    , hscParseType
     , hscCompileCoreExpr
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
@@ -113,6 +114,7 @@ import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
+import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
@@ -147,7 +149,7 @@ import DynamicLoading   ( initializePlugins )
 
 import DynFlags
 import ErrUtils
-import Platform ( platformOS, osSubsectionsViaSymbols )
+import GHC.Platform ( platformOS, osSubsectionsViaSymbols )
 
 import Outputable
 import NameEnv
@@ -174,7 +176,7 @@ import Data.Set (Set)
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts )
-import HieBin           ( readHieFile, writeHieFile )
+import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
 #include "HsVersions.h"
@@ -193,6 +195,7 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     iserv_mvar <- newMVar Nothing
+    emptyDynLinker <- uninitializedLinker
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
                   ,  hsc_mod_graph    = emptyMG
@@ -202,7 +205,8 @@ newHscEnv dflags = do
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
                   ,  hsc_type_env_var = Nothing
-                  , hsc_iserv        = iserv_mvar
+                  ,  hsc_iserv        = iserv_mvar
+                  ,  hsc_dynLinker    = emptyDynLinker
                   }
 
 -- -----------------------------------------------------------------------------
@@ -432,7 +436,7 @@ extract_renamed_stuff mod_summary tc_result = do
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
               (file', _) <- readHieFile nc out_file
-              case diffFile hieFile file' of
+              case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do
@@ -516,7 +520,9 @@ tcRnModule' sum save_rn_syntax mod = do
                  safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
                  when safe $ do
                    case wopt Opt_WarnSafe dflags of
-                     True -> (logWarnings $ unitBag $
+                     True
+                       | safeHaskell dflags == Sf_Safe -> return ()
+                       | otherwise -> (logWarnings $ unitBag $
                               makeIntoWarning (Reason Opt_WarnSafe) $
                               mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
                               errSafe tcg_res')
@@ -1759,7 +1765,7 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env normalise ty
+    ioMsgMaybe $ tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do

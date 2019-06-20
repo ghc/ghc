@@ -81,7 +81,11 @@ endif
 
 RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
 
-RUNTEST_OPTS += -e config.compiler_debugged=$(GhcDebugged)
+ifeq "$(GhcDebugged)" "YES"
+RUNTEST_OPTS += -e "config.compiler_debugged=True"
+else
+RUNTEST_OPTS += -e "config.compiler_debugged=False"
+endif
 
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 RUNTEST_OPTS += -e ghc_with_native_codegen=True
@@ -277,6 +281,8 @@ RUNTEST_OPTS +=  \
 	--config 'hpc=$(call quote_path,$(HPC))' \
 	--config 'gs=$(call quote_path,$(GS))' \
 	--config 'timeout_prog=$(call quote_path,$(TIMEOUT_PROGRAM))'
+
+RUNTEST_OPTS += --config 'stats_files_dir=$(TOP)/tests/perf/haddock'
 
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 

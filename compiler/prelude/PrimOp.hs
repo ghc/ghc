@@ -304,6 +304,27 @@ primOpOutOfLine :: PrimOp -> Bool
 *                                                                      *
 ************************************************************************
 
+Note [Checking versus non-checking primops]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  In GHC primops break down into two classes:
+
+   a. Checking primops behave, for instance, like division. In this
+      case the primop may throw an exception (e.g. division-by-zero)
+      and is consequently is marked with the can_fail flag described below.
+      The ability to fail comes at the expense of precluding some optimizations.
+
+   b. Non-checking primops behavior, for instance, like addition. While
+      addition can overflow it does not produce an exception. So can_fail is
+      set to False, and we get more optimisation opportunities.  But we must
+      never throw an exception, so we cannot rewrite to a call to error.
+
+  It is important that a non-checking primop never be transformed in a way that
+  would cause it to bottom. Doing so would violate Core's let/app invariant
+  (see Note [CoreSyn let/app invariant] in CoreSyn) which is critical to
+  the simplifier's ability to float without fear of changing program meaning.
+
+
 Note [PrimOp can_fail and has_side_effects]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Both can_fail and has_side_effects mean that the primop has

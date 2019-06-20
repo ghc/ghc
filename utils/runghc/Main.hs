@@ -65,6 +65,11 @@ main = do
 -- live, we check for the existence of ghc. If we can't find it, we assume that
 -- we're building ghc from source, in which case we fall back on ghc-stage2.
 -- (See #1185.)
+--
+-- In-tree Hadrian builds of GHC also happen to give us a wrapper-script-less
+-- runghc. In those cases, 'getExecPath' returns the directory where runghc
+-- lives, which is also where the 'ghc' executable lives, so the guessing logic
+-- covers this scenario just as nicely.
 findGhc :: FilePath -> IO FilePath
 findGhc path = do
     let ghcDir = takeDirectory (normalise path)
@@ -207,5 +212,5 @@ getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
 foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
-getExecPath = return Nothing
+getExecPath = Just <$> getExecutablePath
 #endif

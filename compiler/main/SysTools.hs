@@ -40,16 +40,19 @@ module SysTools (
 
 import GhcPrelude
 
+import GHC.Settings
+
 import Module
 import Packages
 import Config
 import Outputable
 import ErrUtils
-import Platform
-import Util
+import GHC.Platform
 import DynFlags
 import Fingerprint
+import ToolSettings
 
+import qualified Data.Map as Map
 import System.FilePath
 import System.IO
 import System.Directory
@@ -150,41 +153,29 @@ initSysTools top_dir
 
        settingsStr <- readFile settingsFile
        platformConstantsStr <- readFile platformConstantsFile
-       mySettings <- case maybeReadFuzzy settingsStr of
+       settingsList <- case maybeReadFuzzy settingsStr of
                      Just s ->
                          return s
                      Nothing ->
                          pgmError ("Can't parse " ++ show settingsFile)
+       let mySettings = Map.fromList settingsList
        platformConstants <- case maybeReadFuzzy platformConstantsStr of
                             Just s ->
                                 return s
                             Nothing ->
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
-       let getSetting key = case lookup key mySettings of
-                            Just xs -> return $ expandTopDir top_dir xs
-                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       -- See Note [Settings file] for a little more about this file. We're
+       -- just partially applying those functions and throwing 'Left's; they're
+       -- written in a very portable style to keep ghc-boot light.
+       let getSetting key = either pgmError pure $
+             getFilePathSetting0 top_dir settingsFile mySettings key
+           getToolSetting :: String -> IO String
            getToolSetting key = expandToolDir mtool_dir <$> getSetting key
-           getBooleanSetting key = case lookup key mySettings of
-                                   Just "YES" -> return True
-                                   Just "NO" -> return False
-                                   Just xs -> pgmError ("Bad value for " ++ show key ++ ": " ++ show xs)
-                                   Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-           readSetting key = case lookup key mySettings of
-                             Just xs ->
-                                 case maybeRead xs of
-                                 Just v -> return v
-                                 Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
-                             Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
-       crossCompiling <- getBooleanSetting "cross compiling"
+           getBooleanSetting :: String -> IO Bool
+           getBooleanSetting key = either pgmError pure $
+             getBooleanSetting0 settingsFile mySettings key
        targetPlatformString <- getSetting "target platform string"
-       targetArch <- readSetting "target arch"
-       targetOS <- readSetting "target os"
-       targetWordSize <- readSetting "target word size"
-       targetUnregisterised <- getBooleanSetting "Unregisterised"
-       targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
-       targetHasIdentDirective <- readSetting "target has .ident directive"
-       targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
        tablesNextToCode <- getBooleanSetting "Tables next to code"
        myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
        -- On Windows, mingw is distributed with GHC,
@@ -193,17 +184,21 @@ initSysTools top_dir
        -- It would perhaps be nice to be able to override this
        -- with the settings file, but it would be a little fiddly
        -- to make that possible, so for now you can't.
-       gcc_prog <- getToolSetting "C compiler command"
-       gcc_args_str <- getSetting "C compiler flags"
+       cc_prog <- getToolSetting "C compiler command"
+       cc_args_str <- getSetting "C compiler flags"
+       cxx_args_str <- getSetting "C++ compiler flags"
        gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getToolSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
-       let unreg_gcc_args = if targetUnregisterised
-                            then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
-                            else []
-           cpp_args= map Option (words cpp_args_str)
-           gcc_args = map Option (words gcc_args_str
-                               ++ unreg_gcc_args)
+
+       platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
+
+       let unreg_cc_args = if platformUnregisterised platform
+                           then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
+                           else []
+           cpp_args = map Option (words cpp_args_str)
+           cc_args  = words cc_args_str ++ unreg_cc_args
+           cxx_args = words cxx_args_str
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
@@ -235,11 +230,11 @@ initSysTools top_dir
 
 
        -- Other things being equal, as and ld are simply gcc
-       gcc_link_args_str <- getSetting "C compiler link flags"
-       let   as_prog  = gcc_prog
-             as_args  = gcc_args
-             ld_prog  = gcc_prog
-             ld_args  = gcc_args ++ map Option (words gcc_link_args_str)
+       cc_link_args_str <- getSetting "C compiler link flags"
+       let   as_prog  = cc_prog
+             as_args  = map Option cc_args
+             ld_prog  = cc_prog
+             ld_args  = map Option (cc_args ++ words cc_link_args_str)
 
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"
@@ -247,17 +242,6 @@ initSysTools top_dir
        lcc_prog <- getSetting "LLVM clang command"
 
        let iserv_prog = libexec "ghc-iserv"
-
-       let platform = Platform {
-                          platformArch = targetArch,
-                          platformOS   = targetOS,
-                          platformWordSize = targetWordSize,
-                          platformUnregisterised = targetUnregisterised,
-                          platformHasGnuNonexecStack = targetHasGnuNonexecStack,
-                          platformHasIdentDirective = targetHasIdentDirective,
-                          platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols,
-                          platformIsCrossCompiling = crossCompiling
-                      }
 
        integerLibrary <- getSetting "integer library"
        integerLibraryType <- case integerLibrary of
@@ -282,68 +266,82 @@ initSysTools top_dir
        ghcDebugged <- getBooleanSetting "Use Debugging"
        ghcRtsWithLibdw <- getBooleanSetting "RTS expects libdw"
 
-       return $ Settings {
-                    sTargetPlatform = platform,
-                    sTmpDir         = normalise tmpdir,
-                    sGhcUsagePath   = ghc_usage_msg_path,
-                    sGhciUsagePath  = ghci_usage_msg_path,
-                    sToolDir        = mtool_dir,
-                    sTopDir         = top_dir,
-                    sRawSettings    = mySettings,
-                    sExtraGccViaCFlags = words myExtraGccViaCFlags,
-                    sSystemPackageConfig = pkgconfig_path,
-                    sLdSupportsCompactUnwind = ldSupportsCompactUnwind,
-                    sLdSupportsBuildId       = ldSupportsBuildId,
-                    sLdSupportsFilelist      = ldSupportsFilelist,
-                    sLdIsGnuLd               = ldIsGnuLd,
-                    sGccSupportsNoPie        = gccSupportsNoPie,
-                    sProgramName             = "ghc",
-                    sProjectVersion          = cProjectVersion,
-                    sPgm_L   = unlit_path,
-                    sPgm_P   = (cpp_prog, cpp_args),
-                    sPgm_F   = "",
-                    sPgm_c   = (gcc_prog, gcc_args),
-                    sPgm_a   = (as_prog, as_args),
-                    sPgm_l   = (ld_prog, ld_args),
-                    sPgm_dll = (mkdll_prog,mkdll_args),
-                    sPgm_T   = touch_path,
-                    sPgm_windres = windres_path,
-                    sPgm_libtool = libtool_path,
-                    sPgm_ar = ar_path,
-                    sPgm_ranlib = ranlib_path,
-                    sPgm_lo  = (lo_prog,[]),
-                    sPgm_lc  = (lc_prog,[]),
-                    sPgm_lcc = (lcc_prog,[]),
-                    sPgm_i   = iserv_prog,
-                    sOpt_L       = [],
-                    sOpt_P       = [],
-                    sOpt_P_fingerprint = fingerprint0,
-                    sOpt_F       = [],
-                    sOpt_c       = [],
-                    sOpt_cxx     = [],
-                    sOpt_a       = [],
-                    sOpt_l       = [],
-                    sOpt_windres = [],
-                    sOpt_lcc     = [],
-                    sOpt_lo      = [],
-                    sOpt_lc      = [],
-                    sOpt_i       = [],
-                    sPlatformConstants = platformConstants,
+       return $ Settings
+         { sGhcNameVersion = GhcNameVersion
+           { ghcNameVersion_programName = "ghc"
+           , ghcNameVersion_projectVersion = cProjectVersion
+           }
 
-                    sTargetPlatformString = targetPlatformString,
-                    sIntegerLibrary = integerLibrary,
-                    sIntegerLibraryType = integerLibraryType,
-                    sGhcWithInterpreter = ghcWithInterpreter,
-                    sGhcWithNativeCodeGen = ghcWithNativeCodeGen,
-                    sGhcWithSMP = ghcWithSMP,
-                    sGhcRTSWays = ghcRTSWays,
-                    sTablesNextToCode = tablesNextToCode,
-                    sLeadingUnderscore = leadingUnderscore,
-                    sLibFFI = useLibFFI,
-                    sGhcThreaded = ghcThreaded,
-                    sGhcDebugged = ghcDebugged,
-                    sGhcRtsWithLibdw = ghcRtsWithLibdw
-             }
+         , sFileSettings = FileSettings
+           { fileSettings_tmpDir         = normalise tmpdir
+           , fileSettings_ghcUsagePath   = ghc_usage_msg_path
+           , fileSettings_ghciUsagePath  = ghci_usage_msg_path
+           , fileSettings_toolDir        = mtool_dir
+           , fileSettings_topDir         = top_dir
+           , fileSettings_systemPackageConfig = pkgconfig_path
+           }
+
+         , sToolSettings = ToolSettings
+           { toolSettings_ldSupportsCompactUnwind = ldSupportsCompactUnwind
+           , toolSettings_ldSupportsBuildId       = ldSupportsBuildId
+           , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
+           , toolSettings_ldIsGnuLd               = ldIsGnuLd
+           , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
+
+           , toolSettings_pgm_L   = unlit_path
+           , toolSettings_pgm_P   = (cpp_prog, cpp_args)
+           , toolSettings_pgm_F   = ""
+           , toolSettings_pgm_c   = cc_prog
+           , toolSettings_pgm_a   = (as_prog, as_args)
+           , toolSettings_pgm_l   = (ld_prog, ld_args)
+           , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
+           , toolSettings_pgm_T   = touch_path
+           , toolSettings_pgm_windres = windres_path
+           , toolSettings_pgm_libtool = libtool_path
+           , toolSettings_pgm_ar = ar_path
+           , toolSettings_pgm_ranlib = ranlib_path
+           , toolSettings_pgm_lo  = (lo_prog,[])
+           , toolSettings_pgm_lc  = (lc_prog,[])
+           , toolSettings_pgm_lcc = (lcc_prog,[])
+           , toolSettings_pgm_i   = iserv_prog
+           , toolSettings_opt_L       = []
+           , toolSettings_opt_P       = []
+           , toolSettings_opt_P_fingerprint = fingerprint0
+           , toolSettings_opt_F       = []
+           , toolSettings_opt_c       = cc_args
+           , toolSettings_opt_cxx     = cxx_args
+           , toolSettings_opt_a       = []
+           , toolSettings_opt_l       = []
+           , toolSettings_opt_windres = []
+           , toolSettings_opt_lcc     = []
+           , toolSettings_opt_lo      = []
+           , toolSettings_opt_lc      = []
+           , toolSettings_opt_i       = []
+
+           , toolSettings_extraGccViaCFlags = words myExtraGccViaCFlags
+           }
+
+         , sTargetPlatform = platform
+         , sPlatformMisc = PlatformMisc
+           { platformMisc_targetPlatformString = targetPlatformString
+           , platformMisc_integerLibrary = integerLibrary
+           , platformMisc_integerLibraryType = integerLibraryType
+           , platformMisc_ghcWithInterpreter = ghcWithInterpreter
+           , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
+           , platformMisc_ghcWithSMP = ghcWithSMP
+           , platformMisc_ghcRTSWays = ghcRTSWays
+           , platformMisc_tablesNextToCode = tablesNextToCode
+           , platformMisc_leadingUnderscore = leadingUnderscore
+           , platformMisc_libFFI = useLibFFI
+           , platformMisc_ghcThreaded = ghcThreaded
+           , platformMisc_ghcDebugged = ghcDebugged
+           , platformMisc_ghcRtsWithLibdw = ghcRtsWithLibdw
+           }
+
+         , sPlatformConstants = platformConstants
+
+         , sRawSettings    = settingsList
+         }
 
 
 {- Note [Windows stack usage]
@@ -418,10 +416,10 @@ linkDynLib dflags0 o_files dep_packages
         -- against libHSrts, then both end up getting loaded,
         -- and things go wrong. We therefore link the libraries
         -- with the same RTS flags that we link GHC with.
-        dflags1 = if sGhcThreaded $ settings dflags0
+        dflags1 = if platformMisc_ghcThreaded $ platformMisc dflags0
           then addWay' WayThreaded dflags0
           else                     dflags0
-        dflags2 = if sGhcDebugged $ settings dflags1
+        dflags2 = if platformMisc_ghcDebugged $ platformMisc dflags1
           then addWay' WayDebug dflags1
           else                  dflags1
         dflags = updateWays dflags2

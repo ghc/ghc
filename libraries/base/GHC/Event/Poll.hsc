@@ -162,24 +162,12 @@ newtype Event = Event CShort
              , FiniteBits -- ^ @since 4.7.0.0
              )
 
--- We have to duplicate the whole enum like this in order for the
--- hsc2hs cross-compilation mode to work
-#if defined(POLLRDHUP)
-#{enum Event, Event
- , pollIn    = POLLIN
- , pollOut   = POLLOUT
- , pollRdHup = POLLRDHUP
- , pollErr   = POLLERR
- , pollHup   = POLLHUP
- }
-#else
 #{enum Event, Event
  , pollIn    = POLLIN
  , pollOut   = POLLOUT
  , pollErr   = POLLERR
  , pollHup   = POLLHUP
  }
-#endif
 
 fromEvent :: E.Event -> Event
 fromEvent e = remap E.evtRead  pollIn .|.

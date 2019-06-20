@@ -8,8 +8,6 @@ module MonadUtils
         , MonadFix(..)
         , MonadIO(..)
 
-        , liftIO1, liftIO2, liftIO3, liftIO4
-
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
@@ -36,27 +34,6 @@ import Control.Monad.Fix
 import Control.Monad.IO.Class
 import Data.Foldable (sequenceA_)
 import Data.List (unzip4, unzip5, zipWith4)
-
--------------------------------------------------------------------------------
--- Lift combinators
---  These are used throughout the compiler
--------------------------------------------------------------------------------
-
--- | Lift an 'IO' operation with 1 argument into another monad
-liftIO1 :: MonadIO m => (a -> IO b) -> a -> m b
-liftIO1 = (.) liftIO
-
--- | Lift an 'IO' operation with 2 arguments into another monad
-liftIO2 :: MonadIO m => (a -> b -> IO c) -> a -> b -> m c
-liftIO2 = ((.).(.)) liftIO
-
--- | Lift an 'IO' operation with 3 arguments into another monad
-liftIO3 :: MonadIO m => (a -> b -> c -> IO d) -> a -> b -> c -> m d
-liftIO3 = ((.).((.).(.))) liftIO
-
--- | Lift an 'IO' operation with 4 arguments into another monad
-liftIO4 :: MonadIO m => (a -> b -> c -> d -> IO e) -> a -> b -> c -> d -> m e
-liftIO4 = (((.).(.)).((.).(.))) liftIO
 
 -------------------------------------------------------------------------------
 -- Common functions

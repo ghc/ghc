@@ -170,6 +170,7 @@ test( 'T4114d', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_r
 test('T5584', [], makefile_test, [])
 test('T5198', [], makefile_test, [])
 test('T7060', [], makefile_test, [])
+# N.B. The typo in the argument below is intentional.
 test('T7130', normal, compile_fail, ['-fflul-laziness'])
 test('T7563', when(unregisterised(), skip), makefile_test, [])
 test('T6037',
@@ -270,3 +271,8 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
 
 test('T14452', [], makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
+test('T16737',
+     [extra_files(['T16737include/']),
+      requires_th,
+      expect_broken_for(16541, ['ghci'])],
+     compile_and_run, ['-optP=-isystem -optP=T16737include'])

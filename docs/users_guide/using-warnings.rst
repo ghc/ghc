@@ -215,7 +215,7 @@ all these warnings can still be controlled with ``-f(no-)warn-*`` instead
 of ``-W(no-)*``.
 
 .. ghc-flag:: -Wunrecognised-warning-flags
-    :shortdesc: throw a warning when an unreconised ``-W...`` flag is
+    :shortdesc: throw a warning when an unrecognised ``-W...`` flag is
         encountered on the command line.
     :type: dynamic
     :reverse: -Wno-unrecognised-warning-flags
@@ -1545,9 +1545,10 @@ of ``-W(no-)*``.
     :shortdesc: Warn about record wildcard matches when none of the bound variables
       are used.
     :type: dynamic
-    :since: 8.10.1
     :reverse: -Wno-unused-record-wildcards
     :category:
+
+    :since: 8.10.1
 
     .. index::
        single: unused, warning, record wildcards
@@ -1566,9 +1567,10 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wredundant-record-wildcards
     :shortdesc: Warn about record wildcard matches when the wildcard binds no patterns.
     :type: dynamic
-    :since: 8.10.1
     :reverse: -Wno-redundant-record-wildcards
     :category:
+
+    :since: 8.10.1
 
     .. index::
        single: unused, warning, record wildcards
@@ -1680,6 +1682,21 @@ of ``-W(no-)*``.
     The warning is suppressed if the field name begins with an underscore. ::
 
         data Foo = Foo { f :: Int } | Bar
+
+.. ghc-flag:: -Wunused-packages
+    :shortdesc: warn when package is requested on command line, but was never loaded.
+    :type: dynamic
+    :reverse: -Wno-unused-packages
+    :category:
+
+    :since: 8.8
+
+    The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
+    command line via :ghc-flag:`-package` or :ghc-flag:`-package-id`, but were not
+    loaded during compication. Usually it means that you have an unused dependency.
+
+    You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
+    in order to get reliable results.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
