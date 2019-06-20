@@ -116,19 +116,6 @@ StgWord flip = 0;     // flip bit
 #define setTravDataToZero(c) \
   (c)->header.prof.hp.trav.lsb = flip
 
-#if defined(DEBUG_RETAINER)
-static uint32_t sumOfNewCost;        // sum of the cost of each object, computed
-                                // when the object is first visited
-static uint32_t sumOfNewCostExtra;   // for those objects not visited during
-                                // retainer profiling, e.g., MUT_VAR
-static uint32_t costArray[N_CLOSURE_TYPES];
-
-uint32_t sumOfCostLinear;            // sum of the costs of all object, computed
-                                // when linearly traversing the heap after
-                                // retainer profiling
-uint32_t costArrayLinear[N_CLOSURE_TYPES];
-#endif
-
 /* -----------------------------------------------------------------------------
  * Retainer stack - header
  *   Note:
@@ -263,11 +250,6 @@ static void retainStack(traverseState *, StgClosure *, stackData, StgPtr, StgPtr
 static void retainClosure(traverseState *, StgClosure *, StgClosure *, retainer);
 static void retainPushClosure(traverseState *, StgClosure *, StgClosure *, stackData);
 static void retainActualPush(traverseState *, stackElement *);
-
-#if defined(DEBUG_RETAINER)
-static void belongToHeap(StgPtr p);
-static uint32_t checkHeapSanityForRetainerProfiling( void );
-#endif
 
 
 // number of blocks allocated for one stack
@@ -1559,22 +1541,6 @@ inner_loop:
 
     typeOfc = get_itbl(c)->type;
 
-#if defined(DEBUG_RETAINER)
-    switch (typeOfc) {
-    case IND_STATIC:
-    case CONSTR_NOCAF:
-    case THUNK_STATIC:
-    case FUN_STATIC:
-        break;
-    default:
-        if (retainerSetOf(c) == NULL) {   // first visit?
-            costArray[typeOfc] += cost(c);
-            sumOfNewCost += cost(c);
-        }
-        break;
-    }
-#endif
-
     // special cases
     switch (typeOfc) {
     case TSO:
@@ -1764,10 +1730,6 @@ computeRetainerSet( traverseState *ts )
     uint32_t g, n;
     StgPtr ml;
     bdescr *bd;
-#if defined(DEBUG_RETAINER)
-    RetainerSet *rtl;
-    RetainerSet tmpRetainerSet;
-#endif
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
@@ -1795,8 +1757,7 @@ computeRetainerSet( traverseState *ts )
     rememberOldStableNameAddresses ();
 
     // The following code resets the rs field of each unvisited mutable
-    // object (computing sumOfNewCostExtra and updating costArray[] when
-    // debugging retainer profiler).
+    // object.
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         // NOT true: even G0 has a block on its mutable list
         // ASSERT(g != 0 || (generations[g].mut_list == NULL));
@@ -1809,28 +1770,6 @@ computeRetainerSet( traverseState *ts )
             for (ml = bd->start; ml < bd->free; ml++) {
 
                 maybeInitTravData((StgClosure *)*ml);
-
-#if defined(DEBUG_RETAINER)
-                rtl = retainerSetOf((StgClosure *)*ml);
-                if (rtl == NULL) {
-
-                    switch (get_itbl((StgClosure *)ml)->type) {
-                    case IND_STATIC:
-                        // no cost involved
-                        break;
-                    case CONSTR_NOCAF:
-                    case THUNK_STATIC:
-                    case FUN_STATIC:
-                        barf("Invalid object in computeRetainerSet(): %d", get_itbl((StgClosure*)ml)->type);
-                        break;
-                    default:
-                        // dynamic objects
-                        costArray[get_itbl((StgClosure *)ml)->type] += cost((StgClosure *)ml);
-                        sumOfNewCostExtra += cost((StgClosure *)ml);
-                        break;
-                    }
-                }
-#endif
             }
           }
         }
@@ -1922,44 +1861,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
 void
 retainerProfile(void)
 {
-#if defined(DEBUG_RETAINER)
-  uint32_t i;
-  uint32_t totalHeapSize;   // total raw heap size (computed by linear scanning)
-#endif
-
-#if defined(DEBUG_RETAINER)
-  debugBelch(" < retainerProfile() invoked : %d>\n", retainerGeneration);
-#endif
-
   stat_startRP();
-
-  // We haven't flipped the bit yet.
-#if defined(DEBUG_RETAINER)
-  debugBelch("Before traversing:\n");
-  sumOfCostLinear = 0;
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    costArrayLinear[i] = 0;
-  totalHeapSize = checkHeapSanityForRetainerProfiling();
-
-  debugBelch("\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
-  /*
-  debugBelch("costArrayLinear[] = ");
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    debugBelch("[%u:%u] ", i, costArrayLinear[i]);
-  debugBelch("\n");
-  */
-
-  ASSERT(sumOfCostLinear == totalHeapSize);
-
-/*
-#define pcostArrayLinear(index) \
-  if (costArrayLinear[index] > 0) \
-    debugBelch("costArrayLinear[" #index "] = %u\n", costArrayLinear[index])
-  pcostArrayLinear(THUNK_STATIC);
-  pcostArrayLinear(FUN_STATIC);
-  pcostArrayLinear(CONSTR_NOCAF);
-*/
-#endif
 
   // Now we flips flip.
   flip = flip ^ 1;
@@ -1971,14 +1873,6 @@ retainerProfile(void)
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
 
-#if defined(DEBUG_RETAINER)
-  debugBelch("During traversing:\n");
-  sumOfNewCost = 0;
-  sumOfNewCostExtra = 0;
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    costArray[i] = 0;
-#endif
-
   /*
     We initialize the traverse stack each time the retainer profiling is
     performed (because the traverse stack size varies on each retainer profiling
@@ -1988,45 +1882,6 @@ retainerProfile(void)
   initializeTraverseStack(&g_retainerTraverseState);
   initializeAllRetainerSet();
   computeRetainerSet(&g_retainerTraverseState);
-
-#if defined(DEBUG_RETAINER)
-  debugBelch("After traversing:\n");
-  sumOfCostLinear = 0;
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    costArrayLinear[i] = 0;
-  totalHeapSize = checkHeapSanityForRetainerProfiling();
-
-  debugBelch("\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
-  ASSERT(sumOfCostLinear == totalHeapSize);
-
-  // now, compare the two results
-  /*
-    Note:
-      costArray[] must be exactly the same as costArrayLinear[].
-      Known exceptions:
-        1) Dead weak pointers, whose type is CONSTR. These objects are not
-           reachable from any roots.
-  */
-  debugBelch("Comparison:\n");
-  debugBelch("\tcostArrayLinear[] (must be empty) = ");
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    if (costArray[i] != costArrayLinear[i])
-      // nothing should be printed except MUT_VAR after major GCs
-      debugBelch("[%u:%u] ", i, costArrayLinear[i]);
-  debugBelch("\n");
-
-  debugBelch("\tsumOfNewCost = %u\n", sumOfNewCost);
-  debugBelch("\tsumOfNewCostExtra = %u\n", sumOfNewCostExtra);
-  debugBelch("\tcostArray[] (must be empty) = ");
-  for (i = 0;i < N_CLOSURE_TYPES; i++)
-    if (costArray[i] != costArrayLinear[i])
-      // nothing should be printed except MUT_VAR after major GCs
-      debugBelch("[%u:%u] ", i, costArray[i]);
-  debugBelch("\n");
-
-  // only for major garbage collection
-  ASSERT(sumOfNewCost + sumOfNewCostExtra == sumOfCostLinear);
-#endif
 
   // post-processing
   closeTraverseStack(&g_retainerTraverseState);
@@ -2039,189 +1894,5 @@ retainerProfile(void)
 #endif
     (double)timesAnyObjectVisited / numObjectVisited);
 }
-
-/* -----------------------------------------------------------------------------
- * DEBUGGING CODE
- * -------------------------------------------------------------------------- */
-
-#if defined(DEBUG_RETAINER)
-
-#define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-        (HEAP_ALLOCED(r))) && \
-        ((StgWord)(*(StgPtr)r)!=(StgWord)0xaaaaaaaaaaaaaaaaULL))
-
-static uint32_t
-sanityCheckHeapClosure( StgClosure *c )
-{
-    ASSERT(LOOKS_LIKE_GHC_INFO(c->header.info));
-    ASSERT(LOOKS_LIKE_PTR(c));
-
-    if ((((StgWord)RSET(c) & 1) ^ flip) != 0) {
-        if (get_itbl(c)->type == CONSTR &&
-            !strcmp(GET_PROF_TYPE(get_itbl(c)), "DEAD_WEAK") &&
-            !strcmp(GET_PROF_DESC(get_itbl(c)), "DEAD_WEAK")) {
-            debugBelch("\tUnvisited dead weak pointer object found: c = %p\n", c);
-            costArray[get_itbl(c)->type] += cost(c);
-            sumOfNewCost += cost(c);
-        } else
-            debugBelch(
-                    "Unvisited object: flip = %d, c = %p(%d, %s, %s), rs = %p\n",
-                    flip, c, get_itbl(c)->type,
-#if !defined(TABLES_NEXT_TO_CODE)
-                    get_itbl(c)->prof.closure_type,
-                    GET_PROF_DESC(get_itbl(c)),
-#else
-                    get_itbl(c)->prof.closure_type_off,
-                    GET_PROF_DESC(get_itbl(c)),
-#endif
-                    RSET(c));
-    } else {
-        // debugBelch("sanityCheckHeapClosure) S: flip = %d, c = %p(%d), rs = %p\n", flip, c, get_itbl(c)->type, RSET(c));
-    }
-
-    return closure_sizeW(c);
-}
-
-static uint32_t
-heapCheck( bdescr *bd )
-{
-    StgPtr p;
-    static uint32_t costSum, size;
-
-    costSum = 0;
-    while (bd != NULL) {
-        p = bd->start;
-        while (p < bd->free) {
-            size = sanityCheckHeapClosure((StgClosure *)p);
-            sumOfCostLinear += size;
-            costArrayLinear[get_itbl((StgClosure *)p)->type] += size;
-            p += size;
-            // no need for slop check; I think slops are not used currently.
-        }
-        ASSERT(p == bd->free);
-        costSum += bd->free - bd->start;
-        bd = bd->link;
-    }
-
-    return costSum;
-}
-
-static uint32_t
-chainCheck(bdescr *bd)
-{
-    uint32_t costSum, size;
-
-    costSum = 0;
-    while (bd != NULL) {
-        // bd->free - bd->start is not an accurate measurement of the
-        // object size.  Actually it is always zero, so we compute its
-        // size explicitly.
-        size = sanityCheckHeapClosure((StgClosure *)bd->start);
-        sumOfCostLinear += size;
-        costArrayLinear[get_itbl((StgClosure *)bd->start)->type] += size;
-        costSum += size;
-        bd = bd->link;
-    }
-
-    return costSum;
-}
-
-static uint32_t
-checkHeapSanityForRetainerProfiling( void )
-{
-    uint32_t costSum, g;
-
-    costSum = 0;
-    debugBelch("START: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-    if (RtsFlags.GcFlags.generations == 1) {
-        costSum += heapCheck(g0->to);
-        debugBelch("heapCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-        costSum += chainCheck(g0->large_objects);
-        debugBelch("chainCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-    } else {
-        for (g = 0; g < RtsFlags.GcFlags.generations; g++)
-            /*
-              After all live objects have been scavenged, the garbage
-              collector may create some objects in
-              scheduleFinalizers(). These objects are created through
-              allocate(), so the small object pool or the large object
-              pool of the g0 may not be empty.
-            */
-            if (g == 0) {
-                costSum += chainCheck(generations[g].large_objects);
-                debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-            } else {
-                costSum += heapCheck(generations[g].blocks);
-                debugBelch("heapCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-                costSum += chainCheck(generations[g].large_objects);
-                debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
-            }
-    }
-
-    return costSum;
-}
-
-void
-findPointer(StgPtr p)
-{
-    StgPtr q, r, e;
-    bdescr *bd;
-    uint32_t g;
-
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        // if (g == 0 && s == 0) continue;
-        bd = generations[g].blocks;
-        for (; bd; bd = bd->link) {
-            for (q = bd->start; q < bd->free; q++) {
-                if (*q == (StgWord)p) {
-                    r = q;
-                    while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
-                    debugBelch("Found in gen[%d]: q = %p, r = %p\n", g, q, r);
-                    // return;
-                }
-            }
-        }
-        bd = generations[g].large_objects;
-        for (; bd; bd = bd->link) {
-            e = bd->start + cost((StgClosure *)bd->start);
-            for (q = bd->start; q < e; q++) {
-                if (*q == (StgWord)p) {
-                    r = q;
-                    while (*r == 0 || !LOOKS_LIKE_GHC_INFO(*r)) r--;
-                    debugBelch("Found in gen[%d], large_objects: %p\n", g, r);
-                    // return;
-                }
-            }
-        }
-    }
-}
-
-static void
-belongToHeap(StgPtr p)
-{
-    bdescr *bd;
-    uint32_t g;
-
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-       // if (g == 0 && s == 0) continue;
-       bd = generations[g].blocks;
-       for (; bd; bd = bd->link) {
-           if (bd->start <= p && p < bd->free) {
-               debugBelch("Belongs to gen[%d]", g);
-               return;
-           }
-       }
-       bd = generations[g].large_objects;
-       for (; bd; bd = bd->link) {
-           if (bd->start <= p
-               && p < bd->start + getHeapClosureSize((StgClosure *)bd->start)) {
-               debugBelch("Found in gen[%d], large_objects: %p\n",
-                   g, bd->start);
-               return;
-           }
-       }
-    }
-}
-#endif /* DEBUG_RETAINER */
 
 #endif /* PROFILING */
