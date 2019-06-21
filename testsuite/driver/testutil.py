@@ -47,17 +47,17 @@ def getStdout(cmd_and_args: "List[str]"):
         raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
     return stdout.decode('utf-8')
 
-def lndir(srcdir: str, dstdir: str):
+def lndir(srcdir: Path, dstdir: Path):
     # Create symlinks for all files in src directory.
     # Not all developers might have lndir installed.
     # os.system('lndir -silent {0} {1}'.format(srcdir, dstdir))
     for filename in os.listdir(srcdir):
-        src = os.path.join(srcdir, filename)
-        dst = os.path.join(dstdir, filename)
-        if os.path.isfile(src):
+        src = srcdir / filename
+        dst = dstdir / filename
+        if src.is_file():
             link_or_copy_file(src, dst)
         else:
-            os.mkdir(dst)
+            dst.mkdir()
             lndir(src, dst)
 
 # All possible test metric strings.

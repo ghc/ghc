@@ -345,7 +345,7 @@ class TestOptions:
        # Custom output checker, otherwise do a comparison with expected
        # stdout file.  Accepts two arguments: filename of actual stdout
        # output, and a normaliser function given other test options
-       self.check_stdout = None
+       self.check_stdout = None # type: Optional[Callable[Path, OutputNormalizer]]
 
        # Check .hp file when profiling libraries are available?
        self.check_hp = True

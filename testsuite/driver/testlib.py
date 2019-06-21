@@ -16,7 +16,7 @@ import copy
 import glob
 import sys
 from math import ceil, trunc
-from pathlib import PurePath
+from pathlib import Path, PurePath
 import collections
 import subprocess
 
@@ -870,7 +870,7 @@ def test_common_work(watcher: testutil.Watcher,
                 # Don't use wildcards in extra_files too much, as
                 # globbing is slow.
                 files.update((os.path.relpath(f, opts.srcdir)
-                            for f in glob.iglob(in_srcdir(filename))))
+                            for f in glob.iglob(str(in_srcdir(filename)))))
 
             elif filename:
                 files.add(filename)
@@ -939,12 +939,12 @@ def do_test(name: TestName, way: WayName, func, args, files) -> None:
     for extra_file in files:
         src = in_srcdir(extra_file)
         dst = in_testdir(os.path.basename(extra_file.rstrip('/\\')))
-        if os.path.isfile(src):
+        if src.is_file():
             link_or_copy_file(src, dst)
-        elif os.path.isdir(src):
-            if os.path.exists(dst):
+        elif src.is_dir():
+            if dst.exists():
                 shutil.rmtree(dst)
-            os.mkdir(dst)
+            dst.mkdir()
             lndir(src, dst)
         else:
             if not config.haddock and os.path.splitext(extra_file)[1] == '.t':
@@ -1311,7 +1311,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
     for mod, opts in extra_mods:
         result = simple_build(mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
-            extra_hc_opts += ' ' + replace_suffix(mod, 'o')
+            extra_hc_opts += ' ' + Path(mod).with_suffix('o')
         if badResult(result):
             return result
 
@@ -1412,17 +1412,17 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str):
 
     # figure out what to use for stdin
     if opts.stdin:
-        stdin = in_testdir(opts.stdin) # type: Optional[str]
+        stdin_arg = in_testdir(opts.stdin) # type: Optional[Path]
     elif os.path.exists(in_testdir(name, 'stdin')):
-        stdin = in_testdir(name, 'stdin')
+        stdin_arg = in_testdir(name, 'stdin')
     else:
-        stdin = None
+        stdin_arg = None
 
-    stdout = in_testdir(name, 'run.stdout')
+    stdout_arg = in_testdir(name, 'run.stdout')
     if opts.combined_output:
-        stderr = subprocess.STDOUT # type: Union[int, str]
+        stderr_arg = subprocess.STDOUT # type: Union[int, Path]
     else:
-        stderr = in_testdir(name, 'run.stderr')
+        stderr_arg = in_testdir(name, 'run.stderr')
 
     my_rts_flags = rts_flags(way)
 
@@ -1446,7 +1446,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str):
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     # run the command
-    exit_code = runCmd(cmd, stdin, stdout, stderr, opts.run_timeout_multiplier)
+    exit_code = runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
 
     # check the exit code
     if exit_code != opts.exit_code:
@@ -1497,7 +1497,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
     if (top_mod == ''):
         srcname = add_hs_lhs_suffix(name)
     else:
-        srcname = top_mod
+        srcname = Path(top_mod)
 
     delimiter = '===== program output begins here\n'
 
@@ -1634,7 +1634,7 @@ def dump_stderr( name: TestName ) -> None:
         print("Stderr (", name, "):")
         print(str)
 
-def read_no_crs(f: str) -> str:
+def read_no_crs(f: Path) -> str:
     s = ''
     try:
         # See Note [Universal newlines].
@@ -1646,7 +1646,7 @@ def read_no_crs(f: str) -> str:
         pass
     return s
 
-def write_file(f: str, s: str) -> None:
+def write_file(f: Path, s: str) -> None:
     # See Note [Universal newlines].
     with io.open(f, 'w', encoding='utf8', newline='') as h:
         h.write(s)
@@ -1717,11 +1717,11 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
     actual_prof_path = in_testdir(actual_prof_file)
 
     if not os.path.exists(actual_prof_path):
-        print(actual_prof_path + " does not exist")
+        print("%s does not exist" % actual_prof_path)
         return(False)
 
     if os.path.getsize(actual_prof_path) == 0:
-        print(actual_prof_path + " is empty")
+        print("%s is empty" % actual_prof_path)
         return(False)
 
     return compare_outputs(way, 'prof', normalise_prof,
@@ -1748,7 +1748,7 @@ def compare_outputs(way: WayName,
         expected_normalised_path = in_testdir(expected_normalised_file)
     else:
         expected_str = ''
-        expected_normalised_path = '/dev/null'
+        expected_normalised_path = Path('/dev/null')
 
     actual_raw = read_no_crs(actual_path)
     actual_str = normaliser(actual_raw)
@@ -2032,20 +2032,25 @@ def if_verbose( n: int, s: str ) -> None:
     if config.verbose >= n:
         print(s)
 
-def dump_file(f: str):
+def dump_file(f: Path):
     try:
         with io.open(f) as file:
             print(file.read())
     except Exception:
         print('')
 
-def runCmd(cmd: str, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=False) -> int:
+def runCmd(cmd: str,
+           stdin: Union[None, int, Path]=None,
+           stdout: Union[None, int, Path]=None,
+           stderr: Union[None, int, Path]=None,
+           timeout_multiplier=1.0,
+           print_output=False) -> int:
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
     # Format cmd using config. Example: cmd='{hpc} report A.tix'
     cmd = cmd.format(**config.__dict__)
-    if_verbose(3, cmd + ('< ' + os.path.basename(stdin) if stdin else ''))
+    if_verbose(3, '%s< %s' % (cmd, os.path.basename(stdin) if isinstance(stdin, Path) else ''))
 
     stdin_file = io.open(stdin, 'rb') if stdin else None
     stdout_buffer = b''
@@ -2096,7 +2101,7 @@ def runCmd(cmd: str, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
 
-def genGSCmd(psfile: str) -> str:
+def genGSCmd(psfile: Path) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
 def gsNotWorking() -> None:
@@ -2121,13 +2126,13 @@ if config.have_profiling:
   else:
     gsNotWorking();
 
-def add_suffix( name: str, suffix: str ) -> str:
+def add_suffix( name: Union[str, Path], suffix: str ) -> Path:
     if suffix == '':
-        return name
+        return Path(name)
     else:
-        return name + '.' + suffix
+        return Path(str(name) + '.' + suffix)
 
-def add_hs_lhs_suffix(name: str) -> str:
+def add_hs_lhs_suffix(name: str) -> Path:
     if getTestOpts().c_src:
         return add_suffix(name, 'c')
     elif getTestOpts().cmm_src:
@@ -2141,36 +2146,32 @@ def add_hs_lhs_suffix(name: str) -> str:
     else:
         return add_suffix(name, 'hs')
 
-def replace_suffix( name: str, suffix: str ) -> str:
-    base, suf = os.path.splitext(name)
-    return base + '.' + suffix
+def in_testdir(name: Union[Path, str], suffix: str='') -> Path:
+    return getTestOpts().testdir / add_suffix(name, suffix)
 
-def in_testdir(name: str, suffix: str='') -> str:
-    return os.path.join(getTestOpts().testdir, add_suffix(name, suffix))
+def in_srcdir(name: Union[Path, str], suffix: str='') -> Path:
+    return getTestOpts().srcdir / add_suffix(name, suffix)
 
-def in_srcdir(name: str, suffix: str='') -> str:
-    return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
-
-def in_statsdir(name: str, suffix: str='') -> str:
-    return os.path.join(config.stats_files_dir, add_suffix(name, suffix))
+def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
+    return getTestOpts().stats_file_dir / add_suffix(name, suffix)
 
 # Finding the sample output.  The filename is of the form
 #
 #   <test>.stdout[-ws-<wordsize>][-<platform>|-<os>]
 #
-def find_expected_file(name: TestName, suff: str) -> str:
+def find_expected_file(name: TestName, suff: str) -> Path:
     basename = add_suffix(name, suff)
     # Override the basename if the user has specified one, this will then be
     # subjected to the same name mangling scheme as normal to allow platform
     # specific overrides to work.
     basename = getTestOpts().use_specs.get (suff, basename)
 
-    files = [basename + ws + plat
+    files = [str(basename) + ws + plat
              for plat in ['-' + config.platform, '-' + config.os, '']
              for ws in ['-ws-' + config.wordsize, '']]
 
     for f in files:
-        if os.path.exists(in_srcdir(f)):
+        if in_srcdir(f).exists():
             return f
 
     return basename
