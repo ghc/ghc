@@ -2,6 +2,8 @@
 # (c) Simon Marlow 2002
 #
 
+from my_typing import *
+
 # -----------------------------------------------------------------------------
 # Configuration info
 
@@ -36,6 +38,27 @@ class TestConfig:
 
         # File in which to save the summary
         self.summary_file = ''
+
+        # Path to Ghostscript
+        self.gs = ''
+
+        # Run tests requiring Haddock
+        self.haddock = False
+
+        # Compiler has native code generator?
+        self.have_ncg = False
+
+        # Is compiler unregisterised?
+        self.unregisterised = False
+
+        # Was the compiler executable compiled with profiling?
+        self.compiler_profiled = False
+
+        # Was the compiler compiled with DEBUG?
+        self.compiler_debugged = False
+
+        # Was the compiler compiled with LLVM?
+        self.ghc_built_by_llvm = False
 
         # Should we print the summary?
         # Disabling this is useful for Phabricator/Harbormaster
@@ -78,16 +101,16 @@ class TestConfig:
         # Which ways to run tests (when compiling and running respectively)
         # Other ways are added from the command line if we have the appropriate
         # libraries.
-        self.compile_ways = []
-        self.run_ways     = []
-        self.other_ways   = []
+        self.compile_ways = [] # type: List[WayName]
+        self.run_ways     = [] # type: List[WayName]
+        self.other_ways   = [] # type: List[WayName]
 
         # The ways selected via the command line.
-        self.cmdline_ways = []
+        self.cmdline_ways = [] # type: List[WayName]
 
         # Lists of flags for each way
-        self.way_flags = {}
-        self.way_rts_flags = {}
+        self.way_flags = {}  # type: Dict[WayName, List[str]]
+        self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
         # Do we have vanilla libraries?
         self.have_vanilla = False
@@ -144,6 +167,10 @@ class TestConfig:
         # See Note [Haddock runtime stats files] at the bottom of this file.
         self.stats_files_dir = '/please_set_stats_files_dir'
 
+        # Should we cleanup after test runs?
+        self.cleanup = True
+
+
 global config
 config = TestConfig()
 
@@ -166,7 +193,13 @@ class TestResult:
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
     __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
-    def __init__(self, directory, testname, reason, way, stdout=None, stderr=None):
+    def __init__(self,
+                 directory: str,
+                 testname: TestName,
+                 reason: str,
+                 way: WayName,
+                 stdout: Optional[str]=None,
+                 stderr: Optional[str]=None):
         self.directory = directory
         self.testname = testname
         self.reason = reason
@@ -184,8 +217,7 @@ class TestRun:
        self.n_expected_passes = 0
        self.n_expected_failures = 0
 
-       # type: List[TestResult]
-       self.missing_libs = []
+       self.missing_libs = [] # type: List[TestResult]
        self.framework_failures = []
        self.framework_warnings = []
 
@@ -203,7 +235,7 @@ class TestRun:
 global t
 t = TestRun()
 
-def getTestRun():
+def getTestRun() -> TestRun:
     return t
 
 # -----------------------------------------------------------------------------
@@ -308,7 +340,7 @@ class TestOptions:
        self.compile_cmd_prefix = ''
 
        # Extra output normalisation
-       self.extra_normaliser = lambda x: x
+       self.extra_normaliser = lambda x: x # type: OutputNormalizer
 
        # Custom output checker, otherwise do a comparison with expected
        # stdout file.  Accepts two arguments: filename of actual stdout
@@ -334,8 +366,6 @@ class TestOptions:
        self.compile_timeout_multiplier = 1.0
        self.run_timeout_multiplier = 1.0
 
-       self.cleanup = True
-
        # Sould we run tests in a local subdirectory (<testname>-run) or
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
@@ -344,6 +374,8 @@ class TestOptions:
 global default_testopts
 default_testopts = TestOptions()
 
+BugNumber = int
+
 # (bug, directory, name) of tests marked broken
 global brokens
-brokens = []
+brokens = []  # type: List[Tuple[BugNumber, str, str]]

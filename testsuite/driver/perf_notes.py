@@ -673,7 +673,7 @@ if __name__ == '__main__':
         print(\
             "<html>" + \
                 '<head>\n' + \
-                    (tooltipjsTag if tooltipjsTag != None else '') + \
+                    (tooltipjsTag if tooltipjsTag is not None else '') + \
                     chartjsTag + \
                 '</head>' + \
                 '<body style="padding: 20px"><canvas id="myChart"></canvas><script>' + \
@@ -681,7 +681,7 @@ if __name__ == '__main__':
                     "var commitMsgs = " + json.dumps(commitMsgs, indent=2) + ";" + \
                     "var chartData = " + json.dumps(chartData, indent=2) + ";" + \
                     (("var chart = new Chart(ctx, setCustomTooltip(chartData, commitMsgs));") \
-                        if tooltipjsTag != None else \
+                        if tooltipjsTag is not None else \
                      ("var chart = new Chart(ctx, chartData);")) + \
                 '</script></body>' + \
             "</html>"\

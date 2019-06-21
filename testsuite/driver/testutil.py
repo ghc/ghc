@@ -2,8 +2,11 @@ import os
 import platform
 import subprocess
 import shutil
+from pathlib import Path, PurePath
 
 import threading
+
+from my_typing import *
 
 def passed():
     return {'passFail': 'pass'}
@@ -30,7 +33,7 @@ def str_warn(s):
 def str_info(s):
     return '\033[1m\033[34m' + s + '\033[0m'
 
-def getStdout(cmd_and_args):
+def getStdout(cmd_and_args: "List[str]"):
     # Can't use subprocess.check_output, since we also verify that
     # no stderr was produced
     p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
@@ -44,7 +47,7 @@ def getStdout(cmd_and_args):
         raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
     return stdout.decode('utf-8')
 
-def lndir(srcdir, dstdir):
+def lndir(srcdir: str, dstdir: str):
     # Create symlinks for all files in src directory.
     # Not all developers might have lndir installed.
     # os.system('lndir -silent {0} {1}'.format(srcdir, dstdir))
@@ -69,12 +72,12 @@ def testing_metrics():
 # We define the following function to make this magic more
 # explicit/discoverable. You are enouraged to use it instead of os.symlink.
 if platform.system() == 'Windows' and os.getenv('FORCE_SYMLINKS') == None:
-    link_or_copy_file = shutil.copyfile
+    link_or_copy_file = lambda src, dst: shutil.copyfile(src, dst)
 else:
-    link_or_copy_file = os.symlink
+    link_or_copy_file = lambda src, dst: os.symlink(src, dst)
 
 class Watcher(object):
-    def __init__(self, count):
+    def __init__(self, count: int):
         self.pool = count
         self.evt = threading.Event()
         self.sync_lock = threading.Lock()

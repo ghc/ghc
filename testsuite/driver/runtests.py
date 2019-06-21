@@ -66,6 +66,10 @@ perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do 
 
 args = parser.parse_args()
 
+# Initialize variables that are set by the build system with -e
+windows = False
+darwin = False
+
 if args.e:
     for e in args.e:
         exec(e)
@@ -284,7 +288,7 @@ t_files = list(findTFiles(config.rootdirs))
 
 print('Found', len(t_files), '.T files...')
 
-t = getTestRun()
+t = getTestRun() # type: TestRun
 
 # Avoid cmd.exe built-in 'date' command on Windows
 t.start_time = time.localtime()
@@ -435,8 +439,8 @@ else:
     stats = [stat for (_, stat) in t.metrics]
     if hasMetricsFile:
         print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
-        with open(config.metrics_file, 'a') as file:
-            file.write("\n" + Perf.format_perf_stat(stats))
+        with open(config.metrics_file, 'a') as f:
+            f.write("\n" + Perf.format_perf_stat(stats))
     elif inside_git_repo() and any(stats):
         if is_worktree_dirty():
             print()
@@ -448,8 +452,8 @@ else:
 
     # Write summary
     if config.summary_file:
-        with open(config.summary_file, 'w') as file:
-            summary(t, file)
+        with open(config.summary_file, 'w') as f:
+            summary(t, f)
 
     if args.junit:
         junit(t).write(args.junit)

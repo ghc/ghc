@@ -3,6 +3,8 @@
 # (c) Simon Marlow 2002
 #
 
+from __future__ import annotations
+
 import io
 import shutil
 import os
@@ -18,12 +20,17 @@ from pathlib import PurePath
 import collections
 import subprocess
 
-from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
+from testglobals import config, ghc_env, default_testopts, brokens, t, \
+                        TestRun, TestResult, TestOptions
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
+                     failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
+import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
+
+from my_typing import * # type: ignore
 
 global pool_sema
 if config.use_threads:
@@ -33,11 +40,11 @@ if config.use_threads:
 global wantToStop
 wantToStop = False
 
-def stopNow():
+def stopNow() -> None:
     global wantToStop
     wantToStop = True
 
-def stopping():
+def stopping() -> bool:
     return wantToStop
 
 
@@ -57,13 +64,13 @@ def getTestOpts():
 
 def setLocalTestOpts(opts):
     global testopts_local
-    testopts_local.x=opts
+    testopts_local.x = opts
 
-def isCompilerStatsTest():
+def isCompilerStatsTest() -> bool:
     opts = getTestOpts()
     return bool(opts.is_compiler_stats_test)
 
-def isStatsTest():
+def isStatsTest() -> bool:
     opts = getTestOpts()
     return opts.is_stats_test
 
@@ -133,9 +140,9 @@ def stage1(name, opts):
 
 # Cache the results of looking to see if we have a library or not.
 # This makes quite a difference, especially on Windows.
-have_lib_cache = {}
+have_lib_cache = {} # type: Dict[str, bool]
 
-def have_library(lib):
+def have_library(lib: str) -> bool:
     """ Test whether the given library is available """
     if lib in have_lib_cache:
         got_it = have_lib_cache[lib]
@@ -426,7 +433,7 @@ def _collect_stats(name, opts, metrics, deviation, is_compiler_stats_test=False)
 
 # -----
 
-def when(b, f):
+def when(b: bool, f):
     # When list_brokens is on, we want to see all expect_broken calls,
     # so we always do f
     if b or config.list_broken:
@@ -434,10 +441,10 @@ def when(b, f):
     else:
         return normal
 
-def unless(b, f):
+def unless(b: bool, f):
     return when(not b, f)
 
-def doing_ghci():
+def doing_ghci() -> bool:
     return 'ghci' in config.run_ways
 
 def requires_th(name, opts):
@@ -448,67 +455,67 @@ def requires_th(name, opts):
     """
     return when(ghc_dynamic(), omit_ways(['profasm']))
 
-def ghc_dynamic():
+def ghc_dynamic() -> bool:
     return config.ghc_dynamic
 
-def fast():
+def fast() -> bool:
     return config.speed == 2
 
-def platform( plat ):
+def platform( plat: str ) -> bool:
     return config.platform == plat
 
-def opsys( os ):
+def opsys( os: str ) -> bool:
     return config.os == os
 
-def arch( arch ):
+def arch( arch: str ) -> bool:
     return config.arch == arch
 
-def wordsize( ws ):
+def wordsize( ws: int ) -> bool:
     return config.wordsize == str(ws)
 
-def msys( ):
+def msys( ) -> bool:
     return config.msys
 
-def cygwin( ):
+def cygwin( ) -> bool:
     return config.cygwin
 
-def have_vanilla( ):
+def have_vanilla( ) -> bool:
     return config.have_vanilla
 
-def have_ncg( ):
+def have_ncg( ) -> bool:
     return config.have_ncg
 
-def have_dynamic( ):
+def have_dynamic( ) -> bool:
     return config.have_dynamic
 
-def have_profiling( ):
+def have_profiling( ) -> bool:
     return config.have_profiling
 
-def in_tree_compiler( ):
+def in_tree_compiler( ) -> bool:
     return config.in_tree_compiler
 
-def unregisterised( ):
+def unregisterised( ) -> bool:
     return config.unregisterised
 
-def compiler_profiled( ):
+def compiler_profiled( ) -> bool:
     return config.compiler_profiled
 
-def compiler_debugged( ):
+def compiler_debugged( ) -> bool:
     return config.compiler_debugged
 
-def have_gdb( ):
+def have_gdb( ) -> bool:
     return config.have_gdb
 
-def have_readelf( ):
+def have_readelf( ) -> bool:
     return config.have_readelf
 
-def integer_gmp( ):
+def integer_gmp( ) -> bool:
     return have_library("integer-gmp")
 
-def integer_simple( ):
+def integer_simple( ) -> bool:
     return have_library("integer-simple")
 
-def llvm_build ( ):
+def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
 
 # ---
@@ -722,9 +729,9 @@ def _newTestDir(name, opts, tempdir, dir):
 
 parallelTests = []
 aloneTests = []
-allTestNames = set([])
+allTestNames = set([])  # type: Set[TestName]
 
-def runTest(watcher, opts, name, func, args):
+def runTest(watcher, opts, name: TestName, func, args):
     if config.use_threads:
         pool_sema.acquire()
         t = threading.Thread(target=test_common_thread,
@@ -737,7 +744,9 @@ def runTest(watcher, opts, name, func, args):
 
 # name  :: String
 # setup :: [TestOpt] -> IO ()
-def test(name, setup, func, args):
+def test(name: TestName,
+         setup: "Callable[[List[TestOptions]], None]",
+         func, args):
     global aloneTests
     global parallelTests
     global allTestNames
@@ -779,7 +788,7 @@ if config.use_threads:
             finally:
                 pool_sema.release()
 
-def get_package_cache_timestamp():
+def get_package_cache_timestamp() -> float:
     if config.package_conf_cache_file == '':
         return 0.0
     else:
@@ -790,7 +799,9 @@ def get_package_cache_timestamp():
 
 do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o', '.out') # 12112
 
-def test_common_work(watcher, name, opts, func, args):
+def test_common_work(watcher: testutil.Watcher,
+                     name: TestName, opts,
+                     func, args) -> None:
     try:
         t.total_tests += 1
         setLocalTestOpts(opts)
@@ -803,12 +814,12 @@ def test_common_work(watcher, name, opts, func, args):
         elif func == compile_and_run or func == multimod_compile_and_run:
             all_ways = config.run_ways
         elif func == ghci_script:
-            if 'ghci' in config.run_ways:
-                all_ways = ['ghci']
+            if WayName('ghci') in config.run_ways:
+                all_ways = [WayName('ghci')]
             else:
                 all_ways = []
         else:
-            all_ways = ['normal']
+            all_ways = [WayName('normal')]
 
         # A test itself can request extra ways by setting opts.extra_ways
         all_ways = all_ways + [way for way in opts.extra_ways if way not in all_ways]
@@ -897,7 +908,7 @@ def test_common_work(watcher, name, opts, func, args):
     finally:
         watcher.notify()
 
-def do_test(name, way, func, args, files):
+def do_test(name: TestName, way: WayName, func, args, files) -> None:
     opts = getTestOpts()
 
     full_name = name + '(' + way + ')'
@@ -951,10 +962,10 @@ def do_test(name, way, func, args, files):
         src_makefile = in_srcdir('Makefile')
         dst_makefile = in_testdir('Makefile')
         if os.path.exists(src_makefile):
-            with io.open(src_makefile, 'r', encoding='utf8') as src:
-                makefile = re.sub('TOP=.*', 'TOP=' + config.top, src.read(), 1)
-                with io.open(dst_makefile, 'w', encoding='utf8') as dst:
-                    dst.write(makefile)
+            with io.open(src_makefile, 'r', encoding='utf8') as src_f:
+                makefile = re.sub('TOP=.*', 'TOP=' + config.top, src_f.read(), 1)
+                with io.open(dst_makefile, 'w', encoding='utf8') as dst_f:
+                    dst_f.write(makefile)
 
     if opts.pre_cmd:
         exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
@@ -1396,12 +1407,12 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run(name, way, prog, extra_run_opts):
+def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str):
     opts = getTestOpts()
 
     # figure out what to use for stdin
     if opts.stdin:
-        stdin = in_testdir(opts.stdin)
+        stdin = in_testdir(opts.stdin) # type: Optional[str]
     elif os.path.exists(in_testdir(name, 'stdin')):
         stdin = in_testdir(name, 'stdin')
     else:
@@ -1409,7 +1420,7 @@ def simple_run(name, way, prog, extra_run_opts):
 
     stdout = in_testdir(name, 'run.stdout')
     if opts.combined_output:
-        stderr = subprocess.STDOUT
+        stderr = subprocess.STDOUT # type: Union[int, str]
     else:
         stderr = in_testdir(name, 'run.stderr')
 
@@ -1465,14 +1476,14 @@ def simple_run(name, way, prog, extra_run_opts):
 
     return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
 
-def rts_flags(way):
+def rts_flags(way: WayName) -> str:
     args = config.way_rts_flags.get(way, [])
     return '+RTS {0} -RTS'.format(' '.join(args)) if args else ''
 
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
 
-def interpreter_run(name, way, extra_hc_opts, top_mod):
+def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_mod: str) -> None:
     opts = getTestOpts()
 
     stdout = in_testdir(name, 'interp.stdout')
@@ -1568,7 +1579,7 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
 
 # -----------------------------------------------------------------------------
 # Utils
-def get_compiler_flags():
+def get_compiler_flags() -> List[str]:
     opts = getTestOpts()
 
     flags = copy.copy(opts.compiler_always_flags)
@@ -1580,7 +1591,7 @@ def get_compiler_flags():
 
     return flags
 
-def stdout_ok(name, way):
+def stdout_ok(name: TestName, way: WayName) -> bool:
    actual_stdout_file = add_suffix(name, 'run.stdout')
    expected_stdout_file = find_expected_file(name, 'stdout')
 
@@ -1594,17 +1605,17 @@ def stdout_ok(name, way):
    return compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
-def read_stdout( name ):
+def read_stdout( name: TestName ) -> str:
     with open(in_testdir(name, 'run.stdout'), encoding='utf8') as f:
         return f.read()
 
-def dump_stdout( name ):
+def dump_stdout( name: TestName ) -> None:
     str = read_stdout(name).strip()
     if str:
         print("Stdout (", name, "):")
         print(str)
 
-def stderr_ok(name, way):
+def stderr_ok(name: TestName, way: WayName) -> bool:
    actual_stderr_file = add_suffix(name, 'run.stderr')
    expected_stderr_file = find_expected_file(name, 'stderr')
 
@@ -1613,32 +1624,32 @@ def stderr_ok(name, way):
                           expected_stderr_file, actual_stderr_file,
                           whitespace_normaliser=normalise_whitespace)
 
-def read_stderr( name ):
+def read_stderr( name: TestName ) -> str:
     with open(in_testdir(name, 'run.stderr'), encoding='utf8') as f:
         return f.read()
 
-def dump_stderr( name ):
+def dump_stderr( name: TestName ) -> None:
     str = read_stderr(name).strip()
     if str:
         print("Stderr (", name, "):")
         print(str)
 
-def read_no_crs(file):
-    str = ''
+def read_no_crs(f: str) -> str:
+    s = ''
     try:
         # See Note [Universal newlines].
-        with io.open(file, 'r', encoding='utf8', errors='replace', newline=None) as h:
-            str = h.read()
+        with io.open(f, 'r', encoding='utf8', errors='replace', newline=None) as h:
+            s = h.read()
     except Exception:
         # On Windows, if the program fails very early, it seems the
         # files stdout/stderr are redirected to may not get created
         pass
-    return str
+    return s
 
-def write_file(file, str):
+def write_file(f: str, s: str) -> None:
     # See Note [Universal newlines].
-    with io.open(file, 'w', encoding='utf8', newline='') as h:
-        h.write(str)
+    with io.open(f, 'w', encoding='utf8', newline='') as h:
+        h.write(s)
 
 # Note [Universal newlines]
 #
@@ -1665,7 +1676,7 @@ def write_file(file, str):
 # Another solution would be to open files in binary mode always, and
 # operate on bytes.
 
-def check_hp_ok(name):
+def check_hp_ok(name: TestName) -> bool:
     opts = getTestOpts()
 
     # do not qualify for hp2ps because we should be in the right directory
@@ -1680,18 +1691,20 @@ def check_hp_ok(name):
             if gs_working:
                 gsResult = runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
-                    return (True)
+                    return True
                 else:
                     print("hp2ps output for " + name + " is not valid PostScript")
-            else: return (True) # assume postscript is valid without ghostscript
+                    return False
+            else:
+                return True # assume postscript is valid without ghostscript
         else:
             print("hp2ps did not generate PostScript for " + name)
-            return (False)
+            return  False
     else:
         print("hp2ps error when processing heap profile for " + name)
-        return(False)
+        return False
 
-def check_prof_ok(name, way):
+def check_prof_ok(name: TestName, way: WayName) -> bool:
     expected_prof_file = find_expected_file(name, 'prof.sample')
     expected_prof_path = in_testdir(expected_prof_file)
 
@@ -1719,8 +1732,11 @@ def check_prof_ok(name, way):
 # new output. Returns true if output matched or was accepted, false
 # otherwise. See Note [Output comparison] for the meaning of the
 # normaliser and whitespace_normaliser parameters.
-def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file=None,
-                    whitespace_normaliser=lambda x:x):
+def compare_outputs(way: WayName,
+                    kind: str,
+                    normaliser: OutputNormalizer,
+                    expected_file, actual_file, diff_file=None,
+                    whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
 
     expected_path = in_srcdir(expected_file)
     actual_path = in_testdir(actual_file)
@@ -1794,7 +1810,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file, diff_file
 
 # Checks that each line from pattern_file is present in actual_file as
 # a substring or regex pattern depending on is_substring.
-def grep_output(normaliser, pattern_file, actual_file, is_substring=True):
+def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_substring: bool=True):
     expected_path = in_srcdir(pattern_file)
     actual_path = in_testdir(actual_file)
 
@@ -1845,13 +1861,13 @@ def grep_output(normaliser, pattern_file, actual_file, is_substring=True):
 #    on the `diff` program to ignore whitespace changes as much as
 #    possible (#10152).
 
-def normalise_whitespace( str ):
+def normalise_whitespace(s: str) -> str:
     # Merge contiguous whitespace characters into a single space.
-    return ' '.join(str.split())
+    return ' '.join(s.split())
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
-def normalise_callstacks(s):
+def normalise_callstacks(s: str) -> str:
     opts = getTestOpts()
     def repl(matches):
         location = matches.group(1)
@@ -1869,72 +1885,72 @@ def normalise_callstacks(s):
 
 tyCon_re = re.compile(r'TyCon\s*\d+L?\#\#\s*\d+L?\#\#\s*', flags=re.MULTILINE)
 
-def normalise_type_reps(str):
+def normalise_type_reps(s: str) -> str:
     """ Normalise out fingerprints from Typeable TyCon representations """
-    return re.sub(tyCon_re, 'TyCon FINGERPRINT FINGERPRINT ', str)
+    return re.sub(tyCon_re, 'TyCon FINGERPRINT FINGERPRINT ', s)
 
-def normalise_errmsg( str ):
+def normalise_errmsg(s: str) -> str:
     """Normalise error-messages emitted via stderr"""
     # IBM AIX's `ld` is a bit chatty
     if opsys('aix'):
-        str = str.replace('ld: 0706-027 The -x flag is ignored.\n', '')
+        s = s.replace('ld: 0706-027 The -x flag is ignored.\n', '')
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
-    str = modify_lines(str, lambda l: re.sub(' error:', '', l))
-    str = modify_lines(str, lambda l: re.sub(' Warning:', ' warning:', l))
-    str = normalise_callstacks(str)
-    str = normalise_type_reps(str)
+    s = modify_lines(s, lambda l: re.sub(' error:', '', l))
+    s = modify_lines(s, lambda l: re.sub(' Warning:', ' warning:', l))
+    s = normalise_callstacks(s)
+    s = normalise_type_reps(s)
 
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
     #    hacky solution is used in place of more sophisticated filename
     #    mangling
-    str = re.sub('([^\\s])\\.exe', '\\1', str)
+    s = re.sub('([^\\s])\\.exe', '\\1', s)
 
     # normalise slashes, minimise Windows/Unix filename differences
-    str = re.sub('\\\\', '/', str)
+    s = re.sub('\\\\', '/', s)
 
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
-    str = re.sub('ghc-stage[123]', 'ghc', str)
+    s = re.sub('ghc-stage[123]', 'ghc', s)
 
     # Error messages sometimes contain integer implementation package
-    str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+    s = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
 
     # Error messages sometimes contain this blurb which can vary
     # spuriously depending upon build configuration (e.g. based on integer
     # backend)
-    str = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
-                 '...plus N instances involving out-of-scope types', str)
+    s = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
+                 '...plus N instances involving out-of-scope types', s)
 
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
     # the division happens.
-    bullet = '•'.encode('utf8') if isinstance(str, bytes) else '•'
-    str = str.replace(bullet, '')
+    bullet = '•'.encode('utf8') if isinstance(s, bytes) else '•'
+    s = s.replace(bullet, '')
 
     # Windows only, this is a bug in hsc2hs but it is preventing
     # stable output for the testsuite. See #9775. For now we filter out this
     # warning message to get clean output.
     if config.msys:
-        str = re.sub('Failed to remove file (.*); error= (.*)$', '', str)
-        str = re.sub('DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', str)
+        s = re.sub('Failed to remove file (.*); error= (.*)$', '', s)
+        s = re.sub('DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', s)
 
-    return str
+    return s
 
 # normalise a .prof file, so that we can reasonably compare it against
 # a sample.  This doesn't compare any of the actual profiling data,
 # only the shape of the profile and the number of entries.
-def normalise_prof (str):
-    # strip everything up to the line beginning "COST CENTRE"
-    str = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',str)
+def normalise_prof (s: str) -> str:
+    # sip everything up to the line beginning "COST CENTRE"
+    s = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',s)
 
-    # strip results for CAFs, these tend to change unpredictably
-    str = re.sub('[ \t]*(CAF|IDLE).*\n','',str)
+    # sip results for CAFs, these tend to change unpredictably
+    s = re.sub('[ \t]*(CAF|IDLE).*\n','',s)
 
     # XXX Ignore Main.main.  Sometimes this appears under CAF, and
     # sometimes under MAIN.
-    str = re.sub('[ \t]*main[ \t]+Main.*\n','',str)
+    s = re.sub('[ \t]*main[ \t]+Main.*\n','',s)
 
     # We have something like this:
     #
@@ -1967,64 +1983,63 @@ def normalise_prof (str):
     # Split 9 whitespace-separated groups, take columns 1 (cost-centre), 2
     # (module), 3 (src), and 5 (entries). SCC names can't have whitespace, so
     # this works fine.
-    str = re.sub(r'\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*',
-            '\\1 \\2 \\3 \\5\n', str)
-    return str
+    s = re.sub(r'\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*(\S+)\s*',
+            '\\1 \\2 \\3 \\5\n', s)
+    return s
 
-def normalise_slashes_( str ):
-    str = re.sub('\\\\', '/', str)
-    str = re.sub('//', '/', str)
-    return str
+def normalise_slashes_( s: str ) -> str:
+    s = re.sub('\\\\', '/', s)
+    s = re.sub('//', '/', s)
+    return s
 
-def normalise_exe_( str ):
-    str = re.sub('\.exe', '', str)
-    return str
+def normalise_exe_( s: str ) -> str:
+    s = re.sub('\.exe', '', s)
+    return s
 
-def normalise_output( str ):
+def normalise_output( s: str ) -> str:
     # remove " error:" and lower-case " Warning:" to make patch for
     # trac issue #10021 smaller
-    str = modify_lines(str, lambda l: re.sub(' error:', '', l))
-    str = modify_lines(str, lambda l: re.sub(' Warning:', ' warning:', l))
+    s = modify_lines(s, lambda l: re.sub(' error:', '', l))
+    s = modify_lines(s, lambda l: re.sub(' Warning:', ' warning:', l))
     # Remove a .exe extension (for Windows)
     # This can occur in error messages generated by the program.
-    str = re.sub('([^\\s])\\.exe', '\\1', str)
-    str = normalise_callstacks(str)
-    str = normalise_type_reps(str)
-    return str
+    s = re.sub('([^\\s])\\.exe', '\\1', s)
+    s = normalise_callstacks(s)
+    s = normalise_type_reps(s)
+    return s
 
-def normalise_asm( str ):
-    lines = str.split('\n')
-    # Only keep instructions and labels not starting with a dot.
+def normalise_asm( s: str ) -> str:
+    lines = s.split('\n')
+    # Only keep insuctions and labels not starting with a dot.
     metadata = re.compile('^[ \t]*\\..*$')
     out = []
     for line in lines:
       # Drop metadata directives (e.g. ".type")
       if not metadata.match(line):
         line = re.sub('@plt', '', line)
-        instr = line.lstrip().split()
+        ins = line.lstrip().split()
         # Drop empty lines.
-        if not instr:
+        if not ins:
           continue
-        # Drop operands, except for call instructions.
-        elif instr[0] == 'call':
-          out.append(instr[0] + ' ' + instr[1])
+        # Drop operands, except for call insuctions.
+        elif ins[0] == 'call':
+          out.append(ins[0] + ' ' + ins[1])
         else:
-          out.append(instr[0])
-    out = '\n'.join(out)
-    return out
+          out.append(ins[0])
+    return '\n'.join(out)
 
-def if_verbose( n, s ):
+def if_verbose( n: int, s: str ) -> None:
     if config.verbose >= n:
         print(s)
 
-def dump_file(f):
+def dump_file(f: str):
     try:
         with io.open(f) as file:
             print(file.read())
     except Exception:
         print('')
 
-def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=False):
+def runCmd(cmd: str, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=False) -> int:
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
@@ -2081,10 +2096,10 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
 
-def genGSCmd(psfile):
+def genGSCmd(psfile: str) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
-def gsNotWorking():
+def gsNotWorking() -> None:
     global gs_working
     print("GhostScript not available for hp2ps tests")
 
@@ -2106,13 +2121,13 @@ if config.have_profiling:
   else:
     gsNotWorking();
 
-def add_suffix( name, suffix ):
+def add_suffix( name: str, suffix: str ) -> str:
     if suffix == '':
         return name
     else:
         return name + '.' + suffix
 
-def add_hs_lhs_suffix(name):
+def add_hs_lhs_suffix(name: str) -> str:
     if getTestOpts().c_src:
         return add_suffix(name, 'c')
     elif getTestOpts().cmm_src:
@@ -2126,24 +2141,24 @@ def add_hs_lhs_suffix(name):
     else:
         return add_suffix(name, 'hs')
 
-def replace_suffix( name, suffix ):
+def replace_suffix( name: str, suffix: str ) -> str:
     base, suf = os.path.splitext(name)
     return base + '.' + suffix
 
-def in_testdir(name, suffix=''):
+def in_testdir(name: str, suffix: str='') -> str:
     return os.path.join(getTestOpts().testdir, add_suffix(name, suffix))
 
-def in_srcdir(name, suffix=''):
+def in_srcdir(name: str, suffix: str='') -> str:
     return os.path.join(getTestOpts().srcdir, add_suffix(name, suffix))
 
-def in_statsdir(name, suffix=''):
+def in_statsdir(name: str, suffix: str='') -> str:
     return os.path.join(config.stats_files_dir, add_suffix(name, suffix))
 
 # Finding the sample output.  The filename is of the form
 #
 #   <test>.stdout[-ws-<wordsize>][-<platform>|-<os>]
 #
-def find_expected_file(name, suff):
+def find_expected_file(name: TestName, suff: str) -> str:
     basename = add_suffix(name, suff)
     # Override the basename if the user has specified one, this will then be
     # subjected to the same name mangling scheme as normal to allow platform
@@ -2162,7 +2177,7 @@ def find_expected_file(name, suff):
 
 if config.msys:
     import stat
-    def cleanup():
+    def cleanup() -> None:
         testdir = getTestOpts().testdir
         max_attempts = 5
         retries = max_attempts
@@ -2202,7 +2217,7 @@ if config.msys:
             raise Exception("Unable to remove folder '%s': %s\nUnable to start current test."
                             % (testdir, exception))
 else:
-    def cleanup():
+    def cleanup() -> None:
         testdir = getTestOpts().testdir
         if os.path.exists(testdir):
             shutil.rmtree(testdir, ignore_errors=False)
@@ -2211,7 +2226,7 @@ else:
 # -----------------------------------------------------------------------------
 # Return a list of all the files ending in '.T' below directories roots.
 
-def findTFiles(roots):
+def findTFiles(roots: List[str]) -> Iterator[str]:
     for root in roots:
         for path, dirs, files in os.walk(root, topdown=True):
             # Never pick up .T files in uncleaned .run directories.
@@ -2224,7 +2239,7 @@ def findTFiles(roots):
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t, file, short=False, color=False):
+def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
 
     file.write('\n')
     printUnexpectedTests(file,
@@ -2299,7 +2314,7 @@ def summary(t, file, short=False, color=False):
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
 
-def printUnexpectedTests(file, testInfoss):
+def printUnexpectedTests(file: TextIO, testInfoss):
     unexpected = set(result.testname
                      for testInfos in testInfoss
                      for result in testInfos
@@ -2309,7 +2324,7 @@ def printUnexpectedTests(file, testInfoss):
         file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
-def printTestInfosSummary(file, testInfos):
+def printTestInfosSummary(file: TextIO, testInfos):
     maxDirLen = max(len(tr.directory) for tr in testInfos)
     for result in sorted(testInfos, key=lambda r: (r.testname.lower(), r.way, r.directory)):
         directory = result.directory.ljust(maxDirLen)
@@ -2318,7 +2333,7 @@ def printTestInfosSummary(file, testInfos):
             directory = directory))
     file.write('\n')
 
-def modify_lines(s, f):
+def modify_lines(s: str, f: Callable[[str], str]) -> str:
     s = '\n'.join([f(l) for l in s.splitlines()])
     if s and s[-1] != '\n':
         # Prevent '\ No newline at end of file' warnings when diffing.
