@@ -511,9 +511,17 @@ hasNoBinding :: Id -> Bool
 -- Data constructor workers used to be things of this kind, but
 -- they aren't any more.  Instead, we inject a binding for
 -- them at the CorePrep stage.
+--
+-- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers] in PrimOp.hs.
+-- for the history of this.
+--
+-- Note that CorePrep currently eta expands things no-binding things and this
+-- can cause quite subtle bugs. See Note [Eta expansion of hasNoBinding things
+-- in CorePrep] in CorePrep for details.
+--
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> True        -- See Note [Primop wrappers]
+                        PrimOpId _       -> False   -- See Note [Primop wrappers] in PrimOp.hs
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
@@ -557,19 +565,6 @@ The easiest way to do this is for hasNoBinding to return True of all things
 that have compulsory unfolding.  A very Ids with a compulsory unfolding also
 have a binding, but it does not harm to say they don't here, and its a very
 simple way to fix Trac #14561.
-
-Note [Primop wrappers]
-~~~~~~~~~~~~~~~~~~~~~~
-Currently hasNoBinding claims that PrimOpIds don't have a curried
-function definition.  But actually they do, in GHC.PrimopWrappers,
-which is auto-generated from prelude/primops.txt.pp.  So actually, hasNoBinding
-could return 'False' for PrimOpIds.
-
-But we'd need to add something in CoreToStg to swizzle any unsaturated
-applications of GHC.Prim.plusInt# to GHC.PrimopWrappers.plusInt#.
-
-Nota Bene: GHC.PrimopWrappers is needed *regardless*, because it's
-used by GHCi, which does not implement primops direct at all.
 -}
 
 isDeadBinder :: Id -> Bool

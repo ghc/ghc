@@ -1285,7 +1285,48 @@ So we have to *predict* the result here, which is revolting.
 
 In particular CorePrep expands Integer and Natural literals. So in the
 prediction code here we resort to applying the same expansion (cvt_literal).
-Ugh!
+There are also numberous other ways in which we can introduce inconsistencies
+between CorePrep and TidyPgm. See Note [CAFfyness inconsistencies due to eta
+expansion in TidyPgm] for one such example.
+
+Ugh! What ugliness we hath wrought.
+
+
+Note [CAFfyness inconsistencies due to eta expansion in TidyPgm]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Eta expansion during CorePrep can have non-obvious negative consequences on
+the CAFfyness computation done by TidyPgm (see Note [Disgusting computation of
+CafRefs] in TidyPgm). This late expansion happens/happened for a few reasons:
+
+ * CorePrep previously eta expanded unsaturated primop applications, as
+   described in Note [Primop wrappers]).
+
+ * CorePrep still does eta expand unsaturated data constructor applications.
+
+In particular, consider the program:
+
+    data Ty = Ty (RealWorld# -> (# RealWorld#, Int #))
+
+    -- Is this CAFfy?
+    x :: STM Int
+    x = Ty (retry# @Int)
+
+Consider whether x is CAFfy. One might be tempted to answer "no".
+Afterall, f obviously has no CAF references and the application (retry#
+@Int) is essentially just a variable reference at runtime.
+
+However, when CorePrep expanded the unsaturated application of 'retry#'
+it would rewrite this to
+
+    x = \u []
+       let sat = retry# @Int
+       in Ty sat
+
+This is now a CAF. Failing to handle this properly was the cause of
+#16846. We fixed this by eliminating the need to eta expand primops, as
+described in Note [Primop wrappers]), However we have not yet done the same for
+data constructor applications.
+
 -}
 
 type CafRefEnv = (VarEnv Id, LitNumType -> Integer -> Maybe CoreExpr)
