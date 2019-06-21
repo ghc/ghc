@@ -45,7 +45,7 @@ import Util
 import DynFlags
 import ForeignCall
 import Demand           ( isUsedOnce )
-import PrimOp           ( PrimCall(..) )
+import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
 
 import Data.List.NonEmpty (nonEmpty, toList)
@@ -537,8 +537,12 @@ coreToStgApp _ f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
+                -- turn unsaturated primop applications into applications of
+                -- the primop's wrapper.
+                PrimOpId op
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)

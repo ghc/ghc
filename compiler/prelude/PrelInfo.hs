@@ -131,6 +131,7 @@ knownKeyNames
 
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps
+             , map (idName . primOpWrapperId) allThePrimOps
              , basicKnownKeyNames
              , templateHaskellNames
              ]
