@@ -46,6 +46,9 @@ StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *excepti
 /* findRetryFrameHelper */
 StgWord findRetryFrameHelper (Capability *cap, StgTSO *tso);
 
+/* findAtomicallyFrameHelper */
+StgWord findAtomicallyFrameHelper (Capability *cap, StgTSO *tso);
+
 /* Entry point for a new worker */
 void scheduleWorker (Capability *cap, Task *task);
 

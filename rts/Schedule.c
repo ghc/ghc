@@ -2999,6 +2999,72 @@ findRetryFrameHelper (Capability *cap, StgTSO *tso)
 }
 
 /* -----------------------------------------------------------------------------
+   findAtomicallyFrameHelper
+
+   This function is called by stg_abort via catch_retry_frame primitive.  It is
+   like findRetryFrameHelper but it will only stop at ATOMICALLY_FRAME.
+   -------------------------------------------------------------------------- */
+
+StgWord
+findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
+{
+  const StgRetInfoTable *info;
+  StgPtr    p, next;
+
+  p = tso->stackobj->sp;
+  while (1) {
+    info = get_ret_itbl((const StgClosure *)p);
+    next = p + stack_frame_sizeW((StgClosure *)p);
+    switch (info->i.type) {
+
+    case ATOMICALLY_FRAME:
+        debugTrace(DEBUG_stm,
+                   "found ATOMICALLY_FRAME at %p while aborting after orElse", p);
+        tso->stackobj->sp = p;
+        return ATOMICALLY_FRAME;
+
+    case CATCH_RETRY_FRAME: {
+        StgTRecHeader *trec = tso -> trec;
+        StgTRecHeader *outer = trec -> enclosing_trec;
+        debugTrace(DEBUG_stm,
+                   "found CATCH_RETRY_FRAME at %p while aborting after orElse", p);
+        debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
+        stmAbortTransaction(cap, trec);
+        stmFreeAbortedTRec(cap, trec);
+        tso -> trec = outer;
+        p = next;
+        continue;
+    }
+
+    case CATCH_STM_FRAME: {
+        StgTRecHeader *trec = tso -> trec;
+        StgTRecHeader *outer = trec -> enclosing_trec;
+        debugTrace(DEBUG_stm,
+                   "found CATCH_STM_FRAME at %p while aborting after orElse", p);
+        debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
+        stmAbortTransaction(cap, trec);
+        stmFreeAbortedTRec(cap, trec);
+        tso -> trec = outer;
+        p = next;
+        continue;
+    }
+
+    case UNDERFLOW_FRAME:
+        tso->stackobj->sp = p;
+        threadStackUnderflow(cap,tso);
+        p = tso->stackobj->sp;
+        continue;
+
+    default:
+      ASSERT(info->i.type != CATCH_FRAME);
+      ASSERT(info->i.type != STOP_FRAME);
+      p = next;
+      continue;
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
    resurrectThreads is called after garbage collection on the list of
    threads found to be garbage.  Each of these threads will be woken
    up and sent a signal: BlockedOnDeadMVar if the thread was blocked
