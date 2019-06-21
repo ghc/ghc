@@ -3,20 +3,3 @@ tcfail063.hs:6:9: error:
     • Expecting one more argument to ‘Num’
       Expected a constraint, but ‘Num’ has kind ‘* -> Constraint’
     • In the type signature: moby :: Num => Int -> a -> Int
-
-tcfail063.hs:7:14: error:
-    • Could not deduce: a ~ Int
-      from the context: Num
-        bound by the type signature for:
-                   moby :: forall a. Num => Int -> a -> Int
-        at tcfail063.hs:6:1-30
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          moby :: forall a. Num => Int -> a -> Int
-        at tcfail063.hs:6:1-30
-    • In the second argument of ‘(+)’, namely ‘y’
-      In the expression: x + y
-      In an equation for ‘moby’: moby x y = x + y
-    • Relevant bindings include
-        y :: a (bound at tcfail063.hs:7:8)
-        moby :: Int -> a -> Int (bound at tcfail063.hs:7:1)

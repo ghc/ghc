@@ -759,14 +759,14 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
+  = ASSERT2( False, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
 
 --------------------
@@ -1066,18 +1066,18 @@ we are trying to generalise this type:
   forall arg. ... (alpha[tau]:arg) ...
 
 We have a metavariable alpha whose kind mentions a skolem variable
-boudn inside the very type we are generalising.
+bound inside the very type we are generalising.
 This can arise while type-checking a user-written type signature
 (see the test case for the full code).
 
 We cannot generalise over alpha!  That would produce a type like
   forall {a :: arg}. forall arg. ...blah...
 The fact that alpha's kind mentions arg renders it completely
-ineligible for generaliation.
+ineligible for generalisation.
 
 However, we are not going to learn any new constraints on alpha,
-because its kind isn't even in scope in the outer context.  So alpha
-is entirely unconstrained.
+because its kind isn't even in scope in the outer context (but see Wrinkle).
+So alpha is entirely unconstrained.
 
 What then should we do with alpha?  During generalization, every
 metavariable is either (A) promoted, (B) generalized, or (C) zapped
@@ -1097,6 +1097,17 @@ the final zonk (which zaps any lingering metavariables to Any).
 We do this eager zapping in candidateQTyVars, which always precedes
 generalisation, because at that moment we have a clear picture of
 what skolems are in scope.
+
+Wrinkle:
+
+We must make absolutely sure that alpha indeed is not
+from an outer context. (Otherwise, we might indeed learn more information
+about it.) This can be done easily: we just check alpha's TcLevel.
+That level must be strictly greater than the ambient TcLevel in order
+to treat it as naughty. We say "strictly greater than" because the call to
+candidateQTyVars is made outside the bumped TcLevel, as stated in the
+comment to candidateQTyVarsOfType. The level check is done in go_tv
+in collect_cant_qtvs. Skipping this check caused #16517.
 
 -}
 
@@ -1145,13 +1156,17 @@ candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 -- | Gathers free variables to use as quantification candidates (in
 -- 'quantifyTyVars'). This might output the same var
 -- in both sets, if it's used in both a type and a kind.
+-- The variables to quantify must have a TcLevel strictly greater than
+-- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
 candidateQTyVarsOfType :: TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
 candidateQTyVarsOfType ty = collect_cand_qtvs False emptyVarSet mempty ty
 
--- | Like 'splitDepVarsOfType', but over a list of types
+-- | Like 'candidateQTyVarsOfType', but over a list of types
+-- The variables to quantify must have a TcLevel strictly greater than
+-- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
 candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
 candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempty tys
 
@@ -1175,7 +1190,7 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
 
 collect_cand_qtvs
   :: Bool            -- True <=> consider every fv in Type to be dependent
-  -> VarSet          -- Bound variables (both locally bound and globally bound)
+  -> VarSet          -- Bound variables (locals only)
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
   -> TcM CandidatesQTvs
@@ -1220,16 +1235,26 @@ collect_cand_qtvs is_dep bound dvs ty
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | tv `elemDVarSet` kvs = return dv  -- We have met this tyvar aleady
+      | tv `elemDVarSet` kvs
+      = return dv  -- We have met this tyvar aleady
+
       | not is_dep
-      , tv `elemDVarSet` tvs = return dv  -- We have met this tyvar aleady
+      , tv `elemDVarSet` tvs
+      = return dv  -- We have met this tyvar aleady
+
       | otherwise
       = do { tv_kind <- zonkTcType (tyVarKind tv)
                  -- This zonk is annoying, but it is necessary, both to
                  -- ensure that the collected candidates have zonked kinds
                  -- (Trac #15795) and to make the naughty check
                  -- (which comes next) works correctly
-           ; if intersectsVarSet bound (tyCoVarsOfType tv_kind)
+
+           ; cur_lvl <- getTcLevel
+           ; if tcTyVarLevel tv `strictlyDeeperThan` cur_lvl &&
+                   -- this tyvar is from an outer context: see Wrinkle
+                   -- in Note [Naughty quantification candidates]
+
+                intersectsVarSet bound (tyCoVarsOfType tv_kind)
 
              then -- See Note [Naughty quantification candidates]
                   do { traceTc "Zapping naughty quantifier" (pprTyVar tv)

@@ -80,6 +80,7 @@ import Data.IORef
 import Data.Maybe       ( fromMaybe )
 import Data.Ord
 import Data.Time
+import Debug.Trace
 import Control.Monad
 import Control.Monad.IO.Class
 import System.IO
@@ -598,9 +599,10 @@ fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
-compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 $
-    logOutput dflags (defaultUserStyle dflags) (text msg)
+compilationProgressMsg dflags msg = do
+    traceEventIO $ "GHC progress: " ++ msg
+    ifVerbose dflags 1 $
+        logOutput dflags (defaultUserStyle dflags) (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
@@ -641,10 +643,12 @@ withTiming getDFlags what force_result action
        if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
+                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:started:" <+> what
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
                   !r <- action
                   () <- pure $ force_result r
+                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:finished:" <+> what
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
