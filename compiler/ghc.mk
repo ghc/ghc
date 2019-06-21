@@ -90,7 +90,7 @@ PLATFORM_H = ghc_boot_platform.h
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
-	@echo "#ifndef __PLATFORM_H__"                           >> $@
+	@echo "#if !defined(__PLATFORM_H__)"                     >> $@
 	@echo "#define __PLATFORM_H__"                           >> $@
 	@echo                                                    >> $@
 	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
@@ -131,7 +131,7 @@ compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
-	@echo "#ifndef __PLATFORM_H__"                            >> $@
+	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
 	@echo "#define __PLATFORM_H__"                            >> $@
 	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
