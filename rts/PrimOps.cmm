@@ -1032,6 +1032,37 @@ stg_threadStatuszh ( gcptr tso )
  * TVar primitives
  * -------------------------------------------------------------------------- */
 
+stg_abort /* no arg list: explicit stack layout */
+{
+    W_ frame_type;
+    W_ frame;
+    W_ trec;
+    W_ outer;
+    W_ r;
+
+    // STM operations may allocate
+    MAYBE_GC_ (stg_abort); // NB. not MAYBE_GC(), we cannot make a
+                           // function call in an explicit-stack proc
+
+    // Find the enclosing ATOMICALLY_FRAME
+    SAVE_THREAD_STATE();
+    (frame_type) = ccall findAtomicallyFrameHelper(MyCapability(), CurrentTSO "ptr");
+    LOAD_THREAD_STATE();
+    frame = Sp;
+    trec = StgTSO_trec(CurrentTSO);
+    outer  = StgTRecHeader_enclosing_trec(trec);
+
+    // We've reached the ATOMICALLY_FRAME
+    ASSERT(frame_type == ATOMICALLY_FRAME);
+    ASSERT(outer == NO_TREC);
+
+    // Restart the transaction.
+    ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", outer "ptr");
+    StgTSO_trec(CurrentTSO) = trec;
+    Sp = frame;
+    R1 = StgAtomicallyFrame_code(frame);
+    jump stg_ap_v_fast [R1];
+}
 // Catch retry frame -----------------------------------------------------------
 
 #define CATCH_RETRY_FRAME_FIELDS(w_,p_,info_ptr,        \
@@ -1066,26 +1097,9 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
         StgTSO_trec(CurrentTSO) = outer;
         return (ret);
     } else {
-        // Did not commit: re-execute
-        P_ new_trec;
-        ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr",
-                                                           outer "ptr");
-        StgTSO_trec(CurrentTSO) = new_trec;
-        if (running_alt_code != 0) {
-            jump stg_ap_v_fast
-                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr, p1, p2,
-                                          running_alt_code,
-                                          first_code,
-                                          alt_code))
-                (alt_code);
-        } else {
-            jump stg_ap_v_fast
-                (CATCH_RETRY_FRAME_FIELDS(,,info_ptr, p1, p2,
-                                          running_alt_code,
-                                          first_code,
-                                          alt_code))
-                (first_code);
-        }
+        // Did not commit: abort and restart.
+        StgTSO_trec(CurrentTSO) = outer;
+        jump stg_abort();
     }
 }
 
