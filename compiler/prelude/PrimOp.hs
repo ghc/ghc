@@ -13,6 +13,7 @@ module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,
         primOpTag, maxPrimOpTag, primOpOcc,
+        primOpWrapperId,
 
         tagToEnumKey,
 
@@ -34,14 +35,18 @@ import TysWiredIn
 
 import CmmType
 import Demand
-import OccName          ( OccName, pprOccName, mkVarOccFS )
+import Id               ( Id, mkVanillaGlobalWithInfo )
+import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
+import Name
+import PrelNames        ( gHC_PRIMOPWRAPPERS )
 import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
 import Type
 import RepType          ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
+import SrcLoc           ( wiredInSrcSpan )
 import ForeignCall      ( CLabelString )
-import Unique           ( Unique, mkPrimOpIdUnique )
+import Unique           ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import Outputable
 import FastString
 import Module           ( UnitId )
@@ -571,6 +576,15 @@ primOpOcc op = case primOpInfo op of
                Monadic   occ _     -> occ
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
+
+-- | Returns the 'Id' of the wrapper associated with the given 'PrimOp'.
+primOpWrapperId :: PrimOp -> Id
+primOpWrapperId op = mkVanillaGlobalWithInfo name ty info
+  where
+    info = setCafInfo vanillaIdInfo NoCafRefs
+    name = mkExternalName uniq gHC_PRIMOPWRAPPERS (primOpOcc op) wiredInSrcSpan
+    uniq = mkPrimOpWrapperUnique (primOpTag op)
+    ty   = primOpType op
 
 isComparisonPrimOp :: PrimOp -> Bool
 isComparisonPrimOp op = case primOpInfo op of

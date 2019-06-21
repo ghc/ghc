@@ -524,9 +524,13 @@ hasNoBinding :: Id -> Bool
 -- Data constructor workers used to be things of this kind, but
 -- they aren't any more.  Instead, we inject a binding for
 -- them at the CorePrep stage.
+--
+-- 'PrimOpId's also used to be of this kind. See Note [Primop wrappers]
+-- for the history of this.
+--
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _       -> True        -- See Note [Primop wrappers]
+                        PrimOpId _       -> False       -- See Note [Primop wrappers]
                         FCallId _        -> True
                         DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
@@ -573,13 +577,21 @@ simple way to fix #14561.
 
 Note [Primop wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~
-Currently hasNoBinding claims that PrimOpIds don't have a curried
-function definition.  But actually they do, in GHC.PrimopWrappers,
-which is auto-generated from prelude/primops.txt.pp.  So actually, hasNoBinding
-could return 'False' for PrimOpIds.
+Previously hasNoBinding would claim that PrimOpIds didn't have a curried
+function definition. This caused quite some trouble as we would be forced to
+eta expand unsaturated primop applications very late in the Core pipeline. Not
+only would this produce unnecessary thunks, but it would also result in nasty
+inconsistencies in CAFfy-ness determinations (see #16846).
 
-But we'd need to add something in CoreToStg to swizzle any unsaturated
-applications of GHC.Prim.plusInt# to GHC.PrimopWrappers.plusInt#.
+However, it was quite unnecessary for hasNoBinding to claim this; primops in
+fact *do* have curried definitions which are found in GHC.PrimopWrappers, which
+is auto-generated from prelude/primops.txt.pp.
+
+We now take advantage of these curried definitions by letting hasNoBinding
+claim that PrimOpIds have a curried definition and then rewrite any unsaturated
+PrimOpId applications that we find during CoreToStg as applications of the
+associated wrapper (e.g. `GHC.Prim.plusInt# 3#` will get rewritten to
+`GHC.PrimopWrappers.plusInt# 3#`).`
 
 Nota Bene: GHC.PrimopWrappers is needed *regardless*, because it's
 used by GHCi, which does not implement primops direct at all.
