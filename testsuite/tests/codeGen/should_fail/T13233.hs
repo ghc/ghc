@@ -21,6 +21,9 @@ obscure _ = ()
 quux :: ()
 quux = obscure (#,#)
 
+-- It used to be that primops has no binding. However, as described in
+-- Note [Primop wrappers] in PrimOp we now rewrite unsaturated primop
+-- applications to their wrapper, which allows safe use of levity polymorphism.
 primop :: forall (rep :: RuntimeRep) (a :: TYPE rep) b c.
           a -> b -> (State# RealWorld -> (# State# RealWorld, c #))
        -> State# RealWorld -> (# State# RealWorld, Weak# b #)

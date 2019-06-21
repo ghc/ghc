@@ -46,7 +46,7 @@ module Unique (
         -- now all the built-in Uniques (and functions to make them)
         -- [the Oh-So-Wonderful Haskell module system wins again...]
         mkAlphaTyVarUnique,
-        mkPrimOpIdUnique,
+        mkPrimOpIdUnique, mkPrimOpWrapperUnique,
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
         mkCoVarUnique,
@@ -368,6 +368,8 @@ mkPreludeClassUnique   :: Int -> Unique
 mkPreludeTyConUnique   :: Int -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
+-- See Note [Primop wrappers] in PrimOp.hs.
+mkPrimOpWrapperUnique  :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
 mkCoVarUnique          :: Int -> Unique
 
@@ -405,7 +407,8 @@ dataConWorkerUnique  u = incrUnique u
 dataConTyRepNameUnique u = stepUnique u 2
 
 --------------------------------------------------
-mkPrimOpIdUnique op         = mkUnique '9' op
+mkPrimOpIdUnique op         = mkUnique '9' (2*op)
+mkPrimOpWrapperUnique op    = mkUnique '9' (2*op+1)
 mkPreludeMiscIdUnique  i    = mkUnique '0' i
 
 -- The "tyvar uniques" print specially nicely: a, b, c, etc.
