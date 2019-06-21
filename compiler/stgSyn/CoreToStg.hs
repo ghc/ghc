@@ -268,7 +268,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id )
+    assertConsistentCaInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,9 +296,14 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
+    assertConsistentCaInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
 
+assertConsistentCaInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
+assertConsistentCaInfo dflags id bind err_doc result
+  | gopt Opt_DoStgLinting dflags || debugIsOn
+  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCaInfo" err_doc
+  | otherwise = result
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
