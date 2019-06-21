@@ -72,7 +72,7 @@ import qualified Data.Set as S
 
 The goal of this pass is to prepare for code generation.
 
-1.  Saturate constructor and primop applications.
+1.  Saturate constructor applications.
 
 2.  Convert to A-normal form; that is, function arguments
     are always variables.
@@ -1064,8 +1064,21 @@ because that has different strictness.  Hence the use of 'allLazy'.
 -- Building the saturated syntax
 -- ---------------------------------------------------------------------------
 
-maybeSaturate deals with saturating primops and constructors
-The type is the type of the entire application
+Note [Eta expansion of hasNoBinding things in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+maybeSaturate deals with eta expanding to saturate things that can't deal with
+unsaturated applications (identified by 'hasNoBinding', currently just
+foreign calls and unboxed tuple/sum constructors).
+
+Note that eta expansion in CorePrep is very fragile due to the "prediction" of
+CAFfyness made by TidyPgm (see Note [CAFfyness inconsistencies due to eta
+expansion in CorePrep] in TidyPgm for details.  We previously saturated primop
+applications here as well but due to this fragility (see #16846) we now deal
+with this another way, as described in Note [Primop wrappers] in PrimOp.
+
+It's quite likely that eta expansion of constructor applications will
+eventually break in a similar way to how primops did. We really should
+eliminate this case as well.
 -}
 
 maybeSaturate :: Id -> CpeApp -> Int -> UniqSM CpeRhs
