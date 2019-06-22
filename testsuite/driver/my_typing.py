@@ -1,5 +1,7 @@
 """
-This module provides some type definitions for use in the testsuite driver.
+This module provides some type definitions and backwards compatibility shims
+for use in the testsuite driver.
+
 The testsuite driver can be typechecked using mypy [1].
 
 
@@ -17,3 +19,7 @@ WayName = NewType("WayName", str)
 TestName = NewType("TestName", str)
 OutputNormalizer = Callable[[str], str]
 IssueNumber = NewType("IssueNumber", int)
+
+# TextIO is missing on some older Pythons.
+if 'TextIO' not in globals():
+    TextIO = None

@@ -2238,7 +2238,7 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: "TextIO", short=False, color=False) -> None:
+def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
 
     file.write('\n')
     printUnexpectedTests(file,
