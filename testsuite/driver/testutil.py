@@ -51,9 +51,10 @@ def lndir(srcdir: Path, dstdir: Path):
     # Create symlinks for all files in src directory.
     # Not all developers might have lndir installed.
     # os.system('lndir -silent {0} {1}'.format(srcdir, dstdir))
-    for filename in os.listdir(srcdir):
-        src = srcdir / filename
-        dst = dstdir / filename
+    for filename in srcdir.iterdir():
+        base = filename.relative_to(srcdir)
+        src = srcdir / base
+        dst = dstdir / base
         if src.is_file():
             link_or_copy_file(src, dst)
         else:

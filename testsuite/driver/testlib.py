@@ -906,7 +906,7 @@ def test_common_work(watcher: testutil.Watcher,
     finally:
         watcher.notify()
 
-def do_test(name: TestName, way: WayName, func, args, files) -> None:
+def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
     opts = getTestOpts()
 
     full_name = name + '(' + way + ')'
@@ -959,7 +959,7 @@ def do_test(name: TestName, way: WayName, func, args, files) -> None:
         # root of the testsuite.
         src_makefile = in_srcdir('Makefile')
         dst_makefile = in_testdir('Makefile')
-        if os.path.exists(src_makefile):
+        if src_makefile.exists():
             makefile = src_makefile.read_text(encoding='UTF-8')
             makefile = re.sub('TOP=.*', 'TOP=' + config.top, makefile, 1)
             dst_makefile.write_text(makefile, encoding='UTF-8')
@@ -1261,11 +1261,9 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
     result = passed()
     if range_fields:
         try:
-            f = open(stats_file)
+            stats_file_contents = stats_file.read_text()
         except IOError as e:
             return failBecause(str(e))
-        stats_file_contents = f.read()
-        f.close()
 
         for (metric, baseline_and_dev) in range_fields.items():
             field_match = re.search('\("' + metric + '", "([0-9]+)"\)', stats_file_contents)
@@ -1415,7 +1413,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     # figure out what to use for stdin
     if opts.stdin:
         stdin_arg = in_testdir(opts.stdin) # type: Optional[Path]
-    elif os.path.exists(in_testdir(name, 'stdin')):
+    elif in_testdir(name, 'stdin').exists():
         stdin_arg = in_testdir(name, 'stdin')
     else:
         stdin_arg = None
@@ -1741,7 +1739,7 @@ def compare_outputs(way: WayName,
     expected_path = in_srcdir(expected_file)
     actual_path = in_testdir(actual_file)
 
-    if os.path.exists(expected_path):
+    if expected_path.exists():
         expected_str = normaliser(read_no_crs(expected_path))
         # Create the .normalised file in the testdir, not in the srcdir.
         expected_normalised_file = add_suffix(expected_file, 'normalised')
@@ -2040,8 +2038,8 @@ def dump_file(f: Path):
         print('')
 
 def runCmd(cmd: str,
-           stdin: Union[None, int, Path]=None,
-           stdout: Union[None, int, Path]=None,
+           stdin: Union[None, Path]=None,
+           stdout: Union[None, Path]=None,
            stderr: Union[None, int, Path]=None,
            timeout_multiplier=1.0,
            print_output=False) -> int:
@@ -2050,9 +2048,9 @@ def runCmd(cmd: str,
 
     # Format cmd using config. Example: cmd='{hpc} report A.tix'
     cmd = cmd.format(**config.__dict__)
-    if_verbose(3, '%s< %s' % (cmd, os.path.basename(stdin) if isinstance(stdin, Path) else ''))
+    if_verbose(3, '%s< %s' % (cmd, stdin.name if isinstance(stdin, Path) else ''))
 
-    stdin_file = io.open(stdin, 'rb') if stdin else None
+    stdin_file = stdin.open('rb') if stdin is not None else None
     stdout_buffer = b''
     stderr_buffer = b''
 
@@ -2082,13 +2080,15 @@ def runCmd(cmd: str,
             if stderr_buffer:
                 sys.stderr.buffer.write(stderr_buffer)
 
-        if stdout:
-            with io.open(stdout, 'wb') as f:
-                f.write(stdout_buffer)
-        if stderr:
-            if stderr is not subprocess.STDOUT:
-                with io.open(stderr, 'wb') as f:
-                    f.write(stderr_buffer)
+        if stdout is not None:
+            if isinstance(stdout, Path):
+                stdout.write_bytes(stdout_buffer)
+            else:
+                with io.open(stdout, 'wb') as f:
+                    f.write(stdout_buffer)
+        if stderr is not None:
+            if isinstance(stderr, Path):
+                stderr.write_bytes(stderr_buffer)
 
     if r.returncode == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
