@@ -3,7 +3,7 @@
 
 module CmmBuildInfoTables
   ( CAFSet, CAFEnv, cafAnal
-  , doSRTs, ModuleSRTInfo, emptySRT
+  , doSRTs, ModuleSRTInfo (..), emptySRT
   ) where
 
 import GhcPrelude hiding (succ)
@@ -40,6 +40,7 @@ import Data.Tuple
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 
+import NameEnv
 
 {- Note [SRTs]
 
@@ -397,12 +398,22 @@ cafAnal
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
+  -> NameEnv Bool -- CAFFY-ness env
   -> CmmGraph
-  -> CAFEnv
-cafAnal contLbls topLbl cmmGraph =
-  analyzeCmmBwd cafLattice
-    (cafTransfers contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+  -> (NameEnv Bool, CAFEnv)
+cafAnal contLbls topLbl caf_infos0 cmmGraph =
+    pprTrace "cafAnal" (ppr ret) (caf_infos1, ret)
+  where
+    ret =
+      analyzeCmmBwd cafLattice
+        (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 
+    caf_infos1
+      | Just nm <- hasHaskellName topLbl
+      = pprTrace "cafAnal" (text "Updating" <+> ppr nm) $
+          extendNameEnv caf_infos0 nm (not (mapNull ret))
+      | otherwise
+      = caf_infos0
 
 cafLattice :: DataflowLattice CAFSet
 cafLattice = DataflowLattice Set.empty add
@@ -412,8 +423,8 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: LabelSet -> Label -> CLabel -> TransferFun CAFSet
-cafTransfers contLbls entry topLbl
+cafTransfers :: LabelSet -> Label -> CLabel -> NameEnv Bool -> TransferFun CAFSet
+cafTransfers contLbls entry topLbl caf_infos
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
         joined = cafsInNode xNode $! live'
@@ -451,17 +462,31 @@ cafTransfers contLbls entry topLbl
               CmmLit (CmmLabelDiffOff c1 c2 _ _) -> add c1 $! add c2 set
               _ -> set
 
-        add l s | pprTrace "cafTransfers.add" (text "l:" <+> ppr l <+> text "hasCAF:" <+> ppr (hasCAF l)) False = undefined
-                | hasCAF l  = Set.insert (mkCAFLabel l) s
-                | otherwise = s
+        add :: CLabel -> Set CAFLabel -> Set CAFLabel
+        add l s
+          | Just nm <- hasHaskellName l
+          , Just caffy <- lookupNameEnv caf_infos nm
+          = if caffy then
+              pprTrace "cafTransfers.add" (text "CAFFY name:" <+> ppr nm) $
+                Set.insert (mkCAFLabel l) s
+            else
+              pprTrace "cafTransfers.add" (text "non-CAFFY name:" <+> ppr nm) $
+                s
 
+          | hasCAF l
+          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l)) $
+              Set.insert (mkCAFLabel l) s
+
+          | otherwise
+          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l)) $
+              s
     in
       pprTrace "cafTransfers" (text "block:" <+> ppr block $$
                                text "contLbls:" <+> ppr contLbls $$
                                text "entry:" <+> ppr entry $$
                                text "topLbl:" <+> ppr topLbl $$
                                text "cafs in exit:" <+> ppr joined $$
-                               text "result:" <+> ppr result)
+                               text "result:" <+> ppr result) $
         mapSingleton (entryLabel eNode) result
 
 
@@ -479,17 +504,24 @@ data ModuleSRTInfo = ModuleSRTInfo
     -- entries. e.g.  if we have an SRT [a,b,c], and we know that b
     -- points to [c,d], we can omit c and emit [a,b].
     -- Used to implement the [Filter] optimisation.
+  , cafInfos :: NameEnv Bool
   }
+
 instance Outputable ModuleSRTInfo where
   ppr ModuleSRTInfo{..} =
-    text "ModuleSRTInfo:" <+> ppr dedupSRTs <+> ppr flatSRTs
+    text "ModuleSRTInfo {" $$
+      (nest 4 $ text "dedupSRTs =" <+> ppr dedupSRTs $$
+                text "flatSRTs =" <+> ppr flatSRTs $$
+                text "cafInfos =" <+> ppr cafInfos) $$ char '}'
 
 emptySRT :: Module -> ModuleSRTInfo
 emptySRT mod =
   ModuleSRTInfo
     { thisModule = mod
     , dedupSRTs = Map.empty
-    , flatSRTs = Map.empty }
+    , flatSRTs = Map.empty
+    , cafInfos = emptyNameEnv
+    }
 
 -- -----------------------------------------------------------------------------
 -- Constructing SRTs
