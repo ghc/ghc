@@ -962,10 +962,9 @@ def do_test(name: TestName, way: WayName, func, args, files) -> None:
         src_makefile = in_srcdir('Makefile')
         dst_makefile = in_testdir('Makefile')
         if os.path.exists(src_makefile):
-            with io.open(src_makefile, 'r', encoding='utf8') as src_f:
-                makefile = re.sub('TOP=.*', 'TOP=' + config.top, src_f.read(), 1)
-                with io.open(dst_makefile, 'w', encoding='utf8') as dst_f:
-                    dst_f.write(makefile)
+            makefile = src_makefile.read_text(encoding='UTF-8')
+            makefile = re.sub('TOP=.*', 'TOP=' + config.top, makefile, 1)
+            dst_makefile.write_text(makefile, encoding='UTF-8')
 
     if opts.pre_cmd:
         exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
@@ -1394,11 +1393,11 @@ def simple_build(name: TestName, way: WayName,
 
     if should_fail:
         if exit_code == 0:
-            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8')
+            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecauseStderr('exit code 0', stderr_contents)
     else:
         if exit_code != 0:
-            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8')
+            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
             return failBecauseStderr('exit code non-0', stderr_contents)
 
     return passed()
