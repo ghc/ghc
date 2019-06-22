@@ -828,7 +828,7 @@ def test_common_work(watcher: testutil.Watcher,
 
         ok_way = lambda way: \
             not getTestOpts().skip \
-            and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
+            and (getTestOpts().only_ways is None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
             and (not (config.only_perf_tests and not isStatsTest())) \
@@ -1270,7 +1270,7 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
 
         for (metric, baseline_and_dev) in range_fields.items():
             field_match = re.search('\("' + metric + '", "([0-9]+)"\)', stats_file_contents)
-            if field_match == None:
+            if field_match is None:
                 print('Failed to find metric: ', metric)
                 metric_result = failBecause('no such stats metric')
             else:
@@ -1285,7 +1285,7 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
                 # If this is the first time running the benchmark, then pass.
                 baseline = baseline_and_dev[0](way, head_commit) \
                     if Perf.inside_git_repo() else None
-                if baseline == None:
+                if baseline is None:
                     metric_result = passed()
                     change = MetricChange.NewMetric
                 else:
@@ -1394,11 +1394,11 @@ def simple_build(name: TestName, way: WayName,
 
     if should_fail:
         if exit_code == 0:
-            stderr_contents = open(actual_stderr_path, 'rb').read()
+            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8')
             return failBecauseStderr('exit code 0', stderr_contents)
     else:
         if exit_code != 0:
-            stderr_contents = open(actual_stderr_path, 'rb').read()
+            stderr_contents = actual_stderr_path.read_text(encoding='UTF-8')
             return failBecauseStderr('exit code non-0', stderr_contents)
 
     return passed()
@@ -1609,8 +1609,7 @@ def stdout_ok(name: TestName, way: WayName) -> bool:
                           expected_stdout_file, actual_stdout_file)
 
 def read_stdout( name: TestName ) -> str:
-    with open(in_testdir(name, 'run.stdout'), encoding='utf8') as f:
-        return f.read()
+    return in_testdir(name, 'run.stdout').read_text(encoding='UTF-8')
 
 def dump_stdout( name: TestName ) -> None:
     str = read_stdout(name).strip()
@@ -1628,8 +1627,7 @@ def stderr_ok(name: TestName, way: WayName) -> bool:
                           whitespace_normaliser=normalise_whitespace)
 
 def read_stderr( name: TestName ) -> str:
-    with open(in_testdir(name, 'run.stderr'), encoding='utf8') as f:
-        return f.read()
+    return in_testdir(name, 'run.stderr').read_text(encoding='UTF-8')
 
 def dump_stderr( name: TestName ) -> None:
     str = read_stderr(name).strip()
