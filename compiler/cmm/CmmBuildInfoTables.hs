@@ -476,11 +476,11 @@ cafTransfers contLbls entry topLbl caf_infos
                 s
 
           | hasCAF l
-          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l)) $
+          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "CAFFY") $
               Set.insert (mkCAFLabel l) s
 
           | otherwise
-          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l)) $
+          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "not CAFFY") $
               s
     in
       pprTrace "cafTransfers" (text "block:" <+> ppr block $$
