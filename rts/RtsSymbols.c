@@ -606,6 +606,7 @@
       SymI_HasProto(stg_compactFixupPointerszh)                         \
       SymI_HasProto(stg_compactSizzezh)                                 \
       SymI_HasProto(closure_flags)                                      \
+      SymI_HasProto(eq_thread)                                          \
       SymI_HasProto(cmp_thread)                                         \
       SymI_HasProto(createAdjustor)                                     \
       SymI_HasProto(stg_decodeDoublezu2Intzh)                           \

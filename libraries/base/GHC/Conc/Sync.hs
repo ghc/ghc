@@ -154,26 +154,21 @@ foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
 id2TSO :: ThreadId -> ThreadId#
 id2TSO (ThreadId t) = t
 
+foreign import ccall unsafe "eq_thread" eq_thread :: ThreadId# -> ThreadId# -> CBool
+
 foreign import ccall unsafe "cmp_thread" cmp_thread :: ThreadId# -> ThreadId# -> CInt
 -- Returns -1, 0, 1
 
-cmpThread :: ThreadId -> ThreadId -> Ordering
-cmpThread t1 t2 =
-   case cmp_thread (id2TSO t1) (id2TSO t2) of
-      -1 -> LT
-      0  -> EQ
-      _  -> GT -- must be 1
-
 -- | @since 4.2.0.0
 instance Eq ThreadId where
-   t1 == t2 =
-      case t1 `cmpThread` t2 of
-         EQ -> True
-         _  -> False
+  ThreadId t1 == ThreadId t2 = eq_thread t1 t2 /= 0
 
 -- | @since 4.2.0.0
 instance Ord ThreadId where
-   compare = cmpThread
+  compare (ThreadId t1) (ThreadId t2) = case cmp_thread t1 t2 of
+    -1 -> LT
+    0  -> EQ
+    _  -> GT
 
 -- | Every thread has an allocation counter that tracks how much
 -- memory has been allocated by the thread.  The counter is

@@ -139,21 +139,36 @@ createThread(Capability *cap, W_ size)
 }
 
 /* ---------------------------------------------------------------------------
+ * Equality on Thread ids.
+ *
+ * This is used from STG land in the implementation of the Eq instance
+ * for ThreadIds.
+ * ------------------------------------------------------------------------ */
+
+bool
+eq_thread(StgPtr tso1, StgPtr tso2)
+{
+  return tso1 == tso2;
+}
+
+/* ---------------------------------------------------------------------------
  * Comparing Thread ids.
  *
- * This is used from STG land in the implementation of the
- * instances of Eq/Ord for ThreadIds.
+ * This is used from STG land in the implementation of the Ord instance
+ * for ThreadIds.
  * ------------------------------------------------------------------------ */
 
 int
 cmp_thread(StgPtr tso1, StgPtr tso2)
 {
+  if (tso1 == tso2) return 0;
+
   StgThreadID id1 = ((StgTSO *)tso1)->id;
   StgThreadID id2 = ((StgTSO *)tso2)->id;
 
-  if (id1 < id2) return (-1);
-  if (id1 > id2) return 1;
-  return 0;
+  ASSERT(id1 != id2);
+
+  return id1 < id2 ? -1 : 1;
 }
 
 /* ---------------------------------------------------------------------------
