@@ -55,10 +55,10 @@ def lndir(srcdir: Path, dstdir: Path):
         src = srcdir / filename
         dst = dstdir / filename
         if src.is_file():
-            link_or_copy_file(src, dst)
+            link_or_copy_file(str(src), str(dst))
         else:
             dst.mkdir()
-            lndir(src, dst)
+            lndir(str(src), str(dst))
 
 # All possible test metric strings.
 def testing_metrics():
