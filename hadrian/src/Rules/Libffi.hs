@@ -84,15 +84,13 @@ libffiContext stage = do
 -- | The name of the (locally built) library
 libffiName :: Expr String
 libffiName = do
-    windows <- expr windowsHost
     way <- getWay
-    return $ libffiName' windows (Dynamic `wayUnit` way)
+    return $ libffiName' (Dynamic `wayUnit` way)
 
 -- | The name of the (locally built) library
-libffiName' :: Bool -> Bool -> String
-libffiName' windows dynamic
-    = (if dynamic then "" else "C")
-    ++ (if windows then "ffi-6" else "ffi")
+libffiName' :: Bool -> String
+libffiName' dynamic = (if dynamic     then ""      else "C")
+                   ++ (if windowsHost then "ffi-6" else "ffi")
 
 libffiLibrary :: FilePath
 libffiLibrary = "inst/lib/libffi.a"
@@ -169,15 +167,13 @@ libffiRules = do
 
         -- Find dynamic libraries.
         dynLibFiles <- do
-            windows <- windowsHost
-            osx     <- osxHost
             let libfilesDir = libffiPath -/-
-                    (if windows then "inst" -/- "bin" else "inst" -/- "lib")
-                libffiName'' = libffiName' windows True
+                    (if windowsHost then "inst" -/- "bin" else "inst" -/- "lib")
+                libffiName'' = libffiName' True
                 dynlibext
-                    | windows   = "dll"
-                    | osx       = "dylib"
-                    | otherwise = "so"
+                    | windowsHost = "dll"
+                    | osxHost     = "dylib"
+                    | otherwise   = "so"
                 filepat = "lib" ++ libffiName'' ++ "." ++ dynlibext ++ "*"
             liftIO $ getDirectoryFilesIO "." [libfilesDir -/- filepat]
 

@@ -76,8 +76,6 @@ runTestBuilderArgs = builder RunTest ? do
         (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
             <*> (maybe False (=="YES") <$> lookupEnv "OS")
 
-    windows     <- expr windowsHost
-    darwin      <- expr osxHost
     threads     <- shakeThreads <$> expr getShakeOptions
     os          <- getTestSetting TestHostOS
     arch        <- getTestSetting TestTargetARCH_CPP
@@ -101,8 +99,8 @@ runTestBuilderArgs = builder RunTest ? do
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
-            , arg "-e", arg $ "windows=" ++ show windows
-            , arg "-e", arg $ "darwin=" ++ show darwin
+            , arg "-e", arg $ "windows=" ++ show windowsHost
+            , arg "-e", arg $ "darwin=" ++ show osxHost
             , arg "-e", arg $ "config.local=False"
             , arg "-e", arg $ "config.cleanup=" ++ show (not keepFiles)
             , arg "-e", arg $ "config.accept=" ++ show accept

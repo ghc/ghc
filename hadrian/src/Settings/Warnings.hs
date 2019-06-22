@@ -2,7 +2,6 @@ module Settings.Warnings (defaultGhcWarningsArgs, ghcWarningsArgs) where
 
 import Expression
 import Oracles.Flag
-import Oracles.Setting
 import Packages
 import Settings
 
@@ -13,7 +12,7 @@ defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
     , (not <$> flag GccIsClang) ? mconcat
-      [ (not <$> windowsHost ) ? arg "-optc-Werror=unused-but-set-variable"
+      [ not windowsHost ? arg "-optc-Werror=unused-but-set-variable"
       , arg "-optc-Wno-error=inline" ]
     , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
 

@@ -212,8 +212,7 @@ libffiBuildPath stage = buildPath $ Context
 libffiLibraryName :: Action FilePath
 libffiLibraryName = do
     useSystemFfi <- flag UseSystemFfi
-    windows      <- windowsHost
-    return $ case (useSystemFfi, windows) of
+    return $ case (useSystemFfi, windowsHost) of
         (True , False) -> "ffi"
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"

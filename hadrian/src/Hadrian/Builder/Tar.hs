@@ -14,7 +14,7 @@ import Development.Shake
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
-import Oracles.Setting
+import Hadrian.Utilities
 
 -- | Tar can be used to 'Create' an archive or 'Extract' from it.
 data TarMode = Create | Extract deriving (Eq, Generic, Show)

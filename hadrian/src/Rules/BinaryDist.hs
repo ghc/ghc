@@ -107,7 +107,6 @@ bindistRules = do
         targetPlatform <- setting TargetPlatformFull
         distDir        <- Context.distDir Stage1
         rtsDir         <- pkgIdentifier rts
-        windows        <- windowsHost
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
@@ -129,7 +128,7 @@ bindistRules = do
         -- contain outdated or even invalid data.
         whenM (doesDirectoryExist (root -/- "docs")) $ do
           copyDirectory (root -/- "docs") bindistFilesDir
-        when windows $ do
+        when windowsHost $ do
           copyDirectory (root -/- "mingw") bindistFilesDir
           -- we use that opportunity to delete the .stamp file that we use
           -- as a proxy for the whole mingw toolchain, there's no point in
@@ -283,8 +282,7 @@ ghciScriptWrapper = unlines
 --   explicitly and 'need' the result of building them.
 needIservBins :: Action ()
 needIservBins = do
-    windows <- windowsHost
-    when (not windows) $ do
+    when (not windowsHost) $ do
         rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
         need =<< traverse programPath
                    [ Context Stage1 iserv w

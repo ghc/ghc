@@ -17,9 +17,11 @@ packageArgs = do
     intLib       <- getIntegerPackage
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpBuildPath <- expr gmpBuildPath
-    win          <- expr windowsHost
-    cross        <- expr (flag CrossCompiling)
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
+        -- Do not bind the result to a Boolean: this forces the configure rule
+        -- immediately and may lead to cyclic dependencies.
+        -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
+        cross = flag CrossCompiling
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -72,8 +74,8 @@ packageArgs = do
          , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? (not win && not cross) ? arg "ext-interp"
-            , flag CrossCompiling ? arg "-terminfo"
+            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
+            , cross ? arg "-terminfo"
             , notStage0 ? intLib == integerGmp ?
               arg "integer-gmp"
             , notStage0 ? intLib == integerSimple ?
@@ -87,8 +89,8 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? (not win && not cross) ? arg "ext-interp"
-            , flag CrossCompiling ? arg "-terminfo"
+            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
+            , cross ? arg "-terminfo"
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
             -- executables with the threaded runtime.
@@ -96,7 +98,7 @@ packageArgs = do
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
-          builder (Cabal Flags) ? flag CrossCompiling ? arg "-terminfo"
+          builder (Cabal Flags) ? cross ? arg "-terminfo"
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
@@ -121,9 +123,9 @@ packageArgs = do
         -- behind the @-fghci@ flag.
         , package ghci ? mconcat
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , notStage0 ? builder (Cabal Flags) ? (not win && not cross)
+          , notStage0 ? builder (Cabal Flags) ? not windowsHost ? notM cross
                       ? arg "ext-interp"
-          , flag CrossCompiling ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
+          , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
         -------------------------------- haddock -------------------------------
         , package haddock ?
@@ -131,7 +133,7 @@ packageArgs = do
 
         ------------------------------- haskeline ------------------------------
         , package haskeline ?
-          builder (Cabal Flags) ? flag CrossCompiling ? arg "-terminfo"
+          builder (Cabal Flags) ? cross ? arg "-terminfo"
 
         -------------------------------- hsc2hs --------------------------------
         , package hsc2hs ?

@@ -28,7 +28,7 @@ module Hadrian.Utilities (
     renderAction, renderActionNoOutput, renderProgram, renderLibrary, renderBox, renderUnicorn,
 
     -- * Miscellaneous
-    (<&>), (%%>), cmdLineLengthLimit,
+    (<&>), (%%>), cmdLineLengthLimit, windowsHost, osxHost, iosHost,
 
     -- * Useful re-exports
     Dynamic, fromDynamic, toDyn, TypeRep, typeOf
@@ -47,7 +47,6 @@ import Development.Shake hiding (Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Environment (lookupEnv)
-import System.Info.Extra
 
 import qualified Control.Exception.Base as IO
 import qualified Data.HashMap.Strict    as Map
@@ -231,9 +230,21 @@ infix 1 %%>
 -- 20000. Hence, 200000 seems like a sensible limit. On other operating systems
 -- we currently use the 4194304 setting.
 cmdLineLengthLimit :: Int
-cmdLineLengthLimit | isWindows = 31000
-                   | isMac     = 200000
-                   | otherwise = 4194304
+cmdLineLengthLimit | IO.isWindows = 31000
+                   | IO.isMac     = 200000
+                   | otherwise    = 4194304
+
+-- | Check if the host OS is Windows.
+windowsHost :: Bool
+windowsHost = IO.isWindows
+
+-- | Check if the host OS is Mac OS.
+osxHost :: Bool
+osxHost = IO.isMac
+
+-- | Check if the host OS is iOS.
+iosHost :: Bool
+iosHost = IO.os == "ios"
 
 -- | Insert a value into Shake's type-indexed map.
 insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic
