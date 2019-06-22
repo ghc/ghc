@@ -374,8 +374,6 @@ class TestOptions:
 global default_testopts
 default_testopts = TestOptions()
 
-BugNumber = int
-
 # (bug, directory, name) of tests marked broken
 global brokens
-brokens = []  # type: List[Tuple[BugNumber, str, str]]
+brokens = []  # type: List[Tuple[IssueNumber, str, str]]

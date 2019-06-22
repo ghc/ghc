@@ -16,3 +16,4 @@ except:
 WayName = NewType("WayName", str)
 TestName = NewType("TestName", str)
 OutputNormalizer = Callable[[str], str]
+IssueNumber = NewType("IssueNumber", int)

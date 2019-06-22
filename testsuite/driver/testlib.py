@@ -218,31 +218,31 @@ def _use_specs( name, opts, specs ):
 
 # -----
 
-def expect_fail_for( ways ):
+def expect_fail_for( ways: List[WayName] ):
     assert isinstance(ways, list)
     return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
 def _expect_fail_for( name, opts, ways ):
     opts.expect_fail_for = ways
 
-def expect_broken( bug ):
+def expect_broken( bug: IssueNumber ):
     # This test is a expected not to work due to the indicated trac bug
     # number.
     return lambda name, opts, b=bug: _expect_broken (name, opts, b )
 
-def _expect_broken( name, opts, bug ):
+def _expect_broken( name: TestName, opts, bug: IssueNumber ):
     record_broken(name, opts, bug)
     opts.expect = 'fail';
 
-def expect_broken_for( bug, ways ):
+def expect_broken_for( bug: IssueNumber, ways: List[WayName] ):
     assert isinstance(ways, list)
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
-def _expect_broken_for( name, opts, bug, ways ):
+def _expect_broken_for( name: TestName, opts, bug: IssueNumber, ways ):
     record_broken(name, opts, bug)
     opts.expect_fail_for = ways
 
-def record_broken(name, opts, bug):
+def record_broken(name: TestName, opts, bug: IssueNumber):
     me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
@@ -254,7 +254,7 @@ def _expect_pass(way):
 
 # -----
 
-def fragile( bug ):
+def fragile( bug: IssueNumber ):
     """
     Indicates that the test should be skipped due to fragility documented in
     the given ticket.
@@ -265,7 +265,7 @@ def fragile( bug ):
 
     return helper
 
-def fragile_for( bug, ways ):
+def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     """
     Indicates that the test should be skipped due to fragility in the given
     test ways as documented in the given ticket.
@@ -278,7 +278,7 @@ def fragile_for( bug, ways ):
 
 # -----
 
-def omit_ways( ways ):
+def omit_ways( ways: List[WayName] ):
     assert isinstance(ways, list)
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
@@ -288,7 +288,7 @@ def _omit_ways( name, opts, ways ):
 
 # -----
 
-def only_ways( ways ):
+def only_ways( ways: List[WayName] ):
     assert isinstance(ways, list)
     return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
@@ -297,7 +297,7 @@ def _only_ways( name, opts, ways ):
 
 # -----
 
-def extra_ways( ways ):
+def extra_ways( ways: List[WayName] ):
     assert isinstance(ways, list)
     return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
@@ -314,13 +314,13 @@ def _set_stdin( name, opts, f ):
 
 # -----
 
-def exit_code( val ):
+def exit_code( val: int ):
     return lambda name, opts, v=val: _exit_code(name, opts, v);
 
 def _exit_code( name, opts, v ):
     opts.exit_code = v
 
-def signal_exit_code( val ):
+def signal_exit_code( val: int ):
     if opsys('solaris2'):
         return exit_code( val )
     else:
@@ -333,13 +333,13 @@ def signal_exit_code( val ):
 
 # -----
 
-def compile_timeout_multiplier( val ):
+def compile_timeout_multiplier( val: float ):
     return lambda name, opts, v=val: _compile_timeout_multiplier(name, opts, v)
 
 def _compile_timeout_multiplier( name, opts, v ):
     opts.compile_timeout_multiplier = v
 
-def run_timeout_multiplier( val ):
+def run_timeout_multiplier( val: float ):
     return lambda name, opts, v=val: _run_timeout_multiplier(name, opts, v)
 
 def _run_timeout_multiplier( name, opts, v ):
@@ -402,7 +402,7 @@ def collect_stats(metric='all', deviation=20):
 # measures the performance numbers of the compiler.
 # As this is a fairly rare case in the testsuite, it defaults to false to
 # indicate that it is a 'normal' performance test.
-def _collect_stats(name, opts, metrics, deviation, is_compiler_stats_test=False):
+def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_test=False):
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         failBecause('This test has an invalid name.')
 
