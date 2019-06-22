@@ -28,6 +28,9 @@ import Control.Monad
 import Outputable
 import GHC.Platform
 
+import NameEnv
+import MonadUtils (mapAccumLM)
+
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
@@ -42,21 +45,23 @@ cmmPipeline
 cmmPipeline hsc_env srtInfo prog = withTiming (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
+     (caf_infos, tops) <- {-# SCC "tops" #-} mapAccumLM (cpsTop hsc_env) (cafInfos srtInfo0) prog
+     pprTrace "cmmPipeline" (text "CAF infos:" <+> ppr caf_infos) (return ())
+     let srtInfo1 = srtInfo0{ cafInfos = caf_infos }
 
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
+     (srtInfo2, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo1 tops
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-     return (srtInfo, cmms)
+     return (srtInfo2, cmms)
 
   where forceRes (info, group) =
           info `seq` foldr (\decl r -> decl `seq` r) () group
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
-cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
-cpsTop hsc_env proc =
+cpsTop :: HscEnv -> NameEnv Bool -> CmmDecl -> IO (NameEnv Bool, (CAFEnv, [CmmDecl]))
+cpsTop _ caf_infos p@(CmmData {}) = return (caf_infos, (mapEmpty, [p]))
+cpsTop hsc_env caf_infos0 proc =
     do
        ----------- Control-flow optimisations ----------------------------------
 
@@ -112,7 +117,7 @@ cpsTop hsc_env proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
+       let (caf_infos1, cafEnv) = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos0 g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points
@@ -145,7 +150,7 @@ cpsTop hsc_env proc =
             -- See Note [unreachable blocks]
        dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-       return (cafEnv, g)
+       return (caf_infos1, (cafEnv, g))
 
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
