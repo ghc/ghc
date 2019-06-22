@@ -42,7 +42,7 @@ StgRegTable * resumeThread  (void *);
 // Thread operations from Threads.c
 //
 int     cmp_thread                       (StgPtr tso1, StgPtr tso2);
-int     rts_getThreadId                  (StgPtr tso);
+long    rts_getThreadId                  (StgPtr tso);
 void    rts_enableThreadAllocationLimit  (StgPtr tso);
 void    rts_disableThreadAllocationLimit (StgPtr tso);
 
