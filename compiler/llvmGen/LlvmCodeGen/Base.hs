@@ -12,7 +12,7 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion, llvmVersionStr,
+        LlvmVersion (..), supportedLlvmVersion, llvmVersionStr,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -176,14 +176,25 @@ llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 --
 
 -- | LLVM Version Number
-type LlvmVersion = (Int, Int)
+data LlvmVersion
+    = LlvmVersion Int
+    | LlvmVersionOld Int Int
+    deriving Eq
+
+-- Custom show instance for backwards compatibility.
+instance Show LlvmVersion where
+  show (LlvmVersion maj) = show maj
+  show (LlvmVersionOld maj min) = show maj ++ "." ++ show min
 
 -- | The LLVM Version that is currently supported.
 supportedLlvmVersion :: LlvmVersion
-supportedLlvmVersion = sUPPORTED_LLVM_VERSION
+supportedLlvmVersion = LlvmVersion sUPPORTED_LLVM_VERSION
 
 llvmVersionStr :: LlvmVersion -> String
-llvmVersionStr (major, minor) = show major ++ "." ++ show minor
+llvmVersionStr v =
+  case v of
+    LlvmVersion maj -> show maj
+    LlvmVersionOld maj min -> show maj ++ "." ++ show min
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
