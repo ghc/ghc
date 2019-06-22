@@ -137,12 +137,11 @@ buildConf _ context@Context {..} conf = do
     -- to record this side effect so that Shake can cache these files too.
     -- See why we need 'fixWindows': https://gitlab.haskell.org/ghc/ghc/issues/16073
     let fixWindows path = do
-            win <- windowsHost
             version  <- setting GhcVersion
             hostOs   <- cabalOsString <$> setting BuildOs
             hostArch <- cabalArchString <$> setting BuildArch
             let dir = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
-            return $ if win then path -/- "../.." -/- dir else path
+            return $ if windowsHost then path -/- "../.." -/- dir else path
     pkgDbPath <- fixWindows =<< packageDbPath stage
     let dir = pkgDbPath -/- takeBaseName conf
     files <- liftIO $ getDirectoryFilesIO "." [dir -/- "**"]

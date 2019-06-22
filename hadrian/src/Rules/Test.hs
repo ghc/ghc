@@ -135,8 +135,7 @@ testRules = do
 timeoutProgBuilder :: Action ()
 timeoutProgBuilder = do
     root    <- buildRoot
-    windows <- windowsHost
-    if windows
+    if windowsHost
         then do
             prog <- programPath =<< programContext Stage1 timeout
             copyFile prog (root -/- timeoutPath)
@@ -178,8 +177,7 @@ stageOf _ = error "unexpected stage argument"
 needIservBins :: Action ()
 needIservBins = do
     -- iserv is not supported under Windows
-    windows <- windowsHost
-    when (not windows) $ do
+    when (not windowsHost) $ do
         testGhc <- testCompiler <$> userSetting defaultTestArgs
         let stg = stageOf testGhc
         rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays

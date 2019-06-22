@@ -83,8 +83,7 @@ copyLibffiDynamicUnix stage libSuf target = do
         copyFile' versionlessSourceFilePath target
 
         -- On OSX the dylib's id must be updated to a relative path.
-        osx <- osxHost
-        when osx $ cmd
+        when osxHost $ cmd
             [ "install_name_tool"
             , "-id", "@rpath/" ++ takeFileName target
             , target

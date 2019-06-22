@@ -61,7 +61,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libs    <- getContextData extraLibs
     libDirs <- getContextData extraLibDirs
     fmwks   <- getContextData frameworks
-    darwin  <- expr osxHost
     way     <- getWay
 
     -- Relative path from the output (rpath $ORIGIN).
@@ -87,7 +86,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             -- libraries will all end up in the lib dir, so just use $ORIGIN
             | otherwise     = metaOrigin
             where
-                metaOrigin | darwin    = "@loader_path"
+                metaOrigin | osxHost   = "@loader_path"
                            | otherwise = "$ORIGIN"
 
         -- TODO: an alternative would be to generalize by linking with extra
@@ -117,7 +116,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                       [ arg ("-optl-Wl,-rpath," ++ rpath)
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
                       -- The darwin linker doesn't support/require the -zorigin option
-                      , not darwin ? arg "-optl-Wl,-zorigin"
+                      , not osxHost ? arg "-optl-Wl,-zorigin"
                       ]
                 ]
             , arg "-no-auto-link-packages"
@@ -126,7 +125,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
-            , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
+            , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
 

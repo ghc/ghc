@@ -16,8 +16,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
     pkg       <- getPackage
     path      <- getContextPath
     stage     <- getStage
-    windows   <- expr windowsHost
-    let prefix = "${pkgroot}" ++ (if windows then "" else "/..")
+    let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
     mconcat [ arg "configure"
             -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
