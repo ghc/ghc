@@ -3,8 +3,6 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import annotations
-
 import io
 import shutil
 import os
