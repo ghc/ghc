@@ -408,10 +408,12 @@ cafAnal contLbls topLbl caf_infos0 cmmGraph =
       analyzeCmmBwd cafLattice
         (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 
+    ret_caffy = any (not . Set.null) (mapElems ret)
+
     caf_infos1
       | Just nm <- hasHaskellName topLbl
-      = pprTrace "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr (not (mapNull ret))) $
-          extendNameEnv caf_infos0 nm (not (mapNull ret))
+      = pprTrace "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr ret_caffy) $
+          extendNameEnv caf_infos0 nm ret_caffy
       | otherwise
       = caf_infos0
 
