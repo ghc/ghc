@@ -338,13 +338,13 @@ for file in t_files:
         exec(src)
     except Exception as e:
         traceback.print_exc()
-        framework_fail(file, '', str(e))
+        framework_fail(None, None, 'exception: %s' % e)
         t_files_ok = False
 
 for name in config.only:
     if t_files_ok:
         # See Note [Mutating config.only]
-        framework_fail(name, '', 'test not found')
+        framework_fail(name, None, 'test not found')
     else:
         # Let user fix .T file errors before reporting on unfound tests.
         # The reason the test can not be found is likely because of those

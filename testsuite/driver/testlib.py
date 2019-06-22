@@ -750,9 +750,9 @@ def test(name: TestName,
     global allTestNames
     global thisdir_settings
     if name in allTestNames:
-        framework_fail(name, WayName('duplicate'), 'There are multiple tests with this name')
+        framework_fail(name, None, 'There are multiple tests with this name')
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
-        framework_fail(name, WayName('bad_name'), 'This test has an invalid name')
+        framework_fail(name, None, 'This test has an invalid name')
 
     if config.run_only_some_tests:
         if name not in config.only:
@@ -861,7 +861,7 @@ def test_common_work(watcher: testutil.Watcher,
                           not os.path.splitext(f)[1] in do_not_copy)
         for filename in (opts.extra_files + extra_src_files.get(name, [])):
             if filename.startswith('/'):
-                framework_fail(name, WayName('whole-test'),
+                framework_fail(name, None,
                     'no absolute paths in extra_files please: ' + filename)
 
             elif '*' in filename:
@@ -874,7 +874,7 @@ def test_common_work(watcher: testutil.Watcher,
                 files.add(filename)
 
             else:
-                framework_fail(name, WayName('whole-test'), 'extra_file is empty string')
+                framework_fail(name, None, 'extra_file is empty string')
 
         # Run the required tests...
         for way in do_ways:
@@ -894,15 +894,15 @@ def test_common_work(watcher: testutil.Watcher,
             try:
                 cleanup()
             except Exception as e:
-                framework_fail(name, WayName('runTest'), 'Unhandled exception during cleanup: ' + str(e))
+                framework_fail(name, None, 'Unhandled exception during cleanup: ' + str(e))
 
         package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
 
         if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
-            framework_fail(name, WayName('whole-test'), 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
+            framework_fail(name, None, 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
     except Exception as e:
-        framework_fail(name, WayName('runTest'), 'Unhandled exception: ' + str(e))
+        framework_fail(name, None, 'Unhandled exception: ' + str(e))
     finally:
         watcher.notify()
 
@@ -1026,12 +1026,14 @@ def override_options(pre_cmd):
 
     return pre_cmd
 
-def framework_fail(name: TestName, way: WayName, reason: str) -> None:
+def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str) -> None:
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
-    full_name = name + '(' + way + ')'
+    full_name = '%s(%s)' % (name, way)
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
-    t.framework_failures.append(TestResult(directory, name, reason, way))
+    name2 = name if name is not None else TestName('none')
+    way2 = way if way is not None else WayName('none')
+    t.framework_failures.append(TestResult(directory, name2, reason, way2))
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
