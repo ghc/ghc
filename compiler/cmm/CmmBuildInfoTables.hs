@@ -410,7 +410,7 @@ cafAnal contLbls topLbl caf_infos0 cmmGraph =
 
     caf_infos1
       | Just nm <- hasHaskellName topLbl
-      = pprTrace "cafAnal" (text "Updating" <+> ppr nm) $
+      = pprTrace "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr (not (mapNull ret))) $
           extendNameEnv caf_infos0 nm (not (mapNull ret))
       | otherwise
       = caf_infos0
@@ -467,10 +467,10 @@ cafTransfers contLbls entry topLbl caf_infos
           | Just nm <- hasHaskellName l
           , Just caffy <- lookupNameEnv caf_infos nm
           = if caffy then
-              pprTrace "cafTransfers.add" (text "CAFFY name:" <+> ppr nm) $
+              pprTrace "cafTransfers.add" (text "CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
                 Set.insert (mkCAFLabel l) s
             else
-              pprTrace "cafTransfers.add" (text "non-CAFFY name:" <+> ppr nm) $
+              pprTrace "cafTransfers.add" (text "non-CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
                 s
 
           | hasCAF l
