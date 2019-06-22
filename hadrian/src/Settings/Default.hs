@@ -22,7 +22,6 @@ import CommandLine
 import Expression
 import Flavour
 import Oracles.Flag
-import Oracles.Setting
 import Packages
 import Settings
 import Settings.Builders.Alex
@@ -54,7 +53,6 @@ defaultPackages Stage3 = return []
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
 stage0Packages :: Action [Package]
 stage0Packages = do
-    win <- windowsHost
     cross <- flag CrossCompiling
     return $ [ binary
              , cabal
@@ -77,13 +75,12 @@ stage0Packages = do
              , text
              , transformers
              , unlit                         ]
-          ++ [ terminfo | not win, not cross ]
-          ++ [ touchy   | win                ]
+          ++ [ terminfo | not windowsHost, not cross ]
+          ++ [ touchy   | windowsHost                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
 stage1Packages = do
-    win        <- windowsHost
     intLib     <- integerLibrary =<< flavour
     libraries0 <- filter isLibrary <$> stage0Packages
     cross      <- flag CrossCompiling
@@ -111,14 +108,14 @@ stage1Packages = do
              , unlit
              , xhtml
              ]
-          ++ [ haddock | not cross           ]
-          ++ [ hpcBin   | not cross          ]
-          ++ [ iserv    | not win, not cross ]
-          ++ [ libiserv | not win, not cross ]
-          ++ [ runGhc   | not cross          ]
-          ++ [ touchy   | win                ]
-          ++ [ unix     | not win            ]
-          ++ [ win32    | win                ]
+          ++ [ haddock  | not cross                  ]
+          ++ [ hpcBin   | not cross                  ]
+          ++ [ iserv    | not windowsHost, not cross ]
+          ++ [ libiserv | not windowsHost, not cross ]
+          ++ [ runGhc   | not cross                  ]
+          ++ [ touchy   | windowsHost                ]
+          ++ [ unix     | not windowsHost            ]
+          ++ [ win32    | windowsHost                ]
 
 -- | Packages built in 'Stage2' by default. You can change this in "UserSettings".
 stage2Packages :: Action [Package]
@@ -127,7 +124,6 @@ stage2Packages = stage1Packages
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
 testsuitePackages = do
-    win <- windowsHost
     return $ [ checkApiAnnotations
              , checkPpr
              , ghci
@@ -137,8 +133,8 @@ testsuitePackages = do
              , hsc2hs
              , iserv
              , runGhc
-             , unlit         ] ++
-             [ timeout | win ]
+             , unlit                 ] ++
+             [ timeout | windowsHost ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
@@ -227,9 +223,8 @@ defaultFlavour = Flavour
 --   in @mk/config.mk.in@.
 defaultDynamicGhcPrograms :: Action Bool
 defaultDynamicGhcPrograms = do
-  win <- windowsHost
   supportsShared <- platformSupportsSharedLibs
-  return (not win && supportsShared)
+  return (not windowsHost && supportsShared)
 
 -- | All 'Builder'-dependent command line arguments.
 defaultBuilderArgs :: Args
