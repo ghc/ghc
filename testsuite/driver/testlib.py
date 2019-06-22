@@ -28,7 +28,7 @@ import perf_notes as Perf
 from perf_notes import MetricChange
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
-from my_typing import * # type: ignore
+from my_typing import *
 
 global pool_sema
 if config.use_threads:
@@ -2238,7 +2238,7 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
+def summary(t: TestRun, file: "TextIO", short=False, color=False) -> None:
 
     file.write('\n')
     printUnexpectedTests(file,
