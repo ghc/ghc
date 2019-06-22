@@ -716,7 +716,7 @@ def newTestDir(tempdir, dir):
 # Should be equal to entry in toplevel .gitignore.
 testdir_suffix = '.run'
 
-def _newTestDir(name, opts, tempdir, dir):
+def _newTestDir(name: TestName, opts, tempdir, dir):
     testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
     opts.srcdir = os.path.join(os.getcwd(), dir)
     opts.testdir = os.path.join(tempdir, testdir, name + testdir_suffix)
@@ -1517,7 +1517,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
         f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
-    if os.path.exists(stdin):
+    if stdin.exists():
         os.system('cat "{0}" >> "{1}"'.format(stdin, script))
 
     flags = ' '.join(get_compiler_flags() + config.way_flags[way])
@@ -1685,7 +1685,7 @@ def check_hp_ok(name: TestName) -> bool:
     actual_ps_path = in_testdir(name, 'ps')
 
     if hp2psResult == 0:
-        if os.path.exists(actual_ps_path):
+        if actual_ps_path.exists():
             if gs_working:
                 gsResult = runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
@@ -1708,17 +1708,17 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
 
     # Check actual prof file only if we have an expected prof file to
     # compare it with.
-    if not os.path.exists(expected_prof_path):
+    if not expected_prof_path.exists():
         return True
 
     actual_prof_file = add_suffix(name, 'prof')
     actual_prof_path = in_testdir(actual_prof_file)
 
-    if not os.path.exists(actual_prof_path):
+    if not actual_prof_path.exists():
         print("%s does not exist" % actual_prof_path)
         return(False)
 
-    if os.path.getsize(actual_prof_path) == 0:
+    if actual_prof_path.stat().st_size == 0:
         print("%s is empty" % actual_prof_path)
         return(False)
 
@@ -2179,14 +2179,14 @@ def find_expected_file(name: TestName, suff: str) -> Path:
 if config.msys:
     import stat
     def cleanup() -> None:
-        testdir = getTestOpts().testdir
+        testdir = getTestOpts().testdir # type: Path
         max_attempts = 5
         retries = max_attempts
         def on_error(function, path, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
             # permission error. Try setting the write bit and try again.
-            os.chmod(path, stat.S_IWRITE)
+            path.chmod(stat.S_IWRITE)
             function(path)
 
         # On Windows we have to retry the delete a couple of times.
@@ -2206,7 +2206,7 @@ if config.msys:
         #
         # See #13162
         exception = None
-        while retries > 0 and os.path.exists(testdir):
+        while retries > 0 and testdir.exists():
             time.sleep((max_attempts-retries)*6)
             try:
                 shutil.rmtree(testdir, onerror=on_error, ignore_errors=False)
@@ -2214,14 +2214,14 @@ if config.msys:
                 exception = e
             retries -= 1
 
-        if retries == 0 and os.path.exists(testdir):
+        if retries == 0 and testdir.exists():
             raise Exception("Unable to remove folder '%s': %s\nUnable to start current test."
                             % (testdir, exception))
 else:
     def cleanup() -> None:
         testdir = getTestOpts().testdir
-        if os.path.exists(testdir):
-            shutil.rmtree(testdir, ignore_errors=False)
+        if testdir.exists():
+            shutil.rmtree(str(testdir), ignore_errors=False)
 
 
 # -----------------------------------------------------------------------------

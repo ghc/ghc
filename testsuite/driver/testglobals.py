@@ -3,6 +3,7 @@
 #
 
 from my_typing import *
+from pathlib import Path
 
 # -----------------------------------------------------------------------------
 # Configuration info
@@ -357,7 +358,7 @@ class TestOptions:
        self.keep_prof_callstacks = False
 
        # The directory the test is in
-       self.testdir = '.'
+       self.testdir = Path('.')
 
        # Should we redirect stdout and stderr to a single file?
        self.combined_output = False
