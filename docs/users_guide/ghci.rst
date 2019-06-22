@@ -2937,7 +2937,7 @@ commonly used commands.
 	*X> :type +d length
 	length :: [a] -> Int
 
-.. ghci-cmd:: :type-at; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
+.. ghci-cmd:: :type-at; ⟨path⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Reports the inferred type at the given span/position in the module, e.g.:
 
@@ -2948,6 +2948,13 @@ commonly used commands.
 
     This command is useful when integrating GHCi with text editors and
     IDEs for providing a show-type-under-point facility.
+
+    The first parameter (path) must be a file path and not a module name.
+    The type of this path is dependent on how the module was loaded into GHCi:
+    If the module was loaded by name, then the path name calculated by GHCi
+    as described in :ref:`ghci-modules-filenames` must be used.
+    If the module was loaded with an absolute or a relative path,
+    then the same path must be specified.
 
     The last string parameter is useful for when the span is out of
     date, i.e. the file changed and the code has moved. In which case
