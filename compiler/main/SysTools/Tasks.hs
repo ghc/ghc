@@ -22,7 +22,7 @@ import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (llvmVersionStr, supportedLlvmVersion)
+import LlvmCodeGen.Base (LlvmVersion (..), llvmVersionStr, supportedLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info
@@ -184,7 +184,7 @@ runClang dflags args = do
     )
 
 -- | Figure out which version of LLVM we are running this session
-figureLlvmVersion :: DynFlags -> IO (Maybe (Int, Int))
+figureLlvmVersion :: DynFlags -> IO (Maybe LlvmVersion)
 figureLlvmVersion dflags = do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
@@ -206,8 +206,10 @@ figureLlvmVersion dflags = do
               vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
               v     <- case span (/= '.') vline of
                         ("",_)  -> fail "no digits!"
-                        (x,y) -> return (read x
-                                        , read $ takeWhile isDigit $ drop 1 y)
+                        (x,"") -> return $ LlvmVersion (read x)
+                        (x,y) -> return $ LlvmVersionOld
+                                            (read x)
+                                            (read $ takeWhile isDigit $ drop 1 y)
 
               hClose pin
               hClose pout

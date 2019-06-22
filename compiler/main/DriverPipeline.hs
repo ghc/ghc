@@ -56,7 +56,7 @@ import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
-import LlvmCodeGen      ( llvmFixupAsm )
+import LlvmCodeGen      ( LlvmVersion (..), llvmFixupAsm )
 import MonadUtils
 import Platform
 import TcRnTypes
@@ -2171,7 +2171,8 @@ getBackendDefs :: DynFlags -> IO [String]
 getBackendDefs dflags | hscTarget dflags == HscLlvm = do
     llvmVer <- figureLlvmVersion dflags
     return $ case llvmVer of
-               Just n -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format n ]
+               Just (LlvmVersion n) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (n,0) ]
+               Just (LlvmVersionOld m n) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
                _      -> []
   where
     format (major, minor)
