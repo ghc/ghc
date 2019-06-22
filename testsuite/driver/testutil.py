@@ -55,10 +55,10 @@ def lndir(srcdir: Path, dstdir: Path):
         src = srcdir / filename
         dst = dstdir / filename
         if src.is_file():
-            link_or_copy_file(str(src), str(dst))
+            link_or_copy_file(src, dst)
         else:
             dst.mkdir()
-            lndir(str(src), str(dst))
+            lndir(src, dst)
 
 # All possible test metric strings.
 def testing_metrics():
@@ -72,9 +72,11 @@ def testing_metrics():
 # We define the following function to make this magic more
 # explicit/discoverable. You are enouraged to use it instead of os.symlink.
 if platform.system() == 'Windows' and os.getenv('FORCE_SYMLINKS') == None:
-    link_or_copy_file = lambda src, dst: shutil.copyfile(src, dst)
+    def link_or_copy_file(src: Path, dst: Path):
+        shutil.copyfile(str(src), str(dst))
 else:
-    link_or_copy_file = lambda src, dst: os.symlink(src, dst)
+    def link_or_copy_file(src: Path, dst: Path):
+        os.symlink(str(src), str(dst))
 
 class Watcher(object):
     def __init__(self, count: int):
