@@ -158,7 +158,7 @@ cmp_thread(StgPtr tso1, StgPtr tso2)
  *
  * This is used in the implementation of Show for ThreadIds.
  * ------------------------------------------------------------------------ */
-int
+long
 rts_getThreadId(StgPtr tso)
 {
   return ((StgTSO *)tso)->id;
@@ -862,7 +862,7 @@ printThreadBlockage(StgTSO *tso)
     debugBelch("is blocked on an STM operation");
     break;
   default:
-    barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%p)",
+    barf("printThreadBlockage: strange tso->why_blocked: %ld for TSO %ld (%p)",
          tso->why_blocked, tso->id, tso);
   }
 }
