@@ -746,15 +746,15 @@ def runTest(watcher, opts, name: TestName, func, args):
 # setup :: [TestOpt] -> IO ()
 def test(name: TestName,
          setup: "Callable[[List[TestOptions]], None]",
-         func, args):
+         func, args) -> None:
     global aloneTests
     global parallelTests
     global allTestNames
     global thisdir_settings
     if name in allTestNames:
-        framework_fail(name, 'duplicate', 'There are multiple tests with this name')
+        framework_fail(name, WayName('duplicate'), 'There are multiple tests with this name')
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
-        framework_fail(name, 'bad_name', 'This test has an invalid name')
+        framework_fail(name, WayName('bad_name'), 'This test has an invalid name')
 
     if config.run_only_some_tests:
         if name not in config.only:
@@ -863,7 +863,7 @@ def test_common_work(watcher: testutil.Watcher,
                           not os.path.splitext(f)[1] in do_not_copy)
         for filename in (opts.extra_files + extra_src_files.get(name, [])):
             if filename.startswith('/'):
-                framework_fail(name, 'whole-test',
+                framework_fail(name, WayName('whole-test'),
                     'no absolute paths in extra_files please: ' + filename)
 
             elif '*' in filename:
@@ -876,7 +876,7 @@ def test_common_work(watcher: testutil.Watcher,
                 files.add(filename)
 
             else:
-                framework_fail(name, 'whole-test', 'extra_file is empty string')
+                framework_fail(name, WayName('whole-test'), 'extra_file is empty string')
 
         # Run the required tests...
         for way in do_ways:
@@ -896,15 +896,15 @@ def test_common_work(watcher: testutil.Watcher,
             try:
                 cleanup()
             except Exception as e:
-                framework_fail(name, 'runTest', 'Unhandled exception during cleanup: ' + str(e))
+                framework_fail(name, WayName('runTest'), 'Unhandled exception during cleanup: ' + str(e))
 
         package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
 
         if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
-            framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
+            framework_fail(name, WayName('whole-test'), 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
     except Exception as e:
-        framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
+        framework_fail(name, WayName('runTest'), 'Unhandled exception: ' + str(e))
     finally:
         watcher.notify()
 
@@ -1029,14 +1029,14 @@ def override_options(pre_cmd):
 
     return pre_cmd
 
-def framework_fail(name, way, reason):
+def framework_fail(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     t.framework_failures.append(TestResult(directory, name, reason, way))
 
-def framework_warn(name, way, reason):
+def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
     full_name = name + '(' + way + ')'
@@ -1257,7 +1257,7 @@ def metric_dict(name, way, metric, value):
 # range_fields: see TestOptions.stats_range_fields
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
-def check_stats(name, way, stats_file, range_fields):
+def check_stats(name, way, stats_file, range_fields) -> Any:
     head_commit = Perf.commit_hash('HEAD') if Perf.inside_git_repo() else None
     result = passed()
     if range_fields:
@@ -1274,7 +1274,9 @@ def check_stats(name, way, stats_file, range_fields):
                 print('Failed to find metric: ', metric)
                 metric_result = failBecause('no such stats metric')
             else:
-                actual_val = int(field_match.group(1))
+                val = field_match.group(1)
+                assert val is not None
+                actual_val = int(val)
 
                 # Store the metric so it can later be stored in a git note.
                 perf_stat = metric_dict(name, way, metric, actual_val)
@@ -1317,7 +1319,8 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, backpack = False):
+def simple_build(name: TestName, way: WayName,
+                 extra_hc_opts, should_fail, top_mod, link, addsuf, backpack = False) -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
@@ -1407,7 +1410,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str):
+def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> Any:
     opts = getTestOpts()
 
     # figure out what to use for stdin
@@ -1491,7 +1494,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
     script = in_testdir(name, 'genscript')
 
     if opts.combined_output:
-        framework_fail(name, 'unsupported',
+        framework_fail(name, WayName('unsupported'),
                        'WAY=ghci and combined_output together is not supported')
 
     if (top_mod == ''):
