@@ -38,6 +38,10 @@ if config.use_threads:
 global wantToStop
 wantToStop = False
 
+# I have no idea what the type of this is
+global thisdir_settings
+thisdir_settings = None # type: ignore
+
 def stopNow() -> None:
     global wantToStop
     wantToStop = True
@@ -55,12 +59,12 @@ if config.use_threads:
 else:
     class TestOpts_Local:
         pass
-    testopts_local = TestOpts_Local()
+    testopts_local = TestOpts_Local() # type: ignore
 
-def getTestOpts():
+def getTestOpts() -> TestOptions:
     return testopts_local.x
 
-def setLocalTestOpts(opts):
+def setLocalTestOpts(opts: TestOptions) -> None:
     global testopts_local
     testopts_local.x = opts
 
@@ -716,9 +720,9 @@ def newTestDir(tempdir, dir):
 # Should be equal to entry in toplevel .gitignore.
 testdir_suffix = '.run'
 
-def _newTestDir(name: TestName, opts, tempdir, dir):
+def _newTestDir(name: TestName, opts: TestOptions, tempdir, dir):
     testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
-    opts.srcdir = Path(os.path.join(os.getcwd(), dir))
+    opts.srcdir = Path.cwd() / dir
     opts.testdir = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
     opts.compiler_always_flags = config.compiler_always_flags
 
@@ -787,11 +791,11 @@ if config.use_threads:
                 pool_sema.release()
 
 def get_package_cache_timestamp() -> float:
-    if config.package_conf_cache_file == '':
+    if config.package_conf_cache_file is None:
         return 0.0
     else:
         try:
-            return os.stat(config.package_conf_cache_file).st_mtime
+            return config.package_conf_cache_file.stat().st_mtime
         except:
             return 0.0
 
@@ -867,7 +871,7 @@ def test_common_work(watcher: testutil.Watcher,
             elif '*' in filename:
                 # Don't use wildcards in extra_files too much, as
                 # globbing is slow.
-                files.update(f.relative_to(opts.srcdir)
+                files.update(str(Path(f).relative_to(opts.srcdir))
                              for f in glob.iglob(str(in_srcdir(filename))))
 
             elif filename:
@@ -1257,7 +1261,7 @@ def metric_dict(name, way, metric, value):
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
 def check_stats(name, way, stats_file, range_fields) -> Any:
-    head_commit = Perf.commit_hash('HEAD') if Perf.inside_git_repo() else None
+    head_commit = Perf.commit_hash(GitRef('HEAD')) if Perf.inside_git_repo() else None
     result = passed()
     if range_fields:
         try:
@@ -2153,7 +2157,10 @@ def in_srcdir(name: Union[Path, str], suffix: str='') -> Path:
     return getTestOpts().srcdir / add_suffix(name, suffix)
 
 def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
-    return getTestOpts().stats_file_dir / add_suffix(name, suffix)
+    dir = getTestOpts().stats_file_dir
+    if dir is None:
+        raise TypeError('stats_file_dir is not set')
+    return dir / add_suffix(name, suffix)
 
 # Finding the sample output.  The filename is of the form
 #

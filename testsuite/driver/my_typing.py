@@ -37,3 +37,7 @@ WayName = NewType("WayName", str)
 TestName = NewType("TestName", str)
 OutputNormalizer = Callable[[str], str]
 IssueNumber = NewType("IssueNumber", int)
+
+# Used by perf_notes
+GitHash = NewType("GitHash", str)
+GitRef = NewType("GitRef", str)

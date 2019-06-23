@@ -140,6 +140,9 @@ class TestConfig:
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
+        # Is the compiler dynamically linked?
+        self.ghc_dynamic = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
@@ -170,6 +173,9 @@ class TestConfig:
 
         # Should we cleanup after test runs?
         self.cleanup = True
+
+        # I have no idea what this does
+        self.package_conf_cache_file = None # type: Optional[Path]
 
 
 global config
@@ -261,6 +267,9 @@ class TestOptions:
 
        # override the expected result for certain ways
        self.expect_fail_for = []
+
+       # the stdin file that this test will use (empty for <name>.stdin)
+       self.srcdir = None
 
        # the stdin file that this test will use (empty for <name>.stdin)
        self.stdin = ''
@@ -367,9 +376,13 @@ class TestOptions:
        self.compile_timeout_multiplier = 1.0
        self.run_timeout_multiplier = 1.0
 
-       # Sould we run tests in a local subdirectory (<testname>-run) or
+       # Should we run tests in a local subdirectory (<testname>-run) or
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
+
+       # The directory where the runtime statistics output from Haddock are
+       # found.
+       self.stats_file_dir = None
 
 # The default set of options
 global default_testopts

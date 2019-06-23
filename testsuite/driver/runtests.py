@@ -24,7 +24,7 @@ import traceback
 import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
-from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
+from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
 import cpu_features
@@ -39,7 +39,11 @@ global config
 config = getConfig() # get it from testglobals
 
 def signal_handler(signal, frame):
-        stopNow()
+    stopNow()
+
+def get_compiler_info() -> TestConfig:
+    """ Overriddden by configuration file. """
+    raise NotImplementedError
 
 # -----------------------------------------------------------------------------
 # cmd-line options
@@ -154,7 +158,7 @@ if windows:
     import ctypes
     # Windows and mingw* Python provide windll, msys2 python provides cdll.
     if hasattr(ctypes, 'WinDLL'):
-        mydll = ctypes.WinDLL
+        mydll = ctypes.WinDLL    # type: ignore
     else:
         mydll = ctypes.CDLL
 
