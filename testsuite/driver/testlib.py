@@ -718,8 +718,8 @@ testdir_suffix = '.run'
 
 def _newTestDir(name: TestName, opts, tempdir, dir):
     testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
-    opts.srcdir = os.path.join(os.getcwd(), dir)
-    opts.testdir = os.path.join(tempdir, testdir, name + testdir_suffix)
+    opts.srcdir = Path(os.path.join(os.getcwd(), dir))
+    opts.testdir = Path(os.path.join(tempdir, testdir, name + testdir_suffix))
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
@@ -926,7 +926,7 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
     cleanup()
-    os.makedirs(opts.testdir)
+    opts.testdir.mkdir(parents=True)
 
     # Link all source files for this test into a new directory in
     # /tmp, and run the test in that directory. This makes it
@@ -2209,7 +2209,7 @@ if config.msys:
         while retries > 0 and testdir.exists():
             time.sleep((max_attempts-retries)*6)
             try:
-                shutil.rmtree(testdir, onerror=on_error, ignore_errors=False)
+                shutil.rmtree(str(testdir), onerror=on_error, ignore_errors=False)
             except Exception as e:
                 exception = e
             retries -= 1
