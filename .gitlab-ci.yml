@@ -71,6 +71,7 @@ ghc-linters:
     refs:
       - merge_requests
 
+# Run mypy Python typechecker on linter scripts.
 lint-linters:
   <<: *only-default
   stage: lint
@@ -81,12 +82,24 @@ lint-linters:
   tags:
     - lint
 
+# Check that .T files all parse by listing broken tests.
 lint-testsuite:
   <<: *only-default
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
     - make -Ctestsuite list_broken TEST_HC=ghc
+  dependencies: []
+  tags:
+    - lint
+
+# Run mypy Python typechecker on testsuite driver
+typecheck-testsuite:
+  <<: *only-default
+  stage: lint
+  image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
+  script:
+    - mypy testsuite/driver/runtests.py
   dependencies: []
   tags:
     - lint
