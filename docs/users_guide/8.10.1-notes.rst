@@ -147,6 +147,10 @@ Compiler
 - Add new flag :ghc-flag:`-fkeep-going` which makes the compiler
   continue as far as it can despite errors.
 
+- Deprecated flag :ghc-flag:`-fwarn-hi-shadowing` because it was not
+  implemented correctly, and appears to be largely unused. This flag
+  will be removed in a later version of GHC.
+
 GHCi
 ~~~~
 

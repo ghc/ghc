@@ -4052,7 +4052,8 @@ wWarningFlagsDeps = [
     "it is subsumed by -Wredundant-constraints",
   flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
   flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
-  flagSpec "hi-shadowing"                Opt_WarnHiShadows,
+  depFlagSpec "hi-shadowing"                Opt_WarnHiShadows
+    "it is not used, and was never implemented",
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
   depFlagSpec "implicit-kind-vars"       Opt_WarnImplicitKindVars

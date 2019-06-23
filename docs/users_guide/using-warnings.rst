@@ -744,19 +744,6 @@ of ``-W(no-)*``.
 
     This option is on by default.
 
-.. ghc-flag:: -Whi-shadowing
-    :shortdesc: warn when a ``.hi`` file in the current directory shadows a library
-    :type: dynamic
-    :reverse: -Wno-hi-shadowing
-    :category:
-
-    .. index::
-       single: shadowing; interface files
-
-    Causes the compiler to emit a warning when a module or interface
-    file in the current directory is shadowing one with the same module
-    name in a library or other directory.
-
 .. ghc-flag:: -Widentities
     :shortdesc: warn about uses of Prelude numeric conversions that are probably
         the identity (and hence could be omitted)
