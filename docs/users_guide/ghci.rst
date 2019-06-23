@@ -3045,6 +3045,11 @@ The available GHCi options are:
     top-level expressions to be discarded after each evaluation (they
     are still retained *during* a single evaluation).
 
+    The `:set +r` option only works in conjunction with compiling to
+    object-code (see :ghc-flag:`-fobject-code`).
+    It has no effect when GHCi compiles to byte-code
+    (see :ghc-flag:`-fbyte-code`).
+
     This option may help if the evaluated top-level expressions are
     consuming large amounts of space, or if you need repeatable
     performance measurements.
