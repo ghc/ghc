@@ -69,8 +69,6 @@ information about the retainers is still applicable.
     (4) printRetainer() and printRetainerSetShort() in RetainerSet.c.
  */
 
-// TODO: Change references to c_child_r in comments to 'data'.
-
 /* -----------------------------------------------------------------------------
  * Declarations...
  * -------------------------------------------------------------------------- */
@@ -1276,13 +1274,7 @@ traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
  *
  *    *cp is one of the following: TSO, AP_STACK.
  *
- *    If *cp is TSO, c == c_child_r.
- *
  *    stackStart < stackEnd.
- *
- *    RSET(c) and RSET(c_child_r) are valid, i.e., their
- *    interpretation conforms to the current value of flip (even when they
- *    are interpreted to be NULL).
  *
  *    If *c is TSO, its state is not ThreadComplete,or ThreadKilled,
  *    which means that its stack is ready to process.
