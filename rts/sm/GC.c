@@ -752,11 +752,11 @@ GarbageCollect (uint32_t collect_gen,
   }
 
 #if defined(PROFILING)
-  // resetStaticObjectForRetainerProfiling() must be called before
+  // resetStaticObjectForProfiling() must be called before
   // zeroing below.
 
   // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForRetainerProfiling(gct->scavenged_static_objects);
+  resetStaticObjectForProfiling(gct->scavenged_static_objects);
 #endif
 
   // Start any pending finalizers.  Must be after
