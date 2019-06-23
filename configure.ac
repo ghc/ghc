@@ -388,6 +388,12 @@ then
     AC_PATH_PROG([Genlib],[genlib])
 fi
 
+# OpenBSD's included gcc is too old, so we use clang
+if test "$BuildOS" = "openbsd"
+then
+    AC_PATH_PROG([CC],[clang])
+fi
+
 # We don't want to bundle a MinGW-w64 toolchain
 # So we have to find these individual tools.
 if test "$EnableDistroToolchain" = "YES"
