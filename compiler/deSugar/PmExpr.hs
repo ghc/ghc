@@ -10,7 +10,8 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), isNotPmExprOther,
-        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, pmExprAsList
+        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, injectPmAltCons,
+        pmExprAsList
     ) where
 
 #include "HsVersions.h"
@@ -78,6 +79,9 @@ mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 
 mkPmExprLit :: PmLit -> PmExpr
 mkPmExprLit l = PmExprCon (PmAltLit l) []
+
+injectPmAltCons :: [PmLit] -> [ConLike] -> [PmAltCon]
+injectPmAltCons lits cls = map PmAltLit lits ++ map PmAltConLike cls
 
 {- Note [Undecidable Equality for Overloaded Literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

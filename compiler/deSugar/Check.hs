@@ -628,11 +628,8 @@ normaliseValAbs delta = runMaybeT . go_va delta
       -- @PmCon@ for better readability of warning messages.
       case incomplete_grps of
         ([con]:_) | all (== [con]) incomplete_grps -> do
-          -- We don't want to simplify to a @PmCon@ (which won't normalise
-          -- any further) when @p@ is just the 'cheapInhabitationTest'.
-          -- Thus, we have to assert satisfiability here, even if the
-          -- expensive 'isConSatisfiable' already did so. Also, we have to
-          -- store the constraints in @delta@.
+          -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
+          -- recorded in delta'
           (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
           lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
           pure (delta', ic_val_abs ic)

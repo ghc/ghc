@@ -33,6 +33,7 @@ import NameEnv
 import UniqFM
 import UniqDFM
 import Type
+import ConLike
 import HsLit
 import TcHsSyn
 import MonadUtils
@@ -63,7 +64,7 @@ type TmVarCtEnv = NameEnv PmExpr
 -- 'NameEnv'.
 --
 -- See also Note [Refutable shapes] in TmOracle.
-type PmRefutEnv = DNameEnv (Type, [PmAltCon])
+type PmRefutEnv = DNameEnv (Type, [PmLit], [ConLike])
 
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
 -- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
@@ -117,7 +118,9 @@ instance Outputable TmState where
       pos   = map pos_eq (nonDetUFMToList (tm_pos state))
       neg   = map neg_eq (udfmToList (tm_neg state))
       pos_eq (l, r) = ppr l <+> char '~' <+> ppr r
-      neg_eq (l, r) = ppr l <+> text "/~" <+> ppr r
+      neg_eq (l, (ty, lits, cls)) = hsep [ppr l, dcolon, ppr ty, text "/~", ppr alts]
+        where
+          alts = injectPmAltCons lits cls
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -154,8 +157,10 @@ canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
 isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
 isRefutable x e env = fromMaybe False $ do
   alt <- exprToAlt e
-  (_, nalts) <- lookupDNameEnv env x
-  pure (elem alt nalts)
+  (_, nlits, ncls) <- lookupDNameEnv env x
+  case alt of
+    PmAltLit lit -> pure (elem lit nlits)
+    PmAltConLike cl -> pure (elem cl ncls)
 
 -- | Solve an equality (top-level).
 solveOneEq :: TmState -> TmVarCt -> Maybe TmState
@@ -178,13 +183,20 @@ tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   where                                --     refutation redundant
     (y, e) = varDeepLookup pos (idName x)
     extended = original { tm_neg = neg' }
-    neg' = extendDNameEnv_C combineRefutEntries neg y (idType x, [nalt])
+    entry = case nalt of
+      PmAltLit nlit -> (idType x, [nlit], [])
+      PmAltConLike ncl -> (idType x, [], [ncl])
+    neg' = extendDNameEnv_C combineRefutEntries neg y entry
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
-combineRefutEntries :: (Type, [PmAltCon]) -> (Type, [PmAltCon]) -> (Type, [PmAltCon])
-combineRefutEntries (old_ty, old_nalts) (new_ty, new_nalts)
-  = ASSERT( eqType old_ty new_ty ) (old_ty, unionLists old_nalts new_nalts)
+combineRefutEntries
+  :: (Type, [PmLit], [ConLike])
+  -> (Type, [PmLit], [ConLike])
+  -> (Type, [PmLit], [ConLike])
+combineRefutEntries (old_ty, old_nlits, old_ncls) (new_ty, new_nlits, new_ncls)
+  = ASSERT( eqType old_ty new_ty )
+    (old_ty, unionLists old_nlits new_nlits, unionLists old_ncls new_ncls)
 
 -- | Return all 'PmAltCon' shapes that are impossible for 'Id' to take, i.e.
 -- would immediately lead to a refutation by the term oracle.
@@ -192,8 +204,10 @@ combineRefutEntries (old_ty, old_nalts) (new_ty, new_nalts)
 -- Note that because of Note [The Pos/Neg invariant], this will return an empty
 -- list of alt cons for 'Id's which already have a solution.
 lookupRefutableAltCons :: TmState -> Id -> (Type, [PmAltCon])
-lookupRefutableAltCons _tms@TmS{ tm_pos = pos, tm_neg = neg } x
-  = fromMaybe (idType x, []) (lookupDNameEnv neg y)
+lookupRefutableAltCons _tms@TmS{ tm_pos = pos, tm_neg = neg } x =
+  case lookupDNameEnv neg y of
+    Just (ty, nlits, ncls) -> (ty, injectPmAltCons nlits ncls)
+    Nothing                -> (idType x, [])
   where
     (y, _e) = varDeepLookup pos (idName x)
 
