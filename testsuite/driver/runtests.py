@@ -354,7 +354,8 @@ for name in config.only:
 if config.list_broken:
     print('')
     print('Broken tests:')
-    print('\n  '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
+    print('\n  '.join('#{ticket}({a}/{b})'.format(ticket=ticket, a=a, b=b)
+                      for ticket, a, b in brokens))
     print('')
 
     if t.framework_failures:
