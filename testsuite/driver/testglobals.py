@@ -382,7 +382,7 @@ class TestOptions:
 
        # The directory where the runtime statistics output from Haddock are
        # found.
-       self.stats_file_dir = None
+       self.stats_files_dir = None
 
 # The default set of options
 global default_testopts

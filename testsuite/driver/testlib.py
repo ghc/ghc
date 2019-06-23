@@ -1156,8 +1156,8 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        stderr = open(diff_file_name, 'rb').read()
-        os.remove(diff_file_name)
+        stderr = diff_file_name.read_bytes()
+        diff_file_name.unlink()
         return failBecauseStderr('stderr mismatch', stderr=stderr )
 
 
@@ -1314,7 +1314,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
     for mod, opts in extra_mods:
         result = simple_build(mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
-            extra_hc_opts += ' ' + Path(mod).with_suffix('.o')
+            extra_hc_opts += ' %s' % Path(mod).with_suffix('.o')
         if badResult(result):
             return result
 
@@ -2157,9 +2157,9 @@ def in_srcdir(name: Union[Path, str], suffix: str='') -> Path:
     return getTestOpts().srcdir / add_suffix(name, suffix)
 
 def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
-    dir = getTestOpts().stats_file_dir
+    dir = getTestOpts().stats_files_dir
     if dir is None:
-        raise TypeError('stats_file_dir is not set')
+        raise TypeError('stats_files_dir is not set')
     return dir / add_suffix(name, suffix)
 
 # Finding the sample output.  The filename is of the form
