@@ -855,7 +855,7 @@ def test_common_work(watcher: testutil.Watcher,
         # specify all other files that their test depends on (but
         # this seems to be necessary for only about 10% of all
         # tests).
-        files = set(f for f in os.listdir(opts.srcdir)
+        files = set(f for f in os.listdir(str(opts.srcdir))
                        if f.startswith(name) and not f == name and
                           not f.endswith(testdir_suffix) and
                           not os.path.splitext(f)[1] in do_not_copy)
@@ -867,8 +867,8 @@ def test_common_work(watcher: testutil.Watcher,
             elif '*' in filename:
                 # Don't use wildcards in extra_files too much, as
                 # globbing is slow.
-                files.update((os.path.relpath(f, opts.srcdir)
-                            for f in glob.iglob(str(in_srcdir(filename)))))
+                files.update(f.relative_to(opts.srcdir)
+                             for f in glob.iglob(str(in_srcdir(filename))))
 
             elif filename:
                 files.add(filename)
@@ -1028,7 +1028,7 @@ def override_options(pre_cmd):
 
 def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str) -> None:
     opts = getTestOpts()
-    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
+    directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
     full_name = '%s(%s)' % (name, way)
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     name2 = name if name is not None else TestName('none')
