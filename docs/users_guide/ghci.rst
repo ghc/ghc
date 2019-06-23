@@ -3049,6 +3049,8 @@ The available GHCi options are:
     consuming large amounts of space, or if you need repeatable
     performance measurements.
 
+    This option doesn't work in the current release.
+
 .. ghci-cmd:: :set +s
 
     Display some stats after evaluating each expression, including the
