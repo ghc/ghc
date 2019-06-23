@@ -169,7 +169,7 @@ class TestConfig:
         # Where to look up runtime stats produced by haddock, needed for
         # the haddock perf tests in testsuite/tests/perf/haddock/.
         # See Note [Haddock runtime stats files] at the bottom of this file.
-        self.stats_files_dir = '/please_set_stats_files_dir'
+        self.stats_files_dir = Path('/please_set_stats_files_dir')
 
         # Should we cleanup after test runs?
         self.cleanup = True
@@ -379,10 +379,6 @@ class TestOptions:
        # Should we run tests in a local subdirectory (<testname>-run) or
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
-
-       # The directory where the runtime statistics output from Haddock are
-       # found.
-       self.stats_files_dir = None
 
 # The default set of options
 global default_testopts

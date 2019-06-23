@@ -2157,7 +2157,7 @@ def in_srcdir(name: Union[Path, str], suffix: str='') -> Path:
     return getTestOpts().srcdir / add_suffix(name, suffix)
 
 def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
-    dir = getTestOpts().stats_files_dir
+    dir = config.stats_files_dir
     if dir is None:
         raise TypeError('stats_files_dir is not set')
     return dir / add_suffix(name, suffix)
