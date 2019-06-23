@@ -158,8 +158,10 @@ typedef union {
     } srt;
 } nextPos;
 
-// Tagged stack element, that keeps information how to process
-// the next element in the traverse stack.
+/**
+ * Position pointer into a closure. Determines what the next element to return
+ * for a stackElement is.
+ */
 typedef struct {
     nextPosType type;
     nextPos next;
@@ -172,29 +174,48 @@ typedef union {
     retainer c_child_r;
 } stackData;
 
-// Element in the traverse stack, keeps the element, information
-// how to continue processing the element, and it's retainer set.
+/**
+ * An element of the traversal work-stack. Besides the closure itself this also
+ * stores it's parent and associated data.
+ *
+ * When 'info.type == posTypeFresh' a 'stackElement' represents just one
+ * closure, namely 'c' and 'cp' being it's parent. Otherwise 'info' specifies an
+ * offset into the children of 'c'. This is to support returning a closure's
+ * children one-by-one without pushing one element per child onto the stack. See
+ * traversePushChildren() and traversePop().
+ *
+ */
 typedef struct {
     stackPos info;
     StgClosure *c;
-    StgClosure *cp; // parent of 'c'
+    StgClosure *cp; // parent of 'c'. Only used when info.type == posTypeFresh.
     stackData data;
 } stackElement;
 
 typedef struct {
 /*
   Invariants:
+
     firstStack points to the first block group.
+
     currentStack points to the block group currently being used.
+
     currentStack->free == stackLimit.
+
     stackTop points to the topmost byte in the stack of currentStack.
+
     Unless the whole stack is empty, stackTop must point to the topmost
     object (or byte) in the whole stack. Thus, it is only when the whole stack
-    is empty that stackTop == stackLimit (not during the execution of push()
-    and pop()).
+    is empty that stackTop == stackLimit (not during the execution of
+    pushStackElement() and popStackElement()).
+
     stackBottom == currentStack->start.
+
     stackLimit == currentStack->start + BLOCK_SIZE_W * currentStack->blocks.
+
+
   Note:
+
     When a current stack becomes empty, stackTop is set to point to
     the topmost element on the previous block group so as to satisfy
     the invariants described above.
@@ -228,7 +249,8 @@ typedef struct {
 #endif
 } traverseState;
 
-/* Callback called when heap traversal visits a closure.
+/**
+ * Callback called when heap traversal visits a closure.
  *
  * Before this callback is called the profiling header of the visited closure
  * 'c' is zero'd with 'setTravDataToZero' if this closure hasn't been visited in
@@ -288,9 +310,9 @@ returnToOldStack( traverseState *ts, bdescr *bd )
     bd->free = (StgPtr)ts->stackLimit;
 }
 
-/* -----------------------------------------------------------------------------
- *  Initializes the traverse stack.
- * -------------------------------------------------------------------------- */
+/**
+ *  Initializes the traversal work-stack.
+ */
 static void
 initializeTraverseStack( traverseState *ts )
 {
@@ -305,11 +327,12 @@ initializeTraverseStack( traverseState *ts )
     newStackBlock(ts, ts->firstStack);
 }
 
-/* -----------------------------------------------------------------------------
- * Frees all the block groups in the traverse stack.
+/**
+ * Frees all the block groups in the traversal works-stack.
+ *
  * Invariants:
  *   firstStack != NULL
- * -------------------------------------------------------------------------- */
+ */
 static void
 closeTraverseStack( traverseState *ts )
 {
@@ -418,16 +441,17 @@ find_srt( stackPos *info )
     }
 }
 
-/* -----------------------------------------------------------------------------
- * Pushes an element onto traverse stack
- * -------------------------------------------------------------------------- */
+/**
+ * Push a set of closures, represented by a single 'stackElement', onto the
+ * traversal work-stack.
+ */
 static void
 pushStackElement(traverseState *ts, stackElement *se)
 {
     bdescr *nbd;      // Next Block Descriptor
     if (ts->stackTop - 1 < ts->stackBottom) {
 #if defined(DEBUG_RETAINER)
-        // debugBelch("push() to the next stack.\n");
+        debugBelch("pushStackElement() to the next stack.\n");
 #endif
         // currentStack->free is updated when the active stack is switched
         // to the next stack.
@@ -461,13 +485,12 @@ pushStackElement(traverseState *ts, stackElement *se)
 
 }
 
-/* Push an object onto traverse stack. This method can be used anytime
- * instead of calling retainClosure(), it exists in order to use an
- * explicit stack instead of direct recursion.
+/**
+ * Push a single closure onto the traversal work-stack.
  *
- *  *cp - object's parent
- *  *c - closure
- *  c_child_r - closure retainer.
+ *  cp   - object's parent
+ *  c    - closure
+ *  data - data associated with closure.
  */
 static INLINE void
 traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data) {
@@ -481,21 +504,27 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
     pushStackElement(ts, &se);
 };
 
-/* -----------------------------------------------------------------------------
- *  push() pushes a stackElement representing the next child of *c
- *  onto the traverse stack. If *c has no child, *first_child is set
- *  to NULL and nothing is pushed onto the stack. If *c has only one
- *  child, *c_child is set to that child and nothing is pushed onto
- *  the stack.  If *c has more than two children, *first_child is set
- *  to the first child and a stackElement representing the second
- *  child is pushed onto the stack.
-
- *  Invariants:
- *     *c_child_r is the most recent retainer of *c's children.
- *     *c is not any of TSO, AP, PAP, AP_STACK, which means that
- *        there cannot be any stack objects.
- *  Note: SRTs are considered to  be children as well.
- * -------------------------------------------------------------------------- */
+/**
+ * traversePushChildren() extracts the first child of 'c' in 'first_child' and
+ * conceptually pushes all remaining children of 'c' onto the traversal stack
+ * while associating 'data' with the pushed elements to be returned upon poping.
+ *
+ * If 'c' has no children, 'first_child' is set to NULL and nothing is pushed
+ * onto the stack.
+ *
+ * If 'c' has only one child, 'first_child' is set to that child and nothing is
+ * pushed onto the stack.
+ *
+ * Invariants:
+ *
+ *  - 'c' is not any of TSO, AP, PAP, AP_STACK, which means that there cannot
+ *       be any stack objects.
+ *
+ * Note: SRTs are considered to be children as well.
+ *
+ * Note: When pushing onto the stack we only really push one 'stackElement'
+ * representing all children onto the stack. See traversePop()
+ */
 static INLINE void
 traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosure **first_child)
 {
@@ -503,7 +532,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     bdescr *nbd;      // Next Block Descriptor
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
+    debugBelch("traversePushChildren(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type != TSO);
@@ -515,7 +544,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
 
     se.c = c;
     se.data = data;
-    // Note: se.cp ommitted on purpose, only retainPushClosure uses that.
+    // Note: se.cp ommitted on purpose, only traversePushClosure uses that.
 
     // fill in se.info
     switch (get_itbl(c)->type) {
@@ -704,19 +733,14 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     pushStackElement(ts, &se);
 }
 
-/* -----------------------------------------------------------------------------
- *  popOff() and popOffReal(): Pop a stackElement off the traverse stack.
+/**
+ *  popStackElement(): Remove a depleted stackElement from the top of the
+ *  traversal work-stack.
+ *
  *  Invariants:
  *    stackTop cannot be equal to stackLimit unless the whole stack is
- *    empty, in which case popOff() is not allowed.
- *  Note:
- *    You can think of popOffReal() as a part of popOff() which is
- *    executed at the end of popOff() in necessary. Since popOff() is
- *    likely to be executed quite often while popOffReal() is not, we
- *    separate popOffReal() from popOff(), which is declared as an
- *    INLINE function (for the sake of execution speed).  popOffReal()
- *    is called only within popOff() and nowhere else.
- * -------------------------------------------------------------------------- */
+ *    empty, in which case popStackElement() is not allowed.
+ */
 static void
 popStackElement(traverseState *ts) {
 #if defined(DEBUG_RETAINER)
@@ -741,7 +765,7 @@ popStackElement(traverseState *ts) {
     bdescr *pbd;    // Previous Block Descriptor
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("pop() to the previous stack.\n");
+    debugBelch("popStackElement() to the previous stack.\n");
 #endif
 
     ASSERT(ts->stackTop + 1 == ts->stackLimit);
@@ -778,9 +802,10 @@ popStackElement(traverseState *ts) {
 #endif
 }
 
-/* -----------------------------------------------------------------------------
+/**
  *  Finds the next object to be considered for retainer profiling and store
  *  its pointer to *c.
+ *
  *  If the unprocessed object was stored in the stack (posTypeFresh), the
  *  this object is returned as-is. Otherwise Test if the topmost stack
  *  element indicates that more objects are left,
@@ -788,21 +813,24 @@ popStackElement(traverseState *ts) {
  *  set *cp and *data appropriately, both of which are stored in the stack
  *  element.  The topmost stack element then is overwritten so as for it to now
  *  denote the next object.
+ *
  *  If the topmost stack element indicates no more objects are left, pop
  *  off the stack element until either an object can be retrieved or
  *  the current stack chunk becomes empty, indicated by true returned by
  *  isOnBoundary(), in which case *c is set to NULL.
+ *
  *  Note:
+ *
  *    It is okay to call this function even when the current stack chunk
  *    is empty.
- * -------------------------------------------------------------------------- */
+ */
 static INLINE void
 traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 {
     stackElement *se;
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
+    debugBelch("traversePop(): stackTop = 0x%x currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 #endif
 
     // Is this the last internal element? If so instead of modifying the current
@@ -816,7 +844,8 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
         }
 
         // Note: Below every `break`, where the loop condition is true, must be
-        // accompanied by a popOff() otherwise this is an infinite loop.
+        // accompanied by a popStackElement() otherwise this is an infinite
+        // loop.
         se = ts->stackTop;
 
         // If this is a top-level element, you should pop that out.
@@ -845,7 +874,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
             if (se->info.next.step == 2) {
                 *c = (StgClosure *)((StgMVar *)se->c)->tail;
                 se->info.next.step++;             // move to the next step
-                // no popOff
+                // no popStackElement
             } else {
                 *c = ((StgMVar *)se->c)->value;
                 last = true;
@@ -857,7 +886,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
             if (se->info.next.step == 2) {
                 *c = ((StgWeak *)se->c)->value;
                 se->info.next.step++;
-                // no popOff
+                // no popStackElement
             } else {
                 *c = ((StgWeak *)se->c)->finalizer;
                 last = true;
@@ -982,7 +1011,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
         case IND:
         case INVALID_OBJECT:
         default:
-            barf("Invalid object *c in pop(): %d", get_itbl(se->c)->type);
+            barf("Invalid object *c in traversePop(): %d", get_itbl(se->c)->type);
             return;
         }
     } while (*c == NULL);
@@ -1194,7 +1223,7 @@ associate( StgClosure *c, RetainerSet *s )
 }
 
 /* -----------------------------------------------------------------------------
-   Call retainPushClosure for each of the closures covered by a large bitmap.
+   Call traversePushClosure for each of the closures covered by a large bitmap.
    -------------------------------------------------------------------------- */
 
 static void
@@ -1236,24 +1265,32 @@ traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
     return p;
 }
 
-/* -----------------------------------------------------------------------------
- *  Process all the objects in the stack chunk from stackStart to stackEnd
- *  with *c and *c_child_r being their parent and their most recent retainer,
- *  respectively. Treat stackOptionalFun as another child of *c if it is
- *  not NULL.
+/**
+ *  traversePushStack(ts, cp, data, stackStart, stackEnd) pushes all the objects
+ *  in the STG stack-chunk from stackStart to stackEnd onto the traversal
+ *  work-stack with 'c' and 'data' being their parent and associated data,
+ *  respectively.
+ *
  *  Invariants:
- *    *c is one of the following: TSO, AP_STACK.
- *    If *c is TSO, c == c_child_r.
+ *
+ *    *cp is one of the following: TSO, AP_STACK.
+ *
+ *    If *cp is TSO, c == c_child_r.
+ *
  *    stackStart < stackEnd.
+ *
  *    RSET(c) and RSET(c_child_r) are valid, i.e., their
  *    interpretation conforms to the current value of flip (even when they
  *    are interpreted to be NULL).
+ *
  *    If *c is TSO, its state is not ThreadComplete,or ThreadKilled,
  *    which means that its stack is ready to process.
+ *
  *  Note:
+ *
  *    This code was almost plagiarzied from GC.c! For each pointer,
- *    retainPushClosure() is invoked instead of evacuate().
- * -------------------------------------------------------------------------- */
+ *    traversePushClosure() is invoked instead of evacuate().
+ */
 static void
 traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
                   StgPtr stackStart, StgPtr stackEnd)
@@ -1265,7 +1302,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     uint32_t size;
 
     /*
-      Each invocation of retainStack() creates a new virtual
+      Each invocation of traversePushStack() creates a new virtual
       stack. Since all such stacks share a single common stack, we
       record the current currentStackBoundary, which will be restored
       at the exit.
@@ -1274,7 +1311,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     ts->currentStackBoundary = ts->stackTop;
 
 #if defined(DEBUG_RETAINER)
-    debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
+    debugBelch("traversePushStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
         oldStackBoundary, ts->currentStackBoundary);
 #endif
 
@@ -1362,7 +1399,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
         }
 
         default:
-            barf("Invalid object found in retainStack(): %d",
+            barf("Invalid object found in traversePushStack(): %d",
                  (int)(info->i.type));
         }
     }
@@ -1370,13 +1407,13 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     // restore currentStackBoundary
     ts->currentStackBoundary = oldStackBoundary;
 #if defined(DEBUG_RETAINER)
-    debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n",
+    debugBelch("traversePushStack() finished: currentStackBoundary = 0x%x\n",
         ts->currentStackBoundary);
 #endif
 }
 
 /* ----------------------------------------------------------------------------
- * Call retainPushClosure for each of the children of a PAP/AP
+ * Call traversePushClosure for each of the children of a PAP/AP
  * ------------------------------------------------------------------------- */
 
 static INLINE StgPtr
@@ -1499,22 +1536,10 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     return 0;
 }
 
-/* -----------------------------------------------------------------------------
- *  Compute the retainer set of *c0 and all its desecents by traversing.
- *  *cp0 is the parent of *c0, and *r0 is the most recent retainer of *c0.
- *  Invariants:
- *    c0 = cp0 = r0 holds only for root objects.
- *    RSET(cp0) and RSET(r0) are valid, i.e., their
- *    interpretation conforms to the current value of flip (even when they
- *    are interpreted to be NULL).
- *    However, RSET(c0) may be corrupt, i.e., it may not conform to
- *    the current value of flip. If it does not, during the execution
- *    of this function, RSET(c0) must be initialized as well as all
- *    its descendants.
- *  Note:
- *    stackTop must be the same at the beginning and the exit of this function.
- *    *c0 can be TSO (as well as AP_STACK).
- * -------------------------------------------------------------------------- */
+/**
+ * Traverse all closures on the traversal work-stack, calling 'visit_cb'
+ * on each closure. See 'visitClosure_cb' for details.
+ */
 static void
 traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
 {
@@ -1545,7 +1570,7 @@ inner_loop:
         if (((StgTSO *)c)->what_next == ThreadComplete ||
             ((StgTSO *)c)->what_next == ThreadKilled) {
 #if defined(DEBUG_RETAINER)
-            debugBelch("ThreadComplete or ThreadKilled encountered in retainClosure()\n");
+            debugBelch("ThreadComplete or ThreadKilled encountered in traverseWorkStack()\n");
 #endif
             goto loop;
         }
@@ -1678,7 +1703,8 @@ inner_loop:
 
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
-    // object. push() may or may not push a stackElement on the stack.
+    // object. traversePushChildren() may or may not push a stackElement on the
+    // stack.
     if (first_child == NULL)
         goto loop;
 
@@ -1689,9 +1715,24 @@ inner_loop:
     goto inner_loop;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  *  Compute the retainer set for every object reachable from *tl.
- * -------------------------------------------------------------------------- */
+ *
+ *  Compute the retainer set of *c0 and all its desecents by traversing.
+ *  *cp0 is the parent of *c0, and *r0 is the most recent retainer of *c0.
+ *  Invariants:
+ *    c0 = cp0 = r0 holds only for root objects.
+ *    RSET(cp0) and RSET(r0) are valid, i.e., their
+ *    interpretation conforms to the current value of flip (even when they
+ *    are interpreted to be NULL).
+ *    However, RSET(c0) may be corrupt, i.e., it may not conform to
+ *    the current value of flip. If it does not, during the execution
+ *    of this function, RSET(c0) must be initialized as well as all
+ *    its descendants.
+ *  Note:
+ *    stackTop must be the same at the beginning and the exit of this function.
+ *    *c0 can be TSO (as well as AP_STACK).
+ */
 static void
 retainRoot(void *user, StgClosure **tl)
 {
