@@ -620,14 +620,14 @@ normaliseValAbs delta = runMaybeT . go_va delta
       pure (delta', pm { pm_con_args = args' })
     go_va delta va@(PmVar x) = do
       grps <- lift (allCompleteMatches (idType x))
-      incomplete_grps <- traverse (go_grp 0 x delta) grps
+      incomplete_grps <- lift (traverse (go_grp 0 x delta) grps)
       -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
       lift $ tracePm "normaliseValAbs" (ppr x <+> ppr (idType x) <+> ppr grps <+> ppr incomplete_grps)
       guard (all notNull incomplete_grps)
       -- If there's a unique singleton incomplete group, turn it into a
       -- @PmCon@ for better readability of warning messages.
       case incomplete_grps of
-        [[con]] -> do
+        ([con]:_) | all (== [con]) incomplete_grps -> do
           -- We don't want to simplify to a @PmCon@ (which won't normalise
           -- any further) when @p@ is just the 'cheapInhabitationTest'.
           -- Thus, we have to assert satisfiability here, even if the
@@ -639,7 +639,7 @@ normaliseValAbs delta = runMaybeT . go_va delta
         _        -> pure (delta, va)
     go_va delta va = pure (delta, va)
 
-    go_grp :: Int -> Id -> Delta -> [ConLike] -> MaybeT PmM [ConLike]
+    go_grp :: Int -> Id -> Delta -> [ConLike] -> PmM [ConLike]
     go_grp _ _ _ []
       = pure []
     go_grp n_inh _ _ group
@@ -649,7 +649,7 @@ normaliseValAbs delta = runMaybeT . go_va delta
       -- For huge groups, this saves a lot of unnecessary oracle queries!
       = pure group
     go_grp n_inh x delta (con:group) = do
-      mb_delta_ic <- lift (mkOneSatisfiableConFull delta x con)
+      mb_delta_ic <- mkOneSatisfiableConFull delta x con
       case mb_delta_ic of
         Nothing -> go_grp n_inh x delta group
         Just _  -> (con:) <$> go_grp (n_inh + 1) x delta group
