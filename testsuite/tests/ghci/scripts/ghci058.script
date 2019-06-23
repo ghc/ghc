@@ -10,6 +10,7 @@
 :l Ghci058
 c
 
+:shell sleep 1
 :shell echo "module Ghci058 where c = 'b'" > Ghci058.hs
 :shell "$HC" $HC_OPTS $ghciWayFlags -fforce-recomp -c Ghci058.hs
 :l Ghci058
