@@ -945,7 +945,7 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
             link_or_copy_file(src, dst)
         elif src.is_dir():
             if dst.exists():
-                shutil.rmtree(dst)
+                shutil.rmtree(str(dst))
             dst.mkdir()
             lndir(src, dst)
         else:
@@ -1505,7 +1505,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
 
     delimiter = '===== program output begins here\n'
 
-    with io.open(script, 'w', encoding='utf8') as f:
+    with script.open('w', encoding='UTF-8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
         f.write(':set prog ' + name + '\n')
@@ -1640,7 +1640,7 @@ def read_no_crs(f: Path) -> str:
     s = ''
     try:
         # See Note [Universal newlines].
-        with io.open(f, 'r', encoding='utf8', errors='replace', newline=None) as h:
+        with f.open('r', encoding='utf8', errors='replace', newline=None) as h:
             s = h.read()
     except Exception:
         # On Windows, if the program fails very early, it seems the
@@ -1650,7 +1650,7 @@ def read_no_crs(f: Path) -> str:
 
 def write_file(f: Path, s: str) -> None:
     # See Note [Universal newlines].
-    with io.open(f, 'w', encoding='utf8', newline='') as h:
+    with f.open('w', encoding='utf8', newline='') as h:
         h.write(s)
 
 # Note [Universal newlines]
@@ -1805,7 +1805,7 @@ def compare_outputs(way: WayName,
             return True
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
-            os.remove(expected_path)
+            expected_path.unlink()
             return True
         else:
             return False
@@ -2036,7 +2036,7 @@ def if_verbose( n: int, s: str ) -> None:
 
 def dump_file(f: Path):
     try:
-        with io.open(f) as file:
+        with f.open() as file:
             print(file.read())
     except Exception:
         print('')
