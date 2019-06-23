@@ -211,7 +211,6 @@ typedef struct {
  */
     stackElement *currentStackBoundary;
 
-#if defined(DEBUG_RETAINER)
 /*
   stackSize records the current size of the stack.
   maxStackSize records its high water mark.
@@ -225,7 +224,6 @@ typedef struct {
     than the actual depth of the graph.
  */
     int stackSize, maxStackSize;
-#endif
 } traverseState;
 
 /* Callback called when heap traversal visits a closure.
@@ -250,6 +248,22 @@ static void traverseStack(traverseState *, StgClosure *, stackData, StgPtr, StgP
 static void traverseClosure(traverseState *, StgClosure *, StgClosure *, retainer);
 static void traversePushClosure(traverseState *, StgClosure *, StgClosure *, stackData);
 
+#if defined(DEBUG)
+unsigned int g_traversalDebugLevel = 0;
+static inline void debug(const char *s, ...)
+{
+    va_list ap;
+
+    if(g_traversalDebugLevel == 0)
+        return;
+
+    va_start(ap,s);
+    vdebugBelch(s, ap);
+    va_end(ap);
+}
+#else
+#define debug(...)
+#endif
 
 // number of blocks allocated for one stack
 #define BLOCKS_IN_STACK 1
@@ -427,9 +441,7 @@ pushStackElement(traverseState *ts, stackElement *se)
 {
     bdescr *nbd;      // Next Block Descriptor
     if (ts->stackTop - 1 < ts->stackBottom) {
-#if defined(DEBUG_RETAINER)
-        // debugBelch("push() to the next stack.\n");
-#endif
+        debug("pop() to the next stack.\n");
         // currentStack->free is updated when the active stack is switched
         // to the next stack.
         ts->currentStack->free = (StgPtr)ts->stackTop;
@@ -453,13 +465,10 @@ pushStackElement(traverseState *ts, stackElement *se)
     // small enough (5 words) that this direct assignment seems to be enough.
     *ts->stackTop = *se;
 
-#if defined(DEBUG_RETAINER)
     ts->stackSize++;
     if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
     ASSERT(ts->stackSize >= 0);
-    debugBelch("stackSize = %d\n", ts->stackSize);
-#endif
-
+    debug("stackSize = %d\n", ts->stackSize);
 }
 
 /* Push an object onto traverse stack. This method can be used anytime
@@ -503,9 +512,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     stackElement se;
     bdescr *nbd;      // Next Block Descriptor
 
-#if defined(DEBUG_RETAINER)
-    debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
-#endif
+    debug("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 
     ASSERT(get_itbl(c)->type != TSO);
     ASSERT(get_itbl(c)->type != AP_STACK);
@@ -720,9 +727,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
  * -------------------------------------------------------------------------- */
 static void
 popStackElement(traverseState *ts) {
-#if defined(DEBUG_RETAINER)
-    debugBelch("popStackElement(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
-#endif
+    debug("popStackElement(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 
     ASSERT(ts->stackTop != ts->stackLimit);
     ASSERT(!isEmptyWorkStack(ts));
@@ -730,20 +735,18 @@ popStackElement(traverseState *ts) {
     // <= (instead of <) is wrong!
     if (ts->stackTop + 1 < ts->stackLimit) {
         ts->stackTop++;
-#if defined(DEBUG_RETAINER)
+
         ts->stackSize--;
         if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
         ASSERT(ts->stackSize >= 0);
-        debugBelch("stackSize = (--) %d\n", ts->stackSize);
-#endif
+        debug("stackSize = (--) %d\n", ts->stackSize);
+
         return;
     }
 
     bdescr *pbd;    // Previous Block Descriptor
 
-#if defined(DEBUG_RETAINER)
-    debugBelch("pop() to the previous stack.\n");
-#endif
+    debug("pop() to the previous stack.\n");
 
     ASSERT(ts->stackTop + 1 == ts->stackLimit);
     ASSERT(ts->stackBottom == (stackElement *)ts->currentStack->start);
@@ -752,12 +755,12 @@ popStackElement(traverseState *ts) {
         // The stack is completely empty.
         ts->stackTop++;
         ASSERT(ts->stackTop == ts->stackLimit);
-#if defined(DEBUG_RETAINER)
+
         ts->stackSize--;
         if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
         ASSERT(ts->stackSize >= 0);
-        debugBelch("stackSize = %d\n", ts->stackSize);
-#endif
+        debug("stackSize = %d\n", ts->stackSize);
+
         return;
     }
 
@@ -771,12 +774,10 @@ popStackElement(traverseState *ts) {
 
     returnToOldStack(ts, pbd);
 
-#if defined(DEBUG_RETAINER)
     ts->stackSize--;
     if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
     ASSERT(ts->stackSize >= 0);
-    debugBelch("stackSize = %d\n", ts->stackSize);
-#endif
+    debug("stackSize = %d\n", ts->stackSize);
 }
 
 /* -----------------------------------------------------------------------------
@@ -802,9 +803,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 {
     stackElement *se;
 
-#if defined(DEBUG_RETAINER)
-    debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
-#endif
+    debug("pop(): stackTop = 0x%x currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
 
     // Is this the last internal element? If so instead of modifying the current
     // stackElement in place we actually remove it from the stack.
@@ -1274,10 +1273,8 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     oldStackBoundary = ts->currentStackBoundary;
     ts->currentStackBoundary = ts->stackTop;
 
-#if defined(DEBUG_RETAINER)
-    debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
+    debug("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
         oldStackBoundary, ts->currentStackBoundary);
-#endif
 
     ASSERT(get_itbl(cp)->type == STACK);
 
@@ -1370,10 +1367,8 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
 
     // restore currentStackBoundary
     ts->currentStackBoundary = oldStackBoundary;
-#if defined(DEBUG_RETAINER)
-    debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n",
+    debug("retainStack() finished: currentStackBoundary = 0x%x\n",
         ts->currentStackBoundary);
-#endif
 }
 
 /* ----------------------------------------------------------------------------
@@ -1533,6 +1528,7 @@ loop:
     traversePop(ts, &c, &cp, &data);
 
     if (c == NULL) {
+        debug("maxStackSize= %d\n", ts->maxStackSize);
         return;
     }
 inner_loop:
@@ -1545,9 +1541,7 @@ inner_loop:
     case TSO:
         if (((StgTSO *)c)->what_next == ThreadComplete ||
             ((StgTSO *)c)->what_next == ThreadKilled) {
-#if defined(DEBUG_RETAINER)
-            debugBelch("ThreadComplete or ThreadKilled encountered in retainClosure()\n");
-#endif
+            debug("ThreadComplete or ThreadKilled encountered in retainClosure()\n");
             goto loop;
         }
         break;
@@ -1803,20 +1797,14 @@ computeRetainerSet( traverseState *ts )
 void
 resetStaticObjectForProfiling( StgClosure *static_objects )
 {
-#if defined(DEBUG_RETAINER)
-    uint32_t count;
-#endif
+    uint32_t count = 0;
     StgClosure *p;
 
-#if defined(DEBUG_RETAINER)
-    count = 0;
-#endif
     p = static_objects;
     while (p != END_OF_STATIC_OBJECT_LIST) {
         p = UNTAG_STATIC_LIST_PTR(p);
-#if defined(DEBUG_RETAINER)
         count++;
-#endif
+
         switch (get_itbl(p)->type) {
         case IND_STATIC:
             // Since we do not compute the retainer set of any
@@ -1843,9 +1831,8 @@ resetStaticObjectForProfiling( StgClosure *static_objects )
             break;
         }
     }
-#if defined(DEBUG_RETAINER)
-    debugBelch("count in scavenged_static_objects = %d\n", count);
-#endif
+
+    debug("count in scavenged_static_objects = %d\n", count);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1865,10 +1852,8 @@ retainerProfile(void)
   // Now we flips flip.
   flip = flip ^ 1;
 
-#if defined(DEBUG_RETAINER)
   g_retainerTraverseState.stackSize = 0;
   g_retainerTraverseState.maxStackSize = 0;
-#endif
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
 
@@ -1888,9 +1873,7 @@ retainerProfile(void)
 
   stat_endRP(
     retainerGeneration - 1,   // retainerGeneration has just been incremented!
-#if defined(DEBUG_RETAINER)
     g_retainerTraverseState.maxStackSize,
-#endif
     (double)timesAnyObjectVisited / numObjectVisited);
 }
 

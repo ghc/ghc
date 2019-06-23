@@ -126,9 +126,7 @@ addElement(retainer r, RetainerSet *rs)
     RetainerSet *nrs;   // New Retainer Set
     StgWord hk;         // Hash Key
 
-#if defined(DEBUG_RETAINER)
     // debugBelch("addElement(%p, %p) = ", r, rs);
-#endif
 
     ASSERT(rs != NULL);
     ASSERT(rs->num <= RtsFlags.ProfFlags.maxRetainerSetSize);
@@ -166,9 +164,8 @@ addElement(retainer r, RetainerSet *rs)
             if (rs->element[i] != nrs->element[i + 1]) break;
         if (i < rs->num) continue;
 
-#if defined(DEBUG_RETAINER)
         // debugBelch("%p\n", nrs);
-#endif
+
         // The set we are seeking already exists!
         return nrs;
     }
@@ -189,9 +186,7 @@ addElement(retainer r, RetainerSet *rs)
 
     hashTable[hash(hk)] = nrs;
 
-#if defined(DEBUG_RETAINER)
     // debugBelch("%p\n", nrs);
-#endif
     return nrs;
 }
 
