@@ -950,7 +950,7 @@ memInventory (bool show)
   retainer_blocks = 0;
 #if defined(PROFILING)
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-      retainer_blocks = retainerStackBlocks();
+      retainer_blocks = traverseWorkStackBlocks();
   }
 #endif
 

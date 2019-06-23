@@ -18,7 +18,7 @@
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
-void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
+void resetStaticObjectForProfiling( StgClosure *static_objects );
 
 /* See Note [Profiling heap traversal visited bit]. */
 extern StgWord flip;
@@ -40,7 +40,7 @@ retainerSetOf( const StgClosure *c )
 }
 
 // Used by Storage.c:memInventory()
-extern W_ retainerStackBlocks ( void );
+extern W_ traverseWorkStackBlocks ( void );
 
 #include "EndPrivate.h"
 
