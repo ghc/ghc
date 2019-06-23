@@ -34,7 +34,7 @@ extern "C" {
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)
 # undef  STATIC_INLINE
-# define STATIC_INLINE static
+# define STATIC_INLINE static inline
 #endif
 
 #include "rts/Types.h"
