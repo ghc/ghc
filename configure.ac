@@ -507,7 +507,7 @@ AC_ARG_WITH([clang],
 
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
-AC_PROG_CC([gcc clang])
+AC_PROG_CC([cc gcc clang])
 
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
