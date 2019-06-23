@@ -984,7 +984,7 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
     except (KeyError, TypeError):
         passFail = 'No passFail found'
 
-    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
+    directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
 
     if passFail == 'pass':
         if _expect_pass(way):
