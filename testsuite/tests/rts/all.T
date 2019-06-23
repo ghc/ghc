@@ -73,7 +73,7 @@ test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
 # Blackhole-detection test.
 # Skip GHCi due to #2786
 test('T2783', [ omit_ways(['ghci']), exit_code(1)
-              , expect_broken_for(2783, ['threaded1'])
+              , fragile_for(2783, ['threaded1'])
               ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
@@ -93,7 +93,7 @@ test('stack002', [extra_files(['stack001.hs']),
 
 # run this test with very small stack chunks to exercise the stack
 # overflow/underflow machinery.
-test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
+test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
                    extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
                  compile_and_run, [''])
 
@@ -214,7 +214,8 @@ test('T7815', [ multi_cpu_race,
 test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
      compile_and_run, [''])
 
-test('T7919', [when(fast(), skip), omit_ways(prof_ways)], compile_and_run,
+# Times out in ghci way
+test('T7919', [when(fast(), skip), omit_ways(['ghci'] + prof_ways)], compile_and_run,
      [config.ghc_th_way_flags])
 
 test('T8035', normal, compile_and_run, [''])
@@ -315,7 +316,7 @@ test('T11788', when(ghc_dynamic(), skip),
 
 test('T10296a', [req_smp], makefile_test, ['T10296a'])
 
-test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
+test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 
 test('numa001', [ extra_run_opts('8'), unless(unregisterised(), extra_ways(['debug_numa'])) ]
                 , compile_and_run, [''])
@@ -390,3 +391,4 @@ test('keep-cafs',
   ],
   makefile_test, ['KeepCafs'])
 
+test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])

@@ -1,7 +1,6 @@
 
 A.hs:8:8:
-    Couldn't match expected type ‘Int’
-                with actual type ‘(Integer, Integer)’
+    Couldn't match expected type ‘Int’ with actual type ‘(a0, b0)’
     In the expression: (2, 3)
     In the expression: (1, (2, 3))
     In an equation for ‘f’: f = (1, (2, 3))

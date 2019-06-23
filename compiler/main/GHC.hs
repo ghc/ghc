@@ -219,6 +219,8 @@ module GHC (
         Kind,
         PredType,
         ThetaType, pprForAll, pprThetaArrowTy,
+        parseInstanceHead,
+        getInstancesForType,
 
         -- ** Entities
         TyThing(..),
@@ -336,7 +338,7 @@ import SysTools.BaseDir
 import Annotations
 import Module
 import Panic
-import Platform
+import GHC.Platform
 import Bag              ( listToBag )
 import ErrUtils
 import MonadUtils

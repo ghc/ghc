@@ -156,4 +156,3 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
 -- | @since 4.12.0.0
 instance MonadFix Down where
     mfix f = Down (fix (getDown . f))
-      where getDown (Down x) = x

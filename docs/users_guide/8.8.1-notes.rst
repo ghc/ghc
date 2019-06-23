@@ -102,6 +102,8 @@ Compiler
 
 - The :ghc-flag:`-Wcompat` warning group now includes :ghc-flag:`-Wstar-is-type`.
 
+- New :ghc-flag:`-Wunused-packages` warning reports unused packages.
+
 - The :ghc-flag:`-fllvm-pass-vectors-in-regs` flag is now deprecated as vector
   arguments are now passed in registers by default.
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module TcCanonical(
      canonicalize,
@@ -1006,8 +1007,10 @@ can_eq_nc_forall ev eq_rel s1 s2
               = do { let tv2 = binderVar bndr2
                    ; (kind_co, wanteds1) <- unify loc Nominal (tyVarKind skol_tv)
                                                   (substTy subst (tyVarKind tv2))
-                   ; let subst' = extendTvSubst subst tv2
+                   ; let subst' = extendTvSubstAndInScope subst tv2
                                        (mkCastTy (mkTyVarTy skol_tv) kind_co)
+                         -- skol_tv is already in the in-scope set, but the
+                         -- free vars of kind_co are not; hence "...AndInScope"
                    ; (co, wanteds2) <- go skol_tvs subst' bndrs2
                    ; return ( mkTcForAllCo skol_tv kind_co co
                             , wanteds1 `unionBags` wanteds2 ) }
@@ -2079,13 +2082,6 @@ What do we do when we have an equality
 
 where k1 and k2 differ? This Note explores this treacherous area.
 
-First off, the question above is slightly the wrong question. Flattening
-a tyvar will flatten its kind (Note [Flattening] in TcFlatten); flattening
-the kind might introduce a cast. So we might have a casted tyvar on the
-left. We thus revise our test case to
-
-  (tv |> co :: k1) ~ (rhs :: k2)
-
 We must proceed differently here depending on whether we have a Wanted
 or a Given. Consider this:
 
@@ -2109,35 +2105,32 @@ The reason for this odd behavior is much the same as
 Note [Wanteds do not rewrite Wanteds] in TcRnTypes: note that the
 new `co` is a Wanted.
 
-   The solution is then not to use `co` to "rewrite" -- that is, cast
-   -- `w`, but instead to keep `w` heterogeneous and
-   irreducible. Given that we're not using `co`, there is no reason to
-   collect evidence for it, so `co` is born a Derived, with a CtOrigin
-   of KindEqOrigin.
+The solution is then not to use `co` to "rewrite" -- that is, cast -- `w`, but
+instead to keep `w` heterogeneous and irreducible. Given that we're not using
+`co`, there is no reason to collect evidence for it, so `co` is born a
+Derived, with a CtOrigin of KindEqOrigin. When the Derived is solved (by
+unification), the original wanted (`w`) will get kicked out. We thus get
 
-When the Derived is solved (by unification), the original wanted (`w`)
-will get kicked out.
+[D] _ :: k ~ Type
+[W] w :: (alpha :: k) ~ (Int :: Type)
 
-Note that, if we had [G] co1 :: k ~ Type available, then none of this code would
-trigger, because flattening would have rewritten k to Type. That is,
-`w` would look like [W] (alpha |> co1 :: Type) ~ (Int :: Type), and the tyvar
-case will trigger, correctly rewriting alpha to (Int |> sym co1).
+Note that the Wanted is unchanged and will be irreducible. This all happens
+in canEqTyVarHetero.
+
+Note that, if we had [G] co1 :: k ~ Type available, then we never get
+to canEqTyVarHetero: canEqTyVar tries flattening the kinds first. If
+we have [G] co1 :: k ~ Type, then flattening the kind of alpha would
+rewrite k to Type, and we would end up in canEqTyVarHomo.
 
 Successive canonicalizations of the same Wanted may produce
 duplicate Deriveds. Similar duplications can happen with fundeps, and there
 seems to be no easy way to avoid. I expect this case to be rare.
 
-For Givens, this problem doesn't bite, so a heterogeneous Given gives
+For Givens, this problem (the Wanteds-rewriting-Wanteds action of
+a kind coercion) doesn't bite, so a heterogeneous Given gives
 rise to a Given kind equality. No Deriveds here. We thus homogenise
-the Given (see the "homo_co" in the Given case in canEqTyVar) and
+the Given (see the "homo_co" in the Given case in canEqTyVarHetero) and
 carry on with a homogeneous equality constraint.
-
-Separately, I (Richard E) spent some time pondering what to do in the case
-that we have [W] (tv |> co1 :: k1) ~ (tv |> co2 :: k2) where k1 and k2
-differ. Note that the tv is the same. (This case is handled as the first
-case in canEqTyVarHomo.) At one point, I thought we could solve this limited
-form of heterogeneous Wanted, but I then reconsidered and now treat this case
-just like any other heterogeneous Wanted.
 
 Note [Type synonyms and canonicalization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2198,10 +2191,7 @@ data StopOrContinue a
   | Stop CtEvidence   -- The (rewritten) constraint was solved
          SDoc         -- Tells how it was solved
                       -- Any new sub-goals have been put on the work list
-
-instance Functor StopOrContinue where
-  fmap f (ContinueWith x) = ContinueWith (f x)
-  fmap _ (Stop ev s)      = Stop ev s
+  deriving (Functor)
 
 instance Outputable a => Outputable (StopOrContinue a) where
   ppr (Stop ev s)      = text "Stop" <> parens s <+> ppr ev
@@ -2285,8 +2275,12 @@ rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred c
                                                        (mkTcSymCo co))
 
 rewriteEvidence ev@(CtWanted { ctev_dest = dest
+                             , ctev_nosh = si
                              , ctev_loc = loc }) new_pred co
-  = do { mb_new_ev <- newWanted loc new_pred
+  = do { mb_new_ev <- newWanted_SI si loc new_pred
+               -- The "_SI" varant ensures that we make a new Wanted
+               -- with the same shadow-info as the existing one
+               -- with the same shadow-info as the existing one (#16735)
        ; MASSERT( tcCoercionRole co == ctEvRole ev )
        ; setWantedEvTerm dest
             (mkEvCast (getEvExpr mb_new_ev)
@@ -2334,8 +2328,10 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
                                   `mkTcTransCo` mkTcSymCo rhs_co)
        ; newGivenEvVar loc' (new_pred, new_tm) }
 
-  | CtWanted { ctev_dest = dest } <- old_ev
-  = do { (new_ev, hole_co) <- newWantedEq loc' (ctEvRole old_ev) nlhs nrhs
+  | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
+  = do { (new_ev, hole_co) <- newWantedEq_SI si loc' (ctEvRole old_ev) nlhs nrhs
+               -- The "_SI" varant ensures that we make a new Wanted
+               -- with the same shadow-info as the existing one (#16735)
        ; let co = maybeSym swapped $
                   mkSymCo lhs_co
                   `mkTransCo` hole_co

@@ -51,7 +51,7 @@ import Digraph
 import DynFlags
 import MonadUtils
 import Outputable
-import Platform
+import GHC.Platform
 import UniqSet
 import UniqFM
 import UniqSupply

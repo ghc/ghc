@@ -248,7 +248,7 @@ module DynFlags (
 
 import GhcPrelude
 
-import Platform
+import GHC.Platform
 import PlatformConstants
 import Module
 import PackageConfig
@@ -320,8 +320,8 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if defined(GHCI)
-import Foreign (Ptr) -- needed for 2nd stage
+#if defined(HAVE_INTERPRETER)
+import Foreign (Ptr)
 #endif
 
 -- Note [Updating flag description in the User's Guide]
@@ -911,6 +911,7 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    | Opt_WarnPrepositiveQualifiedModule   -- Since TBD
+   | Opt_WarnUnusedPackages               -- Since 8.10
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -1420,7 +1421,7 @@ pgm_P                 :: DynFlags -> (String,[Option])
 pgm_P dflags = toolSettings_pgm_P $ toolSettings dflags
 pgm_F                 :: DynFlags -> String
 pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
-pgm_c                 :: DynFlags -> (String,[Option])
+pgm_c                 :: DynFlags -> String
 pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
@@ -3048,7 +3049,7 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s
-         { toolSettings_pgm_c   = (f,[])
+         { toolSettings_pgm_c   = f
          , -- Don't pass -no-pie with -pgmc
            -- (see #15319)
            toolSettings_ccSupportsNoPie = False
@@ -4110,7 +4111,8 @@ wWarningFlagsDeps = [
   flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
-                                         Opt_WarnPrepositiveQualifiedModule
+                                         Opt_WarnPrepositiveQualifiedModule,
+  flagSpec "unused-packages"             Opt_WarnUnusedPackages
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4340,7 +4342,7 @@ supportedExtensions :: [String]
 supportedExtensions = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(GHCI)
+#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
@@ -4525,6 +4527,7 @@ xFlagsDeps = [
   flagSpec "UndecidableSuperClasses"          LangExt.UndecidableSuperClasses,
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
+  flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
 
@@ -5661,10 +5664,6 @@ compilerInfo dflags
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
-       ("Support SMP",                 showBool $ platformMisc_ghcWithSMP $ platformMisc dflags),
-       ("Tables next to code",         showBool $ platformMisc_tablesNextToCode $ platformMisc dflags),
-       ("RTS ways",                    platformMisc_ghcRTSWays $ platformMisc dflags),
-       ("RTS expects libdw",           showBool $ platformMisc_ghcRtsWithLibdw $ platformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5691,7 +5690,6 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Leading underscore",          showBool $ platformMisc_leadingUnderscore $ platformMisc dflags),
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC

@@ -16,6 +16,7 @@ free variables.
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module RnPat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
@@ -72,7 +73,7 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, liftM, ap, guard )
+import Control.Monad       ( when, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -107,10 +108,8 @@ p1 scope over p2,p3.
 
 newtype CpsRn b = CpsRn { unCpsRn :: forall r. (b -> RnM (r, FreeVars))
                                             -> RnM (r, FreeVars) }
+        deriving (Functor)
         -- See Note [CpsRn monad]
-
-instance Functor CpsRn where
-    fmap = liftM
 
 instance Applicative CpsRn where
     pure x = CpsRn (\k -> k x)

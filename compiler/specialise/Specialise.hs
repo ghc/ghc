@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ViewPatterns #-}
 module Specialise ( specProgram, specUnfolding ) where
 
@@ -938,7 +939,7 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | otherwise                             = return ()
   where
     allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
-    doWarn reason = 
+    doWarn reason =
       warnMsg reason
         (vcat [ hang (text ("Could not specialise imported function") <+> quotes (ppr fn))
                 2 (vcat [ text "when specialising" <+> quotes (ppr caller)
@@ -2530,16 +2531,13 @@ deleteCallsFor bs calls = delDVarEnvList calls bs
 ************************************************************************
 -}
 
-newtype SpecM a = SpecM (State SpecState a)
+newtype SpecM a = SpecM (State SpecState a) deriving (Functor)
 
 data SpecState = SpecState {
                      spec_uniq_supply :: UniqSupply,
                      spec_module :: Module,
                      spec_dflags :: DynFlags
                  }
-
-instance Functor SpecM where
-    fmap = liftM
 
 instance Applicative SpecM where
     pure x = SpecM $ return x

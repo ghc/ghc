@@ -8,6 +8,7 @@ This is useful, general stuff for the Native Code Generator.
 Provide trees (of instructions), so that lists of instructions
 can be appended in linear time.
 -}
+{-# LANGUAGE DeriveFunctor #-}
 
 module OrdList (
         OrdList,
@@ -34,6 +35,7 @@ data OrdList a
   | Snoc (OrdList a) a
   | Two (OrdList a) -- Invariant: non-empty
         (OrdList a) -- Invariant: non-empty
+  deriving (Functor)
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
@@ -45,9 +47,6 @@ instance Monoid (OrdList a) where
   mempty = nilOL
   mappend = (Semigroup.<>)
   mconcat = concatOL
-
-instance Functor OrdList where
-  fmap = mapOL
 
 instance Foldable OrdList where
   foldr = foldrOL
@@ -117,12 +116,7 @@ fromOLReverse a = go a []
         go (Many xs)  acc = reverse xs ++ acc
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
-mapOL _ None = None
-mapOL f (One x) = One (f x)
-mapOL f (Cons x xs) = Cons (f x) (mapOL f xs)
-mapOL f (Snoc xs x) = Snoc (mapOL f xs) (f x)
-mapOL f (Two x y) = Two (mapOL f x) (mapOL f y)
-mapOL f (Many xs) = Many (map f xs)
+mapOL = fmap
 
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL _ z None        = z

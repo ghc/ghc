@@ -16,7 +16,7 @@ For state that is global and should be returned at the end (e.g not part
 of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
-{-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
+{-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
              ViewPatterns #-}
 
 module TcRnTypes(
@@ -195,7 +195,7 @@ import Util
 import PrelNames ( isUnboundName )
 import CostCentreState
 
-import Control.Monad (ap, liftM, msum)
+import Control.Monad (ap, msum)
 import qualified Control.Monad.Fail as MonadFail
 import Data.Set      ( Set )
 import qualified Data.Set as S
@@ -207,6 +207,8 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
+
+import {-# SOURCE #-} TcHoleFitTypes ( HoleFitPlugin )
 
 import qualified Language.Haskell.TH as TH
 
@@ -391,7 +393,7 @@ data DsLclEnv = DsLclEnv {
         -- These two fields are augmented as we walk inwards,
         -- through each patttern match in turn
         dsl_dicts   :: Bag EvVar,     -- Constraints from GADT pattern-matching
-        dsl_tm_cs   :: Bag SimpleEq,  -- Constraints form term-level pattern matching
+        dsl_tm_cs   :: Bag TmVarCt,      -- Constraints form term-level pattern matching
 
         dsl_pm_iter :: IORef Int  -- Number of iterations for pmcheck so far
                                   -- We fail if this gets too big
@@ -685,6 +687,8 @@ data TcGblEnv
 
         tcg_tc_plugins :: [TcPluginSolver],
         -- ^ A list of user-defined plugins for the constraint solver.
+        tcg_hf_plugins :: [HoleFitPlugin],
+        -- ^ A list of user-defined plugins for hole fit suggestions.
 
         tcg_top_loc :: RealSrcSpan,
         -- ^ The RealSrcSpan this module came from
@@ -1020,7 +1024,7 @@ splice. In particular it is not set when the splice is renamed or typechecked.
 'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
 the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
 'addModFinalizer' runs when doing Q things. Therefore, It doesn't make sense to
-set 'RunSplice' when renaming or typechecking the splice, where 'Splice', 
+set 'RunSplice' when renaming or typechecking the splice, where 'Splice',
 'Brack' or 'Comp' are used instead.
 
 -}
@@ -1542,6 +1546,10 @@ data TcIdSigInst
                -- No need to keep track of whether they are truly lexically
                --   scoped because the renamer has named them uniquely
                -- See Note [Binding scoped type variables] in TcSigs
+               --
+               -- NB: The order of sig_inst_skols is irrelevant
+               --     for a CompleteSig, but for a PartialSig see
+               --     Note [Quantified varaibles in partial type signatures]
 
          , sig_inst_theta  :: TcThetaType
                -- Instantiated theta.  In the case of a
@@ -1553,15 +1561,15 @@ data TcIdSigInst
 
          -- Relevant for partial signature only
          , sig_inst_wcs   :: [(Name, TcTyVar)]
-               -- Like sig_inst_skols, but for wildcards.  The named
-               -- wildcards scope over the binding, and hence their
-               -- Names may appear in type signatures in the binding
+               -- Like sig_inst_skols, but for /named/ wildcards (_a etc).
+               -- The named wildcards scope over the binding, and hence
+               -- their Names may appear in type signatures in the binding
 
          , sig_inst_wcx   :: Maybe TcType
                -- Extra-constraints wildcard to fill in, if any
                -- If this exists, it is surely of the form (meta_tv |> co)
                -- (where the co might be reflexive). This is filled in
-               -- only from the return value of TcHsType.tcWildCardOcc
+               -- only from the return value of TcHsType.tcAnonWildCardOcc
          }
 
 {- Note [sig_inst_tau may be polymorphic]
@@ -1571,6 +1579,26 @@ if the original function had a signature like
    forall a. Eq a => forall b. Ord b => ....
 But that's ok: tcMatchesFun (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
+
+Note [Quantified varaibles in partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: forall a b. _ -> a -> _ -> b
+   f (x,y) p q = q
+
+Then we expect f's final type to be
+  f :: forall {x,y}. forall a b. (x,y) -> a -> b -> b
+
+Note that x,y are Inferred, and can't be use for visible type
+application (VTA).  But a,b are Specified, and remain Specified
+in the final type, so we can use VTA for them.  (Exception: if
+it turns out that a's kind mentions b we need to reorder them
+with scopedSort.)
+
+The sig_inst_skols of the TISI from a partial signature records
+that original order, and is used to get the variables of f's
+final type in the correct order.
+
 
 Note [Wildcards in partial signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2090,6 +2118,16 @@ see dropDerivedWC.  For example
    [D] Int ~ Bool, and we don't want to report that because it's
    incomprehensible. That is why we don't rewrite wanteds with wanteds!
 
+ * We might float out some Wanteds from an implication, leaving behind
+   their insoluble Deriveds. For example:
+
+   forall a[2]. [W] alpha[1] ~ Int
+                [W] alpha[1] ~ Bool
+                [D] Int ~ Bool
+
+   The Derived is insoluble, but we very much want to drop it when floating
+   out.
+
 But (tiresomely) we do keep *some* Derived constraints:
 
  * Type holes are derived constraints, because they have no evidence
@@ -2098,8 +2136,7 @@ But (tiresomely) we do keep *some* Derived constraints:
  * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
    KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
    Note [Equalities with incompatible kinds] in TcCanonical.
-   These need to be kept because the kind equalities might have different
-   source locations and hence different error messages.
+   Keeping these around produces better error messages, in practice.
    E.g., test case dependent/should_fail/T11471
 
  * We keep most derived equalities arising from functional dependencies
@@ -3823,10 +3860,7 @@ type TcPluginSolver = [Ct]    -- given
                    -> [Ct]    -- wanted
                    -> TcPluginM TcPluginResult
 
-newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a)
-
-instance Functor TcPluginM where
-  fmap = liftM
+newtype TcPluginM a = TcPluginM (EvBindsVar -> TcM a) deriving (Functor)
 
 instance Applicative TcPluginM where
   pure x = TcPluginM (const $ pure x)

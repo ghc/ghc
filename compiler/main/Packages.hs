@@ -77,7 +77,7 @@ import UniqSet
 import Module
 import Util
 import Panic
-import Platform
+import GHC.Platform
 import Outputable
 import Maybes
 
@@ -559,13 +559,15 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
+      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
-      pkgroot = takeDirectory conf_file
+      pkgroot = takeDirectory conf_file'
       pkg_configs1 = map (mungePackageConfig top_dir pkgroot)
                          proto_pkg_configs
       pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
-  return (conf_file, pkg_configs2)
+  return (conf_file', pkg_configs2)
   where
     readDirStylePackageConfig conf_dir = do
       let filename = conf_dir </> "package.cache"
@@ -1470,8 +1472,8 @@ mkPackageState dflags dbs preload0 = do
             _  -> unit'
       addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
       -- This is the set of maximally preferable packages. In fact, it is a set of
-      -- most preferable *units* keyed by package name, which act as stand-ins in 
-      -- for "a package in a database". We use units here because we don't have 
+      -- most preferable *units* keyed by package name, which act as stand-ins in
+      -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
       mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
@@ -1481,7 +1483,7 @@ mkPackageState dflags dbs preload0 = do
       -- with the most preferable unit for package. Being equi-preferable means that
       -- they must be in the same database, with the same version, and the same pacakge name.
       --
-      -- We must take care to consider all these units and not just the most 
+      -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
       mostPreferable u =
         case lookupUDFM mostPreferablePackageReps (fsPackageName u) of

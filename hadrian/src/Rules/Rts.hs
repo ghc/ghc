@@ -17,7 +17,7 @@ rtsRules = priority 3 $ do
       root -/- "//libHSrts_*-ghc*.dylib",
       root -/- "//libHSrts-ghc*.so",
       root -/- "//libHSrts-ghc*.dylib"]
-      |%> \ rtsLibFilePath' -> createFileLinkUntracked
+      |%> \ rtsLibFilePath' -> createFileLink
             (addRtsDummyVersion $ takeFileName rtsLibFilePath')
             rtsLibFilePath'
 

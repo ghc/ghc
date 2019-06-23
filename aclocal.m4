@@ -511,6 +511,7 @@ AC_DEFUN([FP_SETTINGS],
     then
         SettingsCCompilerCommand="$(basename $CC)"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$(basename $LdCmd)"
@@ -564,6 +565,7 @@ AC_DEFUN([FP_SETTINGS],
       SettingsOptCommand="$OptCmd"
     fi
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+    SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
@@ -571,6 +573,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)
+    AC_SUBST(SettingsCxxCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsLdCommand)
@@ -866,7 +869,7 @@ case $TargetPlatform in
       esac ;;
     i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
     x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
-    *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
+    *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#if defined(HAVE_NLIST_H)
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
@@ -876,7 +879,7 @@ int main(argc, argv)
 int argc;
 char **argv;
 {
-#ifdef HAVE_NLIST_H
+#if defined(HAVE_NLIST_H)
     if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
         exit(1);
     if(nlist(argv[0], xYzzY2) == 0 && xYzzY2[0].n_value != 0)
@@ -1650,16 +1653,16 @@ then
     [fptools_cv_timer_create_works],
     [AC_TRY_RUN([
 #include <stdio.h>
-#ifdef HAVE_STDLIB_H
+#if defined(HAVE_STDLIB_H)
 #include <stdlib.h>
 #endif
-#ifdef HAVE_TIME_H
+#if defined(HAVE_TIME_H)
 #include <time.h>
 #endif
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 #include <signal.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 

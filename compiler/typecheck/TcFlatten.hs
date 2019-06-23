@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ViewPatterns, BangPatterns #-}
+{-# LANGUAGE CPP, DeriveFunctor, ViewPatterns, BangPatterns #-}
 
 module TcFlatten(
    FlattenMode(..),
@@ -485,14 +485,12 @@ eqFlattenMode _  _ = False
 -- See Note [The flattening work list].
 newtype FlatM a
   = FlatM { runFlatM :: FlattenEnv -> TcS a }
+  deriving (Functor)
 
 instance Monad FlatM where
   m >>= k  = FlatM $ \env ->
              do { a  <- runFlatM m env
                 ; runFlatM (k a) env }
-
-instance Functor FlatM where
-  fmap = liftM
 
 instance Applicative FlatM where
   pure x = FlatM $ const (pure x)

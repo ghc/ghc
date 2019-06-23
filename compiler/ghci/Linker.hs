@@ -50,7 +50,7 @@ import SrcLoc
 import qualified Maybes
 import UniqDSet
 import FastString
-import Platform
+import GHC.Platform
 import SysTools
 import FileCleanup
 
@@ -115,7 +115,7 @@ readPLS dl =
 
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f 
+modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
@@ -343,7 +343,7 @@ linkCmdLineLibs' hsc_env pls =
 
       -- Add directories to library search paths, this only has an effect
       -- on Windows. On Unix OSes this function is a NOP.
-      let all_paths = let paths = takeDirectory (fst $ pgm_c dflags)
+      let all_paths = let paths = takeDirectory (pgm_c dflags)
                                 : framework_paths
                                ++ lib_paths_base
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
@@ -881,8 +881,8 @@ dynLinkObjs hsc_env pls objs = do
 
 dynLoadObjs :: HscEnv -> PersistentLinkerState -> [FilePath]
             -> IO PersistentLinkerState
-dynLoadObjs _       pls []   = return pls
-dynLoadObjs hsc_env pls objs = do
+dynLoadObjs _       pls                           []   = return pls
+dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
     let dflags = hsc_dflags hsc_env
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
@@ -899,13 +899,13 @@ dynLoadObjs hsc_env pls objs = do
                       -- library.
                       ldInputs =
                            concatMap (\l -> [ Option ("-l" ++ l) ])
-                                     (nub $ snd <$> temp_sos pls)
+                                     (nub $ snd <$> temp_sos)
                         ++ concatMap (\lp -> [ Option ("-L" ++ lp)
                                                     , Option "-Xlinker"
                                                     , Option "-rpath"
                                                     , Option "-Xlinker"
                                                     , Option lp ])
-                                     (nub $ fst <$> temp_sos pls)
+                                     (nub $ fst <$> temp_sos)
                         ++ concatMap
                              (\lp ->
                                  [ Option ("-L" ++ lp)
@@ -933,13 +933,13 @@ dynLoadObjs hsc_env pls objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 objs (pkgs_loaded pls)
+    linkDynLib dflags2 objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
-        Nothing -> return pls { temp_sos = (libPath, libName) : temp_sos pls }
+        Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
         Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
@@ -1123,7 +1123,10 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
-      | otherwise
+
+      -- Code unloading currently disabled due to instability.
+      -- See #16841.
+      | False -- otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
@@ -1131,6 +1134,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
+      | otherwise = return () -- see #16841
 
 {- **********************************************************************
 

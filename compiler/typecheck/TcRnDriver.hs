@@ -61,7 +61,6 @@ import RnExpr
 import RnUtils ( HsDocContext(..) )
 import RnFixity ( lookupFixityRn )
 import MkId
-import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
@@ -141,6 +140,9 @@ import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
 
+import TcHoleFitTypes ( HoleFitPluginR (..) )
+
+
 #include "HsVersions.h"
 
 {-
@@ -165,7 +167,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-          withTcPlugins hsc_env $
+          withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
 
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
@@ -1841,7 +1843,7 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -2418,10 +2420,11 @@ tcRnImportDecls hsc_env import_decls
 
 -- tcRnType just finds the kind of a type
 tcRnType :: HscEnv
+         -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
          -> IO (Messages, Maybe (Type, Kind))
-tcRnType hsc_env normalise rdr_type
+tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
@@ -2434,17 +2437,20 @@ tcRnType hsc_env normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; ((ty, kind), lie)  <-
-                       captureTopConstraints $
-                       tcWildCardBinders wcs $ \ wcs' ->
-                       do { emitWildCardHoleConstraints wcs'
+       ; (ty, kind) <- pushTcLevelM_         $
+                        -- must push level to satisfy level precondition of
+                        -- kindGeneralize, below
+                       solveEqualities       $
+                       tcNamedWildCardBinders wcs $ \ wcs' ->
+                       do { emitNamedWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }
-       ; _ <- checkNoErrs (simplifyInteractive lie)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
-       ; ty  <- zonkTcTypeToType ty
+       ; e <- mkEmptyZonkEnv flexi
+
+       ; ty  <- zonkTcTypeToTypeX e ty
 
        -- Do validity checking on type
        ; checkValidType (GhciCtxt True) ty
@@ -2556,7 +2562,9 @@ tcRnDeclsi hsc_env local_decls
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id
   = do { name' <- externaliseName this_mod (idName id)
-       ; return (globaliseAndTidyId (setIdName id name')) }
+       ; return $ globaliseId id
+                     `setIdName` name'
+                     `setIdType` tidyTopType (idType id) }
 
 
 {-
@@ -2874,6 +2882,30 @@ withTcPlugins hsc_env m =
 
 getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
+
+
+withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
+withHoleFitPlugins hsc_env m =
+  case (getHfPlugins (hsc_dflags hsc_env)) of
+    [] -> m  -- Common fast case
+    plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins
+                  -- This ensures that hfPluginStop is called even if a type
+                  -- error occurs during compilation.
+                  eitherRes <- tryM $ do
+                    updGblEnv (\e -> e { tcg_hf_plugins = plugins }) m
+                  sequence_ stops
+                  case eitherRes of
+                    Left _ -> failM
+                    Right res -> return res
+  where
+    startPlugin (HoleFitPluginR init plugin stop) =
+      do ref <- init
+         return (plugin ref, stop ref)
+
+getHfPlugins :: DynFlags -> [HoleFitPluginR]
+getHfPlugins dflags =
+  catMaybes $ mapPlugins dflags (\p args -> holeFitPlugin p args)
+
 
 runRenamerPlugin :: TcGblEnv
                  -> HsGroup GhcRn

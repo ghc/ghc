@@ -23,7 +23,7 @@ import Hoopl.Collections
 import Hoopl.Label
 import DynFlags
 import Cmm hiding (topInfoTable)
-import Platform
+import GHC.Platform
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.

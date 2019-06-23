@@ -101,7 +101,7 @@ import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
-import Platform
+import GHC.Platform
 import qualified PprColour as Col
 import Pretty           ( Doc, Mode(..) )
 import Panic
@@ -812,6 +812,12 @@ instance Outputable Word32 where
 
 instance Outputable Word where
     ppr n = integer $ fromIntegral n
+
+instance Outputable Float where
+    ppr f = float f
+
+instance Outputable Double where
+    ppr f = double f
 
 instance Outputable () where
     ppr _ = text "()"

@@ -28,11 +28,11 @@ test('ffi004', skip, compile_and_run, [''])
 # On x86, the test suffers from floating-point differences due to the
 # use of 80-bit internal precision when using the native code generator.
 #
-test('ffi005', [ omit_ways(prof_ways),
+test('ffi005', [ omit_ways(prof_ways + ['ghci']),
                  when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3) ],
-               compile_and_run, [''])
+               compile_and_run, ['ffi005_c.c'])
 
 test('ffi006', normal, compile_and_run, [''])
 
@@ -169,7 +169,10 @@ test('ffi_parsing_001', [omit_ways(['ghci'])], compile_and_run,
 
 test('capi_value', [omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
 
-test('T7170', exit_code(1), compile_and_run, [''])
+test('T7170',
+     [when(opsys('mingw32'), fragile(16801)),
+      exit_code(1)],
+     compile_and_run, [''])
 
 test('T4012', [expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
      ['T4012', ''])
@@ -191,6 +194,14 @@ test('T12134', [omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
 
 test('T12614', [omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])
 
+test('T16650a', [omit_ways(['ghci'])], compile_and_run, ['T16650a_c.c'])
+
+test('T16650b', [omit_ways(['ghci'])], compile_and_run, ['T16650b_c.c'])
+
+test('T16650c', [omit_ways(['ghci'])], compile_and_run, ['T16650c_c.c'])
+
+test('T16650d', [omit_ways(['ghci'])], compile_and_run, ['T16650d_c.c'])
+
 test('PrimFFIInt8', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt8_c.c'])
 
 test('PrimFFIWord8', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord8_c.c'])
@@ -199,4 +210,6 @@ test('PrimFFIInt16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt16_c.c'
 
 test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.c'])
 
-test('T493', [], compile_and_run, ['T493_c.c'])
+test('T493', [omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
+
+test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])

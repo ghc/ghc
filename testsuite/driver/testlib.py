@@ -19,7 +19,7 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, TestResult
-from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass
+from testutil import strip_quotes, lndir, link_or_copy_file, passed, failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
 from perf_notes import MetricChange
@@ -204,6 +204,7 @@ def use_specs( specs ):
          ['A B', '-O -prof -fno-prof-count-entries -v0'])
 
     """
+    assert isinstance(specs, dict)
     return lambda name, opts, s=specs: _use_specs( name, opts, s )
 
 def _use_specs( name, opts, specs ):
@@ -213,6 +214,7 @@ def _use_specs( name, opts, specs ):
 # -----
 
 def expect_fail_for( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
 
 def _expect_fail_for( name, opts, ways ):
@@ -228,6 +230,7 @@ def _expect_broken( name, opts, bug ):
     opts.expect = 'fail';
 
 def expect_broken_for( bug, ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
 
 def _expect_broken_for( name, opts, bug, ways ):
@@ -257,28 +260,31 @@ def fragile( bug ):
 
     return helper
 
-def fragile_for( name, opts, bug, ways ):
+def fragile_for( bug, ways ):
     """
     Indicates that the test should be skipped due to fragility in the given
     test ways as documented in the given ticket.
     """
     def helper( name, opts, bug=bug, ways=ways ):
         record_broken(name, opts, bug)
-        opts.omit_ways = ways
+        opts.omit_ways += ways
 
     return helper
 
 # -----
 
 def omit_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _omit_ways( name, opts, w )
 
 def _omit_ways( name, opts, ways ):
-    opts.omit_ways = ways
+    assert ways.__class__ is list
+    opts.omit_ways += ways
 
 # -----
 
 def only_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _only_ways( name, opts, w )
 
 def _only_ways( name, opts, ways ):
@@ -287,6 +293,7 @@ def _only_ways( name, opts, ways ):
 # -----
 
 def extra_ways( ways ):
+    assert isinstance(ways, list)
     return lambda name, opts, w=ways: _extra_ways( name, opts, w )
 
 def _extra_ways( name, opts, ways ):
@@ -384,9 +391,6 @@ def collect_compiler_stats(metric='all',deviation=20):
 def collect_stats(metric='all', deviation=20):
     return lambda name, opts, m=metric, d=deviation: _collect_stats(name, opts, m, d)
 
-def testing_metrics():
-    return ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
-
 # This is an internal function that is used only in the implementation.
 # 'is_compiler_stats_test' is somewhat of an unfortunate name.
 # If the boolean is set to true, it indicates that this test is one that
@@ -435,6 +439,14 @@ def unless(b, f):
 
 def doing_ghci():
     return 'ghci' in config.run_ways
+
+def requires_th(name, opts):
+    """
+    Mark a test as requiring TemplateHaskell. Currently this means
+    that we don't run the test in the profasm when when GHC is
+    dynamically-linked since we can't load profiled objects in this case.
+    """
+    return when(ghc_dynamic(), omit_ways(['profasm']))
 
 def ghc_dynamic():
     return config.ghc_dynamic

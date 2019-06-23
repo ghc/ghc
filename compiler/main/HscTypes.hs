@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -13,7 +14,7 @@ module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
-        Target(..), TargetId(..), pprTarget, pprTargetId,
+        Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
         IServ(..),
 
@@ -200,7 +201,7 @@ import Bag
 import Binary
 import ErrUtils
 import NameCache
-import Platform
+import GHC.Platform
 import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
@@ -231,9 +232,7 @@ data HscStatus
 -- The Hsc monad: Passing an environment and warning state
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-
-instance Functor Hsc where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)
@@ -443,7 +442,7 @@ data HscEnv
                 -- time it is needed.
 
         , hsc_dynLinker :: DynLinker
-                -- ^ dynamic linker. 
+                -- ^ dynamic linker.
 
  }
 
@@ -511,7 +510,7 @@ data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetContents     :: Maybe (StringBuffer,UTCTime)
+      targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
       -- use for this target instead of reading it from disk.
       --
@@ -533,6 +532,8 @@ data TargetId
         -- (which phase to start from).  Nothing indicates the starting phase
         -- should be determined from the suffix of the filename.
   deriving Eq
+
+type InputFileBuffer = StringBuffer
 
 pprTarget :: Target -> SDoc
 pprTarget (Target id obj _) =

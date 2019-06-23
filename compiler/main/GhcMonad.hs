@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP, DeriveFunctor, RankNTypes #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 -- -----------------------------------------------------------------------------
 --
@@ -90,16 +90,13 @@ logWarnings warns = do
 -- | A minimal implementation of a 'GhcMonad'.  If you need a custom monad,
 -- e.g., to maintain additional state consider wrapping this monad or using
 -- 'GhcT'.
-newtype Ghc a = Ghc { unGhc :: Session -> IO a }
+newtype Ghc a = Ghc { unGhc :: Session -> IO a } deriving (Functor)
 
 -- | The Session is a handle to the complete state of a compilation
 -- session.  A compilation session consists of a set of modules
 -- constituting the current program or library, the context for
 -- interactive evaluation, and various caches.
 data Session = Session !(IORef HscEnv)
-
-instance Functor Ghc where
-  fmap f m = Ghc $ \s -> f `fmap` unGhc m s
 
 instance Applicative Ghc where
   pure a = Ghc $ \_ -> return a
@@ -158,12 +155,10 @@ reifyGhc act = Ghc $ act
 --
 -- Note that the wrapped monad must support IO and handling of exceptions.
 newtype GhcT m a = GhcT { unGhcT :: Session -> m a }
+    deriving (Functor)
 
 liftGhcT :: m a -> GhcT m a
 liftGhcT m = GhcT $ \_ -> m
-
-instance Functor m => Functor (GhcT m) where
-  fmap f m = GhcT $ \s -> f `fmap` unGhcT m s
 
 instance Applicative m => Applicative (GhcT m) where
   pure x  = GhcT $ \_ -> pure x

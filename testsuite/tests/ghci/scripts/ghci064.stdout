@@ -1,0 +1,29 @@
+instance GHC.Base.Alternative Maybe -- Defined in ‘GHC.Base’
+instance Applicative Maybe -- Defined in ‘GHC.Base’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Monad Maybe -- Defined in ‘GHC.Base’
+instance GHC.Base.MonadPlus Maybe -- Defined in ‘GHC.Base’
+instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
+instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
+instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
+instance Semigroup _ => Semigroup (Maybe _)
+  -- Defined in ‘GHC.Base’
+instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
+instance Eq _ => Eq [_] -- Defined in ‘GHC.Classes’
+instance Monoid [_] -- Defined in ‘GHC.Base’
+instance Ord _ => Ord [_] -- Defined in ‘GHC.Classes’
+instance Semigroup [_] -- Defined in ‘GHC.Base’
+instance Show _ => Show [_] -- Defined in ‘GHC.Show’
+instance [safe] MyShow _ => MyShow [_]
+  -- Defined at ghci064.hs:7:10
+instance Monoid [T] -- Defined in ‘GHC.Base’
+instance Semigroup [T] -- Defined in ‘GHC.Base’
+instance [safe] MyShow [T] -- Defined at ghci064.hs:7:10
+instance [safe] MyShow [T] -- Defined at ghci064.hs:15:10
+instance Eq Bool -- Defined in ‘GHC.Classes’
+instance Ord Bool -- Defined in ‘GHC.Classes’
+instance Enum Bool -- Defined in ‘GHC.Enum’
+instance Show Bool -- Defined in ‘GHC.Show’
+instance Bounded Bool -- Defined in ‘GHC.Enum’
+instance Functor ((,) Int) -- Defined in ‘GHC.Base’
+instance Foldable ((,) Int) -- Defined in ‘Data.Foldable’

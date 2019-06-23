@@ -248,6 +248,12 @@ getClosure x = do
                         ++ "found " ++ show (length rawWds)
             pure $ MutArrClosure itbl (rawWds !! 0) (rawWds !! 1) pts
 
+        t | t >= SMALL_MUT_ARR_PTRS_CLEAN && t <= SMALL_MUT_ARR_PTRS_FROZEN_CLEAN -> do
+            unless (length rawWds >= 1) $
+                fail $ "Expected at least 1 word to SMALL_MUT_ARR_PTRS_* "
+                        ++ "found " ++ show (length rawWds)
+            pure $ SmallMutArrClosure itbl (rawWds !! 0) pts
+
         t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY ->
             pure $ MutVarClosure itbl (head pts)
 

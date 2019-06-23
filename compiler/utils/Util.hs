@@ -92,9 +92,6 @@ module Util (
         readRational,
         readHexRational,
 
-        -- * read helpers
-        maybeRead, maybeReadFuzzy,
-
         -- * IO-ish utilities
         doesDirNameExist,
         getModificationUTCTime,
@@ -188,7 +185,7 @@ the flags are off.
 -}
 
 ghciSupported :: Bool
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 ghciSupported = True
 #else
 ghciSupported = False
@@ -1253,25 +1250,6 @@ readHexRational__ ('0' : x : rest)
             | otherwise =  ([],xs)
 
 readHexRational__ _ = Nothing
-
-
-
-
------------------------------------------------------------------------------
--- read helpers
-
-maybeRead :: Read a => String -> Maybe a
-maybeRead str = case reads str of
-                [(x, "")] -> Just x
-                _         -> Nothing
-
-maybeReadFuzzy :: Read a => String -> Maybe a
-maybeReadFuzzy str = case reads str of
-                     [(x, s)]
-                      | all isSpace s ->
-                         Just x
-                     _ ->
-                         Nothing
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.

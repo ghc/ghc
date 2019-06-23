@@ -14,14 +14,14 @@ module InstEnv (
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
-        instanceDFunId, tidyClsInstDFun, instanceRoughTcs,
+        instanceDFunId, updateClsInstDFun, instanceRoughTcs,
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
         emptyInstEnv, extendInstEnv,
         deleteFromInstEnv, deleteDFunFromInstEnv,
         identicalClsInstHead,
-        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
+        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts, instEnvClasses,
         memberInstEnv,
         instIsVisible,
         classInstances, instanceBindFun,
@@ -199,8 +199,8 @@ being equal to
 instanceDFunId :: ClsInst -> DFunId
 instanceDFunId = is_dfun
 
-tidyClsInstDFun :: (DFunId -> DFunId) -> ClsInst -> ClsInst
-tidyClsInstDFun tidy_dfun ispec
+updateClsInstDFun :: (DFunId -> DFunId) -> ClsInst -> ClsInst
+updateClsInstDFun tidy_dfun ispec
   = ispec { is_dfun = tidy_dfun (is_dfun ispec) }
 
 instanceRoughTcs :: ClsInst -> [Maybe Name]
@@ -426,6 +426,9 @@ emptyInstEnv = emptyUDFM
 instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts ie = [elt | ClsIE elts <- eltsUDFM ie, elt <- elts]
   -- See Note [InstEnv determinism]
+
+instEnvClasses :: InstEnv -> [Class]
+instEnvClasses ie = [is_cls e | ClsIE (e : _) <- eltsUDFM ie]
 
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.

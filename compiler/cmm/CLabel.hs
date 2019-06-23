@@ -124,7 +124,7 @@ import CostCentre
 import Outputable
 import FastString
 import DynFlags
-import Platform
+import GHC.Platform
 import UniqSet
 import Util
 import PprCore ( {- instances -} )

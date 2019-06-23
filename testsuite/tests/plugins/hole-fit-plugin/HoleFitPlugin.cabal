@@ -1,0 +1,11 @@
+name: HoleFitPlugin
+cabal-version: >= 1.24
+build-type: Simple
+version: 1.0.0
+
+
+library
+  default-language: Haskell2010
+  build-depends: base, ghc, time
+  exposed-modules: HoleFitPlugin
+  ghc-options: -Wall

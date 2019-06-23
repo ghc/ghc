@@ -25,6 +25,7 @@ module GHC.ForeignPtr
   (
         ForeignPtr(..),
         ForeignPtrContents(..),
+        Finalizers(..),
         FinalizerPtr,
         FinalizerEnvPtr,
         newForeignPtr_,
