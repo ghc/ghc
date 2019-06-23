@@ -6,6 +6,8 @@ def just_ghci( name, opts ):
 test('ghcirun001', just_ghci, compile_and_run, [''])
 test('ghcirun002', just_ghci, compile_and_run, [''])
 test('ghcirun003', just_ghci, compile_and_run, [''])
+test('T1400', [combined_output, extra_run_opts('-fobject-code')],
+      ghci_script, ['T1400.script'])
 test('T2589',      just_ghci, compile_and_run, [''])
 test('T2881',      just_ghci, compile_and_run, [''])
 
