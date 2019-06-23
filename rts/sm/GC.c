@@ -752,11 +752,11 @@ GarbageCollect (uint32_t collect_gen,
   }
 
 #if defined(PROFILING)
-  // resetStaticObjectForRetainerProfiling() must be called before
+  // resetStaticObjectForProfiling() must be called before
   // zeroing below.
 
   // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForRetainerProfiling(gct->scavenged_static_objects);
+  resetStaticObjectForProfiling(gct->scavenged_static_objects);
 #endif
 
   // Start any pending finalizers.  Must be after
@@ -806,7 +806,7 @@ GarbageCollect (uint32_t collect_gen,
       need_prealloc += arenaBlocks();
 #if defined(PROFILING)
       if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-          need_prealloc = retainerStackBlocks();
+          need_prealloc = traverseWorkStackBlocks();
       }
 #endif
 
