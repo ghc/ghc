@@ -1,7 +1,10 @@
+from my_typing import *
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
-def junit(t):
+from testglobals import TestRun
+
+def junit(t: TestRun) -> ET.ElementTree:
     testsuites = ET.Element('testsuites')
     testsuite = ET.SubElement(testsuites, 'testsuite',
                               id = "0",
@@ -15,15 +18,21 @@ def junit(t):
 
     for res_type, group in [('stat failure', t.unexpected_stat_failures),
                             ('unexpected failure', t.unexpected_failures),
-                            ('unexpected_passes', t.unexpected_passes)]:
+                            ('unexpected pass', t.unexpected_passes)]:
         for tr in group:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = tr.way,
-                                     name = '%s(%sb)' % (tr.testname, tr.way))
-            new_reason = "\n".join([tr.reason, "STDERR:", tr.stderr.decode("utf-8")]) if tr.stderr else tr.reason
+                                     name = '%s(%s)' % (tr.testname, tr.way))
+            message = [] # type: List[str]
+            if tr.stdout:
+                message += ['', 'stdout:', '==========', tr.stdout]
+            if tr.stderr:
+                message += ['', 'stderr:', '==========', tr.stderr]
+
             result = ET.SubElement(testcase, 'failure',
                                    type = res_type,
-                                   message = new_reason)
+                                   message = tr.reason)
+            result.text = '\n'.join(message)
 
     for tr in t.framework_failures:
         testcase = ET.SubElement(testsuite, 'testcase',
