@@ -52,7 +52,7 @@ templateHaskellNames = [
     -- Exp
     varEName, conEName, litEName, appEName, appTypeEName, infixEName,
     infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
-    tupEName, unboxedTupEName, unboxedSumEName,
+    tupEName, tupEName', unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
@@ -275,7 +275,7 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
+    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName, tupEName',
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName :: Name
@@ -291,6 +291,7 @@ sectionRName          = libFun (fsLit "sectionR")          sectionRIdKey
 lamEName              = libFun (fsLit "lamE")              lamEIdKey
 lamCaseEName          = libFun (fsLit "lamCaseE")          lamCaseEIdKey
 tupEName              = libFun (fsLit "tupE")              tupEIdKey
+tupEName'             = libFun (fsLit "tupE'")             tupEIdKey'
 unboxedTupEName       = libFun (fsLit "unboxedTupE")       unboxedTupEIdKey
 unboxedSumEName       = libFun (fsLit "unboxedSumE")       unboxedSumEIdKey
 condEName             = libFun (fsLit "condE")             condEIdKey
@@ -1071,6 +1072,10 @@ stockStrategyIdKey    = mkPreludeDataConUnique 494
 anyclassStrategyIdKey = mkPreludeDataConUnique 495
 newtypeStrategyIdKey  = mkPreludeDataConUnique 496
 viaStrategyIdKey      = mkPreludeDataConUnique 497
+
+-- Tuple sections in TH (see #15843)
+tupEIdKey' :: Unique
+tupEIdKey' = mkPreludeMiscIdUnique 498
 
 {-
 ************************************************************************

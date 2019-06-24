@@ -287,7 +287,10 @@ lamCaseE :: [MatchQ] -> ExpQ
 lamCaseE ms = sequence ms >>= return . LamCaseE
 
 tupE :: [ExpQ] -> ExpQ
-tupE es = do { es1 <- sequence es; return (TupE es1)}
+tupE es = do { es1 <- sequence es; return (TupE $ map Just es1)}
+
+tupE' :: [Maybe ExpQ] -> ExpQ
+tupE' es = do { es1 <- traverse sequence es; return (TupE $ es1)}
 
 unboxedTupE :: [ExpQ] -> ExpQ
 unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE es1)}

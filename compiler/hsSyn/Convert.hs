@@ -891,13 +891,17 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsLamCase noExt
                                                    (mkMatchGroup FromSource ms')
                             }
-    cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar noExt e' }
+    cvt (TupE [Just e]) = do { e' <- cvtl e; return $ HsPar noExt e' }
                                  -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)
-    cvt (TupE es)      = do { es' <- mapM cvtl es
-                            ; return $ ExplicitTuple noExt
-                                             (map (noLoc . (Present noExt)) es')
-                                                                         Boxed }
+    cvt (TupE es)      = do { let cvtl_maybe Nothing = return missingTupArg
+                                  cvtl_maybe (Just e) = fmap (Present noExt) $ cvtl e
+                            ; es' <- mapM cvtl_maybe es
+                            ; return $ ExplicitTuple
+                                         noExt
+                                         (map noLoc es')
+                                         Boxed }
+
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
                                    ; return $ ExplicitTuple noExt
                                            (map (noLoc . (Present noExt)) es')

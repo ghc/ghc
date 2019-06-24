@@ -1332,10 +1332,20 @@ repE e@(HsDo _ ctxt (dL->L _ sts))
   = notHandled "monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
-repE e@(ExplicitTuple _ es boxed)
-  | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
-  | isBoxed boxed = do { xs <- repLEs [e | (dL->L _ (Present _ e)) <- es]
-                       ; repTup xs }
+repE (ExplicitTuple _ es boxed)
+  | isBoxed boxed =
+    let tupArgToCoreExp :: LHsTupArg GhcRn -> DsM (Core (Maybe TH.ExpQ))
+        tupArgToCoreExp a
+          | tupArgPresent a = do { let L _ (Present _ e) = dL a
+                                 ; e' <- repLE e
+                                 ; coreJust expQTyConName e' }
+         -- TODO: XTupArg?
+          | otherwise = coreNothing expQTyConName
+
+    in do { args <- mapM tupArgToCoreExp es
+          ; tupId <- dsLookupGlobalId tupEName'
+          ; repTup tupId args }
+
   | otherwise     = do { xs <- repLEs [e | (dL->L _ (Present _ e)) <- es]
                        ; repUnboxedTup xs }
 
@@ -2077,8 +2087,8 @@ repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 repLamCase :: Core [TH.MatchQ] -> DsM (Core TH.ExpQ)
 repLamCase (MkC ms) = rep2 lamCaseEName [ms]
 
-repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
-repTup (MkC es) = rep2 tupEName [es]
+repTup :: Id -> [Core (Maybe TH.ExpQ)] -> DsM (Core TH.ExpQ)
+repTup id es = return $ MkC (App (Var id) (unC (nonEmptyCoreList es)))
 
 repUnboxedTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
 repUnboxedTup (MkC es) = rep2 unboxedTupEName [es]

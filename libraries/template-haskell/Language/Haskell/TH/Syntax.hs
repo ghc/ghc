@@ -846,35 +846,38 @@ instance Lift () where
 instance (Lift a, Lift b) => Lift (a, b) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b)
-    = liftM TupE $ sequence [lift a, lift b]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c)
-    = liftM TupE $ sequence [lift a, lift b, lift c]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c, lift d]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (a, b, c, d, e) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b
+                                              , lift c, lift d, lift e ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (a, b, c, d, e, f) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                              , lift d, lift e, lift f ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (a, b, c, d, e, f, g) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f, g)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                              , lift d, lift e, lift f, lift g ]
 
 -- | @since 2.16.0.0
 instance Lift (# #) where
@@ -1901,7 +1904,11 @@ data Exp
                                        -- See "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \\ p1 p2 -> e }@
   | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
-  | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
+  | TupE [Maybe Exp]                   -- ^ @{ (e1,e2) }  @
+      --
+      -- Tuple Sections are suported as well
+      --
+      -- @{ (e1,) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (\# e1,e2 \#) }  @
   | UnboxedSumE Exp SumAlt SumArity    -- ^ @{ (\#|e|\#) }@
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
