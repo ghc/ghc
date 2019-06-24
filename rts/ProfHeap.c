@@ -1161,7 +1161,7 @@ heapCensusChain( Census *census, bdescr *bd )
             p += size;
             /* skip over slop */
             while (p < bd->free &&
-              (p - bd->start < BLOCK_SIZE_WORDS || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
+              (p - bd->start < BLOCK_SIZE_W || !LOOKS_LIKE_INFO_PTR(*p))) { p++; }
         }
     }
 }
