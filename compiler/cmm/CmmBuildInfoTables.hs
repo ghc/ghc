@@ -399,16 +399,17 @@ cafAnal
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
   -> NameEnv Bool -- CAFFY-ness env
+  -> Bool       -- True <=> Updatable
   -> CmmGraph
   -> (NameEnv Bool, CAFEnv)
-cafAnal contLbls topLbl caf_infos0 cmmGraph =
+cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
     pprTrace "cafAnal" (ppr ret) (caf_infos1, ret)
   where
     ret =
       analyzeCmmBwd cafLattice
         (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 
-    ret_caffy = any (not . Set.null) (mapElems ret)
+    ret_caffy = upd_flag || any (not . Set.null) (mapElems ret)
 
     caf_infos1
       | Just nm <- hasHaskellName topLbl

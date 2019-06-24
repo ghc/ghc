@@ -107,9 +107,10 @@ pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   text "updfr_space: " <> ppr updfr_space
 
 pprTopInfo :: CmmTopInfo -> SDoc
-pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
+pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info, upd_flag=upd_flag}) =
   vcat [text "info_tbls: " <> ppr info_tbl,
-        text "stack_info: " <> ppr stack_info]
+        text "stack_info: " <> ppr stack_info,
+        text "upd_flag: " <> ppr upd_flag]
 
 ----------------------------------------------------------
 -- Outputting blocks and graphs
