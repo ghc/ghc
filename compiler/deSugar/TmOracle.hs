@@ -14,7 +14,7 @@ module TmOracle (
         -- the term oracle
         tmOracle, TmVarCtEnv, PmRefutEnv, TmState, initialTmState,
         wrapUpTmState, solveOneEq, extendSubst, canDiverge, isRigid,
-        tryAddRefutableAltCon, lookupRefutableAltCons,
+        tryAddRefutableAltCon,
 
         -- misc.
         exprDeepLookup, pmLitType
@@ -177,10 +177,14 @@ tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   = case exprToAlt e of
       -- We have to take care to preserve Note [The Pos/Neg invariant]
       Nothing         -> Just extended -- Not solved yet
-      Just alt                         -- We have a solution
-        | alt == nalt -> Nothing       -- ... which is contradictory
-        | otherwise   -> Just original -- ... which is compatible, rendering the
-  where                                --     refutation redundant
+      Just alt        ->               -- We have a solution
+        case decEqPmAltCon alt nalt of
+          Just True  -> Nothing       -- ... which is contradictory
+          Just False -> Just original -- ... which is compatible, rendering the
+                                      --     refutation redundant
+          Nothing    -> Just extended -- ... which is incomparable, so might
+                                      --     refute later
+  where
     (y, e) = varDeepLookup pos (idName x)
     extended = original { tm_neg = neg' }
     entry = case nalt of
@@ -197,19 +201,6 @@ combineRefutEntries
 combineRefutEntries (old_ty, old_nlits, old_ncls) (new_ty, new_nlits, new_ncls)
   = ASSERT( eqType old_ty new_ty )
     (old_ty, unionLists old_nlits new_nlits, unionLists old_ncls new_ncls)
-
--- | Return all 'PmAltCon' shapes that are impossible for 'Id' to take, i.e.
--- would immediately lead to a refutation by the term oracle.
---
--- Note that because of Note [The Pos/Neg invariant], this will return an empty
--- list of alt cons for 'Id's which already have a solution.
-lookupRefutableAltCons :: TmState -> Id -> (Type, [PmAltCon])
-lookupRefutableAltCons _tms@TmS{ tm_pos = pos, tm_neg = neg } x =
-  case lookupDNameEnv neg y of
-    Just (ty, nlits, ncls) -> (ty, injectPmAltCons nlits ncls)
-    Nothing                -> (idType x, [])
-  where
-    (y, _e) = varDeepLookup pos (idName x)
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
@@ -238,17 +229,22 @@ unify tms eq@(e1, e2) = case eq of
   (PmExprOther _,_)            -> boring
   (_,PmExprOther _)            -> boring
 
-  (PmExprCon c1 ts1, PmExprCon c2 ts2)
+  (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
     -- See Note [Undecidable Equality for Overloaded Literals]
-    | c1 == c2  -> foldlM unify tms (zip ts1 ts2)
-    | otherwise -> unsat
+    Just True -> foldlM unify tms (zip ts1 ts2)
+    Just False -> unsat
+    Nothing -> boring
 
   (PmExprVar x, PmExprVar y)
     | x == y    -> boring
 
-  -- It's important to handle both rigid cases first, otherwise we get cyclic
-  -- substitutions. Cf. 'extendSubstAndSolve' and
+  -- It's important to handle both rigid cases before the flexible ones,
+  -- otherwise we get cyclic substitutions. Cf. 'extendSubstAndSolve' and
   -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
+  (PmExprVar x, _)
+    | isRefutable x e2 (tm_neg tms) -> unsat
+  (_, PmExprVar y)
+    | isRefutable y e1 (tm_neg tms) -> unsat
   (PmExprVar x, _)
     | Just e1' <- isRigid tms x -> unify tms (e1', e2)
   (_, PmExprVar y)
@@ -292,7 +288,12 @@ trySolve x e _tms@TmS{ tm_pos = pos, tm_neg = neg }
     isRefutable x e neg
   = Nothing
   | otherwise
-  = Just (TmS (extendNameEnv pos x e) (delFromDNameEnv neg x))
+  = Just (TmS (extendNameEnv pos x e) (adjustDNameEnv del_incompat neg x))
+  where
+    PmExprCon alt _ = e -- always succeeds, bc @e@ is a solution
+    del_incompat (ty, nlits, ncls) = case alt of
+      PmAltConLike _ -> (ty, nlits, [])
+      PmAltLit _     -> (ty, [], ncls)
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,

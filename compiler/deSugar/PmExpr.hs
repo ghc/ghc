@@ -10,8 +10,8 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), isNotPmExprOther,
-        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, injectPmAltCons,
-        pmExprAsList
+        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, decEqPmAltCon,
+        injectPmAltCons, pmExprAsList
     ) where
 
 #include "HsVersions.h"
@@ -64,7 +64,31 @@ data PmExpr = PmExprVar   Name
 -- See Note [Undecidable Equality for Overloaded Literals]
 data PmLit = PmSLit (HsLit GhcTc)                               -- simple
            | PmOLit Bool {- is it negated? -} (HsOverLit GhcTc) -- overloaded
-           deriving Eq
+
+-- | Decidable equality for values represented by 'PmLit's.
+-- See Note [Undecidable Equality for Overloaded Literals]
+decEqPmLit :: PmLit -> PmLit -> Maybe Bool
+decEqPmLit (PmSLit    l1) (PmSLit    l2) = Just (l1 == l2)
+decEqPmLit (PmOLit b1 l1) (PmOLit b2 l2)
+  | b1 == b2, l1 == l2
+  = Just True
+decEqPmLit _              _              = Nothing
+
+-- Syntactic equality.
+instance Eq PmLit where
+  a == b = decEqPmLit a b == Just True
+
+-- | Decidable equality for values represented by 'ConLike's.
+-- 'PatSynCon's aren't enforced to be injective, so two syntactically different
+-- 'PatSynCon's might match the exact same values. Without looking into and
+-- reasoning about the pattern synonym's definition, we can't decide if their
+-- sets of matched values is different.
+decEqConLike :: ConLike -> ConLike -> Maybe Bool
+decEqConLike (RealDataCon dc1) (RealDataCon dc2) = Just (dc1 == dc2)
+decEqConLike (PatSynCon psc1)  (PatSynCon psc2)
+  | psc1 == psc2
+  = Just True
+decEqConLike _                 _                 = Nothing
 
 -- | Represents a match against a 'ConLike' or literal. We mostly use it to
 -- to encode shapes for a variable that immediately lead to a refutation.
@@ -72,7 +96,18 @@ data PmLit = PmSLit (HsLit GhcTc)                               -- simple
 -- See Note [Refutable shapes] in TmOracle. Really similar to 'CoreSyn.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
-              deriving Eq
+
+-- | We can't in general decide whether two 'PmAltCon's match the same set of
+-- values. In addition to the reasons in 'decEqPmLit' and 'decEqConLike', a
+-- 'PmAltConLike' might or might not represent the same value as a 'PmAltLit'.
+decEqPmAltCon :: PmAltCon -> PmAltCon -> Maybe Bool
+decEqPmAltCon (PmAltConLike cl1) (PmAltConLike cl2) = decEqConLike cl1 cl2
+decEqPmAltCon (PmAltLit     l1)  (PmAltLit     l2)  = decEqPmLit l1 l2
+decEqPmAltCon _                  _                  = Nothing
+
+-- Syntactic equality.
+instance Eq PmAltCon where
+  a == b = decEqPmAltCon a b == Just True
 
 mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
 mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
