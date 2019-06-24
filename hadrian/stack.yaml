@@ -3,21 +3,16 @@
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
 resolver: lts-12.10
 
+extra-deps:
+# We need a newer happy (see #16825)
+- git: https://github.com/simonmar/happy.git
+  commit: 66982277ac7aed23edbb36c5f7aa5a86e5bdf778
+
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
 - '../libraries/Cabal/Cabal'
 - '../libraries/text'
-
-# This is necessary to build until happy's version bounds are updated to work
-# with the new Cabal version.  Stack's error message explains the issue:
-#
-# In the dependencies for happy-1.19.9:
-#    Cabal-2.3.0.0 from stack configuration does not match <2.2  (latest matching version is 2.0.1.1)
-# needed due to hadrian-0.1.0.0 -> happy-1.19.9
-#
-# TODO: Remove this once it's no longer necessary
-allow-newer: true
 
 nix:
    enable: false
