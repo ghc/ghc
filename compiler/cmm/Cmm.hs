@@ -110,7 +110,11 @@ type CmmBlock = Block CmmNode C C
 -----------------------------------------------------------------------------
 
 data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
-                            , stack_info :: CmmStackInfo }
+                            , stack_info :: CmmStackInfo
+                            , upd_flag   :: Bool -- True <=> Updatable
+                                                 -- Not initialized or used
+                                                 -- after cafAnal
+                            }
 
 topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable
 topInfoTable (CmmProc infos _ _ g) = mapLookup (g_entry g) (info_tbls infos)
