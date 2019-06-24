@@ -78,32 +78,32 @@ static uint32_t timesAnyObjectVisited;  // number of times any objects are
  * If the RTS is compiled with profiling enabled StgProfHeader can be used by
  * profiling code to store per-heap object information.
  *
- * When using the generic heap traversal code we use this field to store
- * profiler specific information. However we reserve the LSB of the *entire*
- * 'trav' union (which will overlap with the other fields) for the generic
- * traversal code. We use the bit to decide whether we've already visited this
- * closure in this pass or not. We do this as the heap may contain cyclic
- * references, it being a graph and all, so we would likely just infinite loop
- * if we didn't.
+ * The generic heap traversal code reserves the least significant bit of the
+ * largest members of the 'trav' union to decide whether we've already visited a
+ * given closure in the current pass or not. The rest of the field is free to be
+ * used by the calling profiler.
  *
- * We assume that at least the LSB of the largest field in the corresponding
- * union is insignificant. This is true at least for the word aligned pointers
- * which the retainer profiler currently stores there and should be maintained
- * by new users of the 'trav' union.
+ * By doing things this way we implicitly assume that the LSB of the largest
+ * field in the 'trav' union is insignificant. This is true at least for the
+ * word aligned pointers which the retainer profiler currently stores there and
+ * should be maintained by new users of the 'trav' union for example by shifting
+ * the real data up by one bit.
  *
- * Now the way the traversal works is that the interpretation of the "visited?"
- * bit depends on the value of the global 'flip' variable. We don't want to have
- * to do another pass over the heap just to reset the bit to zero so instead on
- * each traversal (i.e. each run of the profiling code) we invert the value of
- * the global 'flip' variable. We interpret this as resetting all the "visited?"
- * flags on the heap.
+ * Since we don't want to have to scan the entire heap a second time just to
+ * reset the per-object visitied bit before/after the real traversal we make the
+ * interpretation of this bit dependent on the value of a global variable,
+ * 'flip'.
  *
- * There is one exception to this rule, namely: static objects. There we do just
- * go over the heap and reset the bit manually. See
- * 'resetStaticObjectForProfiling'.
+ * When the 'trav' bit is the inverse of the value of 'flip' the closure data is
+ * valid otherwise not (see isTravDataValid). We then invert the value of 'flip'
+ * on each heap traversal (see traverseWorkStack), in effect marking all
+ * closure's data as invalid at once.
+ *
+ * There are some complications with this approach, namely: static objects and
+ * mutable data. There we do just go over all existing objects to reset the bit
+ * manually. See 'resetStaticObjectForProfiling' and 'computeRetainerSet'.
  */
-StgWord flip = 0;     // flip bit
-                      // must be 0 if DEBUG_RETAINER is on (for static closures)
+StgWord flip = 0;
 
 #define setTravDataToZero(c) \
   (c)->header.prof.hp.trav.lsb = flip
@@ -267,6 +267,12 @@ int
 getTraverseStackMaxSize(traverseState *ts)
 {
     return ts->maxStackSize;
+}
+
+void
+setTraverseStackBoundary(traverseState *ts)
+{
+    ts->currentStackBoundary = ts->stackTop;
 }
 
 /* -----------------------------------------------------------------------------
@@ -972,16 +978,18 @@ endRetainerProfiling( void )
 
 /**
  * Make sure a closure's profiling data is initialized to zero if it does not
- * conform to the current value of the flip bit.
+ * conform to the current value of the flip bit, returns true in this case.
  *
  * See Note [Profiling heap traversal visited bit].
  */
-void
+bool
 traverseMaybeInitClosureData(StgClosure *c)
 {
     if (!isTravDataValid(c)) {
         setTravDataToZero(c);
+        return true;
     }
+    return false;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1361,7 +1369,7 @@ traversePAP (traverseState *ts,
 }
 
 static bool
-retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, stackData *out_data )
+retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
 {
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
@@ -1407,7 +1415,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     } else {
         // This is not the first visit to *c.
         if (isMember(r, retainerSetOfc))
-            return 1;          // no need to process child
+            return 0;          // no need to process child
 
         if (s == NULL)
             associate(c, addElement(r, retainerSetOfc));
@@ -1426,7 +1434,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
         }
 
         if (isRetainer(c))
-            return 1;          // no need to process child
+            return 0;          // no need to process child
 
         // compute c_child_r
         out_data->c_child_r = r;
@@ -1435,12 +1443,14 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     // now, RSET() of all of *c, *cp, and *r is valid.
     // (c, c_child_r) are available.
 
-    return 0;
+    return 1;
 }
 
 /**
- * Traverse all closures on the traversal work-stack, calling 'visit_cb'
- * on each closure. See 'visitClosure_cb' for details.
+ * Traverse all closures on the traversal work-stack, calling 'visit_cb' on each
+ * closure. See 'visitClosure_cb' for details. This function flips the 'flip'
+ * bit and hence every closure's profiling data will be reset to zero upon
+ * visiting. See Note [Profiling heap traversal visited bit].
  */
 void
 traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
@@ -1449,6 +1459,9 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     StgClosure *c, *cp, *first_child;
     stackData data, child_data;
     StgWord typeOfc;
+
+    // Now we flip the flip bit.
+    flip = flip ^ 1;
 
     // c = Current closure                           (possibly tagged)
     // cp = Current closure's Parent                 (NOT tagged)
@@ -1533,9 +1546,10 @@ inner_loop:
     }
 
     // If this is the first visit to c, initialize its data.
-    traverseMaybeInitClosureData(c);
-
-    if(visit_cb(c, cp, data, (stackData*)&child_data))
+    bool first_visit = traverseMaybeInitClosureData(c);
+    bool traverse_children
+        = visit_cb(c, cp, data, first_visit, (stackData*)&child_data);
+    if(!traverse_children)
         goto loop;
 
     // process child
@@ -1644,7 +1658,7 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     ASSERT(isEmptyWorkStack(ts));
-    ts->currentStackBoundary = ts->stackTop;
+    setTraverseStackBoundary(ts);
 
     c = UNTAG_CLOSURE(*tl);
     traverseMaybeInitClosureData(c);
@@ -1696,6 +1710,8 @@ computeRetainerSet( traverseState *ts )
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
+
+    // TODO: Move this code to traverseWorkStack
     // The following code resets the rs field of each unvisited mutable
     // object.
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -1794,9 +1810,6 @@ resetStaticObjectForProfiling( StgClosure *static_objects )
 void
 retainerProfile(void)
 {
-  // Now we flips flip.
-  flip = flip ^ 1;
-
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
 
