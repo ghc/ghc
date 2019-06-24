@@ -61,8 +61,10 @@ cmmPipeline hsc_env srtInfo prog = withTiming (return dflags) (text "Cmm pipelin
 
 cpsTop :: HscEnv -> NameEnv Bool -> CmmDecl -> IO (NameEnv Bool, (CAFEnv, [CmmDecl]))
 cpsTop _ caf_infos p@(CmmData {}) = return (caf_infos, (mapEmpty, [p]))
-cpsTop hsc_env caf_infos0 proc =
+cpsTop hsc_env caf_infos0 proc@(CmmProc top_info _ _ _) =
     do
+       pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
+
        ----------- Control-flow optimisations ----------------------------------
 
        -- The first round of control-flow optimisation speeds up the
@@ -117,7 +119,7 @@ cpsTop hsc_env caf_infos0 proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let (caf_infos1, cafEnv) = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos0 g
+       let (caf_infos1, cafEnv) = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos0 (upd_flag top_info) g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points
