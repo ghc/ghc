@@ -12,16 +12,13 @@
 #if defined(PROFILING)
 
 #include "RetainerSet.h"
+#include "TraverseHeap.h"
 
 #include "BeginPrivate.h"
 
 void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
-void resetStaticObjectForProfiling( StgClosure *static_objects );
-
-/* See Note [Profiling heap traversal visited bit]. */
-extern StgWord flip;
 
 // extract the retainer set field from c
 #define RSET(c)   ((c)->header.prof.hp.trav.rs)
