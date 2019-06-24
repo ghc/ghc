@@ -72,7 +72,7 @@ registerPackages :: [Context] -> Action ()
 registerPackages ctxs = do
     need =<< mapM pkgRegisteredLibraryFile ctxs
 
-    -- | Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
+    -- Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
     forM_ ctxs $ \ ctx -> when (package ctx == rts) $ do
         ways <- interpretInContext ctx (getLibraryWays <> getRtsWays)
         needRtsSymLinks (stage ctx) ways

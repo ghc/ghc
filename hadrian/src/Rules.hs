@@ -153,6 +153,7 @@ packageRules = do
 
     forM_ vanillaContexts Rules.Generate.generatePackageCode
     Rules.SimpleTargets.simplePackageTargets
+    Rules.SimpleTargets.completionRule
 
 buildRules :: Rules ()
 buildRules = do

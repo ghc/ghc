@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdConfigure,
+    cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -10,8 +10,10 @@ import Data.List.Extra
 import Development.Shake hiding (Normal)
 import Flavour (DocTargets, DocTarget(..))
 import Hadrian.Utilities hiding (buildRoot)
+import Settings.Parser
 import System.Console.GetOpt
 import System.Environment
+import qualified System.Directory as Directory
 
 import qualified Data.Set as Set
 
@@ -27,7 +29,8 @@ data CommandLineArgs = CommandLineArgs
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
-    , docTargets     :: DocTargets }
+    , docTargets     :: DocTargets
+    , completeStg    :: Maybe String }
     deriving (Eq, Show)
 
 -- | Default values for 'CommandLineArgs'.
@@ -41,7 +44,8 @@ defaultCommandLineArgs = CommandLineArgs
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
-    , docTargets     = Set.fromList [minBound..maxBound] }
+    , docTargets     = Set.fromList [minBound..maxBound]
+    , completeStg    = Nothing }
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
@@ -199,6 +203,9 @@ readTestWay way =
             let newWays = way : testWays (testArgs flags)
             in flags { testArgs = (testArgs flags) {testWays = newWays} }
 
+readCompleteStg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readCompleteStg ms = Right $ \flags -> flags { completeStg = ms }
+
 readDocsArg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readDocsArg ms = maybe (Left "Cannot parse docs argument") (Right . set) (go =<< ms)
 
@@ -263,18 +270,48 @@ optDescrs =
       "A verbosity value between 0 and 5. 0 is silent, 4 and higher activates extra output."
     , Option [] ["test-way"] (OptArg readTestWay "TEST_WAY")
       "only run these ways"
-    , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests" ]
+    , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests"
+    , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
+        "Setting key to autocomplete, for the 'autocomplete' target."
+    ]
 
 -- | A type-indexed map containing Hadrian command line arguments to be passed
 -- to Shake via 'shakeExtra'.
 cmdLineArgsMap :: IO (Map.HashMap TypeRep Dynamic)
 cmdLineArgsMap = do
-    (opts, _, _) <- getOpt Permute optDescrs <$> getArgs
-    let args = foldl (flip id) defaultCommandLineArgs (rights opts)
+    xs <- getArgs
+    let -- We split the arguments between the ones that look like
+        -- "k = v" or "k += v", in cliSettings, and the rest in
+        -- optArgs.
+        (optsArgs, cliSettings) = partitionKVs xs
+
+        -- We only use the arguments that don't look like setting
+        -- updates for parsing Hadrian and Shake flags/options.
+        (opts, _, _) = getOpt Permute optDescrs optsArgs
+        args = foldl (flip id) defaultCommandLineArgs (rights opts)
+
+        BuildRoot root = buildRoot args
+        settingsFile = root -/- "hadrian.settings"
+
+    -- We try to look at <root>/hadrian.settings, and if it exists
+    -- we read as many settings as we can from it, combining
+    -- them with the ones we got on the command line, in allSettings.
+    -- We then insert all those settings in the dynamic map, so that
+    -- the 'Settings.flavour' action can look them up and apply
+    -- all the relevant updates to the flavour that Hadrian is set
+    -- to run with.
+    settingsFileExists <- Directory.doesFileExist settingsFile
+    fileSettings <-
+      if settingsFileExists
+        then parseJustKVs . lines <$> readFile settingsFile
+        else return []
+    let allSettings = cliSettings ++ fileSettings
+
     return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
            $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
+           $ insertExtra allSettings           -- Accessed by Settings
            $ insertExtra args Map.empty
 
 cmdLineArgs :: Action CommandLineArgs
@@ -285,6 +322,9 @@ cmdConfigure = configure <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
+
+cmdCompleteSetting :: Action (Maybe String)
+cmdCompleteSetting = completeStg <$> cmdLineArgs
 
 lookupBuildRoot :: Map.HashMap TypeRep Dynamic -> BuildRoot
 lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
