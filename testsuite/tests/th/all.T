@@ -461,6 +461,9 @@ test('T15783', normal, multimod_compile,
 test('T15792', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T15815', normal, multimod_compile,
     ['T15815B', '-v0 ' + config.ghc_th_way_flags])
+test('T15843', [], multimod_compile_and_run,
+     ['T15843.hs',
+      '-v0 ' + config.ghc_th_way_flags])
 test('T15845', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T15437', expect_broken(15437), multimod_compile,
      ['T15437', '-v0 ' + config.ghc_th_way_flags])
