@@ -970,20 +970,12 @@ endRetainerProfiling( void )
     outputAllRetainerSet(prof_file);
 }
 
-/* -----------------------------------------------------------------------------
- *  Returns the actual pointer to the retainer set of the closure *c.
- *  It may adjust RSET(c) subject to flip.
- *  Side effects:
- *    RSET(c) is initialized to NULL if its current value does not
- *    conform to flip.
- *  Note:
- *    Even though this function has side effects, they CAN be ignored because
- *    subsequent calls to retainerSetOf() always result in the same return value
- *    and retainerSetOf() is the only way to retrieve retainerSet of a given
- *    closure.
- *    We have to perform an XOR (^) operation each time a closure is examined.
- *    The reason is that we do not know when a closure is visited last.
- * -------------------------------------------------------------------------- */
+/**
+ * Make sure a closure's profiling data is initialized to zero if it does not
+ * conform to the current value of the flip bit.
+ *
+ * See Note [Profiling heap traversal visited bit].
+ */
 void
 traverseMaybeInitClosureData(StgClosure *c)
 {
