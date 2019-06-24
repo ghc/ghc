@@ -930,7 +930,7 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
     # Clean up prior to the test, so that we can't spuriously conclude
     # that it passed on the basis of old run outputs.
     cleanup()
-    opts.testdir.mkdir(parents=True, exist_ok=True)
+    os.makedirs(str(opts.testdir))
 
     # Link all source files for this test into a new directory in
     # /tmp, and run the test in that directory. This makes it
