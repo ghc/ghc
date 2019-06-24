@@ -4,6 +4,7 @@ import System.Directory (getCurrentDirectory)
 import Development.Shake
 import Hadrian.Expression
 import Hadrian.Utilities
+import Settings.Parser
 
 import qualified Base
 import qualified CommandLine
@@ -19,7 +20,7 @@ import qualified UserSettings
 
 main :: IO ()
 main = do
-    -- Provide access to command line arguments and some user settings through
+  -- Provide access to command line arguments and some user settings through
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
     let extra = insertExtra UserSettings.buildProgressColour
@@ -69,7 +70,8 @@ main = do
             Rules.toolArgsTarget
 
     shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
+        let targets' = removeKVs targets
         Environment.setupEnvironment
-        return . Just $ if null targets
+        return . Just $ if null targets'
                         then rules
-                        else want targets >> withoutActions rules
+                        else want targets' >> withoutActions rules
