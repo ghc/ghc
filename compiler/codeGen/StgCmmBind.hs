@@ -558,7 +558,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
                                 (map (CmmReg . CmmLocal) (node : arg_regs))
                                 (initUpdFrameOff dflags)
        tscope <- getTickScope
-       emitProcWithConvention Slow Nothing slow_lbl
+       emitProcWithConvention Slow Nothing slow_lbl (lfUpdatable (closureLFInfo cl_info))
          (node : arg_regs) (jump, tscope)
   | otherwise = return ()
 
