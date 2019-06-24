@@ -244,6 +244,9 @@ initializeTraverseStack( traverseState *ts )
     ts->firstStack->link = NULL;
     ts->firstStack->u.back = NULL;
 
+    ts->stackSize = 0;
+    ts->maxStackSize = 0;
+
     newStackBlock(ts, ts->firstStack);
 }
 
@@ -264,6 +267,12 @@ void
 setTraverseStackBoundary(traverseState *ts)
 {
     ts->currentStackBoundary = ts->stackTop;
+}
+
+int
+getTraverseStackMaxSize(traverseState *ts)
+{
+    return ts->maxStackSize;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1802,8 +1811,6 @@ retainerProfile(void)
   // Now we flips flip.
   flip = flip ^ 1;
 
-  g_retainerTraverseState.stackSize = 0;
-  g_retainerTraverseState.maxStackSize = 0;
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
 
@@ -1823,7 +1830,7 @@ retainerProfile(void)
 
   stat_endRP(
     retainerGeneration - 1,   // retainerGeneration has just been incremented!
-    g_retainerTraverseState.maxStackSize,
+    getTraverseStackMaxSize(&g_retainerTraverseState),
     (double)timesAnyObjectVisited / numObjectVisited);
 }
 
