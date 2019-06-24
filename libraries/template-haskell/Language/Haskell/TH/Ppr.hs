@@ -150,8 +150,8 @@ pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat ap
                                            <+> text "->" <+> ppr e
 pprExp i (LamCaseE ms) = parensIf (i > noPrec)
                        $ text "\\case" $$ nest nestDepth (ppr ms)
-pprExp _ (TupE es) = parens (commaSep es)
-pprExp _ (UnboxedTupE es) = hashParens (commaSep es)
+pprExp _ (TupE es) = parens (commaSepWith (pprMaybeExp noPrec) es)
+pprExp _ (UnboxedTupE es) = hashParens (commaSepWith (pprMaybeExp noPrec) es)
 pprExp _ (UnboxedSumE e alt arity) = unboxedSumBars (ppr e) alt arity
 -- Nesting in Cond is to avoid potential problems in do statements
 pprExp i (CondE guard true false)
