@@ -15,11 +15,12 @@ import qualified Text.Parsec as Parsec
 -- @a@, which represents that @something@, is instantiated with library-related
 -- data types in @Rules.Library@ and with object/interface files related types
 -- in @Rules.Compile@.
-data BuildPath a = BuildPath FilePath -- ^ > <build root>/
-                             Stage    -- ^ > stage<N>/
-                             FilePath -- ^ > <path/to/pkg/from/ghc/root>/build/
-                             a        -- ^ > whatever comes after 'build/'
-    deriving (Eq, Show)
+data BuildPath a = BuildPath
+  { _buildPathRoot :: FilePath    -- ^ @<build root>/@
+  , _buildPathStage :: Stage      -- ^ @stage<N>/@
+  , _buildPathPkgPath :: FilePath -- ^ @<path/to/pkg/from/ghc/root>/build/@
+  , _buildPathTarget :: a         -- ^ whatever comes after @build/@
+  } deriving (Eq, Show)
 
 -- | Parse a build path under the given build root.
 parseBuildPath
@@ -45,13 +46,12 @@ parseBuildPath root afterBuild = do
 -- @a@, which represents that @something@, is instantiated with library-related
 -- data types in @Rules.Library@ and with object/interface files related types
 -- in @Rules.Compile@.
-data GhcPkgPath a
-    = GhcPkgPath
-        FilePath -- ^ > <build root>/
-        Stage    -- ^ > stage<N>/
-        FilePath -- ^ > lib/<arch>-<os>-ghc-<ghc version>/
-        a        -- ^ > whatever comes after
-        deriving (Eq, Show)
+data GhcPkgPath a = GhcPkgPath
+   { _ghcpkgPathRoot  :: FilePath -- ^ @<build root>/@
+   , _ghcpkgPathStage :: Stage    -- ^ @stage<N>/@
+   , _ghcpkgRegPath   :: FilePath -- ^ @lib/<arch>-<os>-ghc-<ghc version>/@
+   , _ghcPkgObject    :: a        -- ^ whatever comes after
+   } deriving (Eq, Show)
 
 -- | Parse a registered ghc-pkg path under the given build root.
 parseGhcPkgPath

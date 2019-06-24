@@ -1,11 +1,15 @@
-# User settings
+# Settings
 
-You can customise Hadrian by copying the file `hadrian/src/UserSettings.hs` to
-`hadrian/UserSettings.hs` and overriding the default build settings (if you don't
-copy the file your changes will be tracked by `git` and you can accidentally commit
-them). Here we document currently supported settings.
+You can customise Hadrian in two ways:
 
-## Build flavour
+- by copying the file `hadrian/src/UserSettings.hs` to `hadrian/UserSettings.hs`
+  and overriding the default build settings (if you don't
+  copy the file your changes will be tracked by `git` and you can accidentally commit
+  them). Here we document currently supported settings.
+
+## The `UserSettings` module
+
+### Build flavour
 
 Build _flavour_ is a collection of build settings that fully define a GHC build
 (see `src/Flavour.hs`):
@@ -103,7 +107,7 @@ patterns such as `"//Prelude.*"` can be used when matching input and output file
 where `//` matches an arbitrary number of path components and `*` matches an entire
 path component, excluding any separators.
 
-### Enabling -Werror
+#### Enabling -Werror
 
 It is useful to enable `-Werror` when building GHC as this setting is
 used in the CI to ensure a warning free build. The `werror` function can be
@@ -114,7 +118,7 @@ devel2WerrorFlavour :: Flavour
 devel2WerrorFlavour = werror (developmentFlavour Stage2)
 ```
 
-### Linking GHC against the debugged RTS
+#### Linking GHC against the debugged RTS
 
 What was previously achieved by having `GhcDebugged=YES` in `mk/build.mk` can
 be done by defining a custom flavour in the user settings file, one that
@@ -129,7 +133,7 @@ Running `build --flavour=dbg` will build a `quick`-flavoured GHC and link
 GHC, iserv, iserv-proxy and remote-iserv against the debugged RTS, by passing
 `-debug` to the commands that link those executables.
 
-## Packages
+### Packages
 
 Users can add and remove packages from particular build stages. As an example,
 below we add package `base` to Stage0 and remove package `haskeline` from Stage1:
@@ -170,7 +174,7 @@ userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", integerLibrary = pure integerSimple }
 ```
 
-### Specifying the final stage to build
+#### Specifying the final stage to build
 
 The `finalStage` variable can be set to indicate after which stage we should
 stop the compilation pipeline. By default it is set to `Stage2` which indicates
@@ -185,7 +189,7 @@ Using this mechanism we can also build a `Stage3` compiler by setting
 `finalStage = Stage3` or just a `Stage1` compiler by setting
 `finalStage = Stage1`.
 
-## Build ways
+### Build ways
 
 Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
 profiling information enabled), and many others as defined in `src/Way.hs`. You
@@ -212,7 +216,7 @@ noDynamicFlavour = defaultFlavour
     , libraryWays = remove [dynamic] defaultLibraryWays }
 ```
 
-## Verbose command lines
+### Verbose command lines
 
 By default Hadrian does not print full command lines during the build process
 and instead prints short human readable digests for each executed command. You
@@ -247,7 +251,7 @@ verboseCommand = output "//rts/sm/*" &&^ way threaded
 verboseCommand = return True
 ```
 
-## Documentation
+### Documentation
 
 `Flavour`'s `ghcDocs :: Action DocTargets` field lets you
 customize the "groups" of documentation targets that should
@@ -286,7 +290,7 @@ all of the documentation targets:
 You can pass several `--docs=...` flags, Hadrian will combine
 their effects.
 
-## Split sections
+### Split sections
 
 You can build all or just a few packages with
 [`-split-sections`][split-sections] by tweaking an existing
@@ -312,7 +316,7 @@ Changing `(const True)` to `(== base)` would only build `base` with
 library with `-split-sections` (it is usually not worth using that
 option with the `ghc` library).
 
-## Miscellaneous
+### Miscellaneous
 
 Hadrian prints various progress info during the build. You can change the colours
 used by default by overriding `buildProgressColour` and `successColour`:
@@ -335,6 +339,98 @@ set. E.g.
 Dull Blue
 Vivid Cyan
 Extended "203"
+```
+
+## `key = value` and `key += value` style settings
+
+One can alternatively supply settings from the command line or a
+`<build root>/hadrian.settings` file. Hadrian currently supports two
+"families" of settings:
+
+- `{stage0, ..., stage3, *}.(<package name> or *).ghc.{c, hs, link, deps, toolargs, *}.opts`
+- `{stage0, ..., stage3, *}.(<package name> or *).cc.{c, deps, *}.opts`
+
+For example, putting the following in a file at `_build/hadrian.settings`:
+
+``` make
+stage1.ghc-bin.ghc.link.opts += -eventlog
+*.base.ghc.*.opts += -v3
+```
+
+and running hadrian with the default build root (`_build`), would respectively
+link the stage 2 GHC executable (using the stage 1 GHC) with the `-eventlog`
+flag, so that stage 2 GHC supports producing eventlogs with `+RTS -l`, and use
+`-v3` on all GHC commands used to build anything related to `base`, whatever
+the stage.
+
+We could equivalently specify those settings on the command-line:
+
+``` sh
+$ hadrian/build.sh "stage1.ghc-bin.ghc.link.opts += -eventlog" \
+                   "*.base.ghc.*.opts += -v3"
+```
+
+or specify some in `hadrian.settings` and some on the command-line.
+
+Here is an overview of the supported settings and how you can figure out
+the right names for them:
+
+- the stage slot, which comes first, can be filled with any of `stage0`,
+  `stage1`, `stage2`, `stage3` or `*`; any value but `*` will restrict the
+  setting update to targets built during the given stage, while `*` is taken
+  to mean "for any stage".
+- the package slot, which comes second, can be filled with any package name
+  that Hadrian knows about (all packages that are part of a GHC checkout),
+  or `*`, to respectively mean that the builder options are going to be updated
+  only when building the given package, or that the said options should be used
+  when building all known packages, if the Hadrian command ever gets them to be
+  built;
+- the third slot is the builder, `ghc` or `cc`, to refer to GHC commands or
+  C compiler commands;
+- the final slot is the builder mode, `{c, hs, link, deps, toolargs}`:
+
+    * `c` for commands that build C files with GHC
+	* `hs` for commands that compile Haskell modules with GHC
+	* `link` for GHC linking command
+	* `deps` for commands that figure out dependencies between Haskell modules
+	  (with `ghc -M`)
+	* `toolargs` for GHC commands that are used to generate the right ghci
+	  argument for `hadrian/ghci.sh` to work
+
+  for GHC and `{c, deps}`:
+
+    * `c` for commands that call the C compiler on some C files
+	* `deps` for commands that call the C compiler for figuring out
+	  dependencies between C files
+
+  for the C compiler;
+- using a wildcard (`*`) ranges over all possible values for a given "slot";
+- `=` entirely overrides the arguments for a given builder in a given context,
+  with the value specified on the right hand side of `=`, while `+=` merely
+  extends the arguments that are to be emitted in the said context, with
+  the values supplied on the right hand side of `+=`.
+
+See `Note [Hadrian settings]` in `hadrian/src/Settings.hs` for explanations
+about the implementation and how the set of supported settings can be
+extended.
+
+### Tab completion
+
+Hadrian supports tab-completion for the key-value settings. This is implemented
+in `Rules.SimpleTargets.completionRule`, by exporting an `autocomplete` target
+that takes an (optional) argument, `--complete-setting=<some string>`, and
+prints on stdout all the setting keys that have the given string as a prefix.
+
+There is a `hadrian/completion.sh` script that makes use of this rule to
+install Bash completions for `hadrian/build.sh` and `hadrian/build.cabal.sh`.
+You can try it out by doing:
+
+``` sh
+$ source hadrian/completion.sh
+$ hadrian/build.sh <TAB>
+$ hadrian/build.sh stage1.ba<TAB>
+$ hadrian/build.sh "stage1.base.ghc.<TAB>
+$ hadrian/build.sh "*.*.ghc.*.opts += -v3" "stage0.ghc-bin.ghc.lin<TAB>
 ```
 
 [split-sections]: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#ghc-flag--split-sections
