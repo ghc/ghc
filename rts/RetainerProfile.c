@@ -15,6 +15,7 @@
 #include "RtsUtils.h"
 #include "RetainerProfile.h"
 #include "RetainerSet.h"
+#include "TraverseHeap.h"
 #include "Schedule.h"
 #include "Printer.h"
 #include "Weak.h"
@@ -158,13 +159,6 @@ typedef struct {
     nextPos next;
 } stackPos;
 
-typedef union {
-     /**
-      * Most recent retainer for the corresponding closure on the stack.
-      */
-    retainer c_child_r;
-} stackData;
-
 /**
  * An element of the traversal work-stack. Besides the closure itself this also
  * stores it's parent and associated data.
@@ -176,90 +170,15 @@ typedef union {
  * traversePushChildren() and traversePop().
  *
  */
-typedef struct {
+typedef struct stackElement_ {
     stackPos info;
     StgClosure *c;
     StgClosure *cp; // parent of 'c'. Only used when info.type == posTypeFresh.
     stackData data;
 } stackElement;
 
-typedef struct {
-/*
-  Invariants:
-
-    firstStack points to the first block group.
-
-    currentStack points to the block group currently being used.
-
-    currentStack->free == stackLimit.
-
-    stackTop points to the topmost byte in the stack of currentStack.
-
-    Unless the whole stack is empty, stackTop must point to the topmost
-    object (or byte) in the whole stack. Thus, it is only when the whole stack
-    is empty that stackTop == stackLimit (not during the execution of
-    pushStackElement() and popStackElement()).
-
-    stackBottom == currentStack->start.
-
-    stackLimit == currentStack->start + BLOCK_SIZE_W * currentStack->blocks.
-
-
-  Note:
-
-    When a current stack becomes empty, stackTop is set to point to
-    the topmost element on the previous block group so as to satisfy
-    the invariants described above.
- */
-    bdescr *firstStack;
-    bdescr *currentStack;
-    stackElement *stackBottom, *stackTop, *stackLimit;
-
-/*
-  currentStackBoundary is used to mark the current stack chunk.
-  If stackTop == currentStackBoundary, it means that the current stack chunk
-  is empty. It is the responsibility of the user to keep currentStackBoundary
-  valid all the time if it is to be employed.
- */
-    stackElement *currentStackBoundary;
-
-/*
-  stackSize records the current size of the stack.
-  maxStackSize records its high water mark.
-  Invariants:
-    stackSize <= maxStackSize
-  Note:
-    stackSize is just an estimate measure of the depth of the graph. The reason
-    is that some heap objects have only a single child and may not result
-    in a new element being pushed onto the stack. Therefore, at the end of
-    retainer profiling, maxStackSize is some value no greater
-    than the actual depth of the graph.
- */
-    int stackSize, maxStackSize;
-} traverseState;
-
-/**
- * Callback called when heap traversal visits a closure.
- *
- * Before this callback is called the profiling header of the visited closure
- * 'c' is zero'd with 'setTravDataToZero' if this closure hasn't been visited in
- * this run yet. See Note [Profiling heap traversal visited bit].
- *
- * Return 'true' when this is not the first visit to this element. The generic
- * traversal code will then skip traversing the children.
- */
-typedef bool (*visitClosure_cb) (
-    const StgClosure *c,
-    const StgClosure *cp,
-    const stackData data,
-    stackData *child_data);
-
 traverseState g_retainerTraverseState;
 
-
-static void traverseStack(traverseState *, StgClosure *, stackData, StgPtr, StgPtr);
-static void traverseClosure(traverseState *, StgClosure *, StgClosure *, retainer);
-static void traversePushClosure(traverseState *, StgClosure *, StgClosure *, stackData);
 
 #if defined(DEBUG)
 unsigned int g_traversalDebugLevel = 0;
@@ -314,7 +233,7 @@ returnToOldStack( traverseState *ts, bdescr *bd )
 /**
  *  Initializes the traversal work-stack.
  */
-static void
+void
 initializeTraverseStack( traverseState *ts )
 {
     if (ts->firstStack != NULL) {
@@ -334,7 +253,7 @@ initializeTraverseStack( traverseState *ts )
  * Invariants:
  *   firstStack != NULL
  */
-static void
+void
 closeTraverseStack( traverseState *ts )
 {
     freeChain(ts->firstStack);
@@ -494,7 +413,7 @@ pushStackElement(traverseState *ts, stackElement *se)
  *  c    - closure
  *  data - data associated with closure.
  */
-STATIC_INLINE void
+inline void
 traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data) {
     stackElement se;
 
@@ -1056,7 +975,7 @@ endRetainerProfiling( void )
  *    We have to perform an XOR (^) operation each time a closure is examined.
  *    The reason is that we do not know when a closure is visited last.
  * -------------------------------------------------------------------------- */
-STATIC_INLINE void
+void
 traverseMaybeInitClosureData(StgClosure *c)
 {
     if (!isTravDataValid(c)) {
@@ -1522,7 +1441,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
  * Traverse all closures on the traversal work-stack, calling 'visit_cb'
  * on each closure. See 'visitClosure_cb' for details.
  */
-static void
+void
 traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
 {
     // first_child = first child of c
