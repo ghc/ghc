@@ -202,63 +202,14 @@ simple_opt_clo :: SimpleOptEnv -> SimpleClo -> OutExpr
 simple_opt_clo env (e_env, e)
   = simple_opt_expr (soeSetInScope env e_env) e
 
-has_unfolding :: Id -> Bool
-has_unfolding i = case unfoldingInfo . idInfo $ i of
-  NoUnfolding -> False
-  _ -> True
-
--- | Recursively check that all let-bound variables in a CoreExpr have explicit
--- unfoldings attached to them. See Note [The Let-Unfoldings Invariant].
-expr_has_let_unfoldings :: HasCallStack => CoreExpr -> Bool
-expr_has_let_unfoldings (App e a) =
-  -- For a function application, check both the argument and the body.
-  expr_has_let_unfoldings e && expr_has_let_unfoldings a
-expr_has_let_unfoldings (Lam _ body) =
-  -- We are not interested in the lambda argument, only the body. (Are we?)
-  expr_has_let_unfoldings body
-expr_has_let_unfoldings (Let (NonRec b _) _) =
-  -- non-rec let bindings can be checked directly
-  has_unfolding b
-expr_has_let_unfoldings (Let (Rec xs) _) =
-  -- for recursive let bindings, we check the entire list
-  all (has_unfolding . fst) xs
-expr_has_let_unfoldings (Case scrutinee _ _ alts) =
-  -- for case expressions, check the scrutinee and all branches; we are only
-  -- interested in the branch bodies though, not the variables captured from
-  -- patterns.
-  expr_has_let_unfoldings scrutinee && all expr_has_let_unfoldings [ e | (_, _, e) <- alts ]
--- Cast and Tick just forward to their arguments
-expr_has_let_unfoldings (Cast e _) =
-  expr_has_let_unfoldings e
-expr_has_let_unfoldings (Tick _ e) =
-  expr_has_let_unfoldings e
-
-expr_has_let_unfoldings (Var _) =
-  -- For a Var, we can't tell whether it was originally let-bound, or
-  -- came about in some other way (imported or lambda-bound), so we'll
-  -- have to take it at face value.
-  True
--- Anything else cannot possibly contain binders and thus trivially satisfies
--- the invariant.
-expr_has_let_unfoldings _ =
-  True
-
 simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
-  = let out = go expr
-    in -- ASSERT(expr_has_let_unfoldings out)
-       out
+  = go expr
   where
-    subst        :: Subst
     subst        = soe_subst env
-
-    in_scope     :: InScopeSet
     in_scope     = substInScope subst
-
-    in_scope_env :: (InScopeSet, IdUnfoldingFun)
     in_scope_env = (in_scope, simpleUnfoldingFun)
 
-    go :: InExpr -> OutExpr
     go (Var v)
        | Just clo <- lookupVarEnv (soe_inl env) v
        = simple_opt_clo env clo
@@ -275,17 +226,9 @@ simple_opt_expr env expr
                         where
                           co' = optCoercion (soe_dflags env) (getTCvSubst subst) co
 
-    go (Let bind body) = let env_mbind :: (SimpleOptEnv, Maybe OutBind)
-                             env_mbind = simple_opt_bind env bind NotTopLevel
-
-                             out :: OutExpr
-                             out = case env_mbind of
-                                     (env', Nothing)   -> simple_opt_expr env' body
-                                     (env', Just bind) -> Let bind (simple_opt_expr env' body)
-                         -- For reasons as of yet unknown to me, the following
-                         -- assert fails in some parts of the test suite:
-                         -- in ASSERT(expr_has_let_unfoldings out) out
-                         in out
+    go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
+                             (env', Nothing)   -> simple_opt_expr env' body
+                             (env', Just bind) -> Let bind (simple_opt_expr env' body)
 
     go lam@(Lam {})     = go_lam env [] lam
     go (Case e b ty as)
@@ -298,8 +241,7 @@ simple_opt_expr env expr
           DEFAULT -> go rhs
           _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
             where
-              env' :: SimpleOptEnv
-              (env', mb_prs) = mapAccumL (\env ve -> simple_out_bind env ve NotTopLevel) env $
+              (env', mb_prs) = mapAccumL (simple_out_bind NotTopLevel) env $
                                zipEqual "simpleOptExpr" bs es
 
          -- Note [Getting the map/coerce RULE to work]
@@ -477,11 +419,11 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     safe_to_inline (ManyOccs {})        = False
 
 -------------------
-simple_out_bind :: SimpleOptEnv
+simple_out_bind :: TopLevelFlag
+                -> SimpleOptEnv
                 -> (InVar, OutExpr)
-                -> TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
-simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs) top_level
+simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
   = ASSERT( isTyVar in_bndr )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
