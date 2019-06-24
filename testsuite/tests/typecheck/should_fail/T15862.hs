@@ -29,8 +29,3 @@ data Quux = MkQuux (# Bool | Int #)
 quux :: TypeRep MkQuux
 quux = typeRep
 
-data Quuz :: (Type ~ Type) => Type where
-  MkQuuz :: Quuz
-
-quuz :: TypeRep MkQuuz
-quuz = typeRep

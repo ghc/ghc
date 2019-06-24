@@ -19,10 +19,3 @@ T15862.hs:30:8: error:
           Typeable ('MkQuux :: (# Bool | Int #) -> Quux)
     • In the expression: typeRep
       In an equation for ‘quux’: quux = typeRep
-
-T15862.hs:36:8: error:
-    • No instance for (Typeable 'MkQuuz)
-        arising from a use of ‘typeRep’
-        GHC can't yet do polykinded Typeable ('MkQuuz :: Quuz)
-    • In the expression: typeRep
-      In an equation for ‘quuz’: quuz = typeRep
