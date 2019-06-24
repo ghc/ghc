@@ -52,7 +52,7 @@ templateHaskellNames = [
     -- Exp
     varEName, conEName, litEName, appEName, appTypeEName, infixEName,
     infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
-    tupEName, unboxedTupEName, unboxedSumEName,
+    tupEName, tupEName', unboxedTupEName, unboxedTupEName', unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
@@ -275,10 +275,10 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName,
-    unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
-    caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName :: Name
+    sectionLName, sectionRName, lamEName, lamCaseEName, tupEName, tupEName',
+    unboxedTupEName, unboxedTupEName', unboxedSumEName, condEName, multiIfEName,
+    letEName, caseEName, doEName, mdoEName, compEName, staticEName,
+    unboundVarEName, labelEName, implicitParamVarEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -291,7 +291,9 @@ sectionRName          = libFun (fsLit "sectionR")          sectionRIdKey
 lamEName              = libFun (fsLit "lamE")              lamEIdKey
 lamCaseEName          = libFun (fsLit "lamCaseE")          lamCaseEIdKey
 tupEName              = libFun (fsLit "tupE")              tupEIdKey
+tupEName'             = libFun (fsLit "tupE'")             tupEIdKey'
 unboxedTupEName       = libFun (fsLit "unboxedTupE")       unboxedTupEIdKey
+unboxedTupEName'      = libFun (fsLit "unboxedTupE'")      unboxedTupEIdKey'
 unboxedSumEName       = libFun (fsLit "unboxedSumE")       unboxedSumEIdKey
 condEName             = libFun (fsLit "condE")             condEIdKey
 multiIfEName          = libFun (fsLit "multiIfE")          multiIfEIdKey
@@ -1071,6 +1073,13 @@ stockStrategyIdKey    = mkPreludeDataConUnique 494
 anyclassStrategyIdKey = mkPreludeDataConUnique 495
 newtypeStrategyIdKey  = mkPreludeDataConUnique 496
 viaStrategyIdKey      = mkPreludeDataConUnique 497
+
+-- Tuple sections in TH (see #15843)
+-- Internal variants for backwards compatibility reasons
+-- See https://gitlab.haskell.org/ghc/ghc/issues/15843#note_200184
+tupEIdKey', unboxedTupEIdKey' :: Unique
+tupEIdKey'        = mkPreludeMiscIdUnique 498
+unboxedTupEIdKey' = mkPreludeMiscIdUnique 499
 
 {-
 ************************************************************************
