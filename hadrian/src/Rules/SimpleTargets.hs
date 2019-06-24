@@ -1,6 +1,10 @@
-module Rules.SimpleTargets (simplePackageTargets) where
+module Rules.SimpleTargets
+  ( simplePackageTargets
+  , completionRule
+  ) where
 
 import Base
+import CommandLine
 import Context
 import Packages
 import Settings
@@ -47,3 +51,18 @@ getProgramPath Stage0 _ =
   error ("Cannot build a stage 0 executable target: " ++
          "it is the boot compiler's toolchain")
 getProgramPath stage pkg = programPath (vanillaContext (pred stage) pkg)
+
+
+-- | A phony @autocomplete@ rule that prints all valid setting keys
+--   completions of the value specified in the @--complete-setting=...@ flag,
+--   or simply all valid setting keys if no such argument is passed to Hadrian.
+--
+--   It is based on the 'completeSetting' function, from the "Settings" module.
+completionRule :: Rules ()
+completionRule =
+  "autocomplete" ~> do
+    partialStr <- fromMaybe "" <$> cmdCompleteSetting
+    case completeSetting (splitOn "." partialStr) of
+      [] -> fail $ "No valid completion found for " ++ partialStr
+      cs -> forM_ cs $ \ks ->
+        liftIO . putStrLn $ intercalate "." ks
