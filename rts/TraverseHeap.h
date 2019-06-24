@@ -112,6 +112,7 @@ void traverseMaybeInitClosureData(StgClosure *c);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);
+void setTraverseStackBoundary(traverseState *ts);
 
 W_ traverseWorkStackBlocks(traverseState *ts);
 
