@@ -9,13 +9,6 @@
 
 #if defined(PROFILING)
 
-// Turn off inlining when debugging - it obfuscates things
-#if defined(DEBUG)
-#define INLINE
-#else
-#define INLINE inline
-#endif
-
 #include "PosixSource.h"
 #include "Rts.h"
 
@@ -293,7 +286,7 @@ static inline void debug(const char *s, ...)
  * Invariants:
  *  currentStack->link == s.
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 newStackBlock( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
@@ -308,7 +301,7 @@ newStackBlock( traverseState *ts, bdescr *bd )
  * Invariants:
  *   s->link == currentStack.
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 returnToOldStack( traverseState *ts, bdescr *bd )
 {
     ts->currentStack = bd;
@@ -351,7 +344,7 @@ closeTraverseStack( traverseState *ts )
 /* -----------------------------------------------------------------------------
  * Returns true if the whole stack is empty.
  * -------------------------------------------------------------------------- */
-static INLINE bool
+STATIC_INLINE bool
 isEmptyWorkStack( traverseState *ts )
 {
     return (ts->firstStack == ts->currentStack) && ts->stackTop == ts->stackLimit;
@@ -382,7 +375,7 @@ retainerStackBlocks(void)
  * Returns true if stackTop is at the stack boundary of the current stack,
  * i.e., if the current stack chunk is empty.
  * -------------------------------------------------------------------------- */
-static INLINE bool
+STATIC_INLINE bool
 isOnBoundary( traverseState *ts )
 {
     return ts->stackTop == ts->currentStackBoundary;
@@ -393,7 +386,7 @@ isOnBoundary( traverseState *ts )
  * Invariants:
  *   payload[] begins with ptrs pointers followed by non-pointers.
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 {
     info->type              = posTypePtrs;
@@ -405,7 +398,7 @@ init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 /* -----------------------------------------------------------------------------
  * Find the next object from *info.
  * -------------------------------------------------------------------------- */
-static INLINE StgClosure *
+STATIC_INLINE StgClosure *
 find_ptrs( stackPos *info )
 {
     if (info->next.ptrs.pos < info->next.ptrs.ptrs) {
@@ -418,7 +411,7 @@ find_ptrs( stackPos *info )
 /* -----------------------------------------------------------------------------
  *  Initializes *info from SRT information stored in *infoTable.
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
     info->type = posTypeSRT;
@@ -429,7 +422,7 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
     }
 }
 
-static INLINE void
+STATIC_INLINE void
 init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
     info->type = posTypeSRT;
@@ -443,7 +436,7 @@ init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 /* -----------------------------------------------------------------------------
  * Find the next object from *info.
  * -------------------------------------------------------------------------- */
-static INLINE StgClosure *
+STATIC_INLINE StgClosure *
 find_srt( stackPos *info )
 {
     StgClosure *c;
@@ -501,7 +494,7 @@ pushStackElement(traverseState *ts, stackElement *se)
  *  c    - closure
  *  data - data associated with closure.
  */
-static INLINE void
+STATIC_INLINE void
 traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data) {
     stackElement se;
 
@@ -534,7 +527,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
  * Note: When pushing onto the stack we only really push one 'stackElement'
  * representing all children onto the stack. See traversePop()
  */
-static INLINE void
+STATIC_INLINE void
 traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosure **first_child)
 {
     stackElement se;
@@ -825,7 +818,7 @@ popStackElement(traverseState *ts) {
  *    It is okay to call this function even when the current stack chunk
  *    is empty.
  */
-static INLINE void
+STATIC_INLINE void
 traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 {
     stackElement *se;
@@ -1063,7 +1056,7 @@ endRetainerProfiling( void )
  *    We have to perform an XOR (^) operation each time a closure is examined.
  *    The reason is that we do not know when a closure is visited last.
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 traverseMaybeInitClosureData(StgClosure *c)
 {
     if (!isTravDataValid(c)) {
@@ -1080,7 +1073,7 @@ traverseMaybeInitClosureData(StgClosure *c)
  * In addition we mark all mutable objects as a retainers, the reason for
  * that decision is lost in time.
  * -------------------------------------------------------------------------- */
-static INLINE bool
+STATIC_INLINE bool
 isRetainer( StgClosure *c )
 {
     switch (get_itbl(c)->type) {
@@ -1198,7 +1191,7 @@ isRetainer( StgClosure *c )
  *  Invariants:
  *    *c must be a retainer.
  * -------------------------------------------------------------------------- */
-static INLINE retainer
+STATIC_INLINE retainer
 getRetainerFrom( StgClosure *c )
 {
     ASSERT(isRetainer(c));
@@ -1213,7 +1206,7 @@ getRetainerFrom( StgClosure *c )
  *    c != NULL
  *    s != NULL
  * -------------------------------------------------------------------------- */
-static INLINE void
+STATIC_INLINE void
 associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
@@ -1249,7 +1242,7 @@ traverseLargeBitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
     }
 }
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
                      StgClosure *c, stackData data)
 {
@@ -1405,7 +1398,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
  * Call traversePushClosure for each of the children of a PAP/AP
  * ------------------------------------------------------------------------- */
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 traversePAP (traverseState *ts,
                     StgClosure *pap,    /* NOT tagged */
                     stackData data,
