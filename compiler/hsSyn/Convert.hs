@@ -891,17 +891,11 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsLamCase noExt
                                                    (mkMatchGroup FromSource ms')
                             }
-    cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar noExt e' }
+    cvt (TupE [Just e]) = do { e' <- cvtl e; return $ HsPar noExt e' }
                                  -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)
-    cvt (TupE es)      = do { es' <- mapM cvtl es
-                            ; return $ ExplicitTuple noExt
-                                             (map (noLoc . (Present noExt)) es')
-                                                                         Boxed }
-    cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es
-                                   ; return $ ExplicitTuple noExt
-                                           (map (noLoc . (Present noExt)) es')
-                                                                       Unboxed }
+    cvt (TupE es)        = cvt_tup es Boxed
+    cvt (UnboxedTupE es) = cvt_tup es Unboxed
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
                                        ; unboxedSumChecks alt arity
                                        ; return $ ExplicitSum noExt
@@ -1012,6 +1006,15 @@ cvtDD (FromR x)           = do { x' <- cvtl x; return $ From x' }
 cvtDD (FromThenR x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ FromThen x' y' }
 cvtDD (FromToR x y)       = do { x' <- cvtl x; y' <- cvtl y; return $ FromTo x' y' }
 cvtDD (FromThenToR x y z) = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z; return $ FromThenTo x' y' z' }
+
+cvt_tup :: [Maybe Exp] -> Boxity -> CvtM (HsExpr GhcPs)
+cvt_tup es boxity = do { let cvtl_maybe Nothing  = return missingTupArg
+                             cvtl_maybe (Just e) = fmap (Present noExt) (cvtl e)
+                       ; es' <- mapM cvtl_maybe es
+                       ; return $ ExplicitTuple
+                                    noExt
+                                    (map noLoc es')
+                                    boxity }
 
 {- Note [Operator assocation]
 We must be quite careful about adding parens:

@@ -2,6 +2,11 @@
 
 ## 2.16.0.0 *TBA*
 
+  * Add support for tuple sections. (#15843) The type signatures of `TupE` and
+    `UnboxedTupE` have changed from `[Exp] -> Exp` to `[Maybe Exp] -> Exp`.
+    The type signatures of `tupE` and `unboxedTupE` remain the same for
+    backwards compatibility.
+
   * Introduce a `liftTyped` method to the `Lift` class and set the default
     implementations of `lift` in terms of `liftTyped`.
 
