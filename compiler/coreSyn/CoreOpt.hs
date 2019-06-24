@@ -566,15 +566,15 @@ add_info env old_bndr top_level new_rhs new_bndr
    new_info :: IdInfo
    new_info = case mb_new_info of
     Just info ->
-      info `setUnfoldingInfo` new_unfolding
+      info `setUnfoldingInfo` (new_unfolding InlineStable)
     Nothing ->
-      idInfo old_bndr `setUnfoldingInfo` new_unfolding
+      idInfo old_bndr `setUnfoldingInfo` (new_unfolding InlineRhs)
 
     where
-      new_unfolding =
+      new_unfolding source =
         mkUnfolding
           dflags
-          InlineRhs
+          source
           (isTopLevel top_level)
           False -- may be bottom or not
           new_rhs
