@@ -262,6 +262,12 @@ closeTraverseStack( traverseState *ts )
     ts->firstStack = NULL;
 }
 
+void
+setTraverseStackBoundary(traverseState *ts)
+{
+    ts->currentStackBoundary = ts->stackTop;
+}
+
 /* -----------------------------------------------------------------------------
  * Returns true if the whole stack is empty.
  * -------------------------------------------------------------------------- */
@@ -1645,7 +1651,7 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     ASSERT(isEmptyWorkStack(ts));
-    ts->currentStackBoundary = ts->stackTop;
+    setTraverseStackBoundary(ts);
 
     c = UNTAG_CLOSURE(*tl);
     traverseMaybeInitClosureData(c);
