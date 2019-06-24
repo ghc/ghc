@@ -1332,12 +1332,17 @@ repE e@(HsDo _ ctxt (dL->L _ sts))
   = notHandled "monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
-repE e@(ExplicitTuple _ es boxed)
-  | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
-  | isBoxed boxed = do { xs <- repLEs [e | (dL->L _ (Present _ e)) <- es]
-                       ; repTup xs }
-  | otherwise     = do { xs <- repLEs [e | (dL->L _ (Present _ e)) <- es]
-                       ; repUnboxedTup xs }
+repE (ExplicitTuple _ es boxity) =
+  let tupArgToCoreExp :: LHsTupArg GhcRn -> DsM (Core (Maybe TH.ExpQ))
+      tupArgToCoreExp a
+        | L _ (Present _ e) <- dL a = do { e' <- repLE e
+                                         ; coreJust expQTyConName e' }
+        | otherwise = coreNothing expQTyConName
+
+  in do { args <- mapM tupArgToCoreExp es
+        ; if isBoxed boxity
+          then repTup args
+          else repUnboxedTup args }
 
 repE (ExplicitSum _ alt arity e)
  = do { e1 <- repLE e
@@ -2077,11 +2082,18 @@ repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 repLamCase :: Core [TH.MatchQ] -> DsM (Core TH.ExpQ)
 repLamCase (MkC ms) = rep2 lamCaseEName [ms]
 
-repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
-repTup (MkC es) = rep2 tupEName [es]
+repTup :: [Core (Maybe TH.ExpQ)] -> DsM (Core TH.ExpQ)
+repTup es = repTup' tupEName es
 
-repUnboxedTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
-repUnboxedTup (MkC es) = rep2 unboxedTupEName [es]
+repUnboxedTup :: [Core (Maybe TH.ExpQ)] -> DsM (Core TH.ExpQ)
+repUnboxedTup es = repTup' unboxedTupEName es
+
+repTup' :: Name -> [Core (Maybe TH.ExpQ)] -> DsM (Core TH.ExpQ)
+repTup' tupName es = do { id <- dsLookupGlobalId tupName
+                        ; expQTy <- lookupType expQTyConName
+                        ; let maybeExpQTy = mkTyConApp maybeTyCon [expQTy]
+                              args = coreList' maybeExpQTy es
+                        ; return $ MkC (App (Var id) (unC args)) }
 
 repUnboxedSum :: Core TH.ExpQ -> TH.SumAlt -> TH.SumArity -> DsM (Core TH.ExpQ)
 -- Note: not Core TH.SumAlt or Core TH.SumArity; it's easier to be direct here
