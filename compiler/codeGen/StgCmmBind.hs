@@ -664,7 +664,7 @@ setupUpdate closure_info node body
 
         ; if closureUpdReqd closure_info
           then do       -- Blackhole the (updatable) CAF:
-                { upd_closure <- link_caf node True
+                { upd_closure <- link_caf node
                 ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
           else do {tickyUpdateFrameOmitted; body}
     }
@@ -704,11 +704,10 @@ emitUpdateFrame dflags frame lbl updatee = do
 -- See Note [CAF management] in rts/sm/Storage.c
 
 link_caf :: LocalReg           -- pointer to the closure
-         -> Bool               -- True <=> updatable, False <=> single-entry
          -> FCode CmmExpr      -- Returns amode for closure to be updated
 -- This function returns the address of the black hole, so it can be
 -- updated with the new value when available.
-link_caf node _is_upd = do
+link_caf node = do
   { dflags <- getDynFlags
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure

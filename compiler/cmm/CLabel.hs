@@ -579,8 +579,7 @@ mkForeignLabel
         -> FunctionOrData
         -> CLabel
 
-mkForeignLabel str mb_sz src fod
-    = ForeignLabel str mb_sz src  fod
+mkForeignLabel = ForeignLabel
 
 
 -- | Update the label size field in a ForeignLabel
