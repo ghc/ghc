@@ -98,9 +98,9 @@ static uint32_t timesAnyObjectVisited;  // number of times any objects are
  * the global 'flip' variable. We interpret this as resetting all the "visited?"
  * flags on the heap.
  *
- * There is one exception to this rule, namely: static objects. There we do just
- * go over the heap and reset the bit manually. See
- * 'resetStaticObjectForProfiling'.
+ * There are some complications with this approach, namely: static objects and
+ * mutable data. There we do just go over all existing objects to reset the bit
+ * manually. See 'resetStaticObjectForProfiling' and 'resetMutableObjects'.
  */
 StgWord flip = 0;     // flip bit
                       // must be 0 if DEBUG_RETAINER is on (for static closures)
@@ -1410,6 +1410,33 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     return 0;
 }
 
+static void
+resetMutableObjects(void)
+{
+    uint32_t g, n;
+    bdescr *bd;
+    StgPtr ml;
+
+    // The following code resets the 'trav' field of each unvisited mutable
+    // object.
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        // NOT true: even G0 has a block on its mutable list
+        // ASSERT(g != 0 || (generations[g].mut_list == NULL));
+
+        // Traversing through mut_list is necessary
+        // because we can find MUT_VAR objects which have not been
+        // visited during heap traversal.
+        for (n = 0; n < n_capabilities; n++) {
+          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
+            for (ml = bd->start; ml < bd->free; ml++) {
+
+                traverseMaybeInitClosureData((StgClosure *)*ml);
+            }
+          }
+        }
+    }
+}
+
 /**
  * Traverse all closures on the traversal work-stack, calling 'visit_cb'
  * on each closure. See 'visitClosure_cb' for details.
@@ -1435,6 +1462,7 @@ loop:
 
     if (c == NULL) {
         debug("maxStackSize= %d\n", ts->maxStackSize);
+        resetMutableObjects();
         return;
     }
 inner_loop:
@@ -1592,22 +1620,7 @@ inner_loop:
 }
 
 /**
- *  Compute the retainer set for every object reachable from *tl.
- *
- *  Compute the retainer set of *c0 and all its desecents by traversing.
- *  *cp0 is the parent of *c0, and *r0 is the most recent retainer of *c0.
- *  Invariants:
- *    c0 = cp0 = r0 holds only for root objects.
- *    RSET(cp0) and RSET(r0) are valid, i.e., their
- *    interpretation conforms to the current value of flip (even when they
- *    are interpreted to be NULL).
- *    However, RSET(c0) may be corrupt, i.e., it may not conform to
- *    the current value of flip. If it does not, during the execution
- *    of this function, RSET(c0) must be initialized as well as all
- *    its descendants.
- *  Note:
- *    stackTop must be the same at the beginning and the exit of this function.
- *    *c0 can be TSO (as well as AP_STACK).
+ *  Push every object reachable from *tl onto the traversal work stack.
  */
 static void
 retainRoot(void *user, StgClosure **tl)
@@ -1625,7 +1638,6 @@ retainRoot(void *user, StgClosure **tl)
     } else {
         traversePushClosure(ts, c, c, (stackData)CCS_SYSTEM);
     }
-    traverseWorkStack(ts, &retainVisitClosure);
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
     // *tl might be a TSO which is ThreadComplete, in which
@@ -1668,26 +1680,7 @@ computeRetainerSet( traverseState *ts )
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
-
-    // TODO: Move this code to traverseWorkStack
-    // The following code resets the rs field of each unvisited mutable
-    // object.
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        // NOT true: even G0 has a block on its mutable list
-        // ASSERT(g != 0 || (generations[g].mut_list == NULL));
-
-        // Traversing through mut_list is necessary
-        // because we can find MUT_VAR objects which have not been
-        // visited during retainer profiling.
-        for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
-            for (ml = bd->start; ml < bd->free; ml++) {
-
-                traverseMaybeInitClosureData((StgClosure *)*ml);
-            }
-          }
-        }
-    }
+    traverseWorkStack(ts, &retainVisitClosure);
 }
 
 /* -----------------------------------------------------------------------------
