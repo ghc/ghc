@@ -649,6 +649,12 @@ resetNurseries (void)
             ASSERT(bd->gen == g0);
             ASSERT(bd->node == capNoToNumaNode(n));
             IF_DEBUG(sanity, memset(bd->start, 0xaa, BLOCK_SIZE));
+            // In the non-DEBUG RTS we initialize bd->free lazily (e.g. when
+            // the mutator starts allocating into the block in stg_gc_noregs).
+            // However, in the past we have had bugs (e.g. #16862) where code
+            // looked at the ->free field of blocks that the mutator never
+            // allocated into.  We set the free pointer to NULL to catch this.
+            IF_DEBUG(sanity, bd->free = NULL);
         }
     }
 #endif
