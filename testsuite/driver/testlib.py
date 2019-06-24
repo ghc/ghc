@@ -1782,8 +1782,8 @@ def compare_outputs(way: WayName,
                                                            actual_normalised_path),
                            stdout=diff_file,
                            print_output=True)
-        elif diff_file: open(diff_file, 'ab').close() # Make sure the file exists still as
-                                            # we will try to read it later
+        elif diff_file: diff_file.open('ab').close() # Make sure the file exists still as
+                                                     # we will try to read it later
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
