@@ -74,8 +74,8 @@ test('T5558',
      compile_and_run, [''])
 
 test('T5421', normal, compile_and_run, [''])
-test('T5611', when(opsys('darwin'), fragile(12751)) , compile_and_run, [''])
-test('T5611a', when(opsys('darwin'), fragile(12751)) , compile_and_run, [''])
+test('T5611', fragile(12751), compile_and_run, [''])
+test('T5611a', fragile(12751), compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
