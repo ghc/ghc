@@ -260,23 +260,23 @@ def _expect_pass(way):
 
 def fragile( bug: IssueNumber ):
     """
-    Indicates that the test should be skipped due to fragility documented in
-    the given ticket.
+    Indicates that failures of this test should be ignored due to fragility
+    documented in the given ticket.
     """
     def helper( name, opts, bug=bug ):
         record_broken(name, opts, bug)
-        opts.skip = True
+        opts.fragile_ways += config.way_flags.keys()
 
     return helper
 
 def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     """
-    Indicates that the test should be skipped due to fragility in the given
-    test ways as documented in the given ticket.
+    Indicates that failures of this test should be ignored due to fragility in
+    the given test ways as documented in the given ticket.
     """
     def helper( name, opts, bug=bug, ways=ways ):
         record_broken(name, opts, bug)
-        opts.omit_ways += ways
+        opts.fragile_ways += ways
 
     return helper
 
@@ -424,7 +424,7 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
     # Compiler performance numbers change when debugging is on, making the results
     # useless and confusing. Therefore, skip if debugging is on.
     if config.compiler_debugged and is_compiler_stats_test:
-        opts.skip = 1
+        opts.skip = True
 
     for metric in metrics:
         def baselineByWay(way, target_commit, metric=metric):
@@ -990,7 +990,10 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
 
     directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
 
-    if passFail == 'pass':
+    if way in opts.fragile_ways:
+        if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, passFail))
+        t.fragile_results.append(TestResult(directory, name, 'fragile %s' % passFail, way))
+    elif passFail == 'pass':
         if _expect_pass(way):
             t.expected_passes.append(TestResult(directory, name, "", way))
             t.n_expected_passes += 1
@@ -2297,6 +2300,8 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
                + ' unexpected failures\n'
                + repr(len(t.unexpected_stat_failures)).rjust(8)
                + ' unexpected stat failures\n'
+               + repr(len(t.fragile_results)).rjust(8)
+               + ' fragile tests\n'
                + '\n')
 
     if t.unexpected_passes:
@@ -2318,6 +2323,10 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
     if t.framework_warnings:
         file.write('Framework warnings:\n')
         printTestInfosSummary(file, t.framework_warnings)
+
+    if t.fragile_results:
+        file.write('Fragile tests:\n')
+        printTestInfosSummary(file, t.fragile_results)
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')

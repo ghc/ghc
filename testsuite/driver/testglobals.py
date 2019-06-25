@@ -232,6 +232,7 @@ class TestRun:
        self.unexpected_passes = []
        self.unexpected_failures = []
        self.unexpected_stat_failures = []
+       self.fragile_results = []
 
        # List of all metrics measured in this test run.
        # [(change, PerfStat)] where change is one of the  MetricChange
@@ -252,6 +253,9 @@ class TestOptions:
    def __init__(self):
        # skip this test?
        self.skip = False
+
+       # the test is known to be fragile in these ways
+       self.fragile_ways = []
 
        # skip these ways
        self.omit_ways = []

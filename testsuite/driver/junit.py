@@ -18,7 +18,8 @@ def junit(t: TestRun) -> ET.ElementTree:
 
     for res_type, group in [('stat failure', t.unexpected_stat_failures),
                             ('unexpected failure', t.unexpected_failures),
-                            ('unexpected pass', t.unexpected_passes)]:
+                            ('unexpected pass', t.unexpected_passes),
+                            ('fragile', t.fragile_results)]:
         for tr in group:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = tr.way,
