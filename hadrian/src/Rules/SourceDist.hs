@@ -4,27 +4,31 @@ import Hadrian.Oracles.DirectoryContents
 
 import Base
 import Builder
+import Context
 import Oracles.Setting
+import Packages
 import Rules.Clean
 
 sourceDistRules :: Rules ()
 sourceDistRules = do
+    root <- buildRootRules
     "source-dist" ~> do
         -- We clean the source tree first.
         -- See https://github.com/snowleopard/hadrian/issues/384.
         -- TODO: Do we still need to clean the tree?
         cleanSourceTree
         version <- setting ProjectVersion
-        need ["sdistprep/ghc-" ++ version ++ "-src.tar.xz"]
+        need [root -/- "source-dist" -/- ("ghc-" ++ version ++ "-src.tar.xz")]
         putSuccess "| Done"
-    "sdistprep/ghc-*-src.tar.xz" %> \fname -> do
+    root -/- "source-dist" -/- "ghc-*-src.tar.xz" %> \fname -> do
         let tarName   = takeFileName fname
             dropTarXz = dropExtension . dropExtension
-            treePath  = "sdistprep/ghc" -/- dropTarXz tarName
+            treePath  = root -/- "source-dist" -/- dropTarXz tarName
         prepareTree treePath
-        runBuilderWithCmdOptions [Cwd "sdistprep/ghc"] (Tar Create)
-            ["cJf", ".." -/- tarName,  dropTarXz tarName]
-            ["cJf", ".." -/- tarName] [dropTarXz tarName]
+        runBuilder
+            (Tar Create)
+            ["cJf", fname,  treePath]
+            ["cJf", fname] [treePath]
     "GIT_COMMIT_ID" %> \fname ->
         writeFileChanged fname =<< setting ProjectGitCommitId
     "VERSION" %> \fname ->
@@ -32,9 +36,28 @@ sourceDistRules = do
 
 prepareTree :: FilePath -> Action ()
 prepareTree dest = do
+    root <- buildRoot
     mapM_ cpDir  srcDirs
     mapM_ cpFile srcFiles
+    copyAlexHappyFiles root
   where
+
+    copyAlexHappyFiles root =
+      forM_ alexHappyFiles $ \(stg, pkg, inp, srcDir, out) -> do
+        let dir = root -/- buildDir (Context stg pkg vanilla)
+            srcInputFile = dest -/- pkgPath pkg -/- maybe id (-/-) srcDir inp
+        -- We first make sure that the generated file is... generated.
+        need [ dir -/- out ]
+        -- We then copy the generated file in the source dist, right
+        -- next to the input file.
+        copyFile (dir -/- out)
+                 (dest -/- pkgPath pkg -/- maybe id (-/-) srcDir out)
+        -- We finally add a ".source" suffix to the input file to
+        -- prevent it from being used when building GHC, since the
+        -- generated file being there already should prevent
+        -- the need for the original input.
+        moveFile srcInputFile (srcInputFile <.> "source")
+
     cpFile a = copyFile a (dest -/- a)
     cpDir  a = copyDirectoryContents (Not excluded) a (dest -/- a)
     excluded = Or
@@ -64,13 +87,11 @@ prepareTree dest = do
         , Test "libraries//GNUmakefile"
         , Test "libraries//config.log"
         , Test "libraries//config.status"
-        , Test "libraries//configure"
         , Test "libraries//ghc.mk"
         , Test "libraries//include/Hs*Config.h"
         , Test "libraries/dph"
         , Test "libraries/primitive"
         , Test "libraries/random"
-        , Test "libraries/stm"
         , Test "libraries/vector"
         , Test "mk/build.mk" ]
     srcDirs =
@@ -83,7 +104,6 @@ prepareTree dest = do
         , "ghc"
         , "hadrian"
         , "includes"
-        , "iserv"
         , "libffi"
         , "libffi-tarballs"
         , "libraries"
@@ -92,8 +112,7 @@ prepareTree dest = do
         , "rules"
         , "utils" ]
     srcFiles =
-        [ "ANNOUNCE"
-        , "GIT_COMMIT_ID"
+        [ "GIT_COMMIT_ID"
         , "HACKING.md"
         , "INSTALL.md"
         , "LICENSE"
@@ -110,4 +129,27 @@ prepareTree dest = do
         , "ghc.mk"
         , "install-sh"
         , "packages"
+        , "llvm-targets"
+        , "llvm-passes"
+        ]
+
+    -- (stage, package, input file, dir, output file)
+    --
+    -- where "dir" is the subdirectory of the package's directory
+    -- where the input file resides and where we're supposed to
+    -- put the output file, in the source distribution.
+    --
+    -- This list was taken from ghc.mk. The treatment of those
+    -- alex/happy files is exactly the one implemented in ghc.mk,
+    -- where Make ends up calling 'sdist-ghc-file' on all those
+    -- files, which implements exactly the logic that we
+    -- have for 'alexHappyFiles' above.
+    alexHappyFiles =
+        [ (Stage0, compiler, "CmmParse.y", Just "cmm", "CmmParse.hs")
+        , (Stage0, compiler, "CmmLex.x", Just "cmm", "CmmLex.hs")
+        , (Stage0, compiler, "Parser.y", Just "parser", "Parser.hs")
+        , (Stage0, compiler, "Lexer.x", Just "parser", "Lexer.hs")
+        , (Stage0, hpcBin, "HpcParser.y", Nothing, "HpcParser.hs")
+        , (Stage0, genprimopcode, "Parser.y", Nothing, "Parser.hs")
+        , (Stage0, genprimopcode, "Lexer.x", Nothing, "Lexer.hs")
         ]
