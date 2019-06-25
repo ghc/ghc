@@ -1398,7 +1398,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps)
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, mod_srt_info)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
@@ -1467,7 +1467,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroup ModuleSRTInfo)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1488,44 +1488,29 @@ doCodeGen hsc_env this_mod data_tycons
         -- CmmGroup on input may produce many CmmGroups on output due
         -- to proc-point splitting).
 
-    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
+        dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
                        "Cmm produced by codegen" (ppr a)
                      return a
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-    -- We are building a single SRT for the entire module, so
-    -- we must thread it through all the procedures as we cps-convert them.
-    us <- mkSplitUniqSupply 'S'
+        -- When splitting, we generate one SRT per split chunk, otherwise
+        -- we generate one SRT for the whole module.
+        pipeline_stream :: Stream IO CmmGroup ModuleSRTInfo
+        pipeline_stream
+         | gopt Opt_SplitSections dflags ||
+           osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
+           = pprPanic "doCodeGen" (text "(osa) I'm not sure how to support SplitSections yet")
 
-    -- When splitting, we generate one SRT per split chunk, otherwise
-    -- we generate one SRT for the whole module.
-    let
-     pipeline_stream
-      | gopt Opt_SplitSections dflags ||
-        osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline us cmmgroup = do
-                (_topSRT, cmmgroup) <-
-                  cmmPipeline hsc_env (emptySRT this_mod) cmmgroup
-                return (us, cmmgroup)
+         | otherwise
+           = {-# SCC "cmmPipeline" #-}
+             Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
 
-          in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
-                return ()
-
-      | otherwise
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline = cmmPipeline hsc_env
-          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
-
-    let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
 
-        ppr_stream2 = Stream.mapM dump2 pipeline_stream
-
-    return ppr_stream2
+    return (Stream.mapM dump2 pipeline_stream)
 
 
 
