@@ -32,6 +32,14 @@ import System.Posix.Internals
 import Foreign.C
 import Foreign.Marshal.Array
 import System.Posix.Internals
+#elif defined(freebsd_HOST_OS)
+import Foreign.C
+import Foreign.Marshal.Alloc
+import Foreign.Marshal.Array
+import Foreign.Ptr
+import Foreign.Storable
+import System.Posix.Internals
+#include <sys/sysctl.h>
 #elif defined(mingw32_HOST_OS)
 import Control.Exception
 import Data.List
@@ -130,6 +138,45 @@ readSymbolicLink file =
             peekFilePathLen (buf,fromIntegral len)
 
 getExecutablePath = readSymbolicLink $ "/proc/self/exe"
+
+--------------------------------------------------------------------------------
+-- FreeBSD
+
+#elif defined(freebsd_HOST_OS)
+
+foreign import ccall unsafe "sysctl"
+  c_sysctl
+    :: Ptr CInt   -- MIB
+    -> CUInt      -- MIB size
+    -> Ptr CChar  -- old / current value buffer
+    -> Ptr CSize  -- old / current value buffer size
+    -> Ptr CChar  -- new value
+    -> CSize      -- new value size
+    -> IO CInt    -- result
+
+getExecutablePath = do
+  withArrayLen mib $ \n mibPtr -> do
+    let mibLen = fromIntegral n
+    alloca $ \bufSizePtr -> do
+      status <- c_sysctl mibPtr mibLen nullPtr bufSizePtr nullPtr 0
+      case status of
+        0 -> do
+          reqBufSize <- fromIntegral <$> peek bufSizePtr
+          allocaBytes reqBufSize $ \buf -> do
+            newStatus <- c_sysctl mibPtr mibLen buf bufSizePtr nullPtr 0
+            case newStatus of
+              0 -> peekFilePath buf
+              _ -> barf
+        _ -> barf
+  where
+    barf = throwErrno "getExecutablePath"
+    mib =
+      [ (#const CTL_KERN)
+      , (#const KERN_PROC)
+      , (#const KERN_PROC_PATHNAME)
+      , -1   -- current process
+      ]
+
 
 --------------------------------------------------------------------------------
 -- Windows
