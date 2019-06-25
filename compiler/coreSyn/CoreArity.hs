@@ -694,7 +694,7 @@ Consider
                            False -> \s(one-shot). e1
            in go2 x
 We *really* want to eta-expand go and go2.
-When combining the barnches of the case we have
+When combining the branches of the case we have
      ATop [] `andAT` ATop [OneShotLam]
 and we want to get ATop [OneShotLam].  But if the inner
 lambda wasn't one-shot we don't want to do this.
