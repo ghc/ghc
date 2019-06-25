@@ -2,7 +2,8 @@
  *
  * (c) The GHC Team, 1994-2000.
  *
- * Heap printer
+ * Heap printer: This is used for debugging within GDB or for emitting debug
+ * prints.
  *
  * ---------------------------------------------------------------------------*/
 
