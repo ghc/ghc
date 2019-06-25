@@ -175,7 +175,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 
 import HieAst           ( mkHieFile )
-import HieTypes         ( getAsts, hie_asts )
+import HieTypes         ( getAsts, hie_asts, hie_module )
 import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
@@ -428,11 +428,12 @@ extract_renamed_stuff mod_summary tc_result = do
             hs_env <- Hsc $ \e w -> return (e, w)
             liftIO $ do
               -- Validate Scopes
-              case validateScopes $ getAsts $ hie_asts hieFile of
+              case validateScopes (hie_module hieFile) $ getAsts $ hie_asts hieFile of
                   [] -> putMsg dflags $ text "Got valid scopes"
                   xs -> do
                     putMsg dflags $ text "Got invalid scopes"
                     mapM_ (putMsg dflags) xs
+                    putMsg dflags $ ppr $ hie_asts hieFile
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
               (file', _) <- readHieFile nc out_file
@@ -441,7 +442,7 @@ extract_renamed_stuff mod_summary tc_result = do
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do
                   putMsg dflags $ text "Got roundtrip errors"
-                  mapM_ (putMsg dflags) xs
+                  mapM_ (putMsg (dopt_set dflags Opt_D_ppr_debug)) xs
     return rn_info
 
 

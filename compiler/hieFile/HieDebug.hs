@@ -16,60 +16,42 @@ import Outputable
 import HieTypes
 import HieBin
 import HieUtils
+import Name
 
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Function    ( on )
 import Data.List        ( sortOn )
-import Data.Foldable    ( toList )
-
-ppHies :: Outputable a => (HieASTs a) -> SDoc
-ppHies (HieASTs asts) = M.foldrWithKey go "" asts
-  where
-    go k a rest = vcat $
-      [ "File: " <> ppr k
-      , ppHie a
-      , rest
-      ]
-
-ppHie :: Outputable a => HieAST a -> SDoc
-ppHie = go 0
-  where
-    go n (Node inf sp children) = hang header n rest
-      where
-        rest = vcat $ map (go (n+2)) children
-        header = hsep
-          [ "Node"
-          , ppr sp
-          , ppInfo inf
-          ]
-
-ppInfo :: Outputable a => NodeInfo a -> SDoc
-ppInfo ni = hsep
-  [ ppr $ toList $ nodeAnnotations ni
-  , ppr $ nodeType ni
-  , ppr $ M.toList $ nodeIdentifiers ni
-  ]
 
 type Diff a = a -> a -> [SDoc]
 
 diffFile :: Diff HieFile
 diffFile = diffAsts eqDiff `on` (getAsts . hie_asts)
 
-diffAsts :: (Outputable a, Eq a) => Diff a -> Diff (M.Map FastString (HieAST a))
+diffAsts :: (Outputable a, Eq a, Ord a) => Diff a -> Diff (M.Map FastString (HieAST a))
 diffAsts f = diffList (diffAst f) `on` M.elems
 
-diffAst :: (Outputable a, Eq a) => Diff a -> Diff (HieAST a)
+diffAst :: (Outputable a, Eq a,Ord a) => Diff a -> Diff (HieAST a)
 diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
     infoDiff ++ spanDiff ++ diffList (diffAst diffType) xs1 xs2
   where
     spanDiff
       | span1 /= span2 = [hsep ["Spans", ppr span1, "and", ppr span2, "differ"]]
       | otherwise = []
-    infoDiff
+    infoDiff'
       = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) info1 info2
      ++ (diffList diffType `on` nodeType) info1 info2
      ++ (diffIdents `on` nodeIdentifiers) info1 info2
+    infoDiff = case infoDiff' of
+      [] -> []
+      xs -> xs ++ [vcat ["In Node:",ppr (nodeIdentifiers info1,span1)
+                           , "and", ppr (nodeIdentifiers info2,span2)
+                        , "While comparing"
+                        , ppr (normalizeIdents $ nodeIdentifiers info1), "and"
+                        , ppr (normalizeIdents $ nodeIdentifiers info2)
+                        ]
+                  ]
+
     diffIdents a b = (diffList diffIdent `on` normalizeIdents) a b
     diffIdent (a,b) (c,d) = diffName a c
                          ++ eqDiff b d
@@ -81,10 +63,11 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
 
 type DiffIdent = Either ModuleName HieName
 
-normalizeIdents :: NodeIdentifiers a -> [(DiffIdent,IdentifierDetails a)]
-normalizeIdents = sortOn fst . map (first toHieName) . M.toList
+normalizeIdents :: Ord a => NodeIdentifiers a -> [(DiffIdent,IdentifierDetails a)]
+normalizeIdents = sortOn go . map (first toHieName) . M.toList
   where
     first f (a,b) = (fmap f a, b)
+    go (a,b) = (hieNameOcc <$> a,identInfo b,identType b)
 
 diffList :: Diff a -> Diff [a]
 diffList f xs ys
@@ -122,10 +105,32 @@ validAst (Node _ span children) = do
 
 -- | Look for any identifiers which occur outside of their supposed scopes.
 -- Returns a list of error messages.
-validateScopes :: M.Map FastString (HieAST a) -> [SDoc]
-validateScopes asts = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
+validateScopes :: Module -> M.Map FastString (HieAST a) -> [SDoc]
+validateScopes mod asts = validScopes ++ validEvLets
   where
     refMap = generateReferencesMap asts
+    -- We use a refmap for most of the computation
+
+    -- Check if everything on the RHS of an EvLet binding is also bound
+    -- somewhere in the AST
+    validEvLets = concatMap evVarInScope evletrhs
+
+    -- Check if a given evidence variable is bound
+    evVarInScope n = case M.lookup (Right n) refMap of
+          Nothing -> return $ hsep ["Local evidence variable:", ppr n
+            , "occuring in the rhs of a EvLet doesn't appear in the refmap"]
+          Just xs
+            | any (any isEvidenceBind) (map (identInfo . snd) xs) -> []
+            | otherwise -> return $ hsep ["Local evidence variable:"
+                , ppr n, "occuring in the rhs of a EvLet isn't bound in the refmap"]
+
+    -- All the evidence variables occuring on the RHS of an EvLet
+    evletrhs = S.fromList $ concatMap (evLets . identInfo . snd)
+                $ concat $ M.elems refMap
+    evLets = concatMap getEvidenceBindDeps
+
+    -- Check if all the names occur in their calculated scopes
+    validScopes = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
     valid (Left _) _ = []
     valid (Right n) refs = concatMap inScope refs
       where
@@ -134,13 +139,25 @@ validateScopes asts = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
           Just xs -> xs
           Nothing -> []
         inScope (sp, dets)
-          |  definedInAsts asts n
+          |  (definedInAsts asts n || (any isEvidenceContext (identInfo dets)))
           && any isOccurrence (identInfo dets)
+          -- We validate scopes for names which are defined locally, and occur
+          -- in this span, or are evidence variables
             = case scopes of
-              [] -> []
+              [] | any isEvidenceContext (identInfo dets)
+                   || (nameIsLocalOrFrom mod n
+                      && not (isDerivedOccName $ nameOccName n))
+                   -- If we don't get any scopes for a local name or
+                   -- an evidence variable, then its an error.
+                   -- We can ignore other kinds of derived names as
+                   -- long as we take evidence vars into account
+                   -> return $ hsep $
+                     [ "Locally defined Name", ppr n,pprDefinedAt n , "at position", ppr sp
+                     , "Doesn't have a calculated scope: ", ppr scopes]
+                 | otherwise -> []
               _ -> if any (`scopeContainsSpan` sp) scopes
                    then []
                    else return $ hsep $
-                     [ "Name", ppr n, "at position", ppr sp
+                     [ "Name", ppr n, pprDefinedAt n, "at position", ppr sp
                      , "doesn't occur in calculated scope", ppr scopes]
           | otherwise = []

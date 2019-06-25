@@ -5,9 +5,11 @@ For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 -}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 module HieTypes where
 
 import GhcPrelude
@@ -19,6 +21,7 @@ import IfaceType
 import Module                     ( ModuleName, Module )
 import Name                       ( Name )
 import Outputable hiding ( (<>) )
+import qualified Outputable as O ( (<>) )
 import SrcLoc                     ( RealSrcSpan )
 import Avail
 
@@ -210,6 +213,15 @@ instance Binary (HieASTs TypeIndex) where
   put_ bh asts = put_ bh $ M.toAscList $ getAsts asts
   get bh = HieASTs <$> fmap M.fromDistinctAscList (get bh)
 
+instance Outputable a => Outputable (HieASTs a) where
+  ppr (HieASTs asts) = M.foldrWithKey go "" asts
+    where
+      go k a rest = vcat $
+        [ "File: " O.<> ppr k
+        , ppr a
+        , rest
+        ]
+
 
 data HieAST a =
   Node
@@ -229,6 +241,11 @@ instance Binary (HieAST TypeIndex) where
     <*> get bh
     <*> get bh
 
+instance Outputable a => Outputable (HieAST a) where
+  ppr (Node ni sp ch) = hang header 2 rest
+    where
+      header = text "Node@" O.<> ppr sp O.<> ":" <+> ppr ni
+      rest = vcat (map ppr ch)
 
 -- | The information stored in one AST node.
 --
@@ -255,6 +272,22 @@ instance Binary (NodeInfo TypeIndex) where
     <*> get bh
     <*> fmap (M.fromList) (get bh)
 
+instance Outputable a => Outputable (NodeInfo a) where
+  ppr (NodeInfo anns typs idents) = braces $ fsep $ punctuate ", "
+    [ parens (text "annotations:" <+> ppr anns)
+    , parens (text "types:" <+> ppr typs)
+    , parens (text "identifier info:" <+> pprNodeIdents idents)
+    ]
+
+pprNodeIdents :: Outputable a => NodeIdentifiers a -> SDoc
+pprNodeIdents ni = braces $ fsep $ punctuate ", " $ map go $ M.toList ni
+  where
+    go (i,id) = parens $ hsep $ punctuate ", " [pprIdentifier i, ppr id]
+
+pprIdentifier :: Identifier -> SDoc
+pprIdentifier (Left mod) = text "module" <+> ppr mod
+pprIdentifier (Right name) = text "name" <+> ppr name
+
 type Identifier = Either ModuleName Name
 
 type NodeIdentifiers a = M.Map Identifier (IdentifierDetails a)
@@ -269,7 +302,7 @@ data IdentifierDetails a = IdentifierDetails
   } deriving (Eq, Functor, Foldable, Traversable)
 
 instance Outputable a => Outputable (IdentifierDetails a) where
-  ppr x = text "IdentifierDetails" <+> ppr (identType x) <+> ppr (identInfo x)
+  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x)
 
 instance Semigroup (IdentifierDetails a) where
   d1 <> d2 = IdentifierDetails (identType d1 <|> identType d2)
@@ -281,10 +314,10 @@ instance Monoid (IdentifierDetails a) where
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
-    put_ bh $ S.toAscList $ identInfo dets
+    put_ bh $ S.toList $ identInfo dets
   get bh =  IdentifierDetails
     <$> get bh
-    <*> fmap (S.fromDistinctAscList) (get bh)
+    <*> fmap S.fromList (get bh)
 
 
 -- | Different contexts under which identifiers exist
@@ -330,10 +363,47 @@ data ContextInfo
 
   -- | Record field
   | RecField RecFieldContext (Maybe Span)
-    deriving (Eq, Ord, Show)
+
+  -- | Constraint/Dictionary evidence variable binding
+  | EvidenceVarBind
+      EvVarSource  -- ^ how did this bind come into being
+      Scope        -- ^ scope over which the value is bound
+      (Maybe Span) -- ^ span of the binding site
+
+  -- | Usage of evidence variable
+  | EvidenceVarUse
+    deriving (Eq, Ord)
 
 instance Outputable ContextInfo where
-  ppr = text . show
+ ppr (Use) = text "usage"
+ ppr (MatchBind) = text "LHS of a match group"
+ ppr (IEThing x) = ppr x
+ ppr (TyDecl) = text "bound in a type signature declaration"
+ ppr (ValBind t sc sp) =
+   ppr t <+> text "value bound with scope:" <+> ppr sc <+> pprBindSpan sp
+ ppr (PatternBind sc1 sc2 sp) =
+   text "bound in a pattern with scope:"
+     <+> ppr sc1 <+> "," <+> ppr sc2
+     <+> pprBindSpan sp
+ ppr (ClassTyDecl sp) =
+   text "bound in a class type declaration" <+> pprBindSpan sp
+ ppr (Decl d sp) =
+   text "declaration of" <+> ppr d <+> pprBindSpan sp
+ ppr (TyVarBind sc1 sc2) =
+   text "type variable binding with scope:"
+     <+> ppr sc1 <+> "," <+> ppr sc2
+ ppr (RecField ctx sp) =
+   text "record field" <+> ppr ctx <+> pprBindSpan sp
+ ppr (EvidenceVarBind ctx sc sp) =
+   text "evidence variable" <+> ppr ctx
+     <+> "with scope: " <+> ppr sc
+     <+> pprBindSpan sp
+ ppr (EvidenceVarUse) =
+   text "usage of evidence variable"
+
+pprBindSpan :: Maybe Span -> SDoc
+pprBindSpan Nothing = text ""
+pprBindSpan (Just sp) = text "at:" <+> ppr sp
 
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0
@@ -367,6 +437,12 @@ instance Binary ContextInfo where
     put_ bh a
     put_ bh b
   put_ bh MatchBind = putByte bh 9
+  put_ bh (EvidenceVarBind a b c) = do
+    putByte bh 10
+    put_ bh a
+    put_ bh b
+    put_ bh c
+  put_ bh EvidenceVarUse = putByte bh 11
 
   get bh = do
     (t :: Word8) <- get bh
@@ -381,7 +457,63 @@ instance Binary ContextInfo where
       7 -> TyVarBind <$> get bh <*> get bh
       8 -> RecField <$> get bh <*> get bh
       9 -> return MatchBind
+      10 -> EvidenceVarBind <$> get bh <*> get bh <*> get bh
+      11 -> return EvidenceVarUse
       _ -> panic "Binary ContextInfo: invalid tag"
+
+data EvVarSource
+  = EvPatternBind -- ^ bound by a pattern match
+  | EvSigBind -- ^ bound by a type signature
+  | EvWrapperBind -- ^ bound by a hswrapper
+  | EvImplicitBind -- ^ bound by an implicit variable
+  | EvExternalBind -- ^ Bound by some instance
+  | EvLetBind EvBindDeps -- ^ A direct let binding
+  deriving (Eq,Ord)
+
+instance Binary EvVarSource where
+  put_ bh EvPatternBind = putByte bh 0
+  put_ bh EvSigBind = putByte bh 1
+  put_ bh EvWrapperBind = putByte bh 2
+  put_ bh EvImplicitBind = putByte bh 3
+  put_ bh EvExternalBind = putByte bh 4
+  put_ bh (EvLetBind deps) = do
+    putByte bh 5
+    put_ bh deps
+
+  get bh = do
+    (t :: Word8) <- get bh
+    case t of
+      0 -> pure EvPatternBind
+      1 -> pure EvSigBind
+      2 -> pure EvWrapperBind
+      3 -> pure EvImplicitBind
+      4 -> pure EvExternalBind
+      5 -> EvLetBind <$> get bh
+      _ -> panic "Binary EvVarSource: invalid tag"
+
+instance Outputable EvVarSource where
+  ppr EvPatternBind = text "bound by a pattern"
+  ppr EvSigBind = text "bound by a type signature"
+  ppr EvWrapperBind = text "bound by a HsWrapper"
+  ppr EvImplicitBind = text "bound by an implicit variable binding"
+  ppr EvExternalBind = text "bound by an instance"
+  ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
+
+-- | Eq/Ord instances treat all values of EvBindDeps as equal
+-- This lets EvVarSource have the correct Ord instance,
+-- as an evidence variable is let bound only once.
+newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
+  deriving Outputable
+
+instance Eq EvBindDeps where
+    _ == _ = True
+
+instance Ord EvBindDeps where
+  compare _ _ = EQ
+
+instance Binary EvBindDeps where
+  put_ bh (EvBindDeps xs) = put_ bh xs
+  get bh = EvBindDeps <$> get bh
 
 
 -- | Types of imports and exports
@@ -390,7 +522,14 @@ data IEType
   | ImportAs
   | ImportHiding
   | Export
-    deriving (Eq, Enum, Ord, Show)
+    deriving (Eq, Enum, Ord)
+
+instance Outputable IEType where
+  ppr Import = text "import"
+  ppr ImportAs = text "import as"
+  ppr ImportHiding = text "import hiding"
+  ppr Export = text "xxport"
+
 
 instance Binary IEType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
@@ -402,7 +541,13 @@ data RecFieldContext
   | RecFieldAssign
   | RecFieldMatch
   | RecFieldOcc
-    deriving (Eq, Enum, Ord, Show)
+    deriving (Eq, Enum, Ord)
+
+instance Outputable RecFieldContext where
+  ppr RecFieldDecl = text "declaration"
+  ppr RecFieldAssign = text "assignment"
+  ppr RecFieldMatch = text "pattern match"
+  ppr RecFieldOcc = text "occurence"
 
 instance Binary RecFieldContext where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
@@ -412,12 +557,15 @@ instance Binary RecFieldContext where
 data BindType
   = RegularBind
   | InstanceBind
-    deriving (Eq, Ord, Show, Enum)
+    deriving (Eq, Ord, Enum)
+
+instance Outputable BindType where
+  ppr RegularBind = "regular"
+  ppr InstanceBind = "instance"
 
 instance Binary BindType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
-
 
 data DeclType
   = FamDec     -- ^ type or data family
@@ -427,18 +575,26 @@ data DeclType
   | PatSynDec  -- ^ pattern synonym
   | ClassDec   -- ^ class declaration
   | InstDec    -- ^ instance declaration
-    deriving (Eq, Ord, Show, Enum)
+    deriving (Eq, Ord, Enum)
+
+instance Outputable DeclType where
+  ppr FamDec = text "type or data family"
+  ppr SynDec = text "type synonym"
+  ppr DataDec = text "data"
+  ppr ConDec = text "constructor "
+  ppr PatSynDec = text "pattern synonym"
+  ppr ClassDec = text "class "
+  ppr InstDec = text "instance"
 
 instance Binary DeclType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
 
-
 data Scope
   = NoScope
   | LocalScope Span
   | ModuleScope
-    deriving (Eq, Ord, Show, Typeable, Data)
+    deriving (Eq, Ord, Typeable, Data)
 
 instance Outputable Scope where
   ppr NoScope = text "NoScope"
@@ -488,9 +644,12 @@ data TyVarScope
                       -- method type signature
     deriving (Eq, Ord)
 
-instance Show TyVarScope where
-  show (ResolvedScopes sc) = show sc
-  show _ = error "UnresolvedScope"
+instance Outputable TyVarScope where
+  ppr (ResolvedScopes xs) =
+    text "type variable scopes:" <+> hsep (punctuate ", " $ map ppr xs)
+  ppr (UnresolvedScope ns sp) =
+    text "unresolved type variable scope for name" O.<> plural ns
+      <+> pprBindSpan sp
 
 instance Binary TyVarScope where
   put_ bh (ResolvedScopes xs) = do
