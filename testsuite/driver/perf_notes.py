@@ -9,6 +9,7 @@
 # (which defaults to 'local' if not given by --test-env).
 #
 
+from enum import Enum
 import colorsys
 import tempfile
 import json
@@ -62,7 +63,7 @@ PerfStat = namedtuple('PerfStat', ['test_env','test','way','metric','value'])
 # A baseline recovered form stored metrics.
 Baseline = namedtuple('Baseline', ['perfStat','commit','commitDepth'])
 
-class MetricChange:
+class MetricChange(Enum):
     NewMetric = 'NewMetric'
     NoChange = 'NoChange'
     Increase = 'Increase'
