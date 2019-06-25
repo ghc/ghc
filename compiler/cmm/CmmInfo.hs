@@ -66,15 +66,16 @@ mkEmptyContInfoTable info_lbl
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
 
-cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
-            -> IO (Stream IO RawCmmGroup ())
+cmmToRawCmm :: DynFlags -> Stream IO CmmGroup a
+            -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one uniqs cmm = do
+       ; let do_one :: UniqSupply -> [CmmDecl] -> IO (UniqSupply, [RawCmmDecl])
+             do_one uniqs cmm = do
                 case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                   (b,uniqs') -> return (uniqs',b)
                   -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-       ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
+       ; return (snd <$> Stream.mapAccumL_ do_one uniqs cmms)
        }
 
 -- Make a concrete info table, represented as a list of CmmStatic

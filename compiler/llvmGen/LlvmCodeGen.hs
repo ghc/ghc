@@ -42,8 +42,8 @@ import System.IO
 -- | Top-level of the LLVM Code generator
 --
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply
-               -> Stream.Stream IO RawCmmGroup ()
-               -> IO ()
+               -> Stream.Stream IO RawCmmGroup a
+               -> IO a
 llvmCodeGen dflags h us cmm_stream
   = withTiming (pure dflags) (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
@@ -66,12 +66,14 @@ llvmCodeGen dflags h us cmm_stream
                             $+$ text "We will try though...")
 
        -- run code generation
-       runLlvm dflags ver bufh us $
+       a <- runLlvm dflags ver bufh us $
          llvmCodeGen' (liftStream cmm_stream)
 
        bFlush bufh
 
-llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
+       return a
+
+llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup a -> LlvmM a
 llvmCodeGen' cmm_stream
   = do  -- Preamble
         renderLlvm header
@@ -80,13 +82,15 @@ llvmCodeGen' cmm_stream
 
         -- Procedures
         let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
-        _ <- Stream.collect llvmStream
+        (_, a) <- Stream.collect_ llvmStream
 
         -- Declare aliases for forward references
         renderLlvm . pprLlvmData =<< generateExternDecls
 
         -- Postamble
         cmmUsedLlvmGens
+
+        return a
   where
     header :: SDoc
     header = sdocWithDynFlags $ \dflags ->
