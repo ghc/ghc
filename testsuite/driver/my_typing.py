@@ -41,3 +41,5 @@ IssueNumber = NewType("IssueNumber", int)
 # Used by perf_notes
 GitHash = NewType("GitHash", str)
 GitRef = NewType("GitRef", str)
+TestEnv = NewType("TestEnv", str)
+MetricName = NewType("MetricName", str)
