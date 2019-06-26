@@ -302,12 +302,10 @@ warnUnusedPackages = do
     let warn = makeIntoWarning
           (Reason Opt_WarnUnusedPackages)
           (mkPlainErrMsg dflags noSrcSpan msg)
-        msg = hang
-          ( text "The following packages were specified "
-            <> text "via -package or -package-id flags, "
-            <> text "but were not needed for compilation: ")
-          4
-          (sep (map pprUnusedArg unusedArgs))
+        msg = vcat [ text "The following packages were specified" <+>
+                     text "via -package or -package-id flags,"
+                   , text "but were not needed for compilation:"
+                   , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
 
     when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
       logWarnings (listToBag [warn])
@@ -318,6 +316,8 @@ warnUnusedPackages = do
 
         pprUnusedArg (PackageArg str) = text str
         pprUnusedArg (UnitIdArg uid) = ppr uid
+
+        withDash = (<+>) (text "-")
 
         matchingStr :: String -> PackageConfig -> Bool
         matchingStr str p

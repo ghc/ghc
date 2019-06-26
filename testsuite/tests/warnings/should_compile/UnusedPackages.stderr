@@ -2,5 +2,8 @@
 Linking UnusedPackages ...
 
 <no location info>: warning: [-Wunused-packages]
-    The following packages were specified via -package or -package-id flags, but were not needed for compilation: 
-        bytestring
+     The following packages were specified via -package or -package-id flags,
+     but were not needed for compilation:
+       - ghc
+       - process
+       - bytestring
