@@ -581,9 +581,9 @@ instance Outputable DeclType where
   ppr FamDec = text "type or data family"
   ppr SynDec = text "type synonym"
   ppr DataDec = text "data"
-  ppr ConDec = text "constructor "
+  ppr ConDec = text "constructor"
   ppr PatSynDec = text "pattern synonym"
-  ppr ClassDec = text "class "
+  ppr ClassDec = text "class"
   ppr InstDec = text "instance"
 
 instance Binary DeclType where

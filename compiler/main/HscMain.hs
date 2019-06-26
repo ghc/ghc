@@ -422,6 +422,7 @@ extract_renamed_stuff mod_summary tc_result = do
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
+        liftIO $ dumpIfSet_dyn dflags Opt_D_dump_hie "HIE AST" (ppr $ hie_asts hieFile)
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
@@ -433,7 +434,6 @@ extract_renamed_stuff mod_summary tc_result = do
                   xs -> do
                     putMsg dflags $ text "Got invalid scopes"
                     mapM_ (putMsg dflags) xs
-                    putMsg dflags $ ppr $ hie_asts hieFile
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
               (file', _) <- readHieFile nc out_file

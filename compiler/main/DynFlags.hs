@@ -459,6 +459,7 @@ data DumpFlag
    | Opt_D_dump_str_signatures
    | Opt_D_dump_tc
    | Opt_D_dump_tc_ast
+   | Opt_D_dump_hie
    | Opt_D_dump_types
    | Opt_D_dump_rules
    | Opt_D_dump_cse
@@ -3398,6 +3399,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_tc)
   , make_ord_flag defGhcFlag "ddump-tc-ast"
         (setDumpFlag Opt_D_dump_tc_ast)
+  , make_ord_flag defGhcFlag "ddump-hie"
+        (setDumpFlag Opt_D_dump_hie)
   , make_ord_flag defGhcFlag "ddump-types"
         (setDumpFlag Opt_D_dump_types)
   , make_ord_flag defGhcFlag "ddump-rules"
