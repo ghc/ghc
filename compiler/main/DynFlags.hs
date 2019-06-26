@@ -320,7 +320,7 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if defined(HAVE_INTERPRETER)
+#if STAGE >= 2
 import Foreign (Ptr)
 #endif
 
