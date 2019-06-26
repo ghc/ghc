@@ -16,6 +16,8 @@ import Target
 import Utilities
 import Rules.Library
 
+import Debug.Trace
+
 -- | TODO: Drop code duplication
 buildProgramRules :: [(Resource, Int)] -> Rules ()
 buildProgramRules rs = do
@@ -96,8 +98,10 @@ buildProgram bin ctx@(Context{..}) rs = do
   -- but when building the program, we link against the *ghc-pkg registered* library e.g.
   --    _build/stage1/lib/x86_64-linux-ghc-8.9.0.20190430/libHShaskeline-0.7.5.0-ghc8.9.0.20190430.so
   -- so we use pkgRegisteredLibraryFile instead.
-  need =<< mapM pkgRegisteredLibraryFile
+  {-
+  need =<< mapM pkgRegisteredLibraryFile . traceShowId
        =<< contextDependencies ctx
+       -}
 
   cross <- flag CrossCompiling
   -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.

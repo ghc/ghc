@@ -22,6 +22,7 @@ import Utilities
 import Rules.Library
 import Hadrian.Oracles.Cabal
 import Hadrian.Haskell.Cabal.Type
+import Hadrian.Haskell.Cabal.Parse
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
@@ -47,12 +48,6 @@ simplePackageTargets rs = traverse_ (simpleTarget rs) targets
                   , boot <- if isLibrary target then [False, True] else [False]
                   ]
 
-simpleTargetString :: Bool -> Stage -> Package -> String
-simpleTargetString boot stage target =
-  intercalate ":" [stagestr, typ, pkgname]
-  where typ = if isLibrary target then (if boot then "boot" else "lib") else "exe"
-        stagestr = stageString stage
-        pkgname = pkgName target
 
 
 
@@ -79,7 +74,7 @@ getProgramPath stage pkg = programPath (vanillaContext (pred stage) pkg)
 
 libraryRule rs boot stage pkg = do
   conf <- getLibraryPath stage pkg
-  produces [conf]
+--  produces [conf]
   liftIO $ print ("Needing", conf)
   historyDisable
   let libpath = takeDirectory (takeDirectory conf)

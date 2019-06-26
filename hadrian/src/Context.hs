@@ -9,7 +9,7 @@ module Context (
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgLibraryFile, pkgGhciLibraryFile,
     pkgConfFile, objectPath, contextPath, getContextPath, libPath, distDir,
-    haddockStatsFilesDir
+    haddockStatsFilesDir, pkgSimpleTarget, simpleTargetString
     ) where
 
 import Base
@@ -122,6 +122,9 @@ pkgConfFile Context {..} = do
     dbPath <- packageDbPath stage
     return $ dbPath -/- pid <.> "conf"
 
+pkgSimpleTarget :: Context -> String
+pkgSimpleTarget Context{..} = simpleTargetString False stage package
+
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:
 -- * "Task.c"                              -> "_build/stage1/rts/Task.thr_o"
@@ -136,3 +139,10 @@ objectPath context@Context {..} src = do
                | "*hs*" ?== extension = path -/- obj
                | otherwise            = path -/- extension -/- obj
     return result
+
+simpleTargetString :: Bool -> Stage -> Package -> String
+simpleTargetString boot stage target =
+  intercalate ":" [stagestr, typ, pkgname]
+  where typ = if isLibrary target then (if boot then "boot" else "lib") else "exe"
+        stagestr = stageString stage
+        pkgname = pkgName target

@@ -223,9 +223,9 @@ libffiLibraryName = do
 
 -- | Generated header files required by GHC in runtime.
 generatedGhcDependencies :: Stage -> Action [FilePath]
-generatedGhcDependencies stage = return [] {- do
+generatedGhcDependencies stage =  do
     let context = vanillaContext stage compilerBoot
     bh <- buildPath   context <&> (-/- "ghc_boot_platform.h")
     ch <- contextPath context <&> (-/- "ghc_boot_platform.h")
     is <- includesDependencies
-    return $ is ++ [bh, ch] -}
+    return $ is ++ [bh, ch]

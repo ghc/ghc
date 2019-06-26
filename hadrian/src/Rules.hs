@@ -94,7 +94,7 @@ topLevelTargets = action $ do
     -- not support multiple targets, where a cabal package has
     -- a library /and/ a program.
     path :: Stage -> Package -> Action FilePath
-    path stage pkg | isLibrary pkg = pkgConfFile (vanillaContext stage pkg)
+    path stage pkg | isLibrary pkg = return  $ pkgSimpleTarget (vanillaContext stage pkg)
                    | otherwise     = programPath =<< programContext stage pkg
     name :: Stage -> Package -> Action String
     name stage pkg | isLibrary pkg = return (pkgName pkg)

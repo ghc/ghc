@@ -45,7 +45,7 @@ import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
 import Hadrian.Target
-import Rules.SimpleTargets
+--import Rules.SimpleTargets
 
 import Base
 import Builder
@@ -53,6 +53,24 @@ import Context
 import Flavour
 import Packages
 import Settings
+
+import Base
+import Context
+import Hadrian.BuildPath
+import Hadrian.Expression
+import Hadrian.Haskell.Cabal
+import Oracles.Setting
+import Packages
+import Rules.Gmp
+import Rules.Rts
+import Settings
+import Target
+import Utilities
+import Rules.Library
+import Hadrian.Oracles.Cabal
+import Hadrian.Haskell.Cabal.Type
+
+import qualified System.Directory            as IO
 
 -- | Parse the Cabal file of a given 'Package'. This operation is cached by the
 -- "Hadrian.Oracles.TextFile.readPackageData" oracle.
@@ -128,8 +146,8 @@ configurePackage context@Context {..} = do
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
     -- We'll need those packages in our package database.
-    deps <- sequence [ simpleTargetString False stage pkg
-                     | pkg <- depPkgs', pkg `elem` stagePkgs ]
+    let deps =  [ simpleTargetString True stage pkg
+                | pkg <- depPkgs', pkg `elem` stagePkgs ]
     liftIO $ print deps
     need deps
 
@@ -246,11 +264,13 @@ buildConf _ context@Context {..} conf = do
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
-    liftIO $ print ("Copying conf", conf)
+    liftIO $ print ("Copying conf", conf, context)
     depPkgIds <- fmap stdOutToPkgIds . askWithResources rs $
         target context (GhcPkg Dependencies stage) [pkgName package] []
     liftIO $ print ("Deps", depPkgIds)
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
+    let norm "rts" = "rts"
+        norm  x = reverse .  drop 1 . dropWhile (/= '-') . reverse $ x
+    need $ map (\pkgId -> "stage0:boot:" ++ norm pkgId) depPkgIds
     -- We should unregister if the file exists since @ghc-pkg@ will complain
     -- about existing package: https://github.com/snowleopard/hadrian/issues/543.
     -- Also, we don't always do the unregistration + registration to avoid

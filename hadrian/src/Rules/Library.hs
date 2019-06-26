@@ -41,9 +41,11 @@ registerStaticLib root archivePath = do
         <- parsePath (parseGhcPkgLibA root)
                     "<.a library (register) path parser>"
                     archivePath
-    need [ root -/- relativePackageDbPath stage
-                -/- (pkgId name version) ++ ".conf"
-         ]
+    need []
+--    need [ stagePackageString _ _ _
+--          root -/- relativePackageDbPath stage
+--                -/- (pkgId name version) ++ ".conf"
+--         ]
 
 -- | Build a static library ('LibA') under the given build root, whose path is
 -- the second argument.
