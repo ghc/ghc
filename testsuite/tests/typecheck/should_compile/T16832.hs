@@ -9,21 +9,22 @@
 
 module WorkingGenerics where
 import GHC.Generics
+import Data.Kind
 
--- type family DiffT (p :: * -> *) :: * -> *
+-- type family DiffT (p :: Type -> Type) :: Type -> Type
 
 data Void  deriving(Generic)
 
 class Diff a  where
-  type family Patch a :: *
+  type family Patch a :: Type
   type Patch a = GPatch (Rep a) a
 
   diff :: a -> a -> Patch a
   default diff :: (Generic a, GDiff (Rep a), Patch a ~ (GPatch (Rep a)) a) => a -> a -> Patch a
   diff a a' = gdiff (from a) (from a')
 
-class GDiff (gen :: * -> *)  where
-  type family GPatch gen :: * -> *
+class GDiff (gen :: Type -> Type)  where
+  type family GPatch gen :: Type -> Type
   gdiff :: gen a -> gen a -> (GPatch gen) a
 
 instance GDiff V1 where
