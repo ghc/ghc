@@ -395,22 +395,16 @@ updateIfaceCafInfos mod_iface0 caf_infos =
           NoInfo
 
         update_id_info False NoInfo =
-          pprTrace "updateIfaceCafInfos" (text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name) $
-            HasInfo [HsNoCafRefs]
+          WARN( True, text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name )
+          HasInfo [HsNoCafRefs]
 
-        update_id_info True (HasInfo infos)
-          | any isHsNoCafRefs infos
-          = pprTrace "updateIfaceCafInfos" (text "WARNING: Turning non-CAFFY name into CAFFY:" <+> ppr name) $
-              HasInfo (filterOut isHsNoCafRefs infos)
-          | otherwise
-          = HasInfo infos
+        update_id_info True (HasInfo infos) =
+          WARN( any isHsNoCafRefs infos, text "WARNING: Turning non-CAFFY name into CAFFY:" <+> ppr name )
+          HasInfo (filterOut isHsNoCafRefs infos)
 
-        update_id_info False (HasInfo infos)
-          | not (any isHsNoCafRefs infos)
-          = pprTrace "updateIfaceCafInfos" (text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name) $
-              HasInfo (HsNoCafRefs : infos)
-          | otherwise
-          = HasInfo infos
+        update_id_info False (HasInfo infos) =
+          WARN( not (any isHsNoCafRefs infos), text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name )
+          HasInfo (HsNoCafRefs : infos)
       in
         case lookupNameEnv caf_infos name of
           Nothing ->
