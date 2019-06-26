@@ -320,8 +320,8 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if defined(HAVE_INTERPRETER)
-import Foreign (Ptr)
+#if STAGE >= 2
+import Foreign (Ptr) -- used by SHARED_GLOBAL_VAR
 #endif
 
 -- Note [Updating flag description in the User's Guide]
