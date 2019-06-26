@@ -764,8 +764,10 @@ checkStability hpt sccs all_home_mods =
 
         object_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
-                                         && same_as_prev t
+          | Just t <- ms_obj_date ms  =
+            validTimestamp (ms_hs_date ms) &&
+            t >= ms_hs_date ms &&
+            same_as_prev t
           | otherwise = False
           where
              same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
@@ -789,6 +791,22 @@ checkStability hpt sccs all_home_mods =
                         not (isObjectLinkable l) &&
                         linkableTime l >= ms_hs_date ms
                 _other  -> False
+
+
+-- Ignore a source timestamp if it is older than 2000. Certain
+-- build systems don't retain timestamps on generated source
+-- files retrieved from cache; the right way to fix this would
+-- be to use hashed file contents rather than a timestamp, but
+-- for now this heuristic suffices to ignore these bogus
+-- timestamps.
+validTimestamp :: UTCTime -> Bool
+validTimestamp t = t >= ancientTime
+  where
+  ancientTime = UTCTime
+    { utctDay = fromGregorian 2000 1 1
+    , utctDayTime = 0
+    }
+
 
 {- Parallel Upsweep
  -
@@ -1544,6 +1562,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
             (target /= HscNothing) `implies` not is_fake_linkable,
+            validTimestamp hs_date,
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
@@ -1562,6 +1581,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           --
           | isObjectTarget target,
             Just obj_date <- mb_obj_date,
+            validTimestamp hs_date,
             obj_date >= hs_date -> do
                 case old_hmi of
                   Just hmi
@@ -1579,6 +1599,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           -- See Note [Recompilation checking in -fno-code mode]
           | writeInterfaceOnlyMode dflags,
             Just if_date <- mb_if_date,
+            validTimestamp hs_date,
             if_date >= hs_date -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "skipping tc'd mod:" <+> ppr this_mod_name)
