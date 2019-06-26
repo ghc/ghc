@@ -17,6 +17,8 @@ module MkIface (
 
         writeIfaceFile, -- Write the interface file
 
+        updateIfaceCafInfos,
+
         checkOldIface,  -- See if recompilation is required, by
                         -- comparing version information
         RecompileRequired(..), recompileRequired,
@@ -119,6 +121,7 @@ import Data.Ord
 import Data.IORef
 import System.Directory
 import System.FilePath
+import Data.Bifunctor (second)
 import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
@@ -372,6 +375,58 @@ writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIfaceFile dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
+
+
+-- -----------------------------------------------------------------------------
+-- Update iface with given CafInfos
+
+-- FIXME (osa): Refactor types to make this efficient
+updateIfaceCafInfos :: ModIface -> NameEnv (Name, Bool) -> ModIface
+updateIfaceCafInfos mod_iface0 caf_infos =
+    mod_iface0{ mi_decls = map (second update_caf_info) (mi_decls mod_iface0) }
+  where
+    update_caf_info :: IfaceDecl -> IfaceDecl
+
+    update_caf_info id@(IfaceId name ty id_details id_info) =
+      let
+        update_id_info :: Bool -> IfaceIdInfo -> IfaceIdInfo
+
+        update_id_info True NoInfo =
+          NoInfo
+
+        update_id_info False NoInfo =
+          pprTrace "updateIfaceCafInfos" (text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name) $
+            HasInfo [HsNoCafRefs]
+
+        update_id_info True (HasInfo infos)
+          | any isHsNoCafRefs infos
+          = pprTrace "updateIfaceCafInfos" (text "WARNING: Turning non-CAFFY name into CAFFY:" <+> ppr name) $
+              HasInfo (filterOut isHsNoCafRefs infos)
+          | otherwise
+          = HasInfo infos
+
+        update_id_info False (HasInfo infos)
+          | not (any isHsNoCafRefs infos)
+          = pprTrace "updateIfaceCafInfos" (text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name) $
+              HasInfo (HsNoCafRefs : infos)
+          | otherwise
+          = HasInfo infos
+      in
+        case lookupNameEnv caf_infos name of
+          Nothing ->
+            pprTrace "updateIfaceCafInfos"
+              (text "Can't find iface name" <+> ppr name <+> text "in CAF env")
+              id
+          Just (_, caffy) ->
+            pprTrace "updateIfaceCafInfos"
+              (text "Updating iface name " <+> ppr name) $
+            IfaceId name ty id_details (update_id_info caffy id_info)
+
+    update_caf_info id
+      = id
+
+    isHsNoCafRefs HsNoCafRefs = True
+    isHsNoCafRefs _ = False
 
 
 -- -----------------------------------------------------------------------------

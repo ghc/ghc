@@ -67,6 +67,8 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
+import MkIface          ( updateIfaceCafInfos )
+import CmmBuildInfoTables ( cafInfos )
 
 import Exception
 import System.Directory
@@ -210,7 +212,7 @@ compileOne' m_tc_result mHscMessage
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
             return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, HscInterpreted) -> do
+        (HscRecomp cgguts summary mod_iface, HscInterpreted) -> do
             (hasStub, comp_bc, spt_entries) <-
                 hscInteractive hsc_env cgguts summary
 
@@ -231,7 +233,7 @@ compileOne' m_tc_result mHscMessage
             let linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
             return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, _) -> do
+        (HscRecomp cgguts summary mod_iface, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -239,7 +241,7 @@ compileOne' m_tc_result mHscMessage
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
+                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary mod_iface)))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -1149,19 +1151,21 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
-            HscRecomp cgguts mod_summary
+            HscRecomp cgguts mod_summary mod_iface
               -> do output_fn <- phaseOutputFilename next_phase
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, mod_srt_info) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
-                    return (RealPhase next_phase, outputFilename)
+                    let iface' = updateIfaceCafInfos mod_iface (cafInfos mod_srt_info)
+                    pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
+                      return (RealPhase next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
 -- Cmm phase

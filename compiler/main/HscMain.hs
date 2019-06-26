@@ -809,7 +809,7 @@ finish summary tc_result mb_old_hash = do
             desugared_guts <- hscSimplify' plugins desugared_guts0
             (iface, no_change, details, cgguts) <-
               liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
-            return (iface, no_change, details, HscRecomp cgguts summary)
+            return (iface, no_change, details, HscRecomp cgguts summary iface)
       else mk_simple_iface
   liftIO $ hscMaybeWriteIface dflags iface no_change summary
   return
@@ -1340,7 +1340,7 @@ hscWriteIface dflags iface no_change mod_summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], ModuleSRTInfo)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1402,7 +1402,9 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+
+            pprTrace "hscGenHardCode" (text "Module CafInfos:" <+> ppr (cafInfos mod_srt_info)) $
+              return (output_filename, stub_c_exists, foreign_fps, mod_srt_info)
 
 
 hscInteractive :: HscEnv

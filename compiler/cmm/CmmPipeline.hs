@@ -28,6 +28,7 @@ import Control.Monad
 import Outputable
 import Platform
 
+import Name
 import NameEnv
 import MonadUtils (mapAccumLM)
 
@@ -55,7 +56,7 @@ cmmPipeline hsc_env srtInfo0 prog =
      return (srtInfo2, cmms)
 
 
-cpsTop :: HscEnv -> NameEnv Bool -> CmmDecl -> IO (NameEnv Bool, (CAFEnv, [CmmDecl]))
+cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (NameEnv (Name, Bool), (CAFEnv, [CmmDecl]))
 cpsTop _ caf_infos p@(CmmData {}) = return (caf_infos, (mapEmpty, [p]))
 cpsTop hsc_env caf_infos0 proc@(CmmProc top_info _ _ _) =
     do

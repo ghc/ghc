@@ -226,7 +226,7 @@ data HscStatus
     | HscUpToDate
     | HscUpdateBoot
     | HscUpdateSig
-    | HscRecomp CgGuts ModSummary
+    | HscRecomp CgGuts ModSummary ModIface
 
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
