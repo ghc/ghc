@@ -14,6 +14,15 @@ source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc
 
+-- To accomodate #16873
+flag threaded
+    manual:              True
+    default:             True
+    description:         Build with the threaded runtime for improved
+                         performance. Users with bootstrap compilers
+                         which don't support the threaded runtime should
+                         disable this flag.
+
 executable hadrian
     main-is:             Main.hs
     hs-source-dirs:      .
@@ -142,6 +151,9 @@ executable hadrian
                        -Wredundant-constraints
                        -fno-warn-name-shadowing
                        -rtsopts
+
+    if flag(threaded)
+      ghc-options:
                        -- * -I0: Disable idle GC to avoid redundant GCs while
                        --        waiting for external processes
                        -- * -qg: Don't use parallel GC as the synchronization
