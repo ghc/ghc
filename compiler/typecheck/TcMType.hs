@@ -1337,6 +1337,7 @@ collect_cand_qtvs_co bound = go_co
     go_prov dv (PhantomProv co)    = go_co dv co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv
+    go_prov dv (ZappedProv fvs)    = foldlM go_cv dv (dVarSetElems fvs)
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv

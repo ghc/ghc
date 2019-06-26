@@ -1649,10 +1649,10 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | ZappedProv DVarSet
+  | ZappedProv { zappedFreeCvs :: DCoVarSet }
     -- ^ See Note [Zapping coercions].
-    -- Free coercion variables must be tracked in 'DVarSet' since
-    -- they appear in interface files.
+    -- Free variables must be tracked in 'DVarSet' since they appear in
+    -- interface files. See Note [Deterministic UniqFM] for details.
 
   deriving Data.Data
 
@@ -2006,6 +2006,8 @@ mkZappedCoercion dflags co (Pair ty1 ty2) role fCvs
     , text "real free co vars:" <+> ppr real_fCvs
     , text "given free co vars:" <+> ppr fCvs
     ]
+  | debugIsOn && not (allDVarSet isCoVar fCvs) =
+    pprPanic "mkZappedCoercion" $ text "non-covar in free variable list:" <+> ppr fCvs
   | shouldBuildCoercions dflags = co
   | otherwise =
     mkUnivCo (ZappedProv fCvs) role ty1 ty2
@@ -2246,7 +2248,7 @@ ty_co_vars_of_prov (PhantomProv co)    is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_prov (ProofIrrelProv co) is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_prov UnsafeCoerceProv    _  acc = acc
 ty_co_vars_of_prov (PluginProv _)      _  acc = acc
-ty_co_vars_of_prov (ZappedProv fvs)    _  acc = dVarSetToVarSet fvs
+ty_co_vars_of_prov (ZappedProv fvs)    _  acc = dVarSetToVarSet fvs `unionDVarSet` dVarSetToVarSet acc
 
 -- | Generates an in-scope set from the free variables in a list of types
 -- and a list of coercions
