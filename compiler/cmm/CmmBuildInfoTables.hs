@@ -40,6 +40,7 @@ import Data.Tuple
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 
+import Name
 import NameEnv
 
 {- Note [SRTs]
@@ -398,10 +399,10 @@ cafAnal
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
-  -> NameEnv Bool -- CAFFY-ness env
+  -> NameEnv (Name, Bool) -- CAFFY-ness env
   -> Bool       -- True <=> Updatable
   -> CmmGraph
-  -> (NameEnv Bool, CAFEnv)
+  -> (NameEnv (Name, Bool), CAFEnv)
 cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
     pprTrace "cafAnal" (ppr ret) (caf_infos1, ret)
   where
@@ -414,7 +415,7 @@ cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
     caf_infos1
       | Just nm <- hasHaskellName topLbl
       = pprTrace "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr ret_caffy) $
-          extendNameEnv caf_infos0 nm ret_caffy
+          extendNameEnv caf_infos0 nm (nm, ret_caffy)
       | otherwise
       = caf_infos0
 
@@ -426,7 +427,7 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: LabelSet -> Label -> CLabel -> NameEnv Bool -> TransferFun CAFSet
+cafTransfers :: LabelSet -> Label -> CLabel -> NameEnv (Name, Bool) -> TransferFun CAFSet
 cafTransfers contLbls entry topLbl caf_infos
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
@@ -468,7 +469,7 @@ cafTransfers contLbls entry topLbl caf_infos
         add :: CLabel -> Set CAFLabel -> Set CAFLabel
         add l s
           | Just nm <- hasHaskellName l
-          , Just caffy <- lookupNameEnv caf_infos nm
+          , Just (_, caffy) <- lookupNameEnv caf_infos nm
           = if caffy then
               pprTrace "cafTransfers.add" (text "CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
                 Set.insert (mkCAFLabel l) s
@@ -507,7 +508,7 @@ data ModuleSRTInfo = ModuleSRTInfo
     -- entries. e.g.  if we have an SRT [a,b,c], and we know that b
     -- points to [c,d], we can omit c and emit [a,b].
     -- Used to implement the [Filter] optimisation.
-  , cafInfos :: NameEnv Bool
+  , cafInfos :: NameEnv (Name, Bool)
   }
 
 instance Outputable ModuleSRTInfo where
