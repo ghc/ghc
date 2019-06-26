@@ -657,9 +657,9 @@ tcDataFamInstDecl mb_clsinfo
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in FamInstEnv
        ; (qtvs, pats, res_kind, stupid_theta)
-             <- tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs
-                                fixity hs_ctxt hs_pats m_ksig hs_cons
-                                new_or_data
+             <- tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs
+                                    fixity hs_ctxt hs_pats m_ksig hs_cons
+                                    new_or_data
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Eta-reduction for data families]
@@ -779,16 +779,18 @@ tcDataFamInstDecl mb_clsinfo
 tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
 -----------------------
-tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
-                -> LexicalFixity -> LHsContext GhcRn
-                -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
-                -> NewOrData
-                -> TcM ([TyVar], [Type], Kind, ThetaType)
--- The "header" is the part other than the data constructors themselves
--- e.g.  data instance D [a] :: * -> * where ...
+tcDataFamInstHeader
+    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
+    -> LexicalFixity -> LHsContext GhcRn
+    -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
+    -> NewOrData
+    -> TcM ([TyVar], [Type], Kind, ThetaType)
+-- The "header" of a data family instance is the part other than
+-- the data constructors themselves
+--    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
-tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt
-                hs_pats m_ksig hs_cons new_or_data
+tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
+                    hs_ctxt hs_pats m_ksig hs_cons new_or_data
   = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
@@ -803,8 +805,10 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt
 
                   -- Add constraints from the result signature
                   ; res_kind <- tc_kind_sig m_ksig
+
                   -- Add constraints from the data constructors
-                  ; mapM_ (wrapLocM_ (kcConDecl new_or_data res_kind)) hs_cons
+                  ; kcConDecls new_or_data res_kind hs_cons
+
                   ; lhs_ty <- checkExpectedKind_pp pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty) }
 
@@ -829,7 +833,7 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt
        -- the body of unravelFamInstPats.
        ; pats <- case splitTyConApp_maybe lhs_ty of
            Just (_, pats) -> pure pats
-           Nothing -> pprPanic "tcDataFamHeader" (ppr lhs_ty)
+           Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
        ; return (qtvs, pats, typeKind lhs_ty, stupid_theta) }
           -- See Note [Unifying data family kinds] about why we need typeKind here
   where
@@ -886,7 +890,7 @@ is always redundant (except, perhaps, in that it helps guide unification). We
 have a definitive kind for the data family from the data family declaration,
 and so we learn nothing really new from the kind signature on an instance.
 We still must perform this unification (done in the call to checkExpectedKind
-toward the beginning of tcDataFamHeader), but the result is unhelpful. If there
+toward the beginning of tcDataFamInstHeader), but the result is unhelpful. If there
 is a cast, it will wrap the lhs_ty, and so we just drop it before splitting the
 lhs_ty to reveal the underlying patterns. Because of the potential of dropping
 a cast like this, we just use typeKind in the result instead of propagating res_kind

@@ -15,7 +15,7 @@ module TcTyClsDecls (
 
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
-        kcConDecl, tcConDecls, dataDeclChecks, checkValidTyCon,
+        kcConDecls, tcConDecls, dataDeclChecks, checkValidTyCon,
         tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         unravelFamInstPats, addConsistencyConstraints,
@@ -1148,8 +1148,7 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
                , dd_ND = new_or_data } <- defn
   = do { tyCon <- kcLookupTcTyCon name
          -- See Note [Implementation of UnliftedNewtypes] STEP 2
-       ; (_, final_res_kind) <- etaExpandAlgTyCon (tyConBinders tyCon) (tyConResKind tyCon)
-       ; mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
+       ; kcConDecls new_or_data (tyConResKind tyCon) cons
        }
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
     -- This must be a GADT-style decl,
@@ -1164,7 +1163,7 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
   = bindTyClTyVars name $ \ _ _ ->
     do { _ <- tcHsContext ctxt
        ; tyCon <- kcLookupTcTyCon name
-       ; mapM_ (wrapLocM_ (kcConDecl new_or_data (tyConResKind tyCon))) cons
+       ; kcConDecls new_or_data (tyConResKind tyCon) cons
        }
 
 kcTyClDecl (SynDecl { tcdLName = dL->L _ name, tcdRhs = rhs })
@@ -1233,16 +1232,27 @@ kcConArgTys new_or_data res_kind arg_tys = do
       unifyNewtypeKind dflags new_or_data arg_tys arg_tc_tys res_kind
   }
 
+kcConDecls :: NewOrData
+           -> Kind             -- The result kind signature
+           -> [LConDecl GhcRn] -- The data constructors
+           -> TcM ()
+kcConDecls new_or_data res_kind cons
+  = mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
+  where
+    (_, final_res_kind) = splitPiTys res_kind
+        -- See Note [kcConDecls result kind]
+
 -- Kind check a data constructor. In additional to the data constructor,
 -- we also need to know about whether or not its corresponding type was
 -- declared with data or newtype, and we need to know the result kind of
 -- this type. See Note [Implementation of UnliftedNewtypes] for why
 -- we need the first two arguments.
-kcConDecl ::
-     NewOrData -- Was the corresponding type declared with data or newtype?
-  -> Kind -- The result kind of the corresponding type constructor
-  -> ConDecl GhcRn -- The data constructor
-  -> TcM ()
+kcConDecl :: NewOrData
+          -> Kind  -- Result kind of the type constructor
+                   -- Usually Type but can be TYPE UnliftedRep
+                   -- or even TYPE r, in the case of unlifted newtype
+          -> ConDecl GhcRn
+          -> TcM ()
 kcConDecl new_or_data res_kind (ConDeclH98
   { con_name = name, con_ex_tvs = ex_tvs
   , con_mb_cxt = ex_ctxt, con_args = args })
@@ -1251,8 +1261,8 @@ kcConDecl new_or_data res_kind (ConDeclH98
     bindExplicitTKBndrs_Tv ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
-         -- We don't need to check the telescope here, because that's
-         -- done in tcConDecl
+         -- We don't need to check the telescope here,
+         -- because that's done in tcConDecl
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
@@ -1260,8 +1270,8 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     , con_args = args, con_res_ty = res_ty })
   | HsQTvs { hsq_ext = implicit_tkv_nms
            , hsq_explicit = explicit_tkv_nms } <- qtvs
-  = -- Even though the data constructor's type is closed, we
-    -- must still kind-check the type, because that may influence
+  = -- Even though the GADT-style data constructor's type is closed,
+    -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
     --    data T f a where
     --      MkT :: f a -> T f a
@@ -1279,7 +1289,31 @@ kcConDecl new_or_data res_kind (ConDeclGADT
 kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _) = noExtCon nec
 kcConDecl _ _ (XConDecl nec) = noExtCon nec
 
-{-
+{- Note [kcConDecls result kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We might have e.g.
+    data T a :: Type -> Type where ...
+or
+    newtype instance N a :: Type -> Type  where ..
+in which case, the 'res_kind' passed to kcConDecls will be
+   Type->Type
+
+We must look past those arrows, or even foralls, to the Type in the
+corner, to pass to kcConDecl c.f. #16828. Hence the splitPiTys here.
+
+I am a bit concerned about tycons with a declaration like
+   data T a :: Type -> forall k. k -> Type  where ...
+
+It does not have a CUSK, so kcLHsQTyVars_NonCusk will make a TcTyCon
+with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
+the splitPiTys will look past the forall.  But I'm bothered about
+what if the type "in the corner" metions k?  This is incredibly
+obscure but something like this could be bad:
+   data T a :: Type -> foral k. k -> TYPE (F k) where ...
+
+I bet we are not quite right here, but my brain suffered a buffer
+overflow and I thought it best to nail the common cases right now.
+
 Note [Recursion and promoting data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't want to allow promotion in a strongly connected component
@@ -1503,7 +1537,7 @@ the H98 syntax doesn't permit a kind signature on the newtype itself.
 2. In a newtype instance (with -XUnliftedNewtypes), if the user does
    not write a kind signature, we want to allow the possibility that
    the kind is not Type, so we use newOpenTypeKind instead of liftedTypeKind.
-   This is done in tcDataFamHeader in TcInstDcls. Example:
+   This is done in tcDataFamInstHeader in TcInstDcls. Example:
 
        data family Bar (a :: RuntimeRep) :: TYPE a
        newtype instance Bar 'IntRep = BarIntC Int#
@@ -2277,7 +2311,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
        -- This code (and the stuff immediately above) is very similar
-       -- to that in tcDataFamHeader.  Maybe we should abstract the
+       -- to that in tcDataFamInstHeader.  Maybe we should abstract the
        -- common code; but for the moment I concluded that it's
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
