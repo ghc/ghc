@@ -404,7 +404,7 @@ cafAnal
   -> CmmGraph
   -> (NameEnv (Name, Bool), CAFEnv)
 cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
-    pprTrace "cafAnal" (ppr ret) (caf_infos1, ret)
+    srtTrace2 "cafAnal" (ppr ret) (caf_infos1, ret)
   where
     ret =
       analyzeCmmBwd cafLattice
@@ -414,7 +414,7 @@ cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
 
     caf_infos1
       | Just nm <- hasHaskellName topLbl
-      = pprTrace "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr ret_caffy) $
+      = srtTrace2 "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr ret_caffy) $
           extendNameEnv caf_infos0 nm (nm, ret_caffy)
       | otherwise
       = caf_infos0
@@ -471,26 +471,26 @@ cafTransfers contLbls entry topLbl caf_infos
           | Just nm <- hasHaskellName l
           , Just (_, caffy) <- lookupNameEnv caf_infos nm
           = if caffy then
-              pprTrace "cafTransfers.add" (text "CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
+              srtTrace2 "cafTransfers.add" (text "CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
                 Set.insert (mkCAFLabel l) s
             else
-              pprTrace "cafTransfers.add" (text "non-CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
+              srtTrace2 "cafTransfers.add" (text "non-CAFFY name:" <+> ppr nm <+> text "hasCAF =" <+> ppr (hasCAF l)) $
                 s
 
           | hasCAF l
-          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "CAFFY") $
+          = srtTrace2 "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "CAFFY") $
               Set.insert (mkCAFLabel l) s
 
           | otherwise
-          = pprTrace "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "not CAFFY") $
+          = srtTrace2 "cafTransfers.add" (text "Unknown CLabel:" <+> ppr l <+> text "Name:" <+> ppr (hasHaskellName l) <+> text "not CAFFY") $
               s
     in
-      pprTrace "cafTransfers" (text "block:" <+> ppr block $$
-                               text "contLbls:" <+> ppr contLbls $$
-                               text "entry:" <+> ppr entry $$
-                               text "topLbl:" <+> ppr topLbl $$
-                               text "cafs in exit:" <+> ppr joined $$
-                               text "result:" <+> ppr result) $
+      srtTrace2 "cafTransfers" (text "block:" <+> ppr block $$
+                                text "contLbls:" <+> ppr contLbls $$
+                                text "entry:" <+> ppr entry $$
+                                text "topLbl:" <+> ppr topLbl $$
+                                text "cafs in exit:" <+> ppr joined $$
+                                text "result:" <+> ppr result) $
         mapSingleton (entryLabel eNode) result
 
 
@@ -947,3 +947,7 @@ updInfoSRTs _ _ _ t = [t]
 srtTrace :: String -> SDoc -> b -> b
 -- srtTrace = pprTrace
 srtTrace _ _ b = b
+
+srtTrace2 :: String -> SDoc -> a -> a
+-- srtTrace2 = pprTrace
+srtTrace2 _ _ a = a

@@ -395,25 +395,25 @@ updateIfaceCafInfos mod_iface0 caf_infos =
           NoInfo
 
         update_id_info False NoInfo =
-          WARN( True, text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name )
+          WARN( True, text "Turning CAFFY name into non-CAFFY:" <+> ppr name )
           HasInfo [HsNoCafRefs]
 
         update_id_info True (HasInfo infos) =
-          WARN( any isHsNoCafRefs infos, text "WARNING: Turning non-CAFFY name into CAFFY:" <+> ppr name )
+          WARN( any isHsNoCafRefs infos, text "Turning non-CAFFY name into CAFFY:" <+> ppr name )
           HasInfo (filterOut isHsNoCafRefs infos)
 
         update_id_info False (HasInfo infos) =
-          WARN( not (any isHsNoCafRefs infos), text "WARNING: Turning CAFFY name into non-CAFFY:" <+> ppr name )
+          WARN( not (any isHsNoCafRefs infos), text "Turning CAFFY name into non-CAFFY:" <+> ppr name )
           HasInfo (HsNoCafRefs : infos)
       in
         case lookupNameEnv caf_infos name of
           Nothing ->
-            pprTrace "updateIfaceCafInfos"
-              (text "Can't find iface name" <+> ppr name <+> text "in CAF env")
-              id
+            -- pprTrace "updateIfaceCafInfos"
+            --   (text "Can't find iface name" <+> ppr name <+> text "in CAF env")
+            id
           Just (_, caffy) ->
-            pprTrace "updateIfaceCafInfos"
-              (text "Updating iface name " <+> ppr name) $
+            -- pprTrace "updateIfaceCafInfos"
+            --   (text "Updating iface name " <+> ppr name) $
             IfaceId name ty id_details (update_id_info caffy id_info)
 
     update_caf_info id

@@ -1403,8 +1403,8 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
 
-            pprTrace "hscGenHardCode" (text "Module CafInfos:" <+> ppr (cafInfos mod_srt_info)) $
-              return (output_filename, stub_c_exists, foreign_fps, mod_srt_info)
+            -- pprTrace "hscGenHardCode" (text "Module CafInfos:" <+> ppr (cafInfos mod_srt_info)) $
+            return (output_filename, stub_c_exists, foreign_fps, mod_srt_info)
 
 
 hscInteractive :: HscEnv
