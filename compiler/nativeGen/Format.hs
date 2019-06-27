@@ -45,7 +45,7 @@ import Outputable
 --
 --  * 'Format.Format': The data format representation used by much of the backend.
 --
---  * 'Format.ScalarFormat': The format of a scalar in 
+--  * 'Format.ScalarFormat': The format of a 'Format.VecFormat'\'s scalar.
 --
 --  * 'RegClass.RegClass': Whether a register is an integer, float-point, or vector register
 --

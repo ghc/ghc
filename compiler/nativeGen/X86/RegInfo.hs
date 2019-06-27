@@ -35,7 +35,7 @@ mkVirtualReg u format
         -- For now we map both to being allocated as "Double" Registers
         -- on X86/X86_64
         FF64    -> VirtualRegD u
-        VecFormat {} -> 
+        VecFormat {} ->
           case formatToWidth format of
             W128 -> VirtualRegVec Vec128 u
             W256 -> VirtualRegVec Vec256 u

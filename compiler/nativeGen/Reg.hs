@@ -101,7 +101,7 @@ instance Outputable VirtualReg where
                 -- namely SSE2 register xmm0 .. xmm15
                 VirtualRegF  u  -> text "%vFloat_"  <> pprUniqueAlways u
                 VirtualRegD  u  -> text "%vDouble_" <> pprUniqueAlways u
-                VirtualRegVec w u -> text "%vVec" <> ppr (vecRegWidthBits w) 
+                VirtualRegVec w u -> text "%vVec" <> ppr (vecRegWidthBits w)
                                       <> text "_"    <> pprUniqueAlways u
 
 
