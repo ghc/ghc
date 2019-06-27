@@ -459,9 +459,11 @@ data GlobalReg
 
   | YmmReg                      -- 256-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
+        !Length !Width !GlobalVecRegTy
 
   | ZmmReg                      -- 512-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
+        !Length !Width !GlobalVecRegTy
 
   -- STG registers
   | Sp                  -- Stack ptr; points to last occupied stack location.
@@ -511,8 +513,8 @@ instance Eq GlobalReg where
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
    XmmReg i l w grt == XmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
-   YmmReg i == YmmReg j = i==j
-   ZmmReg i == ZmmReg j = i==j
+   YmmReg i l w grt == YmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
+   ZmmReg i l w grt == ZmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -541,8 +543,16 @@ instance Ord GlobalReg where
                                          <> compare l l'
                                          <> compare w w'
                                          <> compare grt grt'
-   compare (YmmReg i)    (YmmReg    j) = compare i j
-   compare (ZmmReg i)    (ZmmReg    j) = compare i j
+   compare (YmmReg i l w grt)
+           (YmmReg j l' w' grt')       = compare i j
+                                         <> compare l l'
+                                         <> compare w w'
+                                         <> compare grt grt'
+   compare (ZmmReg i l w grt)
+           (ZmmReg j l' w' grt')       = compare i j
+                                         <> compare l l'
+                                         <> compare w w'
+                                         <> compare grt grt'
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -568,10 +578,10 @@ instance Ord GlobalReg where
    compare _ (LongReg _)      = GT
    compare (XmmReg _ _ _ _) _ = LT
    compare _ (XmmReg _ _ _ _) = GT
-   compare (YmmReg _) _       = LT
-   compare _ (YmmReg _)       = GT
-   compare (ZmmReg _) _       = LT
-   compare _ (ZmmReg _)       = GT
+   compare (YmmReg _ _ _ _) _ = LT
+   compare _ (YmmReg _ _ _ _) = GT
+   compare (ZmmReg _ _ _ _) _ = LT
+   compare _ (ZmmReg _ _ _ _) = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -630,8 +640,12 @@ globalRegType _      (LongReg _)       = cmmBits W64
 globalRegType _      (XmmReg _ l w ty) = case ty of
                                            Integer -> cmmVec l (cmmBits w)
                                            Float   -> cmmVec l (cmmFloat w)
-globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
-globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)
+globalRegType _      (YmmReg _ l w ty) = case ty of
+                                           Integer -> cmmVec l (cmmBits w)
+                                           Float   -> cmmVec l (cmmFloat w)
+globalRegType _      (ZmmReg _ l w ty) = case ty of
+                                           Integer -> cmmVec l (cmmBits w)
+                                           Float   -> cmmVec l (cmmFloat w)
 
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all

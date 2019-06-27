@@ -262,8 +262,8 @@ pprGlobalReg gr
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
         XmmReg     n _ _ _ -> text "XMM" <> int n
-        YmmReg     n   -> text "YMM" <> int n
-        ZmmReg     n   -> text "ZMM" <> int n
+        YmmReg     n _ _ _ -> text "YMM" <> int n
+        ZmmReg     n _ _ _ -> text "ZMM" <> int n
         Sp             -> text "Sp"
         SpLim          -> text "SpLim"
         Hp             -> text "Hp"

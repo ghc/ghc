@@ -64,21 +64,19 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
       assign_regs assts (r:rs) regs | isVecType ty   = vec
                                     | isFloatType ty = float
                                     | otherwise      = int
-        where vec = case (w, regs) of
-                      (W128, (vs, fs, ds, ls, s:ss))
-                        | passVectorInReg W128 dflags
+        where vec = case regs of
+                      (vs, fs, ds, ls, s:ss)
+                        | passVectorInReg w dflags
                           -> let elt_ty = vecElemType ty
-                                 l      = vecLength ty
-                                 w      = typeWidth elt_ty
                                  reg_ty = if isFloatType elt_ty
                                           then Float else Integer
+                                 reg_class = case w of
+                                               W128 -> XmmReg
+                                               W256 -> YmmReg
+                                               W512 -> ZmmReg
                               in k (RegisterParam
-                                     (XmmReg s l w reg_ty),
+                                     (reg_class s (vecLength ty) (typeWidth elt_ty) reg_ty),
                                      (vs, fs, ds, ls, ss))
-                      (W256, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W256 dflags -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
-                      (W512, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W512 dflags -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss))
@@ -97,6 +95,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                       (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth dflags)
                           -> k (RegisterParam l, (vs, fs, ds, ls, ss))
                       _   -> (assts, (r:rs))
+
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
               w  = typeWidth ty
