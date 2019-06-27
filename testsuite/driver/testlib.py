@@ -184,6 +184,16 @@ def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
+def req_th( name, opts ):
+    """
+    Mark a test as requiring TemplateHaskell. In addition to having interpreter
+    support, currently this means that we don't run the test in the profasm when
+    when GHC is dynamically-linked since we can't load profiled objects in this
+    case.
+    """
+    req_interp(name, opts)
+    return when(ghc_dynamic(), omit_ways(['profasm']))
+
 def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
@@ -452,14 +462,6 @@ def unless(b: bool, f):
 
 def doing_ghci() -> bool:
     return 'ghci' in config.run_ways
-
-def requires_th(name, opts):
-    """
-    Mark a test as requiring TemplateHaskell. Currently this means
-    that we don't run the test in the profasm when when GHC is
-    dynamically-linked since we can't load profiled objects in this case.
-    """
-    return when(ghc_dynamic(), omit_ways(['profasm']))
 
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
