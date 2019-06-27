@@ -10,4 +10,4 @@ test('T8958', [normalise_fun(normalise_errmsg), only_ways(['normal'])], compile,
 test('T10263', normal, compile, [''])
 test('T9204b', [], multimod_compile, ['T9204b', '-v0'])
 test('T14101', normal, compile, [''])
-test('T16718', requires_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T16718', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
