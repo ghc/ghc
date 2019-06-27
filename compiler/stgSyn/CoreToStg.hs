@@ -268,7 +268,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    assertConsistentCaInfo dflags id bind (ppr bind)
+    -- assertConsistentCaInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,7 +296,7 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    assertConsistentCaInfo dflags (head binders) bind (ppr binders)
+    -- assertConsistentCaInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
 
 -- | CAF consistency issues will generally result in segfaults and are quite

@@ -67,7 +67,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import MkIface          ( updateIfaceCafInfos )
+import MkIface          ( updateIfaceCafInfos, writeIfaceFile )
 import CmmBuildInfoTables ( cafInfos )
 
 import Exception
@@ -1163,9 +1163,12 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
-                    let iface' = updateIfaceCafInfos mod_iface (cafInfos mod_srt_info)
-                    pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
-                      return (RealPhase next_phase, outputFilename)
+                    let mod_iface' = updateIfaceCafInfos mod_iface (cafInfos mod_srt_info)
+                    let ifaceFile = ml_hi_file (ms_location mod_summary)
+                    liftIO (writeIfaceFile dflags ifaceFile mod_iface')
+
+                    -- pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
+                    return (RealPhase next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
