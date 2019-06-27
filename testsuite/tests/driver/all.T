@@ -208,7 +208,7 @@ test('T9938', [], makefile_test, [])
 test('T9938B', [], makefile_test, [])
 
 test('T9963', exit_code(1), run_command,
-     ['{compiler} --interactive -ignore-dot-ghci --print-libdir'])
+     ['{compiler} $(TEST_HC_OPTS_INTERACTIVE) -ignore-dot-ghci --print-libdir'])
 
 test('T10219', normal, run_command,
      # `-x hspp` in make mode should work.
@@ -227,8 +227,8 @@ test('T365',
      [pre_cmd('touch test_preprocessor.txt'), unless(opsys('mingw32'), skip)],
      compile_fail, [''])
 
-test('T9360a', normal, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
-test('T9360b', normal, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
+test('T9360a', req_interp, run_command, ['{compiler} $(TEST_HC_OPTS_INTERACTIVE) -e "" -ignore-dot-ghci'])
+test('T9360b', req_interp, run_command, ['{compiler} -e "" $(TEST_HC_OPTS_INTERACTIVE) -ignore-dot-ghci'])
 
 test('T10970', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
@@ -273,6 +273,6 @@ test('T14452', [], makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
      [extra_files(['T16737include/']),
-      requires_th,
+      req_th,
       expect_broken_for(16541, ['ghci'])],
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
