@@ -34,7 +34,7 @@ import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
-import IdInfo   ( unfoldingInfo, setUnfoldingInfo, IdInfo )
+import IdInfo   ( unfoldingInfo, setUnfoldingInfo, IdInfo (..) )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
@@ -566,7 +566,15 @@ add_info env old_bndr top_level new_rhs new_bndr
    new_info :: IdInfo
    new_info = case mb_new_info of
     Just info ->
-      info `setUnfoldingInfo` (new_unfolding InlineStable)
+      case unfoldingInfo info of
+        NoUnfolding ->
+          case inlinePragInfo info of
+            InlinePragma { inl_inline = NoInline } ->
+              info `setUnfoldingInfo` (new_unfolding InlineRhs)
+            _ ->
+              info `setUnfoldingInfo` (new_unfolding InlineStable)
+        _ ->
+          info
     Nothing ->
       idInfo old_bndr `setUnfoldingInfo` (new_unfolding InlineRhs)
 
