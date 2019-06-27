@@ -22,5 +22,6 @@ mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
 mkLocMessageAnn :: Maybe String -> Severity -> SrcSpan -> MsgDoc -> MsgDoc
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
+compilationProgressMsg :: DynFlags -> String -> IO ()
 
 instance ToJson Severity
