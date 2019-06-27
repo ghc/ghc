@@ -281,7 +281,7 @@ import ToolSettings
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic )
+                               , getCaretDiagnostic, compilationProgressMsg )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -5328,9 +5328,7 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        putLogMsg dflags NoReason SevInfo noSrcSpan
-             (defaultUserStyle dflags)
-             (text ("Loaded package environment from " ++ envfile))
+        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
         let setFlags :: DynP ()
             setFlags = do
               setGeneralFlag Opt_HideAllPackages
