@@ -2088,9 +2088,9 @@ enableCodeGenForUnboxedTuples :: HscTarget
 enableCodeGenForUnboxedTuples =
   enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
   where
-    condition ms =
-      xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
-      not (isBootSummary ms)
+    condition ms = False  -- disabled due to #16876
+      --xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
+      --not (isBootSummary ms)
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
       hscTarget dflags == HscInterpreted
 
