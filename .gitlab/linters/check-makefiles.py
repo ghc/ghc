@@ -13,7 +13,7 @@ from linter import run_linters, RegexpLinter
 linters = [
     RegexpLinter(r'--interactive',
                  message = "Warning: Use `$(TEST_HC_OPTS_INTERACTIVE)` instead of `--interactive -ignore-dot-ghci -v0`."
-                ).add_path_filter(lambda path: path.suffix == '.T')
+                ).add_path_filter(lambda path: path.name == 'Makefile')
 ]
 
 if __name__ == '__main__':
