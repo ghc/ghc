@@ -634,9 +634,6 @@ globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
 globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
--- NOTE:
--- The below XMM, YMM, ZMM CmmTypes are not fully correct because an
--- XMM can also hold 2 doubles or 16 Int8s etc, similarly for YMM, ZMM
 globalRegType _      (XmmReg _ l w ty) = case ty of
                                            Integer -> cmmVec l (cmmBits w)
                                            Float   -> cmmVec l (cmmFloat w)
