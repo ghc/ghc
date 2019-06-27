@@ -47,7 +47,7 @@ cmmPipeline hsc_env srtInfo0 prog =
   do let dflags = hsc_dflags hsc_env
 
      (caf_infos, tops) <- {-# SCC "tops" #-} mapAccumLM (cpsTop hsc_env) (cafInfos srtInfo0) prog
-     pprTrace "cmmPipeline" (text "CAF infos:" <+> ppr caf_infos) (return ())
+     -- pprTrace "cmmPipeline" (text "CAF infos:" <+> ppr caf_infos) (return ())
      let srtInfo1 = srtInfo0{ cafInfos = caf_infos }
 
      (srtInfo2, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo1 tops
@@ -60,7 +60,7 @@ cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (NameEnv (Name, Bool),
 cpsTop _ caf_infos p@(CmmData {}) = return (caf_infos, (mapEmpty, [p]))
 cpsTop hsc_env caf_infos0 proc@(CmmProc top_info _ _ _) =
     do
-       pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
+       -- pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
 
        ----------- Control-flow optimisations ----------------------------------
 
