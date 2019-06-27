@@ -978,7 +978,16 @@ pprOpOp name format op1 op2
         pprOperand format op2
     ]
 
-
+pprFormatOpRegOp :: PtrString -> Format -> Operand -> Reg -> Operand -> SDoc
+pprFormatOpRegOp name format off reg1 op2
+  = hcat [
+        pprMnemonic name format,
+        pprOperand format off,
+        comma,
+        pprReg format reg1,
+        comma,
+        pprOperand format op2
+    ]
 
 pprRegReg :: PtrString -> Reg -> Reg -> SDoc
 pprRegReg name reg1 reg2

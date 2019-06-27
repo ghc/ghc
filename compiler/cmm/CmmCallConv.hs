@@ -74,6 +74,7 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                                                W128 -> XmmReg
                                                W256 -> YmmReg
                                                W512 -> ZmmReg
+                                               _    -> panic "CmmCallConv.assignArgumentsPos: Invalid vector width"
                               in k (RegisterParam
                                      (reg_class s (vecLength ty) (typeWidth elt_ty) reg_ty),
                                      (vs, fs, ds, ls, ss))

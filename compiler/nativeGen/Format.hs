@@ -27,6 +27,31 @@ import GhcPrelude
 import Cmm
 import Outputable
 
+
+-- Note [GHC's data format representations]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- GHC has severals types that represent various aspects of data format.
+-- These include:
+--
+--  * 'CmmType.CmmType': The data classification used throughout the C--
+--    pipeline. This is a pair of a CmmCat and a Width.
+--
+--  * 'CmmType.CmmCat': What the bits in a C-- value mean (e.g. a pointer, integer, or floating-point value)
+--
+--  * 'CmmType.Width': The width of a C-- value.
+--
+--  * 'CmmType.Length': The width (measured in number of scalars) of a vector value.
+--
+--  * 'Format.Format': The data format representation used by much of the backend.
+--
+--  * 'Format.ScalarFormat': The format of a scalar in 
+--
+--  * 'RegClass.RegClass': Whether a register is an integer, float-point, or vector register
+--
+--  * 'RegClass.VecRegWidth': The bit-width of a vector register; used by 'RegClass.RegClassVec'.
+--
+
 -- It looks very like the old MachRep, but it's now of purely local
 -- significance, here in the native code generator.  You can change it
 -- without global consequences.

@@ -330,7 +330,7 @@ getVecRegisterReg _ use_avx format (CmmLocal (LocalReg u pk))
                               (unlines ["avx flag is not enabled" ,
                                         "or this is not a vector register"])
                               (ppr pk)
-getVecRegisterReg platform use_avx _ c = getRegisterReg platform use_avx c
+getVecRegisterReg platform _use_avx _format c = getRegisterReg platform c
 
 -- | Memory addressing modes passed up the tree.
 data Amode
@@ -568,7 +568,7 @@ getRegister' dflags is32Bit (CmmReg reg)
 
     standardRegister crt =
       let platform = targetPlatform dflags
-       in (Fixed (cmmTypeFormat crt) (getRegisterReg platform us reg) nilOL)
+       in (Fixed (cmmTypeFormat crt) (getRegisterReg platform reg) nilOL)
 
 getRegister' dflags is32Bit (CmmRegOff r n)
   = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
@@ -872,7 +872,7 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
         vector_float_negate_avx l w expr = do
           tmp                  <- getNewRegNat (VecFormat l FmtFloat w)
           (reg, exp)           <- getSomeReg expr
-          Amode addr addr_code <- memConstant (widthInBytes W32) (CmmFloat 0.0 W32)
+          Amode addr addr_code <- memConstant (mkAlignment $ widthInBytes W32) (CmmFloat 0.0 W32)
           let format   = case w of
                            W32 -> VecFormat l FmtFloat w
                            W64 -> VecFormat l FmtDouble w
@@ -904,6 +904,7 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
 getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse4_1 <- sse4_1Enabled
+  sse2   <- sse2Enabled
   sse    <- sseEnabled
   avx    <- avxEnabled
   case mop of
@@ -1559,7 +1560,7 @@ getAmode' _ (CmmMachOp (MO_Add _) [x,y])
   = x86_complex_amode x y 0 0
 
 getAmode' _ (CmmLit lit@(CmmFloat _ w))
-  = memConstant (widthInBytes w) lit
+  = memConstant (mkAlignment $ widthInBytes w) lit
 
 getAmode' is32Bit (CmmLit lit) | is32BitLit is32Bit lit
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)

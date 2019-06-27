@@ -56,6 +56,7 @@ data VirtualReg
         | VirtualRegHi {-# UNPACK #-} !Unique  -- High part of 2-word register
         | VirtualRegF  {-# UNPACK #-} !Unique
         | VirtualRegD  {-# UNPACK #-} !Unique
+        | VirtualRegVec !VecRegWidth {-# UNPACK #-} !Unique
 
         deriving (Eq, Show)
 
@@ -69,6 +70,7 @@ instance Ord VirtualReg where
   compare (VirtualRegHi a) (VirtualRegHi b) = nonDetCmpUnique a b
   compare (VirtualRegF a) (VirtualRegF b) = nonDetCmpUnique a b
   compare (VirtualRegD a) (VirtualRegD b) = nonDetCmpUnique a b
+  compare (VirtualRegVec w a) (VirtualRegVec v b) = compare w v `mappend` nonDetCmpUnique a b
 
   compare VirtualRegI{} _ = LT
   compare _ VirtualRegI{} = GT
@@ -76,7 +78,8 @@ instance Ord VirtualReg where
   compare _ VirtualRegHi{} = GT
   compare VirtualRegF{} _ = LT
   compare _ VirtualRegF{} = GT
-
+  compare VirtualRegVec{} _ = LT
+  compare _ VirtualRegVec{} = GT
 
 
 instance Uniquable VirtualReg where
@@ -86,6 +89,7 @@ instance Uniquable VirtualReg where
                 VirtualRegHi u  -> u
                 VirtualRegF u   -> u
                 VirtualRegD u   -> u
+                VirtualRegVec _ u -> u
 
 instance Outputable VirtualReg where
         ppr reg
@@ -95,8 +99,10 @@ instance Outputable VirtualReg where
                 -- this code is kinda wrong on x86
                 -- because float and double occupy the same register set
                 -- namely SSE2 register xmm0 .. xmm15
-                VirtualRegF  u  -> text "%vFloat_"   <> pprUniqueAlways u
-                VirtualRegD  u  -> text "%vDouble_"   <> pprUniqueAlways u
+                VirtualRegF  u  -> text "%vFloat_"  <> pprUniqueAlways u
+                VirtualRegD  u  -> text "%vDouble_" <> pprUniqueAlways u
+                VirtualRegVec w u -> text "%vVec" <> ppr (vecRegWidthBits w) 
+                                      <> text "_"    <> pprUniqueAlways u
 
 
 
@@ -107,6 +113,7 @@ renameVirtualReg u r
         VirtualRegHi _  -> VirtualRegHi u
         VirtualRegF _   -> VirtualRegF  u
         VirtualRegD _   -> VirtualRegD  u
+        VirtualRegVec w _ -> VirtualRegVec w u
 
 
 classOfVirtualReg :: VirtualReg -> RegClass
@@ -116,6 +123,7 @@ classOfVirtualReg vr
         VirtualRegHi{}  -> RcInteger
         VirtualRegF{}   -> RcFloat
         VirtualRegD{}   -> RcDouble
+        VirtualRegVec w _ -> RcVector w
 
 
 
