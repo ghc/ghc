@@ -305,6 +305,10 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- missing.
 createFileLink :: FilePath -> FilePath -> Action ()
 createFileLink linkTarget link = do
+    -- TODO `disableHistory` is a temporary fix (see issue #16866). Remove
+    -- `disableHistory` when shake issue is fixed: https://github.com/ndmitchell/shake/issues/683.
+    historyDisable
+
     let source = if isAbsolute linkTarget
                     then linkTarget
                     else takeDirectory link -/- linkTarget
