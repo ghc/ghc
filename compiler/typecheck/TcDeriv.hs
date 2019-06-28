@@ -9,7 +9,7 @@ Handles @deriving@ clauses on @data@ declarations.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcDeriv ( tcDeriving, DerivInfo(..), mkDerivInfos ) where
+module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 
 #include "HsVersions.h"
 
@@ -23,7 +23,7 @@ import FamInst
 import TcDerivInfer
 import TcDerivUtils
 import TcValidity( allDistinctTyVars )
-import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
+import TcClassDcl( instDeclCtxt3, tcATDefault )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import TcValidity( checkValidInstHead )
@@ -198,19 +198,6 @@ data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
-
--- | Extract `deriving` clauses of proper data type (skips data families)
-mkDerivInfos :: [LTyClDecl GhcRn] -> TcM [DerivInfo]
-mkDerivInfos decls = concatMapM (mk_deriv . unLoc) decls
-  where
-
-    mk_deriv decl@(DataDecl { tcdLName = L _ data_name
-                            , tcdDataDefn =
-                                HsDataDefn { dd_derivs = L _ clauses } })
-      = do { tycon <- tcLookupTyCon data_name
-           ; return [DerivInfo { di_rep_tc = tycon, di_clauses = clauses
-                               , di_ctxt = tcMkDeclCtxt decl }] }
-    mk_deriv _ = return []
 
 {-
 

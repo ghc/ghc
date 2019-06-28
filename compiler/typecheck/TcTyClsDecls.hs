@@ -36,7 +36,7 @@ import TcHsSyn
 import TcTyDecls
 import TcClassDcl
 import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
-import TcDeriv (DerivInfo)
+import TcDeriv (DerivInfo(..))
 import TcUnify ( unifyKind )
 import TcHsType
 import ClsInst( AssocInstInfo(..) )
@@ -124,7 +124,7 @@ tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                                             -- classes
                                             -- and their implicit Ids,DataCons
                          , [InstInfo GhcRn] -- Source-code instance decls info
-                         , [DerivInfo]      -- data family deriving info
+                         , [DerivInfo]      -- Deriving info
                          )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
@@ -160,7 +160,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 1: Typecheck the type/class declarations
        ; traceTc "---- tcTyClGroup ---- {" empty
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
-       ; tyclss <- tcTyClDecls tyclds role_annots
+       ; (tyclss, data_deriv_info) <- tcTyClDecls tyclds role_annots
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
@@ -186,12 +186,20 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; gbl_env <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; setGblEnv gbl_env $
-         tcInstDecls1 instds }
+       ; (gbl_env', inst_info, datafam_deriv_info) <-
+         setGblEnv gbl_env $
+         tcInstDecls1 instds
+
+       ; let deriv_info = datafam_deriv_info ++ data_deriv_info
+       ; return (gbl_env', inst_info, deriv_info) }
+
 
 tcTyClGroup (XTyClGroup _) = panic "tcTyClGroup"
 
-tcTyClDecls :: [LTyClDecl GhcRn] -> RoleAnnotEnv -> TcM [TyCon]
+tcTyClDecls
+  :: [LTyClDecl GhcRn]
+  -> RoleAnnotEnv
+  -> TcM ([TyCon], [DerivInfo])
 tcTyClDecls tyclds role_annots
   = tcExtendKindEnv promotion_err_env $   --- See Note [Type environment evolution]
     do {    -- Step 1: kind-check this group and returns the final
@@ -206,7 +214,7 @@ tcTyClDecls tyclds role_annots
             -- NB: We have to be careful here to NOT eagerly unfold
             -- type synonyms, as we have not tested for type synonym
             -- loops yet and could fall into a black hole.
-       ; fixM $ \ ~rec_tyclss -> do
+       ; fixM $ \ ~(rec_tyclss, _) -> do
            { tcg_env <- getGblEnv
            ; let roles = inferRoles (tcg_src tcg_env) role_annots rec_tyclss
 
@@ -214,7 +222,8 @@ tcTyClDecls tyclds role_annots
                  -- NB: if the decls mention any ill-staged data cons
                  -- (see Note [Recursion and promoting data constructors])
                  -- we will have failed already in kcTyClGroup, so no worries here
-           ; tcExtendRecEnv (zipRecTyClss tc_tycons rec_tyclss) $
+           ; (tycons, data_deriv_infos) <-
+             tcExtendRecEnv (zipRecTyClss tc_tycons rec_tyclss) $
 
                  -- Also extend the local type envt with bindings giving
                  -- a TcTyCon for each each knot-tied TyCon or Class
@@ -223,7 +232,8 @@ tcTyClDecls tyclds role_annots
              tcExtendKindEnvWithTyCons tc_tycons $
 
                  -- Kind and type check declarations for this group
-               mapM (tcTyClDecl roles) tyclds
+               mapAndUnzipM (tcTyClDecl roles) tyclds
+           ; return (tycons, concat data_deriv_infos)
            } }
   where
     promotion_err_env = mkPromotionErrorEnv tyclds
@@ -1521,40 +1531,55 @@ unlifted types, resolving #13595.
 
 -}
 
-tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM TyCon
+tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM (TyCon, [DerivInfo])
 tcTyClDecl roles_info (dL->L loc decl)
   | Just thing <- wiredInNameTyThing_maybe (tcdName decl)
   = case thing of -- See Note [Declarations for wired-in things]
-      ATyCon tc -> return tc
+      ATyCon tc -> return (tc, wiredInDerivInfo tc decl)
       _ -> pprPanic "tcTyClDecl" (ppr thing)
 
   | otherwise
   = setSrcSpan loc $ tcAddDeclCtxt decl $
     do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
-       ; tc <- tcTyClDecl1 Nothing roles_info decl
+       ; (tc, deriv_infos) <- tcTyClDecl1 Nothing roles_info decl
        ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
-       ; return tc }
+       ; return (tc, deriv_infos) }
+
+noDerivInfos :: a -> (a, [DerivInfo])
+noDerivInfos a = (a, [])
+
+wiredInDerivInfo :: TyCon -> TyClDecl GhcRn -> [DerivInfo]
+wiredInDerivInfo tycon decl
+  | DataDecl { tcdDataDefn = dataDefn } <- decl
+  , HsDataDefn { dd_derivs = derivs } <- dataDefn
+  = [ DerivInfo { di_rep_tc = tycon
+                , di_clauses = unLoc derivs
+                , di_ctxt = tcMkDeclCtxt decl } ]
+wiredInDerivInfo _ _ = []
 
   -- "type family" declarations
-tcTyClDecl1 :: Maybe Class -> RolesInfo -> TyClDecl GhcRn -> TcM TyCon
+tcTyClDecl1 :: Maybe Class -> RolesInfo -> TyClDecl GhcRn -> TcM (TyCon, [DerivInfo])
 tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
-  = tcFamDecl1 parent fd
+  = fmap noDerivInfos $
+    tcFamDecl1 parent fd
 
   -- "type" synonym declaration
 tcTyClDecl1 _parent roles_info
             (SynDecl { tcdLName = (dL->L _ tc_name)
                      , tcdRhs   = rhs })
   = ASSERT( isNothing _parent )
+    fmap noDerivInfos $
     bindTyClTyVars tc_name $ \ binders res_kind ->
     tcTySynRhs roles_info tc_name binders res_kind rhs
 
   -- "data/newtype" declaration
 tcTyClDecl1 _parent roles_info
-            (DataDecl { tcdLName = (dL->L _ tc_name)
-                      , tcdDataDefn = defn })
+            decl@(DataDecl { tcdLName = (dL->L _ tc_name)
+                           , tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
     bindTyClTyVars tc_name $ \ tycon_binders res_kind ->
-    tcDataDefn roles_info tc_name tycon_binders res_kind defn
+    tcDataDefn (tcMkDeclCtxt decl) roles_info tc_name
+               tycon_binders res_kind defn
 
 tcTyClDecl1 _parent roles_info
             (ClassDecl { tcdLName = (dL->L _ class_name)
@@ -1567,7 +1592,7 @@ tcTyClDecl1 _parent roles_info
   = ASSERT( isNothing _parent )
     do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
                               meths fundeps sigs ats at_defs
-       ; return (classTyCon clas) }
+       ; return (noDerivInfos (classTyCon clas)) }
 
 tcTyClDecl1 _ _ (XTyClDecl _) = panic "tcTyClDecl1"
 
@@ -2009,17 +2034,20 @@ tcTySynRhs roles_info tc_name binders res_kind hs_ty
              tycon = buildSynTyCon tc_name binders res_kind roles rhs_ty
        ; return tycon }
 
-tcDataDefn :: RolesInfo -> Name
+tcDataDefn :: SDoc
+           -> RolesInfo -> Name
            -> [TyConBinder] -> Kind
-           -> HsDataDefn GhcRn -> TcM TyCon
+           -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
   -- NB: not used for newtype/data instances (whether associated or not)
-tcDataDefn roles_info
+tcDataDefn err_ctxt
+           roles_info
            tc_name tycon_binders res_kind
            (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                        , dd_ctxt = ctxt
                        , dd_kindSig = mb_ksig  -- Already in tc's kind
                                                -- via getInitialKinds
-                       , dd_cons = cons })
+                       , dd_cons = cons
+                       , dd_derivs = derivs })
  =  do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
 
        ; tcg_env <- getGblEnv
@@ -2057,8 +2085,11 @@ tcDataDefn roles_info
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax) }
+       ; let deriv_info = DerivInfo { di_rep_tc = tycon
+                                    , di_clauses = unLoc derivs
+                                    , di_ctxt = err_ctxt }
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
-       ; return tycon }
+       ; return (tycon, [deriv_info]) }
   where
     -- Abstract data types in hsig files can have arbitrary kinds,
     -- because they may be implemented by type synonyms
@@ -2084,7 +2115,7 @@ tcDataDefn roles_info
           DataType -> return (mkDataTyConRhs data_cons)
           NewType  -> ASSERT( not (null data_cons) )
                       mkNewTyConRhs tc_name tycon (head data_cons)
-tcDataDefn _ _ _ _ (XHsDataDefn _) = panic "tcDataDefn"
+tcDataDefn _ _ _ _ _ (XHsDataDefn _) = panic "tcDataDefn"
 
 
 -------------------------
