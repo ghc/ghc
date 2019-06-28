@@ -1,6 +1,37 @@
 
 ==================== Derived instances ====================
 Derived class instances:
+  instance (GHC.Base.Applicative f, GHC.Base.Applicative g,
+            GHC.Base.Semigroup a) =>
+           GHC.Base.Semigroup (T14578.Wat f g a) where
+    (GHC.Base.<>)
+      = GHC.Prim.coerce
+          @(T14578.App (Data.Functor.Compose.Compose f g) a
+            -> T14578.App (Data.Functor.Compose.Compose f g) a
+               -> T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
+          ((GHC.Base.<>)
+             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
+          T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a
+    GHC.Base.sconcat
+      = GHC.Prim.coerce
+          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose f g) a)
+            -> T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
+          (GHC.Base.sconcat
+             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
+          GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a
+    GHC.Base.stimes
+      = GHC.Prim.coerce
+          @(b
+            -> T14578.App (Data.Functor.Compose.Compose f g) a
+               -> T14578.App (Data.Functor.Compose.Compose f g) a)
+          @(b -> T14578.Wat f g a -> T14578.Wat f g a)
+          (GHC.Base.stimes
+             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
+          forall (b :: TYPE GHC.Types.LiftedRep).
+          GHC.Real.Integral b => b -> T14578.Wat f g a -> T14578.Wat f g a
+  
   instance GHC.Base.Functor f =>
            GHC.Base.Functor (T14578.App f) where
     GHC.Base.fmap
@@ -60,37 +91,6 @@ Derived class instances:
           forall (a :: TYPE GHC.Types.LiftedRep)
                  (b :: TYPE GHC.Types.LiftedRep).
           T14578.App f a -> T14578.App f b -> T14578.App f a
-  
-  instance (GHC.Base.Applicative f, GHC.Base.Applicative g,
-            GHC.Base.Semigroup a) =>
-           GHC.Base.Semigroup (T14578.Wat f g a) where
-    (GHC.Base.<>)
-      = GHC.Prim.coerce
-          @(T14578.App (Data.Functor.Compose.Compose f g) a
-            -> T14578.App (Data.Functor.Compose.Compose f g) a
-               -> T14578.App (Data.Functor.Compose.Compose f g) a)
-          @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
-          ((GHC.Base.<>)
-             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
-          T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a
-    GHC.Base.sconcat
-      = GHC.Prim.coerce
-          @(GHC.Base.NonEmpty (T14578.App (Data.Functor.Compose.Compose f g) a)
-            -> T14578.App (Data.Functor.Compose.Compose f g) a)
-          @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
-          (GHC.Base.sconcat
-             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
-          GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a
-    GHC.Base.stimes
-      = GHC.Prim.coerce
-          @(b
-            -> T14578.App (Data.Functor.Compose.Compose f g) a
-               -> T14578.App (Data.Functor.Compose.Compose f g) a)
-          @(b -> T14578.Wat f g a -> T14578.Wat f g a)
-          (GHC.Base.stimes
-             @(T14578.App (Data.Functor.Compose.Compose f g) a)) ::
-          forall (b :: TYPE GHC.Types.LiftedRep).
-          GHC.Real.Integral b => b -> T14578.Wat f g a -> T14578.Wat f g a
   
 
 Derived type family instances:
