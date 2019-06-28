@@ -845,9 +845,9 @@ messages and in GHCi:
           where
               {- #0 -} (==) (f a) (g b) = (f == g) && (a == b)
               {- #1 -} (==) a a = 'True
-                  -- incompatible indices: 0
+                  -- incompatible with: #0
               {- #2 -} (==) _1 _2 = 'False
-                  -- incompatible indices: 1, 0
+                  -- incompatible with: #1, #0
 
     The equations are numbered starting from 0, and the comment after each
     equation refers to all preceding equations it is incompatible with.
