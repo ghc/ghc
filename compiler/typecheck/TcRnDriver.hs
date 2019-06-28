@@ -1682,7 +1682,7 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, datafam_deriv_info)
+   do { (tcg_env, inst_info, deriv_info)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1692,9 +1692,8 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
           -- Careful to quit now in case there were instance errors, so that
           -- the deriving errors don't pile up as well.
           ; failIfErrsM
-          ; let tyclds = tycl_decls >>= group_tyclds
           ; (tcg_env', inst_info', val_binds)
-              <- tcInstDeclsDeriv datafam_deriv_info tyclds deriv_decls
+              <- tcInstDeclsDeriv deriv_info deriv_decls
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
               ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
