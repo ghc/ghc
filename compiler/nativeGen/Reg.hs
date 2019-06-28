@@ -122,6 +122,7 @@ classOfVirtualReg vr
         VirtualRegHi{}  -> RcInteger
         VirtualRegF{}   -> RcFloat
         VirtualRegD{}   -> RcDouble
+        -- Below is an awful, largely x86-specific hack
         VirtualRegVec{} -> RcDouble
 
 

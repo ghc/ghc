@@ -131,7 +131,6 @@ regDotColor reg
         RcInteger       -> text "blue"
         RcFloat         -> text "red"
         RcDouble        -> text "green"
-        RcVector        -> panic "regDotColor"
 
 
 

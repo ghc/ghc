@@ -193,36 +193,6 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
 
         = count3 < cALLOCATABLE_REGS_DOUBLE
 
-trivColorable platform virtualRegSqueeze realRegSqueeze RcVector conflicts exclusions
-        | let cALLOCATABLE_REGS_VECTOR
-                  =        (case platformArch platform of
-                            ArchX86       -> 8
-                            ArchX86_64    -> 10
-                            -- in x86_64 there are 16 XMM registers
-                            -- xmm0 .. xmm15, here 10 is a
-                            -- "dont need to solve conflicts" count that
-                            -- was chosen at some point in the past.
-                            ArchPPC       -> 0
-                            ArchSPARC     -> 0
-                            ArchSPARC64   -> panic "trivColorable ArchSPARC64"
-                            ArchPPC_64 _  -> 0
-                            ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchARM64     -> panic "trivColorable ArchARM64"
-                            ArchAlpha     -> panic "trivColorable ArchAlpha"
-                            ArchMipseb    -> panic "trivColorable ArchMipseb"
-                            ArchMipsel    -> panic "trivColorable ArchMipsel"
-                            ArchJavaScript-> panic "trivColorable ArchJavaScript"
-                            ArchUnknown   -> panic "trivColorable ArchUnknown")
-        , count2        <- accSqueeze 0 cALLOCATABLE_REGS_VECTOR
-                                (virtualRegSqueeze RcVector)
-                                conflicts
-
-        , count3        <- accSqueeze  count2    cALLOCATABLE_REGS_VECTOR
-                                (realRegSqueeze   RcVector)
-                                exclusions
-
-        = count3 < cALLOCATABLE_REGS_VECTOR
-
 
 
 -- Specification Code ----------------------------------------------------------
