@@ -154,13 +154,6 @@ the following flags:
 
     Pass ⟨option⟩ to the C compiler.
 
-.. ghc-flag:: -optcxx ⟨option⟩
-    :shortdesc: pass ⟨option⟩ to the C++ compiler
-    :type: dynamic
-    :category: phase-options
-
-    Pass ⟨option⟩ to the C++ compiler.
-
 .. ghc-flag:: -optlo ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the LLVM optimiser
     :type: dynamic

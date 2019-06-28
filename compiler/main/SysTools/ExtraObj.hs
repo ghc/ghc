@@ -40,7 +40,7 @@ mkExtraObj dflags extn xs
       oFile <- newTempName dflags TFL_GhcSession "o"
       writeFile cFile xs
       ccInfo <- liftIO $ getCompilerInfo dflags
-      runCc Nothing dflags
+      runCc dflags
             ([Option        "-c",
               FileOption "" cFile,
               Option        "-o",
