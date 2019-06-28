@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 -- emitPrimOp is quite large
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
 
@@ -254,7 +255,7 @@ shouldInlinePrimOp dflags primop args
 cgPrimOp   :: [LocalReg]        -- where to put the results
            -> PrimOp            -- the op
            -> [StgArg]          -- arguments
-           -> FCode ()
+           -> OpDest
 
 cgPrimOp results op args
   = do dflags <- getDynFlags
@@ -266,26 +267,30 @@ cgPrimOp results op args
 --      Emitting code for a primop
 ------------------------------------------------------------------------
 
-emitPrimOp :: DynFlags
-           -> [LocalReg]        -- where to put the results
-           -> PrimOp            -- the op
-           -> [CmmExpr]         -- arguments
-           -> FCode ()
+emitPrimOp0
+  :: DynFlags
+  -> [LocalReg]        -- where to put the results
+  -> PrimOp            -- the op
+  -> [CmmExpr]         -- arguments
+  -> OpDest
 
 -- First we handle various awkward cases specially.  The remaining
 -- easy cases are then handled by translateOp, defined below.
 
-emitPrimOp _ [res] ParOp [arg]
-  =
-        -- for now, just implement this in a C function
-        -- later, we might want to inline it.
+emitPrimOp0 dflags reses op args = case op of
+  ParOp -> OpDest_AllDone $ do
+    -- for now, just implement this in a C function
+    -- later, we might want to inline it.
+    [res] <- reses
+    [arg] <- args
     emitCCall
         [(res,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
         [(baseExpr, AddrHint), (arg,AddrHint)]
 
-emitPrimOp dflags [res] SparkOp [arg]
-  = do
+  SparkOp -> OpDest_AllDone $ do
+        [res] <- pure reses
+        [arg] <- pure args
         -- returns the value of arg in res.  We're going to therefore
         -- refer to arg twice (once to pass to newSpark(), and once to
         -- assign to res), so put it in a temporary.
@@ -297,24 +302,34 @@ emitPrimOp dflags [res] SparkOp [arg]
             [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
-emitPrimOp dflags [res] GetCCSOfOp [arg]
-  = emitAssign (CmmLocal res) val
-  where
+  GetCCSOfOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) val
+   where
     val
      | gopt Opt_SccProfilingOn dflags = costCentreFrom dflags (cmmUntag dflags arg)
      | otherwise                      = CmmLit (zeroCLit dflags)
 
-emitPrimOp _ [res] GetCurrentCCSOp [_dummy_arg]
-   = emitAssign (CmmLocal res) cccsExpr
+  GetCurrentCCSOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [_dummy_arg] <- pure args
+    emitAssign (CmmLocal res) cccsExpr
 
-emitPrimOp _ [res] MyThreadIdOp []
-   = emitAssign (CmmLocal res) currentTSOExpr
+  MyThreadIdOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [] <- pure args
+    emitAssign (CmmLocal res) currentTSOExpr
 
-emitPrimOp dflags [res] ReadMutVarOp [mutv]
-   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
+  ReadMutVarOp -> OpDest_AllDone $
+    [res] <- pure reses
+    [mutv] <- pure args
+    emitAssign (CmmLocal res) (cmmLoadIndexW dflags mutv (fixedHdrSizeW dflags) (gcWord dflags))
 
-emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
-   = do -- Without this write barrier, other CPUs may see this pointer before
+   WriteMutVarOp -> OpDest_AllDone $ do
+        [res] <- pure reses
+        [mutv,var] <- pure args
+        -- Without this write barrier, other CPUs may see this pointer before
         -- the writes for the closure it points to have occurred.
         emitPrimCall res MO_WriteBarrier []
         emitStore (cmmOffsetW dflags mutv (fixedHdrSizeW dflags)) var
@@ -325,42 +340,58 @@ emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
-emitPrimOp dflags [res] SizeofByteArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+  SizeofByteArrayOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
-emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
-   = emitPrimOp dflags [res] SizeofByteArrayOp [arg]
+  SizeofMutableByteArrayOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitPrimOp dflags [res] SizeofByteArrayOp [arg]
 
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
-emitPrimOp dflags [res] GetSizeofMutableByteArrayOp [arg]
-   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+  GetSizeofMutableByteArrayOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
 
 --  #define touchzh(o)                  /* nothing */
-emitPrimOp _ res@[] TouchOp args@[_arg]
-   = do emitPrimCall res MO_Touch args
+  TouchOp -> emitPrimOp _ res@[] TouchOp args@[_arg]
+   = emitPrimCall res MO_Touch args
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
-emitPrimOp dflags [res] ByteArrayContents_Char [arg]
-   = emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
+  ByteArrayContents_Char -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
-emitPrimOp dflags [res] StableNameToIntOp [arg]
-   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+  StableNameToIntOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
-emitPrimOp dflags [res] ReallyUnsafePtrEqualityOp [arg1,arg2]
-   = emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [arg1,arg2])
+  ReallyUnsafePtrEqualityOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [arg1,arg2])
 
 --  #define addrToHValuezh(r,a) r=(P_)a
-emitPrimOp _      [res] AddrToAnyOp [arg]
-   = emitAssign (CmmLocal res) arg
+  AddrToAnyOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) arg
 
 --  #define hvalueToAddrzh(r, a) r=(W_)a
-emitPrimOp _      [res] AnyToAddrOp [arg]
-   = emitAssign (CmmLocal res) arg
+  AnyToAddrOp -> OpDest_AllDone $ do
+    [res] <- pure reses
+    [arg] <- pure args
+    emitAssign (CmmLocal res) arg
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -373,57 +404,53 @@ emitPrimOp _      [res] AnyToAddrOp [arg]
 --        r = a;
 --      }
 emitPrimOp _      [res] UnsafeFreezeArrayOp [arg]
-   = emit $ catAGraphs
+   = OpDest_AllDone $ emit $ catAGraphs
    [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 emitPrimOp _      [res] UnsafeFreezeArrayArrayOp [arg]
-   = emit $ catAGraphs
+   = OpDest_AllDone $ emit $ catAGraphs
    [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 emitPrimOp _      [res] UnsafeFreezeSmallArrayOp [arg]
-   = emit $ catAGraphs
+   = OpDest_AllDone $ emit $ catAGraphs
    [ setInfo arg (CmmLit (CmmLabel mkSMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)
 emitPrimOp _      [res] UnsafeFreezeByteArrayOp [arg]
-   = emitAssign (CmmLocal res) arg
+   = OpDest_AllDone $ emitAssign (CmmLocal res) arg
 
 -- Reading/writing pointer arrays
 
-emitPrimOp _      [res] ReadArrayOp  [obj,ix]    = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] IndexArrayOp [obj,ix]    = doReadPtrArrayOp res obj ix
-emitPrimOp _      []  WriteArrayOp [obj,ix,v]  = doWritePtrArrayOp obj ix v
+emitPrimOp _      [res] ReadArrayOp  [obj,ix]    = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] IndexArrayOp [obj,ix]    = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      []  WriteArrayOp [obj,ix,v]  = OpDest_AllDone $ doWritePtrArrayOp obj ix v
 
-emitPrimOp _      [res] IndexArrayArrayOp_ByteArray         [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] IndexArrayArrayOp_ArrayArray        [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] ReadArrayArrayOp_ByteArray          [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] ReadArrayArrayOp_MutableByteArray   [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] ReadArrayArrayOp_ArrayArray         [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      [res] ReadArrayArrayOp_MutableArrayArray  [obj,ix]   = doReadPtrArrayOp res obj ix
-emitPrimOp _      []  WriteArrayArrayOp_ByteArray         [obj,ix,v] = doWritePtrArrayOp obj ix v
-emitPrimOp _      []  WriteArrayArrayOp_MutableByteArray  [obj,ix,v] = doWritePtrArrayOp obj ix v
-emitPrimOp _      []  WriteArrayArrayOp_ArrayArray        [obj,ix,v] = doWritePtrArrayOp obj ix v
-emitPrimOp _      []  WriteArrayArrayOp_MutableArrayArray [obj,ix,v] = doWritePtrArrayOp obj ix v
+emitPrimOp _      [res] IndexArrayArrayOp_ByteArray         [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] IndexArrayArrayOp_ArrayArray        [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] ReadArrayArrayOp_ByteArray          [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] ReadArrayArrayOp_MutableByteArray   [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] ReadArrayArrayOp_ArrayArray         [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      [res] ReadArrayArrayOp_MutableArrayArray  [obj,ix]   = OpDest_AllDone $ doReadPtrArrayOp res obj ix
+emitPrimOp _      []  WriteArrayArrayOp_ByteArray         [obj,ix,v] = OpDest_AllDone $ doWritePtrArrayOp obj ix v
+emitPrimOp _      []  WriteArrayArrayOp_MutableByteArray  [obj,ix,v] = OpDest_AllDone $ doWritePtrArrayOp obj ix v
+emitPrimOp _      []  WriteArrayArrayOp_ArrayArray        [obj,ix,v] = OpDest_AllDone $ doWritePtrArrayOp obj ix v
+emitPrimOp _      []  WriteArrayArrayOp_MutableArrayArray [obj,ix,v] = OpDest_AllDone $ doWritePtrArrayOp obj ix v
 
-emitPrimOp _      [res] ReadSmallArrayOp  [obj,ix] = doReadSmallPtrArrayOp res obj ix
-emitPrimOp _      [res] IndexSmallArrayOp [obj,ix] = doReadSmallPtrArrayOp res obj ix
-emitPrimOp _      []  WriteSmallArrayOp [obj,ix,v] = doWriteSmallPtrArrayOp obj ix v
+emitPrimOp _      [res] ReadSmallArrayOp  [obj,ix] = OpDest_AllDone $ doReadSmallPtrArrayOp res obj ix
+emitPrimOp _      [res] IndexSmallArrayOp [obj,ix] = OpDest_AllDone $ doReadSmallPtrArrayOp res obj ix
+emitPrimOp _      []  WriteSmallArrayOp [obj,ix,v] = OpDest_AllDone $ doWriteSmallPtrArrayOp obj ix v
 
 -- Getting the size of pointer arrays
 
-emitPrimOp dflags [res] SizeofArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
+  SizeofArrayOp -> let [res] = reses; [arg] = args in  OpDest_AllDone $ emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
     (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
         (bWord dflags))
-emitPrimOp dflags [res] SizeofMutableArrayOp [arg]
-   = emitPrimOp dflags [res] SizeofArrayOp [arg]
-emitPrimOp dflags [res] SizeofArrayArrayOp [arg]
-   = emitPrimOp dflags [res] SizeofArrayOp [arg]
-emitPrimOp dflags [res] SizeofMutableArrayArrayOp [arg]
-   = emitPrimOp dflags [res] SizeofArrayOp [arg]
+  SizeofMutableArrayOp -> let [res] = reses; [arg] = args in  OpDest_AllDone $ emitPrimOp dflags [res] SizeofArrayOp [arg]
+  SizeofArrayArrayOp -> let [res] = reses; [arg] = args in  OpDest_AllDone $ emitPrimOp dflags [res] SizeofArrayOp [arg]
+  SizeofMutableArrayArrayOp -> let [res] = reses; [arg] = args in OpDest_AllDone $ emitPrimOp dflags [res] SizeofArrayOp [arg]
 
-emitPrimOp dflags [res] SizeofSmallArrayOp [arg] =
+emitPrimOp dflags [res] SizeofSmallArrayOp [arg] = OpDest_AllDone $
     emit $ mkAssign (CmmLocal res)
     (cmmLoadIndexW dflags arg
      (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
@@ -433,232 +460,232 @@ emitPrimOp dflags [res] SizeofSmallMutableArrayOp [arg] =
 
 -- IndexXXXoffAddr
 
-emitPrimOp dflags res IndexOffAddrOp_Char             args = doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
-emitPrimOp dflags res IndexOffAddrOp_WideChar         args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp dflags res IndexOffAddrOp_Int              args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexOffAddrOp_Word             args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexOffAddrOp_Addr             args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp _      res IndexOffAddrOp_Float            args = doIndexOffAddrOp   Nothing f32 res args
-emitPrimOp _      res IndexOffAddrOp_Double           args = doIndexOffAddrOp   Nothing f64 res args
-emitPrimOp dflags res IndexOffAddrOp_StablePtr        args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexOffAddrOp_Int8             args = doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
-emitPrimOp dflags res IndexOffAddrOp_Int16            args = doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
-emitPrimOp dflags res IndexOffAddrOp_Int32            args = doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
-emitPrimOp _      res IndexOffAddrOp_Int64            args = doIndexOffAddrOp   Nothing b64 res args
-emitPrimOp dflags res IndexOffAddrOp_Word8            args = doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
-emitPrimOp dflags res IndexOffAddrOp_Word16           args = doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
-emitPrimOp dflags res IndexOffAddrOp_Word32           args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp _      res IndexOffAddrOp_Word64           args = doIndexOffAddrOp   Nothing b64 res args
+emitPrimOp dflags res IndexOffAddrOp_Char             args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
+emitPrimOp dflags res IndexOffAddrOp_WideChar         args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp dflags res IndexOffAddrOp_Int              args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexOffAddrOp_Word             args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexOffAddrOp_Addr             args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp _      res IndexOffAddrOp_Float            args = OpDest_AllDone $ doIndexOffAddrOp   Nothing f32 res args
+emitPrimOp _      res IndexOffAddrOp_Double           args = OpDest_AllDone $ doIndexOffAddrOp   Nothing f64 res args
+emitPrimOp dflags res IndexOffAddrOp_StablePtr        args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexOffAddrOp_Int8             args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
+emitPrimOp dflags res IndexOffAddrOp_Int16            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
+emitPrimOp dflags res IndexOffAddrOp_Int32            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
+emitPrimOp _      res IndexOffAddrOp_Int64            args = OpDest_AllDone $ doIndexOffAddrOp   Nothing b64 res args
+emitPrimOp dflags res IndexOffAddrOp_Word8            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
+emitPrimOp dflags res IndexOffAddrOp_Word16           args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
+emitPrimOp dflags res IndexOffAddrOp_Word32           args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp _      res IndexOffAddrOp_Word64           args = OpDest_AllDone $ doIndexOffAddrOp   Nothing b64 res args
 
 -- ReadXXXoffAddr, which are identical, for our purposes, to IndexXXXoffAddr.
 
-emitPrimOp dflags res ReadOffAddrOp_Char             args = doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
-emitPrimOp dflags res ReadOffAddrOp_WideChar         args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp dflags res ReadOffAddrOp_Int              args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadOffAddrOp_Word             args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadOffAddrOp_Addr             args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp _      res ReadOffAddrOp_Float            args = doIndexOffAddrOp   Nothing f32 res args
-emitPrimOp _      res ReadOffAddrOp_Double           args = doIndexOffAddrOp   Nothing f64 res args
-emitPrimOp dflags res ReadOffAddrOp_StablePtr        args = doIndexOffAddrOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadOffAddrOp_Int8             args = doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
-emitPrimOp dflags res ReadOffAddrOp_Int16            args = doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
-emitPrimOp dflags res ReadOffAddrOp_Int32            args = doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
-emitPrimOp _      res ReadOffAddrOp_Int64            args = doIndexOffAddrOp   Nothing b64 res args
-emitPrimOp dflags res ReadOffAddrOp_Word8            args = doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
-emitPrimOp dflags res ReadOffAddrOp_Word16           args = doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
-emitPrimOp dflags res ReadOffAddrOp_Word32           args = doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp _      res ReadOffAddrOp_Word64           args = doIndexOffAddrOp   Nothing b64 res args
+emitPrimOp dflags res ReadOffAddrOp_Char             args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8 res args
+emitPrimOp dflags res ReadOffAddrOp_WideChar         args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp dflags res ReadOffAddrOp_Int              args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadOffAddrOp_Word             args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadOffAddrOp_Addr             args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp _      res ReadOffAddrOp_Float            args = OpDest_AllDone $ doIndexOffAddrOp   Nothing f32 res args
+emitPrimOp _      res ReadOffAddrOp_Double           args = OpDest_AllDone $ doIndexOffAddrOp   Nothing f64 res args
+emitPrimOp dflags res ReadOffAddrOp_StablePtr        args = OpDest_AllDone $ doIndexOffAddrOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadOffAddrOp_Int8             args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_8ToWord dflags)) b8  res args
+emitPrimOp dflags res ReadOffAddrOp_Int16            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_16ToWord dflags)) b16 res args
+emitPrimOp dflags res ReadOffAddrOp_Int32            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_s_32ToWord dflags)) b32 res args
+emitPrimOp _      res ReadOffAddrOp_Int64            args = OpDest_AllDone $ doIndexOffAddrOp   Nothing b64 res args
+emitPrimOp dflags res ReadOffAddrOp_Word8            args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_8ToWord dflags)) b8  res args
+emitPrimOp dflags res ReadOffAddrOp_Word16           args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_16ToWord dflags)) b16 res args
+emitPrimOp dflags res ReadOffAddrOp_Word32           args = OpDest_AllDone $ doIndexOffAddrOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp _      res ReadOffAddrOp_Word64           args = OpDest_AllDone $ doIndexOffAddrOp   Nothing b64 res args
 
 -- IndexXXXArray
 
-emitPrimOp dflags res IndexByteArrayOp_Char             args = doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
-emitPrimOp dflags res IndexByteArrayOp_WideChar         args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp dflags res IndexByteArrayOp_Int              args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexByteArrayOp_Word             args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexByteArrayOp_Addr             args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp _      res IndexByteArrayOp_Float            args = doIndexByteArrayOp   Nothing f32 res args
-emitPrimOp _      res IndexByteArrayOp_Double           args = doIndexByteArrayOp   Nothing f64 res args
-emitPrimOp dflags res IndexByteArrayOp_StablePtr        args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res IndexByteArrayOp_Int8             args = doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
-emitPrimOp dflags res IndexByteArrayOp_Int16            args = doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
-emitPrimOp dflags res IndexByteArrayOp_Int32            args = doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
-emitPrimOp _      res IndexByteArrayOp_Int64            args = doIndexByteArrayOp   Nothing b64  res args
-emitPrimOp dflags res IndexByteArrayOp_Word8            args = doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
-emitPrimOp dflags res IndexByteArrayOp_Word16           args = doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
-emitPrimOp dflags res IndexByteArrayOp_Word32           args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
-emitPrimOp _      res IndexByteArrayOp_Word64           args = doIndexByteArrayOp   Nothing b64  res args
+emitPrimOp dflags res IndexByteArrayOp_Char             args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_WideChar         args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp dflags res IndexByteArrayOp_Int              args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexByteArrayOp_Word             args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexByteArrayOp_Addr             args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp _      res IndexByteArrayOp_Float            args = OpDest_AllDone $ doIndexByteArrayOp   Nothing f32 res args
+emitPrimOp _      res IndexByteArrayOp_Double           args = OpDest_AllDone $ doIndexByteArrayOp   Nothing f64 res args
+emitPrimOp dflags res IndexByteArrayOp_StablePtr        args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res IndexByteArrayOp_Int8             args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
+emitPrimOp dflags res IndexByteArrayOp_Int16            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
+emitPrimOp dflags res IndexByteArrayOp_Int32            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
+emitPrimOp _      res IndexByteArrayOp_Int64            args = OpDest_AllDone $ doIndexByteArrayOp   Nothing b64  res args
+emitPrimOp dflags res IndexByteArrayOp_Word8            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
+emitPrimOp dflags res IndexByteArrayOp_Word16           args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
+emitPrimOp dflags res IndexByteArrayOp_Word32           args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
+emitPrimOp _      res IndexByteArrayOp_Word64           args = OpDest_AllDone $ doIndexByteArrayOp   Nothing b64  res args
 
 -- ReadXXXArray, identical to IndexXXXArray.
 
-emitPrimOp dflags res ReadByteArrayOp_Char             args = doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
-emitPrimOp dflags res ReadByteArrayOp_WideChar         args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
-emitPrimOp dflags res ReadByteArrayOp_Int              args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadByteArrayOp_Word             args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadByteArrayOp_Addr             args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp _      res ReadByteArrayOp_Float            args = doIndexByteArrayOp   Nothing f32 res args
-emitPrimOp _      res ReadByteArrayOp_Double           args = doIndexByteArrayOp   Nothing f64 res args
-emitPrimOp dflags res ReadByteArrayOp_StablePtr        args = doIndexByteArrayOp   Nothing (bWord dflags) res args
-emitPrimOp dflags res ReadByteArrayOp_Int8             args = doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
-emitPrimOp dflags res ReadByteArrayOp_Int16            args = doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
-emitPrimOp dflags res ReadByteArrayOp_Int32            args = doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
-emitPrimOp _      res ReadByteArrayOp_Int64            args = doIndexByteArrayOp   Nothing b64  res args
-emitPrimOp dflags res ReadByteArrayOp_Word8            args = doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
-emitPrimOp dflags res ReadByteArrayOp_Word16           args = doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
-emitPrimOp dflags res ReadByteArrayOp_Word32           args = doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
-emitPrimOp _      res ReadByteArrayOp_Word64           args = doIndexByteArrayOp   Nothing b64  res args
+emitPrimOp dflags res ReadByteArrayOp_Char             args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_WideChar         args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32 res args
+emitPrimOp dflags res ReadByteArrayOp_Int              args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadByteArrayOp_Word             args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadByteArrayOp_Addr             args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp _      res ReadByteArrayOp_Float            args = OpDest_AllDone $ doIndexByteArrayOp   Nothing f32 res args
+emitPrimOp _      res ReadByteArrayOp_Double           args = OpDest_AllDone $ doIndexByteArrayOp   Nothing f64 res args
+emitPrimOp dflags res ReadByteArrayOp_StablePtr        args = OpDest_AllDone $ doIndexByteArrayOp   Nothing (bWord dflags) res args
+emitPrimOp dflags res ReadByteArrayOp_Int8             args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_8ToWord dflags)) b8  res args
+emitPrimOp dflags res ReadByteArrayOp_Int16            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_16ToWord dflags)) b16  res args
+emitPrimOp dflags res ReadByteArrayOp_Int32            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_s_32ToWord dflags)) b32  res args
+emitPrimOp _      res ReadByteArrayOp_Int64            args = OpDest_AllDone $ doIndexByteArrayOp   Nothing b64  res args
+emitPrimOp dflags res ReadByteArrayOp_Word8            args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_8ToWord dflags)) b8  res args
+emitPrimOp dflags res ReadByteArrayOp_Word16           args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_16ToWord dflags)) b16  res args
+emitPrimOp dflags res ReadByteArrayOp_Word32           args = OpDest_AllDone $ doIndexByteArrayOp   (Just (mo_u_32ToWord dflags)) b32  res args
+emitPrimOp _      res ReadByteArrayOp_Word64           args = OpDest_AllDone $ doIndexByteArrayOp   Nothing b64  res args
 
 -- IndexWord8ArrayAsXXX
 
-emitPrimOp dflags res IndexByteArrayOp_Word8AsChar      args = doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsWideChar  args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsInt       args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsWord      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsAddr      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp _      res IndexByteArrayOp_Word8AsFloat     args = doIndexByteArrayOpAs   Nothing f32 b8 res args
-emitPrimOp _      res IndexByteArrayOp_Word8AsDouble    args = doIndexByteArrayOpAs   Nothing f64 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsStablePtr args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsInt16     args = doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsInt32     args = doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
-emitPrimOp _      res IndexByteArrayOp_Word8AsInt64     args = doIndexByteArrayOpAs   Nothing b64 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsWord16    args = doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
-emitPrimOp dflags res IndexByteArrayOp_Word8AsWord32    args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
-emitPrimOp _      res IndexByteArrayOp_Word8AsWord64    args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsChar      args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWideChar  args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt       args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord      args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsAddr      args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsFloat     args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing f32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsDouble    args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing f64 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsStablePtr args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt16     args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsInt32     args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsInt64     args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord16    args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res IndexByteArrayOp_Word8AsWord32    args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res IndexByteArrayOp_Word8AsWord64    args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing b64 b8 res args
 
 -- ReadInt8ArrayAsXXX, identical to IndexInt8ArrayAsXXX
 
-emitPrimOp dflags res ReadByteArrayOp_Word8AsChar      args = doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsWideChar  args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsInt       args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsWord      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsAddr      args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp _      res ReadByteArrayOp_Word8AsFloat     args = doIndexByteArrayOpAs   Nothing f32 b8 res args
-emitPrimOp _      res ReadByteArrayOp_Word8AsDouble    args = doIndexByteArrayOpAs   Nothing f64 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsStablePtr args = doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsInt16     args = doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsInt32     args = doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
-emitPrimOp _      res ReadByteArrayOp_Word8AsInt64     args = doIndexByteArrayOpAs   Nothing b64 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsWord16    args = doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
-emitPrimOp dflags res ReadByteArrayOp_Word8AsWord32    args = doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
-emitPrimOp _      res ReadByteArrayOp_Word8AsWord64    args = doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsChar      args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_8ToWord dflags)) b8 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWideChar  args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt       args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord      args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsAddr      args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsFloat     args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing f32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsDouble    args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing f64 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsStablePtr args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing (bWord dflags) b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt16     args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_s_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsInt32     args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_s_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsInt64     args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing b64 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord16    args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_16ToWord dflags)) b16 b8 res args
+emitPrimOp dflags res ReadByteArrayOp_Word8AsWord32    args = OpDest_AllDone $ doIndexByteArrayOpAs   (Just (mo_u_32ToWord dflags)) b32 b8 res args
+emitPrimOp _      res ReadByteArrayOp_Word8AsWord64    args = OpDest_AllDone $ doIndexByteArrayOpAs   Nothing b64 b8 res args
 
 -- WriteXXXoffAddr
 
-emitPrimOp dflags res WriteOffAddrOp_Char             args = doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteOffAddrOp_WideChar         args = doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp dflags res WriteOffAddrOp_Int              args = doWriteOffAddrOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteOffAddrOp_Word             args = doWriteOffAddrOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteOffAddrOp_Addr             args = doWriteOffAddrOp Nothing (bWord dflags) res args
-emitPrimOp _      res WriteOffAddrOp_Float            args = doWriteOffAddrOp Nothing f32 res args
-emitPrimOp _      res WriteOffAddrOp_Double           args = doWriteOffAddrOp Nothing f64 res args
-emitPrimOp dflags res WriteOffAddrOp_StablePtr        args = doWriteOffAddrOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteOffAddrOp_Int8             args = doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteOffAddrOp_Int16            args = doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteOffAddrOp_Int32            args = doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteOffAddrOp_Int64            args = doWriteOffAddrOp Nothing b64 res args
-emitPrimOp dflags res WriteOffAddrOp_Word8            args = doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteOffAddrOp_Word16           args = doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteOffAddrOp_Word32           args = doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteOffAddrOp_Word64           args = doWriteOffAddrOp Nothing b64 res args
+emitPrimOp dflags res WriteOffAddrOp_Char             args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteOffAddrOp_WideChar         args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp dflags res WriteOffAddrOp_Int              args = OpDest_AllDone $ doWriteOffAddrOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteOffAddrOp_Word             args = OpDest_AllDone $ doWriteOffAddrOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteOffAddrOp_Addr             args = OpDest_AllDone $ doWriteOffAddrOp Nothing (bWord dflags) res args
+emitPrimOp _      res WriteOffAddrOp_Float            args = OpDest_AllDone $ doWriteOffAddrOp Nothing f32 res args
+emitPrimOp _      res WriteOffAddrOp_Double           args = OpDest_AllDone $ doWriteOffAddrOp Nothing f64 res args
+emitPrimOp dflags res WriteOffAddrOp_StablePtr        args = OpDest_AllDone $ doWriteOffAddrOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteOffAddrOp_Int8             args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteOffAddrOp_Int16            args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
+emitPrimOp dflags res WriteOffAddrOp_Int32            args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp _      res WriteOffAddrOp_Int64            args = OpDest_AllDone $ doWriteOffAddrOp Nothing b64 res args
+emitPrimOp dflags res WriteOffAddrOp_Word8            args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteOffAddrOp_Word16           args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo16 dflags)) b16 res args
+emitPrimOp dflags res WriteOffAddrOp_Word32           args = OpDest_AllDone $ doWriteOffAddrOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp _      res WriteOffAddrOp_Word64           args = OpDest_AllDone $ doWriteOffAddrOp Nothing b64 res args
 
 -- WriteXXXArray
 
-emitPrimOp dflags res WriteByteArrayOp_Char             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_WideChar         args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp dflags res WriteByteArrayOp_Int              args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Word             args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Addr             args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp _      res WriteByteArrayOp_Float            args = doWriteByteArrayOp Nothing f32 res args
-emitPrimOp _      res WriteByteArrayOp_Double           args = doWriteByteArrayOp Nothing f64 res args
-emitPrimOp dflags res WriteByteArrayOp_StablePtr        args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Int8             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Int16            args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteByteArrayOp_Int32            args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteByteArrayOp_Int64            args = doWriteByteArrayOp Nothing b64 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8            args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8  res args
-emitPrimOp dflags res WriteByteArrayOp_Word16           args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteByteArrayOp_Word32           args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteByteArrayOp_Word64           args = doWriteByteArrayOp Nothing b64 res args
+emitPrimOp dflags res WriteByteArrayOp_Char             args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteByteArrayOp_WideChar         args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp dflags res WriteByteArrayOp_Int              args = OpDest_AllDone $ doWriteByteArrayOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Word             args = OpDest_AllDone $ doWriteByteArrayOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Addr             args = OpDest_AllDone $ doWriteByteArrayOp Nothing (bWord dflags) res args
+emitPrimOp _      res WriteByteArrayOp_Float            args = OpDest_AllDone $ doWriteByteArrayOp Nothing f32 res args
+emitPrimOp _      res WriteByteArrayOp_Double           args = OpDest_AllDone $ doWriteByteArrayOp Nothing f64 res args
+emitPrimOp dflags res WriteByteArrayOp_StablePtr        args = OpDest_AllDone $ doWriteByteArrayOp Nothing (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Int8             args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Int16            args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+emitPrimOp dflags res WriteByteArrayOp_Int32            args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp _      res WriteByteArrayOp_Int64            args = OpDest_AllDone $ doWriteByteArrayOp Nothing b64 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8            args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8  res args
+emitPrimOp dflags res WriteByteArrayOp_Word16           args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+emitPrimOp dflags res WriteByteArrayOp_Word32           args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+emitPrimOp _      res WriteByteArrayOp_Word64           args = OpDest_AllDone $ doWriteByteArrayOp Nothing b64 res args
 
 -- WriteInt8ArrayAsXXX
 
-emitPrimOp dflags res WriteByteArrayOp_Word8AsChar       args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWideChar   args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsInt        args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsWord       args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsAddr       args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsFloat      args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsDouble     args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsStablePtr  args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsInt16      args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsInt32      args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsInt64      args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWord16     args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWord32     args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsWord64     args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsChar       args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWideChar   args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsInt        args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsWord       args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsAddr       args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsFloat      args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsDouble     args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsStablePtr  args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt16      args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt32      args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsInt64      args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord16     args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord32     args = OpDest_AllDone $ doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsWord64     args = OpDest_AllDone $ doWriteByteArrayOp Nothing b8 res args
 
 -- Copying and setting byte arrays
-emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
+emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] = OpDest_AllDone $
     doCopyByteArrayOp src src_off dst dst_off n
-emitPrimOp _      [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
+emitPrimOp _      [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] = OpDest_AllDone $
     doCopyMutableByteArrayOp src src_off dst dst_off n
-emitPrimOp _      [] CopyByteArrayToAddrOp [src,src_off,dst,n] =
+emitPrimOp _      [] CopyByteArrayToAddrOp [src,src_off,dst,n] = OpDest_AllDone $
     doCopyByteArrayToAddrOp src src_off dst n
-emitPrimOp _      [] CopyMutableByteArrayToAddrOp [src,src_off,dst,n] =
+emitPrimOp _      [] CopyMutableByteArrayToAddrOp [src,src_off,dst,n] = OpDest_AllDone $
     doCopyMutableByteArrayToAddrOp src src_off dst n
-emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] =
+emitPrimOp _      [] CopyAddrToByteArrayOp [src,dst,dst_off,n] = OpDest_AllDone $
     doCopyAddrToByteArrayOp src dst dst_off n
-emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] =
+emitPrimOp _      [] SetByteArrayOp [ba,off,len,c] = OpDest_AllDone $
     doSetByteArrayOp ba off len c
 
 -- Comparing byte arrays
-emitPrimOp _      [res] CompareByteArraysOp [ba1,ba1_off,ba2,ba2_off,n] =
+emitPrimOp _      [res] CompareByteArraysOp [ba1,ba1_off,ba2,ba2_off,n] = OpDest_AllDone $
     doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n
 
-emitPrimOp _      [res] BSwap16Op [w] = emitBSwapCall res w W16
-emitPrimOp _      [res] BSwap32Op [w] = emitBSwapCall res w W32
-emitPrimOp _      [res] BSwap64Op [w] = emitBSwapCall res w W64
-emitPrimOp dflags [res] BSwapOp   [w] = emitBSwapCall res w (wordWidth dflags)
+emitPrimOp _      [res] BSwap16Op [w] = OpDest_AllDone $ emitBSwapCall res w W16
+emitPrimOp _      [res] BSwap32Op [w] = OpDest_AllDone $ emitBSwapCall res w W32
+emitPrimOp _      [res] BSwap64Op [w] = OpDest_AllDone $ emitBSwapCall res w W64
+emitPrimOp dflags [res] BSwapOp   [w] = OpDest_AllDone $ emitBSwapCall res w (wordWidth dflags)
 
-emitPrimOp _      [res] BRev8Op  [w] = emitBRevCall res w W8
-emitPrimOp _      [res] BRev16Op [w] = emitBRevCall res w W16
-emitPrimOp _      [res] BRev32Op [w] = emitBRevCall res w W32
-emitPrimOp _      [res] BRev64Op [w] = emitBRevCall res w W64
-emitPrimOp dflags [res] BRevOp   [w] = emitBRevCall res w (wordWidth dflags)
+emitPrimOp _      [res] BRev8Op  [w] = OpDest_AllDone $ emitBRevCall res w W8
+emitPrimOp _      [res] BRev16Op [w] = OpDest_AllDone $ emitBRevCall res w W16
+emitPrimOp _      [res] BRev32Op [w] = OpDest_AllDone $ emitBRevCall res w W32
+emitPrimOp _      [res] BRev64Op [w] = OpDest_AllDone $ emitBRevCall res w W64
+emitPrimOp dflags [res] BRevOp   [w] = OpDest_AllDone $ emitBRevCall res w (wordWidth dflags)
 
 -- Population count
-emitPrimOp _      [res] PopCnt8Op  [w] = emitPopCntCall res w W8
-emitPrimOp _      [res] PopCnt16Op [w] = emitPopCntCall res w W16
-emitPrimOp _      [res] PopCnt32Op [w] = emitPopCntCall res w W32
-emitPrimOp _      [res] PopCnt64Op [w] = emitPopCntCall res w W64
-emitPrimOp dflags [res] PopCntOp   [w] = emitPopCntCall res w (wordWidth dflags)
+emitPrimOp _      [res] PopCnt8Op  [w] = OpDest_AllDone $ emitPopCntCall res w W8
+emitPrimOp _      [res] PopCnt16Op [w] = OpDest_AllDone $ emitPopCntCall res w W16
+emitPrimOp _      [res] PopCnt32Op [w] = OpDest_AllDone $ emitPopCntCall res w W32
+emitPrimOp _      [res] PopCnt64Op [w] = OpDest_AllDone $ emitPopCntCall res w W64
+emitPrimOp dflags [res] PopCntOp   [w] = OpDest_AllDone $ emitPopCntCall res w (wordWidth dflags)
 
 -- Parallel bit deposit
-emitPrimOp _      [res] Pdep8Op  [src, mask] = emitPdepCall res src mask W8
-emitPrimOp _      [res] Pdep16Op [src, mask] = emitPdepCall res src mask W16
-emitPrimOp _      [res] Pdep32Op [src, mask] = emitPdepCall res src mask W32
-emitPrimOp _      [res] Pdep64Op [src, mask] = emitPdepCall res src mask W64
-emitPrimOp dflags [res] PdepOp   [src, mask] = emitPdepCall res src mask (wordWidth dflags)
+emitPrimOp _      [res] Pdep8Op  [src, mask] = OpDest_AllDone $ emitPdepCall res src mask W8
+emitPrimOp _      [res] Pdep16Op [src, mask] = OpDest_AllDone $ emitPdepCall res src mask W16
+emitPrimOp _      [res] Pdep32Op [src, mask] = OpDest_AllDone $ emitPdepCall res src mask W32
+emitPrimOp _      [res] Pdep64Op [src, mask] = OpDest_AllDone $ emitPdepCall res src mask W64
+emitPrimOp dflags [res] PdepOp   [src, mask] = OpDest_AllDone $ emitPdepCall res src mask (wordWidth dflags)
 
 -- Parallel bit extract
-emitPrimOp _      [res] Pext8Op  [src, mask] = emitPextCall res src mask W8
-emitPrimOp _      [res] Pext16Op [src, mask] = emitPextCall res src mask W16
-emitPrimOp _      [res] Pext32Op [src, mask] = emitPextCall res src mask W32
-emitPrimOp _      [res] Pext64Op [src, mask] = emitPextCall res src mask W64
-emitPrimOp dflags [res] PextOp   [src, mask] = emitPextCall res src mask (wordWidth dflags)
+emitPrimOp _      [res] Pext8Op  [src, mask] = OpDest_AllDone $ emitPextCall res src mask W8
+emitPrimOp _      [res] Pext16Op [src, mask] = OpDest_AllDone $ emitPextCall res src mask W16
+emitPrimOp _      [res] Pext32Op [src, mask] = OpDest_AllDone $ emitPextCall res src mask W32
+emitPrimOp _      [res] Pext64Op [src, mask] = OpDest_AllDone $ emitPextCall res src mask W64
+emitPrimOp dflags [res] PextOp   [src, mask] = OpDest_AllDone $ emitPextCall res src mask (wordWidth dflags)
 
 -- count leading zeros
-emitPrimOp _      [res] Clz8Op  [w] = emitClzCall res w W8
-emitPrimOp _      [res] Clz16Op [w] = emitClzCall res w W16
-emitPrimOp _      [res] Clz32Op [w] = emitClzCall res w W32
-emitPrimOp _      [res] Clz64Op [w] = emitClzCall res w W64
-emitPrimOp dflags [res] ClzOp   [w] = emitClzCall res w (wordWidth dflags)
+emitPrimOp _      [res] Clz8Op  [w] = OpDest_AllDone $ emitClzCall res w W8
+emitPrimOp _      [res] Clz16Op [w] = OpDest_AllDone $ emitClzCall res w W16
+emitPrimOp _      [res] Clz32Op [w] = OpDest_AllDone $ emitClzCall res w W32
+emitPrimOp _      [res] Clz64Op [w] = OpDest_AllDone $ emitClzCall res w W64
+emitPrimOp dflags [res] ClzOp   [w] = OpDest_AllDone $ emitClzCall res w (wordWidth dflags)
 
 -- count trailing zeros
-emitPrimOp _      [res] Ctz8Op [w]  = emitCtzCall res w W8
-emitPrimOp _      [res] Ctz16Op [w] = emitCtzCall res w W16
-emitPrimOp _      [res] Ctz32Op [w] = emitCtzCall res w W32
-emitPrimOp _      [res] Ctz64Op [w] = emitCtzCall res w W64
-emitPrimOp dflags [res] CtzOp   [w] = emitCtzCall res w (wordWidth dflags)
+emitPrimOp _      [res] Ctz8Op [w]  = OpDest_AllDone $ emitCtzCall res w W8
+emitPrimOp _      [res] Ctz16Op [w] = OpDest_AllDone $ emitCtzCall res w W16
+emitPrimOp _      [res] Ctz32Op [w] = OpDest_AllDone $ emitCtzCall res w W32
+emitPrimOp _      [res] Ctz64Op [w] = OpDest_AllDone $ emitCtzCall res w W64
+emitPrimOp dflags [res] CtzOp   [w] = OpDest_AllDone $ emitCtzCall res w (wordWidth dflags)
 
 -- Unsigned int to floating point conversions
 emitPrimOp _      [res] Word2FloatOp  [w] = emitPrimCall [res]
@@ -667,7 +694,7 @@ emitPrimOp _      [res] Word2DoubleOp [w] = emitPrimCall [res]
                                             (MO_UF_Conv W64) [w]
 
 -- SIMD primops
-emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
+emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros (replicate n e) res
   where
@@ -683,7 +710,7 @@ emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
+emitPrimOp dflags [res] (VecPackOp vcat n w) es = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
@@ -701,7 +728,7 @@ emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = do
+emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
@@ -710,56 +737,56 @@ emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = do
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags [res] (VecInsertOp vcat n w) [v,e,i] = do
+emitPrimOp dflags [res] (VecInsertOp vcat n w) [v,e,i] = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doVecInsertOp (vecElemInjectCast dflags vcat w) ty v e i res
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecIndexByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecIndexByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexByteArrayOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecReadByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecReadByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexByteArrayOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecWriteByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecWriteByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doWriteByteArrayOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecIndexOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecIndexOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexOffAddrOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecReadOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecReadOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexOffAddrOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecWriteOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecWriteOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doWriteOffAddrOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
-emitPrimOp dflags res (VecIndexScalarByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecIndexScalarByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexByteArrayOpAs Nothing vecty ty res args
   where
@@ -769,7 +796,7 @@ emitPrimOp dflags res (VecIndexScalarByteArrayOp vcat n w) args = do
     ty :: CmmType
     ty = vecCmmCat vcat w
 
-emitPrimOp dflags res (VecReadScalarByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecReadScalarByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexByteArrayOpAs Nothing vecty ty res args
   where
@@ -779,14 +806,14 @@ emitPrimOp dflags res (VecReadScalarByteArrayOp vcat n w) args = do
     ty :: CmmType
     ty = vecCmmCat vcat w
 
-emitPrimOp dflags res (VecWriteScalarByteArrayOp vcat n w) args = do
+emitPrimOp dflags res (VecWriteScalarByteArrayOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doWriteByteArrayOp Nothing ty res args
   where
     ty :: CmmType
     ty = vecCmmCat vcat w
 
-emitPrimOp dflags res (VecIndexScalarOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecIndexScalarOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexOffAddrOpAs Nothing vecty ty res args
   where
@@ -796,7 +823,7 @@ emitPrimOp dflags res (VecIndexScalarOffAddrOp vcat n w) args = do
     ty :: CmmType
     ty = vecCmmCat vcat w
 
-emitPrimOp dflags res (VecReadScalarOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecReadScalarOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doIndexOffAddrOpAs Nothing vecty ty res args
   where
@@ -806,7 +833,7 @@ emitPrimOp dflags res (VecReadScalarOffAddrOp vcat n w) args = do
     ty :: CmmType
     ty = vecCmmCat vcat w
 
-emitPrimOp dflags res (VecWriteScalarOffAddrOp vcat n w) args = do
+emitPrimOp dflags res (VecWriteScalarOffAddrOp vcat n w) args = OpDest_AllDone $ do
     checkVecCompatibility dflags vcat n w
     doWriteOffAddrOp Nothing ty res args
   where
@@ -814,48 +841,63 @@ emitPrimOp dflags res (VecWriteScalarOffAddrOp vcat n w) args = do
     ty = vecCmmCat vcat w
 
 -- Prefetch
-emitPrimOp _ [] PrefetchByteArrayOp3        args = doPrefetchByteArrayOp 3  args
-emitPrimOp _ [] PrefetchMutableByteArrayOp3 args = doPrefetchMutableByteArrayOp 3  args
-emitPrimOp _ [] PrefetchAddrOp3             args = doPrefetchAddrOp  3  args
-emitPrimOp _ [] PrefetchValueOp3            args = doPrefetchValueOp 3 args
+emitPrimOp _ [] PrefetchByteArrayOp3        args = OpDest_AllDone $ doPrefetchByteArrayOp 3  args
+emitPrimOp _ [] PrefetchMutableByteArrayOp3 args = OpDest_AllDone $ doPrefetchMutableByteArrayOp 3  args
+emitPrimOp _ [] PrefetchAddrOp3             args = OpDest_AllDone $ doPrefetchAddrOp  3  args
+emitPrimOp _ [] PrefetchValueOp3            args = OpDest_AllDone $ doPrefetchValueOp 3 args
 
-emitPrimOp _ [] PrefetchByteArrayOp2        args = doPrefetchByteArrayOp 2  args
-emitPrimOp _ [] PrefetchMutableByteArrayOp2 args = doPrefetchMutableByteArrayOp 2  args
-emitPrimOp _ [] PrefetchAddrOp2             args = doPrefetchAddrOp 2  args
-emitPrimOp _ [] PrefetchValueOp2           args = doPrefetchValueOp 2 args
+emitPrimOp _ [] PrefetchByteArrayOp2        args = OpDest_AllDone $ doPrefetchByteArrayOp 2  args
+emitPrimOp _ [] PrefetchMutableByteArrayOp2 args = OpDest_AllDone $ doPrefetchMutableByteArrayOp 2  args
+emitPrimOp _ [] PrefetchAddrOp2             args = OpDest_AllDone $ doPrefetchAddrOp 2  args
+emitPrimOp _ [] PrefetchValueOp2           args = OpDest_AllDone $ doPrefetchValueOp 2 args
 
-emitPrimOp _ [] PrefetchByteArrayOp1        args = doPrefetchByteArrayOp 1  args
-emitPrimOp _ [] PrefetchMutableByteArrayOp1 args = doPrefetchMutableByteArrayOp 1  args
-emitPrimOp _ [] PrefetchAddrOp1             args = doPrefetchAddrOp 1  args
-emitPrimOp _ [] PrefetchValueOp1            args = doPrefetchValueOp 1 args
+emitPrimOp _ [] PrefetchByteArrayOp1        args = OpDest_AllDone $ doPrefetchByteArrayOp 1  args
+emitPrimOp _ [] PrefetchMutableByteArrayOp1 args = OpDest_AllDone $ doPrefetchMutableByteArrayOp 1  args
+emitPrimOp _ [] PrefetchAddrOp1             args = OpDest_AllDone $ doPrefetchAddrOp 1  args
+emitPrimOp _ [] PrefetchValueOp1            args = OpDest_AllDone $ doPrefetchValueOp 1 args
 
-emitPrimOp _ [] PrefetchByteArrayOp0        args = doPrefetchByteArrayOp 0  args
-emitPrimOp _ [] PrefetchMutableByteArrayOp0 args = doPrefetchMutableByteArrayOp 0  args
-emitPrimOp _ [] PrefetchAddrOp0             args = doPrefetchAddrOp 0  args
-emitPrimOp _ [] PrefetchValueOp0            args = doPrefetchValueOp 0 args
+emitPrimOp _ [] PrefetchByteArrayOp0        args = OpDest_AllDone $ doPrefetchByteArrayOp 0  args
+emitPrimOp _ [] PrefetchMutableByteArrayOp0 args = OpDest_AllDone $ doPrefetchMutableByteArrayOp 0  args
+emitPrimOp _ [] PrefetchAddrOp0             args = OpDest_AllDone $ doPrefetchAddrOp 0  args
+emitPrimOp _ [] PrefetchValueOp0            args = OpDest_AllDone $ doPrefetchValueOp 0 args
 
 -- Atomic read-modify-write
-emitPrimOp dflags [res] FetchAddByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchAddByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_Add mba ix (bWord dflags) n
-emitPrimOp dflags [res] FetchSubByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchSubByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_Sub mba ix (bWord dflags) n
-emitPrimOp dflags [res] FetchAndByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchAndByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_And mba ix (bWord dflags) n
-emitPrimOp dflags [res] FetchNandByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchNandByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_Nand mba ix (bWord dflags) n
-emitPrimOp dflags [res] FetchOrByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchOrByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_Or mba ix (bWord dflags) n
-emitPrimOp dflags [res] FetchXorByteArrayOp_Int [mba, ix, n] =
+emitPrimOp dflags [res] FetchXorByteArrayOp_Int [mba, ix, n] = OpDest_AllDone $
     doAtomicRMW res AMO_Xor mba ix (bWord dflags) n
-emitPrimOp dflags [res] AtomicReadByteArrayOp_Int [mba, ix] =
+emitPrimOp dflags [res] AtomicReadByteArrayOp_Int [mba, ix] = OpDest_AllDone $
     doAtomicReadByteArray res mba ix (bWord dflags)
-emitPrimOp dflags [] AtomicWriteByteArrayOp_Int [mba, ix, val] =
+emitPrimOp dflags [] AtomicWriteByteArrayOp_Int [mba, ix, val] = OpDest_AllDone $
     doAtomicWriteByteArray mba ix (bWord dflags) val
-emitPrimOp dflags [res] CasByteArrayOp_Int [mba, ix, old, new] =
+emitPrimOp dflags [res] CasByteArrayOp_Int [mba, ix, old, new] = OpDest_AllDone $
     doCasByteArray res mba ix (bWord dflags) old new
 
+
+  Int2WordOp      -> OpDest_Nop
+  Word2IntOp      -> OpDest_Nop
+  Int2AddrOp      -> OpDest_Nop
+  Addr2IntOp      -> OpDest_Nop
+  ChrOp           -> OpDest_Nop  -- Int# and Char# are rep'd the same
+  OrdOp           -> OpDest_Nop
+
+
+emitPrimOp' :: DynFlags
+           -> [LocalReg]        -- where to put the results
+           -> PrimOp            -- the op
+           -> [CmmExpr]         -- arguments
+           -> FCode ()
+
 -- The rest just translate straightforwardly
-emitPrimOp dflags [res] op [arg]
+emitPrimOp' dflags [res] op [arg]
    | nopOp op
    = emitAssign (CmmLocal res) arg
 
@@ -893,7 +935,6 @@ callishPrimOpSupported dflags op
       Int16QuotRemOp | ncg && (x86ish || ppc)
                                      -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
-
 
       WordQuotRemOp  | ncg && (x86ish || ppc) ->
                          Left (MO_U_QuotRem  (wordWidth dflags))
@@ -1240,249 +1281,325 @@ genericFabsOp w [res_r] [aa]
 
 genericFabsOp _ _ _ = panic "genericFabsOp"
 
--- These PrimOps are NOPs in Cmm
+-- | Helper datatype used to ensure completion. Should be totally eliminated in
+-- optimized builds.
+data OpDest
+  = OpDest_Nop
+  | OpDest_Narrow !(Width -> Width -> MachOp, Width)
+  | OpDest_Callish !CallishMachOp
+  | OpDest_Translate !MachOp
+  -- | handled in 'callishPrimOpSupported'
+  | OpDest_CallishHandledLater
+  | OpDest_AllDone (FCode ())
 
+
+-- | These PrimOps are NOPs in Cmm
 nopOp :: PrimOp -> Bool
-nopOp Int2WordOp     = True
-nopOp Word2IntOp     = True
-nopOp Int2AddrOp     = True
-nopOp Addr2IntOp     = True
-nopOp ChrOp          = True  -- Int# and Char# are rep'd the same
-nopOp OrdOp          = True
-nopOp _              = False
+nopOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Nop -> True
+  _ -> False
 
--- These PrimOps turn into double casts
-
+-- | These PrimOps turn into double casts
 narrowOp :: PrimOp -> Maybe (Width -> Width -> MachOp, Width)
-narrowOp Narrow8IntOp   = Just (MO_SS_Conv, W8)
-narrowOp Narrow16IntOp  = Just (MO_SS_Conv, W16)
-narrowOp Narrow32IntOp  = Just (MO_SS_Conv, W32)
-narrowOp Narrow8WordOp  = Just (MO_UU_Conv, W8)
-narrowOp Narrow16WordOp = Just (MO_UU_Conv, W16)
-narrowOp Narrow32WordOp = Just (MO_UU_Conv, W32)
-narrowOp _              = Nothing
+narrowOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Narrow x -> Just x
+  _ -> Nothing
+
+-- | These primops are implemented by CallishMachOps, because they sometimes
+-- turn into foreign calls depending on the backend.
+callishOp :: PrimOp -> Maybe CallishMachOp
+callishOp op = case dealWithOp (error "should not need dynflags") op of
+  OpDest_Callish x -> Just x
+  _ -> Nothing
+
+translateOp :: DynFlags -> PrimOp -> Maybe MachOp
+translateOp dflags op = case dealWithOp dflags op of
+  OpDest_Translate x -> Just x
+  _ -> Nothing
+
+{-# INLINE dealWithOp #-}
+-- | Combination of the three previous functions to ensure completeness.
+dealWithOp :: DynFlags -> PrimOp -> OpDest
+dealWithOp dflags = \case
+
+  Narrow8IntOp   -> OpDest_Narrow (MO_SS_Conv, W8)
+  Narrow16IntOp  -> OpDest_Narrow (MO_SS_Conv, W16)
+  Narrow32IntOp  -> OpDest_Narrow (MO_SS_Conv, W32)
+  Narrow8WordOp  -> OpDest_Narrow (MO_UU_Conv, W8)
+  Narrow16WordOp -> OpDest_Narrow (MO_UU_Conv, W16)
+  Narrow32WordOp -> OpDest_Narrow (MO_UU_Conv, W32)
+
+  DoublePowerOp  -> OpDest_Callish MO_F64_Pwr
+  DoubleSinOp    -> OpDest_Callish MO_F64_Sin
+  DoubleCosOp    -> OpDest_Callish MO_F64_Cos
+  DoubleTanOp    -> OpDest_Callish MO_F64_Tan
+  DoubleSinhOp   -> OpDest_Callish MO_F64_Sinh
+  DoubleCoshOp   -> OpDest_Callish MO_F64_Cosh
+  DoubleTanhOp   -> OpDest_Callish MO_F64_Tanh
+  DoubleAsinOp   -> OpDest_Callish MO_F64_Asin
+  DoubleAcosOp   -> OpDest_Callish MO_F64_Acos
+  DoubleAtanOp   -> OpDest_Callish MO_F64_Atan
+  DoubleAsinhOp  -> OpDest_Callish MO_F64_Asinh
+  DoubleAcoshOp  -> OpDest_Callish MO_F64_Acosh
+  DoubleAtanhOp  -> OpDest_Callish MO_F64_Atanh
+  DoubleLogOp    -> OpDest_Callish MO_F64_Log
+  DoubleLog1POp  -> OpDest_Callish MO_F64_Log1P
+  DoubleExpOp    -> OpDest_Callish MO_F64_Exp
+  DoubleExpM1Op  -> OpDest_Callish MO_F64_ExpM1
+  DoubleSqrtOp   -> OpDest_Callish MO_F64_Sqrt
+
+  FloatPowerOp   -> OpDest_Callish MO_F32_Pwr
+  FloatSinOp     -> OpDest_Callish MO_F32_Sin
+  FloatCosOp     -> OpDest_Callish MO_F32_Cos
+  FloatTanOp     -> OpDest_Callish MO_F32_Tan
+  FloatSinhOp    -> OpDest_Callish MO_F32_Sinh
+  FloatCoshOp    -> OpDest_Callish MO_F32_Cosh
+  FloatTanhOp    -> OpDest_Callish MO_F32_Tanh
+  FloatAsinOp    -> OpDest_Callish MO_F32_Asin
+  FloatAcosOp    -> OpDest_Callish MO_F32_Acos
+  FloatAtanOp    -> OpDest_Callish MO_F32_Atan
+  FloatAsinhOp   -> OpDest_Callish MO_F32_Asinh
+  FloatAcoshOp   -> OpDest_Callish MO_F32_Acosh
+  FloatAtanhOp   -> OpDest_Callish MO_F32_Atanh
+  FloatLogOp     -> OpDest_Callish MO_F32_Log
+  FloatLog1POp   -> OpDest_Callish MO_F32_Log1P
+  FloatExpOp     -> OpDest_Callish MO_F32_Exp
+  FloatExpM1Op   -> OpDest_Callish MO_F32_ExpM1
+  FloatSqrtOp    -> OpDest_Callish MO_F32_Sqrt
 
 -- Native word signless ops
 
-translateOp :: DynFlags -> PrimOp -> Maybe MachOp
-translateOp dflags IntAddOp       = Just (mo_wordAdd dflags)
-translateOp dflags IntSubOp       = Just (mo_wordSub dflags)
-translateOp dflags WordAddOp      = Just (mo_wordAdd dflags)
-translateOp dflags WordSubOp      = Just (mo_wordSub dflags)
-translateOp dflags AddrAddOp      = Just (mo_wordAdd dflags)
-translateOp dflags AddrSubOp      = Just (mo_wordSub dflags)
+  IntAddOp       -> OpDest_Translate (mo_wordAdd dflags)
+  IntSubOp       -> OpDest_Translate (mo_wordSub dflags)
+  WordAddOp      -> OpDest_Translate (mo_wordAdd dflags)
+  WordSubOp      -> OpDest_Translate (mo_wordSub dflags)
+  AddrAddOp      -> OpDest_Translate (mo_wordAdd dflags)
+  AddrSubOp      -> OpDest_Translate (mo_wordSub dflags)
 
-translateOp dflags IntEqOp        = Just (mo_wordEq dflags)
-translateOp dflags IntNeOp        = Just (mo_wordNe dflags)
-translateOp dflags WordEqOp       = Just (mo_wordEq dflags)
-translateOp dflags WordNeOp       = Just (mo_wordNe dflags)
-translateOp dflags AddrEqOp       = Just (mo_wordEq dflags)
-translateOp dflags AddrNeOp       = Just (mo_wordNe dflags)
+  IntEqOp        -> OpDest_Translate (mo_wordEq dflags)
+  IntNeOp        -> OpDest_Translate (mo_wordNe dflags)
+  WordEqOp       -> OpDest_Translate (mo_wordEq dflags)
+  WordNeOp       -> OpDest_Translate (mo_wordNe dflags)
+  AddrEqOp       -> OpDest_Translate (mo_wordEq dflags)
+  AddrNeOp       -> OpDest_Translate (mo_wordNe dflags)
 
-translateOp dflags AndOp          = Just (mo_wordAnd dflags)
-translateOp dflags OrOp           = Just (mo_wordOr dflags)
-translateOp dflags XorOp          = Just (mo_wordXor dflags)
-translateOp dflags NotOp          = Just (mo_wordNot dflags)
-translateOp dflags SllOp          = Just (mo_wordShl dflags)
-translateOp dflags SrlOp          = Just (mo_wordUShr dflags)
+  AndOp          -> OpDest_Translate (mo_wordAnd dflags)
+  OrOp           -> OpDest_Translate (mo_wordOr dflags)
+  XorOp          -> OpDest_Translate (mo_wordXor dflags)
+  NotOp          -> OpDest_Translate (mo_wordNot dflags)
+  SllOp          -> OpDest_Translate (mo_wordShl dflags)
+  SrlOp          -> OpDest_Translate (mo_wordUShr dflags)
 
-translateOp dflags AddrRemOp      = Just (mo_wordURem dflags)
+  AddrRemOp      -> OpDest_Translate (mo_wordURem dflags)
 
 -- Native word signed ops
 
-translateOp dflags IntMulOp        = Just (mo_wordMul dflags)
-translateOp dflags IntMulMayOfloOp = Just (MO_S_MulMayOflo (wordWidth dflags))
-translateOp dflags IntQuotOp       = Just (mo_wordSQuot dflags)
-translateOp dflags IntRemOp        = Just (mo_wordSRem dflags)
-translateOp dflags IntNegOp        = Just (mo_wordSNeg dflags)
+  IntMulOp        -> OpDest_Translate (mo_wordMul dflags)
+  IntMulMayOfloOp -> OpDest_Translate (MO_S_MulMayOflo (wordWidth dflags))
+  IntQuotOp       -> OpDest_Translate (mo_wordSQuot dflags)
+  IntRemOp        -> OpDest_Translate (mo_wordSRem dflags)
+  IntNegOp        -> OpDest_Translate (mo_wordSNeg dflags)
 
 
-translateOp dflags IntGeOp        = Just (mo_wordSGe dflags)
-translateOp dflags IntLeOp        = Just (mo_wordSLe dflags)
-translateOp dflags IntGtOp        = Just (mo_wordSGt dflags)
-translateOp dflags IntLtOp        = Just (mo_wordSLt dflags)
+  IntGeOp        -> OpDest_Translate (mo_wordSGe dflags)
+  IntLeOp        -> OpDest_Translate (mo_wordSLe dflags)
+  IntGtOp        -> OpDest_Translate (mo_wordSGt dflags)
+  IntLtOp        -> OpDest_Translate (mo_wordSLt dflags)
 
-translateOp dflags AndIOp         = Just (mo_wordAnd dflags)
-translateOp dflags OrIOp          = Just (mo_wordOr dflags)
-translateOp dflags XorIOp         = Just (mo_wordXor dflags)
-translateOp dflags NotIOp         = Just (mo_wordNot dflags)
-translateOp dflags ISllOp         = Just (mo_wordShl dflags)
-translateOp dflags ISraOp         = Just (mo_wordSShr dflags)
-translateOp dflags ISrlOp         = Just (mo_wordUShr dflags)
+  ISllOp         -> OpDest_Translate (mo_wordShl dflags)
+  ISraOp         -> OpDest_Translate (mo_wordSShr dflags)
+  ISrlOp         -> OpDest_Translate (mo_wordUShr dflags)
 
 -- Native word unsigned ops
 
-translateOp dflags WordGeOp       = Just (mo_wordUGe dflags)
-translateOp dflags WordLeOp       = Just (mo_wordULe dflags)
-translateOp dflags WordGtOp       = Just (mo_wordUGt dflags)
-translateOp dflags WordLtOp       = Just (mo_wordULt dflags)
+  WordGeOp       -> OpDest_Translate (mo_wordUGe dflags)
+  WordLeOp       -> OpDest_Translate (mo_wordULe dflags)
+  WordGtOp       -> OpDest_Translate (mo_wordUGt dflags)
+  WordLtOp       -> OpDest_Translate (mo_wordULt dflags)
 
-translateOp dflags WordMulOp      = Just (mo_wordMul dflags)
-translateOp dflags WordQuotOp     = Just (mo_wordUQuot dflags)
-translateOp dflags WordRemOp      = Just (mo_wordURem dflags)
+  WordMulOp      -> OpDest_Translate (mo_wordMul dflags)
+  WordQuotOp     -> OpDest_Translate (mo_wordUQuot dflags)
+  WordRemOp      -> OpDest_Translate (mo_wordURem dflags)
 
-translateOp dflags AddrGeOp       = Just (mo_wordUGe dflags)
-translateOp dflags AddrLeOp       = Just (mo_wordULe dflags)
-translateOp dflags AddrGtOp       = Just (mo_wordUGt dflags)
-translateOp dflags AddrLtOp       = Just (mo_wordULt dflags)
+  AddrGeOp       -> OpDest_Translate (mo_wordUGe dflags)
+  AddrLeOp       -> OpDest_Translate (mo_wordULe dflags)
+  AddrGtOp       -> OpDest_Translate (mo_wordUGt dflags)
+  AddrLtOp       -> OpDest_Translate (mo_wordULt dflags)
 
 -- Int8# signed ops
 
-translateOp dflags Int8Extend     = Just (MO_SS_Conv W8 (wordWidth dflags))
-translateOp dflags Int8Narrow     = Just (MO_SS_Conv (wordWidth dflags) W8)
-translateOp _      Int8NegOp      = Just (MO_S_Neg W8)
-translateOp _      Int8AddOp      = Just (MO_Add W8)
-translateOp _      Int8SubOp      = Just (MO_Sub W8)
-translateOp _      Int8MulOp      = Just (MO_Mul W8)
-translateOp _      Int8QuotOp     = Just (MO_S_Quot W8)
-translateOp _      Int8RemOp      = Just (MO_S_Rem W8)
+  Int8Extend     -> OpDest_Translate (MO_SS_Conv W8 (wordWidth dflags))
+  Int8Narrow     -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W8)
+  Int8NegOp      -> OpDest_Translate (MO_S_Neg W8)
+  Int8AddOp      -> OpDest_Translate (MO_Add W8)
+  Int8SubOp      -> OpDest_Translate (MO_Sub W8)
+  Int8MulOp      -> OpDest_Translate (MO_Mul W8)
+  Int8QuotOp     -> OpDest_Translate (MO_S_Quot W8)
+  Int8RemOp      -> OpDest_Translate (MO_S_Rem W8)
 
-translateOp _      Int8EqOp       = Just (MO_Eq W8)
-translateOp _      Int8GeOp       = Just (MO_S_Ge W8)
-translateOp _      Int8GtOp       = Just (MO_S_Gt W8)
-translateOp _      Int8LeOp       = Just (MO_S_Le W8)
-translateOp _      Int8LtOp       = Just (MO_S_Lt W8)
-translateOp _      Int8NeOp       = Just (MO_Ne W8)
+  Int8EqOp       -> OpDest_Translate (MO_Eq W8)
+  Int8GeOp       -> OpDest_Translate (MO_S_Ge W8)
+  Int8GtOp       -> OpDest_Translate (MO_S_Gt W8)
+  Int8LeOp       -> OpDest_Translate (MO_S_Le W8)
+  Int8LtOp       -> OpDest_Translate (MO_S_Lt W8)
+  Int8NeOp       -> OpDest_Translate (MO_Ne W8)
 
 -- Word8# unsigned ops
 
-translateOp dflags Word8Extend     = Just (MO_UU_Conv W8 (wordWidth dflags))
-translateOp dflags Word8Narrow     = Just (MO_UU_Conv (wordWidth dflags) W8)
-translateOp _      Word8NotOp      = Just (MO_Not W8)
-translateOp _      Word8AddOp      = Just (MO_Add W8)
-translateOp _      Word8SubOp      = Just (MO_Sub W8)
-translateOp _      Word8MulOp      = Just (MO_Mul W8)
-translateOp _      Word8QuotOp     = Just (MO_U_Quot W8)
-translateOp _      Word8RemOp      = Just (MO_U_Rem W8)
+  Word8Extend     -> OpDest_Translate (MO_UU_Conv W8 (wordWidth dflags))
+  Word8Narrow     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W8)
+  Word8NotOp      -> OpDest_Translate (MO_Not W8)
+  Word8AddOp      -> OpDest_Translate (MO_Add W8)
+  Word8SubOp      -> OpDest_Translate (MO_Sub W8)
+  Word8MulOp      -> OpDest_Translate (MO_Mul W8)
+  Word8QuotOp     -> OpDest_Translate (MO_U_Quot W8)
+  Word8RemOp      -> OpDest_Translate (MO_U_Rem W8)
 
-translateOp _      Word8EqOp       = Just (MO_Eq W8)
-translateOp _      Word8GeOp       = Just (MO_U_Ge W8)
-translateOp _      Word8GtOp       = Just (MO_U_Gt W8)
-translateOp _      Word8LeOp       = Just (MO_U_Le W8)
-translateOp _      Word8LtOp       = Just (MO_U_Lt W8)
-translateOp _      Word8NeOp       = Just (MO_Ne W8)
+  Word8EqOp       -> OpDest_Translate (MO_Eq W8)
+  Word8GeOp       -> OpDest_Translate (MO_U_Ge W8)
+  Word8GtOp       -> OpDest_Translate (MO_U_Gt W8)
+  Word8LeOp       -> OpDest_Translate (MO_U_Le W8)
+  Word8LtOp       -> OpDest_Translate (MO_U_Lt W8)
+  Word8NeOp       -> OpDest_Translate (MO_Ne W8)
 
 -- Int16# signed ops
 
-translateOp dflags Int16Extend     = Just (MO_SS_Conv W16 (wordWidth dflags))
-translateOp dflags Int16Narrow     = Just (MO_SS_Conv (wordWidth dflags) W16)
-translateOp _      Int16NegOp      = Just (MO_S_Neg W16)
-translateOp _      Int16AddOp      = Just (MO_Add W16)
-translateOp _      Int16SubOp      = Just (MO_Sub W16)
-translateOp _      Int16MulOp      = Just (MO_Mul W16)
-translateOp _      Int16QuotOp     = Just (MO_S_Quot W16)
-translateOp _      Int16RemOp      = Just (MO_S_Rem W16)
+  Int16Extend     -> OpDest_Translate (MO_SS_Conv W16 (wordWidth dflags))
+  Int16Narrow     -> OpDest_Translate (MO_SS_Conv (wordWidth dflags) W16)
+  Int16NegOp      -> OpDest_Translate (MO_S_Neg W16)
+  Int16AddOp      -> OpDest_Translate (MO_Add W16)
+  Int16SubOp      -> OpDest_Translate (MO_Sub W16)
+  Int16MulOp      -> OpDest_Translate (MO_Mul W16)
+  Int16QuotOp     -> OpDest_Translate (MO_S_Quot W16)
+  Int16RemOp      -> OpDest_Translate (MO_S_Rem W16)
 
-translateOp _      Int16EqOp       = Just (MO_Eq W16)
-translateOp _      Int16GeOp       = Just (MO_S_Ge W16)
-translateOp _      Int16GtOp       = Just (MO_S_Gt W16)
-translateOp _      Int16LeOp       = Just (MO_S_Le W16)
-translateOp _      Int16LtOp       = Just (MO_S_Lt W16)
-translateOp _      Int16NeOp       = Just (MO_Ne W16)
+  Int16EqOp       -> OpDest_Translate (MO_Eq W16)
+  Int16GeOp       -> OpDest_Translate (MO_S_Ge W16)
+  Int16GtOp       -> OpDest_Translate (MO_S_Gt W16)
+  Int16LeOp       -> OpDest_Translate (MO_S_Le W16)
+  Int16LtOp       -> OpDest_Translate (MO_S_Lt W16)
+  Int16NeOp       -> OpDest_Translate (MO_Ne W16)
 
 -- Word16# unsigned ops
 
-translateOp dflags Word16Extend     = Just (MO_UU_Conv W16 (wordWidth dflags))
-translateOp dflags Word16Narrow     = Just (MO_UU_Conv (wordWidth dflags) W16)
-translateOp _      Word16NotOp      = Just (MO_Not W16)
-translateOp _      Word16AddOp      = Just (MO_Add W16)
-translateOp _      Word16SubOp      = Just (MO_Sub W16)
-translateOp _      Word16MulOp      = Just (MO_Mul W16)
-translateOp _      Word16QuotOp     = Just (MO_U_Quot W16)
-translateOp _      Word16RemOp      = Just (MO_U_Rem W16)
+  Word16Extend     -> OpDest_Translate (MO_UU_Conv W16 (wordWidth dflags))
+  Word16Narrow     -> OpDest_Translate (MO_UU_Conv (wordWidth dflags) W16)
+  Word16NotOp      -> OpDest_Translate (MO_Not W16)
+  Word16AddOp      -> OpDest_Translate (MO_Add W16)
+  Word16SubOp      -> OpDest_Translate (MO_Sub W16)
+  Word16MulOp      -> OpDest_Translate (MO_Mul W16)
+  Word16QuotOp     -> OpDest_Translate (MO_U_Quot W16)
+  Word16RemOp      -> OpDest_Translate (MO_U_Rem W16)
 
-translateOp _      Word16EqOp       = Just (MO_Eq W16)
-translateOp _      Word16GeOp       = Just (MO_U_Ge W16)
-translateOp _      Word16GtOp       = Just (MO_U_Gt W16)
-translateOp _      Word16LeOp       = Just (MO_U_Le W16)
-translateOp _      Word16LtOp       = Just (MO_U_Lt W16)
-translateOp _      Word16NeOp       = Just (MO_Ne W16)
+  Word16EqOp       -> OpDest_Translate (MO_Eq W16)
+  Word16GeOp       -> OpDest_Translate (MO_U_Ge W16)
+  Word16GtOp       -> OpDest_Translate (MO_U_Gt W16)
+  Word16LeOp       -> OpDest_Translate (MO_U_Le W16)
+  Word16LtOp       -> OpDest_Translate (MO_U_Lt W16)
+  Word16NeOp       -> OpDest_Translate (MO_Ne W16)
 
 -- Char# ops
 
-translateOp dflags CharEqOp       = Just (MO_Eq (wordWidth dflags))
-translateOp dflags CharNeOp       = Just (MO_Ne (wordWidth dflags))
-translateOp dflags CharGeOp       = Just (MO_U_Ge (wordWidth dflags))
-translateOp dflags CharLeOp       = Just (MO_U_Le (wordWidth dflags))
-translateOp dflags CharGtOp       = Just (MO_U_Gt (wordWidth dflags))
-translateOp dflags CharLtOp       = Just (MO_U_Lt (wordWidth dflags))
+  CharEqOp       -> OpDest_Translate (MO_Eq (wordWidth dflags))
+  CharNeOp       -> OpDest_Translate (MO_Ne (wordWidth dflags))
+  CharGeOp       -> OpDest_Translate (MO_U_Ge (wordWidth dflags))
+  CharLeOp       -> OpDest_Translate (MO_U_Le (wordWidth dflags))
+  CharGtOp       -> OpDest_Translate (MO_U_Gt (wordWidth dflags))
+  CharLtOp       -> OpDest_Translate (MO_U_Lt (wordWidth dflags))
 
 -- Double ops
 
-translateOp _      DoubleEqOp     = Just (MO_F_Eq W64)
-translateOp _      DoubleNeOp     = Just (MO_F_Ne W64)
-translateOp _      DoubleGeOp     = Just (MO_F_Ge W64)
-translateOp _      DoubleLeOp     = Just (MO_F_Le W64)
-translateOp _      DoubleGtOp     = Just (MO_F_Gt W64)
-translateOp _      DoubleLtOp     = Just (MO_F_Lt W64)
+  DoubleEqOp     -> OpDest_Translate (MO_F_Eq W64)
+  DoubleNeOp     -> OpDest_Translate (MO_F_Ne W64)
+  DoubleGeOp     -> OpDest_Translate (MO_F_Ge W64)
+  DoubleLeOp     -> OpDest_Translate (MO_F_Le W64)
+  DoubleGtOp     -> OpDest_Translate (MO_F_Gt W64)
+  DoubleLtOp     -> OpDest_Translate (MO_F_Lt W64)
 
-translateOp _      DoubleAddOp    = Just (MO_F_Add W64)
-translateOp _      DoubleSubOp    = Just (MO_F_Sub W64)
-translateOp _      DoubleMulOp    = Just (MO_F_Mul W64)
-translateOp _      DoubleDivOp    = Just (MO_F_Quot W64)
-translateOp _      DoubleNegOp    = Just (MO_F_Neg W64)
+  DoubleAddOp    -> OpDest_Translate (MO_F_Add W64)
+  DoubleSubOp    -> OpDest_Translate (MO_F_Sub W64)
+  DoubleMulOp    -> OpDest_Translate (MO_F_Mul W64)
+  DoubleDivOp    -> OpDest_Translate (MO_F_Quot W64)
+  DoubleNegOp    -> OpDest_Translate (MO_F_Neg W64)
 
 -- Float ops
 
-translateOp _      FloatEqOp     = Just (MO_F_Eq W32)
-translateOp _      FloatNeOp     = Just (MO_F_Ne W32)
-translateOp _      FloatGeOp     = Just (MO_F_Ge W32)
-translateOp _      FloatLeOp     = Just (MO_F_Le W32)
-translateOp _      FloatGtOp     = Just (MO_F_Gt W32)
-translateOp _      FloatLtOp     = Just (MO_F_Lt W32)
+  FloatEqOp     -> OpDest_Translate (MO_F_Eq W32)
+  FloatNeOp     -> OpDest_Translate (MO_F_Ne W32)
+  FloatGeOp     -> OpDest_Translate (MO_F_Ge W32)
+  FloatLeOp     -> OpDest_Translate (MO_F_Le W32)
+  FloatGtOp     -> OpDest_Translate (MO_F_Gt W32)
+  FloatLtOp     -> OpDest_Translate (MO_F_Lt W32)
 
-translateOp _      FloatAddOp    = Just (MO_F_Add  W32)
-translateOp _      FloatSubOp    = Just (MO_F_Sub  W32)
-translateOp _      FloatMulOp    = Just (MO_F_Mul  W32)
-translateOp _      FloatDivOp    = Just (MO_F_Quot W32)
-translateOp _      FloatNegOp    = Just (MO_F_Neg  W32)
+  FloatAddOp    -> OpDest_Translate (MO_F_Add  W32)
+  FloatSubOp    -> OpDest_Translate (MO_F_Sub  W32)
+  FloatMulOp    -> OpDest_Translate (MO_F_Mul  W32)
+  FloatDivOp    -> OpDest_Translate (MO_F_Quot W32)
+  FloatNegOp    -> OpDest_Translate (MO_F_Neg  W32)
 
 -- Vector ops
 
-translateOp _ (VecAddOp FloatVec n w) = Just (MO_VF_Add  n w)
-translateOp _ (VecSubOp FloatVec n w) = Just (MO_VF_Sub  n w)
-translateOp _ (VecMulOp FloatVec n w) = Just (MO_VF_Mul  n w)
-translateOp _ (VecDivOp FloatVec n w) = Just (MO_VF_Quot n w)
-translateOp _ (VecNegOp FloatVec n w) = Just (MO_VF_Neg  n w)
+  (VecAddOp FloatVec n w) -> OpDest_Translate (MO_VF_Add  n w)
+  (VecSubOp FloatVec n w) -> OpDest_Translate (MO_VF_Sub  n w)
+  (VecMulOp FloatVec n w) -> OpDest_Translate (MO_VF_Mul  n w)
+  (VecDivOp FloatVec n w) -> OpDest_Translate (MO_VF_Quot n w)
+  (VecNegOp FloatVec n w) -> OpDest_Translate (MO_VF_Neg  n w)
 
-translateOp _ (VecAddOp  IntVec n w) = Just (MO_V_Add   n w)
-translateOp _ (VecSubOp  IntVec n w) = Just (MO_V_Sub   n w)
-translateOp _ (VecMulOp  IntVec n w) = Just (MO_V_Mul   n w)
-translateOp _ (VecQuotOp IntVec n w) = Just (MO_VS_Quot n w)
-translateOp _ (VecRemOp  IntVec n w) = Just (MO_VS_Rem  n w)
-translateOp _ (VecNegOp  IntVec n w) = Just (MO_VS_Neg  n w)
+  (VecAddOp  IntVec n w) -> OpDest_Translate (MO_V_Add   n w)
+  (VecSubOp  IntVec n w) -> OpDest_Translate (MO_V_Sub   n w)
+  (VecMulOp  IntVec n w) -> OpDest_Translate (MO_V_Mul   n w)
+  (VecQuotOp IntVec n w) -> OpDest_Translate (MO_VS_Quot n w)
+  (VecRemOp  IntVec n w) -> OpDest_Translate (MO_VS_Rem  n w)
+  (VecNegOp  IntVec n w) -> OpDest_Translate (MO_VS_Neg  n w)
 
-translateOp _ (VecAddOp  WordVec n w) = Just (MO_V_Add   n w)
-translateOp _ (VecSubOp  WordVec n w) = Just (MO_V_Sub   n w)
-translateOp _ (VecMulOp  WordVec n w) = Just (MO_V_Mul   n w)
-translateOp _ (VecQuotOp WordVec n w) = Just (MO_VU_Quot n w)
-translateOp _ (VecRemOp  WordVec n w) = Just (MO_VU_Rem  n w)
+  (VecAddOp  WordVec n w) -> OpDest_Translate (MO_V_Add   n w)
+  (VecSubOp  WordVec n w) -> OpDest_Translate (MO_V_Sub   n w)
+  (VecMulOp  WordVec n w) -> OpDest_Translate (MO_V_Mul   n w)
+  (VecQuotOp WordVec n w) -> OpDest_Translate (MO_VU_Quot n w)
+  (VecRemOp  WordVec n w) -> OpDest_Translate (MO_VU_Rem  n w)
 
 -- Conversions
 
-translateOp dflags Int2DoubleOp   = Just (MO_SF_Conv (wordWidth dflags) W64)
-translateOp dflags Double2IntOp   = Just (MO_FS_Conv W64 (wordWidth dflags))
+  Int2DoubleOp   -> OpDest_Translate (MO_SF_Conv (wordWidth dflags) W64)
+  Double2IntOp   -> OpDest_Translate (MO_FS_Conv W64 (wordWidth dflags))
 
-translateOp dflags Int2FloatOp    = Just (MO_SF_Conv (wordWidth dflags) W32)
-translateOp dflags Float2IntOp    = Just (MO_FS_Conv W32 (wordWidth dflags))
+  Int2FloatOp    -> OpDest_Translate (MO_SF_Conv (wordWidth dflags) W32)
+  Float2IntOp    -> OpDest_Translate (MO_FS_Conv W32 (wordWidth dflags))
 
-translateOp _      Float2DoubleOp = Just (MO_FF_Conv W32 W64)
-translateOp _      Double2FloatOp = Just (MO_FF_Conv W64 W32)
+  Float2DoubleOp -> OpDest_Translate (MO_FF_Conv W32 W64)
+  Double2FloatOp -> OpDest_Translate (MO_FF_Conv W64 W32)
 
 -- Word comparisons masquerading as more exotic things.
 
-translateOp dflags SameMutVarOp           = Just (mo_wordEq dflags)
-translateOp dflags SameMVarOp             = Just (mo_wordEq dflags)
-translateOp dflags SameMutableArrayOp     = Just (mo_wordEq dflags)
-translateOp dflags SameMutableByteArrayOp = Just (mo_wordEq dflags)
-translateOp dflags SameMutableArrayArrayOp= Just (mo_wordEq dflags)
-translateOp dflags SameSmallMutableArrayOp= Just (mo_wordEq dflags)
-translateOp dflags SameTVarOp             = Just (mo_wordEq dflags)
-translateOp dflags EqStablePtrOp          = Just (mo_wordEq dflags)
+  SameMutVarOp            -> OpDest_Translate (mo_wordEq dflags)
+  SameMVarOp              -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableArrayOp      -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableByteArrayOp  -> OpDest_Translate (mo_wordEq dflags)
+  SameMutableArrayArrayOp -> OpDest_Translate (mo_wordEq dflags)
+  SameSmallMutableArrayOp -> OpDest_Translate (mo_wordEq dflags)
+  SameTVarOp              -> OpDest_Translate (mo_wordEq dflags)
+  EqStablePtrOp           -> OpDest_Translate (mo_wordEq dflags)
 -- See Note [Comparing stable names]
-translateOp dflags EqStableNameOp         = Just (mo_wordEq dflags)
+  EqStableNameOp          -> OpDest_Translate (mo_wordEq dflags)
 
-translateOp _      _ = Nothing
+-- handled in 'callishPrimOpSupported'
+  IntQuotRemOp    -> OpDest_CallishHandledLater
+  Int8QuotRemOp   -> OpDest_CallishHandledLater
+  Int16QuotRemOp  -> OpDest_CallishHandledLater
+  WordQuotRemOp   -> OpDest_CallishHandledLater
+  WordQuotRem2Op  -> OpDest_CallishHandledLater
+  Word8QuotRemOp  -> OpDest_CallishHandledLater
+  Word16QuotRemOp -> OpDest_CallishHandledLater
+  WordAdd2Op      -> OpDest_CallishHandledLater
+  WordAddCOp      -> OpDest_CallishHandledLater
+  WordSubCOp      -> OpDest_CallishHandledLater
+  IntAddCOp       -> OpDest_CallishHandledLater
+  IntSubCOp       -> OpDest_CallishHandledLater
+  WordMul2Op      -> OpDest_CallishHandledLater
+  FloatFabsOp     -> OpDest_CallishHandledLater
+  DoubleFabsOp    -> OpDest_CallishHandledLater
+
+  _ -> OpDest_CallishHandledLater -- already handled TODO
 
 -- Note [Comparing stable names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1494,50 +1611,6 @@ translateOp _      _ = Nothing
 -- this is not necessary: there is a one-to-one correspondence
 -- between SNOs and entries in the SNT, so simple pointer equality
 -- does the trick.
-
--- These primops are implemented by CallishMachOps, because they sometimes
--- turn into foreign calls depending on the backend.
-
-callishOp :: PrimOp -> Maybe CallishMachOp
-callishOp DoublePowerOp  = Just MO_F64_Pwr
-callishOp DoubleSinOp    = Just MO_F64_Sin
-callishOp DoubleCosOp    = Just MO_F64_Cos
-callishOp DoubleTanOp    = Just MO_F64_Tan
-callishOp DoubleSinhOp   = Just MO_F64_Sinh
-callishOp DoubleCoshOp   = Just MO_F64_Cosh
-callishOp DoubleTanhOp   = Just MO_F64_Tanh
-callishOp DoubleAsinOp   = Just MO_F64_Asin
-callishOp DoubleAcosOp   = Just MO_F64_Acos
-callishOp DoubleAtanOp   = Just MO_F64_Atan
-callishOp DoubleAsinhOp  = Just MO_F64_Asinh
-callishOp DoubleAcoshOp  = Just MO_F64_Acosh
-callishOp DoubleAtanhOp  = Just MO_F64_Atanh
-callishOp DoubleLogOp    = Just MO_F64_Log
-callishOp DoubleLog1POp  = Just MO_F64_Log1P
-callishOp DoubleExpOp    = Just MO_F64_Exp
-callishOp DoubleExpM1Op  = Just MO_F64_ExpM1
-callishOp DoubleSqrtOp   = Just MO_F64_Sqrt
-
-callishOp FloatPowerOp  = Just MO_F32_Pwr
-callishOp FloatSinOp    = Just MO_F32_Sin
-callishOp FloatCosOp    = Just MO_F32_Cos
-callishOp FloatTanOp    = Just MO_F32_Tan
-callishOp FloatSinhOp   = Just MO_F32_Sinh
-callishOp FloatCoshOp   = Just MO_F32_Cosh
-callishOp FloatTanhOp   = Just MO_F32_Tanh
-callishOp FloatAsinOp   = Just MO_F32_Asin
-callishOp FloatAcosOp   = Just MO_F32_Acos
-callishOp FloatAtanOp   = Just MO_F32_Atan
-callishOp FloatAsinhOp  = Just MO_F32_Asinh
-callishOp FloatAcoshOp  = Just MO_F32_Acosh
-callishOp FloatAtanhOp  = Just MO_F32_Atanh
-callishOp FloatLogOp    = Just MO_F32_Log
-callishOp FloatLog1POp  = Just MO_F32_Log1P
-callishOp FloatExpOp    = Just MO_F32_Exp
-callishOp FloatExpM1Op  = Just MO_F32_ExpM1
-callishOp FloatSqrtOp   = Just MO_F32_Sqrt
-
-callishOp _ = Nothing
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.
