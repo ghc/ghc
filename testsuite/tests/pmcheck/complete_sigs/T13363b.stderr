@@ -1,7 +1,7 @@
 
-testsuite/tests/pmcheck/complete_sigs/T13363b.hs:16:1: warning: [-Woverlapping-patterns]
+T13363b.hs:1:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma
+
+T13363b.hs:17:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
-    In an equation for `f': f _ = ...
-   |
-16 | f _  = error "impossible"
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+    In an equation for ‘f’: f _ = ...
