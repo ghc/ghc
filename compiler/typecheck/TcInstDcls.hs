@@ -392,17 +392,14 @@ tcInstDecls1 inst_decls
 --   (DerivDecl) to check and process all derived class instances.
 tcInstDeclsDeriv
   :: [DerivInfo]
-  -> [LTyClDecl GhcRn]
   -> [LDerivDecl GhcRn]
   -> TcM (TcGblEnv, [InstInfo GhcRn], HsValBinds GhcRn)
-tcInstDeclsDeriv datafam_deriv_infos tyclds derivds
+tcInstDeclsDeriv deriv_infos derivds
   = do th_stage <- getStage -- See Note [Deriving inside TH brackets]
        if isBrackStage th_stage
        then do { gbl_env <- getGblEnv
                ; return (gbl_env, bagToList emptyBag, emptyValBindsOut) }
-       else do { data_deriv_infos <- mkDerivInfos tyclds
-               ; let deriv_infos = datafam_deriv_infos ++ data_deriv_infos
-               ; (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
+       else do { (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
                ; return (tcg_env, bagToList info_bag, valbinds) }
 
 addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
