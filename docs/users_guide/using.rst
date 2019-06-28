@@ -843,14 +843,14 @@ messages and in GHCi:
         ghci> :i Data.Type.Equality.==
         type family (==) (a :: k) (b :: k) :: Bool
           where
-              (==) (f a) (g b) = (f == g) && (a == b)
-              (==) a a = 'True
+              {- #0 -} (==) (f a) (g b) = (f == g) && (a == b)
+              {- #1 -} (==) a a = 'True
                   -- incompatible indices: 0
-              (==) _1 _2 = 'False
+              {- #2 -} (==) _1 _2 = 'False
                   -- incompatible indices: 1, 0
 
-    The comment after each equation refers to the indices (0-indexed) of
-    preceding equations it is incompatible with.
+    The equations are numbered starting from 0, and the comment after each
+    equation refers to all preceding equations it is incompatible with.
 
 .. ghc-flag:: -fprint-equality-relations
     :shortdesc: Distinguish between equality relations when printing
