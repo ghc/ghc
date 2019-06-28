@@ -626,13 +626,18 @@ normaliseValAbs delta = runMaybeT . go_va delta
       guard (all notNull incomplete_grps)
       -- If there's a unique singleton incomplete group, turn it into a
       -- @PmCon@ for better readability of warning messages.
+      -- We only want to do this when there is more than 1 constructor.
+      -- Otherwise we generate warnings like 'failed to match ()'.
+      -- TODO write a Note
       case incomplete_grps of
-        ([con]:_) | all (== [con]) incomplete_grps -> do
-          -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
-          -- recorded in delta'
-          (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
-          lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
-          pure (delta', ic_val_abs ic)
+        ([con]:_)
+          | all (== [con]) incomplete_grps
+          , any ((> 1) . length) grps -> do
+            -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
+            -- recorded in delta'
+            (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
+            lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
+            pure (delta', ic_val_abs ic)
         _        -> pure (delta, va)
     go_va delta va = pure (delta, va)
 
