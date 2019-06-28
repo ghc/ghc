@@ -227,25 +227,6 @@ lintAlt (DataAlt _, bndrs, rhs) = do
 {-
 ************************************************************************
 *                                                                      *
-Utilities
-*                                                                      *
-************************************************************************
--}
-
-bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
-bindersOf (StgNonRec binder _) = [binder]
-bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
-
-bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
-bindersOfTop (StgTopLifted bind) = bindersOf bind
-bindersOfTop (StgTopStringLit binder _) = [binder]
-
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
-
-{-
-************************************************************************
-*                                                                      *
 The Lint monad
 *                                                                      *
 ************************************************************************

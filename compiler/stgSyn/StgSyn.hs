@@ -52,6 +52,7 @@ module StgSyn (
         stgArgType,
         stripStgTicksTop,
         stgCaseBndrInScope,
+        bindersOf, bindersOfTop, bindersOfTopBinds,
 
         pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
     ) where
@@ -690,6 +691,25 @@ data StgOp
         -- itself, is needed by the stg-to-cmm pass to determine the offset to
         -- apply to unlifted boxed arguments in StgCmmForeign. See Note
         -- [Unlifted boxed arguments to foreign calls]
+
+{-
+************************************************************************
+*                                                                      *
+Utilities
+*                                                                      *
+************************************************************************
+-}
+
+bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
+bindersOf (StgNonRec binder _) = [binder]
+bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
+
+bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
+bindersOfTop (StgTopLifted bind) = bindersOf bind
+bindersOfTop (StgTopStringLit binder _) = [binder]
+
+bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
+bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************
