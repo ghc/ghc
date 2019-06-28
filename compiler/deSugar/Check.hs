@@ -1707,6 +1707,8 @@ mkOneConFull x con = do
   MASSERT( isJust (tcMatchTy con_res_ty res_ty) )
   let subst1  = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  -- The expectJust is always satisfied as long as we filter
+                  -- with 'isValidCompleteMatch' in 'allCompleteMatches'
                   PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
                                     -- See Note [Pattern synonym result type] in PatSyn
 
@@ -1732,7 +1734,7 @@ mkOneConFull x con = do
 
 -- | 'mkOneConFull' and immediately check whether the resulting
 -- 'InhabitationCandidat' @ic@ is inhabited by consulting 'pmIsSatisfiable'.
--- Return @Just ic@ if it is.
+-- Return @Just (new_delta, ic)@ if it is.
 mkOneSatisfiableConFull :: Delta -> Id -> ConLike -> PmM (Maybe (Delta, InhabitationCandidate))
 mkOneSatisfiableConFull delta x con = do
   -- mkOneConFull doesn't cope with type families, so we have to normalise
@@ -1877,12 +1879,13 @@ allCompleteMatches ty = case splitTyConApp_maybe ty of
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
-    let candidates = rdcs ++ pscs
     -- Check that all the pattern synonym return types in a `COMPLETE`
     -- pragma subsume the type we're matching.
     -- See Note [Filtering out non-matching COMPLETE sets]
-    -- TODO: Check if we need to do this any longer
-    pure (filter (isValidCompleteMatch ty) candidates)
+    -- TODO: Check if we need to do this any longer. We probably need to change
+    -- 'mkOneConFull' to return a Maybe (only happens for PatSynCons) in case
+    -- tcMatchTy fails, but that should be it.
+    pure (rdcs ++ filter (isValidCompleteMatch ty) pscs)
       where
         isValidCompleteMatch :: Type -> [ConLike] -> Bool
         isValidCompleteMatch ty = all p
@@ -2177,11 +2180,10 @@ pmcheckHd p@PmCon{} ps guards (PmVar x) vva@(ValVec vas delta) = do
 
   -- For the value vector of the current constructor, we directly recurse into
   -- checking the the current case, so we get back a PartialResult
-  ic <- mkOneConFull x con
-  mb_delta' <- pmIsSatisfiable delta (ic_tm_ct ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
-  pr_pos <- case mb_delta' of
+  mb_delta_ic <- mkOneSatisfiableConFull delta x con
+  pr_pos <- case mb_delta_ic of
     Nothing -> pure mempty
-    Just delta' -> do
+    Just (delta', ic) -> do
       tracePm "matched at all" (ppr (delta_tm_cs delta'))
       pr <- pmcheckHdI p ps guards (ic_val_abs ic) (ValVec vas delta')
       pure (forceIfCanDiverge x (delta_tm_cs delta) pr)
