@@ -5,8 +5,7 @@ pmc001.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns not matched:
             MkT1 MkT3
             (MkT2 _) MkT3
-            MkT3 MkT1
-            MkT3 (MkT2 _)
+            MkT3 q where q is not one of {MkT3}
 
 pmc001.hs:19:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -14,5 +13,4 @@ pmc001.hs:19:1: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns not matched:
             MkT1 MkT3
             (MkT2 _) MkT3
-            MkT3 MkT1
-            MkT3 (MkT2 _)
+            MkT3 q where q is not one of {MkT3}

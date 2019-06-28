@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fwarn-incomplete-patterns -fwarn-overlapping-patterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module Lib where
