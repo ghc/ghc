@@ -34,7 +34,7 @@ import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(LitString) )
 import Id
-import IdInfo   ( unfoldingInfo, setUnfoldingInfo, IdInfo (..) )
+import IdInfo   ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import Var      ( isNonCoVarId )
 import VarSet
 import VarEnv
@@ -554,38 +554,28 @@ add_info env old_bndr top_level new_rhs new_bndr
  | isTyVar old_bndr = new_bndr
  | otherwise        = lazySetIdInfo new_bndr new_info
  where
-   subst = soe_subst env
-   dflags = soe_dflags env
+   subst    = soe_subst env
+   dflags   = soe_dflags env
+   old_info = idInfo old_bndr
 
-   -- mb_new_info is Just for stable unfoldings, Nothing for unstable
-   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+   -- Add back in the rules and unfolding which were
+   -- removed by zapFragileIdInfo in subst_opt_id_bndr
+   new_info = idInfo new_bndr `setRuleInfo`      new_rules
+                              `setUnfoldingInfo` new_unfolding
 
-   -- For unstable unfoldings (i.e., all let(rec) bound variables that do not
-   -- come from INLINE pragmas), attach the RHS; for stable ones, use the
-   -- unfolding we already have.
-   new_info :: IdInfo
-   new_info = case mb_new_info of
-    Just info ->
-      case unfoldingInfo info of
-        NoUnfolding ->
-          case inlinePragInfo info of
-            InlinePragma { inl_inline = NoInline } ->
-              info `setUnfoldingInfo` (new_unfolding InlineRhs)
-            _ ->
-              info `setUnfoldingInfo` (new_unfolding InlineStable)
-        _ ->
-          info
-    Nothing ->
-      idInfo old_bndr `setUnfoldingInfo` (new_unfolding InlineRhs)
+   old_rules = ruleInfo old_info
+   new_rules = substSpec subst new_bndr old_rules
 
-    where
-      new_unfolding source =
-        mkUnfolding
-          dflags
-          source
-          (isTopLevel top_level)
-          False -- may be bottom or not
-          new_rhs
+   old_unfolding = unfoldingInfo old_info
+   new_unfolding | isStableUnfolding old_unfolding
+                 = substUnfolding subst old_unfolding
+                 | otherwise
+                 = unfolding_from_rhs
+
+   unfolding_from_rhs = mkUnfolding dflags InlineRhs
+                                    (isTopLevel top_level)
+                                    False -- may be bottom or not
+                                    new_rhs
 
 simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id
