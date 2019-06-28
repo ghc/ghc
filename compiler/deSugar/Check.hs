@@ -43,6 +43,7 @@ import Util
 import Outputable
 import FastString
 import DataCon
+import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 
@@ -1879,19 +1880,21 @@ allCompleteMatches ty = case splitTyConApp_maybe ty of
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
+    let candidates = rdcs ++ pscs
     -- Check that all the pattern synonym return types in a `COMPLETE`
     -- pragma subsume the type we're matching.
     -- See Note [Filtering out non-matching COMPLETE sets]
     -- TODO: Check if we need to do this any longer. We probably need to change
     -- 'mkOneConFull' to return a Maybe (only happens for PatSynCons) in case
     -- tcMatchTy fails, but that should be it.
-    pure (rdcs ++ filter (isValidCompleteMatch ty) pscs)
+    pure (filter (isValidCompleteMatch ty) candidates)
       where
         isValidCompleteMatch :: Type -> [ConLike] -> Bool
         isValidCompleteMatch ty = all p
           where
-            p = isJust . flip tcMatchTy ty . projResTy . conLikeFullSig
-            projResTy (_, _, _, _, _, _, res_ty) = res_ty
+            p (RealDataCon _) = True
+            p (PatSynCon ps)  = isJust (tcMatchTy (projResTy (patSynSig ps)) ty)
+            projResTy (_, _, _, _, _, res_ty) = res_ty
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
