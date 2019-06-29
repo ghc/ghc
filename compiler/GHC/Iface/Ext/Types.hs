@@ -314,7 +314,7 @@ instance Monoid (IdentifierDetails a) where
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
-    put_ bh $ S.toAscList $ identInfo dets
+    put_ bh $ S.toList $ identInfo dets
   get bh =  IdentifierDetails
     <$> get bh
     <*> fmap S.fromDistinctAscList (get bh)
@@ -363,6 +363,14 @@ data ContextInfo
 
   -- | Record field
   | RecField RecFieldContext (Maybe Span)
+  -- | Constraint/Dictionary evidence variable binding
+  | EvidenceVarBind
+      EvVarSource  -- ^ how did this bind come into being
+      Scope        -- ^ scope over which the value is bound
+      (Maybe Span) -- ^ span of the binding site
+
+  -- | Usage of evidence variable
+  | EvidenceVarUse
     deriving (Eq, Ord)
 
 instance Outputable ContextInfo where
@@ -385,6 +393,12 @@ instance Outputable ContextInfo where
      <+> ppr sc1 <+> "," <+> ppr sc2
  ppr (RecField ctx sp) =
    text "record field" <+> ppr ctx <+> pprBindSpan sp
+ ppr (EvidenceVarBind ctx sc sp) =
+   text "evidence variable" <+> ppr ctx
+     <+> "with scope: " <+> ppr sc
+     <+> pprBindSpan sp
+ ppr (EvidenceVarUse) =
+   text "usage of evidence variable"
 
 pprBindSpan :: Maybe Span -> SDoc
 pprBindSpan Nothing = text ""
@@ -422,6 +436,12 @@ instance Binary ContextInfo where
     put_ bh a
     put_ bh b
   put_ bh MatchBind = putByte bh 9
+  put_ bh (EvidenceVarBind a b c) = do
+    putByte bh 10
+    put_ bh a
+    put_ bh b
+    put_ bh c
+  put_ bh EvidenceVarUse = putByte bh 11
 
   get bh = do
     (t :: Word8) <- get bh
@@ -436,7 +456,64 @@ instance Binary ContextInfo where
       7 -> TyVarBind <$> get bh <*> get bh
       8 -> RecField <$> get bh <*> get bh
       9 -> return MatchBind
+      10 -> EvidenceVarBind <$> get bh <*> get bh <*> get bh
+      11 -> return EvidenceVarUse
       _ -> panic "Binary ContextInfo: invalid tag"
+
+data EvVarSource
+  = EvPatternBind -- ^ bound by a pattern match
+  | EvSigBind -- ^ bound by a type signature
+  | EvWrapperBind -- ^ bound by a hswrapper
+  | EvImplicitBind -- ^ bound by an implicit variable
+  | EvExternalBind -- ^ Bound by some instance
+  | EvLetBind EvBindDeps -- ^ A direct let binding
+  deriving (Eq,Ord)
+
+instance Binary EvVarSource where
+  put_ bh EvPatternBind = putByte bh 0
+  put_ bh EvSigBind = putByte bh 1
+  put_ bh EvWrapperBind = putByte bh 2
+  put_ bh EvImplicitBind = putByte bh 3
+  put_ bh EvExternalBind = putByte bh 4
+  put_ bh (EvLetBind deps) = do
+    putByte bh 5
+    put_ bh deps
+
+  get bh = do
+    (t :: Word8) <- get bh
+    case t of
+      0 -> pure EvPatternBind
+      1 -> pure EvSigBind
+      2 -> pure EvWrapperBind
+      3 -> pure EvImplicitBind
+      4 -> pure EvExternalBind
+      5 -> EvLetBind <$> get bh
+      _ -> panic "Binary EvVarSource: invalid tag"
+
+instance Outputable EvVarSource where
+  ppr EvPatternBind = text "bound by a pattern"
+  ppr EvSigBind = text "bound by a type signature"
+  ppr EvWrapperBind = text "bound by a HsWrapper"
+  ppr EvImplicitBind = text "bound by an implicit variable binding"
+  ppr EvExternalBind = text "bound by an instance"
+  ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
+
+-- | Eq/Ord instances treat all values of EvBindDeps as equal
+-- This lets EvVarSource have the correct Ord instance,
+-- as an evidence variable is let bound only once.
+newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
+  deriving Outputable
+
+instance Eq EvBindDeps where
+    _ == _ = True
+
+instance Ord EvBindDeps where
+  compare _ _ = EQ
+
+instance Binary EvBindDeps where
+  put_ bh (EvBindDeps xs) = put_ bh xs
+  get bh = EvBindDeps <$> get bh
+
 
 -- | Types of imports and exports
 data IEType
