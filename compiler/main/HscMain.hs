@@ -175,7 +175,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 
 import HieAst           ( mkHieFile )
-import HieTypes         ( getAsts, hie_asts )
+import HieTypes         ( getAsts, hie_asts, hie_module )
 import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
@@ -428,7 +428,8 @@ extract_renamed_stuff mod_summary tc_result = do
             hs_env <- Hsc $ \e w -> return (e, w)
             liftIO $ do
               -- Validate Scopes
-              case validateScopes $ getAsts $ hie_asts hieFile of
+              let mdl = hie_module hieFile
+              case validateScopes mdl $ getAsts $ hie_asts hieFile of
                   [] -> putMsg dflags $ text "Got valid scopes"
                   xs -> do
                     putMsg dflags $ text "Got invalid scopes"
