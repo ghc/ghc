@@ -425,14 +425,14 @@ extract_renamed_stuff mod_summary tc_result = do
         hieFile <- mkHieFile mod_summary tc_result (fromJust rn_info)
         let out_file = ml_hie_file $ ms_location mod_summary
         liftIO $ writeHieFile out_file hieFile
+        liftIO $ dumpIfSet_dyn dflags Opt_D_dump_hie "HIE AST" FormatHaskell (ppr $ hie_asts hieFile)
 
         -- Validate HIE files
         when (gopt Opt_ValidateHie dflags) $ do
             hs_env <- Hsc $ \e w -> return (e, w)
             liftIO $ do
               -- Validate Scopes
-              let mdl = hie_module hieFile
-              case validateScopes mdl $ getAsts $ hie_asts hieFile of
+              case validateScopes (hie_module hieFile) $ getAsts $ hie_asts hieFile of
                   [] -> putMsg dflags $ text "Got valid scopes"
                   xs -> do
                     putMsg dflags $ text "Got invalid scopes"
@@ -445,7 +445,7 @@ extract_renamed_stuff mod_summary tc_result = do
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do
                   putMsg dflags $ text "Got roundtrip errors"
-                  mapM_ (putMsg dflags) xs
+                  mapM_ (putMsg (dopt_set dflags Opt_D_ppr_debug)) xs
     return rn_info
 
 
