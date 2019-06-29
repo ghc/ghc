@@ -15,7 +15,6 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 
 import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Utils
 import GHC.Types.Name
 
@@ -39,17 +38,18 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
     spanDiff
       | span1 /= span2 = [hsep ["Spans", ppr span1, "and", ppr span2, "differ"]]
       | otherwise = []
-    infoDiff'
-      = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) info1 info2
-     ++ (diffList diffType `on` nodeType) info1 info2
-     ++ (diffIdents `on` nodeIdentifiers) info1 info2
-    infoDiff = case infoDiff' of
+    infoDiff' i1 i2
+      = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) i1 i2
+     ++ (diffList diffType `on` nodeType) i1 i2
+     ++ (diffIdents `on` nodeIdentifiers) i1 i2
+    sinfoDiff = diffList (\(k1,a) (k2,b) -> eqDiff k1 k2 ++ infoDiff' a b) `on` (M.toList . getSourcedNodeInfo)
+    infoDiff = case sinfoDiff info1 info2 of
       [] -> []
-      xs -> xs ++ [vcat ["In Node:",ppr (nodeIdentifiers info1,span1)
-                           , "and", ppr (nodeIdentifiers info2,span2)
+      xs -> xs ++ [vcat ["In Node:",ppr (sourcedNodeIdents info1,span1)
+                           , "and", ppr (sourcedNodeIdents info2,span2)
                         , "While comparing"
-                        , ppr (normalizeIdents $ nodeIdentifiers info1), "and"
-                        , ppr (normalizeIdents $ nodeIdentifiers info2)
+                        , ppr (normalizeIdents $ sourcedNodeIdents info1), "and"
+                        , ppr (normalizeIdents $ sourcedNodeIdents info2)
                         ]
                   ]
 
@@ -107,10 +107,23 @@ validAst (Node _ span children) = do
 -- | Look for any identifiers which occur outside of their supposed scopes.
 -- Returns a list of error messages.
 validateScopes :: Module -> M.Map FastString (HieAST a) -> [SDoc]
-validateScopes mod asts = validScopes
+validateScopes mod asts = validScopes ++ validEvs
   where
     refMap = generateReferencesMap asts
     -- We use a refmap for most of the computation
+
+    evs = M.keys
+      $ M.filter (any isEvidenceContext . concatMap (S.toList . identInfo . snd)) refMap
+
+    validEvs = do
+      i@(Right ev) <- evs
+      case M.lookup i refMap of
+        Nothing -> ["Impossible, ev"<+> ppr ev <+> "not found in refmap" ]
+        Just refs
+          | nameIsLocalOrFrom mod ev
+          , not (any isEvidenceBind . concatMap (S.toList . identInfo . snd) $ refs)
+          -> ["Evidence var" <+> ppr ev <+> "not bound in refmap"]
+          | otherwise -> []
 
     -- Check if all the names occur in their calculated scopes
     validScopes = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
@@ -122,15 +135,18 @@ validateScopes mod asts = validScopes
           Just xs -> xs
           Nothing -> []
         inScope (sp, dets)
-          |  (definedInAsts asts n)
+          |  (definedInAsts asts n || (any isEvidenceContext (identInfo dets)))
           && any isOccurrence (identInfo dets)
           -- We validate scopes for names which are defined locally, and occur
-          -- in this span
+          -- in this span, or are evidence variables
             = case scopes of
-              [] | (nameIsLocalOrFrom mod n
-                   && not (isDerivedOccName $ nameOccName n))
-                   -- If we don't get any scopes for a local name then its an error.
-                   -- We can ignore derived names.
+              [] | nameIsLocalOrFrom mod n
+                  , (  not (isDerivedOccName $ nameOccName n)
+                    || any isEvidenceContext (identInfo dets))
+                   -- If we don't get any scopes for a local name or
+                   -- an evidence variable, then its an error.
+                   -- We can ignore other kinds of derived names as
+                   -- long as we take evidence vars into account
                    -> return $ hsep $
                      [ "Locally defined Name", ppr n,pprDefinedAt n , "at position", ppr sp
                      , "Doesn't have a calculated scope: ", ppr scopes]
