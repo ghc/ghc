@@ -177,6 +177,12 @@ These flags dump various information from GHC's typechecker and renamer.
 
     Dump typechecker output as a syntax tree
 
+.. ghc-flag:: -ddump-hie
+    :shortdesc: Dump the hie file syntax tree
+    :type: dynamic
+
+    Dump the hie file syntax tree if we are generating extended interface files
+
 .. ghc-flag:: -ddump-splices
     :shortdesc: Dump TH spliced expressions, and what they evaluate to
     :type: dynamic
