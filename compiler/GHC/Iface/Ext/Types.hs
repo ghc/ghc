@@ -17,13 +17,16 @@ import GHC.Prelude
 import Config
 import GHC.Utils.Binary
 import GHC.Data.FastString        ( FastString )
+import GHC.Builtin.Utils
 import GHC.Iface.Type
-import GHC.Unit.Module           ( ModuleName, Module )
-import GHC.Types.Name             ( Name )
+import GHC.Unit.Module            ( ModuleName, Module )
+import GHC.Types.Name
 import GHC.Utils.Outputable hiding ( (<>) )
-import GHC.Types.SrcLoc           ( RealSrcSpan )
+import GHC.Types.SrcLoc
 import GHC.Types.Avail
+import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
+import GHC.Utils.Misc
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -33,6 +36,8 @@ import Data.Data                  ( Typeable, Data )
 import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
 import Control.Applicative        ( (<|>) )
+import Data.Coerce                ( coerce  )
+import Data.Function              ( on )
 
 type Span = RealSrcSpan
 
@@ -314,7 +319,7 @@ instance Monoid (IdentifierDetails a) where
 instance Binary (IdentifierDetails TypeIndex) where
   put_ bh dets = do
     put_ bh $ identType dets
-    put_ bh $ S.toAscList $ identInfo dets
+    put_ bh $ S.toList $ identInfo dets
   get bh =  IdentifierDetails
     <$> get bh
     <*> fmap S.fromDistinctAscList (get bh)
@@ -363,6 +368,14 @@ data ContextInfo
 
   -- | Record field
   | RecField RecFieldContext (Maybe Span)
+  -- | Constraint/Dictionary evidence variable binding
+  | EvidenceVarBind
+      EvVarSource  -- ^ how did this bind come into being
+      Scope        -- ^ scope over which the value is bound
+      (Maybe Span) -- ^ span of the binding site
+
+  -- | Usage of evidence variable
+  | EvidenceVarUse
     deriving (Eq, Ord)
 
 instance Outputable ContextInfo where
@@ -385,10 +398,16 @@ instance Outputable ContextInfo where
      <+> ppr sc1 <+> "," <+> ppr sc2
  ppr (RecField ctx sp) =
    text "record field" <+> ppr ctx <+> pprBindSpan sp
+ ppr (EvidenceVarBind ctx sc sp) =
+   text "evidence variable" <+> ppr ctx
+     $$ "with scope:" <+> ppr sc
+     $$ pprBindSpan sp
+ ppr (EvidenceVarUse) =
+   text "usage of evidence variable"
 
 pprBindSpan :: Maybe Span -> SDoc
 pprBindSpan Nothing = text ""
-pprBindSpan (Just sp) = text "at:" <+> ppr sp
+pprBindSpan (Just sp) = text "bound at:" <+> ppr sp
 
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0
@@ -422,6 +441,12 @@ instance Binary ContextInfo where
     put_ bh a
     put_ bh b
   put_ bh MatchBind = putByte bh 9
+  put_ bh (EvidenceVarBind a b c) = do
+    putByte bh 10
+    put_ bh a
+    put_ bh b
+    put_ bh c
+  put_ bh EvidenceVarUse = putByte bh 11
 
   get bh = do
     (t :: Word8) <- get bh
@@ -436,7 +461,64 @@ instance Binary ContextInfo where
       7 -> TyVarBind <$> get bh <*> get bh
       8 -> RecField <$> get bh <*> get bh
       9 -> return MatchBind
+      10 -> EvidenceVarBind <$> get bh <*> get bh <*> get bh
+      11 -> return EvidenceVarUse
       _ -> panic "Binary ContextInfo: invalid tag"
+
+data EvVarSource
+  = EvPatternBind -- ^ bound by a pattern match
+  | EvSigBind -- ^ bound by a type signature
+  | EvWrapperBind -- ^ bound by a hswrapper
+  | EvImplicitBind -- ^ bound by an implicit variable
+  | EvExternalBind -- ^ Bound by some instance
+  | EvLetBind EvBindDeps -- ^ A direct let binding
+  deriving (Eq,Ord)
+
+instance Binary EvVarSource where
+  put_ bh EvPatternBind = putByte bh 0
+  put_ bh EvSigBind = putByte bh 1
+  put_ bh EvWrapperBind = putByte bh 2
+  put_ bh EvImplicitBind = putByte bh 3
+  put_ bh EvExternalBind = putByte bh 4
+  put_ bh (EvLetBind deps) = do
+    putByte bh 5
+    put_ bh deps
+
+  get bh = do
+    (t :: Word8) <- get bh
+    case t of
+      0 -> pure EvPatternBind
+      1 -> pure EvSigBind
+      2 -> pure EvWrapperBind
+      3 -> pure EvImplicitBind
+      4 -> pure EvExternalBind
+      5 -> EvLetBind <$> get bh
+      _ -> panic "Binary EvVarSource: invalid tag"
+
+instance Outputable EvVarSource where
+  ppr EvPatternBind = text "bound by a pattern"
+  ppr EvSigBind = text "bound by a type signature"
+  ppr EvWrapperBind = text "bound by a HsWrapper"
+  ppr EvImplicitBind = text "bound by an implicit variable binding"
+  ppr EvExternalBind = text "bound by an instance"
+  ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
+
+-- | Eq/Ord instances compare on the converted HieName,
+-- as non-exported names may have different uniques after
+-- a roundtrip
+newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
+  deriving Outputable
+
+instance Eq EvBindDeps where
+  (==) = coerce ((==) `on` map toHieName)
+
+instance Ord EvBindDeps where
+  compare = coerce (compare `on` map toHieName)
+
+instance Binary EvBindDeps where
+  put_ bh (EvBindDeps xs) = put_ bh xs
+  get bh = EvBindDeps <$> get bh
+
 
 -- | Types of imports and exports
 data IEType
@@ -587,3 +669,46 @@ instance Binary TyVarScope where
       0 -> ResolvedScopes <$> get bh
       1 -> UnresolvedScope <$> get bh <*> get bh
       _ -> panic "Binary TyVarScope: invalid tag"
+
+-- | `Name`'s get converted into `HieName`'s before being written into @.hie@
+-- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
+-- these two types.
+data HieName
+  = ExternalName !Module !OccName !SrcSpan
+  | LocalName !OccName !SrcSpan
+  | KnownKeyName !Unique
+  deriving (Eq)
+
+instance Ord HieName where
+  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` leftmost_smallest c f
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
+  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` leftmost_smallest b d
+    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
+  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
+    -- Not actually non deterministic as it is a KnownKey
+  compare ExternalName{} _ = LT
+  compare LocalName{} ExternalName{} = GT
+  compare LocalName{} _ = LT
+  compare KnownKeyName{} _ = GT
+
+instance Outputable HieName where
+  ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
+  ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
+  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
+
+hieNameOcc :: HieName -> OccName
+hieNameOcc (ExternalName _ occ _) = occ
+hieNameOcc (LocalName occ _) = occ
+hieNameOcc (KnownKeyName u) =
+  case lookupKnownKeyName u of
+    Just n -> nameOccName n
+    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
+                        (ppr (unpkUnique u))
+
+toHieName :: Name -> HieName
+toHieName name
+  | isKnownKeyName name = KnownKeyName (nameUnique name)
+  | isExternalName name = ExternalName (nameModule name)
+                                       (nameOccName name)
+                                       (nameSrcSpan name)
+  | otherwise = LocalName (nameOccName name) (nameSrcSpan name)

@@ -15,7 +15,6 @@ import GHC.Data.FastString
 import GHC.Utils.Outputable
 
 import GHC.Iface.Ext.Types
-import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Utils
 import GHC.Types.Name
 
@@ -107,10 +106,28 @@ validAst (Node _ span children) = do
 -- | Look for any identifiers which occur outside of their supposed scopes.
 -- Returns a list of error messages.
 validateScopes :: Module -> M.Map FastString (HieAST a) -> [SDoc]
-validateScopes mod asts = validScopes
+validateScopes mod asts = validScopes ++ validEvLets
   where
     refMap = generateReferencesMap asts
     -- We use a refmap for most of the computation
+
+    -- Check if everything on the RHS of an EvLet binding is also bound
+    -- somewhere in the AST
+    validEvLets = concatMap evVarInScope evletrhs
+
+    -- Check if a given evidence variable is bound
+    evVarInScope n = case M.lookup (Right n) refMap of
+          Nothing -> return $ hsep ["Local evidence variable:", ppr n
+            , "occuring in the rhs of a EvLet doesn't appear in the refmap"]
+          Just xs
+            | any (any isEvidenceBind) (map (identInfo . snd) xs) -> []
+            | otherwise -> return $ hsep ["Local evidence variable:"
+                , ppr n, "occuring in the rhs of a EvLet isn't bound in the refmap"]
+
+    -- All the evidence variables occuring on the RHS of an EvLet
+    evletrhs = S.fromList $ concatMap (evLets . identInfo . snd)
+                $ concat $ M.elems refMap
+    evLets = concatMap getEvidenceBindDeps
 
     -- Check if all the names occur in their calculated scopes
     validScopes = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
@@ -122,15 +139,18 @@ validateScopes mod asts = validScopes
           Just xs -> xs
           Nothing -> []
         inScope (sp, dets)
-          |  (definedInAsts asts n)
+          |  (definedInAsts asts n || (any isEvidenceContext (identInfo dets)))
           && any isOccurrence (identInfo dets)
           -- We validate scopes for names which are defined locally, and occur
-          -- in this span
+          -- in this span, or are evidence variables
             = case scopes of
-              [] | (nameIsLocalOrFrom mod n
-                   && not (isDerivedOccName $ nameOccName n))
-                   -- If we don't get any scopes for a local name then its an error.
-                   -- We can ignore derived names.
+              [] | any isEvidenceContext (identInfo dets)
+                   || (nameIsLocalOrFrom mod n
+                      && not (isDerivedOccName $ nameOccName n))
+                   -- If we don't get any scopes for a local name or
+                   -- an evidence variable, then its an error.
+                   -- We can ignore other kinds of derived names as
+                   -- long as we take evidence vars into account
                    -> return $ hsep $
                      [ "Locally defined Name", ppr n,pprDefinedAt n , "at position", ppr sp
                      , "Doesn't have a calculated scope: ", ppr scopes]
