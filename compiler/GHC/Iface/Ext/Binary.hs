@@ -24,7 +24,6 @@ import GHC.Utils.Binary
 import GHC.Iface.Binary           ( getDictFastString )
 import GHC.Data.FastMutInt
 import GHC.Data.FastString        ( FastString )
-import GHC.Unit.Module            ( Module )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Utils.Outputable
@@ -33,7 +32,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 import GHC.Iface.Env (NameCacheUpdater(..))
 
 import qualified Data.Array as A
@@ -48,42 +46,6 @@ import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
 import GHC.Iface.Ext.Types
-
--- | `Name`'s get converted into `HieName`'s before being written into @.hie@
--- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
--- these two types.
-data HieName
-  = ExternalName !Module !OccName !SrcSpan
-  | LocalName !OccName !SrcSpan
-  | KnownKeyName !Unique
-  deriving (Eq)
-
-instance Ord HieName where
-  compare (ExternalName a b c) (ExternalName d e f) = compare (a,b) (d,e) `thenCmp` SrcLoc.leftmost_smallest c f
-    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (LocalName a b) (LocalName c d) = compare a c `thenCmp` SrcLoc.leftmost_smallest b d
-    -- TODO (int-index): Perhaps use RealSrcSpan in HieName?
-  compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
-    -- Not actually non deterministic as it is a KnownKey
-  compare ExternalName{} _ = LT
-  compare LocalName{} ExternalName{} = GT
-  compare LocalName{} _ = LT
-  compare KnownKeyName{} _ = GT
-
-instance Outputable HieName where
-  ppr (ExternalName m n sp) = text "ExternalName" <+> ppr m <+> ppr n <+> ppr sp
-  ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
-  ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
-
-hieNameOcc :: HieName -> OccName
-hieNameOcc (ExternalName _ occ _) = occ
-hieNameOcc (LocalName occ _) = occ
-hieNameOcc (KnownKeyName u) =
-  case lookupKnownKeyName u of
-    Just n -> nameOccName n
-    Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
-                        (ppr (unpkUnique u))
-
 
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
@@ -352,14 +314,6 @@ putName (HieSymbolTable next ref) bh name = do
 
 
 -- ** Converting to and from `HieName`'s
-
-toHieName :: Name -> HieName
-toHieName name
-  | isKnownKeyName name = KnownKeyName (nameUnique name)
-  | isExternalName name = ExternalName (nameModule name)
-                                       (nameOccName name)
-                                       (nameSrcSpan name)
-  | otherwise = LocalName (nameOccName name) (nameSrcSpan name)
 
 fromHieName :: NameCache -> HieName -> (NameCache, Name)
 fromHieName nc (ExternalName mod occ span) =

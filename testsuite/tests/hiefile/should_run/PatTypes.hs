@@ -42,16 +42,9 @@ dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
   return $ defaultDynFlags systemSettings (LlvmConfig [] [])
 
-selectPoint :: HieFile -> (Int,Int) -> HieAST Int
-selectPoint hf (sl,sc) = case M.toList (getAsts $ hie_asts hf) of
-    [(fs,ast)] ->
-      case selectSmallestContaining (sp fs) ast of
-        Nothing -> error "point not found"
-        Just ast' -> ast'
-    _ -> error "map should only contain a single AST"
- where
-   sloc fs = mkRealSrcLoc fs sl sc
-   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+selectPoint' :: HieFile -> (Int,Int) -> HieAST Int
+selectPoint' hf loc =
+  maybe (error "point not found") id $ selectPoint hf loc
 
 main = do
   libdir:_ <- getArgs
@@ -61,6 +54,6 @@ main = do
   let hf = hie_file_result hfr
   forM_ [p1,p2,p3,p4] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "
-    let types = nodeType $ nodeInfo $ selectPoint hf point
+    let types = nodeType $ nodeInfo $ selectPoint' hf point
     forM_ types $ \typ -> do
       putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))

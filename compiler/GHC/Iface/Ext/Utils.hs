@@ -1,7 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 module GHC.Iface.Ext.Utils where
 
 import GHC.Prelude
@@ -11,7 +13,8 @@ import GHC.Driver.Session    ( DynFlags )
 import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
 import GHC.Types.Name hiding (varName)
-import GHC.Utils.Outputable  ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
+import GHC.Utils.Outputable hiding ( (<>) )
+import qualified GHC.Utils.Outputable as O
 import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
@@ -27,16 +30,19 @@ import qualified Data.Set as S
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Array as A
 import Data.Data                  ( typeOf, typeRepTyCon, Data(toConstr) )
-import Data.Maybe                 ( maybeToList )
+import Data.Maybe                 ( maybeToList, mapMaybe)
 import Data.Monoid
+import Data.List                  (find)
 import Data.Traversable           ( for )
 import Control.Monad.Trans.State.Strict hiding (get)
+import qualified Data.Tree as Tree
 
+type RefMap a = M.Map Identifier [(Span, IdentifierDetails a)]
 
 generateReferencesMap
   :: Foldable f
   => f (HieAST a)
-  -> M.Map Identifier [(Span, IdentifierDetails a)]
+  -> RefMap a
 generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
   where
     go ast = M.unionsWith (++) (this : map go (nodeChildren ast))
@@ -71,6 +77,61 @@ resolveVisibility kind ty_args
 
 foldType :: (HieType a -> a) -> HieTypeFix -> a
 foldType f (Roll t) = f $ fmap (foldType f) t
+
+selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
+selectPoint hf (sl,sc) = getFirst $
+  flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(fs,ast) -> First $
+      case selectSmallestContaining (sp fs) ast of
+        Nothing -> Nothing
+        Just ast' -> Just ast'
+ where
+   sloc fs = mkRealSrcLoc fs sl sc
+   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+
+findEvidenceUse :: NodeInfo a -> [Name]
+findEvidenceUse ni = [n | (Right n, dets) <- xs, any isEvidenceUse (identInfo dets)]
+ where
+   xs = M.toList $ nodeIdentifiers ni
+
+data EvidenceInfo a
+  = EvidenceInfo
+  { evidenceVar :: Name
+  , evidenceSpan :: RealSrcSpan
+  , evidenceType :: a
+  , evidenceDetails :: [(EvVarSource, Scope, Maybe Span)]
+  } deriving (Eq,Ord,Functor)
+
+instance (Outputable a) => Outputable (EvidenceInfo a) where
+  ppr (EvidenceInfo name span typ dets) =
+    hang (ppr name <+> text "at" <+> ppr span O.<> text ", of type:" <+> ppr typ) 4 $
+      pdets $$ (pprDefinedAt name)
+    where
+      pdets = case dets of
+        [] -> text "is a usage of an evidence variable"
+        xs -> text "is an" <+> (hsep $ punctuate (text "and/or") $
+          map (\(src,scp,spn) -> ppr (EvidenceVarBind src scp spn)) xs)
+
+getEvidenceTreesAtPoint :: HieFile -> RefMap a -> (Int,Int) -> Tree.Forest (EvidenceInfo a)
+getEvidenceTreesAtPoint hf refmap point =
+  [t | Just ast <- pure $ selectPoint hf point
+     , n        <- findEvidenceUse (nodeInfo ast)
+     , Just t   <- pure $ getEvidenceTree refmap n
+     ]
+
+getEvidenceTree :: RefMap a -> Name -> Maybe (Tree.Tree (EvidenceInfo a))
+getEvidenceTree refmap var = do
+  xs <- M.lookup (Right var) refmap
+  (sp,dets) <- find (any isEvidenceBind . identInfo . snd) xs
+  typ <- identType dets
+  let
+    (evdets,concat -> children) = unzip $ do
+      det <- S.toList $ identInfo dets
+      case det of
+        EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
+          pure ((src,scp,spn),mapMaybe (getEvidenceTree refmap) xs)
+        EvidenceVarBind src scp spn -> pure ((src,scp,spn),[])
+        _ -> []
+  pure $ Tree.Node (EvidenceInfo var sp typ evdets) children
 
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
@@ -245,6 +306,7 @@ getScopeFromContext (ClassTyDecl _) = Just [ModuleScope]
 getScopeFromContext (Decl _ _) = Just [ModuleScope]
 getScopeFromContext (TyVarBind a (ResolvedScopes xs)) = Just $ a:xs
 getScopeFromContext (TyVarBind a _) = Just [a]
+getScopeFromContext (EvidenceVarBind _ a _) = Just [a]
 getScopeFromContext _ = Nothing
 
 getBindSiteFromContext :: ContextInfo -> Maybe Span
@@ -292,8 +354,27 @@ definedInAsts asts n = case nameSrcSpan n of
   RealSrcSpan sp _ -> srcSpanFile sp `elem` M.keys asts
   _ -> False
 
+getEvidenceBindDeps :: ContextInfo -> [Name]
+getEvidenceBindDeps (EvidenceVarBind (EvLetBind xs) _ _) =
+  getEvBindDeps xs
+getEvidenceBindDeps _ = []
+
+isEvidenceBind :: ContextInfo -> Bool
+isEvidenceBind EvidenceVarBind{} = True
+isEvidenceBind _ = False
+
+isEvidenceContext :: ContextInfo -> Bool
+isEvidenceContext EvidenceVarUse = True
+isEvidenceContext EvidenceVarBind{} = True
+isEvidenceContext _ = False
+
+isEvidenceUse :: ContextInfo -> Bool
+isEvidenceUse EvidenceVarUse = True
+isEvidenceUse _ = False
+
 isOccurrence :: ContextInfo -> Bool
 isOccurrence Use = True
+isOccurrence EvidenceVarUse = True
 isOccurrence _ = False
 
 scopeContainsSpan :: Scope -> Span -> Bool
