@@ -79,6 +79,7 @@ data DumpFlag
    | Opt_D_dump_cpr_signatures
    | Opt_D_dump_tc
    | Opt_D_dump_tc_ast
+   | Opt_D_dump_hie
    | Opt_D_dump_types
    | Opt_D_dump_rules
    | Opt_D_dump_cse
