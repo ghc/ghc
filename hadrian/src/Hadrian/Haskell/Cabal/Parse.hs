@@ -138,15 +138,15 @@ configurePackage context@Context {..} = do
     depPkgs <- packageDependencies <$> readPackageData package
     liftIO $ print depPkgs
     let
-      depPkgs' = if pkgName package == "graphmod-plugin" then
-                (compilerBoot :) . delete compiler $ depPkgs
+      depPkgs' = if pkgName package == "graphmod-plugin" && False then
+                 depPkgs --(compilerBoot :) . delete compiler $ depPkgs
                 else depPkgs
 
     liftIO $ print depPkgs'
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
     -- We'll need those packages in our package database.
-    let deps =  [ simpleTargetString True stage pkg
+    let deps =  [ simpleTargetString False stage pkg
                 | pkg <- depPkgs', pkg `elem` stagePkgs ]
     liftIO $ print deps
     need deps

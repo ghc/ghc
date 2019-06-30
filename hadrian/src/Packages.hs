@@ -3,12 +3,13 @@ module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
+    filepath, genapply, genprimopcode, ghc, ghcCompact,
     ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
-    transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage, compilerBoot,
+    transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
+    ghcBootTh, ghcBoot,
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
@@ -33,12 +34,12 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
-    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootThBoot, ghcCompact
+    , filepath, genapply, genprimopcode, ghc, ghcCompact
     , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
     , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
-    , parsec, pretty, process, rts, runGhc, stm, templateHaskellBoot
+    , parsec, pretty, process, rts, runGhc, stm
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
-    , timeout, compilerBoot ]
+    , timeout, templateHaskell, ghcBoot, ghcBootTh]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -54,7 +55,6 @@ checkApiAnnotations = util "check-api-annotations"
 checkPpr            = util "check-ppr"
 compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = top  "ghc"             `setPath` "compiler"
-compilerBoot        = boot "ghc"
 containers          = lib  "containers"
 deepseq             = lib  "deepseq"
 deriveConstants     = util "deriveConstants"
@@ -65,7 +65,6 @@ genprimopcode       = util "genprimopcode"
 ghc                 = prg  "ghc-bin"         `setPath` "ghc"
 ghcBoot             = lib  "ghc-boot"
 ghcBootTh           = lib  "ghc-boot-th"
-ghcBootThBoot       = boot  "ghc-boot-th"
 ghcCompact          = lib  "ghc-compact"
 ghcHeap             = lib  "ghc-heap"
 ghci                = lib  "ghci"
@@ -93,7 +92,6 @@ rts                 = top  "rts"
 runGhc              = util "runghc"
 stm                 = lib  "stm"
 templateHaskell     = lib  "template-haskell"
-templateHaskellBoot = boot "template-haskell"
 terminfo            = lib  "terminfo"
 text                = lib  "text"
 time                = lib  "time"
@@ -224,7 +222,7 @@ libffiLibraryName = do
 -- | Generated header files required by GHC in runtime.
 generatedGhcDependencies :: Stage -> Action [FilePath]
 generatedGhcDependencies stage =  do
-    let context = vanillaContext stage compilerBoot
+    let context = vanillaContext stage compiler
     bh <- buildPath   context <&> (-/- "ghc_boot_platform.h")
     ch <- contextPath context <&> (-/- "ghc_boot_platform.h")
     is <- includesDependencies
