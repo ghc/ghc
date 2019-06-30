@@ -45,11 +45,11 @@ import FastString
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
-import BasicTypes (Boxity(..))
+import BasicTypes (Boxity(..), IntegralLit(..), negateIntegralLit)
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
-import TcType        (isStringTy)
+import TcType        (isStringTy, isIntTy, isIntegerTy, isWordTy)
 import Bag
 import ErrUtils
 import Var           (EvVar)
@@ -1081,13 +1081,7 @@ translatePat fam_insts pat = case pat of
                       , pm_con_args    = args }]
 
   -- See Note [Translate Overloaded Literal for Exhaustiveness Checking]
-  NPat _ (dL->L _ olit) mb_neg _
-    | OverLit (OverLitTc False ty) (HsIsString src s) _ <- olit
-    , isStringTy ty ->
-        foldr (mkListPatVec charTy) [nilPattern charTy] <$>
-          translatePatVec fam_insts
-            (map (LitPat noExt . HsChar src) (unpackFS s))
-    | otherwise -> return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) olit }]
+  NPat ty (dL->L _ olit) mb_neg _ -> translateNPat fam_insts olit mb_neg ty
 
   -- See Note [Translate Overloaded Literal for Exhaustiveness Checking]
   LitPat _ lit
@@ -1117,6 +1111,36 @@ translatePat fam_insts pat = case pat of
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
   XPat      {} -> panic "Check.translatePat: XPat"
+
+-- | Translate an overloaded literal (see `tidyNPat' in deSugar/MatchLit.hs)
+translateNPat :: FamInstEnvs
+              -> HsOverLit GhcTc -> Maybe (SyntaxExpr GhcTc) -> Type
+              -> DsM PatVec
+translateNPat fam_insts (OverLit (OverLitTc False ty) val _ ) mb_neg outer_ty
+  | not type_change, isStringTy  ty, HsIsString src s <- val, Nothing <- mb_neg
+  = translatePat fam_insts (LitPat noExt (HsString src s))
+  | not type_change, isIntTy     ty, HsIntegral i <- val
+  = translatePat fam_insts
+                 (LitPat noExt $ case mb_neg of
+                             Nothing -> HsInt noExt i
+                             Just _  -> HsInt noExt (negateIntegralLit i))
+  | not type_change, isWordTy    ty, HsIntegral i <- val
+  = translatePat fam_insts
+                 (LitPat noExt $ case mb_neg of
+                             Nothing -> HsWordPrim (il_text i) (il_value i)
+                             Just _  -> let ni = negateIntegralLit i in
+                                        HsWordPrim (il_text ni) (il_value ni))
+  | not type_change, isIntegerTy ty, HsIntegral i <- val
+  = translatePat fam_insts
+                 (LitPat noExt $ case mb_neg of
+                             Nothing -> HsInteger (il_text i) (il_value i) ty
+                             Just _  -> let ni = negateIntegralLit i in
+                                        HsInteger (il_text i) (il_value ni) ty)
+  where
+    type_change = not (outer_ty `eqType` ty)
+
+translateNPat _ ol mb_neg _
+  = return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) ol }]
 
 {- Note [Translate Overloaded Literal for Exhaustiveness Checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2203,6 +2227,7 @@ pmcheckHd p@(PmLit l) ps guards (PmVar x) vva@(ValVec vas delta) = do
   pr_pos <- case solveOneEq (delta_tm_cs delta) (TVC x (mkPmExprLit l)) of
     Nothing -> pure mempty
     Just tms -> do
+      tracePm "matched at all" (ppr (delta_tm_cs delta))
       let vva'= ValVec vas (delta { delta_tm_cs = tms })
       pmcheckHdI p ps guards (PmLit l) vva'
 

@@ -19,7 +19,7 @@ module PmExpr (
 import GhcPrelude
 
 import Util
-import BasicTypes (SourceText)
+import BasicTypes (SourceText, IntegralLit(..))
 import FastString (FastString, unpackFS)
 import HsSyn
 import Id
@@ -27,7 +27,7 @@ import Name
 import DataCon
 import ConLike
 import TcEvidence (isErasableHsWrapper)
-import TcType (isStringTy)
+import TcType (isStringTy, isIntTy, isIntegerTy, isWordTy)
 import TysWiredIn
 import Outputable
 import SrcLoc
@@ -225,10 +225,17 @@ hsExprToPmExpr (HsVar        _ x) = PmExprVar (idName (unLoc x))
 -- keep it as it is.
 -- See `translatePat` in Check.hs (the `NPat` and `LitPat` case), and
 -- Note [Translate Overloaded Literal for Exhaustiveness Checking].
-hsExprToPmExpr (HsOverLit _ olit)
-  | OverLit (OverLitTc False ty) (HsIsString src s) _ <- olit, isStringTy ty
+hsExprToPmExpr (HsOverLit _ olit@(OverLit (OverLitTc False ty) val _))
+  | isStringTy    ty, HsIsString src s <- val
   = stringExprToList src s
-  | otherwise = PmExprCon (PmAltLit (PmOLit False olit)) []
+  | isIntTy       ty, HsIntegral i <- val
+  = PmExprCon (PmAltLit (PmSLit (HsInt noExt i))) []
+  | isWordTy      ty, HsIntegral i <- val
+  = PmExprCon (PmAltLit (PmSLit (HsWordPrim (il_text i) (il_value i)))) []
+  | isIntegerTy   ty, HsIntegral i <- val
+  = PmExprCon (PmAltLit (PmSLit (HsInteger (il_text i) (il_value i) ty))) []
+  | otherwise
+  = PmExprCon (PmAltLit (PmOLit False olit)) []
 hsExprToPmExpr (HsLit     _ lit)
   | HsString src s <- lit
   = stringExprToList src s
@@ -238,7 +245,7 @@ hsExprToPmExpr e@(NegApp _ (dL->L _ neg_expr) _)
   | PmExprCon (PmAltLit (PmOLit False olit)) _ <- hsExprToPmExpr neg_expr
     -- NB: DON'T simply @(NegApp (NegApp olit))@ as @x@. when extension
     -- @RebindableSyntax@ enabled, (-(-x)) may not equals to x.
-  = PmExprCon (PmAltLit (PmOLit False olit)) []
+  = PmExprCon (PmAltLit (PmOLit True olit)) []
   | otherwise = PmExprOther e
 
 hsExprToPmExpr (HsPar _ (dL->L _ e)) = hsExprToPmExpr e
