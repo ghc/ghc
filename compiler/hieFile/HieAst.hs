@@ -37,6 +37,7 @@ import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import MkIface                    ( mkIfaceExports )
+import Panic
 
 import HieTypes
 import HieUtils
@@ -747,6 +748,7 @@ instance ( a ~ GhcPass p
          , Data (HsSplice a)
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
+         , (HasRealDataConName a)
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
