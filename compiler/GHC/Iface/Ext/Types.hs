@@ -5,9 +5,11 @@ For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 -}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 module GHC.Iface.Ext.Types where
 
 import GhcPrelude
@@ -21,6 +23,7 @@ import GHC.Types.Name             ( Name )
 import Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc           ( RealSrcSpan )
 import GHC.Types.Avail
+import qualified Outputable as O ( (<>) )
 
 import qualified Data.Array as A
 import qualified Data.Map as M
@@ -210,6 +213,15 @@ instance Binary (HieASTs TypeIndex) where
   put_ bh asts = put_ bh $ M.toAscList $ getAsts asts
   get bh = HieASTs <$> fmap M.fromDistinctAscList (get bh)
 
+instance Outputable a => Outputable (HieASTs a) where
+  ppr (HieASTs asts) = M.foldrWithKey go "" asts
+    where
+      go k a rest = vcat $
+        [ "File: " O.<> ppr k
+        , ppr a
+        , rest
+        ]
+
 
 data HieAST a =
   Node
@@ -229,6 +241,11 @@ instance Binary (HieAST TypeIndex) where
     <*> get bh
     <*> get bh
 
+instance Outputable a => Outputable (HieAST a) where
+  ppr (Node ni sp ch) = hang header 2 rest
+    where
+      header = text "Node@" O.<> ppr sp O.<> ":" <+> ppr ni
+      rest = vcat (map ppr ch)
 
 -- | The information stored in one AST node.
 --
@@ -255,6 +272,22 @@ instance Binary (NodeInfo TypeIndex) where
     <*> get bh
     <*> fmap (M.fromList) (get bh)
 
+instance Outputable a => Outputable (NodeInfo a) where
+  ppr (NodeInfo anns typs idents) = braces $ fsep $ punctuate ", "
+    [ parens (text "annotations:" <+> ppr anns)
+    , parens (text "types:" <+> ppr typs)
+    , parens (text "identifier info:" <+> pprNodeIdents idents)
+    ]
+
+pprNodeIdents :: Outputable a => NodeIdentifiers a -> SDoc
+pprNodeIdents ni = braces $ fsep $ punctuate ", " $ map go $ M.toList ni
+  where
+    go (i,id) = parens $ hsep $ punctuate ", " [pprIdentifier i, ppr id]
+
+pprIdentifier :: Identifier -> SDoc
+pprIdentifier (Left mod) = text "module" <+> ppr mod
+pprIdentifier (Right name) = text "name" <+> ppr name
+
 type Identifier = Either ModuleName Name
 
 type NodeIdentifiers a = M.Map Identifier (IdentifierDetails a)
@@ -269,7 +302,7 @@ data IdentifierDetails a = IdentifierDetails
   } deriving (Eq, Functor, Foldable, Traversable)
 
 instance Outputable a => Outputable (IdentifierDetails a) where
-  ppr x = text "IdentifierDetails" <+> ppr (identType x) <+> ppr (identInfo x)
+  ppr x = text "Details: " <+> ppr (identType x) <+> ppr (identInfo x)
 
 instance Semigroup (IdentifierDetails a) where
   d1 <> d2 = IdentifierDetails (identType d1 <|> identType d2)
@@ -284,7 +317,7 @@ instance Binary (IdentifierDetails TypeIndex) where
     put_ bh $ S.toAscList $ identInfo dets
   get bh =  IdentifierDetails
     <$> get bh
-    <*> fmap (S.fromDistinctAscList) (get bh)
+    <*> fmap S.fromDistinctAscList (get bh)
 
 
 -- | Different contexts under which identifiers exist
@@ -330,10 +363,32 @@ data ContextInfo
 
   -- | Record field
   | RecField RecFieldContext (Maybe Span)
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
 
 instance Outputable ContextInfo where
-  ppr = text . show
+ ppr (Use) = text "usage"
+ ppr (MatchBind) = text "LHS of a match group"
+ ppr (IEThing x) = ppr x
+ ppr (TyDecl) = text "bound in a type signature declaration"
+ ppr (ValBind t sc sp) =
+   ppr t <+> text "value bound with scope:" <+> ppr sc <+> pprBindSpan sp
+ ppr (PatternBind sc1 sc2 sp) =
+   text "bound in a pattern with scope:"
+     <+> ppr sc1 <+> "," <+> ppr sc2
+     <+> pprBindSpan sp
+ ppr (ClassTyDecl sp) =
+   text "bound in a class type declaration" <+> pprBindSpan sp
+ ppr (Decl d sp) =
+   text "declaration of" <+> ppr d <+> pprBindSpan sp
+ ppr (TyVarBind sc1 sc2) =
+   text "type variable binding with scope:"
+     <+> ppr sc1 <+> "," <+> ppr sc2
+ ppr (RecField ctx sp) =
+   text "record field" <+> ppr ctx <+> pprBindSpan sp
+
+pprBindSpan :: Maybe Span -> SDoc
+pprBindSpan Nothing = text ""
+pprBindSpan (Just sp) = text "at:" <+> ppr sp
 
 instance Binary ContextInfo where
   put_ bh Use = putByte bh 0
@@ -383,14 +438,19 @@ instance Binary ContextInfo where
       9 -> return MatchBind
       _ -> panic "Binary ContextInfo: invalid tag"
 
-
 -- | Types of imports and exports
 data IEType
   = Import
   | ImportAs
   | ImportHiding
   | Export
-    deriving (Eq, Enum, Ord, Show)
+    deriving (Eq, Enum, Ord)
+
+instance Outputable IEType where
+  ppr Import = text "import"
+  ppr ImportAs = text "import as"
+  ppr ImportHiding = text "import hiding"
+  ppr Export = text "export"
 
 instance Binary IEType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
@@ -402,7 +462,13 @@ data RecFieldContext
   | RecFieldAssign
   | RecFieldMatch
   | RecFieldOcc
-    deriving (Eq, Enum, Ord, Show)
+    deriving (Eq, Enum, Ord)
+
+instance Outputable RecFieldContext where
+  ppr RecFieldDecl = text "declaration"
+  ppr RecFieldAssign = text "assignment"
+  ppr RecFieldMatch = text "pattern match"
+  ppr RecFieldOcc = text "occurence"
 
 instance Binary RecFieldContext where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
@@ -412,12 +478,15 @@ instance Binary RecFieldContext where
 data BindType
   = RegularBind
   | InstanceBind
-    deriving (Eq, Ord, Show, Enum)
+    deriving (Eq, Ord, Enum)
+
+instance Outputable BindType where
+  ppr RegularBind = "regular"
+  ppr InstanceBind = "instance"
 
 instance Binary BindType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
-
 
 data DeclType
   = FamDec     -- ^ type or data family
@@ -427,18 +496,26 @@ data DeclType
   | PatSynDec  -- ^ pattern synonym
   | ClassDec   -- ^ class declaration
   | InstDec    -- ^ instance declaration
-    deriving (Eq, Ord, Show, Enum)
+    deriving (Eq, Ord, Enum)
+
+instance Outputable DeclType where
+  ppr FamDec = text "type or data family"
+  ppr SynDec = text "type synonym"
+  ppr DataDec = text "data"
+  ppr ConDec = text "constructor"
+  ppr PatSynDec = text "pattern synonym"
+  ppr ClassDec = text "class"
+  ppr InstDec = text "instance"
 
 instance Binary DeclType where
   put_ bh b = putByte bh (fromIntegral (fromEnum b))
   get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
 
-
 data Scope
   = NoScope
   | LocalScope Span
   | ModuleScope
-    deriving (Eq, Ord, Show, Typeable, Data)
+    deriving (Eq, Ord, Typeable, Data)
 
 instance Outputable Scope where
   ppr NoScope = text "NoScope"
@@ -488,9 +565,12 @@ data TyVarScope
                       -- method type signature
     deriving (Eq, Ord)
 
-instance Show TyVarScope where
-  show (ResolvedScopes sc) = show sc
-  show _ = error "UnresolvedScope"
+instance Outputable TyVarScope where
+  ppr (ResolvedScopes xs) =
+    text "type variable scopes:" <+> hsep (punctuate ", " $ map ppr xs)
+  ppr (UnresolvedScope ns sp) =
+    text "unresolved type variable scope for name" O.<> plural ns
+      <+> pprBindSpan sp
 
 instance Binary TyVarScope where
   put_ bh (ResolvedScopes xs) = do
