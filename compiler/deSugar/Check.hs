@@ -2188,14 +2188,15 @@ pmcheckHd p@PmCon{} ps guards (PmVar x) vva@(ValVec vas delta) = do
     Nothing -> pure mempty
     Just (delta', ic) -> do
       tracePm "matched at all" (ppr (delta_tm_cs delta'))
-      pr <- pmcheckHdI p ps guards (ic_val_abs ic) (ValVec vas delta')
-      pure (forceIfCanDiverge x (delta_tm_cs delta) pr)
+      pmcheckHdI p ps guards (ic_val_abs ic) (ValVec vas delta')
 
+  -- The var is forced regardless of whether @con@ was satisfiable
+  let pr_pos' = forceIfCanDiverge x (delta_tm_cs delta) pr_pos
   pr_neg <- mkUnmatched x (PmAltConLike con) vva
-  tracePm "ConVar" (vcat [ppr p, ppr x, ppr pr_pos, ppr pr_neg])
+  tracePm "ConVar" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
 
   -- Combine both into a single PartialResult
-  pure (mkUnion pr_pos pr_neg)
+  pure (mkUnion pr_pos' pr_neg)
 
 -- LitVar
 pmcheckHd p@(PmLit l) ps guards (PmVar x) vva@(ValVec vas delta) = do
@@ -2203,11 +2204,14 @@ pmcheckHd p@(PmLit l) ps guards (PmVar x) vva@(ValVec vas delta) = do
     Nothing -> pure mempty
     Just tms -> do
       let vva'= ValVec vas (delta { delta_tm_cs = tms })
-      pr <- pmcheckHdI p ps guards (PmLit l) vva'
-      pure (forceIfCanDiverge x (delta_tm_cs delta) pr)
+      pmcheckHdI p ps guards (PmLit l) vva'
 
+  -- The var is forced regardless of whether @l@ was satisfiable.
+  -- Although for literals I can't think of a scenario where the var is not
+  -- forced yet but the above oracle call leads to a contradiction...
+  let pr_pos' = forceIfCanDiverge x (delta_tm_cs delta) pr_pos
   pr_neg <- mkUnmatched x (PmAltLit l) vva
-  pure (mkUnion pr_pos pr_neg)
+  pure (mkUnion pr_pos' pr_neg)
 
 -- ----------------------------------------------------------------------------
 -- The following three can happen only in cases like #322 where constructors
