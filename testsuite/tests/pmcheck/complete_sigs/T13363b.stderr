@@ -1,7 +1,4 @@
 
-T13363b.hs:1:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
-    Unrecognised pragma
-
 T13363b.hs:17:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f _ = ...
