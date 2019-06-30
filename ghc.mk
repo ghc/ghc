@@ -562,10 +562,14 @@ endif
 $(foreach p,$(INSTALL_PACKAGES),$(eval $p_dist-install_DO_HADDOCK = YES))
 compiler_stage2_DO_HADDOCK = YES
 
+# Add constraints on boot packages. However, exclude template-haskell since
+# it's almost certain that the boot compiler will have a different version than
+# that included in this tree.
 BOOT_PKG_CONSTRAINTS := \
     $(foreach d,$(PACKAGES_STAGE0),\
         $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
-            --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
+					  $(if $(findstring template-haskell,$p), ,\
+                --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")")))
 
 # The actual .a and .so/.dll files: needed for dependencies.
 $(foreach way,$(GhcLibWays),$(eval ALL_STAGE1_$(way)_LIBS = $$(foreach lib,$$(PACKAGES_STAGE1),$$(libraries/$$(lib)_dist-install_$(way)_LIB))))
