@@ -1660,6 +1660,15 @@ mkBasicIndexedRead off mcast ty res base idx_ty idx = do
     emit =<< mkCmmIfThen
       (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
       (mkRaise dflags updfr_off boundsCheckExcpLabel)
+    let len = cmmLoadIndexW dflags base
+          (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
+          (bWord dflags)
+        idxShifted = CmmMachOp
+          (MO_Shl (wordWidth dflags))
+          [idx, mkIntExpr dflags (widthInLog (typeWidth ty))]
+    emit =<< mkCmmIfThen
+      (CmmMachOp (MO_S_Ge w) [idxShifted,len])
+      (mkRaise dflags updfr_off boundsCheckExcpLabel)
   case mcast of
     Nothing -> emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
     Just cast ->
