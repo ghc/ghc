@@ -84,9 +84,6 @@ defaults
 
 #include "MachDeps.h"
 
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
-
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
          must contain at least 30 bits. GHC always implements {\tt
@@ -2797,30 +2794,6 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
-
 ------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
@@ -3409,13 +3382,6 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
      of the event is the zero-terminated byte string passed as the first
      argument.  The event will be emitted either to the {\tt .eventlog} file,
      or to stderr, depending on the runtime RTS flags. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
-   { Retrieves the allocation counter for the current thread. }
    with
    has_side_effects = True
    out_of_line      = True

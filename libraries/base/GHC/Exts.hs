@@ -29,6 +29,7 @@ module GHC.Exts
 
         -- * Primitive operations
         module GHC.Prim,
+        module GHC.Prim.Ext,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
@@ -89,6 +90,7 @@ module GHC.Exts
 
 import GHC.Prim hiding ( coerce, TYPE )
 import qualified GHC.Prim
+import qualified GHC.Prim.Ext
 import GHC.Base hiding ( coerce )
 import GHC.Word
 import GHC.Int
