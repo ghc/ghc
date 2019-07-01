@@ -24,5 +24,7 @@ test('ShowPrim', normal, compile_and_run, [''])
 test('ArithInt16', omit_ways(['ghci']), compile_and_run, [''])
 test('ArithWord16', omit_ways(['ghci']), compile_and_run, [''])
 
+test('BoundsCheckA', omit_ways(['ghci']), compile_and_run, ['-fcmm-bounds-check'])
+
 test('CmpInt16', normal, compile_and_run, [''])
 test('CmpWord16', normal, compile_and_run, [''])

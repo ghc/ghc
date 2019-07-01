@@ -1331,9 +1331,10 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
 
+-- Bounds checking with -fcmm-bounds-check
 boundsCheckExceptionName :: Name
 boundsCheckExceptionName = varQual
-  gHC_IO_Exception (fsLit "cannotCompactFunction")
+  gHC_IO_Exception (fsLit "boundsCheckException")
   boundsCheckExceptionIdKey
 
 -- Debug.Trace
@@ -2200,7 +2201,6 @@ thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
-boundsCheckExceptionIdKey     = mkPreludeMiscIdUnique 998
 oneShotKey                    = mkPreludeMiscIdUnique 106
 runRWKey                      = mkPreludeMiscIdUnique 107
 
@@ -2412,6 +2412,9 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+
+-- Bounds checking with -fcmm-bounds-check
+boundsCheckExceptionIdKey = mkPreludeMiscIdUnique 570
 
 {-
 ************************************************************************
