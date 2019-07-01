@@ -45,6 +45,7 @@ Library
         GHC.Debug
         GHC.IntWord64
         GHC.Magic
+        GHC.Prim.Ext
         GHC.PrimopWrappers
         GHC.Tuple
         GHC.Types

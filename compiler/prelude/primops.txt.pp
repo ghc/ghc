@@ -68,8 +68,8 @@
 
 defaults
    has_side_effects = False
-   out_of_line      = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
-   can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
+   out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
+   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topRes }
@@ -78,14 +78,47 @@ defaults
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
 
+
+-- Note [When do out-of-line primops go in primops.txt.pp]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Out of line primops are those with a C-- implementation. But that
+-- doesn't mean they *just* have an C-- implementation. As mentioned in
+-- Note [Inlining out-of-line primops and heap checks], some out-of-line
+-- primops also have additional internal implementations under certain
+-- conditions. Now that `foreign import prim` exists, only those primops
+-- which have both internal and external implementations ought to be
+-- this file. The rest aren't really primops, since they don't need
+-- bespoke compiler support but just a general way to interface with
+-- C--. They are just foreign calls.
+--
+-- Unfortunately, for the time being most of the primops which should be
+-- moved according to the previous paragraph can't yet. There are some
+-- superficial restrictions in `foreign import prim` which mus be fixed
+-- first. Specifically, `foreign import prim` always requires:
+--
+--   - No polymorphism in type
+--   - `strictness       = <default>`
+--   - `can_fail         = False`
+--   - `has_side_effects = True`
+--
+-- https://gitlab.haskell.org/ghc/ghc/issues/16929 tracks this issue,
+-- and has a table of which external-only primops are blocked by which
+-- of these. Hopefully those restrictions are relaxed so the rest of
+-- those can be moved over.
+--
+-- 'module GHC.Prim.Ext is a temporarily "holding ground" for primops
+-- that were formally in here, until they can be given a better home.
+-- Likewise, their underlying C-- implementation need not live in the
+-- RTS either. Best case (in my view), both the C-- and `foreign import
+-- prim` can be moved to a small library tailured to the features being
+-- implemented and dependencies of those features.
+
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
 
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
@@ -2797,30 +2830,6 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
-
 ------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
@@ -3409,13 +3418,6 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
      of the event is the zero-terminated byte string passed as the first
      argument.  The event will be emitted either to the {\tt .eventlog} file,
      or to stderr, depending on the runtime RTS flags. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
-   { Retrieves the allocation counter for the current thread. }
    with
    has_side_effects = True
    out_of_line      = True
