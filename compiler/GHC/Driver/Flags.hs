@@ -212,6 +212,7 @@ data GeneralFlag
    | Opt_ProfCountEntries
 
    -- misc opts
+   | Opt_CmmBoundsCheck
    | Opt_Pp
    | Opt_ForceRecomp
    | Opt_IgnoreOptimChanges

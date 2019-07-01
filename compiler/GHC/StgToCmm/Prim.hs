@@ -53,6 +53,8 @@ import FastString
 import Outputable
 import Util
 import Data.Maybe
+import PrelNames
+import IdInfo
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
@@ -689,68 +691,68 @@ emitPrimOp dflags = \case
 -- WriteXXXArray
 
   WriteByteArrayOp_Char -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 dflags)) W8 b8 res args
   WriteByteArrayOp_WideChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
   WriteByteArrayOp_Int -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
   WriteByteArrayOp_Word -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
   WriteByteArrayOp_Addr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
   WriteByteArrayOp_Float -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing f32 res args
+    doWriteByteArrayOp Nothing W32 f32 res args
   WriteByteArrayOp_Double -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing f64 res args
+    doWriteByteArrayOp Nothing W64 f64 res args
   WriteByteArrayOp_StablePtr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing (bWord dflags) res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
   WriteByteArrayOp_Int8 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 dflags)) W8 b8 res args
   WriteByteArrayOp_Int16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b16 res args
   WriteByteArrayOp_Int32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
   WriteByteArrayOp_Int64 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b64 res args
+    doWriteByteArrayOp Nothing W64 b64 res args
   WriteByteArrayOp_Word8 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8  res args
+    doWriteByteArrayOp (Just (mo_WordTo8 dflags)) W8 b8  res args
   WriteByteArrayOp_Word16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b16 res args
   WriteByteArrayOp_Word32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
   WriteByteArrayOp_Word64 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b64 res args
+    doWriteByteArrayOp Nothing W64 b64 res args
 
 -- WriteInt8ArrayAsXXX
 
   WriteByteArrayOp_Word8AsChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo8 dflags)) W8 b8 res args
   WriteByteArrayOp_Word8AsWideChar -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
   WriteByteArrayOp_Word8AsInt -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
   WriteByteArrayOp_Word8AsWord -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
   WriteByteArrayOp_Word8AsAddr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
   WriteByteArrayOp_Word8AsFloat -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing W32 b8 res args
   WriteByteArrayOp_Word8AsDouble -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing W64 b8 res args
   WriteByteArrayOp_Word8AsStablePtr -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
   WriteByteArrayOp_Word8AsInt16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b8 res args
   WriteByteArrayOp_Word8AsInt32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
   WriteByteArrayOp_Word8AsInt64 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing W8 b8 res args
   WriteByteArrayOp_Word8AsWord16 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b8 res args
   WriteByteArrayOp_Word8AsWord32 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
+    doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
   WriteByteArrayOp_Word8AsWord64 -> \args -> opAllDone $ \res -> do
-    doWriteByteArrayOp Nothing b8 res args
+    doWriteByteArrayOp Nothing W64 b8 res args
 
 -- Copying and setting byte arrays
   CopyByteArrayOp -> \[src,src_off,dst,dst_off,n] -> opAllDone $ \[] -> do
@@ -923,7 +925,7 @@ emitPrimOp dflags = \case
 
   (VecWriteByteArrayOp vcat n w) -> \args -> opAllDone $ \res0 -> do
     checkVecCompatibility dflags vcat n w
-    doWriteByteArrayOp Nothing ty res0 args
+    doWriteByteArrayOp Nothing w ty res0 args
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -971,7 +973,7 @@ emitPrimOp dflags = \case
 
   (VecWriteScalarByteArrayOp vcat n w) -> \args -> opAllDone $ \res0 -> do
     checkVecCompatibility dflags vcat n w
-    doWriteByteArrayOp Nothing ty res0 args
+    doWriteByteArrayOp Nothing w ty res0 args
    where
     ty :: CmmType
     ty = vecCmmCat vcat w
@@ -1938,7 +1940,7 @@ doIndexOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doIndexOffAddrOp maybe_post_read_cast rep [res] [addr,idx]
-   = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr rep idx
+   = mkBasicIndexedRead Nothing 0 maybe_post_read_cast rep res addr rep idx
 doIndexOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOp"
 
@@ -1949,7 +1951,7 @@ doIndexOffAddrOpAs :: Maybe MachOp
                    -> [CmmExpr]
                    -> FCode ()
 doIndexOffAddrOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
-   = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr idx_rep idx
+   = mkBasicIndexedRead Nothing 0 maybe_post_read_cast rep res addr idx_rep idx
 doIndexOffAddrOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOpAs"
 
@@ -1960,7 +1962,7 @@ doIndexByteArrayOp :: Maybe MachOp
                    -> FCode ()
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
+        mkBasicIndexedRead (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
 doIndexByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOp"
 
@@ -1972,7 +1974,7 @@ doIndexByteArrayOpAs :: Maybe MachOp
                     -> FCode ()
 doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
+        mkBasicIndexedRead (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
 doIndexByteArrayOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOpAs"
 
@@ -1982,7 +1984,7 @@ doReadPtrArrayOp :: LocalReg
                  -> FCode ()
 doReadPtrArrayOp res addr idx
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr (gcWord dflags) idx
+        mkBasicIndexedRead (Just sizeofArrayExpr) (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr (gcWord dflags) idx
 
 doWriteOffAddrOp :: Maybe MachOp
                  -> CmmType
@@ -1990,19 +1992,21 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doWriteOffAddrOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = mkBasicIndexedWrite 0 maybe_pre_write_cast addr idx_ty idx val
+     -- The width is ignored, so we just make up W8 as the value.
+   = mkBasicIndexedWrite Nothing 0 maybe_pre_write_cast W8 addr idx_ty idx val
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
 doWriteByteArrayOp :: Maybe MachOp
+                   -> Width
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
-doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
+doWriteByteArrayOp maybe_pre_write_cast width idx_ty [] [addr,idx,val]
    = do dflags <- getDynFlags
-        mkBasicIndexedWrite (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx_ty idx val
-doWriteByteArrayOp _ _ _ _
+        mkBasicIndexedWrite (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_pre_write_cast width addr idx_ty idx val
+doWriteByteArrayOp _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
 doWritePtrArrayOp :: CmmExpr
@@ -2020,7 +2024,7 @@ doWritePtrArrayOp addr idx val
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite hdr_size Nothing addr ty idx val
+       mkBasicIndexedWrite (Just sizeofArrayExpr) hdr_size Nothing (wordWidth dflags) addr ty idx val
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
        -- the write barrier.  We must write a byte into the mark table:
        -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
@@ -2036,34 +2040,95 @@ loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
 loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
  where off = fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags
 
-mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
-                   -> Maybe MachOp -- Optional result cast
-                   -> CmmType      -- Type of element we are accessing
-                   -> LocalReg     -- Destination
-                   -> CmmExpr      -- Base address
-                   -> CmmType      -- Type of element by which we are indexing
-                   -> CmmExpr      -- Index
-                   -> FCode ()
-mkBasicIndexedRead off Nothing ty res base idx_ty idx
-   = do dflags <- getDynFlags
-        emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
-mkBasicIndexedRead off (Just cast) ty res base idx_ty idx
-   = do dflags <- getDynFlags
-        emitAssign (CmmLocal res) (CmmMachOp cast [
-                                   cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
+emitIndexBoundsCheck ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr) -- How to compute payload size in bytes
+  -> CmmExpr -- Base address
+  -> Width -- Width of element being read or written
+  -> CmmType -- Type of element by which we are indexing
+  -> CmmExpr -- Index
+  -> FCode ()
+emitIndexBoundsCheck Nothing _ _ _ _ = return ()
+emitIndexBoundsCheck (Just getSize) base width idx_ty idx = do
+  dflags <- getDynFlags
+  when (gopt Opt_CmmBoundsCheck dflags) $ do
+    emitAssertNonNegative idx
+    let len = getSize dflags base
+        w = wordWidth dflags
+        idxShifted = CmmMachOp
+          (MO_Shl w)
+          [idx, mkIntExpr dflags (widthInLog (typeWidth idx_ty))]
+        idxPost = CmmMachOp
+          (MO_Add w)
+          [idxShifted, mkIntExpr dflags (widthInBytes width)]
+    emitAssertLessThanEqual idxPost len
 
-mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
-                    -> Maybe MachOp -- Optional value cast
-                    -> CmmExpr      -- Base address
-                    -> CmmType      -- Type of element by which we are indexing
-                    -> CmmExpr      -- Index
-                    -> CmmExpr      -- Value to write
-                    -> FCode ()
-mkBasicIndexedWrite off Nothing base idx_ty idx val
-   = do dflags <- getDynFlags
-        emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
-mkBasicIndexedWrite off (Just cast) base idx_ty idx val
-   = mkBasicIndexedWrite off Nothing base idx_ty idx (CmmMachOp cast [val])
+-- Throws BoundsCheckException when the argument is negative.
+emitAssertNonNegative :: CmmExpr -> FCode ()
+emitAssertNonNegative idx = do
+  dflags <- getDynFlags
+  let w = wordWidth dflags
+  updfr_off <- getUpdFrameOff
+  emit =<< mkCmmIfThen
+    (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
+    (mkRaise dflags updfr_off boundsCheckExcpLabel)
+
+-- Throws BoundsCheckException when the first argument is greater than
+-- the second argument.
+emitAssertLessThanEqual :: CmmExpr -> CmmExpr -> FCode ()
+emitAssertLessThanEqual a b = do
+  dflags <- getDynFlags
+  let w = wordWidth dflags
+  updfr_off <- getUpdFrameOff
+  emit =<< mkCmmIfThen
+    (CmmMachOp (MO_S_Gt w) [a,b])
+    (mkRaise dflags updfr_off boundsCheckExcpLabel)
+
+plusMachWord :: Width -> CmmExpr -> CmmExpr -> CmmExpr
+plusMachWord w a b = CmmMachOp (MO_Add w) [a,b]
+
+boundsCheckExcpLabel :: CmmExpr
+boundsCheckExcpLabel =
+  CmmLit (CmmLabel (mkClosureLabel boundsCheckExceptionName MayHaveCafRefs))
+
+mkBasicIndexedRead ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr)
+     -- Function for extracting the payload size in
+     -- bytes from the base address. Passing Nothing
+     -- suppresses bounds checking (suppression used
+     -- when indexing into an Addr#).
+  -> ByteOff      -- Initial offset in bytes
+  -> Maybe MachOp -- Optional result cast
+  -> CmmType      -- Type of element we are accessing
+  -> LocalReg     -- Destination
+  -> CmmExpr      -- Base address
+  -> CmmType      -- Type of element by which we are indexing
+  -> CmmExpr      -- Index
+  -> FCode ()
+mkBasicIndexedRead getSize off mcast ty res base idx_ty idx = do
+  emitIndexBoundsCheck getSize base (typeWidth ty) idx_ty idx
+  dflags <- getDynFlags
+  case mcast of
+    Nothing -> emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
+    Just cast ->
+      emitAssign (CmmLocal res) (CmmMachOp cast [
+                                 cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
+
+mkBasicIndexedWrite ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr) -- See mkBasicIndexedRead
+  -> ByteOff      -- Initial offset in bytes
+  -> Maybe MachOp -- Optional value cast
+  -> Width        -- Width of element we are writing
+  -> CmmExpr      -- Base address
+  -> CmmType      -- Type of element by which we are indexing
+  -> CmmExpr      -- Index
+  -> CmmExpr      -- Value to write
+  -> FCode ()
+mkBasicIndexedWrite getSize off mcast width base idx_ty idx val = do
+  emitIndexBoundsCheck getSize base width idx_ty idx
+  dflags <- getDynFlags
+  case mcast of
+    Nothing -> emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
+    Just cast -> emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) (CmmMachOp cast [val])
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
@@ -2455,12 +2520,33 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
             (getCode $ emitMemcpyCall  dst_p src_p bytes align)
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
+-- Emit every available copy assertions given
+emitAllCopyAssertions ::
+     CmmExpr -- destination array length
+  -> CmmExpr -- destination offset
+  -> CmmExpr -- source array length
+  -> CmmExpr -- source offset
+  -> CmmExpr -- number of bytes to copy
+  -> FCode ()
+emitAllCopyAssertions dst_len dst_off src_len src_off n = do
+    dflags <- getDynFlags
+    emitAssertNonNegative src_off
+    emitAssertNonNegative dst_off
+    emitAssertNonNegative n
+    let w = wordWidth dflags
+    emitAssertLessThanEqual (plusMachWord w src_off n) src_len
+    emitAssertLessThanEqual (plusMachWord w dst_off n) dst_len
+
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> Alignment -> FCode ())
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        let src_len = sizeofByteArrayExpr dflags src
+            dst_len = sizeofByteArrayExpr dflags dst
+        emitAllCopyAssertions dst_len dst_off src_len src_off n
     let byteArrayAlignment = wordAlignment dflags
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
@@ -2476,6 +2562,12 @@ doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative src_off
+        emitAssertNonNegative bytes
+        let src_len = sizeofByteArrayExpr dflags src
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w src_off bytes) src_len
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
@@ -2493,6 +2585,12 @@ doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative dst_off
+        emitAssertNonNegative bytes
+        let dst_len = sizeofByteArrayExpr dflags dst
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w dst_off bytes) dst_len
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
@@ -2508,6 +2606,13 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
 
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative off
+        emitAssertNonNegative len
+        let ba_len = sizeofByteArrayExpr dflags ba
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w off len) ba_len
+
     let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
@@ -2518,7 +2623,9 @@ doSetByteArrayOp ba off len c = do
 -- ----------------------------------------------------------------------------
 -- Allocating arrays
 
--- | Allocate a new array.
+-- | Allocate a new array. The size of the array is statically
+-- known and small. Consequently, we inline the initialization
+-- as a series of writes rather than using a loop or memset.
 doNewArrayOp :: CmmFormal             -- ^ return register
              -> SMRep                 -- ^ representation of the array
              -> CLabel                -- ^ info pointer
@@ -2803,7 +2910,7 @@ doReadSmallPtrArrayOp :: LocalReg
                       -> FCode ()
 doReadSmallPtrArrayOp res addr idx = do
     dflags <- getDynFlags
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr
+    mkBasicIndexedRead (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr
         (gcWord dflags) idx
 
 doWriteSmallPtrArrayOp :: CmmExpr
@@ -2816,11 +2923,11 @@ doWriteSmallPtrArrayOp addr idx val = do
 
     -- Update remembered set for non-moving collector
     tmp <- newTemp ty
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing ty tmp addr ty idx
+    mkBasicIndexedRead (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled dflags $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
+    mkBasicIndexedWrite (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing (wordWidth dflags) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
@@ -2897,6 +3004,23 @@ doCasByteArray res mba idx idx_ty old new = do
         [ res ]
         (MO_Cmpxchg width)
         [ addr, old, new ]
+
+-----------------------------------------------------------
+-- Helpers for getting array sizes. These all take the
+-- base address as their argument.
+sizeofByteArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofByteArrayExpr dflags base =
+  cmmLoadIndexW dflags base (fixedHdrSizeW dflags) (bWord dflags)
+
+sizeofArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofArrayExpr dflags base = cmmLoadIndexW dflags base
+  (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
+  (bWord dflags)
+
+sizeofSmallArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofSmallArrayExpr dflags base = cmmLoadIndexW dflags base
+  (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+  (bWord dflags)
 
 ------------------------------------------------------------------------------
 -- Helpers for emitting function calls
