@@ -27,6 +27,7 @@
 module GHC.Integer.Type where
 
 import GHC.Prim
+import GHC.Prim.Ext
 import GHC.Classes
 import GHC.Types
 import GHC.Tuple ()

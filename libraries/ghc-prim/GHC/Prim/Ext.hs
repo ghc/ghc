@@ -29,6 +29,11 @@ module GHC.Prim.Ext
   -- 64-bit bit aliases
     INT64
   , WORD64
+  -- * Double#
+  , decodeDouble_2Int#
+  , decodeDouble_Int64#
+  -- * Float#
+  , decodeFloat_Int#
   -- * Arrays
   , unsafeThawArray#
   , casArray#
@@ -121,6 +126,32 @@ import GHC.Prim
 import GHC.Types () -- Make implicit dependency known to build system
 
 default () -- Double and Integer aren't available yet
+
+------------------------------------------------------------------------
+-- Double#
+------------------------------------------------------------------------
+
+-- | Convert to integer.
+-- First component of the result is -1 or 1, indicating the sign of the
+-- mantissa. The next two are the high and low 32 bits of the mantissa
+-- respectively, and the last is the exponent.
+foreign import prim "decodeDouble_2Int" decodeDouble_2Int#
+  :: Double#
+  -> (# Int#, Word#, Word#, Int# #)
+
+-- | Decode 'Double' into mantissa and base-2 exponent.
+foreign import prim  "decodeDouble_Int64" decodeDouble_Int64#
+  :: Double#
+  -> (# INT64, Int# #)
+
+------------------------------------------------------------------------
+-- Float#
+------------------------------------------------------------------------
+
+-- | Convert to integers.
+-- First 'Int#' in result is the mantissa; second is the exponent.
+foreign import prim "decodeFloat_Int" decodeFloat_Int#
+  :: Float# -> (# Int#, Int# #)
 
 ------------------------------------------------------------------------
 -- Arrays

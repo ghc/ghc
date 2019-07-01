@@ -36,6 +36,7 @@ module GHC.Integer.Type where
 import GHC.Classes
 import GHC.Magic
 import GHC.Prim
+import GHC.Prim.Ext
 import GHC.Types
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
