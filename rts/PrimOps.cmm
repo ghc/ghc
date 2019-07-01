@@ -251,6 +251,9 @@ stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )
 {
     W_ p, h;
 
+    ASSERT(ind >= 0);
+    ASSERT(ind < BYTES_TO_WDS(StgArrBytes_bytes(arr)));
+
     p = arr + SIZEOF_StgArrBytes + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);
 
@@ -264,6 +267,8 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
     gcptr arr;
 
     again: MAYBE_GC(again);
+
+    ASSERT(n >= 0);
 
     // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
     // in the array, making sure we round up, and then rounding up to a whole
@@ -359,6 +364,9 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     gcptr h;
     W_ p, len;
 
+    ASSERT(ind >= 0);
+    ASSERT(ind < StgMutArrPtrs_ptrs(arr));
+
     p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);
 
@@ -386,6 +394,8 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     gcptr arr;
 
     MAYBE_GC_N(stg_newArrayArrayzh, n);
+
+    ASSERT(n >= 0);
 
     // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
     // in the array, making sure we round up, and then rounding up to a whole
@@ -425,6 +435,8 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
     gcptr arr;
 
     again: MAYBE_GC(again);
+
+    ASSERT(n >= 0);
 
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
     ("ptr" arr) = ccall allocateMightFail(MyCapability() "ptr",words);
@@ -518,6 +530,10 @@ stg_copySmallArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n)
             call stg_copyArray_barrier(SIZEOF_StgSmallMutArrPtrs,
                                       dst, dst_off, n);
         }
+        ASSERT(src_off >= 0);
+        ASSERT(dst_off >= 0);
+        ASSERT((src_off + n) <= StgMutArrPtrs_ptrs(src));
+        ASSERT((dst_off + n) <= StgMutArrPtrs_ptrs(dst));
 
         SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
@@ -540,6 +556,11 @@ stg_copySmallMutableArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
                                       dst, dst_off, n);
         }
 
+        ASSERT(src_off >= 0);
+        ASSERT(dst_off >= 0);
+        ASSERT((src_off + n) <= StgMutArrPtrs_ptrs(src));
+        ASSERT((dst_off + n) <= StgMutArrPtrs_ptrs(dst));
+
         SET_INFO(dst, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
 
         dst_p = dst + SIZEOF_StgSmallMutArrPtrs + WDS(dst_off);
@@ -561,6 +582,9 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 {
     gcptr h;
     W_ p, len;
+
+    ASSERT(ind >= 0);
+    ASSERT(ind < StgSmallMutArrPtrs_ptrs(arr));
 
     p = arr + SIZEOF_StgSmallMutArrPtrs + WDS(ind);
     (h) = prim %cmpxchgW(p, old, new);

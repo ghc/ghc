@@ -44,6 +44,8 @@ Language
 Compiler
 ~~~~~~~~
 
+* Introduce `-fcmm-assertions` flag for hunting down stray accesses and
+  writes into arrays.
 
 GHCi
 ~~~~
