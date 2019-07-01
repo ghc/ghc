@@ -1107,13 +1107,6 @@ primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
    with
    has_side_effects = True
 
-primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
-   Array# a -> State# s -> (# State# s, MutableArray# s a #)
-   {Make an immutable array mutable, without copying.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
 primop  CopyArrayOp "copyArray#" GenPrimOp
   Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
   {Given a source array, an offset into the source array, a
@@ -1185,24 +1178,6 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   out_of_line      = True
   has_side_effects = True
   can_fail         = True
-
-primop CasArrayOp  "casArray#" GenPrimOp
-   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
-   {Given an array, an offset, the expected old value, and
-    the new value, perform an atomic compare and swap (i.e. write the new
-    value if the current value and the old value are the same pointer).
-    Returns 0 if the swap succeeds and 1 if it fails. Additionally, returns
-    the element at the offset after the operation completes. This means that
-    on a success the new value is returned, and on a failure the actual old
-    value (not the expected one) is returned. Implies a full memory barrier.
-    The use of a pointer equality on a lifted value makes this function harder
-    to use correctly than {\tt casIntArray\#}. All of the difficulties
-    of using {\tt reallyUnsafePtrEquality\#} correctly apply to
-    {\tt casArray\#} as well.
-   }
-   with
-   out_of_line = True
-   has_side_effects = True
 
 
 ------------------------------------------------------------------------
@@ -1277,13 +1252,6 @@ primop  UnsafeFreezeSmallArrayOp "unsafeFreezeSmallArray#" GenPrimOp
    SmallMutableArray# s a -> State# s -> (# State# s, SmallArray# a #)
    {Make a mutable array immutable, without copying.}
    with
-   has_side_effects = True
-
-primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
-   SmallArray# a -> State# s -> (# State# s, SmallMutableArray# s a #)
-   {Make an immutable array mutable, without copying.}
-   with
-   out_of_line = True
    has_side_effects = True
 
 -- The code_size is only correct for the case when the copy family of
@@ -1362,14 +1330,6 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
   has_side_effects = True
   can_fail         = True
 
-primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
-   SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
-   {Unsafe, machine-level atomic compare and swap on an element within an array.
-    See the documentation of {\tt casArray\#}.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
 ------------------------------------------------------------------------
 section "Byte Arrays"
         {Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
@@ -1396,18 +1356,6 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    with out_of_line = True
         has_side_effects = True
 
-primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array that the GC guarantees not to move.}
-   with out_of_line = True
-        has_side_effects = True
-
-primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
-   Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
-   with out_of_line = True
-        has_side_effects = True
-
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
    MutableByteArray# s -> Int#
    {Determine whether a {\tt MutableByteArray\#} is guaranteed not to move
@@ -1425,30 +1373,6 @@ primop  ByteArrayContents_Char "byteArrayContents#" GenPrimOp
 
 primop  SameMutableByteArrayOp "sameMutableByteArray#" GenPrimOp
    MutableByteArray# s -> MutableByteArray# s -> Int#
-
-primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> State# s
-   {Shrink mutable byte array to new specified size (in bytes), in
-    the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofMutableByteArray\#}.}
-   with out_of_line = True
-        has_side_effects = True
-
-primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
-   MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
-   {Resize (unpinned) mutable byte array to new specified size (in bytes).
-    The returned {\tt MutableByteArray\#} is either the original
-    {\tt MutableByteArray\#} resized in-place or, if not possible, a newly
-    allocated (unpinned) {\tt MutableByteArray\#} (with the original content
-    copied over).
-
-    To avoid undefined behaviour, the original {\tt MutableByteArray\#} shall
-    not be accessed anymore after a {\tt resizeMutableByteArray\#} has been
-    performed.  Moreover, no reference to the old one should be kept in order
-    to allow garbage collection of the original {\tt MutableByteArray\#} in
-    case a new {\tt MutableByteArray\#} had to be allocated.}
-   with out_of_line = True
-        has_side_effects = True
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
@@ -2093,15 +2017,6 @@ primtype ArrayArray#
 
 primtype MutableArrayArray# s
 
-primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
-   Int# -> State# s -> (# State# s, MutableArrayArray# s #)
-   {Create a new mutable array of arrays with the specified number of elements,
-    in the specified state thread, with each element recursively referring to the
-    newly created array.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
 primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
    MutableArrayArray# s -> MutableArrayArray# s -> Int#
 
@@ -2460,13 +2375,6 @@ section "Mutable variables"
 primtype MutVar# s a
         {A {\tt MutVar\#} behaves like a single-element mutable array.}
 
-primop  NewMutVarOp "newMutVar#" GenPrimOp
-   a -> State# s -> (# State# s, MutVar# s a #)
-   {Create {\tt MutVar\#} with specified initial value in specified state thread.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
 -- Note [Why MutVar# ops can't fail]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -2534,12 +2442,6 @@ primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    out_of_line = True
    has_side_effects = True
    can_fail         = True
-
-primop  CasMutVarOp "casMutVar#" GenPrimOp
-  MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
-   with
-   out_of_line = True
-   has_side_effects = True
 
 ------------------------------------------------------------------------
 section "Exceptions"
@@ -2630,12 +2532,6 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop  MaskStatus "getMaskingState#" GenPrimOp
-        State# RealWorld -> (# State# RealWorld, Int# #)
-   with
-   out_of_line = True
-   has_side_effects = True
-
 ------------------------------------------------------------------------
 section "STM-accessible Mutable Variables"
 ------------------------------------------------------------------------
@@ -2692,39 +2588,6 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop  NewTVarOp "newTVar#" GenPrimOp
-       a
-    -> State# s -> (# State# s, TVar# s a #)
-   {Create a new {\tt TVar\#} holding a specified initial value.}
-   with
-   out_of_line  = True
-   has_side_effects = True
-
-primop  ReadTVarOp "readTVar#" GenPrimOp
-       TVar# s a
-    -> State# s -> (# State# s, a #)
-   {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
-   with
-   out_of_line  = True
-   has_side_effects = True
-
-primop ReadTVarIOOp "readTVarIO#" GenPrimOp
-       TVar# s a
-    -> State# s -> (# State# s, a #)
-   {Read contents of {\tt TVar\#} outside an STM transaction}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  WriteTVarOp "writeTVar#" GenPrimOp
-       TVar# s a
-    -> a
-    -> State# s -> State# s
-   {Write contents of {\tt TVar\#}.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
 primop  SameTVarOp "sameTVar#" GenPrimOp
    TVar# s a -> TVar# s a -> Int#
 
@@ -2739,96 +2602,8 @@ primtype MVar# s a
         (Note: in a non-concurrent implementation, {\tt (MVar\# a)} can be
         represented by {\tt (MutVar\# (Maybe a))}.) }
 
-primop  NewMVarOp "newMVar#"  GenPrimOp
-   State# s -> (# State# s, MVar# s a #)
-   {Create new {\tt MVar\#}; initially empty.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
-primop  TakeMVarOp "takeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, a #)
-   {If {\tt MVar\#} is empty, block until it becomes full.
-   Then remove and return its contents, and set it empty.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
-   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  PutMVarOp "putMVar#" GenPrimOp
-   MVar# s a -> a -> State# s -> State# s
-   {If {\tt MVar\#} is full, block until it becomes empty.
-   Then store value arg as its new contents.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
-   MVar# s a -> a -> State# s -> (# State# s, Int# #)
-   {If {\tt MVar\#} is full, immediately return with integer 0.
-    Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  ReadMVarOp "readMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, a #)
-   {If {\tt MVar\#} is empty, block until it becomes full.
-   Then read its contents without modifying the MVar, without possibility
-   of intervention from other threads.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
-primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int#, a #)
-   {If {\tt MVar\#} is empty, immediately return with integer 0 and value undefined.
-   Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
-   with
-   out_of_line      = True
-   has_side_effects = True
-
 primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Int#
-
-primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
-   MVar# s a -> State# s -> (# State# s, Int# #)
-   {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
-   with
-   out_of_line = True
-   has_side_effects = True
-
-------------------------------------------------------------------------
-section "Delay/wait operations"
-------------------------------------------------------------------------
-
-primop  DelayOp "delay#" GenPrimOp
-   Int# -> State# s -> State# s
-   {Sleep specified number of microseconds.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  WaitReadOp "waitRead#" GenPrimOp
-   Int# -> State# s -> State# s
-   {Block until input is available on specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  WaitWriteOp "waitWrite#" GenPrimOp
-   Int# -> State# s -> State# s
-   {Block until output is possible on specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"
@@ -2851,57 +2626,9 @@ primtype ThreadId#
         type, whose (unique) value is returned by {\tt myThreadId\#}.  The
         other operations can be omitted.)}
 
-primop  ForkOp "fork#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  ForkOnOp "forkOn#" GenPrimOp
-   Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  KillThreadOp "killThread#"  GenPrimOp
-   ThreadId# -> a -> State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  YieldOp "yield#" GenPrimOp
-   State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-   out_of_line      = True
-
 primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   has_side_effects = True
-
-primop LabelThreadOp "labelThread#" GenPrimOp
-   ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, Int# #)
-   with
-   out_of_line = True
-   has_side_effects = True
-
-primop  NoDuplicateOp "noDuplicate#" GenPrimOp
-   State# s -> State# s
-   with
-   out_of_line = True
-   has_side_effects = True
-
-primop  ThreadStatusOp "threadStatus#" GenPrimOp
-   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
-   with
-   out_of_line = True
    has_side_effects = True
 
 ------------------------------------------------------------------------
@@ -2911,55 +2638,6 @@ section "Weak pointers"
 primtype Weak# b
 
 -- note that tyvar "o" denotes openAlphaTyVar
-
-primop  MkWeakOp "mkWeak#" GenPrimOp
-   o -> b -> (State# RealWorld -> (# State# RealWorld, c #))
-     -> State# RealWorld -> (# State# RealWorld, Weak# b #)
-   { {\tt mkWeak# k v finalizer s} creates a weak reference to value {\tt k},
-     with an associated reference to some value {\tt v}. If {\tt k} is still
-     alive then {\tt v} can be retrieved using {\tt deRefWeak#}. Note that
-     the type of {\tt k} must be represented by a pointer (i.e. of kind {\tt
-     TYPE 'LiftedRep} or {\tt TYPE 'UnliftedRep}). }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
-   o -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
-   Addr# -> Addr# -> Int# -> Addr# -> Weak# b
-          -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { {\tt addCFinalizerToWeak# fptr ptr flag eptr w} attaches a C
-     function pointer {\tt fptr} to a weak pointer {\tt w} as a finalizer. If
-     {\tt flag} is zero, {\tt fptr} will be called with one argument,
-     {\tt ptr}. Otherwise, it will be called with two arguments,
-     {\tt eptr} and {\tt ptr}. {\tt addCFinalizerToWeak#} returns
-     1 on success, or 0 if {\tt w} is already dead. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  DeRefWeakOp "deRefWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
-   Weak# a -> State# RealWorld -> (# State# RealWorld, Int#,
-              (State# RealWorld -> (# State# RealWorld, b #) ) #)
-   { Finalize a weak pointer. The return value is an unboxed tuple
-     containing the new state of the world and an "unboxed Maybe",
-     represented by an {\tt Int#} and a (possibly invalid) finalization
-     action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
-     return value {\tt b} from the finalizer should be ignored. }
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
@@ -2975,28 +2653,10 @@ primtype StablePtr# a
 
 primtype StableName# a
 
-primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
-   StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
-   with
-   has_side_effects = True
-   out_of_line      = True
-
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
    StablePtr# a -> StablePtr# a -> Int#
    with
    has_side_effects = True
-
-primop  MakeStableNameOp "makeStableName#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, StableName# a #)
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
    StableName# a -> StableName# b -> Int#
@@ -3022,110 +2682,6 @@ section "Compact normal form"
 ------------------------------------------------------------------------
 
 primtype Compact#
-
-primop  CompactNewOp "compactNew#" GenPrimOp
-   Word# -> State# RealWorld -> (# State# RealWorld, Compact# #)
-   { Create a new CNF with a single compact block. The argument is
-     the capacity of the compact block (in bytes, not words).
-     The capacity is rounded up to a multiple of the allocator block size
-     and is capped to one mega block. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  CompactResizeOp "compactResize#" GenPrimOp
-   Compact# -> Word# -> State# RealWorld ->
-   State# RealWorld
-   { Set the new allocation size of the CNF. This value (in bytes)
-     determines the capacity of each compact block in the CNF. It
-     does not retroactively affect existing compact blocks in the CNF. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  CompactContainsOp "compactContains#" GenPrimOp
-   Compact# -> a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1\# if the object is contained in the CNF, 0\# otherwise. }
-   with
-   out_of_line      = True
-
-primop  CompactContainsAnyOp "compactContainsAny#" GenPrimOp
-   a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1\# if the object is in any CNF at all, 0\# otherwise. }
-   with
-   out_of_line      = True
-
-primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
-   Compact# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
-   { Returns the address and the utilized size (in bytes) of the
-     first compact block of a CNF.}
-   with
-   out_of_line      = True
-
-primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
-   Compact# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
-   { Given a CNF and the address of one its compact blocks, returns the
-     next compact block and its utilized size, or {\tt nullAddr\#} if the
-     argument was the last compact block in the CNF. }
-   with
-   out_of_line      = True
-
-primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
-   Word# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
-   { Attempt to allocate a compact block with the capacity (in
-     bytes) given by the first argument. The {\texttt Addr\#} is a pointer
-     to previous compact block of the CNF or {\texttt nullAddr\#} to create a
-     new CNF with a single compact block.
-
-     The resulting block is not known to the GC until
-     {\texttt compactFixupPointers\#} is called on it, and care must be taken
-     so that the address does not escape or memory will be leaked.
-   }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld -> (# State# RealWorld, Compact#, Addr# #)
-   { Given the pointer to the first block of a CNF and the
-     address of the root object in the old address space, fix up
-     the internal pointers inside the CNF to account for
-     a different position in memory than when it was serialized.
-     This method must be called exactly once after importing
-     a serialized CNF. It returns the new CNF and the new adjusted
-     root address. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop CompactAdd "compactAdd#" GenPrimOp
-   Compact# -> a -> State# RealWorld -> (# State# RealWorld, a #)
-   { Recursively add a closure and its transitive closure to a
-     {\texttt Compact\#} (a CNF), evaluating any unevaluated components
-     at the same time. Note: {\texttt compactAdd\#} is not thread-safe, so
-     only one thread may call {\texttt compactAdd\#} with a particular
-     {\texttt Compact\#} at any given time. The primop does not
-     enforce any mutual exclusion; the caller is expected to
-     arrange this. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
-   Compact# -> a -> State# RealWorld -> (# State# RealWorld, a #)
-   { Like {\texttt compactAdd\#}, but retains sharing and cycles
-   during compaction. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop CompactSize "compactSize#" GenPrimOp
-   Compact# -> State# RealWorld -> (# State# RealWorld, Word# #)
-   { Return the total capacity (in bytes) of all the compact blocks
-     in the CNF. }
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 ------------------------------------------------------------------------
 section "Unsafe pointer equality"
@@ -3190,19 +2746,6 @@ primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    -- See Note [seq# magic] in PrelRules
 
-primop GetSparkOp "getSpark#" GenPrimOp
-   State# s -> (# State# s, Int#, a #)
-   with
-   has_side_effects = True
-   out_of_line = True
-
-primop NumSparks "numSparks#" GenPrimOp
-   State# s -> (# State# s, Int# #)
-   { Returns the number of sparks in the local spark pool. }
-   with
-   has_side_effects = True
-   out_of_line = True
-
 ------------------------------------------------------------------------
 section "Tag to enum stuff"
         {Convert back and forth between values of enumerated types
@@ -3251,44 +2794,6 @@ primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    with
    code_size = 0
 
-primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   BCO# -> (# a #)
-   { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
-     the BCO when evaluated. }
-   with
-   out_of_line = True
-
-primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
-   { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
-     resulting object encodes a function of the given arity with the instructions
-     encoded in {\tt instrs}, and a static reference table usage bitmap given by
-     {\tt bitmap}. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  UnpackClosureOp "unpackClosure#" GenPrimOp
-   a -> (# Addr#, ByteArray#, Array# b #)
-   { {\tt unpackClosure\# closure} copies the closure and pointers in the
-     payload of the given closure into two new arrays, and returns a pointer to
-     the first word of the closure's info table, a non-pointer array for the raw
-     bytes of the closure, and a pointer array for the pointers in the payload. }
-   with
-   out_of_line = True
-
-primop  ClosureSizeOp "closureSize#" GenPrimOp
-   a -> Int#
-   { {\tt closureSize\# closure} returns the size of the given closure in
-     machine words. }
-   with
-   out_of_line = True
-
-primop  GetApStackValOp "getApStackVal#" GenPrimOp
-   a -> Int# -> (# Int#, b #)
-   with
-   out_of_line = True
-
 ------------------------------------------------------------------------
 section "Misc"
         {These aren't nearly as wired in as Etc...}
@@ -3304,14 +2809,6 @@ primop  GetCurrentCCSOp "getCurrentCCS#" GenPrimOp
      avoid the call to {\tt getCurrentCCS\#} being floated out by the
      simplifier, which would result in an uninformative stack
      ("CAF"). }
-
-primop  ClearCCSOp "clearCCS#" GenPrimOp
-   (State# s -> (# State# s, a #)) -> State# s -> (# State# s, a #)
-   { Run the supplied IO action with an empty CCS.  For example, this
-     is used by the interpreter to run an interpreted computation
-     without the call stack showing that it was invoked from GHC. }
-   with
-   out_of_line = True
 
 ------------------------------------------------------------------------
 section "Etc"
@@ -3391,43 +2888,6 @@ pseudoop   "unsafeCoerce#"
 -- to () -> () and back again.  The strictness analyser saw that the function was strict, but
 -- the wrapper had type () -> (), and hence the wrapper de-constructed the (), the worker re-constructed
 -- a new (), with the result that the code ended up with "case () of (a,b) -> ...".
-
-primop  TraceEventOp "traceEvent#" GenPrimOp
-   Addr# -> State# s -> State# s
-   { Emits an event via the RTS tracing framework.  The contents
-     of the event is the zero-terminated byte string passed as the first
-     argument.  The event will be emitted either to the {\tt .eventlog} file,
-     or to stderr, depending on the runtime RTS flags. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  TraceEventBinaryOp "traceBinaryEvent#" GenPrimOp
-   Addr# -> Int# -> State# s -> State# s
-   { Emits an event via the RTS tracing framework.  The contents
-     of the event is the binary object passed as the first argument with
-     the the given length passed as the second argument. The event will be
-     emitted to the {\tt .eventlog} file. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  TraceMarkerOp "traceMarker#" GenPrimOp
-   Addr# -> State# s -> State# s
-   { Emits a marker event via the RTS tracing framework.  The contents
-     of the event is the zero-terminated byte string passed as the first
-     argument.  The event will be emitted either to the {\tt .eventlog} file,
-     or to stderr, depending on the runtime RTS flags. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
-   INT64 -> State# RealWorld -> State# RealWorld
-   { Sets the allocation counter for the current thread to the given value. }
-   with
-   has_side_effects = True
-   out_of_line      = True
 
 ------------------------------------------------------------------------
 section "Safe coercions"
