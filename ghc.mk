@@ -605,15 +605,16 @@ libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-ins
 
 ifneq "$(CLEANING)" "YES"
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp
 compiler_stage2_CONFIGURE_OPTS += --flags=integer-gmp
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp
 else ifeq "$(INTEGER_LIBRARY)" "integer-openssl"
+compiler_stage2_CONFIGURE_OPTS += --flags=integer-openssl
 libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-openssl
 libraries/bytestring_dist-install_CONFIGURE_OPTS += --flags=-integer-gmp
 libraries/text_dist-install_CONFIGURE_OPTS += --flags=integer-openssl
 else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
 compiler_stage2_CONFIGURE_OPTS += --flags=integer-simple
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
 libraries/bytestring_dist-install_CONFIGURE_OPTS += --flags=-integer-gmp
 libraries/text_dist-install_CONFIGURE_OPTS += --flags=integer-simple
 else

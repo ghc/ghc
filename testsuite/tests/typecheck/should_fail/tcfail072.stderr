@@ -8,8 +8,7 @@ tcfail072.hs:23:13: error:
       The type variable ‘p0’ is ambiguous
       These potential instances exist:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
-        instance Ord Integer
-          -- Defined in ‘integer-gmp-1.0.1.0:GHC.Integer.Type’
+        instance Ord Integer -- Defined in ‘GHC.Integer.Type’
         instance Ord () -- Defined in ‘GHC.Classes’
         ...plus 21 others
         ...plus three instances involving out-of-scope types

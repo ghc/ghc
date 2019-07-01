@@ -63,12 +63,14 @@ import SMRep ( roundUpTo )
 import Control.Monad
 import Data.Maybe
 import Data.List
-#if defined(INTEGER_GMP)
 import GHC.Exts
+#if defined(INTEGER_GMP)
 import Data.Array.Base
 import GHC.Integer.GMP.Internals
+#elif defined(INTEGER_OPENSSL)
+import Data.Array.Base
+import GHC.Integer.Internals
 #elif defined(INTEGER_SIMPLE)
-import GHC.Exts
 import GHC.Integer.Simple.Internals
 #endif
 import qualified Data.Sequence as Seq
@@ -415,6 +417,27 @@ cPprTermBase y =
         constr
           | "Jp#" <- getOccString (dataConName con) = Jp#
           | otherwise = Jn#
+      return (Just (Ppr.integer (constr (BN# arr#))))
+#elif defined(INTEGER_OPENSSL)
+   -- As with the GMP case, this depends deeply on the integer-openssl
+   -- representation.
+   --
+   --   data Integer
+   --     = S# Int#
+   --     | Bp# {-# UNPACK #-} !BigNum
+   --     | Bn# {-# UNPACK #-} !BigNum
+   --
+   --   data BigNum = BN# ByteArray#
+   --
+   ppr_integer _ Term{subTerms=[Prim{valRaw=[W# w]}]} =
+      return (Just (Ppr.integer (S# (word2Int# w))))
+   ppr_integer _ Term{dc=Right con,
+                      subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]} = do
+      let
+        !(UArray _ _ _ arr#) = listArray (0,length ws-1) ws
+        constr
+          | "Bp#" <- getOccString (dataConName con) = Bp#
+          | otherwise = Bn#
       return (Just (Ppr.integer (constr (BN# arr#))))
 #elif defined(INTEGER_SIMPLE)
    -- As with the GMP case, this depends deeply on the integer-simple

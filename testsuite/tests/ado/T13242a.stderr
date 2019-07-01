@@ -26,8 +26,7 @@ T13242a.hs:13:11: error:
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq Integer
-          -- Defined in ‘integer-gmp-1.0.2.0:GHC.Integer.Type’
+        instance Eq Integer -- Defined in ‘GHC.Integer.Type’
         instance Eq () -- Defined in ‘GHC.Classes’
         ...plus 21 others
         ...plus six instances involving out-of-scope types

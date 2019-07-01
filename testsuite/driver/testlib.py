@@ -2006,7 +2006,7 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('ghc-stage[123]', 'ghc', s)
 
     # Error messages sometimes contain integer implementation package
-    s = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
+    s = re.sub('integer-(gmp|openssl|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
 
     # Error messages sometimes contain this blurb which can vary
     # spuriously depending upon build configuration (e.g. based on integer
