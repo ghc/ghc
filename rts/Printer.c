@@ -613,7 +613,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             StgRetFun *ret_fun;
 
             ret_fun = (StgRetFun *)sp;
-            fun_info = get_fun_itbl(ret_fun->fun);
+            fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
             debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, (int)fun_info->f.fun_type);
             switch (fun_info->f.fun_type) {
             case ARG_GEN:
