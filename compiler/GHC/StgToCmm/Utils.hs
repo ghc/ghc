@@ -14,6 +14,7 @@ module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
+        mkRaise,
         assignTemp, newTemp,
 
         newUnboxedTupleRegs,
@@ -81,6 +82,7 @@ import GHC.Types.CostCentre
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as M
+import qualified Data.Semigroup as SG
 import Data.Char
 import Data.List
 import Data.Ord
@@ -179,6 +181,22 @@ tagToClosure platform tycon tag
 --      Conditionals and rts calls
 --
 -------------------------------------------------------------------------
+
+-- Writes the exception to R1 and then jumps
+-- to stg_raisezh.
+mkRaise ::
+     DynFlags
+  -> UpdFrameOffset
+  -> CmmExpr -- The exception to raise
+  -> CmmAGraph
+mkRaise dflags updfr_off excp =
+  mkAssign (CmmGlobal (VanillaReg 1 VGcPtr)) excp
+  SG.<>
+  mkRawJump
+    dflags
+    (CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "stg_raisezh"))))
+    updfr_off
+    [VanillaReg 1 VGcPtr]
 
 emitRtsCall :: Unit -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe

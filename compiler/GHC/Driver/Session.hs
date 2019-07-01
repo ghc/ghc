@@ -388,7 +388,6 @@ import Foreign (Ptr)
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
-
 -- | Used to differentiate the scope an include needs to apply to.
 -- We have to split the include paths to avoid accidentally forcing recursive
 -- includes since -I overrides the system search paths. See #14312.
@@ -3513,6 +3512,7 @@ fFlagsDeps = [
   flagSpec "case-merge"                       Opt_CaseMerge,
   flagSpec "case-folding"                     Opt_CaseFolding,
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
+  flagSpec "cmm-assertions"                   Opt_CmmAssertions,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cmm-static-pred"                  Opt_CmmStaticPred,
   flagSpec "cse"                              Opt_CSE,

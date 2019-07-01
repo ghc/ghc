@@ -859,6 +859,10 @@
                                                                \
     again: MAYBE_GC(again);                                    \
                                                                \
+    ASSERT(offset >= 0);                                       \
+    ASSERT(n >= 0);                                            \
+    ASSERT((offset + n) <= StgMutArrPtrs_ptrs(src));           \
+                                                               \
     size = n + mutArrPtrsCardWords(n);                         \
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;         \
     ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
@@ -876,6 +880,12 @@
 
 #define copyArray(src, src_off, dst, dst_off, n)                  \
   W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    ASSERT(src_off >= 0);                                         \
+    ASSERT(dst_off >= 0);                                         \
+    ASSERT(n >= 0);                                               \
+    ASSERT((src_off + n) <= StgMutArrPtrs_ptrs(src));             \
+    ASSERT((dst_off + n) <= StgMutArrPtrs_ptrs(dst));             \
                                                                   \
     if ((n) != 0) {                                               \
         SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
@@ -895,6 +905,12 @@
 
 #define copyMutableArray(src, src_off, dst, dst_off, n)           \
   W_ dst_elems_p, dst_p, src_p, dst_cards_p, bytes;               \
+                                                                  \
+    ASSERT(src_off >= 0);                                         \
+    ASSERT(dst_off >= 0);                                         \
+    ASSERT(n >= 0);                                               \
+    ASSERT((src_off + n) <= StgMutArrPtrs_ptrs(src));             \
+    ASSERT((dst_off + n) <= StgMutArrPtrs_ptrs(dst));             \
                                                                   \
     if ((n) != 0) {                                               \
         SET_HDR(dst, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);          \
@@ -935,6 +951,10 @@
     gcptr dst, dst_p, src_p;                                   \
                                                                \
     again: MAYBE_GC(again);                                    \
+                                                               \
+    ASSERT(offset >= 0);                                       \
+    ASSERT(n >= 0);                                            \
+    ASSERT((offset + n) <= StgSmallMutArrPtrs_ptrs(src));      \
                                                                \
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;       \
     ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \

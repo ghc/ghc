@@ -24,6 +24,10 @@ test('ShowPrim', normal, compile_and_run, [''])
 test('ArithInt16', omit_ways(['ghci']), compile_and_run, [''])
 test('ArithWord16', omit_ways(['ghci']), compile_and_run, [''])
 
+test('BoundsCheckA', omit_ways(['ghci']), compile_and_run, ['-fcmm-assertions'])
+test('BoundsCheckB', omit_ways(['ghci']), compile_and_run, ['-fcmm-assertions'])
+test('BoundsCheckC', omit_ways(['ghci']), compile_and_run, ['-fcmm-assertions'])
+
 test('CmpInt16', normal, compile_and_run, [''])
 test('CmpWord16', normal, compile_and_run, [''])
 test('ShrinkSmallMutableArrayA', normal, compile_and_run, [''])
