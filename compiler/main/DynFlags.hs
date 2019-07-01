@@ -559,6 +559,7 @@ data GeneralFlag
    | Opt_IrrefutableTuples
    | Opt_CmmSink
    | Opt_CmmElimCommonBlocks
+   | Opt_CmmBoundsCheck
    | Opt_AsmShortcutting
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
@@ -4170,6 +4171,7 @@ fFlagsDeps = [
   flagSpec "case-merge"                       Opt_CaseMerge,
   flagSpec "case-folding"                     Opt_CaseFolding,
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
+  flagSpec "cmm-bounds-check"                 Opt_CmmBoundsCheck,
   flagSpec "cmm-sink"                         Opt_CmmSink,
   flagSpec "cse"                              Opt_CSE,
   flagSpec "stg-cse"                          Opt_StgCSE,

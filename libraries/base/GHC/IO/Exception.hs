@@ -32,6 +32,7 @@ module GHC.IO.Exception (
   AsyncException(..), stackOverflow, heapOverflow,
 
   ArrayException(..),
+  BoundsCheckException(..),
   ExitCode(..),
   FixIOException (..),
 
@@ -42,6 +43,7 @@ module GHC.IO.Exception (
   IOErrorType(..),
   userError,
   assertError,
+  boundsCheckException,
   unsupportedOperation,
   untangle,
  ) where
@@ -249,6 +251,24 @@ data ArrayException
 
 -- | @since 4.1.0.0
 instance Exception ArrayException
+
+-- | Exception thrown by out-of-bounds primitive array
+-- operations when compiling with @-fcmm-bounds-check@.
+--
+-- @since 4.14.0.0
+data BoundsCheckException = BoundsCheckException
+  deriving (Eq,Show)
+
+-- | @since 4.14.0.0
+instance Exception BoundsCheckException where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
+
+-- Using by Stg to Cmm when -fcmm-bounds-check is on.
+boundsCheckException :: SomeException
+{-# noinline boundsCheckException #-}
+boundsCheckException =
+  asyncExceptionToException BoundsCheckException
 
 -- for the RTS
 stackOverflow, heapOverflow :: SomeException
