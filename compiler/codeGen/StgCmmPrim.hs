@@ -46,6 +46,8 @@ import SMRep
 import FastString
 import Outputable
 import Util
+import PrelNames
+import IdInfo
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
@@ -1650,13 +1652,24 @@ mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
                    -> CmmType      -- Type of element by which we are indexing
                    -> CmmExpr      -- Index
                    -> FCode ()
-mkBasicIndexedRead off Nothing ty res base idx_ty idx
-   = do dflags <- getDynFlags
-        emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
-mkBasicIndexedRead off (Just cast) ty res base idx_ty idx
-   = do dflags <- getDynFlags
-        emitAssign (CmmLocal res) (CmmMachOp cast [
-                                   cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
+mkBasicIndexedRead off mcast ty res base idx_ty idx = do
+  dflags <- getDynFlags
+  when (gopt Opt_CmmBoundsCheck dflags) $ do
+    updfr_off <- getUpdFrameOff
+    let w = wordWidth dflags
+    emit =<< mkCmmIfThen
+      (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
+      (mkRaise dflags updfr_off boundsCheckExcpLabel)
+  case mcast of
+    Nothing -> emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
+    Just cast ->
+      emitAssign (CmmLocal res) (CmmMachOp cast [
+                                 cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
+
+-- We use the wrong closure for now.
+boundsCheckExcpLabel :: CmmExpr
+boundsCheckExcpLabel =
+  CmmLit (CmmLabel (mkClosureLabel boundsCheckExceptionName MayHaveCafRefs))
 
 mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
                     -> Maybe MachOp -- Optional value cast

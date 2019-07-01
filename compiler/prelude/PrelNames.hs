@@ -1331,6 +1331,11 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
 
+boundsCheckExceptionName :: Name
+boundsCheckExceptionName = varQual
+  gHC_IO_Exception (fsLit "cannotCompactFunction")
+  boundsCheckExceptionIdKey
+
 -- Debug.Trace
 traceName          :: Name
 traceName         = varQual dEBUG_TRACE (fsLit "trace") traceKey
@@ -2081,7 +2086,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
-    absentSumFieldErrorIdKey :: Unique
+    absentSumFieldErrorIdKey, boundsCheckExceptionIdKey :: Unique
 
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
@@ -2195,6 +2200,7 @@ thenIOIdKey, lazyIdKey, assertErrorIdKey, oneShotKey, runRWKey :: Unique
 thenIOIdKey                   = mkPreludeMiscIdUnique 103
 lazyIdKey                     = mkPreludeMiscIdUnique 104
 assertErrorIdKey              = mkPreludeMiscIdUnique 105
+boundsCheckExceptionIdKey     = mkPreludeMiscIdUnique 998
 oneShotKey                    = mkPreludeMiscIdUnique 106
 runRWKey                      = mkPreludeMiscIdUnique 107
 
