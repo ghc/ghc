@@ -1331,6 +1331,12 @@ dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
 assertErrorName    :: Name
 assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
 
+-- Bounds checking with -fcmm-bounds-check
+boundsCheckExceptionName :: Name
+boundsCheckExceptionName = varQual
+  gHC_IO_Exception (fsLit "boundsCheckException")
+  boundsCheckExceptionIdKey
+
 -- Debug.Trace
 traceName          :: Name
 traceName         = varQual dEBUG_TRACE (fsLit "trace") traceKey
@@ -2081,7 +2087,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
-    absentSumFieldErrorIdKey :: Unique
+    absentSumFieldErrorIdKey, boundsCheckExceptionIdKey :: Unique
 
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
@@ -2406,6 +2412,9 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+
+-- Bounds checking with -fcmm-bounds-check
+boundsCheckExceptionIdKey = mkPreludeMiscIdUnique 570
 
 {-
 ************************************************************************
