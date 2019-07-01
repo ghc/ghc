@@ -1490,7 +1490,9 @@ checkMergedSignatures mod_summary iface = do
 -- In addition, we also checks if the union of dependencies of the imported
 -- modules has any difference to the existing set of dependencies. We would need
 -- to recompile in that case also since the `mi_deps` field of ModIface needs
--- to be updated to match that information. See bug #16511.
+-- to be updated to match that information. This is one of the invariants
+-- of interface files (see https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-avoidance#interface-file-invariants).
+-- See bug #16511.
 --
 -- Returns (RecompBecause <textual reason>) if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
