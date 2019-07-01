@@ -1487,7 +1487,7 @@ checkMergedSignatures mod_summary iface = do
 --   - a new home module has been added that shadows a package module
 -- See bug #1372.
 --
--- In addition, we also checks if the union of dependencies of the imported
+-- In addition, we also check if the union of dependencies of the imported
 -- modules has any difference to the existing set of dependencies. We would need
 -- to recompile in that case also since the `mi_deps` field of ModIface needs
 -- to be updated to match that information. This is one of the invariants
