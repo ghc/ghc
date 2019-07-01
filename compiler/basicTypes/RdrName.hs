@@ -75,6 +75,7 @@ import GhcPrelude
 import Module
 import Name
 import Avail
+import Binary
 import NameSet
 import Maybes
 import SrcLoc
@@ -466,6 +467,10 @@ data GlobalRdrElt
          -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
          -- See Note [GlobalRdrElt provenance]
 
+instance Binary GlobalRdrElt where
+  put_ bh (GRE a b c d) = put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  get bh = GRE <$> get bh <*> get bh <*> get bh <*> get bh
+
 -- | The children of a Name are the things that are abbreviated by the ".."
 --   notation in export lists.  See Note [Parents]
 data Parent = NoParent
@@ -473,6 +478,18 @@ data Parent = NoParent
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
             deriving (Eq, Data)
+
+instance Binary Parent where
+  put_ bh p = case p of
+    NoParent      -> putByte bh 0
+    ParentIs p    -> putByte bh 1 >> put_ bh p
+    FldParent a b -> putByte bh 2 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure NoParent
+      1 -> ParentIs <$> get bh
+      _ -> FldParent <$> get bh <*> get bh
 
 instance Outputable Parent where
    ppr NoParent        = empty
@@ -1130,6 +1147,10 @@ data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
                             is_item :: ImpItemSpec }
                 deriving( Eq, Ord, Data )
 
+instance Binary ImportSpec where
+  put_ bh (ImpSpec a b) = put_ bh a >> put_ bh b
+  get bh = ImpSpec <$> get bh <*> get bh
+
 -- | Import Declaration Specification
 --
 -- Describes a particular import declaration and is
@@ -1146,6 +1167,11 @@ data ImpDeclSpec
         is_qual     :: Bool,       -- ^ Was this import qualified?
         is_dloc     :: SrcSpan     -- ^ The location of the entire import declaration
     } deriving Data
+
+instance Binary ImpDeclSpec where
+  put_ bh (ImpDeclSpec a b c d) =
+    put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  get bh = ImpDeclSpec <$> get bh <*> get bh <*> get bh <*> get bh
 
 -- | Import Item Specification
 --
@@ -1167,6 +1193,16 @@ data ImpItemSpec
         -- Here the constructors of @T@ are not named explicitly;
         -- only @T@ is named explicitly.
   deriving Data
+
+instance Binary ImpItemSpec where
+  put_ bh s = case s of
+    ImpAll      -> putByte bh 0
+    ImpSome a b -> putByte bh 1 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure ImpAll
+      _ -> ImpSome <$> get bh <*> get bh
 
 instance Eq ImpDeclSpec where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False

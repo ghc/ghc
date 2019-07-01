@@ -86,6 +86,7 @@ import TysPrim( funTyConName )
 import Type
 import HsDoc
 import BasicTypes
+import Binary
 import SrcLoc
 import Outputable
 import FastString
@@ -472,6 +473,10 @@ newtype HsIPName = HsIPName FastString
 
 hsIPNameFS :: HsIPName -> FastString
 hsIPNameFS (HsIPName n) = n
+
+instance Binary HsIPName where
+  put_ bh (HsIPName s) = put_ bh s
+  get bh = HsIPName <$> get bh
 
 instance Outputable HsIPName where
     ppr (HsIPName n) = char '?' <> ftext n -- Ordinary implicit parameters

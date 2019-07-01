@@ -66,7 +66,7 @@ module UniqFM (
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
-        nonDetUFMToList, ufmToIntMap,
+        nonDetUFMToList, ufmToIntMap, intMapToUFM,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
@@ -335,6 +335,9 @@ nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m
+
+intMapToUFM :: M.IntMap elt -> UniqFM elt
+intMapToUFM = UFM
 
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM a -> UniqFM b -> Bool
