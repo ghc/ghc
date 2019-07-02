@@ -51,7 +51,10 @@ data Flavour = Flavour {
     ghcDocs :: Action DocTargets,
 
     -- | Whether to uses hashes or inplace for unit ids
-    hashUnitIds :: Bool
+    hashUnitIds :: Bool,
+
+    -- | Whether to generate .hie files
+    ghcHieFiles :: Stage -> Bool
 
     }
 

@@ -283,6 +283,7 @@ defaultFlavour = Flavour
     , ghcDebugAssertions = const False
     , ghcSplitSections   = False
     , ghcDocs            = cmdDocsArgs
+    , ghcHieFiles        = const False
     , hashUnitIds        = False }
 
 -- | Default logic for determining whether to build

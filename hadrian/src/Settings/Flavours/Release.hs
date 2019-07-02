@@ -11,4 +11,6 @@ releaseFlavour =
   $ enableHaddock
   -- 3. Include unit id hashes
   $ enableHashUnitIds
+  -- 4. Include hie files (#16901)
+  -- $ enableHieFiles
   $ performanceFlavour { name = "release" }

@@ -3,7 +3,7 @@ module Context (
     Context (..), vanillaContext, stageContext,
 
     -- * Expressions
-    getStage, getPackage, getWay, getBuildPath, getPackageDbLoc, getStagedTarget,
+    getStage, getPackage, getWay, getBuildPath, getHieBuildPath, getPackageDbLoc, getStagedTarget,
 
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,

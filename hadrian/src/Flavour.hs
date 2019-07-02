@@ -21,6 +21,7 @@ module Flavour
   , enableHiCore
   , useNativeBignum
   , enableTextWithSIMDUTF
+  , enableHieFiles
   , omitPragmas
 
   , completeSetting
@@ -75,6 +76,7 @@ flavourTransformers = M.fromList
     , "boot_nonmoving_gc" =: enableBootNonmovingGc
     , "dump_stg"         =: enableDumpStg
     , "hash_unit_ids"    =: enableHashUnitIds
+    , "hie_files"        =: enableHieFiles
     ]
   where (=:) = (,)
 
@@ -323,6 +325,9 @@ enableTextWithSIMDUTF flavour = flavour {
 
 enableHashUnitIds :: Flavour -> Flavour
 enableHashUnitIds flavour = flavour { hashUnitIds = True }
+
+enableHieFiles :: Flavour -> Flavour
+enableHieFiles flavour = flavour { ghcHieFiles = (>= Stage1) }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.

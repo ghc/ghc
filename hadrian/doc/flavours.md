@@ -334,6 +334,8 @@ The supported transformers are listed below:
         <td>Disable including self-recompilation information in interface files via <code>-fno-write-if-self-recomp</code>. If you are building a distribution you can enable this flag to produce more deterministic interface files.</td>
         <td><code>hash_unit_ids</code></td>
         <td>Include a package hash in the unit id of built packages</td>
+        <td><code>hie_files</code></td>
+        <td>Produce hie files for stage1 libraries</td>
     </tr>
 </table>
 

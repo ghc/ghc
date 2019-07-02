@@ -35,6 +35,9 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     useColor <- shakeColor <$> expr getShakeOptions
     let hasVanilla = elem vanilla ways
         hasDynamic = elem dynamic ways
+    hieFiles <- ghcHieFiles <$> expr flavour
+    stage <- getStage
+    hie_path <- getHieBuildPath
     mconcat [ arg "-Wall"
             , arg "-Wcompat"
             , not useColor ? builder (Ghc CompileHs) ?
@@ -49,6 +52,10 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , ghcLinkArgs
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
+            , hieFiles stage ? builder (Ghc CompileHs) ? mconcat
+                  [ arg "-fwrite-ide-info"
+                  , arg "-hiedir", arg hie_path
+                  ]
             , getInputs
             , arg "-o", arg =<< getOutput ]
 
