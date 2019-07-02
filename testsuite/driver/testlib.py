@@ -1376,7 +1376,7 @@ def simple_build(name: Union[TestName, str],
     stdout = in_testdir(name, 'comp.stderr')
     stderr = subprocess.STDOUT
 
-    if top_mod != '':
+    if top_mod is not None:
         srcname = top_mod
     elif addsuf:
         if backpack:
@@ -1386,7 +1386,7 @@ def simple_build(name: Union[TestName, str],
     else:
         srcname = Path(name)
 
-    if top_mod != '':
+    if top_mod is not None:
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
@@ -1550,7 +1550,7 @@ def interpreter_run(name: TestName,
         framework_fail(name, WayName('unsupported'),
                        'WAY=ghci and combined_output together is not supported')
 
-    if (top_mod == ''):
+    if top_mod is None:
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = Path(top_mod)
