@@ -25,6 +25,8 @@ main = do
   demandException =<< try (readIntArray arr 5)
   demandValue 47 =<< readIntArray arr 0
   demandValue 55 =<< readIntArray arr 4
+  demandException =<< try (writeIntArray arr 5 2467)
+  demandException =<< try (writeIntArray arr (-1) 1958)
 
 demandException :: Either BoundsCheckException a -> IO ()
 demandException (Left BoundsCheckException) = pure ()

@@ -328,17 +328,17 @@ emitPrimOp dflags res@[] WriteMutVarOp [mutv,var]
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofByteArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+   = emitAssign (CmmLocal res) (sizeofByteArrayExpr dflags arg)
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] SizeofMutableByteArrayOp [arg]
-   = emitPrimOp dflags [res] SizeofByteArrayOp [arg]
+   = emitAssign (CmmLocal res) (sizeofByteArrayExpr dflags arg)
 
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
 emitPrimOp dflags [res] GetSizeofMutableByteArrayOp [arg]
-   = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
+   = emitAssign (CmmLocal res) (sizeofByteArrayExpr dflags arg)
 
 
 --  #define touchzh(o)                  /* nothing */
@@ -415,9 +415,7 @@ emitPrimOp _      []  WriteSmallArrayOp [obj,ix,v] = doWriteSmallPtrArrayOp obj 
 -- Getting the size of pointer arrays
 
 emitPrimOp dflags [res] SizeofArrayOp [arg]
-   = emit $ mkAssign (CmmLocal res) (cmmLoadIndexW dflags arg
-    (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
-        (bWord dflags))
+   = emitAssign (CmmLocal res) (sizeofArrayExpr dflags arg)
 emitPrimOp dflags [res] SizeofMutableArrayOp [arg]
    = emitPrimOp dflags [res] SizeofArrayOp [arg]
 emitPrimOp dflags [res] SizeofArrayArrayOp [arg]
@@ -426,12 +424,9 @@ emitPrimOp dflags [res] SizeofMutableArrayArrayOp [arg]
    = emitPrimOp dflags [res] SizeofArrayOp [arg]
 
 emitPrimOp dflags [res] SizeofSmallArrayOp [arg] =
-    emit $ mkAssign (CmmLocal res)
-    (cmmLoadIndexW dflags arg
-     (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
-        (bWord dflags))
+    emitAssign (CmmLocal res) (sizeofSmallArrayExpr dflags arg)
 emitPrimOp dflags [res] SizeofSmallMutableArrayOp [arg] =
-    emitPrimOp dflags [res] SizeofSmallArrayOp [arg]
+    emitAssign (CmmLocal res) (sizeofSmallArrayExpr dflags arg)
 
 -- IndexXXXoffAddr
 
@@ -1550,7 +1545,7 @@ doIndexOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doIndexOffAddrOp maybe_post_read_cast rep [res] [addr,idx]
-   = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr rep idx
+   = mkBasicIndexedRead Nothing 0 maybe_post_read_cast rep res addr rep idx
 doIndexOffAddrOp _ _ _ _
    = panic "StgCmmPrim: doIndexOffAddrOp"
 
@@ -1561,7 +1556,7 @@ doIndexOffAddrOpAs :: Maybe MachOp
                    -> [CmmExpr]
                    -> FCode ()
 doIndexOffAddrOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
-   = mkBasicIndexedRead 0 maybe_post_read_cast rep res addr idx_rep idx
+   = mkBasicIndexedRead Nothing 0 maybe_post_read_cast rep res addr idx_rep idx
 doIndexOffAddrOpAs _ _ _ _ _
    = panic "StgCmmPrim: doIndexOffAddrOpAs"
 
@@ -1572,7 +1567,7 @@ doIndexByteArrayOp :: Maybe MachOp
                    -> FCode ()
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
+        mkBasicIndexedRead (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
 doIndexByteArrayOp _ _ _ _
    = panic "StgCmmPrim: doIndexByteArrayOp"
 
@@ -1584,7 +1579,7 @@ doIndexByteArrayOpAs :: Maybe MachOp
                     -> FCode ()
 doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
+        mkBasicIndexedRead (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
 doIndexByteArrayOpAs _ _ _ _ _
    = panic "StgCmmPrim: doIndexByteArrayOpAs"
 
@@ -1594,7 +1589,7 @@ doReadPtrArrayOp :: LocalReg
                  -> FCode ()
 doReadPtrArrayOp res addr idx
    = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr (gcWord dflags) idx
+        mkBasicIndexedRead (Just sizeofArrayExpr) (arrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr (gcWord dflags) idx
 
 doWriteOffAddrOp :: Maybe MachOp
                  -> CmmType
@@ -1602,7 +1597,7 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doWriteOffAddrOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = mkBasicIndexedWrite 0 maybe_pre_write_cast addr idx_ty idx val
+   = mkBasicIndexedWrite Nothing 0 maybe_pre_write_cast addr idx_ty idx val
 doWriteOffAddrOp _ _ _ _
    = panic "StgCmmPrim: doWriteOffAddrOp"
 
@@ -1613,7 +1608,7 @@ doWriteByteArrayOp :: Maybe MachOp
                    -> FCode ()
 doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
    = do dflags <- getDynFlags
-        mkBasicIndexedWrite (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx_ty idx val
+        mkBasicIndexedWrite (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx_ty idx val
 doWriteByteArrayOp _ _ _ _
    = panic "StgCmmPrim: doWriteByteArrayOp"
 
@@ -1628,7 +1623,7 @@ doWritePtrArrayOp addr idx val
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite (arrPtrsHdrSize dflags) Nothing addr ty idx val
+       mkBasicIndexedWrite (Just sizeofArrayExpr) (arrPtrsHdrSize dflags) Nothing addr ty idx val
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
   -- the write barrier.  We must write a byte into the mark table:
   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
@@ -1644,15 +1639,14 @@ loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
 loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags)
  where off = fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags
 
-mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
-                   -> Maybe MachOp -- Optional result cast
-                   -> CmmType      -- Type of element we are accessing
-                   -> LocalReg     -- Destination
-                   -> CmmExpr      -- Base address
-                   -> CmmType      -- Type of element by which we are indexing
-                   -> CmmExpr      -- Index
-                   -> FCode ()
-mkBasicIndexedRead off mcast ty res base idx_ty idx = do
+emitIndexBoundsCheck ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr) -- How to compute payload size in bytes
+  -> CmmExpr -- Base address
+  -> CmmType -- Type of element by which we are indexing
+  -> CmmExpr -- Index
+  -> FCode ()
+emitIndexBoundsCheck Nothing _ _ _ = return ()
+emitIndexBoundsCheck (Just getSize) base idx_ty idx = do
   dflags <- getDynFlags
   when (gopt Opt_CmmBoundsCheck dflags) $ do
     updfr_off <- getUpdFrameOff
@@ -1660,38 +1654,56 @@ mkBasicIndexedRead off mcast ty res base idx_ty idx = do
     emit =<< mkCmmIfThen
       (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
       (mkRaise dflags updfr_off boundsCheckExcpLabel)
-    let len = cmmLoadIndexW dflags base
-          (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
-          (bWord dflags)
+    let len = getSize dflags base
         idxShifted = CmmMachOp
           (MO_Shl (wordWidth dflags))
-          [idx, mkIntExpr dflags (widthInLog (typeWidth ty))]
+          [idx, mkIntExpr dflags (widthInLog (typeWidth idx_ty))]
     emit =<< mkCmmIfThen
       (CmmMachOp (MO_S_Ge w) [idxShifted,len])
       (mkRaise dflags updfr_off boundsCheckExcpLabel)
+
+boundsCheckExcpLabel :: CmmExpr
+boundsCheckExcpLabel =
+  CmmLit (CmmLabel (mkClosureLabel boundsCheckExceptionName MayHaveCafRefs))
+
+mkBasicIndexedRead ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr)
+     -- Function for extracting the payload size in
+     -- bytes from the base address. Passing Nothing
+     -- suppresses bounds checking (suppression used
+     -- when indexing into an Addr#).
+  -> ByteOff      -- Initial offset in bytes
+  -> Maybe MachOp -- Optional result cast
+  -> CmmType      -- Type of element we are accessing
+  -> LocalReg     -- Destination
+  -> CmmExpr      -- Base address
+  -> CmmType      -- Type of element by which we are indexing
+  -> CmmExpr      -- Index
+  -> FCode ()
+mkBasicIndexedRead getSize off mcast ty res base idx_ty idx = do
+  emitIndexBoundsCheck getSize base idx_ty idx
+  dflags <- getDynFlags
   case mcast of
     Nothing -> emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
     Just cast ->
       emitAssign (CmmLocal res) (CmmMachOp cast [
                                  cmmLoadIndexOffExpr dflags off ty base idx_ty idx])
 
--- We use the wrong closure for now.
-boundsCheckExcpLabel :: CmmExpr
-boundsCheckExcpLabel =
-  CmmLit (CmmLabel (mkClosureLabel boundsCheckExceptionName MayHaveCafRefs))
-
-mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
-                    -> Maybe MachOp -- Optional value cast
-                    -> CmmExpr      -- Base address
-                    -> CmmType      -- Type of element by which we are indexing
-                    -> CmmExpr      -- Index
-                    -> CmmExpr      -- Value to write
-                    -> FCode ()
-mkBasicIndexedWrite off Nothing base idx_ty idx val
-   = do dflags <- getDynFlags
-        emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
-mkBasicIndexedWrite off (Just cast) base idx_ty idx val
-   = mkBasicIndexedWrite off Nothing base idx_ty idx (CmmMachOp cast [val])
+mkBasicIndexedWrite ::
+     Maybe (DynFlags -> CmmExpr -> CmmExpr) -- See mkBasicIndexedRead
+  -> ByteOff      -- Initial offset in bytes
+  -> Maybe MachOp -- Optional value cast
+  -> CmmExpr      -- Base address
+  -> CmmType      -- Type of element by which we are indexing
+  -> CmmExpr      -- Index
+  -> CmmExpr      -- Value to write
+  -> FCode ()
+mkBasicIndexedWrite getSize off mcast base idx_ty idx val = do
+  emitIndexBoundsCheck getSize base idx_ty idx
+  dflags <- getDynFlags
+  case mcast of
+    Nothing -> emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
+    Just cast -> emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) (CmmMachOp cast [val])
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
@@ -2425,7 +2437,7 @@ doReadSmallPtrArrayOp :: LocalReg
                       -> FCode ()
 doReadSmallPtrArrayOp res addr idx = do
     dflags <- getDynFlags
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr
+    mkBasicIndexedRead (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing (gcWord dflags) res addr
         (gcWord dflags) idx
 
 doWriteSmallPtrArrayOp :: CmmExpr
@@ -2436,7 +2448,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     dflags <- getDynFlags
     let ty = cmmExprType dflags val
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
+    mkBasicIndexedWrite (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
@@ -2513,6 +2525,23 @@ doCasByteArray res mba idx idx_ty old new = do
         [ res ]
         (MO_Cmpxchg width)
         [ addr, old, new ]
+
+-----------------------------------------------------------
+-- Helpers for getting array sizes. These all take the
+-- base address as their argument.
+sizeofByteArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofByteArrayExpr dflags base =
+  cmmLoadIndexW dflags base (fixedHdrSizeW dflags) (bWord dflags)
+
+sizeofArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofArrayExpr dflags base = cmmLoadIndexW dflags base
+  (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgMutArrPtrs_ptrs dflags))
+  (bWord dflags)
+
+sizeofSmallArrayExpr :: DynFlags -> CmmExpr -> CmmExpr
+sizeofSmallArrayExpr dflags base = cmmLoadIndexW dflags base
+  (fixedHdrSizeW dflags + bytesToWordsRoundUp dflags (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+  (bWord dflags)
 
 ------------------------------------------------------------------------------
 -- Helpers for emitting function calls
