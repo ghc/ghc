@@ -38,7 +38,9 @@ data Flavour = Flavour {
     ghcDebugged :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
-    ghcDocs :: Action DocTargets }
+    ghcDocs :: Action DocTargets,
+    -- | Whether to generate .hie files
+    ghcHieFiles :: Bool }
 
 -- | A set of documentation targets
 type DocTargets = Set DocTarget

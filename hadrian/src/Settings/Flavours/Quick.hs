@@ -11,6 +11,7 @@ quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
+    , ghcHieFiles = False
     , libraryWays = mconcat
                     [ pure [vanilla]
                     , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
