@@ -123,7 +123,7 @@ isSymOcc n
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
 pprInfixExp (ConE v) = pprName' Infix v
-pprInfixExp _        = text "<<Non-variable/constructor in infix context>>"
+pprInfixExp e        = text "`" <> ppr e <> text "`"
 
 pprExp :: Precedence -> Exp -> Doc
 pprExp _ (VarE v)     = pprName' Applied v
