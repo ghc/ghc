@@ -6,8 +6,8 @@ GhcLibHcOpts       = -O -dcore-lint -dno-debug-output
 BUILD_PROF_LIBS    = NO
 SplitSections      = NO
 HADDOCK_DOCS       = YES
-BUILD_SPHINX_HTML  = YES
-BUILD_SPHINX_PDF   = NO
+BUILD_SPHINX_HTML ?= YES
+BUILD_SPHINX_PDF  ?= NO
 
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts   += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
