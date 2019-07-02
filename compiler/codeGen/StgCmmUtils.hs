@@ -190,7 +190,6 @@ mkRaise dflags updfr_off excp =
     (CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "stg_raisezh"))))
     updfr_off
     [VanillaReg 1 VGcPtr]
-    
 
 emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
 emitRtsCall pkg fun args safe = emitRtsCallGen [] (mkCmmCodeLabel pkg fun) args safe
