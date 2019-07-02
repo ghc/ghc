@@ -1895,11 +1895,15 @@ data Exp
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
 
-    -- It's a bit gruesome to use an Exp as the
-    -- operator, but how else can we distinguish
-    -- constructors from non-constructors?
-    -- Maybe there should be a var-or-con type?
-    -- Or maybe we should leave it to the String itself?
+    -- It's a bit gruesome to use an Exp as the operator when a Name
+    -- would suffice. Historically, Exp was used to make it easier to
+    -- distinguish between infix constructors and non-constructors.
+    -- This is a bit overkill, since one could just as well call
+    -- `startsConId` or `startsConSym` (from `GHC.Lexeme`) on a Name.
+    -- Unfortunately, changing this design now would involve lots of
+    -- code churn for consumers of the TH API, so we continue to use
+    -- an Exp as the operator and perform an extra check during conversion
+    -- to ensure that the Exp is a constructor or a variable (#16895).
 
   | UInfixE Exp Exp Exp                -- ^ @{x + y}@
                                        --

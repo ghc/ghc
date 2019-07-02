@@ -123,7 +123,10 @@ isSymOcc n
 pprInfixExp :: Exp -> Doc
 pprInfixExp (VarE v) = pprName' Infix v
 pprInfixExp (ConE v) = pprName' Infix v
-pprInfixExp _        = text "<<Non-variable/constructor in infix context>>"
+pprInfixExp (UnboundVarE v) = pprName' Infix v
+-- This case will only ever be reached in exceptional circumstances.
+-- For example, when printing an error message in case of a malformed expression.
+pprInfixExp e = text "`" <> ppr e <> text "`"
 
 pprExp :: Precedence -> Exp -> Doc
 pprExp _ (VarE v)     = pprName' Applied v
