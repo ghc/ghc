@@ -257,16 +257,16 @@ class TestOptions:
        self.skip = False
 
        # the test is known to be fragile in these ways
-       self.fragile_ways = []
+       self.fragile_ways = [] # type: List[WayName]
 
        # skip these ways
-       self.omit_ways = []
+       self.omit_ways = [] # type: List[WayName]
 
        # skip all ways except these (None == do all ways)
-       self.only_ways = None
+       self.only_ways = None # type: Optional[List[WayName]]
 
        # add these ways to the default set
-       self.extra_ways = []
+       self.extra_ways = [] # type: List[WayName]
 
        # the result we normally expect for this test
        self.expect = 'pass'
@@ -274,11 +274,11 @@ class TestOptions:
        # override the expected result for certain ways
        self.expect_fail_for = []
 
-       # the stdin file that this test will use (empty for <name>.stdin)
-       self.srcdir = None
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.srcdir = None # type: Optional[Path]
 
-       # the stdin file that this test will use (empty for <name>.stdin)
-       self.stdin = ''
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.stdin = None # type: Optional[Path]
 
        # Set the expected stderr/stdout. '' means infer from test name.
        self.use_specs = {}
@@ -302,13 +302,13 @@ class TestOptions:
        self.extra_run_opts = ''
 
        # expected exit code
-       self.exit_code = 0
+       self.exit_code = 0 # type: int
 
        # extra files to clean afterward
-       self.clean_files = []
+       self.clean_files = [] # type: List[str]
 
        # extra files to copy to the testdir
-       self.extra_files = []
+       self.extra_files = [] # type: List[str]
 
        # Map from metric to (function from way and commit to baseline value, allowed percentage deviation) e.g.
        #     { 'bytes allocated': (
@@ -320,7 +320,7 @@ class TestOptions:
        #              , 10) }
        # This means no baseline is available for way1. For way 2, allow a 10%
        # deviation from 9300000000.
-       self.stats_range_fields = {}
+       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
 
        # Is the test testing performance?
        self.is_stats_test = False
