@@ -114,6 +114,11 @@ Compiler
   only convenient workaround was to enable `-fobject-code` for all
   modules.
 
+- The eventlog now contains events for biographical and retainer profiling.
+  The biographical profiling events all appear at the end of the eventlog but
+  the sample start event contains a timestamp of when the census occurred.
+  The retainer profiling events are emitted using the standard events.
+
 GHCi
 ~~~~
 
