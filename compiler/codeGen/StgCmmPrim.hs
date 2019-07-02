@@ -1684,6 +1684,9 @@ emitAssertLessThanEqual a b = do
     (CmmMachOp (MO_S_Gt w) [a,b])
     (mkRaise dflags updfr_off boundsCheckExcpLabel)
 
+plusMachWord :: Width -> CmmExpr -> CmmExpr -> CmmExpr
+plusMachWord w a b = CmmMachOp (MO_Add w) [a,b]
+
 boundsCheckExcpLabel :: CmmExpr
 boundsCheckExcpLabel =
   CmmLit (CmmLabel (mkClosureLabel boundsCheckExceptionName MayHaveCafRefs))
@@ -2128,6 +2131,11 @@ emitCopyByteArray copy src src_off dst dst_off n = do
         emitAssertNonNegative src_off
         emitAssertNonNegative dst_off
         emitAssertNonNegative n
+        let src_len = sizeofByteArrayExpr dflags src
+            dst_len = sizeofByteArrayExpr dflags dst
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w src_off n) src_len
+        emitAssertLessThanEqual (plusMachWord w dst_off n) dst_len
     let byteArrayAlignment = wordAlignment dflags
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off

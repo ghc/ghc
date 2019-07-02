@@ -51,6 +51,17 @@ main = do
   demandException =<< try (readWord16ArrayUnaligned arrB (-2))
   demandException =<< try (readWord16ArrayUnaligned arrB 17)
   demandException =<< try (readWord16ArrayUnaligned arrB 18)
+  -- After testing the simple read/write operations on Word16Array,
+  -- we use the more complicated range-copying functions.
+  srcB <- unsafeFreezeWord16Array arrB
+  dstB <- newWord16Array 13
+  demandException =<< try (copyWord16Array dstB (-1) srcB 0 1)
+  demandException =<< try (copyWord16Array dstB 0 srcB (-1) 1)
+  demandException =<< try (copyWord16Array dstB 0 srcB 0 (-1))
+  demandException =<< try (copyWord16Array dstB 0 srcB 8 2)
+  demandException =<< try (copyWord16Array dstB 11 srcB 0 3)
+  copyWord16Array dstB 0 srcB 0 9
+  copyWord16Array dstB 4 srcB 0 9
 
 demandException :: Either BoundsCheckException a -> IO ()
 demandException (Left BoundsCheckException) = pure ()
@@ -144,7 +155,12 @@ unsafeFreezeIntArray (MutableIntArray arr#) = IO $ \s# ->
   case unsafeFreezeByteArray# arr# s# of
     (# s'#, arr'# #) -> (# s'#, IntArray arr'# #)
 
-unsafeFreezeWord16Array :: MutableIntArray -> IO IntArray
-unsafeFreezeWord16Array (MutableIntArray arr#) = IO $ \s# ->
+unsafeFreezeWord16Array :: MutableWord16Array -> IO Word16Array
+unsafeFreezeWord16Array (MutableWord16Array arr#) = IO $ \s# ->
   case unsafeFreezeByteArray# arr# s# of
-    (# s'#, arr'# #) -> (# s'#, IntArray arr'# #)
+    (# s'#, arr'# #) -> (# s'#, Word16Array arr'# #)
+
+copyWord16Array :: MutableWord16Array -> Int -> Word16Array -> Int -> Int -> IO ()
+copyWord16Array (MutableWord16Array dst) (I# doff) (Word16Array src) (I# soff) (I# n)
+  = IO $ \s0 -> case copyByteArray# src (soff *# 2#) dst (doff *# 2#) (n *# 2#) s0 of
+    s1 -> (# s1, () #)
