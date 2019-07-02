@@ -1,6 +1,8 @@
+{-#LANGUAGE MultiWayIf #-}
+
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdConfigure,
+    cmdProgressColour, alignColourOpts, cmdProgressInfo, cmdConfigure,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -13,9 +15,13 @@ import Hadrian.Utilities hiding (buildRoot)
 import System.Console.GetOpt
 import System.Environment
 
+import Debug.Trace (trace)
+
 import qualified Data.Set as Set
 
 data TestSpeed = TestSlow | TestNormal | TestFast deriving (Show, Eq)
+
+data UserSet = Set | NotSet deriving (Show, Eq)
 
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
@@ -24,6 +30,7 @@ data CommandLineArgs = CommandLineArgs
     , freeze1        :: Bool
     , integerSimple  :: Bool
     , progressColour :: UseColour
+    , colourUserSet  :: UserSet
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
@@ -38,6 +45,7 @@ defaultCommandLineArgs = CommandLineArgs
     , freeze1        = False
     , integerSimple  = False
     , progressColour = Auto
+    , colourUserSet  = NotSet
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
@@ -110,7 +118,25 @@ readProgressColour ms =
     go "always"  = Just Always
     go _         = Nothing
     set :: UseColour -> CommandLineArgs -> CommandLineArgs
-    set flag flags = flags { progressColour = flag }
+    set flag flags = flags { progressColour = flag, colourUserSet = Set }
+
+alignColourOpts :: ShakeOptions -> ShakeOptions
+alignColourOpts opts = let
+    extra = shakeExtra opts
+    progressColorSet = lookupExtra NotSet extra
+    progressColor = lookupExtra Never extra
+    optsUserNo = opts { shakeExtra = insertExtra Never extra }
+    optsUserYes = opts { shakeExtra = insertExtra Always extra }
+    optsShakeNo = opts { shakeColor = False }
+  in
+    if
+      | shakeColor opts == False
+        -> trace "First" optsUserNo
+      | progressColorSet == NotSet
+        -> trace "Second" opts
+      | progressColor == Auto || progressColor == Never
+        -> trace "Third" optsShakeNo
+      | otherwise -> trace "Fourth" optsUserYes
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -272,10 +298,11 @@ cmdLineArgsMap = do
     (opts, _, _) <- getOpt Permute optDescrs <$> getArgs
     let args = foldl (flip id) defaultCommandLineArgs (rights opts)
     return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
+           $ insertExtra (colourUserSet args)  -- Accessed by CommandLine
            $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
-           $ insertExtra args Map.empty
+             Map.empty
 
 cmdLineArgs :: Action CommandLineArgs
 cmdLineArgs = userSetting defaultCommandLineArgs
