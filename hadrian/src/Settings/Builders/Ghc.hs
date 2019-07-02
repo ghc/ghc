@@ -35,6 +35,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , ghcLinkArgs
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"
+            , notStage0 ? builder (Ghc CompileHs) ? arg "-fwrite-ide-info"
             , getInputs
             , arg "-o", arg =<< getOutput ]
 
