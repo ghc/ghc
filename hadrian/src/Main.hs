@@ -39,6 +39,7 @@ main = do
             , shakeProgress = progressSimple
             , shakeRebuild  = rebuild
             , shakeTimings  = True
+            , shakeColor    = True
             , shakeExtra    = extra
 
             -- Enable linting file accesses in the build dir and ghc root dir
@@ -68,8 +69,12 @@ main = do
             Rules.topLevelTargets
             Rules.toolArgsTarget
 
-    shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
+    shakeArgsOptionsWith options CommandLine.optDescrs $
+      \userShakeOpts _ targets -> do
+        let finalShakeOpts = CommandLine.alignColourOpts userShakeOpts
         Environment.setupEnvironment
-        return . Just $ if null targets
-                        then rules
-                        else want targets >> withoutActions rules
+        return $ Just (finalShakeOpts,
+                       if null targets
+                         then rules
+                         else want targets >> withoutActions rules)
+
