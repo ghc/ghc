@@ -1,0 +1,8 @@
+
+T16900.hs:4:1: error:
+    Recursive pattern synonym definition with following bindings:
+      P1 (defined at T16900.hs:4:1-15)
+      P2 (defined at T16900.hs:5:1-15)
+  |
+4 | pattern P1 = P2
+  | ^^^^^^^^^^^^^^^
