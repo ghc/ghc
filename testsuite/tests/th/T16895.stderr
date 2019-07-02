@@ -1,0 +1,6 @@
+
+T16895.hs:7:16: error:
+    • Non-variable expression is not allowed
+      When splicing a TH expression:
+        1 <<Non-variable/constructor in infix context>> 2
+    • In the untyped splice: $(uInfixE [| 1 |] [| id id |] [| 2 |])
