@@ -2121,6 +2121,23 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
             (getCode $ emitMemcpyCall  dst_p src_p bytes align)
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
+-- Emit every available copy assertions given
+emitAllCopyAssertions ::
+     CmmExpr -- destination array length
+  -> CmmExpr -- destination offset
+  -> CmmExpr -- source array length
+  -> CmmExpr -- source offset
+  -> CmmExpr -- number of bytes to copy
+  -> FCode ()
+emitAllCopyAssertions dst_len dst_off src_len src_off n = do
+    dflags <- getDynFlags
+    emitAssertNonNegative src_off
+    emitAssertNonNegative dst_off
+    emitAssertNonNegative n
+    let w = wordWidth dflags
+    emitAssertLessThanEqual (plusMachWord w src_off n) src_len
+    emitAssertLessThanEqual (plusMachWord w dst_off n) dst_len
+
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> Alignment -> FCode ())
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
@@ -2128,14 +2145,9 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
     when (gopt Opt_CmmBoundsCheck dflags) $ do
-        emitAssertNonNegative src_off
-        emitAssertNonNegative dst_off
-        emitAssertNonNegative n
         let src_len = sizeofByteArrayExpr dflags src
             dst_len = sizeofByteArrayExpr dflags dst
-            w = wordWidth dflags
-        emitAssertLessThanEqual (plusMachWord w src_off n) src_len
-        emitAssertLessThanEqual (plusMachWord w dst_off n) dst_len
+        emitAllCopyAssertions dst_len dst_off src_len src_off n
     let byteArrayAlignment = wordAlignment dflags
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
@@ -2151,6 +2163,12 @@ doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative src_off
+        emitAssertNonNegative bytes
+        let src_len = sizeofByteArrayExpr dflags src
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w src_off bytes) src_len
     src_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags src (arrWordsHdrSize dflags)) src_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
@@ -2168,6 +2186,12 @@ doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative dst_off
+        emitAssertNonNegative bytes
+        let dst_len = sizeofByteArrayExpr dflags dst
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w dst_off bytes) dst_len
     dst_p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags dst (arrWordsHdrSize dflags)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
@@ -2183,6 +2207,13 @@ doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
 doSetByteArrayOp ba off len c = do
     dflags <- getDynFlags
 
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative off
+        emitAssertNonNegative len
+        let ba_len = sizeofByteArrayExpr dflags ba
+            w = wordWidth dflags
+        emitAssertLessThanEqual (plusMachWord w off len) ba_len
+
     let byteArrayAlignment = wordAlignment dflags -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
@@ -2193,7 +2224,9 @@ doSetByteArrayOp ba off len c = do
 -- ----------------------------------------------------------------------------
 -- Allocating arrays
 
--- | Allocate a new array.
+-- | Allocate a new array. The size of the array is statically
+-- known and small. Consequently, we inline the initialization
+-- as a series of writes rather than using a loop or memset.
 doNewArrayOp :: CmmFormal             -- ^ return register
              -> SMRep                 -- ^ representation of the array
              -> CLabel                -- ^ info pointer
