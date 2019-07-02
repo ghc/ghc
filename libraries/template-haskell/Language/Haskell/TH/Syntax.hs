@@ -1900,6 +1900,8 @@ data Exp
     -- constructors from non-constructors?
     -- Maybe there should be a var-or-con type?
     -- Or maybe we should leave it to the String itself?
+    -- No one knows why the field isn't just a Name,
+    -- but it seems burdensome to users to fix it.
 
   | UInfixE Exp Exp Exp                -- ^ @{x + y}@
                                        --
