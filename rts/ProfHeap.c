@@ -81,6 +81,10 @@ initLDVCtr( counter *ctr )
 
 typedef struct {
     double      time;    // the time in MUT time when the census is made
+    StgWord64   rtime;   // The eventlog time the census was made. This is used
+                         // for the LDV profiling events because they are all
+                         // emitted at the end of compilation so we need to know
+                         // when the sample actually took place.
     HashTable * hash;
     counter   * ctrs;
     Arena     * arena;
@@ -769,9 +773,18 @@ dumpCensus( Census *census )
     ssize_t count;
 
     printSample(true, census->time);
-    traceHeapProfSampleBegin(era);
+
+
+    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+      traceHeapBioProfSampleBegin(era, census->rtime);
+    } else {
+      traceHeapProfSampleBegin(era);
+    }
+
+
 
 #if defined(PROFILING)
+
     /* change typecast to uint64_t to remove
      * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -788,6 +801,23 @@ dumpCensus( Census *census )
                 (uint64_t)(census->prim * sizeof(W_)));
         fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
                 (uint64_t)(census->drag_total * sizeof(W_)));
+
+
+        // Eventlog
+        traceHeapProfSampleString(0, "VOID",
+                (census->void_total * sizeof(W_)));
+        traceHeapProfSampleString(0, "LAG",
+                ((census->not_used - census->void_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "USE",
+                ((census->used - census->drag_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "INHERENT_USE",
+                (census->prim * sizeof(W_)));
+        traceHeapProfSampleString(0, "DRAG",
+                (census->drag_total * sizeof(W_)));
+
+        traceHeapProfSampleEnd(era);
         printSample(false, census->time);
         return;
     }
@@ -856,7 +886,8 @@ dumpCensus( Census *census )
                 rs->id = -(rs->id);
 
             // report in the unit of bytes: * sizeof(StgWord)
-            printRetainerSetShort(hp_file, rs, RtsFlags.ProfFlags.ccsLength);
+            printRetainerSetShort(hp_file, rs, (W_)count * sizeof(W_)
+                                             , RtsFlags.ProfFlags.ccsLength);
             break;
         }
 #endif
@@ -1156,6 +1187,8 @@ void heapCensus (Time t)
 
   census = &censuses[era];
   census->time  = mut_user_time_until(t);
+  census->rtime = TimeToNS(stat_getElapsedTime());
+
 
   // calculate retainer sets if necessary
 #if defined(PROFILING)
