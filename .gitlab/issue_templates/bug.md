@@ -1,16 +1,16 @@
-# Summary
+## Summary
 
 Write a brief description of the issue.
 
-# Steps to reproduce
+## Steps to reproduce
 
 Please provide a set of concrete steps to reproduce the issue.
 
-# Expected behavior
+## Expected behavior
 
 What do you expect the reproducer described above to do?
 
-# Environment
+## Environment
 
 * GHC version used: 
 
