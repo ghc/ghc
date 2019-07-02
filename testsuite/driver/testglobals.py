@@ -4,6 +4,8 @@
 
 from my_typing import *
 from pathlib import Path
+from perf_notes import MetricChange, PerfStat
+from datetime import datetime
 
 # -----------------------------------------------------------------------------
 # Configuration info
@@ -206,7 +208,7 @@ class TestResult:
                  reason: str,
                  way: WayName,
                  stdout: Optional[str]=None,
-                 stderr: Optional[str]=None):
+                 stderr: Optional[str]=None) -> None:
         self.directory = directory
         self.testname = testname
         self.reason = reason
@@ -215,8 +217,8 @@ class TestResult:
         self.stderr = stderr
 
 class TestRun:
-   def __init__(self):
-       self.start_time = None
+   def __init__(self) -> None:
+       self.start_time = None # type: Optional[datetime]
        self.total_tests = 0
        self.total_test_cases = 0
 
@@ -252,36 +254,36 @@ def getTestRun() -> TestRun:
 # Information about the current test
 
 class TestOptions:
-   def __init__(self):
+   def __init__(self) -> None:
        # skip this test?
        self.skip = False
 
        # the test is known to be fragile in these ways
-       self.fragile_ways = []
+       self.fragile_ways = [] # type: List[WayName]
 
        # skip these ways
-       self.omit_ways = []
+       self.omit_ways = [] # type: List[WayName]
 
        # skip all ways except these (None == do all ways)
-       self.only_ways = None
+       self.only_ways = None # type: Optional[List[WayName]]
 
        # add these ways to the default set
-       self.extra_ways = []
+       self.extra_ways = [] # type: List[WayName]
 
        # the result we normally expect for this test
        self.expect = 'pass'
 
        # override the expected result for certain ways
-       self.expect_fail_for = []
+       self.expect_fail_for = [] # type: List[WayName]
 
-       # the stdin file that this test will use (empty for <name>.stdin)
-       self.srcdir = None
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.srcdir = None # type: Optional[Path]
 
-       # the stdin file that this test will use (empty for <name>.stdin)
-       self.stdin = ''
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.stdin = None # type: Optional[Path]
 
        # Set the expected stderr/stdout. '' means infer from test name.
-       self.use_specs = {}
+       self.use_specs = {} # type: Dict[str, Path]
 
        # don't compare output
        self.ignore_stdout = False
@@ -293,7 +295,7 @@ class TestOptions:
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
        # make a new instance of TestOptions.
-       self.compiler_always_flags = []
+       self.compiler_always_flags = [] # type: List[str]
 
        # extra compiler opts for this test
        self.extra_hc_opts = ''
@@ -302,13 +304,13 @@ class TestOptions:
        self.extra_run_opts = ''
 
        # expected exit code
-       self.exit_code = 0
+       self.exit_code = 0 # type: int
 
        # extra files to clean afterward
-       self.clean_files = []
+       self.clean_files = [] # type: List[str]
 
        # extra files to copy to the testdir
-       self.extra_files = []
+       self.extra_files = [] # type: List[str]
 
        # Map from metric to (function from way and commit to baseline value, allowed percentage deviation) e.g.
        #     { 'bytes allocated': (
@@ -320,7 +322,7 @@ class TestOptions:
        #              , 10) }
        # This means no baseline is available for way1. For way 2, allow a 10%
        # deviation from 9300000000.
-       self.stats_range_fields = {}
+       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
 
        # Is the test testing performance?
        self.is_stats_test = False
@@ -361,7 +363,7 @@ class TestOptions:
        # Custom output checker, otherwise do a comparison with expected
        # stdout file.  Accepts two arguments: filename of actual stdout
        # output, and a normaliser function given other test options
-       self.check_stdout = None # type: Optional[Callable[Path, OutputNormalizer]]
+       self.check_stdout = None # type: Optional[Callable[[Path, OutputNormalizer], bool]]
 
        # Check .hp file when profiling libraries are available?
        self.check_hp = True
