@@ -925,7 +925,7 @@ cvtl e = wrapL (cvt e)
                              }
 
     -- Infix expressions
-    cvt (InfixE (Just x) s (Just y)) =
+    cvt (InfixE (Just x) s (Just y)) = ensureValidOpExp s $
       do { x' <- cvtl x
          ; s' <- cvtl s
          ; y' <- cvtl y
@@ -937,20 +937,24 @@ cvtl e = wrapL (cvt e)
            -- to ensure this operator application does
            -- does not get re-associated
            -- See Note [Operator association]
-    cvt (InfixE Nothing  s (Just y)) = do { s' <- cvtl s; y' <- cvtl y
+    cvt (InfixE Nothing  s (Just y)) = ensureValidOpExp s $
+                                       do { s' <- cvtl s; y' <- cvtl y
                                           ; wrapParL (HsPar noExt) $
                                                           SectionR noExt s' y' }
                                             -- See Note [Sections in HsSyn] in HsExpr
-    cvt (InfixE (Just x) s Nothing ) = do { x' <- cvtl x; s' <- cvtl s
+    cvt (InfixE (Just x) s Nothing ) = ensureValidOpExp s $
+                                       do { x' <- cvtl x; s' <- cvtl s
                                           ; wrapParL (HsPar noExt) $
                                                           SectionL noExt x' s' }
 
-    cvt (InfixE Nothing  s Nothing ) = do { s' <- cvtl s
+    cvt (InfixE Nothing  s Nothing ) = ensureValidOpExp s $
+                                       do { s' <- cvtl s
                                           ; return $ HsPar noExt s' }
                                        -- Can I indicate this is an infix thing?
                                        -- Note [Dropping constructors]
 
-    cvt (UInfixE x s y)  = do { x' <- cvtl x
+    cvt (UInfixE x s y)  = ensureValidOpExp s $
+                           do { x' <- cvtl x
                               ; let x'' = case unLoc x' of
                                             OpApp {} -> x'
                                             _ -> mkLHsPar x'
@@ -976,6 +980,24 @@ cvtl e = wrapL (cvt e)
                               ; return $ HsVar noExt (noLoc s') }
     cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
     cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExt n' }
+
+{- | #16895 Ensure an infix expression's operator is a variable/constructor.
+Consider this example:
+
+  $(uInfixE [|1|] [|id id|] [|2|])
+
+This infix expression is obviously ill-formed so we use this helper function
+to reject such programs outright.
+
+The constructors `ensureValidOpExp` permits should be in sync with `pprInfixExp`
+in Language.Haskell.TH.Ppr from the template-haskell library.
+-}
+ensureValidOpExp :: TH.Exp -> CvtM a -> CvtM a
+ensureValidOpExp (VarE _n) m = m
+ensureValidOpExp (ConE _n) m = m
+ensureValidOpExp (UnboundVarE _n) m = m
+ensureValidOpExp _e _m =
+    failWith (text "Non-variable expression is not allowed in an infix expression")
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
