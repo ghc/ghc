@@ -1729,7 +1729,6 @@ mkOneConFull x con = do
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
       tc_args = tyConAppArgs res_ty
-  MASSERT( isJust (tcMatchTy con_res_ty res_ty) )
   let subst1  = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args
                   -- The expectJust is always satisfied as long as we filter
