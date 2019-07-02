@@ -295,9 +295,9 @@ print('Found', len(t_files), '.T files...')
 t = getTestRun() # type: TestRun
 
 # Avoid cmd.exe built-in 'date' command on Windows
-t.start_time = time.localtime()
+t.start_time = datetime.datetime.now()
 
-print('Beginning test run at', time.strftime("%c %Z",t.start_time))
+print('Beginning test run at', t.start_time.strftime("%c %Z"))
 
 # For reference
 try:
