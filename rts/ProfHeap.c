@@ -788,6 +788,23 @@ dumpCensus( Census *census )
                 (uint64_t)(census->prim * sizeof(W_)));
         fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
                 (uint64_t)(census->drag_total * sizeof(W_)));
+
+
+        // Eventlog
+        traceHeapProfSampleString(0, "VOID",
+                (census->void_total * sizeof(W_)));
+        traceHeapProfSampleString(0, "LAG",
+                ((census->not_used - census->void_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "USE",
+                ((census->used - census->drag_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "INHERENT_USE",
+                (census->prim * sizeof(W_)));
+        traceHeapProfSampleString(0, "DRAG",
+                (census->drag_total * sizeof(W_)));
+
+        traceHeapProfSampleEnd(era);
         printSample(false, census->time);
         return;
     }
