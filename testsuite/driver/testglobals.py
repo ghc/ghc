@@ -320,7 +320,7 @@ class TestOptions:
        #              , 10) }
        # This means no baseline is available for way1. For way 2, allow a 10%
        # deviation from 9300000000.
-       self.stats_range_fields = {}
+       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
 
        # Is the test testing performance?
        self.is_stats_test = False
