@@ -1107,25 +1107,25 @@ def ghci_script( name, way, script):
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], extra_hc_opts )
+    return do_compile( name, way, 0, None, [], extra_hc_opts )
 
 def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], extra_hc_opts )
+    return do_compile( name, way, 1, None, [], extra_hc_opts )
 
 def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, 0, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, 1, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, 0, None, [], extra_hc_opts, backpack=True )
 
 def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, 1, None, [], extra_hc_opts, backpack=True )
 
 def backpack_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, '', [], extra_hc_opts, backpack=True )
+    return compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
@@ -1142,7 +1142,7 @@ def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
 def do_compile(name: TestName,
                way: WayName,
                should_fail: bool,
-               top_mod: Path,
+               top_mod: Optional[Path],
                extra_mods: List[str],
                extra_hc_opts: str,
                **kwargs
@@ -1263,7 +1263,7 @@ def compile_and_run__(name: TestName,
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, '', [], extra_hc_opts)
+    return compile_and_run__( name, way, None, [], extra_hc_opts)
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, [], extra_hc_opts)
@@ -1376,7 +1376,7 @@ def simple_build(name: Union[TestName, str],
     stdout = in_testdir(name, 'comp.stderr')
     stderr = subprocess.STDOUT
 
-    if top_mod != '':
+    if top_mod is not None:
         srcname = top_mod
     elif addsuf:
         if backpack:
@@ -1386,7 +1386,7 @@ def simple_build(name: Union[TestName, str],
     else:
         srcname = Path(name)
 
-    if top_mod != '':
+    if top_mod is not None:
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
@@ -1550,7 +1550,7 @@ def interpreter_run(name: TestName,
         framework_fail(name, WayName('unsupported'),
                        'WAY=ghci and combined_output together is not supported')
 
-    if (top_mod == ''):
+    if top_mod is None:
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = Path(top_mod)
