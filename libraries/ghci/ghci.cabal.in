@@ -92,7 +92,7 @@ library
         ghc-boot         == @ProjectVersionMunged@,
         ghc-boot-th      == @ProjectVersionMunged@,
         ghc-heap         == @ProjectVersionMunged@,
-        template-haskell == 2.15.*,
+        template-haskell == 2.16.*,
         transformers     == 0.5.*
 
     if !os(windows)
