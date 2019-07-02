@@ -45,7 +45,12 @@ main = do
   demandException =<< try (readWord16Array arrB 9)
   demandWord16 103 =<< readWord16Array arrB 0
   demandWord16 135 =<< readWord16Array arrB 8
-  
+  demandWord16 103 =<< readWord16ArrayUnaligned arrB 0
+  demandWord16 135 =<< readWord16ArrayUnaligned arrB 16
+  demandException =<< try (readWord16ArrayUnaligned arrB (-1))
+  demandException =<< try (readWord16ArrayUnaligned arrB (-2))
+  demandException =<< try (readWord16ArrayUnaligned arrB 17)
+  demandException =<< try (readWord16ArrayUnaligned arrB 18)
 
 demandException :: Either BoundsCheckException a -> IO ()
 demandException (Left BoundsCheckException) = pure ()
@@ -98,6 +103,15 @@ readWord16Array (MutableWord16Array arr#) (I# i#) = IO $ \s0 ->
   case readWord16Array# arr# i# s0 of
     (# s1, r #) -> (# s1, W16# r #)
 
+readWord16ArrayUnaligned ::
+     MutableWord16Array
+  -> Int -- index (in bytes, not elements)
+  -> IO Word16
+readWord16ArrayUnaligned (MutableWord16Array arr#) (I# i#) = IO $ \s0 ->
+  case readWord8ArrayAsWord16# arr# i# s0 of
+    (# s1, r #) -> (# s1, W16# r #)
+
+
 writeIntArray ::
      MutableIntArray -- ^ array
   -> Int -- ^ index
@@ -109,11 +123,20 @@ writeIntArray (MutableIntArray arr#) (I# i#) (I# x) = IO $ \s0 ->
 
 writeWord16Array ::
      MutableWord16Array -- ^ array
-  -> Int -- ^ index
+  -> Int -- ^ index (in elements)
   -> Word16 -- ^ element
   -> IO ()
 writeWord16Array (MutableWord16Array arr#) (I# i#) (W16# x) = IO $ \s0 ->
   case writeWord16Array# arr# i# x s0 of
+    s1 -> (# s1, () #)
+
+writeWord16ArrayUnaligned ::
+     MutableWord16Array -- ^ array
+  -> Int -- ^ index (in bytes)
+  -> Word16 -- ^ element
+  -> IO ()
+writeWord16ArrayUnaligned (MutableWord16Array arr#) (I# i#) (W16# x) = IO $ \s0 ->
+  case writeWord8ArrayAsWord16# arr# i# x s0 of
     s1 -> (# s1, () #)
 
 unsafeFreezeIntArray :: MutableIntArray -> IO IntArray

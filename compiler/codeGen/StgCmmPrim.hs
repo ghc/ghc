@@ -559,39 +559,39 @@ emitPrimOp _      res WriteOffAddrOp_Word64           args = doWriteOffAddrOp No
 
 -- WriteXXXArray
 
-emitPrimOp dflags res WriteByteArrayOp_Char             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_WideChar         args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp dflags res WriteByteArrayOp_Int              args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Word             args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Addr             args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp _      res WriteByteArrayOp_Float            args = doWriteByteArrayOp Nothing f32 res args
-emitPrimOp _      res WriteByteArrayOp_Double           args = doWriteByteArrayOp Nothing f64 res args
-emitPrimOp dflags res WriteByteArrayOp_StablePtr        args = doWriteByteArrayOp Nothing (bWord dflags) res args
-emitPrimOp dflags res WriteByteArrayOp_Int8             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Int16            args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteByteArrayOp_Int32            args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteByteArrayOp_Int64            args = doWriteByteArrayOp Nothing b64 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8            args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8  res args
-emitPrimOp dflags res WriteByteArrayOp_Word16           args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b16 res args
-emitPrimOp dflags res WriteByteArrayOp_Word32           args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b32 res args
-emitPrimOp _      res WriteByteArrayOp_Word64           args = doWriteByteArrayOp Nothing b64 res args
+emitPrimOp dflags res WriteByteArrayOp_Char             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  W8  b8  res args
+emitPrimOp dflags res WriteByteArrayOp_WideChar         args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
+emitPrimOp dflags res WriteByteArrayOp_Int              args = doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Word             args = doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Addr             args = doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
+emitPrimOp _      res WriteByteArrayOp_Float            args = doWriteByteArrayOp Nothing W32 f32 res args
+emitPrimOp _      res WriteByteArrayOp_Double           args = doWriteByteArrayOp Nothing W64 f64 res args
+emitPrimOp dflags res WriteByteArrayOp_StablePtr        args = doWriteByteArrayOp Nothing (wordWidth dflags) (bWord dflags) res args
+emitPrimOp dflags res WriteByteArrayOp_Int8             args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  W8  b8  res args
+emitPrimOp dflags res WriteByteArrayOp_Int16            args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b16 res args
+emitPrimOp dflags res WriteByteArrayOp_Int32            args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
+emitPrimOp _      res WriteByteArrayOp_Int64            args = doWriteByteArrayOp Nothing W64 b64 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8            args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  W8  b8  res args
+emitPrimOp dflags res WriteByteArrayOp_Word16           args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b16 res args
+emitPrimOp dflags res WriteByteArrayOp_Word32           args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b32 res args
+emitPrimOp _      res WriteByteArrayOp_Word64           args = doWriteByteArrayOp Nothing W64 b64 res args
 
 -- WriteInt8ArrayAsXXX
 
-emitPrimOp dflags res WriteByteArrayOp_Word8AsChar       args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWideChar   args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsInt        args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsWord       args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsAddr       args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsFloat      args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsDouble     args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsStablePtr  args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsInt16      args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsInt32      args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsInt64      args = doWriteByteArrayOp Nothing b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWord16     args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) b8 res args
-emitPrimOp dflags res WriteByteArrayOp_Word8AsWord32     args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) b8 res args
-emitPrimOp _      res WriteByteArrayOp_Word8AsWord64     args = doWriteByteArrayOp Nothing b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsChar       args = doWriteByteArrayOp (Just (mo_WordTo8 dflags))  W8  b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWideChar   args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt        args = doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord       args = doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsAddr       args = doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsFloat      args = doWriteByteArrayOp Nothing W32 b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsDouble     args = doWriteByteArrayOp Nothing W64 b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsStablePtr  args = doWriteByteArrayOp Nothing (wordWidth dflags) b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt16      args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsInt32      args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsInt64      args = doWriteByteArrayOp Nothing W64 b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord16     args = doWriteByteArrayOp (Just (mo_WordTo16 dflags)) W16 b8 res args
+emitPrimOp dflags res WriteByteArrayOp_Word8AsWord32     args = doWriteByteArrayOp (Just (mo_WordTo32 dflags)) W32 b8 res args
+emitPrimOp _      res WriteByteArrayOp_Word8AsWord64     args = doWriteByteArrayOp Nothing W64 b8 res args
 
 -- Copying and setting byte arrays
 emitPrimOp _      [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
@@ -730,7 +730,7 @@ emitPrimOp dflags res (VecReadByteArrayOp vcat n w) args = do
 
 emitPrimOp dflags res (VecWriteByteArrayOp vcat n w) args = do
     checkVecCompatibility dflags vcat n w
-    doWriteByteArrayOp Nothing ty res args
+    doWriteByteArrayOp Nothing w ty res args
   where
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -778,7 +778,7 @@ emitPrimOp dflags res (VecReadScalarByteArrayOp vcat n w) args = do
 
 emitPrimOp dflags res (VecWriteScalarByteArrayOp vcat n w) args = do
     checkVecCompatibility dflags vcat n w
-    doWriteByteArrayOp Nothing ty res args
+    doWriteByteArrayOp Nothing w ty res args
   where
     ty :: CmmType
     ty = vecCmmCat vcat w
@@ -1597,19 +1597,21 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doWriteOffAddrOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = mkBasicIndexedWrite Nothing 0 maybe_pre_write_cast addr idx_ty idx val
+     -- The width is ignored, so we just make up W8 as the value.
+   = mkBasicIndexedWrite Nothing 0 maybe_pre_write_cast W8 addr idx_ty idx val
 doWriteOffAddrOp _ _ _ _
    = panic "StgCmmPrim: doWriteOffAddrOp"
 
 doWriteByteArrayOp :: Maybe MachOp
+                   -> Width
                    -> CmmType
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
-doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
+doWriteByteArrayOp maybe_pre_write_cast width idx_ty [] [addr,idx,val]
    = do dflags <- getDynFlags
-        mkBasicIndexedWrite (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx_ty idx val
-doWriteByteArrayOp _ _ _ _
+        mkBasicIndexedWrite (Just sizeofByteArrayExpr) (arrWordsHdrSize dflags) maybe_pre_write_cast width addr idx_ty idx val
+doWriteByteArrayOp _ _ _ _ _
    = panic "StgCmmPrim: doWriteByteArrayOp"
 
 doWritePtrArrayOp :: CmmExpr
@@ -1623,7 +1625,7 @@ doWritePtrArrayOp addr idx val
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite (Just sizeofArrayExpr) (arrPtrsHdrSize dflags) Nothing addr ty idx val
+       mkBasicIndexedWrite (Just sizeofArrayExpr) (arrPtrsHdrSize dflags) Nothing (wordWidth dflags) addr ty idx val
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
   -- the write barrier.  We must write a byte into the mark table:
   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
@@ -1642,11 +1644,12 @@ loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB dflags addr off) (bWord dflags
 emitIndexBoundsCheck ::
      Maybe (DynFlags -> CmmExpr -> CmmExpr) -- How to compute payload size in bytes
   -> CmmExpr -- Base address
+  -> Width -- Width of element being read or written
   -> CmmType -- Type of element by which we are indexing
   -> CmmExpr -- Index
   -> FCode ()
-emitIndexBoundsCheck Nothing _ _ _ = return ()
-emitIndexBoundsCheck (Just getSize) base idx_ty idx = do
+emitIndexBoundsCheck Nothing _ _ _ _ = return ()
+emitIndexBoundsCheck (Just getSize) base width idx_ty idx = do
   dflags <- getDynFlags
   when (gopt Opt_CmmBoundsCheck dflags) $ do
     updfr_off <- getUpdFrameOff
@@ -1658,8 +1661,11 @@ emitIndexBoundsCheck (Just getSize) base idx_ty idx = do
         idxShifted = CmmMachOp
           (MO_Shl (wordWidth dflags))
           [idx, mkIntExpr dflags (widthInLog (typeWidth idx_ty))]
+        idxPost = CmmMachOp
+          (MO_Add (wordWidth dflags))
+          [idxShifted, mkIntExpr dflags (widthInBytes width)]
     emit =<< mkCmmIfThen
-      (CmmMachOp (MO_S_Ge w) [idxShifted,len])
+      (CmmMachOp (MO_S_Gt w) [idxPost,len])
       (mkRaise dflags updfr_off boundsCheckExcpLabel)
 
 boundsCheckExcpLabel :: CmmExpr
@@ -1681,7 +1687,7 @@ mkBasicIndexedRead ::
   -> CmmExpr      -- Index
   -> FCode ()
 mkBasicIndexedRead getSize off mcast ty res base idx_ty idx = do
-  emitIndexBoundsCheck getSize base idx_ty idx
+  emitIndexBoundsCheck getSize base (typeWidth ty) idx_ty idx
   dflags <- getDynFlags
   case mcast of
     Nothing -> emitAssign (CmmLocal res) (cmmLoadIndexOffExpr dflags off ty base idx_ty idx)
@@ -1693,13 +1699,14 @@ mkBasicIndexedWrite ::
      Maybe (DynFlags -> CmmExpr -> CmmExpr) -- See mkBasicIndexedRead
   -> ByteOff      -- Initial offset in bytes
   -> Maybe MachOp -- Optional value cast
+  -> Width        -- Width of element we are writing
   -> CmmExpr      -- Base address
   -> CmmType      -- Type of element by which we are indexing
   -> CmmExpr      -- Index
   -> CmmExpr      -- Value to write
   -> FCode ()
-mkBasicIndexedWrite getSize off mcast base idx_ty idx val = do
-  emitIndexBoundsCheck getSize base idx_ty idx
+mkBasicIndexedWrite getSize off mcast width base idx_ty idx val = do
+  emitIndexBoundsCheck getSize base width idx_ty idx
   dflags <- getDynFlags
   case mcast of
     Nothing -> emitStore (cmmIndexOffExpr dflags off (typeWidth idx_ty) base idx) val
@@ -2448,7 +2455,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     dflags <- getDynFlags
     let ty = cmmExprType dflags val
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
+    mkBasicIndexedWrite (Just sizeofSmallArrayExpr) (smallArrPtrsHdrSize dflags) Nothing (wordWidth dflags) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
