@@ -72,12 +72,24 @@ Sample event types
 A sample (consisting of a list of break-down classes, e.g. cost centres, and
 heap residency sizes), is to be encoded in the body of one or more events.
 
-We mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
+We normally mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
 event,
 
  * ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
 
    * ``Word64``: sample number
+
+Biographical profiling samples start with the ``EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN``
+event. These events also include a timestamp which indicates when the sample
+was taken. This is because all these samples will appear at the end of
+the eventlog due to how the biographical profiling mode works. You can
+use the timestamp to reorder the samples relative to the other events.
+
+ * ``EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN``
+
+   * ``Word64``: sample number
+   * ``Word64``: eventlog timestamp in ns
+
 
 A heap residency census will follow. Since events may only be up to 2^16^ bytes
 in length a single sample may need to be split among multiple
