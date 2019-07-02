@@ -21,7 +21,8 @@ import subprocess
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
-                     failBecause, failBecauseStderr, str_fail, str_pass, testing_metrics
+                     failBecause, str_fail, str_pass, testing_metrics, \
+                     PassFail
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -445,7 +446,8 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
             return Perf.baseline_metric( \
                               target_commit, name, config.test_env, metric, way)
 
-        opts.stats_range_fields[metric] = (baselineByWay, deviation)
+        opts.stats_range_fields[metric] = MetricOracles(baseline=baselineByWay,
+                                                        deviation=deviation)
 
 # -----
 
@@ -834,9 +836,11 @@ def test_common_work(watcher: testutil.Watcher,
 
         t.total_test_cases += len(all_ways)
 
+        only_ways = getTestOpts().only_ways
         ok_way = lambda way: \
             not getTestOpts().skip \
-            and (getTestOpts().only_ways is None or way in getTestOpts().only_ways) \
+            and (only_ways is None
+                 or (only_ways is not None and way in only_ways)) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
             and (not (config.only_perf_tests and not isStatsTest())) \
@@ -916,7 +920,12 @@ def test_common_work(watcher: testutil.Watcher,
     finally:
         watcher.notify()
 
-def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
+def do_test(name: TestName,
+            way: WayName,
+            func: Callable[..., PassFail],
+            args,
+            files: Set[str]
+            ) -> None:
     opts = getTestOpts()
 
     full_name = name + '(' + way + ')'
@@ -990,7 +999,7 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
         framework_fail(name, way, 'bad expected ' + opts.expect)
 
     try:
-        passFail = result['passFail']
+        passFail = result.passFail
     except (KeyError, TypeError):
         passFail = 'No passFail found'
 
@@ -1008,17 +1017,17 @@ def do_test(name: TestName, way: WayName, func, args, files: Set[str]) -> None:
             t.unexpected_passes.append(TestResult(directory, name, 'unexpected', way))
     elif passFail == 'fail':
         if _expect_pass(way):
-            reason = result['reason']
-            tag = result.get('tag')
+            reason = result.reason
+            tag = result.tag
             if tag == 'stat':
                 if_verbose(1, '*** unexpected stat test failure for %s' % full_name)
                 t.unexpected_stat_failures.append(TestResult(directory, name, reason, way))
             else:
                 if_verbose(1, '*** unexpected failure for %s' % full_name)
-                result = TestResult(directory, name, reason, way,
-                                    stdout=result.get('stdout'),
-                                    stderr=result.get('stderr'))
-                t.unexpected_failures.append(result)
+                tr = TestResult(directory, name, reason, way,
+                                stdout=result.stdout,
+                                stderr=result.stderr)
+                t.unexpected_failures.append(tr)
         else:
             if opts.expect == 'missing-lib':
                 t.missing_libs.append(TestResult(directory, name, 'missing-lib', way))
@@ -1050,14 +1059,14 @@ def framework_fail(name: Optional[TestName], way: Optional[WayName], reason: str
 
 def framework_warn(name: TestName, way: WayName, reason: str) -> None:
     opts = getTestOpts()
-    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
+    directory = re.sub('^\\.[/\\\\]', '', str(opts.testdir))
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
     t.framework_warnings.append(TestResult(directory, name, reason, way))
 
-def badResult(result):
+def badResult(result: PassFail) -> bool:
     try:
-        if result['passFail'] == 'pass':
+        if result.passFail == 'pass':
             return False
         return True
     except (KeyError, TypeError):
@@ -1104,25 +1113,25 @@ def ghci_script( name, way, script):
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], extra_hc_opts )
+    return do_compile( name, way, 0, None, [], extra_hc_opts )
 
 def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], extra_hc_opts )
+    return do_compile( name, way, 1, None, [], extra_hc_opts )
 
 def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, 0, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, 1, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, 0, None, [], extra_hc_opts, backpack=True )
 
 def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, 1, None, [], extra_hc_opts, backpack=True )
 
 def backpack_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, '', [], extra_hc_opts, backpack=True )
+    return compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
@@ -1136,15 +1145,22 @@ def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
 
-def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwargs):
+def do_compile(name: TestName,
+               way: WayName,
+               should_fail: bool,
+               top_mod: Optional[Path],
+               extra_mods: List[str],
+               extra_hc_opts: str,
+               **kwargs
+               ) -> PassFail:
     # print 'Compile only, extra args = ', extra_hc_opts
 
     result = extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
        return result
-    extra_hc_opts = result['hc_opts']
+    extra_hc_opts = result.hc_opts
 
-    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, 0, 1, **kwargs)
+    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, False, True, **kwargs)
 
     if badResult(result):
         return result
@@ -1165,17 +1181,21 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
                                                          normalise_whitespace)):
-        stderr = diff_file_name.read_bytes()
+        stderr = diff_file_name.read_text()
         diff_file_name.unlink()
-        return failBecauseStderr('stderr mismatch', stderr=stderr )
+        return failBecause('stderr mismatch', stderr=stderr)
 
 
     # no problems found, this test passed
     return passed()
 
-def compile_cmp_asm( name, way, ext, extra_hc_opts ):
+def compile_cmp_asm(name: TestName,
+                    way: WayName,
+                    ext: str,
+                    extra_hc_opts: str
+                    ) -> PassFail:
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, False, False)
 
     if badResult(result):
         return result
@@ -1195,9 +1215,14 @@ def compile_cmp_asm( name, way, ext, extra_hc_opts ):
     # no problems found, this test passed
     return passed()
 
-def compile_grep_asm( name, way, ext, is_substring, extra_hc_opts ):
+def compile_grep_asm(name: TestName,
+                     way: WayName,
+                     ext: str,
+                     is_substring: bool,
+                     extra_hc_opts: str
+                     ) -> PassFail:
     print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0)
+    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, False, False)
 
     if badResult(result):
         return result
@@ -1216,18 +1241,25 @@ def compile_grep_asm( name, way, ext, is_substring, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts, backpack=0 ):
+def compile_and_run__(name: TestName,
+                      way: WayName,
+                      top_mod: Path,
+                      extra_mods: List[str],
+                      extra_hc_opts: str,
+                      backpack: bool=False
+                      ) -> PassFail:
     # print 'Compile and run, extra args = ', extra_hc_opts
 
     result = extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
        return result
-    extra_hc_opts = result['hc_opts']
+    extra_hc_opts = result.hc_opts
+    assert extra_hc_opts is not None
 
     if way.startswith('ghci'): # interpreted...
         return interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
-        result = simple_build(name, way, extra_hc_opts, 0, top_mod, 1, 1, backpack = backpack)
+        result = simple_build(name, way, extra_hc_opts, False, top_mod, True, True, backpack = backpack)
         if badResult(result):
             return result
 
@@ -1237,7 +1269,7 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts, backpack=0
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, '', [], extra_hc_opts)
+    return compile_and_run__( name, way, None, [], extra_hc_opts)
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, [], extra_hc_opts)
@@ -1269,8 +1301,15 @@ def metric_dict(name, way, metric, value):
 # range_fields: see TestOptions.stats_range_fields
 # Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
 # This prints the results for the user.
-def check_stats(name, way, stats_file, range_fields) -> Any:
+def check_stats(name: TestName,
+                way: WayName,
+                stats_file: Path,
+                range_fields: Dict[MetricName, MetricOracles]
+                ) -> PassFail:
     head_commit = Perf.commit_hash(GitRef('HEAD')) if Perf.inside_git_repo() else None
+    if head_commit is None:
+        return passed()
+
     result = passed()
     if range_fields:
         try:
@@ -1296,13 +1335,13 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
                 change = None
 
                 # If this is the first time running the benchmark, then pass.
-                baseline = baseline_and_dev[0](way, head_commit) \
+                baseline = baseline_and_dev.baseline(way, head_commit) \
                     if Perf.inside_git_repo() else None
                 if baseline is None:
                     metric_result = passed()
                     change = MetricChange.NewMetric
                 else:
-                    tolerance_dev = baseline_and_dev[1]
+                    tolerance_dev = baseline_and_dev.deviation
                     (change, metric_result) = Perf.check_stats_change(
                         perf_stat,
                         baseline,
@@ -1314,7 +1353,7 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
             # a complete list of changes can be presented to the user.
-            if metric_result['passFail'] == 'fail':
+            if metric_result.passFail == 'fail':
                 result = metric_result
 
     return result
@@ -1324,23 +1363,29 @@ def check_stats(name, way, stats_file, range_fields) -> Any:
 
 def extras_build( way, extra_mods, extra_hc_opts ):
     for mod, opts in extra_mods:
-        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0)
+        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, False, False)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
             extra_hc_opts += ' %s' % Path(mod).with_suffix('.o')
         if badResult(result):
             return result
 
-    return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
+    return passed(hc_opts=extra_hc_opts)
 
-def simple_build(name: TestName, way: WayName,
-                 extra_hc_opts, should_fail, top_mod, link, addsuf, backpack = False) -> Any:
+def simple_build(name: Union[TestName, str],
+                 way: WayName,
+                 extra_hc_opts: str,
+                 should_fail: bool,
+                 top_mod: Optional[Path],
+                 link: bool,
+                 addsuf: bool,
+                 backpack: bool = False) -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
     stdout = in_testdir(name, 'comp.stderr')
     stderr = subprocess.STDOUT
 
-    if top_mod != '':
+    if top_mod is not None:
         srcname = top_mod
     elif addsuf:
         if backpack:
@@ -1348,9 +1393,9 @@ def simple_build(name: TestName, way: WayName,
         else:
             srcname = add_hs_lhs_suffix(name)
     else:
-        srcname = name
+        srcname = Path(name)
 
-    if top_mod != '':
+    if top_mod is not None:
         to_do = '--make '
         if link:
             to_do = to_do + '-o ' + name
@@ -1401,18 +1446,18 @@ def simple_build(name: TestName, way: WayName,
     # ToDo: if the sub-shell was killed by ^C, then exit
 
     if isCompilerStatsTest():
-        statsResult = check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+        statsResult = check_stats(TestName(name), way, in_testdir(stats_file), opts.stats_range_fields)
         if badResult(statsResult):
             return statsResult
 
     if should_fail:
         if exit_code == 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
-            return failBecauseStderr('exit code 0', stderr_contents)
+            return failBecause('exit code 0', stderr=stderr_contents)
     else:
         if exit_code != 0:
             stderr_contents = actual_stderr_path.read_text(encoding='UTF-8', errors='replace')
-            return failBecauseStderr('exit code non-0', stderr_contents)
+            return failBecause('exit code non-0', stderr=stderr_contents)
 
     return passed()
 
@@ -1456,7 +1501,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
     cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
 
-    if opts.cmd_wrapper != None:
+    if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
@@ -1499,7 +1544,11 @@ def rts_flags(way: WayName) -> str:
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
 
-def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_mod: str) -> None:
+def interpreter_run(name: TestName,
+                    way: WayName,
+                    extra_hc_opts: str,
+                    top_mod: Path
+                    ) -> PassFail:
     opts = getTestOpts()
 
     stdout = in_testdir(name, 'interp.stdout')
@@ -1510,7 +1559,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
         framework_fail(name, WayName('unsupported'),
                        'WAY=ghci and combined_output together is not supported')
 
-    if (top_mod == ''):
+    if top_mod is None:
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = Path(top_mod)
@@ -1541,7 +1590,7 @@ def interpreter_run(name: TestName, way: WayName, extra_hc_opts: List[str], top_
     cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
 
-    if getTestOpts().cmd_wrapper != None:
+    if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd);
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
@@ -1602,7 +1651,7 @@ def get_compiler_flags() -> List[str]:
 
     flags.append(opts.extra_hc_opts)
 
-    if opts.outputdir != None:
+    if opts.outputdir is not None:
         flags.extend(["-outputdir", opts.outputdir])
 
     return flags
@@ -1614,7 +1663,7 @@ def stdout_ok(name: TestName, way: WayName) -> bool:
    extra_norm = join_normalisers(normalise_output, getTestOpts().extra_normaliser)
 
    check_stdout = getTestOpts().check_stdout
-   if check_stdout:
+   if check_stdout is not None:
       actual_stdout_path = in_testdir(actual_stdout_file)
       return check_stdout(actual_stdout_path, extra_norm)
 
@@ -2166,7 +2215,11 @@ def in_testdir(name: Union[Path, str], suffix: str='') -> Path:
     return getTestOpts().testdir / add_suffix(name, suffix)
 
 def in_srcdir(name: Union[Path, str], suffix: str='') -> Path:
-    return getTestOpts().srcdir / add_suffix(name, suffix)
+    srcdir = getTestOpts().srcdir
+    if srcdir is None:
+        return add_suffix(name, suffix)
+    else:
+        return srcdir / add_suffix(name, suffix)
 
 def in_statsdir(name: Union[Path, str], suffix: str='') -> Path:
     dir = config.stats_files_dir
@@ -2183,7 +2236,7 @@ def find_expected_file(name: TestName, suff: str) -> Path:
     # Override the basename if the user has specified one, this will then be
     # subjected to the same name mangling scheme as normal to allow platform
     # specific overrides to work.
-    basename = getTestOpts().use_specs.get (suff, basename)
+    basename = getTestOpts().use_specs.get(suff, basename)
 
     files = [str(basename) + ws + plat
              for plat in ['-' + config.platform, '-' + config.os, '']
@@ -2280,10 +2333,10 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
         else:
             colorize = str_pass
 
+    assert t.start_time is not None
     file.write(colorize('SUMMARY') + ' for test run started at '
-               + time.strftime("%c %Z", t.start_time) + '\n'
-               + str(datetime.timedelta(seconds=
-                    round(time.time() - time.mktime(t.start_time)))).rjust(8)
+               + t.start_time.strftime("%c %Z") + '\n'
+               + str(datetime.datetime.now() - t.start_time).rjust(8)
                + ' spent to go through\n'
                + repr(t.total_tests).rjust(8)
                + ' total tests, which gave rise to\n'
