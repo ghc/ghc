@@ -67,6 +67,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import ConLike
 
 import Control.Monad
+import Data.Foldable (find)
 
 #include "HsVersions.h"
 
@@ -485,12 +486,13 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         -- (This used to be optional, but isn't now.)
         -- See Note [Polymorphic recursion] in HsBinds.
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
-        ; when hasPatSyn $ recursivePatSynErr binds
+        ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
+            recursivePatSynErr (getLoc lpat_syn) binds
         ; (binds1, thing) <- go sccs
         ; return ([(Recursive, binds1)], thing) }
                 -- Rec them all together
   where
-    hasPatSyn = anyBag (isPatSyn . unLoc) binds
+    mbFirstPatSyn = find (isPatSyn . unLoc) binds
     isPatSyn PatSynBind{} = True
     isPatSyn _ = False
 
@@ -511,10 +513,14 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     tc_sub_group rec_tc binds =
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
-recursivePatSynErr :: OutputableBndrId (GhcPass p) =>
-                      LHsBinds (GhcPass p) -> TcM a
-recursivePatSynErr binds
-  = failWithTc $
+recursivePatSynErr ::
+     OutputableBndrId (GhcPass p) =>
+     SrcSpan -- ^ The location of the first pattern synonym binding
+             --   (for error reporting)
+  -> LHsBinds (GhcPass p)
+  -> TcM a
+recursivePatSynErr loc binds
+  = failAt loc $
     hang (text "Recursive pattern synonym definition with following bindings:")
        2 (vcat $ map pprLBind . bagToList $ binds)
   where

@@ -45,3 +45,4 @@ test('T15289', normal, compile_fail, [''])
 test('T15685', normal, compile_fail, [''])
 test('T15692', normal, compile, [''])   # It has -fdefer-type-errors inside
 test('T15694', normal, compile_fail, [''])
+test('T16900', normal, compile_fail, ['-fdiagnostics-show-caret'])
