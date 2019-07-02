@@ -1652,21 +1652,37 @@ emitIndexBoundsCheck Nothing _ _ _ _ = return ()
 emitIndexBoundsCheck (Just getSize) base width idx_ty idx = do
   dflags <- getDynFlags
   when (gopt Opt_CmmBoundsCheck dflags) $ do
-    updfr_off <- getUpdFrameOff
-    let w = wordWidth dflags
-    emit =<< mkCmmIfThen
-      (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
-      (mkRaise dflags updfr_off boundsCheckExcpLabel)
+    emitAssertNonNegative idx
     let len = getSize dflags base
+        w = wordWidth dflags
         idxShifted = CmmMachOp
-          (MO_Shl (wordWidth dflags))
+          (MO_Shl w)
           [idx, mkIntExpr dflags (widthInLog (typeWidth idx_ty))]
         idxPost = CmmMachOp
-          (MO_Add (wordWidth dflags))
+          (MO_Add w)
           [idxShifted, mkIntExpr dflags (widthInBytes width)]
-    emit =<< mkCmmIfThen
-      (CmmMachOp (MO_S_Gt w) [idxPost,len])
-      (mkRaise dflags updfr_off boundsCheckExcpLabel)
+    emitAssertLessThanEqual idxPost len
+
+-- Throws BoundsCheckException when the argument is negative.
+emitAssertNonNegative :: CmmExpr -> FCode ()
+emitAssertNonNegative idx = do
+  dflags <- getDynFlags
+  let w = wordWidth dflags
+  updfr_off <- getUpdFrameOff
+  emit =<< mkCmmIfThen
+    (CmmMachOp (MO_S_Lt w) [idx,CmmLit (CmmInt 0 w)])
+    (mkRaise dflags updfr_off boundsCheckExcpLabel)
+
+-- Throws BoundsCheckException when the first argument is greater than
+-- the second argument.
+emitAssertLessThanEqual :: CmmExpr -> CmmExpr -> FCode ()
+emitAssertLessThanEqual a b = do
+  dflags <- getDynFlags
+  let w = wordWidth dflags
+  updfr_off <- getUpdFrameOff
+  emit =<< mkCmmIfThen
+    (CmmMachOp (MO_S_Gt w) [a,b])
+    (mkRaise dflags updfr_off boundsCheckExcpLabel)
 
 boundsCheckExcpLabel :: CmmExpr
 boundsCheckExcpLabel =
@@ -2108,6 +2124,10 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
     dflags <- getDynFlags
+    when (gopt Opt_CmmBoundsCheck dflags) $ do
+        emitAssertNonNegative src_off
+        emitAssertNonNegative dst_off
+        emitAssertNonNegative n
     let byteArrayAlignment = wordAlignment dflags
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
