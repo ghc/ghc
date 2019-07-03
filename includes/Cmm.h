@@ -857,7 +857,7 @@
                                                                \
     ASSERT(offset >= 0);                                       \
     ASSERT(n >= 0);                                            \
-    ASSERT((offset + n) <= StgMutArrPtrs_ptrs(arr));           \
+    ASSERT((offset + n) <= StgMutArrPtrs_ptrs(src));           \
                                                                \
     size = n + mutArrPtrsCardWords(n);                         \
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;         \
@@ -950,7 +950,7 @@
                                                                \
     ASSERT(offset >= 0);                                       \
     ASSERT(n >= 0);                                            \
-    ASSERT((offset + n) <= StgSmallMutArrPtrs_ptrs(arr));      \
+    ASSERT((offset + n) <= StgSmallMutArrPtrs_ptrs(src));      \
                                                                \
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;       \
     ("ptr" dst) = ccall allocate(MyCapability() "ptr", words); \
