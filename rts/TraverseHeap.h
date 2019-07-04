@@ -94,7 +94,7 @@ typedef struct traverseState_ {
  * this closure's children.
  */
 typedef bool (*visitClosure_cb) (
-    const StgClosure *c,
+    StgClosure *c,
     const StgClosure *cp,
     const stackData data,
     const bool first_visit,
