@@ -442,8 +442,8 @@ cmmproc :: { CmmParse () }
                          return (entry_ret_label, info, stk_formals, formals) }
                      let do_layout = isJust $3
                      code (emitProcWithStackFrame $2 info
-                                entry_ret_label False {- TODO (osa): Not sure about this!!! -}
-                                stk_formals formals agraph do_layout ) }
+                                entry_ret_label stk_formals formals agraph
+                                do_layout ) }
 
 maybe_conv :: { Convention }
            : {- empty -}        { NativeNodeCall }
