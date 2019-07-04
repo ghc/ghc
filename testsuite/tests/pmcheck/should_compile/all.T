@@ -95,7 +95,7 @@ test('pmc007', [], compile,
 test('pmc008', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('pmc009', [], compile,
-     ['-package ghc', '-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+     ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11245', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11336b', [], compile,
