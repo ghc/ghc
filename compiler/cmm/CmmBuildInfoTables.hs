@@ -369,7 +369,7 @@ So, no shortcutting.
 -- labels will not actually exist; that's ok because we're going to
 -- map them to SRTEntry later, which ranges over labels that do exist.
 --
-newtype CAFLabel = CAFLabel CLabel
+newtype CAFLabel = CAFLabel { cafLabelCLabel :: CLabel }
   deriving (Eq,Ord,Outputable)
 
 type CAFSet = Set CAFLabel
@@ -404,13 +404,16 @@ cafAnal
   -> CmmGraph
   -> (NameEnv (Name, Bool), CAFEnv)
 cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
-    srtTrace2 "cafAnal" (ppr ret) (caf_infos1, ret)
+    srtTrace2 "cafAnal" (ppr caf_env) (caf_infos1, caf_env)
   where
-    ret =
+    caf_env =
       analyzeCmmBwd cafLattice
         (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 
-    ret_caffy = upd_flag || any (not . Set.null) (mapElems ret)
+    ret_caffy = upd_flag || any (not . Set.null) (mapElems caf_env)
+
+    all_caf_refs :: [CLabel]
+    all_caf_refs = map (\(CAFLabel l) -> l) (Set.toList (Set.unions (mapElems caf_env)))
 
     caf_infos1
       | Just nm <- hasHaskellName topLbl
@@ -418,6 +421,7 @@ cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
           extendNameEnv caf_infos0 nm (nm, ret_caffy)
       | otherwise
       = caf_infos0
+
 
 cafLattice :: DataflowLattice CAFSet
 cafLattice = DataflowLattice Set.empty add
@@ -633,7 +637,7 @@ doSRTs
   :: DynFlags
   -> ModuleSRTInfo
   -> [(CAFEnv, [CmmDecl])]
-  -> IO (ModuleSRTInfo, [CmmDecl])
+  -> IO (ModuleSRTInfo, [CmmDecl], [Name])
 
 doSRTs dflags moduleSRTInfo tops = do
   us <- mkSplitUniqSupply 'u'
@@ -662,14 +666,18 @@ doSRTs dflags moduleSRTInfo tops = do
           , [(Label, CLabel)]      -- SRT fields for info tables
           , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
           ) ]
-      ((result, _srtMap), moduleSRTInfo') =
+
+      _srtMap :: Map CAFLabel (Maybe SRTEntry)
+
+      (((result, new_cafs), _srtMap), moduleSRTInfo') =
         initUs_ us $
         flip runStateT moduleSRTInfo $
         flip runStateT Map.empty $ do
-          nonCAFs <- mapM (doSCC dflags staticFuns) sccs
-          cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
+          (nonCAFs, new_cafs_1) <- mapAndUnzipM (doSCC dflags staticFuns) sccs
+          (cAFs, new_cafs_2) <- flip mapAndUnzipM cafsWithSRTs $ \(l, cafLbl, cafs) ->
             oneSRT dflags staticFuns [l] [cafLbl] True{-is a CAF-} cafs
-          return (nonCAFs ++ cAFs)
+          let new_cafs = concat (new_cafs_1 ++ new_cafs_2)
+          return (nonCAFs ++ cAFs, new_cafs)
 
       (declss, pairs, funSRTs) = unzip3 result
 
@@ -679,7 +687,7 @@ doSRTs dflags moduleSRTInfo tops = do
     funSRTMap = mapFromList (concat funSRTs)
     decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap) decls
 
-  return (moduleSRTInfo', concat declss ++ decls')
+  return (moduleSRTInfo', concat declss ++ decls', new_cafs)
 
 
 -- | Build the SRT for a strongly-connected component of blocks
@@ -689,9 +697,11 @@ doSCC
   -> SCC (Label, CAFLabel, Set CAFLabel)
   -> StateT SRTMap
         (StateT ModuleSRTInfo UniqSM)
-        ( [CmmDecl]              -- generated SRTs
-        , [(Label, CLabel)]      -- SRT fields for info tables
-        , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
+        ( ( [CmmDecl]              -- generated SRTs
+          , [(Label, CLabel)]      -- SRT fields for info tables
+          , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
+          )
+        , [Name]                   -- Names of new CAFFYs
         )
 
 doSCC dflags staticFuns  (AcyclicSCC (l, cafLbl, cafs)) =
@@ -738,9 +748,11 @@ oneSRT
   -> Set CAFLabel               -- SRT for this set
   -> StateT SRTMap
        (StateT ModuleSRTInfo UniqSM)
-       ( [CmmDecl]                    -- SRT objects we built
-       , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
-       , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
+       ( ( [CmmDecl]                    -- SRT objects we built
+         , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
+         , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
+         )
+       , [Name]                         -- Names of new CAFFYs
        )
 
 oneSRT dflags staticFuns blockids lbls isCAF cafs = do
@@ -790,11 +802,13 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
 
     this_mod = thisModule topSRT
 
+    haskell_names = mapMaybe (hasHaskellName . cafLabelCLabel) lbls
+
   case Set.toList filtered of
     [] -> do
-      srtTrace "oneSRT: empty" (ppr lbls) $ return ()
+      srtTrace2 "oneSRT: empty" (ppr lbls <+> ppr haskell_names) $ return ()
       updateSRTMap Nothing
-      return ([], [], [])
+      return (([], [], []), [])
 
     -- [Inline] - when we have only one entry there is no need to
     -- build an SRT object at all, instead we put the singleton SRT
@@ -817,26 +831,27 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
         -- we could have multiple labels here is if this is a
         -- recursive group, see Note [recursive SRTs])
         case maybeFunClosure of
-          Just (staticFunLbl,staticFunBlock) -> return ([], withLabels, [])
+          Just (staticFunLbl,staticFunBlock) ->
+              return (([], withLabels, []), haskell_names)
             where
               withLabels =
                 [ (b, if b == staticFunBlock then lbl else staticFunLbl)
                 | b <- blockids ]
           Nothing -> do
             updateSRTMap (Just one)
-            return ([], map (,lbl) blockids, [])
+            return (([], map (,lbl) blockids, []), haskell_names)
 
     cafList ->
       -- Check whether an SRT with the same entries has been emitted already.
       -- Implements the [Common] optimisation.
       case Map.lookup filtered (dedupSRTs topSRT) of
         Just srtEntry@(SRTEntry srtLbl)  -> do
-          srtTrace "oneSRT [Common]" (ppr lbls <+> ppr srtLbl) $ return ()
+          srtTrace2 "oneSRT [Common]" (ppr lbls <+> ppr haskell_names <+> ppr srtLbl) $ return ()
           updateSRTMap (Just srtEntry)
-          return ([], map (,srtLbl) blockids, [])
+          return (([], map (,srtLbl) blockids, []), haskell_names)
         Nothing -> do
           -- No duplicates: we have to build a new SRT object
-          srtTrace "oneSRT: new" (ppr lbls <+> ppr filtered) $ return ()
+          srtTrace2 "oneSRT: new" (ppr lbls <+> ppr haskell_names <+> ppr filtered) $ return ()
           (decls, funSRTs, srtEntry) <-
             case maybeFunClosure of
               Just (fun,block) ->
@@ -852,7 +867,7 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
           lift (put (topSRT { dedupSRTs = newDedupSRTs
                             , flatSRTs = newFlatSRTs }))
           let SRTEntry lbl = srtEntry
-          return (decls, map (,lbl) blockids, funSRTs)
+          return ((decls, map (,lbl) blockids, funSRTs), haskell_names)
 
 
 -- | build a static SRT object (or a chain of objects) from a list of
@@ -949,5 +964,5 @@ srtTrace :: String -> SDoc -> b -> b
 srtTrace _ _ b = b
 
 srtTrace2 :: String -> SDoc -> a -> a
--- srtTrace2 = pprTrace
-srtTrace2 _ _ a = a
+srtTrace2 = pprTrace
+-- srtTrace2 _ _ a = a

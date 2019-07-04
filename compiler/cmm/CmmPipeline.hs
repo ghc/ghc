@@ -50,10 +50,11 @@ cmmPipeline hsc_env srtInfo0 prog =
      -- pprTrace "cmmPipeline" (text "CAF infos:" <+> ppr caf_infos) (return ())
      let srtInfo1 = srtInfo0{ cafInfos = caf_infos }
 
-     (srtInfo2, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo1 tops
+     (srtInfo2, cmms, new_cafs) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo1 tops
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-     return (srtInfo2, cmms)
+     pprTrace "doSRTs" (text "new_cafs:" <+> ppr new_cafs) $
+       return (srtInfo2, cmms)
 
 
 cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (NameEnv (Name, Bool), (CAFEnv, [CmmDecl]))
