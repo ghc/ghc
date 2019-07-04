@@ -53,7 +53,7 @@ deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 
 
 -- | Assumes that the arguments contain no duplicates
-unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
+unionLists :: (HasDebugCallStack, Outputable a, Eq a) => [a] -> [a] -> [a]
 -- We special case some reasonable common patterns.
 unionLists xs [] = xs
 unionLists [] ys = ys
