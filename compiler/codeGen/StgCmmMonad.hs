@@ -729,36 +729,35 @@ emitProcWithStackFrame
    :: Convention                        -- entry convention
    -> Maybe CmmInfoTable                -- info table?
    -> CLabel                            -- label for the proc
-   -> Bool                              -- updatable?
    -> [CmmFormal]                       -- stack frame
    -> [CmmFormal]                       -- arguments
    -> CmmAGraphScoped                   -- code
    -> Bool                              -- do stack layout?
    -> FCode ()
 
-emitProcWithStackFrame _conv mb_info lbl upd_flag _stk_args [] blocks False
+emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { dflags <- getDynFlags
-        ; emitProc mb_info lbl upd_flag [] blocks (widthInBytes (wordWidth dflags)) False
+        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth dflags)) False
         }
-emitProcWithStackFrame conv mb_info lbl upd_flag stk_args args (graph, tscope) True
+emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
   = do  { dflags <- getDynFlags
         ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
               graph' = entry MkGraph.<*> graph
-        ; emitProc mb_info lbl upd_flag live (graph', tscope) offset True
+        ; emitProc mb_info lbl live (graph', tscope) offset True
         }
-emitProcWithStackFrame _ _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
+emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
 
-emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel -> Bool
+emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
                        -> [CmmFormal]
                        -> CmmAGraphScoped
                        -> FCode ()
-emitProcWithConvention conv mb_info lbl upd_flag args blocks
-  = emitProcWithStackFrame conv mb_info lbl upd_flag [] args blocks True
+emitProcWithConvention conv mb_info lbl args blocks
+  = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
-emitProc :: Maybe CmmInfoTable -> CLabel -> Bool -> [GlobalReg] -> CmmAGraphScoped
+emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
-emitProc mb_info lbl upd_flag live blocks offset do_layout
+emitProc mb_info lbl live blocks offset do_layout
   = do  { dflags <- getDynFlags
         ; l <- newBlockId
         ; let
@@ -773,9 +772,7 @@ emitProc mb_info lbl upd_flag live blocks offset do_layout
                                 , do_layout = do_layout }
 
               tinfo = TopInfo { info_tbls = infos
-                              , stack_info=sinfo
-                              , upd_flag  = upd_flag
-                              }
+                              , stack_info=sinfo}
 
               proc_block = CmmProc tinfo lbl live blks
 

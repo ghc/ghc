@@ -400,10 +400,9 @@ cafAnal
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
   -> NameEnv (Name, Bool) -- CAFFY-ness env
-  -> Bool       -- True <=> Updatable
   -> CmmGraph
   -> CAFEnv
-cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
+cafAnal contLbls topLbl caf_infos0 cmmGraph =
     analyzeCmmBwd cafLattice
       (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 

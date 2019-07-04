@@ -88,7 +88,7 @@ cmmPipeline hsc_env srtInfo0 prog =
 
 cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (CAFEnv, [CmmDecl])
 cpsTop _ _ p@(CmmData {}) = return (mapEmpty, [p])
-cpsTop hsc_env caf_infos proc@(CmmProc top_info _ _ _) =
+cpsTop hsc_env caf_infos proc =
     do
        -- pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
 
@@ -145,7 +145,7 @@ cpsTop hsc_env caf_infos proc@(CmmProc top_info _ _ _) =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos (upd_flag top_info) g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points

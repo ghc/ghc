@@ -558,7 +558,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
                                 (map (CmmReg . CmmLocal) (node : arg_regs))
                                 (initUpdFrameOff dflags)
        tscope <- getTickScope
-       emitProcWithConvention Slow Nothing slow_lbl (lfUpdatable (closureLFInfo cl_info))
+       emitProcWithConvention Slow Nothing slow_lbl
          (node : arg_regs) (jump, tscope)
   | otherwise = return ()
 
@@ -632,6 +632,7 @@ emitBlackHoleCode node = do
 
   when eager_blackholing $ do
     emitStore (cmmOffsetW dflags node (fixedHdrSizeW dflags)) currentTSOExpr
+    -- See Note [Heap memory barriers] in SMP.h.
     emitPrimCall [] MO_WriteBarrier []
     emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
 
@@ -664,7 +665,7 @@ setupUpdate closure_info node body
 
         ; if closureUpdReqd closure_info
           then do       -- Blackhole the (updatable) CAF:
-                { upd_closure <- link_caf node True
+                { upd_closure <- link_caf node
                 ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
           else do {tickyUpdateFrameOmitted; body}
     }
@@ -704,11 +705,10 @@ emitUpdateFrame dflags frame lbl updatee = do
 -- See Note [CAF management] in rts/sm/Storage.c
 
 link_caf :: LocalReg           -- pointer to the closure
-         -> Bool               -- True <=> updatable, False <=> single-entry
          -> FCode CmmExpr      -- Returns amode for closure to be updated
 -- This function returns the address of the black hole, so it can be
 -- updated with the new value when available.
-link_caf node _is_upd = do
+link_caf node = do
   { dflags <- getDynFlags
         -- Call the RTS function newCAF, returning the newly-allocated
         -- blackhole indirection closure

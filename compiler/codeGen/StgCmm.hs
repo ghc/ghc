@@ -206,7 +206,7 @@ cgDataCon data_con
                        , rep_ty <- typePrimRep ty
                        , not (isVoidRep rep_ty) ]
 
-        ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] False $
+        ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on
             -- entry to a constructor.  If the pointer is tagged,
             -- then we should not be entering it.  This assumption
