@@ -33,7 +33,6 @@ import NameEnv
 import UniqFM
 import UniqDFM
 import Type
-import ConLike
 import HsLit
 import TcHsSyn
 import MonadUtils
@@ -64,7 +63,7 @@ type TmVarCtEnv = NameEnv PmExpr
 -- 'NameEnv'.
 --
 -- See also Note [Refutable shapes] in TmOracle.
-type PmRefutEnv = DNameEnv (Type, [PmLit], [ConLike])
+type PmRefutEnv = DNameEnv (Type, [PmAltCon])
 
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
 -- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
@@ -97,19 +96,30 @@ data TmState = TmS
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant: In any 'TmState', The domains of 'tm_pos' and 'tm_neg' are disjoint.
+Invariant: In any 'TmState', whenever there is @x ~ C@ in 'tm_pos',
+an entry @x :-> cs@ in 'tm_neg' may only have incomparable 'PmAltCons' according
+to 'decEqPmAltCons'.
 
 For example, it would make no sense to say both
-    tm_pos = [...x :-> 3 ...]
-    tm_neg = [...x :-> [4,42]... ]
+    tm_pos = [...x :-> 3...]
+    tm_neg = [...x :-> [4,42]...]
 The positive information is strictly more informative than the negative.
+On the other hand
+    tm_pos = [...x :-> I# y...]
+    tm_neg = [...x :-> [4]...]
+We want to know that @x@ is certainly not the literal 4 when we know it is a
+@I#@. Notice that @PmAltLit 4@ and @PmAltConLike I#@ are incomparable. In
+general, we consider every binding in 'tm_neg' informative when the equality
+relation to the solution is undecidable ('decEqPmAltCons').
 
-Suppose we are adding the (positive) fact @x :-> e@ to 'tm_pos'. Then we must
-delete any binding for @x@ from 'tm_neg', to uphold the invariant.
+Now, suppose we are adding the (positive) fact @x :-> e@ to 'tm_pos'. Then we
+must delete any comparable negative facts (after considering them for
+refutation) for @x@ from 'tm_neg', to uphold the invariant.
 
 But there is more! Suppose we are adding @x :-> y@ to 'tm_pos', and 'tm_neg'
 contains @x :-> cs, y :-> ds@. Then we want to update 'tm_neg' to
-@y :-> (cs ++ ds)@, to make use of the negative information we have about @x@.
+@y :-> (cs ++ ds)@, to make use of the negative information we have about @x@,
+while we can *completely* discard the entry for @x@ in 'tm_neg'.
 -}
 
 instance Outputable TmState where
@@ -118,9 +128,7 @@ instance Outputable TmState where
       pos   = map pos_eq (nonDetUFMToList (tm_pos state))
       neg   = map neg_eq (udfmToList (tm_neg state))
       pos_eq (l, r) = ppr l <+> char '~' <+> ppr r
-      neg_eq (l, (ty, lits, cls)) = hsep [ppr l, dcolon, ppr ty, text "/~", ppr alts]
-        where
-          alts = injectPmAltCons lits cls
+      neg_eq (l, (ty, alts)) = hsep [ppr l, dcolon, ppr ty, text "/~", ppr alts]
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -157,10 +165,8 @@ canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
 isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
 isRefutable x e env = fromMaybe False $ do
   alt <- exprToAlt e
-  (_, nlits, ncls) <- lookupDNameEnv env x
-  case alt of
-    PmAltLit lit -> pure (elem lit nlits)
-    PmAltConLike cl -> pure (elem cl ncls)
+  (_, ncons) <- lookupDNameEnv env x
+  pure (notNull (filter ((== Just True) . decEqPmAltCon alt) ncons))
 
 -- | Solve an equality (top-level).
 solveOneEq :: TmState -> TmVarCt -> Maybe TmState
@@ -176,8 +182,8 @@ tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
 tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   = case exprToAlt e of
       -- We have to take care to preserve Note [The Pos/Neg invariant]
-      Nothing         -> Just extended -- Not solved yet
-      Just alt        ->               -- We have a solution
+      Nothing        -> Just extended -- Not solved yet
+      Just alt       ->               -- We have a solution
         case decEqPmAltCon alt nalt of
           Just True  -> Nothing       -- ... which is contradictory
           Just False -> Just original -- ... which is compatible, rendering the
@@ -187,20 +193,17 @@ tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
   where
     (y, e) = varDeepLookup pos (idName x)
     extended = original { tm_neg = neg' }
-    entry = case nalt of
-      PmAltLit nlit -> (idType x, [nlit], [])
-      PmAltConLike ncl -> (idType x, [], [ncl])
+    entry = (idType x, [nalt])
     neg' = extendDNameEnv_C combineRefutEntries neg y entry
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
 combineRefutEntries
-  :: (Type, [PmLit], [ConLike])
-  -> (Type, [PmLit], [ConLike])
-  -> (Type, [PmLit], [ConLike])
-combineRefutEntries (old_ty, old_nlits, old_ncls) (new_ty, new_nlits, new_ncls)
-  = ASSERT( eqType old_ty new_ty )
-    (old_ty, unionLists old_nlits new_nlits, unionLists old_ncls new_ncls)
+  :: (Type, [PmAltCon])
+  -> (Type, [PmAltCon])
+  -> (Type, [PmAltCon])
+combineRefutEntries (old_ty, old_ncons) (new_ty, new_ncons)
+  = ASSERT( eqType old_ty new_ty ) (old_ty, unionLists old_ncons new_ncons)
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
@@ -288,12 +291,11 @@ trySolve x e _tms@TmS{ tm_pos = pos, tm_neg = neg }
     isRefutable x e neg
   = Nothing
   | otherwise
-  = Just (TmS (extendNameEnv pos x e) (adjustDNameEnv del_incompat neg x))
+  = Just (TmS (extendNameEnv pos x e) (adjustDNameEnv del_compat neg x))
   where
     PmExprCon alt _ = e -- always succeeds, bc @e@ is a solution
-    del_incompat (ty, nlits, ncls) = case alt of
-      PmAltConLike _ -> (ty, nlits, [])
-      PmAltLit _     -> (ty, [], ncls)
+    -- Uphold Note [The Pos/Neg invariant]
+    del_compat (ty, ncs) = (ty, filter ((== Nothing) . decEqPmAltCon alt) ncs)
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,

@@ -94,7 +94,7 @@ type PrettyPmRefutEnv = DNameEnv (SDoc, [PmAltCon])
 prettifyRefuts :: PmRefutEnv -> PrettyPmRefutEnv
 prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList
   where
-    rename new (old, (_ty, nlits, ncls)) = (old, (new, injectPmAltCons nlits ncls))
+    rename new (old, (_ty, ncons)) = (old, (new, ncons))
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
     nameList :: [SDoc]
     nameList = map text ["p","q","r","s","t"] ++
