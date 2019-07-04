@@ -1652,6 +1652,8 @@ is correct, choosing ImplicationStatus IC_BadTelescope if they aren't.
 Then, in TcErrors, we report if there is a bad telescope. This way,
 we can report a suggested ordering to the user if there is a problem.
 
+See also Note [Checking telescopes] in TcRnTypes
+
 Note [Keeping scoped variables in order: Implicit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the user implicitly quantifies over variables (say, in a type

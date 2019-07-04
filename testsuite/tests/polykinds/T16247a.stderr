@@ -1,0 +1,8 @@
+
+T16247a.hs:21:21: error:
+    • These kind and type variables: p k
+      are out of dependency order. Perhaps try this ordering:
+        k (p :: k)
+    • In the kind ‘forall p k.
+                   (U1 :: k -> Type) p ~> Rep1 (U1 :: k -> Type) p’
+      In the data type declaration for ‘From1U1Sym0’
