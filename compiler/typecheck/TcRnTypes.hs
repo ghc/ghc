@@ -2587,11 +2587,9 @@ data Implication
       ic_skols :: [TcTyVar],     -- Introduced skolems
       ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
+
       ic_telescope :: Maybe SDoc,  -- User-written telescope, if there is one
-                                   -- The list of skolems is order-checked
-                                   -- if and only if this is a Just.
-                                   -- See Note [Keeping scoped variables in order: Explicit]
-                                   -- in TcHsType
+                                   -- See Note [Checking telescopes]
 
       ic_given  :: [EvVar],      -- Given evidence variables
                                  --   (order does not matter)
@@ -2708,7 +2706,43 @@ instance Outputable ImplicStatus where
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
-{-
+{- Note [Checking telescopes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When kind-checking a /user-written/ type, we might have a "bad telescope"
+like this one:
+  data SameKind :: forall k. k -> k -> Type
+  type Foo :: forall a k (b :: k). SameKind a b -> Type
+
+The kind of 'a' mentions 'k' which is bound after 'a'.  Oops.
+
+Knowing this means that unification etc must have happened, so it's
+convenient to detect it in the constraint solver:
+
+* We make a single implication constraint when kind-checking
+  the 'forall' in Foo's kind, something like
+      forall a k (b::k). { wanted constraints }
+
+* Having solved {wanted}, before discarding the now-solved implication,
+  the costraint solver checks the dependency order of the skolem
+  variables (ic_skols).  This is done in setImplicationStatus.
+
+* This check is only necessary if the implication was born from a
+  user-written signature.  If, say, it comes from checking a pattern
+  match that binds existentials, where the type of the data constructor
+  is known to be valid (it in tcConPat), no need for the check.
+
+  So the check is done if and only if ic_telescope is (Just blah).
+
+* If ic_telesope is (Just d), the d::SDoc displays the original,
+  user-written type variables.
+
+* Be careful /NOT/ to discard an implication with non-Nothing
+  ic_telescope, even if ic_wanted is empty.  We must give the
+  constraint solver a chance to make that bad-telesope test!  Hence
+  the extra guard in emitResidualTvConstraint; see #16247
+
+See also TcHsTYpe Note [Keeping scoped variables in order: Explicit]
+
 Note [Needed evidence variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Th ic_need_evs field holds the free vars of ic_binds, and all the
