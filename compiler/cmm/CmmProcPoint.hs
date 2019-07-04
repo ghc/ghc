@@ -340,18 +340,16 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      let to_proc (bid, g)
              | bid == entry
              =  CmmProc (TopInfo {info_tbls  = info_tbls,
-                                  stack_info = stack_info,
-                                  upd_flag   = pprPanic "splitAtProcPoints" (text "upd_flag not initialized") {- doesn't matter after cafAnal -}})
+                                  stack_info = stack_info})
                         top_l live g'
              | otherwise
              = case expectJust "pp label" $ mapLookup bid procLabels of
                  (lbl, Just info_lbl)
                     -> CmmProc (TopInfo { info_tbls = mapSingleton (g_entry g) (mkEmptyContInfoTable info_lbl)
-                                        , stack_info=stack_info
-                                        , upd_flag = pprPanic "splitAtProcPoints" (text "upd_flag not initialized")})
+                                        , stack_info=stack_info})
                                lbl live g'
                  (lbl, Nothing)
-                    -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info, upd_flag = pprPanic "splitAtProcPoints" (text "upd_flag not initialized")})
+                    -> CmmProc (TopInfo {info_tbls = mapEmpty, stack_info=stack_info})
                                lbl live g'
                 where
                  g' = replacePPIds g
