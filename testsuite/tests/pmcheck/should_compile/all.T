@@ -94,9 +94,11 @@ test('pmc007', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('pmc008', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('pmc009', reqlib('ghc'), compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('pmc009', [], compile,
+     ['-package ghc', '-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11245', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T11336b', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T12949', [],  compile, ['-fwarn-overlapping-patterns'])
 test('T12957', [], compile, ['-fwarn-overlapping-patterns'])

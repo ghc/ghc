@@ -117,7 +117,7 @@ data PmPat :: PatTy -> * where
 -- | Should not face a user.
 instance Outputable (PmPat a) where
   ppr (PmCon cc _arg_tys _con_tvs con_args)
-    = hsep [ppr cc, hsep (map ppr con_args)]
+    = cparen (notNull con_args) (hsep [ppr cc, hsep (map ppr con_args)])
   -- the @ is to differentiate (flexible) variables from rigid constructors and
   -- literals
   ppr (PmVar vid) = ppr vid
@@ -1728,7 +1728,9 @@ mkOneConFull x con = do
       (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
-      tc_args = tyConAppArgs res_ty
+      -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
+      -- be fine after type-checking.
+      (_, tc_args) = splitAppTys res_ty
   let subst1  = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args
                   -- The expectJust is always satisfied as long as we filter
@@ -1767,7 +1769,7 @@ mkOneSatisfiableConFull delta x con = do
   mb_res_ty <- pmTopNormaliseType_maybe fam_insts (delta_ty_cs delta) (idType x)
   let res_ty = fromMaybe (idType x) (fstOf3 <$> mb_res_ty)
   (y, delta') <- mkIdCoercion x res_ty delta
-  tracePm "coercing" (ppr x <+> ppr (idType x) <+> ppr y <+> ppr res_ty)
+  tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
   ic <- mkOneConFull y con
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr (delta_tm_cs delta'))
   ((,ic) <$>) <$> pmIsSatisfiable delta' (ic_tm_ct ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
