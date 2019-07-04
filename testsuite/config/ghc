@@ -1,3 +1,5 @@
+# vim: set filetype=python:
+
 import re
 
 # Testsuite configuration setup for GHC
