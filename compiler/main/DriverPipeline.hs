@@ -1165,7 +1165,8 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     let mod_iface' = updateIfaceCafInfos mod_iface (cafInfos mod_srt_info)
                     let ifaceFile = ml_hi_file (ms_location mod_summary)
-                    liftIO (writeIfaceFile dflags ifaceFile mod_iface')
+                    unless (gopt Opt_OmitInterfacePragmas dflags) $
+                      liftIO (writeIfaceFile dflags ifaceFile mod_iface')
 
                     -- pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
                     return (RealPhase next_phase, outputFilename)
