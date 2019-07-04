@@ -363,6 +363,8 @@ find_srt( stackPos *info )
         info->next.srt.srt = NULL;
         return c;
     }
+
+    return NULL;
 }
 
 /**
@@ -449,7 +451,6 @@ STATIC_INLINE void
 traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosure **first_child)
 {
     stackElement se;
-    bdescr *nbd;      // Next Block Descriptor
 
     debug("traversePushChildren(): stackTop = 0x%x\n", ts->stackTop);
 
@@ -606,6 +607,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     // SRT only
     case THUNK_STATIC:
         ASSERT(get_itbl(c)->srt != 0);
+        /* fall-thru */
     case THUNK_0_1:
     case THUNK_0_2:
     thunk_srt_only:
@@ -985,7 +987,7 @@ traverseMaybeInitClosureData(StgClosure *c)
  * that decision is lost in time.
  * -------------------------------------------------------------------------- */
 STATIC_INLINE bool
-isRetainer( StgClosure *c )
+isRetainer( const StgClosure *c )
 {
     switch (get_itbl(c)->type) {
         //
@@ -1192,7 +1194,6 @@ static void
 traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
                   StgPtr stackStart, StgPtr stackEnd)
 {
-    stackElement *oldStackBoundary;
     StgPtr p;
     const StgRetInfoTable *info;
     StgWord bitmap;
@@ -1335,8 +1336,10 @@ traversePAP (traverseState *ts,
 }
 
 static bool
-retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
+retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
 {
+    (void) first_visit;
+
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
     retainerSetOfc = retainerSetOf(c);
@@ -1525,9 +1528,10 @@ inner_loop:
             // reachable static objects.
             goto loop;
         }
+        /* fall-thru */
 
     case FUN_STATIC: {
-        StgInfoTable *info = get_itbl(c);
+        const StgInfoTable *info = get_itbl(c);
         if (info->srt == 0 && info->layout.payload.ptrs == 0) {
             goto loop;
         } else {
@@ -1657,8 +1661,6 @@ computeRetainerSet( traverseState *ts )
 {
     StgWeak *weak;
     uint32_t g, n;
-    StgPtr ml;
-    bdescr *bd;
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
@@ -1745,8 +1747,8 @@ resetStaticObjectForProfiling( StgClosure *static_objects )
             p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
             break;
         default:
-            barf("resetStaticObjectForProfiling: %p (%s)",
-                 p, get_itbl(p)->type);
+            barf("resetStaticObjectForProfiling: %p (%lu)",
+                 p, (unsigned long)get_itbl(p)->type);
             break;
         }
     }
