@@ -52,7 +52,7 @@ deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 -}
 
 
-unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
+unionLists :: (HasDebugCallStack, Outputable a, Eq a) => [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates
 unionLists xs ys
   = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
