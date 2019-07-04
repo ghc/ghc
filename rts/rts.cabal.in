@@ -430,6 +430,7 @@ library
                Timer.c
                TopHandler.c
                Trace.c
+               TraverseHeap.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c
