@@ -1146,6 +1146,9 @@ mkGReflLeftCo r ty co
 -- is a GRefl coercion.
 mkCoherenceLeftCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceLeftCo r ty co co2
+  | debugIsOn
+  , Pair ty' _ <- coercionKind co2
+  , not $ ty `eqType` ty' = pprPanic "mkCoherenceLeftCo" (ppr ty $$ ppr co $$ ppr co2)
   | isGReflCo co = co2
   | otherwise = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
 
@@ -1155,6 +1158,9 @@ mkCoherenceLeftCo r ty co co2
 -- is a GRefl coercion.
 mkCoherenceRightCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceRightCo r ty co co2
+  | debugIsOn
+  , Pair _ ty' <- coercionKind co2
+  , not $ ty `eqType` ty' = pprPanic "mkCoherenceLeftCo" (ppr ty $$ ppr co $$ ppr co2)
   | isGReflCo co = co2
   | otherwise = co2 `mkTransCo` GRefl r ty (MCo co)
 
