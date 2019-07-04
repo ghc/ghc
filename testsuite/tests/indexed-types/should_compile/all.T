@@ -245,7 +245,7 @@ test('T10318', normal, compile, [''])
 test('UnusedTyVarWarnings', normal, compile, ['-Wunused-type-patterns'])
 test('UnusedTyVarWarningsNamedWCs', normal, compile, ['-Wunused-type-patterns'])
 test('T11408', normal, compile, [''])
-test('T11361', normal, compile, ['-dunique-increment=-1'])
+test('T11361', normal, compile, ['-dunique-increment=-1 -dinitial-unique=16777215'])
   # -dunique-increment=-1 doesn't work inside the file
 test('T11361a', normal, compile_fail, [''])
 test('T11581', normal, compile, [''])
