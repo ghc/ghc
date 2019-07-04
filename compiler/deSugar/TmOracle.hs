@@ -13,7 +13,7 @@ module TmOracle (
 
         -- the term oracle
         tmOracle, TmVarCtEnv, PmRefutEnv, TmState, initialTmState,
-        wrapUpTmState, solveOneEq, extendSubst, canDiverge, isRigid,
+        wrapUpTmState, solveOneEq, extendSubst, canDiverge,
         tryAddRefutableAltCon,
 
         -- misc.
@@ -90,8 +90,8 @@ data TmState = TmS
   --
   -- then @x :-> [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
   -- and hence can only match @Branch@. Should we later solve @x@ to a variable
-  -- @y@ ('extendSubstAndSolve'), we merge the refutable shapes of @x@ into
-  -- those of @y@. See also Note [The Pos/Neg invariant].
+  -- @y@ ('equate'), we merge the refutable shapes of @x@ into those of @y@.
+  -- See also Note [The Pos/Neg invariant].
   }
 
 {- Note [The Pos/Neg invariant]
@@ -122,6 +122,7 @@ contains @x :-> cs, y :-> ds@. Then we want to update 'tm_neg' to
 while we can *completely* discard the entry for @x@ in 'tm_neg'.
 -}
 
+-- | Not user-facing.
 instance Outputable TmState where
   ppr state = braces (fsep (punctuate comma (pos ++ neg)))
     where
