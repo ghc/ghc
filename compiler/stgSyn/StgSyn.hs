@@ -50,7 +50,7 @@ module StgSyn (
         topStgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
         isDllConApp,
         stgArgType,
-        stripStgTicksTop,
+        stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
 
         pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
@@ -163,11 +163,17 @@ stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
 
 
--- | Strip ticks of a given type from an STG expression
+-- | Strip ticks of a given type from an STG expression.
 stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
+
+-- | Strip ticks of a given type from an STG expression returning only the expression.
+stripStgTicksTopE :: (Tickish Id -> Bool) -> GenStgExpr p -> GenStgExpr p
+stripStgTicksTopE p = go
+   where go (StgTick t e) | p t = go e
+         go other               = other
 
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.
