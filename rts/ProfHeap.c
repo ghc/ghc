@@ -836,10 +836,7 @@ dumpCensus( Census *census )
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
             break;
-        }
-
 #if defined(PROFILING)
-        switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CCS:
             fprint_ccs(hp_file, (CostCentreStack *)ctr->identity,
                        RtsFlags.ProfFlags.ccsLength);
@@ -876,10 +873,10 @@ dumpCensus( Census *census )
             printRetainerSetShort(hp_file, rs, RtsFlags.ProfFlags.ccsLength);
             break;
         }
+#endif
         default:
             barf("dumpCensus; doHeapProfile");
         }
-#endif
 
         fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
     }
