@@ -402,25 +402,10 @@ cafAnal
   -> NameEnv (Name, Bool) -- CAFFY-ness env
   -> Bool       -- True <=> Updatable
   -> CmmGraph
-  -> (NameEnv (Name, Bool), CAFEnv)
+  -> CAFEnv
 cafAnal contLbls topLbl caf_infos0 upd_flag cmmGraph =
-    srtTrace2 "cafAnal" (ppr caf_env) (caf_infos1, caf_env)
-  where
-    caf_env =
-      analyzeCmmBwd cafLattice
-        (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
-
-    ret_caffy = upd_flag || any (not . Set.null) (mapElems caf_env)
-
-    all_caf_refs :: [CLabel]
-    all_caf_refs = map (\(CAFLabel l) -> l) (Set.toList (Set.unions (mapElems caf_env)))
-
-    caf_infos1
-      | Just nm <- hasHaskellName topLbl
-      = srtTrace2 "cafAnal" (text "Updating" <+> ppr nm <+> equals <+> ppr ret_caffy) $
-          extendNameEnv caf_infos0 nm (nm, ret_caffy)
-      | otherwise
-      = caf_infos0
+    analyzeCmmBwd cafLattice
+      (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -964,5 +949,5 @@ srtTrace :: String -> SDoc -> b -> b
 srtTrace _ _ b = b
 
 srtTrace2 :: String -> SDoc -> a -> a
-srtTrace2 = pprTrace
--- srtTrace2 _ _ a = a
+-- srtTrace2 = pprTrace
+srtTrace2 _ _ a = a
