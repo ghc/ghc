@@ -265,7 +265,7 @@ mkRhsClosure    dflags bndr _cc
                 upd_flag                -- Updatable thunk
                 []                      -- A thunk
                 expr
-  | let strip = snd . stripStgTicksTop (not . tickishIsCode)
+  | let strip = stripStgTicksTopE (not . tickishIsCode)
   , StgCase (StgApp scrutinee [{-no args-}])
          _   -- ignore bndr
          (AlgAlt _)
