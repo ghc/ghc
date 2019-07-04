@@ -130,7 +130,7 @@ module Module
 
         -- * Sets of Modules
         ModuleSet,
-        emptyModuleSet, mkModuleSet, moduleSetElts,
+        emptyModuleSet, mkModuleSet, mkModuleSet', moduleSetElts,
         extendModuleSet, extendModuleSetList, delModuleSet,
         elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet,
         unitModuleSet
@@ -1257,7 +1257,10 @@ isEmptyModuleEnv (ModuleEnv e) = Map.null e
 type ModuleSet = Set NDModule
 
 mkModuleSet :: [Module] -> ModuleSet
-mkModuleSet = Set.fromList . coerce
+mkModuleSet = mkModuleSet' . Set.fromList
+
+mkModuleSet' :: S.Set Module -> ModuleSet
+mkModuleSet' = coerce
 
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
 extendModuleSet s m = Set.insert (NDModule m) s

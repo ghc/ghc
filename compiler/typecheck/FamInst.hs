@@ -632,7 +632,8 @@ loadDependentFamInstModules fam_insts
             home_fams_only = all (nameIsHomePackage this_mod . fi_fam) fam_insts
 
       ; loadModuleInterfaces (text "Loading family-instance modules") $
-        filter want_module (imp_finsts imports) }
+        filter want_module $
+        S.toList (imp_finsts imports) }
 
 {- Note [Home package family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

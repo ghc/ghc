@@ -78,7 +78,7 @@ mkDependencies iuid pluginModules
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
 
-          dep_orphs = filter (/= mod) (imp_orphs imports)
+          dep_orphs = S.filter (/= mod) (imp_orphs imports)
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 
@@ -97,7 +97,7 @@ mkDependencies iuid pluginModules
                     dep_pkgs   = dep_pkgs',
                     dep_orphs  = dep_orphs,
                     dep_plgins = dep_plgins,
-                    dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
+                    dep_finsts = sortBy stableModuleCmp $ S.toList (imp_finsts imports) }
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
 

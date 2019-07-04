@@ -729,7 +729,7 @@ data TcGblEnv
 
 tcVisibleOrphanMods :: TcGblEnv -> ModuleSet
 tcVisibleOrphanMods tcg_env
-    = mkModuleSet (tcg_mod tcg_env : imp_orphs (tcg_imports tcg_env))
+    = mkModuleSet' (S.insert tcg_mod tcg_env (imp_orphs (tcg_imports tcg_env)))
 
 instance ContainsModule TcGblEnv where
     extractModule env = tcg_semantic_mod env
@@ -1394,11 +1394,11 @@ data ImportAvails
           -- a Trustworthy module that resides in the same package as it.
           -- See Note [RnNames . Trust Own Package]
 
-        imp_orphs :: [Module],
+        imp_orphs :: Set Module,
           -- ^ Orphan modules below us in the import tree (and maybe including
           -- us for imported modules)
 
-        imp_finsts :: [Module]
+        imp_finsts :: Set Module
           -- ^ Family instance modules below us in the import tree (and maybe
           -- including us for imported modules)
       }
@@ -1422,8 +1422,8 @@ emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
                                    imp_dep_pkgs      = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
-                                   imp_orphs         = [],
-                                   imp_finsts        = [] }
+                                   imp_orphs         = S.empty
+                                   imp_finsts        = S.empty }
 
 -- | Union two ImportAvails
 --
@@ -1445,8 +1445,8 @@ plusImportAvails
                    imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
-                   imp_orphs         = orphs1 `unionLists` orphs2,
-                   imp_finsts        = finsts1 `unionLists` finsts2 }
+                   imp_orphs         = orphs1 `S.union` orphs2,
+                   imp_finsts        = finsts1 `S.union` finsts2 }
   where
     plus_mod_dep r1@(m1, boot1) r2@(m2, boot2)
       | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )

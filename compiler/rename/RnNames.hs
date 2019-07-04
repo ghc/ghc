@@ -183,23 +183,18 @@ rnImports imports = do
     combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
             -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine ss =
-      let (decls, rdr_env, imp_avails, hpc_usage, finsts) = foldr
+      let (decls, rdr_env, imp_avails, hpc_usage) = foldr
             plus
-            ([], emptyGlobalRdrEnv, emptyImportAvails, False, emptyModuleSet)
+            ([], emptyGlobalRdrEnv, emptyImportAvails, False)
             ss
-      in (decls, rdr_env, imp_avails { imp_finsts = moduleSetElts finsts },
-            hpc_usage)
+      in (decls, rdr_env, imp_avails, hpc_usage)
 
     plus (decl,  gbl_env1, imp_avails1, hpc_usage1)
-         (decls, gbl_env2, imp_avails2, hpc_usage2, finsts_set)
+         (decls, gbl_env2, imp_avails2, hpc_usage2)
       = ( decl:decls,
           gbl_env1 `plusGlobalRdrEnv` gbl_env2,
           imp_avails1' `plusImportAvails` imp_avails2,
-          hpc_usage1 || hpc_usage2,
-          extendModuleSetList finsts_set new_finsts )
-      where
-      imp_avails1' = imp_avails1 { imp_finsts = [] }
-      new_finsts = imp_finsts imp_avails1
+          hpc_usage1 || hpc_usage2 )
 
 {-
 Note [Combining ImportAvails]
@@ -465,8 +460,8 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
 
   in ImportAvails {
           imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
-          imp_orphs      = orphans,
-          imp_finsts     = finsts,
+          imp_orphs      = S.fromList orphans,
+          imp_finsts     = S.fromList finsts,
           imp_dep_mods   = mkModDeps dependent_mods,
           imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
           -- Add in the imported modules trusted package
