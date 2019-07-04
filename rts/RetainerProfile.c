@@ -12,21 +12,14 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#include "RtsUtils.h"
 #include "RetainerProfile.h"
 #include "RetainerSet.h"
 #include "TraverseHeap.h"
-#include "Schedule.h"
-#include "Printer.h"
-#include "Weak.h"
-#include "sm/Sanity.h"
 #include "Profiling.h"
 #include "Stats.h"
-#include "ProfHeap.h"
-#include "Apply.h"
 #include "StablePtr.h" /* markStablePtrTable */
 #include "StableName.h" /* rememberOldStableNameAddresses */
-#include "sm/Storage.h" // for END_OF_STATIC_LIST
+#include "sm/Storage.h"
 
 /* Note [What is a retainer?]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~
