@@ -64,6 +64,7 @@ import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 
+import Data.Maybe( isNothing )
 import Control.Monad
 import Control.Arrow ( second )
 
@@ -1176,7 +1177,13 @@ emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
   | isEmptyWC wanted
+  , isNothing m_telescope || skol_tvs `lengthAtMost` 1
+    -- If m_telescope is (Just d), we must do the bad-telescope check,
+    -- so we must /not/ discard the implication even if there are no
+    -- wanted constraints. See Note [Checking telescopes] in TcRnTypes.
+    -- Lacking this check led to #16247
   = return ()
+
   | otherwise
   = do { ev_binds <- newNoTcEvBinds
        ; implic   <- newImplication
