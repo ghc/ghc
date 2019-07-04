@@ -716,7 +716,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
     , ccs )
 
   where
-    (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
+    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -758,7 +758,7 @@ mkStgRhs bndr rhs
                   currentCCS
                   upd_flag [] rhs
   where
-    (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
+    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
