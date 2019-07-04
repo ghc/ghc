@@ -1159,7 +1159,7 @@ from translation in pattern matcher.
     checker will fail to match the literals patterns correctly. See
     #14546.
 
-  In Note [Undecidable Equality for Overloaded Literals], we say: "treat
+  In Note [Undecidable Equality for PmAltCons], we say: "treat
   overloaded literals that look different as different", but previously we
   didn't do such things.
 
@@ -1181,7 +1181,7 @@ from translation in pattern matcher.
     as reported in #14546. In this patch we remove the specialization of
     OverLit patterns, and keep the overloaded number literal in pattern as it
     is to maintain the consistency. We know nothing about the `fromInteger`
-    method (see Note [Undecidable Equality for Overloaded Literals]). Now we
+    method (see Note [Undecidable Equality for PmAltCons]). Now we
     can capture the exhaustiveness of pattern 0 and the redundancy of pattern
     1 and _.
 
@@ -1441,7 +1441,7 @@ below is the *right thing to do*:
 The case with literals is a bit different. a literal @l@ should be translated
 to @x (True <- x == from l)@. Since we want to have better warnings for
 overloaded literals as it is a very common feature, we treat them differently.
-They are mainly covered in Note [Undecidable Equality for Overloaded Literals]
+They are mainly covered in Note [Undecidable Equality for PmAltCons]
 in PmExpr.
 
 4. N+K Patterns & Pattern Synonyms

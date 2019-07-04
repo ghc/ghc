@@ -233,7 +233,7 @@ unify tms eq@(e1, e2) = case eq of
   (_,PmExprOther _)            -> boring
 
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
-    -- See Note [Undecidable Equality for Overloaded Literals]
+    -- See Note [Undecidable Equality for PmAltCons]
     Just True -> foldlM unify tms (zip ts1 ts2)
     Just False -> unsat
     Nothing -> boring

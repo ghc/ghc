@@ -61,12 +61,12 @@ data PmExpr = PmExprVar   Name
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
--- See Note [Undecidable Equality for Overloaded Literals]
+-- See Note [Undecidable Equality for PmAltCons]
 data PmLit = PmSLit (HsLit GhcTc)                               -- simple
            | PmOLit Bool {- is it negated? -} (HsOverLit GhcTc) -- overloaded
 
 -- | Decidable equality for values represented by 'PmLit's.
--- See Note [Undecidable Equality for Overloaded Literals]
+-- See Note [Undecidable Equality for PmAltCons]
 decEqPmLit :: PmLit -> PmLit -> Maybe Bool
 decEqPmLit (PmSLit    l1) (PmSLit    l2) = Just (l1 == l2)
 decEqPmLit (PmOLit b1 l1) (PmOLit b2 l2)
@@ -79,7 +79,8 @@ instance Eq PmLit where
   a == b = decEqPmLit a b == Just True
 
 -- | Decidable equality for values represented by 'ConLike's.
--- 'PatSynCon's aren't enforced to be injective, so two syntactically different
+-- See Note [Decidable Equality for PmAltCons].
+-- 'PatSynCon's aren't enforced to be generative, so two syntactically different
 -- 'PatSynCon's might match the exact same values. Without looking into and
 -- reasoning about the pattern synonym's definition, we can't decide if their
 -- sets of matched values is different.
@@ -100,6 +101,7 @@ data PmAltCon = PmAltConLike ConLike
 -- | We can't in general decide whether two 'PmAltCon's match the same set of
 -- values. In addition to the reasons in 'decEqPmLit' and 'decEqConLike', a
 -- 'PmAltConLike' might or might not represent the same value as a 'PmAltLit'.
+-- See Note [Decidable Equality for PmAltCons].
 decEqPmAltCon :: PmAltCon -> PmAltCon -> Maybe Bool
 decEqPmAltCon (PmAltConLike cl1) (PmAltConLike cl2) = decEqConLike cl1 cl2
 decEqPmAltCon (PmAltLit     l1)  (PmAltLit     l2)  = decEqPmLit l1 l2
@@ -115,7 +117,7 @@ mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 mkPmExprLit :: PmLit -> PmExpr
 mkPmExprLit l = PmExprCon (PmAltLit l) []
 
-{- Note [Undecidable Equality for Overloaded Literals]
+{- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Equality on overloaded literals is undecidable in the general case. Consider
 the following example:
@@ -129,25 +131,19 @@ the following example:
     f 1 = ()        -- Clause A
     f 2 = ()        -- Clause B
 
-Clause B is redundant but to detect this, we should be able to solve the
-constraint: False ~ (fromInteger 2 ~ fromInteger 1) which means that we
-have to look through function `fromInteger`, whose implementation could
+Clause B is redundant but to detect this, we must decide the constraint:
+@fromInteger 2 ~ fromInteger 1@ which means that we
+have to look through function @fromInteger@, whose implementation could
 be anything. This poses difficulties for:
 
 1. The expressive power of the check.
    We cannot expect a reasonable implementation of pattern matching to detect
-   that fromInteger 2 ~ fromInteger 1 is True, unless we unfold function
+   that @fromInteger 2 ~ fromInteger 1@ is True, unless we unfold function
    fromInteger. This puts termination at risk and is undecidable in the
    general case.
 
-2. Performance.
-   Having an unresolved constraint False ~ (fromInteger 2 ~ fromInteger 1)
-   lying around could become expensive really fast. Ticket #11161 illustrates
-   how heavy use of overloaded literals can generate plenty of those
-   constraints, effectively undermining the term oracle's performance.
-
-3. Error nessages/Warnings.
-   What should our message for `f` above be? A reasonable approach would be
+2. Error messages/Warnings.
+   What should our message for @f@ above be? A reasonable approach would be
    to issue:
 
      Pattern matches are (potentially) redundant:
@@ -155,8 +151,13 @@ be anything. This poses difficulties for:
 
    but seems to complex and confusing for the user.
 
-We choose to treat overloaded literals that look different as different. The
-impact of this is the following:
+We choose to equate only obviously equal overloaded literals, in all other cases
+we signal undecidability by returning Nothing from 'decEqPmAltCons'. We do
+better for non-overloaded literals, because we know their fromInteger/fromString
+implementation is actually injective, allowing us to simplify the constraint
+@fromInteger 1 ~ fromInteger 2@ to @1 ~ 2@, which is trivially unsatisfiable.
+
+The impact of this treatment of overloaded literals is the following:
 
   * Redundancy checking is rather conservative, since it cannot see that clause
     B above is redundant.
@@ -169,16 +170,9 @@ impact of this is the following:
 
   * The warnings issued are simpler.
 
-  * We do not play on the safe side, strictly speaking. The assumption that
-    1 /= 2 makes the redundancy check more conservative but at the same time
-    makes its dual (exhaustiveness check) unsafe. This we can live with, mainly
-    for two reasons:
-    1. At the moment we do not use the results of the check during compilation
-       where this would be a disaster (could result in runtime errors even if
-       our function was deemed exhaustive).
-    2. Pattern matcing on literals can never be considered exhaustive unless we
-       have a catch-all clause. Hence, this assumption affects mainly the
-       appearance of the warnings and is, in practice safe.
+Rather the same applies to pattern synonyms: In contrast to data constructors,
+which are generative, constraints like F a ~ G b for two different pattern
+synonyms F and G aren't immediately unsatisfiable. We know F a ~ F a, though.
 -}
 
 -- | A term constraint. @TVC x e@ encodes that @x@ is equal to @e@.
