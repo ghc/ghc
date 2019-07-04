@@ -1,0 +1,7 @@
+
+T16247.hs:9:13: error:
+    • These kind and type variables: a k (b :: k)
+      are out of dependency order. Perhaps try this ordering:
+        k (a :: k) (b :: k)
+    • In the kind ‘forall a k (b :: k). SameKind a b -> Type’
+      In the data type declaration for ‘Foo’
