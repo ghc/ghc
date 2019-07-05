@@ -5700,7 +5700,7 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Debug on",                    show debugIsOn),
+       ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
        ("Global Package DB",           systemPackageConfig dflags)
