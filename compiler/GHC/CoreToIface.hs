@@ -201,10 +201,10 @@ toIfaceTypeX fr (TyConApp tc tys)
     n_tys = length tys
 
 toIfaceTyVar :: TyVar -> FastString
-toIfaceTyVar = occNameFS . getOccName
+toIfaceTyVar v = ASSERT(isTyVar v) occNameFS (getOccName v)
 
 toIfaceCoVar :: CoVar -> FastString
-toIfaceCoVar = occNameFS . getOccName
+toIfaceCoVar v = ASSERT(isCoVar v) occNameFS (getOccName v)
 
 toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
