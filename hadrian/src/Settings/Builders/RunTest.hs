@@ -68,7 +68,7 @@ runTestBuilderArgs = builder RunTest ? do
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     withSMP             <- getBooleanSetting TestGhcWithSMP
-    debugged            <- readBool <$> getTestSetting TestGhcDebugged
+    debugged            <- getBooleanSetting TestGhcDebugged
     keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
