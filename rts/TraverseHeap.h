@@ -68,14 +68,6 @@ typedef struct traverseState_ {
     stackElement *stackBottom, *stackTop, *stackLimit;
 
 /*
-  currentStackBoundary is used to mark the current stack chunk.
-  If stackTop == currentStackBoundary, it means that the current stack chunk
-  is empty. It is the responsibility of the user to keep currentStackBoundary
-  valid all the time if it is to be employed.
- */
-    stackElement *currentStackBoundary;
-
-/*
   stackSize records the current size of the stack.
   maxStackSize records its high water mark.
   Invariants:
