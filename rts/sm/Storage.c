@@ -407,8 +407,10 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
-    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
+    SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
+    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
+    write_barrier();
 
     caf->indirectee = (StgClosure *)bh;
     write_barrier();
@@ -1081,6 +1083,8 @@ void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
     Capability *cap = regTableToCapability(reg);
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
         p->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap,p);
@@ -1090,6 +1094,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 void
 dirty_TVAR(Capability *cap, StgTVar *p)
 {
+    // No barrier required here as no other heap object fields are read. See
+    // note [Heap memory barriers] in SMP.h.
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
@@ -1363,13 +1369,18 @@ StgWord calcTotalCompactW (void)
 #include <libkern/OSCacheControl.h>
 #endif
 
+/* __builtin___clear_cache is supported since GNU C 4.3.6.
+ * We pick 4.4 to simplify condition a bit.
+ */
+#define GCC_HAS_BUILTIN_CLEAR_CACHE (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4))
+
 #if defined(__clang__)
 /* clang defines __clear_cache as a builtin on some platforms.
  * For example on armv7-linux-androideabi. The type slightly
  * differs from gcc.
  */
 extern void __clear_cache(void * begin, void * end);
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && !GCC_HAS_BUILTIN_CLEAR_CACHE
 /* __clear_cache is a libgcc function.
  * It existed before __builtin___clear_cache was introduced.
  * See Trac #8562.
@@ -1397,15 +1408,12 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   __clear_cache((void*)begin, (void*)end);
 # endif
 #elif defined(__GNUC__)
-  /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
-  /* __builtin___clear_cache is supported since GNU C 4.3.6.
-   * We pick 4.4 to simplify condition a bit.
-   */
-# if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+# if GCC_HAS_BUILTIN_CLEAR_CACHE
   __builtin___clear_cache((void*)begin, (void*)end);
 # else
+  /* For all other platforms, fall back to a libgcc builtin. */
   __clear_cache((void*)begin, (void*)end);
 # endif
 #else

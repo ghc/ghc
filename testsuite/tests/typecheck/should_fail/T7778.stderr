@@ -1,10 +1,4 @@
 
-T7778.hs:3:6: error:
-    • Illegal qualified type: Num Int => Num
-      A constraint must be a monotype
-      Perhaps you intended to use QuantifiedConstraints
-    • In the type signature: v :: ((Num Int => Num) ()) => ()
-
 T7778.hs:3:7: error:
     • Expected kind ‘* -> Constraint’,
         but ‘Num Int => Num’ has kind ‘*’

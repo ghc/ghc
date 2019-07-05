@@ -1,17 +1,17 @@
 
-T11976.hs:7:7: error:
-    • Cannot instantiate unification variable ‘a0’
+T11976.hs:7:7:
+     Cannot instantiate unification variable ‘a0’
       with a type involving foralls: Lens _3 _4 _5
         GHC doesn't yet support impredicative polymorphism
-    • In the expression: undefined :: Lens _ _ _
+     In the expression: undefined :: Lens _ _ _
       In an equation for ‘foo’: foo = undefined :: Lens _ _ _
-    • Relevant bindings include
+     Relevant bindings include
         foo :: Lens _ _1 _2 (bound at T11976.hs:7:1)
 
-T11976.hs:7:20: error:
-    • Expected kind ‘k0 -> *’, but ‘Lens _ _’ has kind ‘*’
-    • In the type ‘Lens _ _ _’
+T11976.hs:7:20:
+     Expected kind ‘k0 -> *’, but ‘Lens _ _’ has kind ‘*’
+     In the type ‘Lens _ _ _’
       In an expression type signature: Lens _ _ _
       In the expression: undefined :: Lens _ _ _
-    • Relevant bindings include
+     Relevant bindings include
         foo :: Lens _ _1 _2 (bound at T11976.hs:7:1)

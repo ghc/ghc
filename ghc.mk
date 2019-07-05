@@ -432,7 +432,7 @@ PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
 PACKAGES_STAGE1 += deepseq
 PACKAGES_STAGE1 += bytestring
-PACKAGES_STAGE1 += containers
+PACKAGES_STAGE1 += containers/containers
 
 ifeq "$(Windows_Target)" "YES"
 PACKAGES_STAGE1 += Win32

@@ -11,7 +11,7 @@
 
 module TcHsType (
         -- Type signatures
-        kcHsSigType, tcClassSigType,
+        kcClassSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
         tcHsPartialSigType,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
@@ -187,24 +187,40 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcHsSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
-kcHsSigType names (HsIB { hsib_body = hs_ty
-                                  , hsib_ext = sig_vars })
-  = addSigCtxt (funsSigCtxt names) hs_ty $
-    discardResult $
-    bindImplicitTKBndrs_Skol sig_vars $
-    tc_lhs_type typeLevelMode hs_ty liftedTypeKind
-
-kcHsSigType _ (XHsImplicitBndrs _) = panic "kcHsSigType"
+kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType skol_info names sig_ty
+  = discardResult $
+    tcClassSigType skol_info names sig_ty
+  -- tcClassSigType does a fair amount of extra work that we don't need,
+  -- such as ordering quantified variables. But we absolutely do need
+  -- to push the level when checking method types and solve local equalities,
+  -- and so it seems easier just to call tcClassSigType than selectively
+  -- extract the lines of code from tc_hs_sig_type that we really need.
+  -- If we don't push the level, we get #16517, where GHC accepts
+  --   class C a where
+  --     meth :: forall k. Proxy (a :: k) -> ()
+  -- Note that k is local to meth -- this is hogwash.
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    snd <$> tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
+       -- No need to fail here if the type has an error:
+       --   If we're in the kind-checking phase, the solveEqualities
+       --     in kcTyClGroup catches the error
+       --   If we're in the type-checking phase, the solveEqualities
+       --     in tcClassDecl1 gets it
+       -- Failing fast here degrades the error message in, e.g., tcfail135:
+       --   class Foo f where
+       --     baa :: f a -> f
+       -- If we fail fast, we're told that f has kind `k1` when we wanted `*`.
+       -- It should be that f has kind `k2 -> *`, but we never get a chance
+       -- to run the solver where the kind of f is touchable. This is
+       -- painfully delicate.
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -214,9 +230,12 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type skol_info sig_ty
-                                      (expectedKindInCtxt ctxt)
+       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty
+                                       (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
+
+       ; when insol failM
+       -- See Note [Fail fast if there are insoluble kind equalities] in TcSimplify
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -225,12 +244,14 @@ tcHsSigType ctxt sig_ty
     skol_info = SigTypeSkol ctxt
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
-               -> ContextKind -> TcM Type
+               -> ContextKind -> TcM (Bool, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
+-- Returns also a Bool indicating whether the type induced an insoluble constraint;
+-- True <=> constraint is insoluble
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
@@ -249,9 +270,9 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
                                   tc_lvl wanted
 
-       ; return (mkInvForAllTys kvs ty1) }
+       ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
+tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -2056,7 +2077,8 @@ kindGeneralize :: TcType -> TcM [KindVar]
 -- Quantify the free kind variables of a kind or type
 -- In the latter case the type is closed, so it has no free
 -- type variables.  So in both cases, all the free vars are kind vars
--- Input needn't be zonked.
+-- Input needn't be zonked. All variables to be quantified must
+-- have a TcLevel higher than the ambient TcLevel.
 -- NB: You must call solveEqualities or solveLocalEqualities before
 -- kind generalization
 --
@@ -2074,7 +2096,8 @@ kindGeneralize kind_or_type
 
 -- | This variant of 'kindGeneralize' refuses to generalize over any
 -- variables free in the given WantedConstraints. Instead, it promotes
--- these variables into an outer TcLevel. See also
+-- these variables into an outer TcLevel. All variables to be quantified must
+-- have a TcLevel higher than the ambient TcLevel. See also
 -- Note [Promoting unification variables] in TcSimplify
 kindGeneralizeLocal :: WantedConstraints -> TcType -> TcM [KindVar]
 kindGeneralizeLocal wanted kind_or_type

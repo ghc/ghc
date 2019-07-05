@@ -45,7 +45,7 @@ import Util
 import DynFlags
 import ForeignCall
 import Demand           ( isUsedOnce )
-import PrimOp           ( PrimCall(..) )
+import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
 
 import Data.List.NonEmpty (nonEmpty, toList)
@@ -268,7 +268,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id )
+    assertConsistentCaInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,9 +296,18 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
+    assertConsistentCaInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
 
+-- | CAF consistency issues will generally result in segfaults and are quite
+-- difficult to debug (see #16846). We enable checking of the
+-- 'consistentCafInfo' invariant with @-dstg-lint@ to increase the chance that
+-- we catch these issues.
+assertConsistentCaInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
+assertConsistentCaInfo dflags id bind err_doc result
+  | gopt Opt_DoStgLinting dflags || debugIsOn
+  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCaInfo" err_doc
+  | otherwise = result
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
@@ -528,8 +537,12 @@ coreToStgApp _ f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
+                -- turn unsaturated primop applications into applications of
+                -- the primop's wrapper.
+                PrimOpId op
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)

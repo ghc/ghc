@@ -131,7 +131,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #else
     src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
     *p = TAG_CLOSURE(tag,(StgClosure*)to);
-#endif
+#endif  /* defined(PARALLEL_GC) */
 
 #if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
@@ -194,7 +194,7 @@ spin:
         if (info == (W_)&stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
             whitehole_gc_spin++;
-#endif
+#endif /* PROF_SPIN */
             busy_wait_nop();
             goto spin;
         }
@@ -205,7 +205,7 @@ spin:
     }
 #else
     info = (W_)src->header.info;
-#endif
+#endif /* PARALLEL_GC */
 
     to = alloc_for_copy(size_to_reserve, gen_no);
 
@@ -216,8 +216,8 @@ spin:
     }
 
     write_barrier();
-    src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
     *p = (StgClosure *)to;
+    src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
 
 #if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
@@ -1099,6 +1099,7 @@ selector_chain:
             //     need the write-barrier stuff.
             //   - undo the chain we've built to point to p.
             SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
+            write_barrier();
             *q = (StgClosure *)p;
             if (evac) evacuate(q);
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
@@ -1109,7 +1110,7 @@ selector_chain:
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
     SET_INFO((StgClosure *)p,&stg_WHITEHOLE_info);
-#endif
+#endif /* THREADED_RTS */
 
     field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
 
@@ -1165,6 +1166,7 @@ selector_loop:
                   SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
                   OVERWRITING_CLOSURE((StgClosure*)p);
                   SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
+                  write_barrier();
               }
 #endif
 

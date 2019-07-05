@@ -998,6 +998,7 @@ machOps = listToUFM $
 callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
+        ( "read_barrier", (,) MO_ReadBarrier ),
         ( "write_barrier", (,) MO_WriteBarrier ),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),

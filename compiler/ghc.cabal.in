@@ -508,6 +508,7 @@ Library
         TcTyClsDecls
         TcTyDecls
         TcTypeable
+        TcTypeableValidity
         TcType
         TcEvidence
         TcEvTerm

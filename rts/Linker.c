@@ -1183,11 +1183,17 @@ void freeObjectCode (ObjectCode *oc)
                            oc->sections[i].mapped_size);
                     break;
                 case SECTION_M32:
+                    IF_DEBUG(sanity,
+                        memset(oc->sections[i].start,
+                            0x00, oc->sections[i].size));
                     m32_free(oc->sections[i].start,
                              oc->sections[i].size);
                     break;
 #endif
                 case SECTION_MALLOC:
+                    IF_DEBUG(sanity,
+                        memset(oc->sections[i].start,
+                            0x00, oc->sections[i].size));
                     stgFree(oc->sections[i].start);
                     break;
                 default:

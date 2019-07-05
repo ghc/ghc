@@ -425,7 +425,7 @@ scavenge_block (bdescr *bd)
   // time around the loop.
   while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
 
-      ASSERT(bd->link == NULL);
+    ASSERT(bd->link == NULL);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
 
@@ -1574,6 +1574,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
 #if defined(DEBUG)
+            const StgInfoTable *pinfo;
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_VAR_CLEAN:
                 // can happen due to concurrent writeMutVars
@@ -1593,9 +1594,10 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             case TREC_CHUNK:
                 mutlist_TREC_CHUNK++; break;
             case MUT_PRIM:
-                if (((StgClosure*)p)->header.info == &stg_TVAR_WATCH_QUEUE_info)
+                pinfo = ((StgClosure*)p)->header.info;
+                if (pinfo == &stg_TVAR_WATCH_QUEUE_info)
                     mutlist_TVAR_WATCH_QUEUE++;
-                else if (((StgClosure*)p)->header.info == &stg_TREC_HEADER_info)
+                else if (pinfo == &stg_TREC_HEADER_info)
                     mutlist_TREC_HEADER++;
                 else
                     mutlist_OTHERS++;

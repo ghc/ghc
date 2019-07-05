@@ -16,6 +16,11 @@ parser.add_argument('--validate', action='store_true', help='Run in validate mod
 parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
 args = parser.parse_args()
 
+# Packages whose libraries aren't in the submodule root
+EXCEPTIONS = {
+    'libraries/containers/': 'libraries/containers/containers/'
+}
+
 def print_err(s):
     print(dedent(s), file=sys.stderr)
 
@@ -50,7 +55,7 @@ def check_for_url_rewrites():
 
             Or start over, and clone the GHC repository from the haskell server:
 
-              git clone --recursive git://git.haskell.org/ghc.git
+              git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 
             For more information, see:
               * https://ghc.haskell.org/trac/ghc/wiki/Newcomers or
@@ -78,7 +83,7 @@ def check_boot_packages():
             # but in an lndir tree we avoid making .git directories,
             # so it doesn't exist. We therefore require that every repo
             # has a LICENSE file instead.
-            license_path = os.path.join(dir_, 'LICENSE')
+            license_path = os.path.join(EXCEPTIONS.get(dir_+'/', dir_), 'LICENSE')
             if not os.path.isfile(license_path):
                 die("""\
                     Error: %s doesn't exist
@@ -91,9 +96,12 @@ def boot_pkgs():
 
     for package in glob.glob("libraries/*/"):
         packages_file = os.path.join(package, 'ghc-packages')
+        print(package)
         if os.path.isfile(packages_file):
             for subpkg in open(packages_file, 'r'):
                 library_dirs.append(os.path.join(package, subpkg.strip()))
+        elif package in EXCEPTIONS:
+            library_dirs.append(EXCEPTIONS[package])
         else:
             library_dirs.append(package)
 

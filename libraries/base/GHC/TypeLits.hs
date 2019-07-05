@@ -105,6 +105,9 @@ someNatVal n
 -- @since 4.7.0.0
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
+{-# NOINLINE someSymbolVal #-}
+-- For details see Note [NOINLINE someNatVal] in "GHC.TypeNats"
+-- The issue described there applies to `someSymbolVal` as well.
 
 -- | @since 4.7.0.0
 instance Eq SomeSymbol where

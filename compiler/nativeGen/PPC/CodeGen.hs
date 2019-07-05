@@ -943,6 +943,7 @@ condIntCode' True cond W64 x y
                  , BCC LE cmp_lo Nothing
                  , CMPL II32 x_lo (RIReg y_lo)
                  , BCC ALWAYS end_lbl Nothing
+                 , NEWBLOCK cmp_lo
                  , CMPL II32 y_lo (RIReg x_lo)
                  , BCC ALWAYS end_lbl Nothing
 
@@ -1116,6 +1117,8 @@ genCCall :: ForeignTarget      -- function to call
          -> [CmmFormal]        -- where to put the result
          -> [CmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
+genCCall (PrimTarget MO_ReadBarrier) _ _
+ = return $ unitOL LWSYNC
 genCCall (PrimTarget MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
@@ -2020,6 +2023,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_AddIntC {}    -> unsupported
                     MO_SubIntC {}    -> unsupported
                     MO_U_Mul2 {}     -> unsupported
+                    MO_ReadBarrier   -> unsupported
                     MO_WriteBarrier  -> unsupported
                     MO_Touch         -> unsupported
                     MO_Prefetch_Data _ -> unsupported

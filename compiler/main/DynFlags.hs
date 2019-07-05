@@ -2713,7 +2713,7 @@ updOptLevel n dfs
 -- Parsing the dynamic flags.
 
 
--- | Parse dynamic flags from a list of command line arguments.  Returns the
+-- | Parse dynamic flags from a list of command line arguments.  Returns
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).

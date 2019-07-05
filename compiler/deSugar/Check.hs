@@ -39,6 +39,7 @@ import FastString
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
+import BasicTypes (Boxity(..))
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
@@ -1072,12 +1073,17 @@ translatePat fam_insts pat = case pat of
   TuplePat tys ps boxity -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
-    return [vanillaConPattern tuple_con tys (concat tidy_ps)]
+        tys' = case boxity of
+                 Boxed -> tys
+                 -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                 Unboxed -> map getRuntimeRep tys ++ tys
+    return [vanillaConPattern tuple_con tys' (concat tidy_ps)]
 
   SumPat ty p alt arity -> do
     tidy_p <- translatePat fam_insts (unLoc p)
     let sum_con = RealDataCon (sumDataCon alt arity)
-    return [vanillaConPattern sum_con ty tidy_p]
+    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+    return [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
 
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
@@ -2543,7 +2549,7 @@ warnPmIters dflags (DsMatchContext kind loc)
     msg is = fsep [ text "Pattern match checker exceeded"
                   , parens (ppr is), text "iterations in", ctxt <> dot
                   , text "(Use -fmax-pmcheck-iterations=n"
-                  , text "to set the maximun number of iterations to n)" ]
+                  , text "to set the maximum number of iterations to n)" ]
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind

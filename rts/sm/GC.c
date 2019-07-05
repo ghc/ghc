@@ -1097,6 +1097,8 @@ loop:
 
     // scavenge_loop() only exits when there's no work to do
 
+    // This atomic decrement also serves as a full barrier to ensure that any
+    // writes we made during scavenging are visible to other threads.
 #if defined(DEBUG)
     r = dec_running();
 #else

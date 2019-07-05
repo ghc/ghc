@@ -96,6 +96,151 @@ EXTERN_INLINE void write_barrier(void);
 EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
 
+/*
+ * Note [Heap memory barriers]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Machines with weak memory ordering semantics have consequences for how
+ * closures are observed and mutated. For example, consider a thunk that needs
+ * to be updated to an indirection. In order for the indirection to be safe for
+ * concurrent observers to enter, said observers must read the indirection's
+ * info table before they read the indirectee. Furthermore, the indirectee must
+ * be set before the info table pointer. This ensures that if the observer sees
+ * an IND info table then the indirectee is valid.
+ *
+ * When a closure is updated with an indirection, both its info table and its
+ * indirectee must be written. With weak memory ordering, these two writes can
+ * be arbitrarily reordered, and perhaps even interleaved with other threads'
+ * reads and writes (in the absence of memory barrier instructions). Consider
+ * this example of a bad reordering:
+ *
+ * - An updater writes to a closure's info table (INFO_TYPE is now IND).
+ * - A concurrent observer branches upon reading the closure's INFO_TYPE as IND.
+ * - A concurrent observer reads the closure's indirectee and enters it.
+ * - An updater writes the closure's indirectee.
+ *
+ * Here the update to the indirectee comes too late and the concurrent observer
+ * has jumped off into the abyss. Speculative execution can also cause us
+ * issues, consider:
+ *
+ * - an observer is about to case on a value in closure's info table.
+ * - the observer speculatively reads one or more of closure's fields.
+ * - an updater writes to closure's info table.
+ * - the observer takes a branch based on the new info table value, but with the
+ *   old closure fields!
+ * - the updater writes to the closure's other fields, but its too late.
+ *
+ * Because of these effects, reads and writes to a closure's info table must be
+ * ordered carefully with respect to reads and writes to the closure's other
+ * fields, and memory barriers must be placed to ensure that reads and writes
+ * occur in program order. Specifically, updates to an already existing closure
+ * must follow the following pattern:
+ *
+ * - Update the closure's (non-info table) fields.
+ * - Write barrier.
+ * - Update the closure's info table.
+ *
+ * Observing the fields of an updateable closure (e.g. a THUNK) must follow the
+ * following pattern:
+ *
+ * - Read the closure's info pointer.
+ * - Read barrier.
+ * - Read the closure's (non-info table) fields.
+ *
+ * We must also take care when we expose a newly-allocated closure to other cores
+ * by writing a pointer to it to some shared data structure (e.g. an MVar#, a Message,
+ * or MutVar#). Specifically, we need to ensure that all writes constructing the
+ * closure are visible *before* the write exposing the new closure is made visible:
+ *
+ * - Allocate memory for the closure
+ * - Write the closure's info pointer and fields (ordering betweeen this doesn't
+ *   matter since the closure isn't yet visible to anyone else).
+ * - Write barrier
+ * - Make closure visible to other cores
+ *
+ * Note that thread stacks are inherently thread-local and consequently allocating an
+ * object and introducing a reference to it to our stack needs no barrier.
+ *
+ * There are several ways in which the mutator may make a newly-allocated
+ * closure visible to other cores:
+ *
+ *  - Eager blackholing a THUNK:
+ *    This is protected by an explicit write barrier in the eager blackholing
+ *    code produced by the codegen. See StgCmmBind.emitBlackHoleCode.
+ *
+ *  - Lazy blackholing a THUNK:
+ *    This is is protected by an explicit write barrier in the thread suspension
+ *    code. See ThreadPaused.c:threadPaused.
+ *
+ *  - Updating a BLACKHOLE:
+ *    This case is protected by explicit write barriers in the the update frame
+ *    entry code (see rts/Updates.h).
+ *
+ *  - Blocking on an MVar# (e.g. takeMVar#):
+ *    In this case the appropriate MVar primops (e.g. stg_takeMVarzh).  include
+ *    explicit memory barriers to ensure that the the newly-allocated
+ *    MVAR_TSO_QUEUE is visible to other cores.
+ *
+ *  - Write to an MVar# (e.g. putMVar#):
+ *    This protected by the full barrier implied by the CAS in putMVar#.
+ *
+ *  - Write to a TVar#:
+ *    This is protected by the full barrier implied by the CAS in STM.c:lock_stm.
+ *
+ *  - Write to an Array#, ArrayArray#, or SmallArray#:
+ *    This case is protected by an explicit write barrier in the code produced
+ *    for this primop by the codegen. See StgCmmPrim.doWritePtrArrayOp and
+ *    StgCmmPrim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
+ *
+ *  - Write to MutVar# via writeMutVar#:
+ *    This case is protected by an explicit write barrier in the code produced
+ *    for this primop by the codegen.
+ *
+ *  - Write to MutVar# via atomicModifyMutVar# or casMutVar#:
+ *    This is protected by the full barrier implied by the cmpxchg operations
+ *    in this primops.
+ *
+ *  - Sending a Message to another capability:
+ *    This is protected by the acquition and release of the target capability's
+ *    lock in Messages.c:sendMessage.
+ *
+ * Finally, we must ensure that we flush all cores store buffers before
+ * entering and leaving GC, since stacks may be read by other cores. This
+ * happens as a side-effect of taking and release mutexes (which implies
+ * acquire and release barriers, respectively).
+ *
+ * N.B. recordClosureMutated places a reference to the mutated object on
+ * the capability-local mut_list. Consequently this does not require any memory
+ * barrier.
+ *
+ * During parallel GC we need to be careful during evacuation: before replacing
+ * a closure with a forwarding pointer we must commit a write barrier to ensure
+ * that the copy we made in to-space is visible to other cores.
+ *
+ * However, we can be a bit lax when *reading* during GC. Specifically, the GC
+ * can only make a very limited set of changes to existing closures:
+ *
+ *  - it can replace a closure's info table with stg_WHITEHOLE.
+ *  - it can replace a previously-whitehole'd closure's info table with a
+ *    forwarding pointer
+ *  - it can replace a previously-whitehole'd closure's info table with a
+ *    valid info table pointer (done in eval_thunk_selector)
+ *  - it can update the value of a pointer field after evacuating it
+ *
+ * This is quite nice since we don't need to worry about an interleaving
+ * of writes producing an invalid state: a closure's fields remain valid after
+ * an update of its info table pointer and vice-versa.
+ *
+ * After a round of parallel scavenging we must also ensure that any writes the
+ * GC thread workers made are visible to the main GC thread. This is ensured by
+ * the full barrier implied by the atomic decrement in
+ * GC.c:scavenge_until_all_done.
+ *
+ * The work-stealing queue (WSDeque) also requires barriers; these are
+ * documented in WSDeque.c.
+ *
+ */
+
 /* ----------------------------------------------------------------------------
    Implementations
    ------------------------------------------------------------------------- */

@@ -193,3 +193,4 @@ test('T15892',
         extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
 test('T16449_2', exit_code(0), compile_and_run, [''])
+test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
