@@ -300,7 +300,7 @@ checkSingle' locn var p = do
   tracePm "checkSingle': missing" (vcat (map ppr missing))
                                   -- no guards
   PartialResult cs us ds <- runMany (pmcheckI clause []) missing
-  us' <- UncoveredPatterns <$> normaliseUncovered normaliseValVec us
+  us' <- UncoveredPatterns <$> normaliseUncovered us
   return $ case (cs,ds) of
     (Covered,  _    )         -> PmResult [] us' [] -- useful
     (NotCovered, NotDiverged) -> PmResult m  us' [] -- redundant
@@ -352,7 +352,7 @@ checkMatches' vars matches
       missing    <- mkInitialUncovered vars
       tracePm "checkMatches': missing" (vcat (map ppr missing))
       (rs,us,ds) <- go matches missing
-      us' <- normaliseUncovered normaliseValVec us
+      us' <- normaliseUncovered us
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
                  , pmresultUncovered    = UncoveredPatterns us'
@@ -611,6 +611,9 @@ tmTyCsAreSatisfiable
                                                  , delta_tm_cs = term_cs }
            _unsat               -> Nothing
 
+-- | The work-horse of 'normaliseUncovered'. Weeds out a single value
+-- abstraction if it is vacuous, or otherwise tries to turn it into the single
+-- possible constructor.
 normaliseValAbs :: Delta -> ValAbs -> PmM (Maybe (Delta, ValAbs))
 normaliseValAbs delta = runMaybeT . go_va delta
   where
@@ -621,8 +624,15 @@ normaliseValAbs delta = runMaybeT . go_va delta
     go_va delta va@(PmVar x) = do
       grps <- lift (allCompleteMatches (idType x))
       incomplete_grps <- lift (traverse (go_grp 0 x delta) grps)
+      -- TODO: If performance is a problem for large refutable enums, record
+      --       the new incomplete_grps (or its inverse, rather) in delta
+      lift $ tracePm "normaliseValAbs: incomplete_grps" $ hcat
+        [ ppr x
+        , ppr (idType x)
+        , ppr grps
+        , ppr incomplete_grps
+        ]
       -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
-      lift $ tracePm "normaliseValAbs" (ppr x <+> ppr (idType x) <+> ppr grps <+> ppr incomplete_grps)
       guard (all notNull incomplete_grps)
       -- See Note [Turn singleton incomplete groups into a constructor]
       case incomplete_grps of
@@ -632,7 +642,11 @@ normaliseValAbs delta = runMaybeT . go_va delta
             -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
             -- recorded in delta'
             (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
-            lift $ tracePm "normaliseValAbs2" (ppr x <+> ppr (idType x) <+> ppr (ic_val_abs ic))
+            lift $ tracePm "normaliseValAbs: single con" $ hcat
+              [ ppr x
+              , ppr (idType x)
+              , ppr (ic_val_abs ic)
+              ]
             pure (delta', ic_val_abs ic)
         _        -> pure (delta, va)
     go_va delta va = pure (delta, va)
@@ -652,41 +666,20 @@ normaliseValAbs delta = runMaybeT . go_va delta
         Nothing -> go_grp n_inh x delta group
         Just _  -> (con:) <$> go_grp (n_inh + 1) x delta group
 
--- | Something that normalises a 'ValVec' by consulting the given
--- 'InhabitationTest' to weed out vacuous 'ValAbs'.
--- See also 'normaliseValVecHead' and 'normaliseValVec'.
-type ValVecNormaliser = ValVec -> PmM (Maybe ValVec)
-
--- | A 'ValVecNormaliser' that normalises all components of a 'ValVec'. This is
--- the 'ValVecNormaliser' to choose once at the end.
-normaliseValVec :: ValVecNormaliser
-normaliseValVec (ValVec vva delta) = runMaybeT $ do
-  (delta', vva') <- mapAccumLM ((MaybeT .) . normaliseValAbs) delta vva
-  pure (ValVec vva' delta')
-
--- | A 'ValVecNormaliser' that only tries to normalise the head of each
--- 'ValVec'. This is mandatory for pattern guards, where we call 'utail' on the
--- temporarily extended 'ValVec', hence there's no way to delay this check.
--- Of course we could 'normaliseValVec' instead, but that's unnecessarily
--- expensive.
-normaliseValVecHead :: ValVecNormaliser
-normaliseValVecHead vva@(ValVec []       _) = pure (Just vva)
-normaliseValVecHead (ValVec (va:vva) delta) = runMaybeT $ do
-  (delta', va') <- MaybeT (normaliseValAbs delta va)
-  pure (ValVec (va':vva) delta')
-
 -- | This weeds out 'ValVec's with 'PmVar's where at least one COMPLETE set is
--- rendered vacuous by equality constraints, by calling out the given
--- 'ValVecNormaliser'.
+-- rendered vacuous by equality constraints.
 --
--- This is quite costly due to the many oracle queries, so we only call this at
--- the last possible moment. I.e., with 'normaliseValVecHead' when leaving a
--- pattern guard and with 'normaliseValVec' on the final uncovered set.
-normaliseUncovered :: ValVecNormaliser -> Uncovered -> PmM Uncovered
-normaliseUncovered normalise_val_vec us = do
+-- This is quite costly due to the many oracle queries, so we only call this as
+-- seldom as possible.
+normaliseUncovered :: Uncovered -> PmM Uncovered
+normaliseUncovered us = do
   us' <- mapMaybeM normalise_val_vec us
   tracePm "normaliseUncovered" (vcat (map ppr us'))
   pure us'
+    where
+      normalise_val_vec (ValVec vva delta) = runMaybeT $ do
+        (delta', vva') <- mapAccumLM ((MaybeT .) . normaliseValAbs) delta vva
+        pure (ValVec vva' delta')
 
 {- Note [Turn singleton incomplete groups into a constructor]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2016,8 +2009,9 @@ pmcheck (p : ps) guards (ValVec vas delta)
           delta'   = delta { delta_tm_cs = tm_state }
       pr <- pmcheckI (pv ++ ps) guards (ValVec (PmVar y : vas) delta')
       -- The heads of the ValVecs in the uncovered set might be vacuous, so
-      -- normalise them
-      us <- normaliseUncovered normaliseValVecHead (presultUncovered pr)
+      -- normalise them. We do so for the whole uncovered set for now, as long
+      -- as performance doesn't bite.
+      us <- normaliseUncovered (presultUncovered pr)
       pure $ utail pr { presultUncovered = us }
 
 pmcheck [] _ (ValVec (_:_) _) = panic "pmcheck: nil-cons"
