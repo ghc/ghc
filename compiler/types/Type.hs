@@ -637,9 +637,9 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
     go_prov (ZappedProv fvs)
-      = let bndrFVs v =
+      = let bndrFVs v
               | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
-              | isTyVar v = tyCoVarsOfCoDSet <$> tyvar env v
+              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
               | otherwise = panic "mapCoercion(ZappedProv): Bad free variable"
         in ZappedProv . unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
 

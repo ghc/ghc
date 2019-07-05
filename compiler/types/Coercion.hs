@@ -1776,7 +1776,7 @@ mkZappedCoercion dflags co (Pair ty1 ty2) role fvs
         , text "real ty2:" <+> ppr real_ty2
         , text "given ty2:" <+> ppr ty2
         , text "real free co vars:" <+> ppr real_fCvs
-        , text "given free co vars:" <+> ppr fCvs
+        , text "given free co vars:" <+> ppr fvs
         , text "coercion:" <+> ppr co
         ]
 
