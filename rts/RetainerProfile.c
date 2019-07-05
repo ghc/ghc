@@ -300,16 +300,6 @@ retainerStackBlocks(void)
 }
 
 /* -----------------------------------------------------------------------------
- * Returns true if stackTop is at the stack boundary of the current stack,
- * i.e., if the current stack chunk is empty.
- * -------------------------------------------------------------------------- */
-STATIC_INLINE bool
-isOnBoundary( traverseState *ts )
-{
-    return ts->stackTop == ts->currentStackBoundary;
-}
-
-/* -----------------------------------------------------------------------------
  * Initializes *info from ptrs and payload.
  * Invariants:
  *   payload[] begins with ptrs pointers followed by non-pointers.
@@ -461,7 +451,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     stackElement se;
     bdescr *nbd;      // Next Block Descriptor
 
-    debug("traversePushChildren(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
+    debug("traversePushChildren(): stackTop = 0x%x\n", ts->stackTop);
 
     ASSERT(get_itbl(c)->type != TSO);
     ASSERT(get_itbl(c)->type != AP_STACK);
@@ -671,7 +661,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
  */
 static void
 popStackElement(traverseState *ts) {
-    debug("popStackElement(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
+    debug("popStackElement(): stackTop = 0x%x\n", ts->stackTop);
 
     ASSERT(ts->stackTop != ts->stackLimit);
     ASSERT(!isEmptyWorkStack(ts));
@@ -738,27 +728,26 @@ popStackElement(traverseState *ts) {
  *
  *  If the topmost stack element indicates no more objects are left, pop
  *  off the stack element until either an object can be retrieved or
- *  the current stack chunk becomes empty, indicated by true returned by
- *  isOnBoundary(), in which case *c is set to NULL.
+ *  the work-stack becomes empty, indicated by true returned by
+ *  isEmptyWorkStack(), in which case *c is set to NULL.
  *
  *  Note:
  *
- *    It is okay to call this function even when the current stack chunk
- *    is empty.
+ *    It is okay to call this function even when the work-stack is empty.
  */
 STATIC_INLINE void
 traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 {
     stackElement *se;
 
-    debug("traversePop(): stackTop = 0x%x currentStackBoundary = 0x%x\n", ts->stackTop, ts->currentStackBoundary);
+    debug("traversePop(): stackTop = 0x%x\n", ts->stackTop);
 
     // Is this the last internal element? If so instead of modifying the current
     // stackElement in place we actually remove it from the stack.
     bool last = false;
 
     do {
-        if (isOnBoundary(ts)) {     // if the current stack chunk is depleted
+        if (isEmptyWorkStack(ts)) {
             *c = NULL;
             return;
         }
@@ -1207,18 +1196,6 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     StgWord bitmap;
     uint32_t size;
 
-    /*
-      Each invocation of traversePushStack() creates a new virtual
-      stack. Since all such stacks share a single common stack, we
-      record the current currentStackBoundary, which will be restored
-      at the exit.
-    */
-    oldStackBoundary = ts->currentStackBoundary;
-    ts->currentStackBoundary = ts->stackTop;
-
-    debug("traversePushStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n",
-        oldStackBoundary, ts->currentStackBoundary);
-
     ASSERT(get_itbl(cp)->type == STACK);
 
     p = stackStart;
@@ -1307,11 +1284,6 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
                  (int)(info->i.type));
         }
     }
-
-    // restore currentStackBoundary
-    ts->currentStackBoundary = oldStackBoundary;
-    debug("traversePushStack() finished: currentStackBoundary = 0x%x\n",
-        ts->currentStackBoundary);
 }
 
 /* ----------------------------------------------------------------------------
@@ -1645,9 +1617,6 @@ retainRoot(void *user, StgClosure **tl)
 
     // We no longer assume that only TSOs and WEAKs are roots; any closure can
     // be a root.
-
-    ASSERT(isEmptyWorkStack(ts));
-    ts->currentStackBoundary = ts->stackTop;
 
     c = UNTAG_CLOSURE(*tl);
     traverseMaybeInitClosureData(c);
