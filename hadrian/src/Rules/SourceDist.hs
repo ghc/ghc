@@ -143,7 +143,7 @@ prepareTree dest = do
     -- alex/happy files is exactly the one implemented in ghc.mk,
     -- where Make ends up calling 'sdist-ghc-file' on all those
     -- files, which implements exactly the logic that we
-    -- have foro 'alexHappyFiles' above.
+    -- have for 'alexHappyFiles' above.
     alexHappyFiles =
         [ (Stage0, compiler, "CmmParse.y", Just "cmm", "CmmParse.hs")
         , (Stage0, compiler, "CmmLex.x", Just "cmm", "CmmLex.hs")
