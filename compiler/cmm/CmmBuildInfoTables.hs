@@ -402,9 +402,9 @@ cafAnal
   -> NameEnv (Name, Bool) -- CAFFY-ness env
   -> CmmGraph
   -> CAFEnv
-cafAnal contLbls topLbl caf_infos0 cmmGraph =
+cafAnal contLbls topLbl caf_infos cmmGraph =
     analyzeCmmBwd cafLattice
-      (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos0) cmmGraph mapEmpty
+      (cafTransfers contLbls (g_entry cmmGraph) topLbl caf_infos) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
