@@ -4102,7 +4102,7 @@ tidyCo env@(_, subst) co
     go_prov p@(PluginProv _)    = p
     go_prov (ZappedProv fvs)    = ZappedProv $ mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs)
 
-    substVar cv = fromMaybe cv $ lookupVarEnv subst cv
+    substCoVar cv = fromMaybe cv $ lookupVarEnv subst cv
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
