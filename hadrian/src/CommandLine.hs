@@ -305,7 +305,7 @@ cmdLineArgsMap = do
       if settingsFileExists
         then parseJustKVs . lines <$> readFile settingsFile
         else return []
-    let allSettings = cliSettings ++ fileSettings
+    let allSettings = fileSettings ++ cliSettings
 
     return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
            $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
