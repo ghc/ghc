@@ -1164,7 +1164,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     let mod_iface' = updateIfaceCafInfos mod_iface (cafInfos mod_srt_info)
-                    let ifaceFile = ml_hi_file (ms_location mod_summary)
+                    let ifaceFile = ml_hi_file location
                     unless (gopt Opt_OmitInterfacePragmas dflags) $
                       liftIO (writeIfaceFile dflags ifaceFile mod_iface')
 
