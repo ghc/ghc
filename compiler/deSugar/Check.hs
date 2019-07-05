@@ -624,11 +624,7 @@ normaliseValAbs delta = runMaybeT . go_va delta
       -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
       lift $ tracePm "normaliseValAbs" (ppr x <+> ppr (idType x) <+> ppr grps <+> ppr incomplete_grps)
       guard (all notNull incomplete_grps)
-      -- If there's a unique singleton incomplete group, turn it into a
-      -- @PmCon@ for better readability of warning messages.
-      -- We only want to do this when there is more than 1 constructor.
-      -- Otherwise we generate warnings like 'failed to match ()'.
-      -- TODO write a Note
+      -- See Note [Turn singleton incomplete groups into a constructor]
       case incomplete_grps of
         ([con]:_)
           | all (== [con]) incomplete_grps
@@ -691,6 +687,39 @@ normaliseUncovered normalise_val_vec us = do
   us' <- mapMaybeM normalise_val_vec us
   tracePm "normaliseUncovered" (vcat (map ppr us'))
   pure us'
+
+{- Note [Turn singleton incomplete groups into a constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The general idea is that if there's a unique singleton incomplete group, we turn
+it into the single possible constructor. This makes for better warning messges.
+Example:
+
+  data D2 = A2 | B2
+  f1 A2 = ()
+
+We want to warn that f1 lacks a clause for the B case and not the more cryptic
+message 'p where p is not one of {A}'. But on the other hand, we don't want this
+to happen for product types, so that we don't generate a warning like 'Just ()'
+instead of 'Just _' here:
+
+  f2 :: Maybe () -> ()
+  f2 Nothing = ()
+
+Things get more complicated in the presence of multiple elible COMPLETE sets.
+Example:
+
+  data D3 = A3 | B3 | C3
+  {-# COMPLETE A3, B3 #-}
+  f3 A3 = ()
+
+rather than give preference to a particular complete set and warn that f3 lacks
+a clause for B1, we prefer the message 'p where p is not one of {A3}' here.
+
+So: When all incomplete sets are singletons of the same non-product constructor,
+replace the value abstraction by one for that constructor.
+
+See also the test case SinglePossibleCon.
+-}
 
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of
@@ -1419,7 +1448,8 @@ the paper. This Note serves as a reference for these new features.
 * Handling of uninhabited fields like `!Void`.
   See Note [Strict argument type constraints]
 * Efficient handling of literal splitting, large enumerations and accurate
-  redundancy warnings for `COMPLETE` groups. See Note [PmNLit and PmNCon]
+  redundancy warnings for `COMPLETE` groups through the term oracle.
+  See Note [Refutable shapes] in TmOracle.
 
 Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1544,41 +1574,6 @@ intuition formal, we say that a type is definitely inhabitable (DI) if:
 
 It's relatively cheap to check if a type is DI, so before we call `nonVoid`
 on a list of strict argument types, we filter out all of the DI ones.
-
-Note [PmNLit and PmNCon]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-TLDR:
-* 'PmNLit' is an efficient encoding of literals we already matched on.
-  Important for checking redundancy without blowing up the term oracle.
-* 'PmNCon' is an efficient encoding of all constructors we already matched on.
-  Important for proper redundancy and completeness checks while being more
-  efficient than the `ConVar` split in GADTs Meet Their Match.
-
-GADTs Meet Their Match handled literals by desugaring to guard expressions,
-effectively encoding the knowledge in the term oracle. As it turned out, this
-doesn't scale (#11303, cf. Note [Literals in PmPat]), so we adopted an approach
-that encodes negative information about literals as a 'PmNLit', which encodes
-literal values the carried variable may no longer take on.
-
-The counterpart for constructor values is 'PmNCon', where we associate
-with a variable the topmost 'ConLike's it surely can't be. This is in contrast
-to GADTs Meet Their Match, where instead the `ConVar` case would split the value
-vector abstraction on all possible constructors from a `COMPLETE` group.
-In fact, we used to do just that, but committing to a particular `COMPLETE`
-group in `ConVar`, even nondeterministically, led to misleading redundancy
-warnings (#13363).
-Apart from that, splitting on huge enumerations in the presence of a catch-all
-case is a huge waste of resources.
-
-Note that since we have pattern guards, the term oracle must also be able to
-cope with negative equations involving literals and constructors, cf.
-Note [Refutable shapes] in TmOracle. Since we don't want to put too much strain
-on the term oracle with repeated coverage checks against all `COMPLETE` groups,
-we only do so once at the end in 'normaliseUncovered'.
-
-Peter Sestoft was probably the first to describe positive and negative
-information about terms in this manner in ML Pattern Match Compilation and
-Partial Evaluation.
 -}
 
 instance Outputable InhabitationCandidate where
@@ -1797,9 +1792,6 @@ allCompleteMatches ty = case splitTyConApp_maybe ty of
     -- Check that all the pattern synonym return types in a `COMPLETE`
     -- pragma subsume the type we're matching.
     -- See Note [Filtering out non-matching COMPLETE sets]
-    -- TODO: Check if we need to do this any longer. We probably need to change
-    -- 'mkOneConFull' to return a Maybe (only happens for PatSynCons) in case
-    -- tcMatchTy fails, but that should be it.
     pure (filter (isValidCompleteMatch ty) candidates)
       where
         isValidCompleteMatch :: Type -> [ConLike] -> Bool
