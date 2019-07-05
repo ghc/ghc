@@ -591,6 +591,7 @@ mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
 mapCoercion :: (Monad m, HasDynFlags m)
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_covar = covar
+                               , tcm_tyvar = tyvar
                                , tcm_hole = cohole
                                , tcm_tycobinder = tycobinder
                                , tcm_tycon = tycon })
@@ -637,8 +638,9 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov p@(PluginProv _)    = return p
     go_prov (ZappedProv fvs)
       = let bndrFVs v =
-              ASSERT(isCoVar v)
-              tyCoVarsOfCoDSet <$> covar env v
+              | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
+              | isTyVar v = tyCoVarsOfCoDSet <$> tyvar env v
+              | otherwise = panic "mapCoercion(ZappedProv): Bad free variable"
         in ZappedProv . unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
 
 {-

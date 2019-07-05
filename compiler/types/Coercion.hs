@@ -1748,18 +1748,18 @@ mkZappedCoercion :: HasDebugCallStack
                  -> Coercion  -- ^ the un-zapped coercion
                  -> Pair Type -- ^ the kind of the coercion
                  -> Role      -- ^ the role of the coercion
-                 -> DCoVarSet -- ^ the free coercion variables of the coercion
+                 -> DTyCoVarSet -- ^ the free variables of the coercion
                  -> Coercion
-mkZappedCoercion dflags co (Pair ty1 ty2) role fCvs
+mkZappedCoercion dflags co (Pair ty1 ty2) role fvs
   | debugIsOn && real_role /= role =
     pprPanic "mkZappedCoercion(roles mismatch)" panic_doc
   | debugIsOn && not co_kind_ok =
     pprPanic "mkZappedCoercion(kind mismatch)" panic_doc
-  | debugIsOn && not (allDVarSet isCoVar fCvs) =
-    pprPanic "mkZappedCoercion" $ text "non-covar in free variable list:" <+> ppr fCvs
+  | debugIsOn && not (allDVarSet isCoVar fvs) =
+    pprPanic "mkZappedCoercion" $ text "non-covar in free variable list:" <+> ppr fvs
   | shouldBuildCoercions dflags = co
   | otherwise =
-    mkUnivCo (ZappedProv fCvs) role ty1 ty2
+    mkUnivCo (ZappedProv fvs) role ty1 ty2
   where
     (Pair real_ty1 real_ty2, real_role) = coercionKindRole co
     real_fCvs = filterVarSet isCoVar (coVarsOfCo co)

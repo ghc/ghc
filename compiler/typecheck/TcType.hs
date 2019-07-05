@@ -1020,7 +1020,7 @@ exactTyCoVarsOfType ty
     goProv (PhantomProv kco)    = goCo kco
     goProv (ProofIrrelProv kco) = goCo kco
     goProv (PluginProv _)       = emptyVarSet
-    goProv (ZappedProv _)       = emptyVarSet -- TODO
+    goProv (ZappedProv fvs)     = dVarSetToVarSet fvs
 
     goVar v = unitVarSet v `unionVarSet` go (varType v)
 

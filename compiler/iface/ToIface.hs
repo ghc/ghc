@@ -279,9 +279,9 @@ toIfaceCoercionX fr co
                           where
                             (fCvs, cvs) = partitionWith f $ dVarSetElems fvs
                             isFree = (`elemVarSet` fr)
-                            f v | ASSERT(isCoVar v)
-                                  isFree v  = Left v
-                                | otherwise = Right $ toIfaceCoVar v
+                            f v | isFree v  = Left v
+                                | isCoVar v = Right $ toIfaceCoVar v
+                                | otherwise = Right $ toIfaceTyVar v
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet

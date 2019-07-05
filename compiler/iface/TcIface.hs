@@ -1255,7 +1255,7 @@ tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
-tcIfaceUnivCoProv (IfaceZappedProv coFvs _) = ZappedProv . mkDVarSet <$> mapM tcIfaceLclId coFvs
+tcIfaceUnivCoProv (IfaceZappedProv fvs _)   = ZappedProv . mkDVarSet <$> mapM tcIfaceLclId fvs
 
 {-
 ************************************************************************

@@ -1648,7 +1648,7 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | ZappedProv { zappedFreeCvs :: DCoVarSet }
+  | ZappedProv { zappedFreeVars :: DTyCoVarSet }
     -- ^ See Note [Zapping coercions].
     -- Free variables must be tracked in 'DVarSet' since they appear in
     -- interface files. See Note [Deterministic UniqFM] for details.
@@ -3404,7 +3404,7 @@ subst_co subst co
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
-    go_prov (ZappedProv fvs)     = ZappedProv (filterDVarSet isCoVar $ substFreeDVarSet subst fvs)
+    go_prov (ZappedProv fvs)     = ZappedProv (substFreeDVarSet subst fvs)
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
@@ -4102,7 +4102,7 @@ tidyCo env@(_, subst) co
     go_prov p@(PluginProv _)    = p
     go_prov (ZappedProv fvs)    = ZappedProv $ mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs)
 
-    substCoVar cv = fromMaybe cv $ lookupVarEnv subst cv
+    substVar cv = fromMaybe cv $ lookupVarEnv subst cv
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
