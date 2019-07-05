@@ -68,7 +68,7 @@ runTestBuilderArgs = builder RunTest ? do
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     withSMP             <- getBooleanSetting TestGhcWithSMP
-    debugged            <- readBool <$> getTestSetting TestGhcDebugged
+    debugged            <- getBooleanSetting TestGhcDebugged
     keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
@@ -139,8 +139,6 @@ runTestBuilderArgs = builder RunTest ? do
             , arg $ "--threads=" ++ show threads
             , getTestArgs -- User-provided arguments from command line.
             ]
-
-    where readBool x = read x :: Bool
 
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args
