@@ -37,7 +37,6 @@ uint32_t peakWorkerCount;
 
 static int tasksInitialized = 0;
 
-static void   freeTask  (Task *task);
 static Task * newTask   (bool);
 
 #if defined(THREADED_RTS)
@@ -173,7 +172,7 @@ void freeMyTask (void)
     setMyTask(NULL);
 }
 
-static void
+void
 freeTask (Task *task)
 {
     InCall *incall, *next;

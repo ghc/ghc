@@ -188,6 +188,7 @@ isWorker (Task *task)
 // Linked list of all tasks.
 //
 extern Task *all_tasks;
+void   freeTask  (Task *task);
 
 // The all_tasks list is protected by the all_tasks_mutex
 #if defined(THREADED_RTS)
