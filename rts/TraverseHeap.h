@@ -36,49 +36,53 @@ typedef union stackData_ {
 typedef struct stackElement_ stackElement;
 
 typedef struct traverseState_ {
-/*
-  Invariants:
-
-    firstStack points to the first block group.
-
-    currentStack points to the block group currently being used.
-
-    currentStack->free == stackLimit.
-
-    stackTop points to the topmost byte in the stack of currentStack.
-
-    Unless the whole stack is empty, stackTop must point to the topmost
-    object (or byte) in the whole stack. Thus, it is only when the whole stack
-    is empty that stackTop == stackLimit (not during the execution of
-    pushStackElement() and popStackElement()).
-
-    stackBottom == currentStack->start.
-
-    stackLimit == currentStack->start + BLOCK_SIZE_W * currentStack->blocks.
-
-
-  Note:
-
-    When a current stack becomes empty, stackTop is set to point to
-    the topmost element on the previous block group so as to satisfy
-    the invariants described above.
- */
+    /**
+     * Invariants:
+     *
+     *    firstStack points to the first block group.
+     *
+     *    currentStack points to the block group currently being used.
+     *
+     *    currentStack->free == stackLimit.
+     *
+     *    stackTop points to the topmost byte in the stack of currentStack.
+     *
+     *    Unless the whole stack is empty, stackTop must point to the topmost
+     *    object (or byte) in the whole stack. Thus, it is only when the whole
+     *    stack is empty that stackTop == stackLimit (not during the execution
+     *    of pushStackElement() and popStackElement()).
+     *
+     *    stackBottom == currentStack->start.
+     *
+     *    stackLimit
+     *      == currentStack->start + BLOCK_SIZE_W * currentStack->blocks.
+     *
+     *  Note:
+     *
+     *    When a current stack becomes empty, stackTop is set to point to
+     *    the topmost element on the previous block group so as to satisfy
+     *    the invariants described above.
+     */
     bdescr *firstStack;
     bdescr *currentStack;
     stackElement *stackBottom, *stackTop, *stackLimit;
 
-/*
-  stackSize records the current size of the stack.
-  maxStackSize records its high water mark.
-  Invariants:
-    stackSize <= maxStackSize
-  Note:
-    stackSize is just an estimate measure of the depth of the graph. The reason
-    is that some heap objects have only a single child and may not result
-    in a new element being pushed onto the stack. Therefore, at the end of
-    retainer profiling, maxStackSize is some value no greater
-    than the actual depth of the graph.
- */
+    /**
+     * stackSize: records the current size of the stack.
+     * maxStackSize: records its high water mark.
+     *
+     * Invariants:
+     *
+     *   stackSize <= maxStackSize
+     *
+     * Note:
+     *
+     *   stackSize is just an estimate measure of the depth of the graph. The
+     *   reason is that some heap objects have only a single child and may not
+     *   result in a new element being pushed onto the stack. Therefore, at the
+     *   end of retainer profiling, maxStackSize is some value no greater than
+     *   the actual depth of the graph.
+     */
     int stackSize, maxStackSize;
 } traverseState;
 

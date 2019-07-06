@@ -199,18 +199,18 @@ getTraverseStackMaxSize(traverseState *ts)
     return ts->maxStackSize;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  * Returns true if the whole stack is empty.
- * -------------------------------------------------------------------------- */
+ **/
 STATIC_INLINE bool
 isEmptyWorkStack( traverseState *ts )
 {
     return (ts->firstStack == ts->currentStack) && ts->stackTop == ts->stackLimit;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  * Returns size of stack
- * -------------------------------------------------------------------------- */
+ */
 W_
 traverseWorkStackBlocks(traverseState *ts)
 {
@@ -223,11 +223,13 @@ traverseWorkStackBlocks(traverseState *ts)
     return res;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  * Initializes *info from ptrs and payload.
+ *
  * Invariants:
+ *
  *   payload[] begins with ptrs pointers followed by non-pointers.
- * -------------------------------------------------------------------------- */
+ */
 STATIC_INLINE void
 init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
 {
@@ -237,9 +239,9 @@ init_ptrs( stackPos *info, uint32_t ptrs, StgPtr payload )
     info->next.ptrs.payload = payload;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  * Find the next object from *info.
- * -------------------------------------------------------------------------- */
+ */
 STATIC_INLINE StgClosure *
 find_ptrs( stackPos *info )
 {
@@ -250,9 +252,9 @@ find_ptrs( stackPos *info )
     }
 }
 
-/* -----------------------------------------------------------------------------
+/**
  *  Initializes *info from SRT information stored in *infoTable.
- * -------------------------------------------------------------------------- */
+ */
 STATIC_INLINE void
 init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
@@ -275,9 +277,9 @@ init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
     }
 }
 
-/* -----------------------------------------------------------------------------
+/**
  * Find the next object from *info.
- * -------------------------------------------------------------------------- */
+ */
 STATIC_INLINE StgClosure *
 find_srt( stackPos *info )
 {
@@ -881,10 +883,9 @@ traverseMaybeInitClosureData(StgClosure *c)
     return false;
 }
 
-/* -----------------------------------------------------------------------------
-   Call traversePushClosure for each of the closures covered by a large bitmap.
-   -------------------------------------------------------------------------- */
-
+/**
+ * Call traversePushClosure for each of the closures covered by a large bitmap.
+ */
 static void
 traverseLargeBitmap (traverseState *ts, StgPtr p, StgLargeBitmap *large_bitmap,
                      uint32_t size, StgClosure *c, stackData data)
@@ -1043,10 +1044,9 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackData data,
     }
 }
 
-/* ----------------------------------------------------------------------------
+/**
  * Call traversePushClosure for each of the children of a PAP/AP
- * ------------------------------------------------------------------------- */
-
+ */
 STATIC_INLINE StgPtr
 traversePAP (traverseState *ts,
                     StgClosure *pap,    /* NOT tagged */
@@ -1302,7 +1302,7 @@ inner_loop:
     goto inner_loop;
 }
 
-/* -----------------------------------------------------------------------------
+/**
  *  Traverse all static objects for which we compute retainer sets,
  *  and reset their rs fields to NULL, which is accomplished by
  *  invoking traverseMaybeInitClosureData(). This function must be called
@@ -1326,7 +1326,7 @@ inner_loop:
  * added a traverseMaybeInitClosureData() call to retainRoot(), and that seems
  * to have fixed the assertion failure in retainerSetOf() I was
  * encountering.
- * -------------------------------------------------------------------------- */
+ */
 void
 resetStaticObjectForProfiling( StgClosure *static_objects )
 {
