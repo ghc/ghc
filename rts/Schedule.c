@@ -143,7 +143,6 @@ static void scheduleYield (Capability **pcap, Task *task);
 static bool requestSync (Capability **pcap, Task *task,
                          PendingSync *sync_type, SyncType *prev_sync_type);
 static void acquireAllCapabilities(Capability *cap, Task *task);
-static void releaseAllCapabilities(uint32_t n, Capability *cap, Task *task);
 static void startWorkerTasks (uint32_t from USED_IF_THREADS,
                               uint32_t to USED_IF_THREADS);
 #endif
@@ -1387,7 +1386,7 @@ scheduleNeedHeapProfile( bool ready_to_gc )
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static void stopAllCapabilities (Capability **pCap, Task *task)
+void stopAllCapabilities (Capability **pCap, Task *task)
 {
     stopAllCapabilitiesWith(pCap, task, SYNC_OTHER);
 }
