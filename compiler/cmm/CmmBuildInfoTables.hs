@@ -186,6 +186,53 @@ and the only SRT closure we generate is
   g_srt = SRT_2 [c2_closure, c1_closure]
 
 
+Algorithm
+^^^^^^^^^
+
+0. let srtMap :: Map CAFLabel (Maybe SRTEntry) = {}
+
+1. start with decls :: [CmmDecl].  This corresponds to an SCC of
+bindings in STG after code-generation.
+
+2. CPS-convert each CmmDecl (cpsTop), resulting in a list [CmmDecl].
+There might be multiple CmmDecls in the result, due to proc-point
+splitting.
+
+3. in cpsTop, *before* proc-point splitting, when we still have a
+single CmmDecl, we do cafAnal:
+  * cafAnal performs a backwards analysis on the code blocks in the CmmDecl
+  * for each labelled block, the analysis produces a CAFSet (= Set
+    CAFLabel), representing all the CAFLabels reachable from this
+    label.
+  * A label is added to the set if it refers to a FUN, THUNK, or RET,
+    and its CafInfo /= NoCafRefs.
+    (NB. all CafInfo for Ids in the current module should be
+    initialised to MayHaveCafRefs)
+  * The result is CAFEnv = LabelMap CAFSet
+
+  (why *before* proc-point splitting? Because the analysis needs to
+  propagate information across branches, and proc-point splitting
+  turns branches into CmmCalls to top-level CmmDecls.  The analysis
+  would fail to find all the references to CAFFY labels if we did it
+  after proc-point splitting.)
+
+4. The result of cpsTop is (CAFEnv, [CmmDecl]). So after `mapM
+cpsTop decls` we have [(CAFEnv, [CmmDecl])]
+
+5. Concat the decls and union the CAFEnvs to get (CAFEnv, [CmmDecl])
+
+7. Dependency-analyse the CAFEnv, giving us SCC CAFLabel
+
+8. For each SCC in dependency order
+   - let lbls :: [CAFLabel] be the labels in this SCC
+   - apply CAFEnv to each label and concat the result :: [CAFLabel]
+   - for each CAFLabel in the set, apply srtMap (and ignore Nothing) to get srt :: [SRTEntry]
+   - make a label for this SRT, call it l
+   - add to srtMap: lbls -> if null srt then Nothing else Just l
+
+9. At the end, for every top-level binding x, if srtMap x == Nothing,
+then the binding is non-CAFFY, otherwise it is CAFFY.
+
 Optimisations
 ^^^^^^^^^^^^^
 
@@ -731,7 +778,7 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
     -- important that we don't do this for static functions or CAFs,
     -- see Note [Invalid optimisation: shortcutting].
     updateSRTMap srtEntry =
-      when (not isCAF && not isStaticFun) $ do
+      when (not isCAF && (not isStaticFun || isNothing srtEntry) $ do
         let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
         put (Map.union newSRTMap srtMap)
 
