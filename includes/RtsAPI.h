@@ -17,6 +17,7 @@ extern "C" {
 
 #include "HsFFI.h"
 #include "rts/Time.h"
+#include "rts/Task.h"
 #include "rts/EventLogWriter.h"
 
 /*
