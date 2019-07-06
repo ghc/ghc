@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #include "HsFFI.h"
+#include "rts/Types.h"
 #include "rts/Time.h"
 #include "rts/Task.h"
 #include "rts/EventLogWriter.h"
@@ -448,7 +449,7 @@ SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 // Various bits of information that need to be persisted between rts_pause and
 // rts_unpause.
-typedef struct {
+typedef struct RtsPaused_ {
     Task *pausing_task;
     Capability *capabilities;
 } RtsPaused;
