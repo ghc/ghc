@@ -52,8 +52,17 @@ deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 -}
 
 
+-- | Assumes that the arguments contain no duplicates
 unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
--- Assumes that the arguments contain no duplicates
+-- We special case some reasonable common patterns.
+unionLists xs [] = xs
+unionLists [] ys = ys
+unionLists [x] ys
+  | isIn "unionLists" x ys = ys
+  | otherwise = x:ys
+unionLists xs [y]
+  | isIn "unionLists" y xs = xs
+  | otherwise = y:xs
 unionLists xs ys
   = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
