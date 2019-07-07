@@ -1022,7 +1022,6 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
     includes/Makefile \
-    $(includes_SETTINGS) \
     $(includes_H_FILES) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
