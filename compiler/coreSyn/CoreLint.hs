@@ -2281,9 +2281,6 @@ markAllJoinsBadIf False m = m
 
 addGoodJoins :: [Var] -> LintM a -> LintM a
 addGoodJoins vars thing_inside
-  | null join_ids
-  = thing_inside
-  | otherwise
   = LintM $ \ env errs -> unLintM thing_inside (add_joins env) errs
   where
     add_joins env = env { le_joins = le_joins env `extendVarSetList` join_ids }
