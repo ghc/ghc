@@ -225,7 +225,8 @@ rtsPackageArgs = package rts ? do
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
-                                                    , "-g" ]
+                                                    , "-g3"
+                                                    , "-O0" ]
           , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
