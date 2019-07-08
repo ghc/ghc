@@ -342,7 +342,7 @@ pushStackElement(traverseState *ts, const stackElement se)
  *  c    - closure
  *  data - data associated with closure.
  */
-inline void
+STATIC_INLINE void
 traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data) {
     stackElement se;
 
@@ -352,6 +352,12 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
     se.info.type = posTypeFresh;
 
     pushStackElement(ts, se);
+};
+
+void
+traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data)
+{
+    traversePushClosure(ts, c, cp, data);
 };
 
 /**
