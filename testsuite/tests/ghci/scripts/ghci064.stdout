@@ -3,27 +3,45 @@ instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Monad Maybe -- Defined in ‘GHC.Base’
 instance GHC.Base.MonadPlus Maybe -- Defined in ‘GHC.Base’
+instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
+instance Foldable Maybe -- Defined in ‘Data.Foldable’
+instance Traversable Maybe -- Defined in ‘Data.Traversable’
 instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
 instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
 instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
 instance Semigroup _ => Semigroup (Maybe _)
   -- Defined in ‘GHC.Base’
 instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
+instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
+instance GHC.Generics.Generic (Maybe _)
+  -- Defined in ‘GHC.Generics’
+instance GHC.Generics.SingKind _ => GHC.Generics.SingKind (Maybe _)
+  -- Defined in ‘GHC.Generics’
 instance Eq _ => Eq [_] -- Defined in ‘GHC.Classes’
 instance Monoid [_] -- Defined in ‘GHC.Base’
 instance Ord _ => Ord [_] -- Defined in ‘GHC.Classes’
 instance Semigroup [_] -- Defined in ‘GHC.Base’
 instance Show _ => Show [_] -- Defined in ‘GHC.Show’
+instance Read _ => Read [_] -- Defined in ‘GHC.Read’
+instance GHC.Generics.Generic [_] -- Defined in ‘GHC.Generics’
 instance [safe] MyShow _ => MyShow [_]
   -- Defined at ghci064.hs:7:10
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’
+instance GHC.Generics.Generic [T] -- Defined in ‘GHC.Generics’
 instance [safe] MyShow [T] -- Defined at ghci064.hs:7:10
 instance [safe] MyShow [T] -- Defined at ghci064.hs:15:10
 instance Eq Bool -- Defined in ‘GHC.Classes’
 instance Ord Bool -- Defined in ‘GHC.Classes’
 instance Enum Bool -- Defined in ‘GHC.Enum’
 instance Show Bool -- Defined in ‘GHC.Show’
+instance Read Bool -- Defined in ‘GHC.Read’
 instance Bounded Bool -- Defined in ‘GHC.Enum’
+instance GHC.Generics.Generic Bool -- Defined in ‘GHC.Generics’
+instance GHC.Arr.Ix Bool -- Defined in ‘GHC.Arr’
+instance GHC.Generics.SingKind Bool -- Defined in ‘GHC.Generics’
+instance Data.Bits.Bits Bool -- Defined in ‘Data.Bits’
+instance Data.Bits.FiniteBits Bool -- Defined in ‘Data.Bits’
 instance Functor ((,) Int) -- Defined in ‘GHC.Base’
 instance Foldable ((,) Int) -- Defined in ‘Data.Foldable’
+instance Traversable ((,) Int) -- Defined in ‘Data.Traversable’
