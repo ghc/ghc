@@ -61,7 +61,9 @@ typedef enum {
     posTypeSRT,
     // Keeps a new object that was not inspected yet. Keeps a parent
     // element (stackPos.next.parent)
-    posTypeFresh
+    posTypeFresh,
+    // This stackElement is empty
+    posTypeEmpty
 } nextPosType;
 
 typedef union {
@@ -680,9 +682,10 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 
     debug("traversePop(): stackTop = 0x%x\n", ts->stackTop);
 
-    // Is this the last internal element? If so instead of modifying the current
-    // stackElement in place we actually remove it from the stack.
+    // Is this the last internal sub-element?
     bool last = false;
+
+    *c = NULL;
 
     do {
         if (isEmptyWorkStack(ts)) {
@@ -702,6 +705,9 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
             *data = se->data;
             popStackElement(ts);
             return;
+        } else if (se->info.type == posTypeEmpty) {
+            popStackElement(ts);
+            continue;
         }
 
         // Note: The first ptr of all of these was already returned as
@@ -747,13 +753,10 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
             // which field, and the rest of the bits indicate the
             // entry number (starting from zero).
             TRecEntry *entry;
-            uint32_t entry_no = se->info.next.step >> 2;
-            uint32_t field_no = se->info.next.step & 3;
-            if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
-                *c = NULL;
-                popStackElement(ts);
-                break; // this breaks out of the switch not the loop
-            }
+            StgWord step = se->info.next.step;
+            uint32_t entry_no = step >> 2;
+            uint32_t field_no = step & 3;
+
             entry = &((StgTRecChunk *)se->c)->entries[entry_no];
             if (field_no == 0) {
                 *c = (StgClosure *)entry->tvar;
@@ -762,7 +765,14 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
             } else {
                 *c = entry->new_value;
             }
-            se->info.next.step++;
+
+            se->info.next.step = ++step;
+
+            entry_no = step >> 2;
+            if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
+                se->info.type = posTypeEmpty;
+                continue;
+            }
             goto out;
         }
 
@@ -782,8 +792,8 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
         case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
-                popStackElement(ts);
-                break; // this breaks out of the switch not the loop
+                se->info.type = posTypeEmpty;
+                continue;
             }
             goto out;
 
@@ -824,8 +834,8 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
         case THUNK_1_1:
             *c = find_srt(&se->info);
             if(*c == NULL) {
-                popStackElement(ts);
-                break; // this breaks out of the switch not the loop
+                se->info.type = posTypeEmpty;
+                continue;
             }
             goto out;
 
@@ -871,7 +881,7 @@ out:
     *data = se->data;
 
     if(last)
-        popStackElement(ts);
+        se->info.type = posTypeEmpty;
 
     return;
 
