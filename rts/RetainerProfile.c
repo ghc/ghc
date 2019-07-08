@@ -255,9 +255,10 @@ associate( StgClosure *c, RetainerSet *s )
 }
 
 static bool
-retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
+retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackAccum *acc, stackData *out_data )
 {
     (void) first_visit;
+    (void) acc;
 
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
