@@ -24,6 +24,7 @@ curl --silent --show-error \
   -F "token=$HEAD_HACKAGE_TRIGGER_TOKEN" \
   -F "ref=master" \
   -F "variables[GHC_PIPELINE_ID]=$CI_PIPELINE_ID" \
+  -F "variables[EXTRA_HC_OPTS]=-dcore-lint" \
   https://gitlab.haskell.org/api/v4/projects/$HEAD_HACKAGE_PROJECT_ID/trigger/pipeline \
   | tee resp.json
 
