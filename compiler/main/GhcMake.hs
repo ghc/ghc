@@ -2198,15 +2198,17 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
           -- to by the user. But we need them, so we patch their locations in
           -- the ModSummary with temporary files.
           --
-        hi_file <-
+        (hi_file, o_file) <-
+          -- If ``-fwrite-interface` is specified, then the .o and .hi files
+          -- are written into `-odir` and `-hidir` respectively.  #16670
           if gopt Opt_WriteInterface dflags
-            then return $ ml_hi_file ms_location
-            else new_temp_file (hiSuf dflags) (dynHiSuf dflags)
-        o_temp_file <- new_temp_file (objectSuf dflags) (dynObjectSuf dflags)
+            then return (ml_hi_file ms_location, ml_obj_file ms_location)
+            else (,) <$> (new_temp_file (hiSuf dflags) (dynHiSuf dflags))
+                     <*> (new_temp_file (objectSuf dflags) (dynObjectSuf dflags))
         return $
           ms
           { ms_location =
-              ms_location {ml_hi_file = hi_file, ml_obj_file = o_temp_file}
+              ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
           , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
           }
       | otherwise = return ms
