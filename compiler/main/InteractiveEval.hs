@@ -104,7 +104,7 @@ import GHC.Exts
 import Data.Array
 import Exception
 
-import TcRnDriver ( runTcInteractive, tcRnType )
+import TcRnDriver ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
 
 import TcEnv (tcGetInstEnvs)
@@ -1048,6 +1048,8 @@ getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env -> do
   liftIO $ runInteractiveHsc hsc_env $ do
     ioMsgMaybe $ runTcInteractive hsc_env $ do
+      -- Bring class and instances from unqualified modules into scope, this fixes #16793.
+      loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
       fmap catMaybes . forM matches $ uncurry checkForExistence
 
