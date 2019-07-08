@@ -1,3 +1,5 @@
+# vim: set filetype=python:
+
 import re
 
 # Testsuite configuration setup for GHC
@@ -154,6 +156,16 @@ opt_ways      = [x[0] for x in config.way_flags.items()
 
 llvm_ways     = [x[0] for x in config.way_flags.items()
                       if '-fflvm' in x[1]]
+
+# N.B. This is here rather than testlib.py due to its depedence on prof_ways
+def req_th(name, opts):
+    """
+    Mark a test as requiring TemplateHaskell. Currently this means
+    that we don't run the test in the profasm when when GHC is
+    dynamically-linked since we can't load profiled objects in this case.
+    """
+    if ghc_dynamic():
+        return _omit_ways(name, opts, prof_ways)
 
 def get_compiler_info():
     s = getStdout([config.compiler, '--info'])
