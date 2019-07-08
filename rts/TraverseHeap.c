@@ -9,6 +9,7 @@
 
 #if defined(PROFILING)
 
+#include <string.h>
 #include "PosixSource.h"
 #include "Rts.h"
 #include "sm/Storage.h"
@@ -98,13 +99,13 @@ typedef struct {
 
 /**
  * An element of the traversal work-stack. Besides the closure itself this also
- * stores it's parent and associated data.
+ * stores it's parent, associated data and an accumulator.
  *
  * When 'info.type == posTypeFresh' a 'stackElement' represents just one
  * closure, namely 'c' and 'cp' being it's parent. Otherwise 'info' specifies an
  * offset into the children of 'c'. This is to support returning a closure's
  * children one-by-one without pushing one element per child onto the stack. See
- * traversePushChildren() and traversePop().
+ * traverseGetChildren() and traversePop().
  *
  */
 typedef struct stackElement_ {
@@ -112,6 +113,7 @@ typedef struct stackElement_ {
     StgClosure *c;
     stackElement *sep; // stackElement of parent closure
     stackData data;
+    stackAccum accum;
 } stackElement;
 
 
@@ -358,6 +360,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackEleme
     se.info.next.cp = cp;
     se.sep = sep;
     se.data = data;
+    se.accum = (stackAccum)(StgWord)0;
     se.info.type = posTypeFresh;
 
     pushStackElement(ts, se);
@@ -370,15 +373,49 @@ traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData dat
 };
 
 /**
- * traversePushChildren() extracts the first child of 'c' in 'first_child' and
- * conceptually pushes all remaining children of 'c' onto the traversal stack
- * while associating 'data' with the pushed elements to be returned upon poping.
+ * Push an empty stackElement onto the traversal work-stack for the sole purpose
+ * of triggering the return callback 'traversalState.return_cb' for the closure
+ * '*c' when traversing of it's children is complete.
  *
- * If 'c' has no children, 'first_child' is set to NULL and nothing is pushed
- * onto the stack.
+ * This is needed for code-paths which don't inherently have to push a
+ * stackElement. c.f. traverseWorkStack.
  *
- * If 'c' has only one child, 'first_child' is set to that child and nothing is
- * pushed onto the stack.
+ * When return_cb is NULL this function does nothing.
+ */
+STATIC_INLINE stackElement *
+traversePushReturn(traverseState *ts, StgClosure *c, stackAccum acc, stackElement *sep)
+{
+    if(!ts->return_cb)
+        return sep;
+
+    stackElement se;
+    se.c = c;
+    se.info.next.cp = NULL;
+    se.accum = acc;
+    se.sep = sep;
+    memset(&se.data, 0, sizeof(se.data));
+    // return frames never emit closures, traversePop just skips over them. So
+    // the data field is simply never used.
+    se.info.type = posTypeEmpty;
+    return pushStackElement(ts, se);
+};
+
+/**
+ * traverseGetChildren() extracts the first child of 'c' in 'first_child' and if
+ * 'other_children' is true returns a stackElement in 'se' which
+ * conceptually contains all remaining children of 'c'.
+ *
+ * If 'c' has no children, 'first_child' is set to NULL, other_children is set
+ * to false and nothing is returned in 'se'.
+ *
+ * If 'c' has only one child, 'first_child' is set to that child, other_children
+ * is set to false and nothing is returned in 'se'.
+ *
+ * Otherwise 'other_children' is set to true and a stackElement representing the
+ * other children is returned in 'se'.
+ *
+ * Note that when 'se' is set only the fields fields 'se.c' and 'se.info'
+ * are initialized. It is the caller's responsibility to initialize the rest.
  *
  * Invariants:
  *
@@ -386,17 +423,10 @@ traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData dat
  *       be any stack objects.
  *
  * Note: SRTs are considered to be children as well.
- *
- * Note: When pushing onto the stack we only really push one 'stackElement'
- * representing all children onto the stack. See traversePop()
  */
 STATIC_INLINE void
-traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stackData data, StgClosure **first_child)
+traverseGetChildren(StgClosure *c, StgClosure **first_child, bool *other_children, stackElement *se)
 {
-    stackElement se;
-
-    debug("traversePushChildren(): stackTop = 0x%x\n", ts->stackTop);
-
     ASSERT(get_itbl(c)->type != TSO);
     ASSERT(get_itbl(c)->type != AP_STACK);
 
@@ -404,11 +434,11 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     // fill in se
     //
 
-    se.c = c;
-    se.data = data;
-    se.sep = *sep;
+    se->c = c;
 
-    // fill in se.info
+    *other_children = false;
+
+    // fill in se->info
     switch (get_itbl(c)->type) {
         // no child, no SRT
     case CONSTR_0_1:
@@ -434,16 +464,16 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
         *first_child = c->payload[0];
         return;
 
-        // For CONSTR_2_0 and MVAR, we use se.info.step to record the position
+        // For CONSTR_2_0 and MVAR, we use se->info.step to record the position
         // of the next child. We do not write a separate initialization code.
         // Also we do not have to initialize info.type;
 
         // two children (fixed), no SRT
-        // need to push a stackElement, but nothing to store in se.info
+        // need to push a stackElement, but nothing to store in se->info
     case CONSTR_2_0:
         *first_child = c->payload[0];         // return the first pointer
-        se.info.type = posTypeStep;
-        se.info.next.step = 2;            // 2 = second
+        se->info.type = posTypeStep;
+        se->info.next.step = 2;            // 2 = second
         break;
 
         // three children (fixed), no SRT
@@ -453,15 +483,15 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
         // head must be TSO and the head of a linked list of TSOs.
         // Shoule it be a child? Seems to be yes.
         *first_child = (StgClosure *)((StgMVar *)c)->head;
-        se.info.type = posTypeStep;
-        se.info.next.step = 2;            // 2 = second
+        se->info.type = posTypeStep;
+        se->info.next.step = 2;            // 2 = second
         break;
 
         // three children (fixed), no SRT
     case WEAK:
         *first_child = ((StgWeak *)c)->key;
-        se.info.type = posTypeStep;
-        se.info.next.step = 2;
+        se->info.type = posTypeStep;
+        se->info.next.step = 2;
         break;
 
         // layout.payload.ptrs, no SRT
@@ -471,9 +501,9 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case PRIM:
     case MUT_PRIM:
     case BCO:
-        init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs,
+        init_ptrs(&se->info, get_itbl(c)->layout.payload.ptrs,
                   (StgPtr)c->payload);
-        *first_child = find_ptrs(&se.info);
+        *first_child = find_ptrs(&se->info);
         if (*first_child == NULL)
             return;   // no child
         break;
@@ -483,9 +513,9 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case MUT_ARR_PTRS_DIRTY:
     case MUT_ARR_PTRS_FROZEN_CLEAN:
     case MUT_ARR_PTRS_FROZEN_DIRTY:
-        init_ptrs(&se.info, ((StgMutArrPtrs *)c)->ptrs,
+        init_ptrs(&se->info, ((StgMutArrPtrs *)c)->ptrs,
                   (StgPtr)(((StgMutArrPtrs *)c)->payload));
-        *first_child = find_ptrs(&se.info);
+        *first_child = find_ptrs(&se->info);
         if (*first_child == NULL)
             return;
         break;
@@ -495,9 +525,9 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case SMALL_MUT_ARR_PTRS_DIRTY:
     case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
     case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-        init_ptrs(&se.info, ((StgSmallMutArrPtrs *)c)->ptrs,
+        init_ptrs(&se->info, ((StgSmallMutArrPtrs *)c)->ptrs,
                   (StgPtr)(((StgSmallMutArrPtrs *)c)->payload));
-        *first_child = find_ptrs(&se.info);
+        *first_child = find_ptrs(&se->info);
         if (*first_child == NULL)
             return;
         break;
@@ -506,8 +536,8 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case FUN_STATIC:
     case FUN:           // *c is a heap object.
     case FUN_2_0:
-        init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
-        *first_child = find_ptrs(&se.info);
+        init_ptrs(&se->info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
+        *first_child = find_ptrs(&se->info);
         if (*first_child == NULL)
             // no child from ptrs, so check SRT
             goto fun_srt_only;
@@ -515,9 +545,9 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
 
     case THUNK:
     case THUNK_2_0:
-        init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs,
+        init_ptrs(&se->info, get_itbl(c)->layout.payload.ptrs,
                   (StgPtr)((StgThunk *)c)->payload);
-        *first_child = find_ptrs(&se.info);
+        *first_child = find_ptrs(&se->info);
         if (*first_child == NULL)
             // no child from ptrs, so check SRT
             goto thunk_srt_only;
@@ -528,21 +558,21 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case FUN_1_1:
         *first_child = c->payload[0];
         ASSERT(*first_child != NULL);
-        init_srt_fun(&se.info, get_fun_itbl(c));
+        init_srt_fun(&se->info, get_fun_itbl(c));
         break;
 
     case THUNK_1_0:
     case THUNK_1_1:
         *first_child = ((StgThunk *)c)->payload[0];
         ASSERT(*first_child != NULL);
-        init_srt_thunk(&se.info, get_thunk_itbl(c));
+        init_srt_thunk(&se->info, get_thunk_itbl(c));
         break;
 
     case FUN_0_1:      // *c is a heap object.
     case FUN_0_2:
     fun_srt_only:
-        init_srt_fun(&se.info, get_fun_itbl(c));
-        *first_child = find_srt(&se.info);
+        init_srt_fun(&se->info, get_fun_itbl(c));
+        *first_child = find_srt(&se->info);
         if (*first_child == NULL)
             return;     // no child
         break;
@@ -554,16 +584,16 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
     case THUNK_0_1:
     case THUNK_0_2:
     thunk_srt_only:
-        init_srt_thunk(&se.info, get_thunk_itbl(c));
-        *first_child = find_srt(&se.info);
+        init_srt_thunk(&se->info, get_thunk_itbl(c));
+        *first_child = find_srt(&se->info);
         if (*first_child == NULL)
             return;     // no child
         break;
 
     case TREC_CHUNK:
         *first_child = (StgClosure *)((StgTRecChunk *)c)->prev_chunk;
-        se.info.type = posTypeStep;
-        se.info.next.step = 0;  // entry no.
+        se->info.type = posTypeStep;
+        se->info.next.step = 0;  // entry no.
         break;
 
         // cannot appear
@@ -589,22 +619,14 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackElement **sep, stack
         return;
     }
 
-    // se.info.next.cp has to be initialized when type==posTypeFresh. We don't
+    // se->info.next.cp has to be initialized when type==posTypeFresh. We don't
     // do that here though. So type must be !=posTypeFresh.
-    ASSERT(se.info.type != posTypeFresh);
+    ASSERT(se->info.type != posTypeFresh);
 
-    *sep = pushStackElement(ts, se);
+    *other_children = true;
 }
 
-/**
- *  popStackElement(): Remove a depleted stackElement from the top of the
- *  traversal work-stack.
- *
- *  Invariants:
- *    stackTop cannot be equal to stackLimit unless the whole stack is
- *    empty, in which case popStackElement() is not allowed.
- */
-static void
+STATIC_INLINE void
 popStackElement(traverseState *ts) {
     debug("popStackElement(): stackTop = 0x%x\n", ts->stackTop);
 
@@ -660,6 +682,26 @@ popStackElement(traverseState *ts) {
 }
 
 /**
+ *  callReturnAndPopStackElement(): Call 'traversalState.return_cb' and remove a
+ *  depleted stackElement from the top of the traversal work-stack.
+ *
+ *  Invariants:
+ *    stackTop cannot be equal to stackLimit unless the whole stack is
+ *    empty, in which case popStackElement() is not allowed.
+ */
+static void
+callReturnAndPopStackElement(traverseState *ts)
+{
+    stackElement *se = ts->stackTop;
+
+    if(ts->return_cb)
+        ts->return_cb(se->c, se->accum,
+                      se->sep->c, &se->sep->accum);
+
+    popStackElement(ts);
+}
+
+/**
  *  Finds the next object to be considered for retainer profiling and store
  *  its pointer to *c.
  *
@@ -699,8 +741,8 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
         }
 
         // Note: Below every `break`, where the loop condition is true, must be
-        // accompanied by a popStackElement() otherwise this is an infinite
-        // loop.
+        // accompanied by a popStackElement()/callReturnAndPopStackElement()
+        // call otherwise this is an infinite loop.
         se = ts->stackTop;
 
         *sep = se->sep;
@@ -713,7 +755,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
             popStackElement(ts);
             return;
         } else if (se->info.type == posTypeEmpty) {
-            popStackElement(ts);
+            callReturnAndPopStackElement(ts);
             continue;
         }
 
@@ -886,9 +928,12 @@ out:
 
     *cp = se->c;
     *data = se->data;
+    *sep = se;
 
-    if(last)
+    if(last && ts->return_cb)
         se->info.type = posTypeEmpty;
+    else if(last)
+        popStackElement(ts);
 
     return;
 
@@ -1158,6 +1203,7 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     stackData data, child_data;
     StgWord typeOfc;
     stackElement *sep;
+    bool other_children;
 
     // Now we flip the flip bit.
     flip = flip ^ 1;
@@ -1247,10 +1293,12 @@ inner_loop:
         break;
     }
 
+    stackAccum accum = {};
+
     // If this is the first visit to c, initialize its data.
     bool first_visit = traverseMaybeInitClosureData(c);
     bool traverse_children
-        = visit_cb(c, cp, data, first_visit, (stackData*)&child_data);
+        = visit_cb(c, cp, data, first_visit, &accum, &child_data);
     if(!traverse_children)
         goto loop;
 
@@ -1261,6 +1309,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
+        sep = traversePushReturn(ts, c, accum, sep);
         traversePushStack(ts, c, sep, child_data,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
@@ -1269,6 +1318,8 @@ inner_loop:
     case TSO:
     {
         StgTSO *tso = (StgTSO *)c;
+
+        sep = traversePushReturn(ts, c, accum, sep);
 
         traversePushClosure(ts, (StgClosure *) tso->stackobj, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, sep, child_data);
@@ -1288,6 +1339,9 @@ inner_loop:
     case BLOCKING_QUEUE:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
+
+        sep = traversePushReturn(ts, c, accum, sep);
+
         traversePushClosure(ts, (StgClosure *) bq->link, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) bq->bh, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) bq->owner, c, sep, child_data);
@@ -1297,6 +1351,9 @@ inner_loop:
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
+
+        sep = traversePushReturn(ts, c, accum, sep);
+
         traversePAP(ts, c, sep, child_data, pap->fun, pap->payload, pap->n_args);
         goto loop;
     }
@@ -1304,11 +1361,16 @@ inner_loop:
     case AP:
     {
         StgAP *ap = (StgAP *)c;
+
+        sep = traversePushReturn(ts, c, accum, sep);
+
         traversePAP(ts, c, sep, child_data, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
+        sep = traversePushReturn(ts, c, accum, sep);
+
         traversePushClosure(ts, ((StgAP_STACK *)c)->fun, c, sep, child_data);
         traversePushStack(ts, c, sep, child_data,
                     (StgPtr)((StgAP_STACK *)c)->payload,
@@ -1317,16 +1379,38 @@ inner_loop:
         goto loop;
     }
 
-    traversePushChildren(ts, c, &sep, child_data, &first_child);
+    stackElement se;
+    traverseGetChildren(c, &first_child, &other_children, &se);
+
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
-    // object. traversePushChildren() may or may not push a stackElement on the
-    // stack.
-    if (first_child == NULL)
+    // object.
+    if(first_child == NULL && ts->return_cb) { // no children
+        // This is only true when we're pushing additional return frames onto
+        // the stack due to return_cb, so don't get any funny ideas about
+        // replacing 'cp' by sep.
+        ASSERT(sep->c == cp);
+        ts->return_cb(c, accum, cp, &sep->accum);
         goto loop;
+    } else if (first_child == NULL) { // no children
+        goto loop;
+    } else if(!other_children) {      // one child
+        // Pushing a return frame for one child is pretty inefficent. We could
+        // optimize this by storing a pointer to cp in c's profiling header
+        // instead. I tested this out in a Haskell prototype of this code and it
+        // works out but is rather fiddly.
+        //
+        // See Haskell model code here:
+        //
+        //     https://gitlab.haskell.org/ghc/ghc/snippets/1461
+        sep = traversePushReturn(ts, c, accum, sep);
+    } else {                          // many children
+        se.sep = sep;
+        se.data = child_data;
+        se.accum = accum;
 
-    // sep is now the stack element traversePushChildren just pushed onto the
-    // stack.
+        sep = pushStackElement(ts, se);
+    }
 
     // (c, cp, data) = (first_child, c, child_data)
     data = child_data;
