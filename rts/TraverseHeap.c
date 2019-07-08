@@ -298,7 +298,7 @@ find_srt( stackPos *info )
  * traversal work-stack.
  */
 static void
-pushStackElement(traverseState *ts, stackElement *se)
+pushStackElement(traverseState *ts, const stackElement se)
 {
     bdescr *nbd;      // Next Block Descriptor
     if (ts->stackTop - 1 < ts->stackBottom) {
@@ -325,7 +325,7 @@ pushStackElement(traverseState *ts, stackElement *se)
     // following statement by either a memcpy() call or a switch statement
     // on the type of the element. Currently, the size of stackElement is
     // small enough (5 words) that this direct assignment seems to be enough.
-    *ts->stackTop = *se;
+    *ts->stackTop = se;
 
     ts->stackSize++;
     if (ts->stackSize > ts->maxStackSize) ts->maxStackSize = ts->stackSize;
@@ -349,7 +349,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
     se.data = data;
     se.info.type = posTypeFresh;
 
-    pushStackElement(ts, &se);
+    pushStackElement(ts, se);
 };
 
 /**
@@ -576,7 +576,7 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
     // here though. So type must be !=posTypeFresh.
     ASSERT(se.info.type != posTypeFresh);
 
-    pushStackElement(ts, &se);
+    pushStackElement(ts, se);
 }
 
 /**
