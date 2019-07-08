@@ -312,11 +312,17 @@ simple_app env (Tick t e) as
 -- The let might appear there as a result of inlining
 -- e.g.   let f = let x = e in b
 --        in f a1 a2
--- (#13208)
-simple_app env (Let bind body) as
+--   (#13208)
+-- However, do /not/ do this transformation for join points
+--    See Note [simple_app and join points]
+simple_app env (Let bind body) args
   = case simple_opt_bind env bind of
-      (env', Nothing)   -> simple_app env' body as
-      (env', Just bind) -> Let bind (simple_app env' body as)
+      (env', Nothing)   -> simple_app env' body args
+      (env', Just bind')
+        | isJoinBind bind' -> finish_app env expr' args
+        | otherwise        -> Let bind' (simple_app env' body args)
+        where
+          expr' = Let bind' (simple_opt_expr env' body)
 
 simple_app env e as
   = finish_app env (simple_opt_expr env e) as
@@ -494,6 +500,34 @@ the join-point arity invariant.  #15108 was caused by simplifying
 the RHS with simple_opt_expr, which does eta-reduction.  Solution:
 simplify the RHS of a join point by simplifying under the lambdas
 (which of course should be there).
+
+Note [simple_app and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general for let-bindings we can do this:
+   (let { x = e } in b) a  ==>  let { x = e } in b a
+
+But not for join points!  For two reasons:
+
+- We would need to push the continuation into the RHS:
+   (join { j = e } in b) a  ==>  let { j' = e a } in b[j'/j] a
+                                      NB ----^^
+  and also change the type of j, hence j'.
+  That's a bit sophisticated for the very simple optimiser.
+
+- We might end up with something like
+    join { j' = e a } in
+    (case blah of        )
+    (  True  -> j' void# ) a
+    (  False -> blah     )
+  and now the call to j' doesn't look like a tail call, and
+  Lint may reject.  I say "may" because this is /explicitly/
+  allowed in the "Compiling without Continuations" paper
+  (Section 3, "Managing \Delta").  But GHC currently does not
+  allow this slightly-more-flexible form.  See CoreSyn
+  Note [Join points are less general than the paper].
+
+The simple thing to do is to disable this transformation
+for join points in the simple optimiser
 -}
 
 ----------------------
