@@ -708,10 +708,10 @@ callReturnAndPopStackElement(traverseState *ts)
  *  If the unprocessed object was stored in the stack (posTypeFresh), the
  *  this object is returned as-is. Otherwise Test if the topmost stack
  *  element indicates that more objects are left,
- *  and if so, retrieve the first object and store its pointer to *c. Also,
+ *  and if so, retrieve the next object and store its pointer to *c. Also,
  *  set *cp and *data appropriately, both of which are stored in the stack
- *  element.  The topmost stack element then is overwritten so as for it to now
- *  denote the next object.
+ *  element.  The topmost stack element is then overwritten so it denotes the
+ *  next object.
  *
  *  If the topmost stack element indicates no more objects are left, pop
  *  off the stack element until either an object can be retrieved or
@@ -1211,7 +1211,7 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     // c = Current closure                           (possibly tagged)
     // cp = Current closure's Parent                 (NOT tagged)
     // data = current closures' associated data      (NOT tagged)
-    // data_out = data to associate with current closure's children
+    // child_data = data to associate with current closure's children
 
 loop:
     traversePop(ts, &c, &cp, &data, &sep);
