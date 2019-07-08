@@ -349,9 +349,9 @@ retainRoot(void *user, StgClosure **tl)
     c = UNTAG_CLOSURE(*tl);
     traverseMaybeInitClosureData(c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
-        traversePushClosure(ts, c, c, (stackData)getRetainerFrom(c));
+        traversePushRoot(ts, c, c, (stackData)getRetainerFrom(c));
     } else {
-        traversePushClosure(ts, c, c, (stackData)CCS_SYSTEM);
+        traversePushRoot(ts, c, c, (stackData)CCS_SYSTEM);
     }
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));
