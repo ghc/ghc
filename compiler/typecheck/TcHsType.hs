@@ -8,6 +8,7 @@
 {-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcHsType (
         -- Type signatures
@@ -299,7 +300,7 @@ tcTopLHsType hs_sig_type ctxt_kind
 tcTopLHsType (XHsImplicitBndrs nec) _ = noExtCon nec
 
 -----------------
-tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
+tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
 -- Like tcHsSigType, but for the ...deriving( C t1 ty2 ) clause
 -- Returns the C, [ty1, ty2, and the kinds of C's remaining arguments
 -- E.g.    class C (a::*) (b::k->k)
@@ -313,52 +314,37 @@ tcHsDeriv hs_ty
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, (cls, tys, kind_args))
+           Just (cls, tys) -> return (tvs, cls, tys, kind_args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
--- | Typecheck something within the context of a deriving strategy.
--- This is of particular importance when the deriving strategy is @via@.
--- For instance:
---
--- @
--- deriving via (S a) instance C (T a)
--- @
---
--- We need to typecheck @S a@, and moreover, we need to extend the tyvar
--- environment with @a@ before typechecking @C (T a)@, since @S a@ quantified
--- the type variable @a@.
-tcDerivStrategy
-  :: forall a.
-     Maybe (DerivStrategy GhcRn) -- ^ The deriving strategy
-  -> TcM ([TyVar], a) -- ^ The thing to typecheck within the context of the
-                      -- deriving strategy, which might quantify some type
-                      -- variables of its own.
-  -> TcM (Maybe (DerivStrategy GhcTc), [TyVar], a)
-     -- ^ The typechecked deriving strategy, all quantified tyvars, and
-     -- the payload of the typechecked thing.
-tcDerivStrategy mds thing_inside
-  = case mds of
+-- | Typecheck a deriving strategy. For most deriving strategies, this is a
+-- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
+tcDerivStrategy ::
+     Maybe (LDerivStrategy GhcRn)
+     -- ^ The deriving strategy
+  -> TcM (Maybe (LDerivStrategy GhcTc), [TyVar])
+     -- ^ The typechecked deriving strategy and the tyvars that it binds
+     -- (if using 'ViaStrategy').
+tcDerivStrategy mb_lds
+  = case mb_lds of
       Nothing -> boring_case Nothing
-      Just ds -> do (ds', tvs, thing) <- tc_deriv_strategy ds
-                    pure (Just ds', tvs, thing)
+      Just (dL->L loc ds) ->
+        setSrcSpan loc $ do
+          (ds', tvs) <- tc_deriv_strategy ds
+          pure (Just (cL loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
-                      -> TcM (DerivStrategy GhcTc, [TyVar], a)
+                      -> TcM (DerivStrategy GhcTc, [TyVar])
     tc_deriv_strategy StockStrategy    = boring_case StockStrategy
     tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
-      ty' <- checkNoErrs $
-             tcTopLHsType ty AnyKind
+      ty' <- checkNoErrs $ tcTopLHsType ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'
-      tcExtendTyVarEnv via_tvs $ do
-        (thing_tvs, thing) <- thing_inside
-        pure (ViaStrategy via_pred, via_tvs ++ thing_tvs, thing)
+      pure (ViaStrategy via_pred, via_tvs)
 
-    boring_case :: mds -> TcM (mds, [TyVar], a)
-    boring_case mds = do
-      (thing_tvs, thing) <- thing_inside
-      pure (mds, thing_tvs, thing)
+    boring_case :: ds -> TcM (ds, [TyVar])
+    boring_case ds = pure (ds, [])
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn
