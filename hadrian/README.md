@@ -196,6 +196,32 @@ is close to zero (see [#197][test-issue]).
 * `build -B` forces Shake to rerun all rules, even if the previous build results
 are still up-to-date.
 
+#### Staged compilation
+
+GHC is a self-hosted compiler and consequently the build proceeds in several
+stages:
+
+1. The build begins with a user-provided installation of GHC called the
+   stage0 (or bootstrap) compiler which is used (via the `build.*.sh` scripts)
+   to build Hadrian.
+1. Hadrian uses the stage0 compiler to build a stage1 compiler (somewhat
+   confusingly found in `_build/stage0/bin/ghc`), linking against the stage0
+   compiler's core libraries (e.g. `base`).
+1. The stage1 compiler is used to build new core libraries (found in
+   `_build/stage1/lib`).
+1. The stage1 compiler is used to build a stage2 compiler (found in
+   `_build/stage1/bin/ghc`), linking against these new core libraries.
+1. Optionally (see the [Building Stage3](#building-stage3) section below) the
+   stage2 compiler can be used to build a stage3 compiler (found in
+   `build/stage2/bin/ghc`) as a further smoke-test.
+
+Note that the stage directories in the `_build` directory can be thought of as
+named after the stage that was used to *build* the artifacts in each directory.
+
+These stages can be summarized graphically:
+
+![an overview of the stages of a Hadrian compilation](doc/staged-compilation.svg)
+
 #### Documentation
 
 To build GHC documentation, run `build docs`. Note that finer-grain
