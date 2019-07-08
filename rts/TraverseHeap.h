@@ -106,7 +106,7 @@ typedef bool (*visitClosure_cb) (
     stackData *child_data);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
-void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
+void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 bool traverseMaybeInitClosureData(StgClosure *c);
 
 void initializeTraverseStack(traverseState *ts);
