@@ -196,7 +196,7 @@ def req_th(name, opts):
     dynamically-linked since we can't load profiled objects in this case.
     """
     if ghc_dynamic():
-        omit_ways(['profasm'])
+        return _omit_ways(name, opts, ['profasm'])
 
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
