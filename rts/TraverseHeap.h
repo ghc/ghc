@@ -33,6 +33,10 @@ typedef union stackData_ {
     retainer c_child_r;
 } stackData;
 
+typedef union stackAccum_ {
+    StgWord subtree_sizeW;
+} stackAccum;
+
 typedef struct stackElement_ stackElement;
 
 typedef struct traverseState_ {
@@ -77,13 +81,31 @@ typedef struct traverseState_ {
      *
      * Note:
      *
-     *   stackSize is just an estimate measure of the depth of the graph. The
-     *   reason is that some heap objects have only a single child and may not
-     *   result in a new element being pushed onto the stack. Therefore, at the
-     *   end of retainer profiling, maxStackSize is some value no greater than
-     *   the actual depth of the graph.
+     *   When return_cb == NULL stackSize is just an estimate measure of the
+     *   depth of the graph. The reason is that some heap objects have only a
+     *   single child and may not result in a new element being pushed onto the
+     *   stack. Therefore, at the end of retainer profiling, maxStackSize is
+     *   some value no greater than the actual depth of the graph.
      */
     int stackSize, maxStackSize;
+
+    /**
+     * Callback called when processing of a closure 'c' is complete, i.e. when
+     * all it's children have been processed. Note: This includes leaf nodes
+     * without children.
+     *
+     * @param c     The closure who's processing just completed.
+     * @param acc   The current value of the accumulator for 'c' on the
+     *              stack. It's about to be removed, hence the 'const'
+     *              qualifier. This is the same accumulator 'visit_cb' got
+     *              passed when 'c' was visited.
+     *
+     * @param c_parent    The parent closure of 'c'
+     * @param acc_parent  The accumulator associated with 'c_parent', currently
+     *                    on the stack.
+     */
+    void (*return_cb)(StgClosure *c, const stackAccum acc,
+                      StgClosure *c_parent, stackAccum *acc_parent);
 } traverseState;
 
 /**
@@ -103,6 +125,7 @@ typedef bool (*visitClosure_cb) (
     const StgClosure *cp,
     const stackData data,
     const bool first_visit,
+    stackAccum *accum,
     stackData *child_data);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
