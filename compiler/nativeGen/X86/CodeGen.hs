@@ -111,25 +111,12 @@ sse2Enabled = do
     ArchX86    -> return True
     _          -> panic "trying to generate x86/x86_64 on the wrong platform"
 
-sse4_1Enabled :: NatM Bool
-sse4_1Enabled = do
-  dflags <- getDynFlags
-  return (isSse4_1Enabled dflags)
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
   dflags <- getDynFlags
   return (isSse4_2Enabled dflags)
 
-sseEnabled :: NatM Bool
-sseEnabled = do
-  dflags <- getDynFlags
-  return (isSseEnabled dflags)
-
-avxEnabled :: NatM Bool
-avxEnabled = do
-  dflags <- getDynFlags
-  return (isAvxEnabled dflags)
 
 cmmTopCodeGen
         :: RawCmmDecl
@@ -228,7 +215,6 @@ stmtToInstrs bid stmt = do
     CmmAssign reg src
       | isFloatType ty         -> assignReg_FltCode format reg src
       | is32Bit && isWord64 ty -> assignReg_I64Code      reg src
-      | isVecType ty           -> assignReg_VecCode format reg src
       | otherwise              -> assignReg_IntCode format reg src
         where ty = cmmRegType dflags reg
               format = cmmTypeFormat ty
@@ -236,7 +222,6 @@ stmtToInstrs bid stmt = do
     CmmStore addr src
       | isFloatType ty         -> assignMem_FltCode format addr src
       | is32Bit && isWord64 ty -> assignMem_I64Code      addr src
-      | isVecType ty           -> assignMem_VecCode format addr src
       | otherwise              -> assignMem_IntCode format addr src
         where ty = cmmExprType dflags src
               format = cmmTypeFormat ty
@@ -322,15 +307,6 @@ getRegisterReg platform  (CmmGlobal mid)
         -- ones which map to a real machine register on this
         -- platform.  Hence ...
 
-
-getVecRegisterReg :: Platform -> Bool -> Format -> CmmReg -> Reg
-getVecRegisterReg _ use_avx format (CmmLocal (LocalReg u pk))
-  | isVecType pk && use_avx = RegVirtual (mkVirtualReg u format)
-  | otherwise               = pprPanic
-                              (unlines ["avx flag is not enabled" ,
-                                        "or this is not a vector register"])
-                              (ppr pk)
-getVecRegisterReg platform _use_avx _format c = getRegisterReg platform c
 
 -- | Memory addressing modes passed up the tree.
 data Amode
@@ -527,13 +503,6 @@ iselExpr64 expr
 
 
 --------------------------------------------------------------------------------
-
--- This is a helper data type which helps reduce the code duplication for
--- the code generation of arithmetic operations. This is not specifically
--- targetted for any particular type like Int8, Int32 etc
-data VectorArithInstns = VA_Add | VA_Sub | VA_Mul | VA_Div
-
-
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do dflags <- getDynFlags
                    is32Bit <- is32BitPlatform
@@ -551,24 +520,16 @@ getRegister' dflags is32Bit (CmmReg reg)
             do reg' <- getPicBaseNat (archWordFormat is32Bit)
                return (Fixed (archWordFormat is32Bit) reg' nilOL)
         _ ->
-            do use_sse2 <- sse2Enabled
-               use_avx <- avxEnabled
-               let cmmregtype = cmmRegType dflags reg
-               if isVecType cmmregtype
-                 then return (vectorRegister cmmregtype use_avx use_sse2)
-                 else return (standardRegister cmmregtype)
-  where
-    vectorRegister :: CmmType -> Bool -> Bool -> Register
-    vectorRegister reg_ty use_avx use_sse2
-      | use_avx || use_sse2 =
-        let vecfmt   = cmmTypeFormat reg_ty
-            platform = targetPlatform dflags
-        in (Fixed vecfmt (getVecRegisterReg platform True vecfmt reg) nilOL)
-      | otherwise = panic "Please enable the -mavx or -msse2 flag"
+            do
+               let
+                 fmt = cmmTypeFormat (cmmRegType dflags reg)
+                 format  = fmt
+               --
+               let platform = targetPlatform dflags
+               return (Fixed format
+                             (getRegisterReg platform  reg)
+                             nilOL)
 
-    standardRegister crt =
-      let platform = targetPlatform dflags
-       in (Fixed (cmmTypeFormat crt) (getRegisterReg platform reg) nilOL)
 
 getRegister' dflags is32Bit (CmmRegOff r n)
   = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
@@ -670,69 +631,7 @@ getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
       return $ Any II64 (\dst -> unitOL $
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
-getRegister' _ _ (CmmMachOp mop [x, y, z]) = do -- ternary MachOps
-  sse4_1 <- sse4_1Enabled
-  sse2   <- sse2Enabled
-  sse    <- sseEnabled
-  case mop of
-    MO_VF_Insert l W32  | sse4_1 && sse -> vector_float_pack l W32 x y z
-                        | otherwise
-                          -> sorry "Please enable the -msse4 and -msse flag"
-    MO_VF_Insert l W64  | sse2   && sse -> vector_float_pack l W64 x y z
-                        | otherwise
-                          -> sorry "Please enable the -msse2 and -msse flag"
-    _other                              -> incorrectOperands
-    where
-    vector_float_pack :: Length
-                      -> Width
-                      -> CmmExpr
-                      -> CmmExpr
-                      -> CmmExpr
-                      -> NatM Register
-    vector_float_pack len W32 expr1 expr2 (CmmLit offset)
-      = do
-      fn          <- getAnyReg expr1
-      (r, exp)    <- getSomeReg expr2
-      let f        = VecFormat len FmtFloat W32
-          imm      = litToImm offset
-          code dst = exp `appOL`
-                     (fn dst) `snocOL`
-                     (INSERTPS f (OpImm imm) (OpReg r) dst)
-       in return $ Any f code
-    vector_float_pack len W64 expr1 expr2 (CmmLit offset)
-      = do
-      Amode addr addr_code <- getAmode expr2
-      (r, exp) <- getSomeReg expr1
-
-      -- fn <- getAnyReg expr1
-      -- (r, exp) <- getSomeReg expr2
-      let f = VecFormat len FmtDouble W64
-          code dst
-            = case offset of
-                CmmInt 0  _ -> exp `appOL` addr_code `snocOL`
-                               (MOVL f (OpAddr addr) (OpReg r)) `snocOL`
-                               (MOVU f (OpReg r) (OpReg dst))
-                CmmInt 16 _ -> exp `appOL` addr_code `snocOL`
-                               (MOVH f (OpAddr addr) (OpReg r)) `snocOL`
-                               (MOVU f (OpReg r) (OpReg dst))
-                _ -> panic "Error in offset while packing"
-          -- code dst
-          --   = case offset of
-          --       CmmInt 0  _ -> exp `appOL`
-          --                      (fn dst) `snocOL`
-          --                      (MOVL f (OpReg r) (OpReg dst))
-          --       CmmInt 16 _ -> exp `appOL`
-          --                      (fn dst) `snocOL`
-          --                      (MOVH f (OpReg r) (OpReg dst))
-          --       _ -> panic "Error in offset while packing"
-       in return $ Any f code
-    vector_float_pack _ _ _ c _
-      = pprPanic "Pack not supported for : " (ppr c)
-
 getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
-    sse2   <- sse2Enabled
-    sse    <- sseEnabled
-    avx    <- avxEnabled
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -809,28 +708,23 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_FS_Conv from to -> coerceFP2Int from to x
       MO_SF_Conv from to -> coerceInt2FP from to x
 
-      MO_V_Insert {}      -> needLlvm
-      MO_V_Extract {}     -> needLlvm
-      MO_V_Add {}         -> needLlvm
-      MO_V_Sub {}         -> needLlvm
-      MO_V_Mul {}         -> needLlvm
-      MO_VS_Quot {}       -> needLlvm
-      MO_VS_Rem {}        -> needLlvm
-      MO_VS_Neg {}        -> needLlvm
-      MO_VU_Quot {}       -> needLlvm
-      MO_VU_Rem {}        -> needLlvm
-      MO_VF_Broadcast {}  -> incorrectOperands
-      MO_VF_Insert {}     -> incorrectOperands
-      MO_VF_Extract {}    -> incorrectOperands
-      MO_VF_Add {}        -> incorrectOperands
-      MO_VF_Sub {}        -> incorrectOperands
-      MO_VF_Mul {}        -> incorrectOperands
-      MO_VF_Quot {}       -> incorrectOperands
-
-      MO_VF_Neg l w  | avx           -> vector_float_negate_avx l w x
-                     | sse && sse2   -> vector_float_negate_sse l w x
-                     | otherwise
-                       -> sorry "Please enable the -mavx or -msse, -msse2 flag"
+      MO_V_Insert {}   -> needLlvm
+      MO_V_Extract {}  -> needLlvm
+      MO_V_Add {}      -> needLlvm
+      MO_V_Sub {}      -> needLlvm
+      MO_V_Mul {}      -> needLlvm
+      MO_VS_Quot {}    -> needLlvm
+      MO_VS_Rem {}     -> needLlvm
+      MO_VS_Neg {}     -> needLlvm
+      MO_VU_Quot {}    -> needLlvm
+      MO_VU_Rem {}     -> needLlvm
+      MO_VF_Insert {}  -> needLlvm
+      MO_VF_Extract {} -> needLlvm
+      MO_VF_Add {}     -> needLlvm
+      MO_VF_Sub {}     -> needLlvm
+      MO_VF_Mul {}     -> needLlvm
+      MO_VF_Quot {}    -> needLlvm
+      MO_VF_Neg {}     -> needLlvm
 
       _other -> pprPanic "getRegister" (pprMachOp mop)
    where
@@ -868,45 +762,8 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
             = do e_code <- getRegister' dflags is32Bit expr
                  return (swizzleRegisterRep e_code new_format)
 
-        vector_float_negate_avx :: Length -> Width -> CmmExpr -> NatM Register
-        vector_float_negate_avx l w expr = do
-          tmp                  <- getNewRegNat (VecFormat l FmtFloat w)
-          (reg, exp)           <- getSomeReg expr
-          Amode addr addr_code <- memConstant (mkAlignment $ widthInBytes W32) (CmmFloat 0.0 W32)
-          let format   = case w of
-                           W32 -> VecFormat l FmtFloat w
-                           W64 -> VecFormat l FmtDouble w
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-              code dst = case w of
-                           W32 -> exp `appOL` addr_code `snocOL`
-                                  (VBROADCAST format addr tmp) `snocOL`
-                                  (VSUB format (OpReg reg) tmp dst)
-                           W64 -> exp `appOL` addr_code `snocOL`
-                                  (MOVL format (OpAddr addr) (OpReg tmp)) `snocOL`
-                                  (MOVH format (OpAddr addr) (OpReg tmp)) `snocOL`
-                                  (VSUB format (OpReg reg) tmp dst)
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-          return (Any format code)
-
-        vector_float_negate_sse :: Length -> Width -> CmmExpr -> NatM Register
-        vector_float_negate_sse l w expr = do
-          tmp                  <- getNewRegNat (VecFormat l FmtFloat w)
-          (reg, exp)           <- getSomeReg expr
-          let format   = case w of
-                           W32 -> VecFormat l FmtFloat w
-                           W64 -> VecFormat l FmtDouble w
-                           _ -> pprPanic "Cannot negate vector of width" (ppr w)
-              code dst = exp `snocOL`
-                         (XOR format (OpReg tmp) (OpReg tmp)) `snocOL`
-                         (MOVU format (OpReg tmp) (OpReg dst)) `snocOL`
-                         (SUB format (OpReg reg) (OpReg dst))
-          return (Any format code)
 
 getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
-  sse4_1 <- sse4_1Enabled
-  sse2   <- sse2Enabled
-  sse    <- sseEnabled
-  avx    <- avxEnabled
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -971,49 +828,13 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_VS_Quot {}    -> needLlvm
       MO_VS_Rem {}     -> needLlvm
       MO_VS_Neg {}     -> needLlvm
-
-      MO_VF_Broadcast l W32 | avx       -> vector_float_broadcast_avx l W32 x y
-                            | sse4_1    -> vector_float_broadcast_sse l W32 x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse4 flag"
-
-      MO_VF_Broadcast l W64 | sse2      -> vector_float_broadcast_avx l W64 x y
-                            | otherwise -> sorry "Please enable the -msse2 flag"
-
-      MO_VF_Extract l W32   | avx       -> vector_float_unpack l W32 x y
-                            | sse       -> vector_float_unpack_sse l W32 x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse flag"
-
-      MO_VF_Extract l W64   | sse2      -> vector_float_unpack l W64 x y
-                            | otherwise -> sorry "Please enable the -msse2 flag"
-
-      MO_VF_Add l w         | avx              -> vector_float_op_avx VA_Add l w x y
-                            | sse  && w == W32 -> vector_float_op_sse VA_Add l w x y
-                            | sse2 && w == W64 -> vector_float_op_sse VA_Add l w x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse flag"
-
-      MO_VF_Sub l w         | avx              -> vector_float_op_avx VA_Sub l w x y
-                            | sse  && w == W32 -> vector_float_op_sse VA_Sub l w x y
-                            | sse2 && w == W64 -> vector_float_op_sse VA_Sub l w x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse flag"
-
-      MO_VF_Mul l w         | avx              -> vector_float_op_avx VA_Mul l w x y
-                            | sse  && w == W32 -> vector_float_op_sse VA_Mul l w x y
-                            | sse2 && w == W64 -> vector_float_op_sse VA_Mul l w x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse flag"
-
-      MO_VF_Quot l w        | avx              -> vector_float_op_avx VA_Div l w x y
-                            | sse  && w == W32 -> vector_float_op_sse VA_Div l w x y
-                            | sse2 && w == W64 -> vector_float_op_sse VA_Div l w x y
-                            | otherwise
-                              -> sorry "Please enable the -mavx or -msse flag"
-
-      MO_VF_Insert {}                  -> incorrectOperands
-      MO_VF_Neg {}                     -> incorrectOperands
+      MO_VF_Insert {}  -> needLlvm
+      MO_VF_Extract {} -> needLlvm
+      MO_VF_Add {}     -> needLlvm
+      MO_VF_Sub {}     -> needLlvm
+      MO_VF_Mul {}     -> needLlvm
+      MO_VF_Quot {}    -> needLlvm
+      MO_VF_Neg {}     -> needLlvm
 
       _other -> pprPanic "getRegister(x86) - binary CmmMachOp (1)" (pprMachOp mop)
   where
@@ -1109,171 +930,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     -- TODO: There are other interesting patterns we want to replace
     --     with a LEA, e.g. `(x + offset) + (y << shift)`.
 
-    -----------------------
-    -- Vector operations---
-    vector_float_op_avx :: VectorArithInstns
-                        -> Length
-                        -> Width
-                        -> CmmExpr
-                        -> CmmExpr
-                        -> NatM Register
-    vector_float_op_avx op l w expr1 expr2 = do
-      (reg1, exp1) <- getSomeReg expr1
-      (reg2, exp2) <- getSomeReg expr2
-      let format   = case w of
-                       W32 -> VecFormat l FmtFloat  W32
-                       W64 -> VecFormat l FmtDouble W64
-                       _ -> pprPanic "Operation not supported for width " (ppr w)
-          code dst = case op of
-            VA_Add -> arithInstr VADD
-            VA_Sub -> arithInstr VSUB
-            VA_Mul -> arithInstr VMUL
-            VA_Div -> arithInstr VDIV
-            where
-              -- opcode src2 src1 dst <==> dst = src1 `opcode` src2
-              arithInstr instr = exp1 `appOL` exp2 `snocOL`
-                                 (instr format (OpReg reg2) reg1 dst)
-      return (Any format code)
-
-    vector_float_op_sse :: VectorArithInstns
-                        -> Length
-                        -> Width
-                        -> CmmExpr
-                        -> CmmExpr
-                        -> NatM Register
-    vector_float_op_sse op l w expr1 expr2 = do
-      (reg1, exp1) <- getSomeReg expr1
-      (reg2, exp2) <- getSomeReg expr2
-      let format   = case w of
-                       W32 -> VecFormat l FmtFloat  W32
-                       W64 -> VecFormat l FmtDouble W64
-                       _ -> pprPanic "Operation not supported for width " (ppr w)
-          code dst = case op of
-            VA_Add -> arithInstr ADD
-            VA_Sub -> arithInstr SUB
-            VA_Mul -> arithInstr MUL
-            VA_Div -> arithInstr FDIV
-            where
-              -- opcode src2 src1 <==> src1 = src1 `opcode` src2
-              arithInstr instr
-                = exp1 `appOL` exp2 `snocOL`
-                  (MOVU format (OpReg reg1) (OpReg dst)) `snocOL`
-                  (instr format (OpReg reg2) (OpReg dst))
-      return (Any format code)
     --------------------
-    vector_float_unpack :: Length
-                        -> Width
-                        -> CmmExpr
-                        -> CmmExpr
-                        -> NatM Register
-    vector_float_unpack l W32 expr (CmmLit lit)
-      = do
-      (r, exp) <- getSomeReg expr
-      let format   = VecFormat l FmtFloat W32
-          imm      = litToImm lit
-          code dst
-            = case lit of
-                CmmInt 0 _ -> exp `snocOL` (VMOVU format (OpReg r) (OpReg dst))
-                CmmInt _ _ -> exp `snocOL` (VPSHUFD format (OpImm imm) (OpReg r) dst)
-                _          -> panic "Error in offset while unpacking"
-      return (Any format code)
-    vector_float_unpack l W64 expr (CmmLit lit)
-      = do
-      dflags <- getDynFlags
-      (r, exp) <- getSomeReg expr
-      let format   = VecFormat l FmtDouble W64
-          addr     = spRel dflags 0
-          code dst
-            = case lit of
-                CmmInt 0 _ -> exp `snocOL`
-                              (MOVL format (OpReg r) (OpAddr addr)) `snocOL`
-                              (MOV FF64 (OpAddr addr) (OpReg dst))
-                CmmInt 1 _ -> exp `snocOL`
-                              (MOVH format (OpReg r) (OpAddr addr)) `snocOL`
-                              (MOV FF64 (OpAddr addr) (OpReg dst))
-                _          -> panic "Error in offset while unpacking"
-      return (Any format code)
-    vector_float_unpack _ w c e
-      = pprPanic "Unpack not supported for : " (ppr c $$ ppr e $$ ppr w)
-    -----------------------
-
-    vector_float_unpack_sse :: Length
-                            -> Width
-                            -> CmmExpr
-                            -> CmmExpr
-                            -> NatM Register
-    vector_float_unpack_sse l W32 expr (CmmLit lit)
-      = do
-      (r,exp) <- getSomeReg expr
-      let format   = VecFormat l FmtFloat W32
-          imm      = litToImm lit
-          code dst
-            = case lit of
-                CmmInt 0 _ -> exp `snocOL` (MOVU format (OpReg r) (OpReg dst))
-                CmmInt _ _ -> exp `snocOL` (PSHUFD format (OpImm imm) (OpReg r) dst)
-                _          -> panic "Error in offset while unpacking"
-      return (Any format code)
-    vector_float_unpack_sse _ w c e
-      = pprPanic "Unpack not supported for : " (ppr c $$ ppr e $$ ppr w)
-    -----------------------
-    vector_float_broadcast_avx :: Length
-                           -> Width
-                           -> CmmExpr
-                           -> CmmExpr
-                           -> NatM Register
-    vector_float_broadcast_avx len W32 expr1 expr2
-      = do
-      dflags    <- getDynFlags
-      fn        <- getAnyReg expr1
-      (r', exp) <- getSomeReg expr2
-      let f    = VecFormat len FmtFloat W32
-          addr = spRel dflags 0
-       in return $ Any f (\r -> exp    `appOL`
-                                (fn r) `snocOL`
-                                (MOVU f (OpReg r') (OpAddr addr)) `snocOL`
-                                (VBROADCAST f addr r))
-    vector_float_broadcast_avx len W64 expr1 expr2
-      = do
-      dflags    <- getDynFlags
-      fn        <- getAnyReg  expr1
-      (r', exp) <- getSomeReg expr2
-      let f    = VecFormat len FmtDouble W64
-          addr = spRel dflags 0
-       in return $ Any f (\r -> exp    `appOL`
-                                (fn r) `snocOL`
-                                (MOVU f (OpReg r') (OpAddr addr)) `snocOL`
-                                (MOVL f (OpAddr addr) (OpReg r)) `snocOL`
-                                (MOVH f (OpAddr addr) (OpReg r)))
-    vector_float_broadcast_avx _ _ c _
-      = pprPanic "Broadcast not supported for : " (ppr c)
-    -----------------------
-    vector_float_broadcast_sse :: Length
-                               -> Width
-                               -> CmmExpr
-                               -> CmmExpr
-                               -> NatM Register
-    vector_float_broadcast_sse len W32 expr1 expr2
-      = do
-      dflags   <- getDynFlags
-      fn       <- getAnyReg  expr1  -- destination
-      (r, exp) <- getSomeReg expr2  -- source
-      let f        = VecFormat len FmtFloat W32
-          addr     = spRel dflags 0
-          code dst = exp `appOL`
-                     (fn dst) `snocOL`
-                     (MOVU f (OpReg r) (OpAddr addr)) `snocOL`
-                     (insertps 0) `snocOL`
-                     (insertps 16) `snocOL`
-                     (insertps 32) `snocOL`
-                     (insertps 48)
-            where
-              insertps off =
-                INSERTPS f (OpImm $ litToImm $ CmmInt off W32) (OpAddr addr) dst
-
-       in return $ Any f code
-    vector_float_broadcast_sse _ _ c _
-      = pprPanic "Broadcast not supported for : " (ppr c)
-    -----------------------
     sub_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
     sub_code rep x (CmmLit (CmmInt y _))
         | is32BitInteger (-y) = add_int rep x (-y)
@@ -1326,21 +983,6 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
            return (Fixed format result code)
 
-getRegister' _ _ (CmmLoad mem pk)
-  | isVecType pk = do
-      use_avx <- avxEnabled
-      use_sse <- sseEnabled
-      Amode addr mem_code <- getAmode mem
-      let format = cmmTypeFormat pk
-          code dst
-            | use_avx = mem_code `snocOL`
-                        VMOVU format (OpAddr addr) (OpReg dst)
-            | use_sse = mem_code `snocOL`
-                        MOVU format (OpAddr addr) (OpReg dst)
-            | otherwise = pprPanic (unlines ["avx or sse flag not enabled",
-                                            "for loading to "])
-                          (ppr pk)
-      return (Any format code)
 
 getRegister' _ _ (CmmLoad mem pk)
   | isFloatType pk
@@ -1407,24 +1049,10 @@ getRegister' dflags is32Bit (CmmLit lit)
         -- small memory model (see gcc docs, -mcmodel=small).
 
 getRegister' dflags _ (CmmLit lit)
-  | isVecType cmmtype = vectorRegister cmmtype
-  | otherwise         = standardRegister cmmtype
-  where
-    cmmtype = cmmLitType dflags lit
-    vectorRegister ctype
-      = do
-      --NOTE:
-      -- This operation is only used to zero a register. For loading a
-      -- vector literal there are pack and broadcast operations
-      let format = cmmTypeFormat ctype
-          code dst = unitOL (XOR format (OpReg dst) (OpReg dst))
-      return (Any format code)
-    standardRegister ctype
-      = do
-      let format = cmmTypeFormat ctype
-          imm = litToImm lit
-          code dst = unitOL (MOV format (OpImm imm) (OpReg dst))
-      return (Any format code)
+  = do let format = cmmTypeFormat (cmmLitType dflags lit)
+           imm = litToImm lit
+           code dst = unitOL (MOV format (OpImm imm) (OpReg dst))
+       return (Any format code)
 
 getRegister' _ _ other
     | isVecExpr other  = needLlvm
@@ -1490,14 +1118,8 @@ getNonClobberedReg expr = do
                 return (reg, code)
 
 reg2reg :: Format -> Reg -> Reg -> Instr
-reg2reg format@(VecFormat _ FmtFloat W32) src dst
-  = VMOVU format (OpReg src) (OpReg dst)
-reg2reg format@(VecFormat _ FmtDouble W64) src dst
-  = VMOVU format (OpReg src) (OpReg dst)
-reg2reg (VecFormat _ _ _) _ _
-  = panic "MOV operation not implemented for vectors"
-reg2reg format src dst
-  = MOV format (OpReg src) (OpReg dst)
+reg2reg format src dst = MOV format (OpReg src) (OpReg dst)
+
 
 --------------------------------------------------------------------------------
 getAmode :: CmmExpr -> NatM Amode
@@ -1558,9 +1180,6 @@ getAmode' _ (CmmMachOp (MO_Add _)
 
 getAmode' _ (CmmMachOp (MO_Add _) [x,y])
   = x86_complex_amode x y 0 0
-
-getAmode' _ (CmmLit lit@(CmmFloat _ w))
-  = memConstant (mkAlignment $ widthInBytes w) lit
 
 getAmode' is32Bit (CmmLit lit) | is32BitLit is32Bit lit
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
@@ -1942,8 +1561,7 @@ assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignMem_FltCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
 assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 
-assignMem_VecCode :: Format -> CmmExpr -> CmmExpr -> NatM InstrBlock
-assignReg_VecCode :: Format -> CmmReg -> CmmExpr -> NatM InstrBlock
+
 -- integer assignment to memory
 
 -- specific case of adding/subtracting an integer to a particular address.
@@ -2020,29 +1638,6 @@ assignReg_FltCode _ reg src = do
   let platform = targetPlatform dflags
   return (src_code (getRegisterReg platform  reg))
 
-assignMem_VecCode pk addr src = do
-  (src_reg, src_code) <- getNonClobberedReg src
-  Amode addr addr_code <- getAmode addr
-  use_avx <- avxEnabled
-  use_sse <- sseEnabled
-  let
-        code | use_avx   = src_code `appOL`
-                           addr_code `snocOL`
-                           (VMOVU pk (OpReg src_reg) (OpAddr addr))
-             | use_sse   = src_code `appOL`
-                           addr_code `snocOL`
-                           (MOVU pk (OpReg src_reg) (OpAddr addr))
-             | otherwise = sorry "Please enable the -mavx or -msse flag"
-  return code
-
-assignReg_VecCode format reg src = do
-  use_avx <- avxEnabled
-  use_sse <- sseEnabled
-  src_code <- getAnyReg src
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-      flag     = use_avx || use_sse
-  return (src_code (getVecRegisterReg platform flag format reg))
 
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
 
@@ -3767,7 +3362,6 @@ sse2NegCode w x = do
       x@II16 -> wrongFmt x
       x@II32 -> wrongFmt x
       x@II64 -> wrongFmt x
-      x@VecFormat {} -> wrongFmt x
 
       where
         wrongFmt x = panic $ "sse2NegCode: " ++ show x
@@ -3782,32 +3376,28 @@ sse2NegCode w x = do
   return (Any fmt code)
 
 isVecExpr :: CmmExpr -> Bool
-isVecExpr (CmmMachOp (MO_V_Insert {}) _)     = True
-isVecExpr (CmmMachOp (MO_V_Extract {}) _)    = True
-isVecExpr (CmmMachOp (MO_V_Add {}) _)        = True
-isVecExpr (CmmMachOp (MO_V_Sub {}) _)        = True
-isVecExpr (CmmMachOp (MO_V_Mul {}) _)        = True
-isVecExpr (CmmMachOp (MO_VS_Quot {}) _)      = True
-isVecExpr (CmmMachOp (MO_VS_Rem {}) _)       = True
-isVecExpr (CmmMachOp (MO_VS_Neg {}) _)       = True
-isVecExpr (CmmMachOp (MO_VF_Broadcast {}) _) = True
-isVecExpr (CmmMachOp (MO_VF_Insert {}) _)    = True
-isVecExpr (CmmMachOp (MO_VF_Extract {}) _)   = True
-isVecExpr (CmmMachOp (MO_VF_Add {}) _)       = True
-isVecExpr (CmmMachOp (MO_VF_Sub {}) _)       = True
-isVecExpr (CmmMachOp (MO_VF_Mul {}) _)       = True
-isVecExpr (CmmMachOp (MO_VF_Quot {}) _)      = True
-isVecExpr (CmmMachOp (MO_VF_Neg {}) _)       = True
-isVecExpr (CmmMachOp _ [e])                  = isVecExpr e
-isVecExpr _                                  = False
+isVecExpr (CmmMachOp (MO_V_Insert {}) _)   = True
+isVecExpr (CmmMachOp (MO_V_Extract {}) _)  = True
+isVecExpr (CmmMachOp (MO_V_Add {}) _)      = True
+isVecExpr (CmmMachOp (MO_V_Sub {}) _)      = True
+isVecExpr (CmmMachOp (MO_V_Mul {}) _)      = True
+isVecExpr (CmmMachOp (MO_VS_Quot {}) _)    = True
+isVecExpr (CmmMachOp (MO_VS_Rem {}) _)     = True
+isVecExpr (CmmMachOp (MO_VS_Neg {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Insert {}) _)  = True
+isVecExpr (CmmMachOp (MO_VF_Extract {}) _) = True
+isVecExpr (CmmMachOp (MO_VF_Add {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Sub {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Mul {}) _)     = True
+isVecExpr (CmmMachOp (MO_VF_Quot {}) _)    = True
+isVecExpr (CmmMachOp (MO_VF_Neg {}) _)     = True
+isVecExpr (CmmMachOp _ [e])                = isVecExpr e
+isVecExpr _                                = False
 
 needLlvm :: NatM a
 needLlvm =
     sorry $ unlines ["The native code generator does not support vector"
                     ,"instructions. Please use -fllvm."]
-
-incorrectOperands :: NatM a
-incorrectOperands = sorry "Incorrect number of operands"
 
 -- | This works on the invariant that all jumps in the given blocks are required.
 --   Starting from there we try to make a few more jumps redundant by reordering

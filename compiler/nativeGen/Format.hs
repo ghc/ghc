@@ -10,11 +10,9 @@
 --
 module Format (
     Format(..),
-    ScalarFormat(..),
     intFormat,
     floatFormat,
     isFloatFormat,
-    isVecFormat,
     cmmTypeFormat,
     formatToWidth,
     formatInBytes
@@ -26,29 +24,6 @@ import GhcPrelude
 
 import Cmm
 import Outputable
-
-
--- Note [GHC's data format representations]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- GHC has severals types that represent various aspects of data format.
--- These include:
---
---  * 'CmmType.CmmType': The data classification used throughout the C--
---    pipeline. This is a pair of a CmmCat and a Width.
---
---  * 'CmmType.CmmCat': What the bits in a C-- value mean (e.g. a pointer, integer, or floating-point value)
---
---  * 'CmmType.Width': The width of a C-- value.
---
---  * 'CmmType.Length': The width (measured in number of scalars) of a vector value.
---
---  * 'Format.Format': The data format representation used by much of the backend.
---
---  * 'Format.ScalarFormat': The format of a 'Format.VecFormat'\'s scalar.
---
---  * 'RegClass.RegClass': Whether a register is an integer, float-point, or vector register
---
 
 -- It looks very like the old MachRep, but it's now of purely local
 -- significance, here in the native code generator.  You can change it
@@ -72,16 +47,8 @@ data Format
         | II64
         | FF32
         | FF64
-        | VecFormat !Length !ScalarFormat !Width
         deriving (Show, Eq)
 
-data ScalarFormat = FmtInt8
-                  | FmtInt16
-                  | FmtInt32
-                  | FmtInt64
-                  | FmtFloat
-                  | FmtDouble
-                  deriving (Show, Eq)
 
 -- | Get the integer format of this width.
 intFormat :: Width -> Format
@@ -114,33 +81,13 @@ isFloatFormat format
         FF64    -> True
         _       -> False
 
--- | Check if a format represents a vector
-isVecFormat :: Format -> Bool
-isVecFormat (VecFormat {}) = True
-isVecFormat _              = False
 
 -- | Convert a Cmm type to a Format.
 cmmTypeFormat :: CmmType -> Format
 cmmTypeFormat ty
         | isFloatType ty        = floatFormat (typeWidth ty)
-        | isVecType ty          = vecFormat ty
         | otherwise             = intFormat (typeWidth ty)
 
-vecFormat :: CmmType -> Format
-vecFormat ty =
-  let l      = vecLength ty
-      elemTy = vecElemType ty
-   in if isFloatType elemTy
-      then case typeWidth elemTy of
-             W32 -> VecFormat l FmtFloat  W32
-             W64 -> VecFormat l FmtDouble W64
-             _   -> pprPanic "Incorrect vector element width" (ppr elemTy)
-      else case typeWidth elemTy of
-             W8  -> VecFormat l FmtInt8  W8
-             W16 -> VecFormat l FmtInt16 W16
-             W32 -> VecFormat l FmtInt32 W32
-             W64 -> VecFormat l FmtInt64 W64
-             _   -> pprPanic "Incorrect vector element width" (ppr elemTy)
 
 -- | Get the Width of a Format.
 formatToWidth :: Format -> Width
@@ -152,7 +99,7 @@ formatToWidth format
         II64            -> W64
         FF32            -> W32
         FF64            -> W64
-        VecFormat l _ w -> widthFromBytes (l*widthInBytes w)
+
 
 formatInBytes :: Format -> Int
 formatInBytes = widthInBytes . formatToWidth

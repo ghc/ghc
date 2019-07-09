@@ -29,7 +29,7 @@ import BlockId
 import CLabel
 import PprCmmExpr ()
 
-import Unique                ( getUnique )
+import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable
@@ -168,7 +168,10 @@ pprReg r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no i
       RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
-      RegVirtual v                 -> ppr v
+      RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
+      RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
 
   where
     ppr_reg_no :: Int -> SDoc
@@ -187,8 +190,7 @@ pprFormat x
                 II32 -> sLit "w"
                 II64 -> sLit "d"
                 FF32 -> sLit "fs"
-                FF64 -> sLit "fd"
-                VecFormat _ _ _ -> panic "PPC.Ppr.pprFormat: VecFormat")
+                FF64 -> sLit "fd")
 
 
 pprCond :: Cond -> SDoc
@@ -373,7 +375,6 @@ pprInstr (LD fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            VecFormat _ _ _ -> panic "PPC.Ppr.pprInstr: VecFormat"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
@@ -413,7 +414,6 @@ pprInstr (LA fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            VecFormat _ _ _ -> panic "PPC.Ppr.pprInstr: VecFormat"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',

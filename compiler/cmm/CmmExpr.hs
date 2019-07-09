@@ -14,7 +14,6 @@ module CmmExpr
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
     , node, baseReg
     , VGcPtr(..)
-    , GlobalVecRegTy(..)
 
     , DefinerOfRegs, UserOfRegs
     , foldRegsDefd, foldRegsUsed
@@ -42,7 +41,6 @@ import Outputable (panic)
 import Unique
 
 import Data.Set (Set)
-import Data.Monoid ((<>))
 import qualified Data.Set as Set
 
 import BasicTypes (Alignment, mkAlignment, alignmentOf)
@@ -394,7 +392,6 @@ data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
 -----------------------------------------------------------------------------
 {-
 Note [Overlapping global registers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The backend might not faithfully implement the abstraction of the STG
 machine with independent registers for different values of type
@@ -416,26 +413,6 @@ on a particular platform. The instance Eq GlobalReg is syntactic
 equality of STG registers and does not take overlap into
 account. However it is still used in UserOfRegs/DefinerOfRegs and
 there are likely still bugs there, beware!
-
-
-Note [SIMD registers]
-~~~~~~~~~~~~~~~~~~~~~
-
-GHC's treatment of SIMD registers is heavily modelled after the x86_64
-architecture. Namely we have 128- (XMM), 256- (YMM), and 512-bit (ZMM)
-registers. Furthermore, we treat each possible format in these registers as a
-distinct register which overlaps with the others. For instance, we XMM1 as a
-2xI64 register is distinct from but overlaps with (in the sense defined in Note
-[Overlapping global registers]) its use as a 4xI32 register.
-
-This model makes it easier to fit SIMD registers into the NCG, which generally
-expects that each global register has a single, known CmmType.
-
-In the future we could consider further refactoring this to eliminate the
-XMM, YMM, and ZMM register names (which are quite x86-specific) and instead just
-having a set of NxM-bit vector registers (e.g. Vec2x64A, Vec2x64B, ...,
-Vec4x32A, ..., Vec4x64A).
-
 -}
 
 data GlobalReg
@@ -455,15 +432,12 @@ data GlobalReg
 
   | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
-        !Length !Width !GlobalVecRegTy
 
   | YmmReg                      -- 256-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
-        !Length !Width !GlobalVecRegTy
 
   | ZmmReg                      -- 512-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
-        !Length !Width !GlobalVecRegTy
 
   -- STG registers
   | Sp                  -- Stack ptr; points to last occupied stack location.
@@ -504,17 +478,17 @@ data GlobalReg
 
   deriving( Show )
 
-data GlobalVecRegTy = Integer | Float
-  deriving (Show, Eq, Ord)
-
 instance Eq GlobalReg where
    VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes
    FloatReg i == FloatReg j = i==j
    DoubleReg i == DoubleReg j = i==j
    LongReg i == LongReg j = i==j
-   XmmReg i l w grt == XmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
-   YmmReg i l w grt == YmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
-   ZmmReg i l w grt == ZmmReg j l' w' grt' = i==j && l == l' && w == w' && grt == grt'
+   -- NOTE: XMM, YMM, ZMM registers actually are the same registers
+   -- at least with respect to store at YMM i and then read from XMM i
+   -- and similarly for ZMM etc.
+   XmmReg i == XmmReg j = i==j
+   YmmReg i == YmmReg j = i==j
+   ZmmReg i == ZmmReg j = i==j
    Sp == Sp = True
    SpLim == SpLim = True
    Hp == Hp = True
@@ -538,21 +512,9 @@ instance Ord GlobalReg where
    compare (FloatReg i)  (FloatReg  j) = compare i j
    compare (DoubleReg i) (DoubleReg j) = compare i j
    compare (LongReg i)   (LongReg   j) = compare i j
-   compare (XmmReg i l w grt)
-           (XmmReg j l' w' grt')       = compare i j
-                                         <> compare l l'
-                                         <> compare w w'
-                                         <> compare grt grt'
-   compare (YmmReg i l w grt)
-           (YmmReg j l' w' grt')       = compare i j
-                                         <> compare l l'
-                                         <> compare w w'
-                                         <> compare grt grt'
-   compare (ZmmReg i l w grt)
-           (ZmmReg j l' w' grt')       = compare i j
-                                         <> compare l l'
-                                         <> compare w w'
-                                         <> compare grt grt'
+   compare (XmmReg i)    (XmmReg    j) = compare i j
+   compare (YmmReg i)    (YmmReg    j) = compare i j
+   compare (ZmmReg i)    (ZmmReg    j) = compare i j
    compare Sp Sp = EQ
    compare SpLim SpLim = EQ
    compare Hp Hp = EQ
@@ -576,12 +538,12 @@ instance Ord GlobalReg where
    compare _ (DoubleReg _)    = GT
    compare (LongReg _) _      = LT
    compare _ (LongReg _)      = GT
-   compare (XmmReg _ _ _ _) _ = LT
-   compare _ (XmmReg _ _ _ _) = GT
-   compare (YmmReg _ _ _ _) _ = LT
-   compare _ (YmmReg _ _ _ _) = GT
-   compare (ZmmReg _ _ _ _) _ = LT
-   compare _ (ZmmReg _ _ _ _) = GT
+   compare (XmmReg _) _       = LT
+   compare _ (XmmReg _)       = GT
+   compare (YmmReg _) _       = LT
+   compare _ (YmmReg _)       = GT
+   compare (ZmmReg _) _       = LT
+   compare _ (ZmmReg _)       = GT
    compare Sp _ = LT
    compare _ Sp = GT
    compare SpLim _ = LT
@@ -634,15 +596,12 @@ globalRegType dflags (VanillaReg _ VNonGcPtr) = bWord dflags
 globalRegType _      (FloatReg _)      = cmmFloat W32
 globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
-globalRegType _      (XmmReg _ l w ty) = case ty of
-                                           Integer -> cmmVec l (cmmBits w)
-                                           Float   -> cmmVec l (cmmFloat w)
-globalRegType _      (YmmReg _ l w ty) = case ty of
-                                           Integer -> cmmVec l (cmmBits w)
-                                           Float   -> cmmVec l (cmmFloat w)
-globalRegType _      (ZmmReg _ l w ty) = case ty of
-                                           Integer -> cmmVec l (cmmBits w)
-                                           Float   -> cmmVec l (cmmFloat w)
+-- TODO: improve the internal model of SIMD/vectorized registers
+-- the right design SHOULd improve handling of float and double code too.
+-- see remarks in "NOTE [SIMD Design for the future]"" in StgCmmPrim
+globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
+globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
+globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)
 
 globalRegType dflags Hp                = gcWord dflags
                                             -- The initialiser for all
