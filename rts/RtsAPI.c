@@ -18,6 +18,10 @@
 #include "StablePtr.h"
 #include "Threads.h"
 #include "Weak.h"
+#include "StableName.h"
+
+
+
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -651,8 +655,11 @@ static bool rts_paused = false;
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
+    printf("pausing");
     paused.pausing_task = newBoundTask();
+    printf("bound task");
     stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    printf("paused");
     rts_paused = true;
     return paused;
 }
@@ -660,7 +667,9 @@ RtsPaused rts_pause (void)
 void rts_unpause (RtsPaused paused)
 {
     rts_paused = false;
+    printf("Releasing");
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
+    printf("Released");
     freeTask(paused.pausing_task);
 }
 
@@ -676,26 +685,26 @@ void rts_listThreads(ListThreadsCb cb, void *user)
     }
 }
 
-//struct list_roots_ctx {
-//    ListRootsCb cb;
-//    void *user;
-//}
+struct list_roots_ctx {
+    ListRootsCb cb;
+    void *user;
+};
 
 // This is an evac_fn.
-//void list_roots_helper(void *user, StgClosure **p) {
-//    struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
-//    ctx->cb(ctx->user, *p);
-//}
+void list_roots_helper(void *user, StgClosure **p) {
+    struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
+    ctx->cb(ctx->user, *p);
+}
 
 void rts_listMiscRoots (ListRootsCb cb, void *user)
 {
-//    struct list_roots_ctx ctx;
-//    ctx.cb = cb;
-//    ctx.user = user;
+    struct list_roots_ctx ctx;
+    ctx.cb = cb;
+    ctx.user = user;
 
     ASSERT(rts_paused);
-//    threadStableNameTable(cb, ctx);
-//    threadStablePointerTable(cb, ctx);
+    threadStableNameTable(&list_roots_helper, (void *)&ctx);
+    threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
 
 #endif
