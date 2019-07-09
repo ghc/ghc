@@ -1746,7 +1746,7 @@ def check_hp_ok(name: TestName) -> bool:
     # do not qualify for hp2ps because we should be in the right directory
     hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
 
-    hp2psResult = runCmd(hp2psCmd)
+    hp2psResult = runCmd(hp2psCmd, print_output=True)
 
     actual_ps_path = in_testdir(name, 'ps')
 
