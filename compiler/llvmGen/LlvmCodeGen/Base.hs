@@ -152,12 +152,12 @@ llvmFunArgs dflags live =
     where platform = targetPlatform dflags
           isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
           isPassed r = not (isSSE r) || isLive r
-          isSSE (FloatReg _)      = True
-          isSSE (DoubleReg _)     = True
-          isSSE (XmmReg _ _ _ _ ) = True
-          isSSE (YmmReg _ _ _ _ ) = True
-          isSSE (ZmmReg _ _ _ _ ) = True
-          isSSE _                 = False
+          isSSE (FloatReg _)  = True
+          isSSE (DoubleReg _) = True
+          isSSE (XmmReg _)    = True
+          isSSE (YmmReg _)    = True
+          isSSE (ZmmReg _)    = True
+          isSSE _             = False
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]

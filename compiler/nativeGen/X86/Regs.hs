@@ -84,7 +84,6 @@ virtualRegSqueeze cls vr
          -> case vr of
                 VirtualRegD{}           -> 1
                 VirtualRegF{}           -> 0
-                VirtualRegVec{}         -> 1
                 _other                  -> 0
 
 
