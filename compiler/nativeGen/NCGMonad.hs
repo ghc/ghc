@@ -250,6 +250,7 @@ getNewRegNat rep
       dflags <- getDynFlags
       return (RegVirtual $ targetMkVirtualReg (targetPlatform dflags) u rep)
 
+
 getNewRegPairNat :: Format -> NatM (Reg,Reg)
 getNewRegPairNat rep
  = do u <- getUniqueNat
