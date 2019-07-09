@@ -64,20 +64,13 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
       assign_regs assts (r:rs) regs | isVecType ty   = vec
                                     | isFloatType ty = float
                                     | otherwise      = int
-        where vec = case regs of
-                      (vs, fs, ds, ls, s:ss)
-                        | passVectorInReg w dflags
-                          -> let elt_ty = vecElemType ty
-                                 reg_ty = if isFloatType elt_ty
-                                          then Float else Integer
-                                 reg_class = case w of
-                                               W128 -> XmmReg
-                                               W256 -> YmmReg
-                                               W512 -> ZmmReg
-                                               _    -> panic "CmmCallConv.assignArgumentsPos: Invalid vector width"
-                              in k (RegisterParam
-                                     (reg_class s (vecLength ty) (typeWidth elt_ty) reg_ty),
-                                     (vs, fs, ds, ls, ss))
+        where vec = case (w, regs) of
+                      (W128, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W128 dflags -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
+                      (W256, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W256 dflags -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
+                      (W512, (vs, fs, ds, ls, s:ss))
+                          | passVectorInReg W512 dflags -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss))
@@ -96,7 +89,6 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                       (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth dflags)
                           -> k (RegisterParam l, (vs, fs, ds, ls, ss))
                       _   -> (assts, (r:rs))
-
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
               w  = typeWidth ty
@@ -210,13 +202,11 @@ nodeOnly = ([VanillaReg 1], [], [], [], [])
 -- only use this functionality in hand-written C-- code in the RTS.
 realArgRegsCover :: DynFlags -> [GlobalReg]
 realArgRegsCover dflags
-    | passFloatArgsInXmm dflags
-      = map ($VGcPtr) (realVanillaRegs dflags) ++
-        realLongRegs dflags ++
-        map (\x -> XmmReg x 2 W64 Integer) (realXmmRegNos dflags)
-    | otherwise
-      = map ($VGcPtr) (realVanillaRegs dflags) ++
-        realFloatRegs dflags ++
-        realDoubleRegs dflags ++
-        realLongRegs dflags ++
-        map (\x -> XmmReg x 2 W64 Integer) (realXmmRegNos dflags)
+    | passFloatArgsInXmm dflags = map ($VGcPtr) (realVanillaRegs dflags) ++
+                                  realLongRegs dflags ++
+                                  map XmmReg (realXmmRegNos dflags)
+    | otherwise                 = map ($VGcPtr) (realVanillaRegs dflags) ++
+                                  realFloatRegs dflags ++
+                                  realDoubleRegs dflags ++
+                                  realLongRegs dflags ++
+                                  map XmmReg (realXmmRegNos dflags)

@@ -884,10 +884,8 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         $ vcat
                                 [ text "allocating vreg:  " <> text (show r)
                                 , text "assignment:       " <> ppr assig
-                                , text "freeRegs:         " <> text (showRegs freeRegs)
-                                , text "initFreeRegs:     " <> text (showRegs (frInitFreeRegs platform `asTypeOf` freeRegs))
-                                ]
-                        where showRegs = show . map (\reg -> (reg, targetClassOfRealReg platform reg)) . allFreeRegs platform
+                                , text "freeRegs:         " <> text (show freeRegs)
+                                , text "initFreeRegs:     " <> text (show (frInitFreeRegs platform `asTypeOf` freeRegs)) ]
 
                 result
 

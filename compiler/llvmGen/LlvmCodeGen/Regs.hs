@@ -60,24 +60,24 @@ lmGlobalReg dflags suf reg
         DoubleReg 4    -> doubleGlobal $ "D4" ++ suf
         DoubleReg 5    -> doubleGlobal $ "D5" ++ suf
         DoubleReg 6    -> doubleGlobal $ "D6" ++ suf
-        XmmReg 1 _ _ _ -> xmmGlobal $ "XMM1" ++ suf
-        XmmReg 2 _ _ _ -> xmmGlobal $ "XMM2" ++ suf
-        XmmReg 3 _ _ _ -> xmmGlobal $ "XMM3" ++ suf
-        XmmReg 4 _ _ _ -> xmmGlobal $ "XMM4" ++ suf
-        XmmReg 5 _ _ _ -> xmmGlobal $ "XMM5" ++ suf
-        XmmReg 6 _ _ _ -> xmmGlobal $ "XMM6" ++ suf
-        YmmReg 1 _ _ _ -> ymmGlobal $ "YMM1" ++ suf
-        YmmReg 2 _ _ _ -> ymmGlobal $ "YMM2" ++ suf
-        YmmReg 3 _ _ _ -> ymmGlobal $ "YMM3" ++ suf
-        YmmReg 4 _ _ _ -> ymmGlobal $ "YMM4" ++ suf
-        YmmReg 5 _ _ _ -> ymmGlobal $ "YMM5" ++ suf
-        YmmReg 6 _ _ _ -> ymmGlobal $ "YMM6" ++ suf
-        ZmmReg 1 _ _ _ -> zmmGlobal $ "ZMM1" ++ suf
-        ZmmReg 2 _ _ _ -> zmmGlobal $ "ZMM2" ++ suf
-        ZmmReg 3 _ _ _ -> zmmGlobal $ "ZMM3" ++ suf
-        ZmmReg 4 _ _ _ -> zmmGlobal $ "ZMM4" ++ suf
-        ZmmReg 5 _ _ _ -> zmmGlobal $ "ZMM5" ++ suf
-        ZmmReg 6 _ _ _ -> zmmGlobal $ "ZMM6" ++ suf
+        XmmReg 1       -> xmmGlobal $ "XMM1" ++ suf
+        XmmReg 2       -> xmmGlobal $ "XMM2" ++ suf
+        XmmReg 3       -> xmmGlobal $ "XMM3" ++ suf
+        XmmReg 4       -> xmmGlobal $ "XMM4" ++ suf
+        XmmReg 5       -> xmmGlobal $ "XMM5" ++ suf
+        XmmReg 6       -> xmmGlobal $ "XMM6" ++ suf
+        YmmReg 1       -> ymmGlobal $ "YMM1" ++ suf
+        YmmReg 2       -> ymmGlobal $ "YMM2" ++ suf
+        YmmReg 3       -> ymmGlobal $ "YMM3" ++ suf
+        YmmReg 4       -> ymmGlobal $ "YMM4" ++ suf
+        YmmReg 5       -> ymmGlobal $ "YMM5" ++ suf
+        YmmReg 6       -> ymmGlobal $ "YMM6" ++ suf
+        ZmmReg 1       -> zmmGlobal $ "ZMM1" ++ suf
+        ZmmReg 2       -> zmmGlobal $ "ZMM2" ++ suf
+        ZmmReg 3       -> zmmGlobal $ "ZMM3" ++ suf
+        ZmmReg 4       -> zmmGlobal $ "ZMM4" ++ suf
+        ZmmReg 5       -> zmmGlobal $ "ZMM5" ++ suf
+        ZmmReg 6       -> zmmGlobal $ "ZMM6" ++ suf
         MachSp         -> wordGlobal $ "MachSp" ++ suf
         _other         -> panic $ "LlvmCodeGen.Reg: GlobalReg (" ++ (show reg)
                                 ++ ") not supported!"
