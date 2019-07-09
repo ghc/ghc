@@ -1114,37 +1114,37 @@ def ghci_script( name, way, script):
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, None, [], extra_hc_opts )
+    return do_compile( name, way, False, None, [], extra_hc_opts )
 
 def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, None, [], extra_hc_opts )
+    return do_compile( name, way, True, None, [], extra_hc_opts )
 
 def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, False, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+    return do_compile( name, way, True, None, [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, None, [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, False, None, [], extra_hc_opts, backpack=True )
 
 def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, None, [], extra_hc_opts, backpack=True )
+    return do_compile( name, way, True, None, [], extra_hc_opts, backpack=True )
 
 def backpack_run( name, way, extra_hc_opts ):
     return compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
+    return do_compile( name, way, False, top_mod, [], extra_hc_opts )
 
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, 1, top_mod, [], extra_hc_opts )
+    return do_compile( name, way, True, top_mod, [], extra_hc_opts )
 
 def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, 0, top_mod, extra_mods, extra_hc_opts)
+    return do_compile( name, way, False, top_mod, extra_mods, extra_hc_opts)
 
 def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
+    return do_compile( name, way, True, top_mod, extra_mods, extra_hc_opts)
 
 def do_compile(name: TestName,
                way: WayName,
