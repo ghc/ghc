@@ -80,6 +80,9 @@ typedef union {
     struct {
         StgClosure *srt;
     } srt;
+
+    // parent of the current closure, used only when posTypeFresh is set
+    StgClosure *cp;
 } nextPos;
 
 /**
@@ -105,7 +108,6 @@ typedef struct {
 typedef struct stackElement_ {
     stackPos info;
     StgClosure *c;
-    StgClosure *cp; // parent of 'c'. Only used when info.type == posTypeFresh.
     stackData data;
 } stackElement;
 
@@ -345,7 +347,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData 
     stackElement se;
 
     se.c = c;
-    se.cp = cp;
+    se.info.next.cp = cp;
     se.data = data;
     se.info.type = posTypeFresh;
 
@@ -389,7 +391,6 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
 
     se.c = c;
     se.data = data;
-    // Note: se.cp ommitted on purpose, only traversePushClosure uses that.
 
     // fill in se.info
     switch (get_itbl(c)->type) {
@@ -572,8 +573,8 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
         return;
     }
 
-    // se.cp has to be initialized when type==posTypeFresh. We don't do that
-    // here though. So type must be !=posTypeFresh.
+    // se.info.next.cp has to be initialized when type==posTypeFresh. We don't
+    // do that here though. So type must be !=posTypeFresh.
     ASSERT(se.info.type != posTypeFresh);
 
     pushStackElement(ts, se);
@@ -687,7 +688,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data)
 
         // If this is a top-level element, you should pop that out.
         if (se->info.type == posTypeFresh) {
-            *cp = se->cp;
+            *cp = se->info.next.cp;
             *c = se->c;
             *data = se->data;
             popStackElement(ts);
