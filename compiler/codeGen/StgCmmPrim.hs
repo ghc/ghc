@@ -2187,7 +2187,6 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
               -> WordOff        -- ^ number of elements to copy
               -> FCode ()
 emitCopyArray copy src0 src_off dst0 dst_off0 n = do
-    dflags <- getDynFlags
     when (n /= 0) $ do
         dflags <- getDynFlags
 
