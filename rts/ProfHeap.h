@@ -11,8 +11,9 @@
 #include "BeginPrivate.h"
 
 void        heapCensus         (Time t);
-uint32_t    initHeapProfiling  (void);
+void        initHeapProfiling  (void);
 void        endHeapProfiling   (void);
+void        freeHeapProfiling  (void);
 bool        strMatchesSelector (const char* str, const char* sel);
 
 #if defined(PROFILING)
