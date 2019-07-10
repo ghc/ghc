@@ -77,7 +77,7 @@ import Id
 import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
-import TyCoRep( TyCoBinder(..), TyBinder )
+import TyCoRep( TyCoBinder(..), TyBinder, isUnsafeCo )
 import Coercion
 import TyCon
 import Unique
@@ -1499,7 +1499,7 @@ expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
 
 expr_ok primop_ok (Var v)    = app_ok primop_ok v []
-expr_ok primop_ok (Cast e _) = expr_ok primop_ok e
+expr_ok primop_ok (Cast e co) = expr_ok primop_ok e && not (isUnsafeCo co)
 expr_ok primop_ok (Lam b e)
                  | isTyVar b = expr_ok primop_ok  e
                  | otherwise = True
@@ -1833,7 +1833,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     is_hnf_like (Tick tickish e) = not (tickishCounts tickish)
                                    && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
-    is_hnf_like (Cast e _)       = is_hnf_like e
+    is_hnf_like (Cast e co)      = is_hnf_like e && not (isUnsafeCo co)
     is_hnf_like (App e a)
       | isValArg a               = app_is_value e 1
       | otherwise                = is_hnf_like e
@@ -1845,7 +1845,7 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
     app_is_value :: CoreExpr -> Int -> Bool
     app_is_value (Var f)    nva = id_app_is_value f nva
     app_is_value (Tick _ f) nva = app_is_value f nva
-    app_is_value (Cast f _) nva = app_is_value f nva
+    app_is_value (Cast f co) nva= app_is_value f nva && not (isUnsafeCo co)
     app_is_value (App f a)  nva
       | isValArg a              = app_is_value f (nva + 1)
       | otherwise               = app_is_value f nva
