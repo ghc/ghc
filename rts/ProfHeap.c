@@ -26,6 +26,9 @@
 #include <fs_rts.h>
 #include <string.h>
 
+FILE *hp_file;
+static char *hp_filename; /* heap profile (hp2ps style) log file */
+
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
  * number of censuses that have been performed.
@@ -311,57 +314,6 @@ nextEra( void )
  * Heap profiling by info table
  * ------------------------------------------------------------------------- */
 
-#if !defined(PROFILING)
-FILE *hp_file;
-static char *hp_filename;
-
-void freeProfiling (void)
-{
-}
-
-void initProfiling (void)
-{
-    char *prog;
-
-    prog = stgMallocBytes(strlen(prog_name) + 1, "initProfiling2");
-    strcpy(prog, prog_name);
-#if defined(mingw32_HOST_OS)
-    // on Windows, drop the .exe suffix if there is one
-    {
-        char *suff;
-        suff = strrchr(prog,'.');
-        if (suff != NULL && !strcmp(suff,".exe")) {
-            *suff = '\0';
-        }
-    }
-#endif
-
-  if (RtsFlags.ProfFlags.doHeapProfile) {
-    /* Initialise the log file name */
-    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
-    sprintf(hp_filename, "%s.hp", prog);
-
-    /* open the log file */
-    if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
-      debugBelch("Can't open profiling report file %s\n",
-              hp_filename);
-      RtsFlags.ProfFlags.doHeapProfile = 0;
-      stgFree(prog);
-      return;
-    }
-  }
-
-  stgFree(prog);
-
-  initHeapProfiling();
-}
-
-void endProfiling( void )
-{
-  endHeapProfiling();
-}
-#endif /* !PROFILING */
-
 static void
 printEscapedString(const char* string)
 {
@@ -398,15 +350,51 @@ dumpCostCentresToEventLog(void)
 #endif
 }
 
+void freeHeapProfiling (void)
+{
+}
+
 /* --------------------------------------------------------------------------
  * Initialize the heap profilier
  * ----------------------------------------------------------------------- */
-uint32_t
+void
 initHeapProfiling(void)
 {
     if (! RtsFlags.ProfFlags.doHeapProfile) {
-        return 0;
+        return;
     }
+
+    char *prog;
+
+    prog = stgMallocBytes(strlen(prog_name) + 1, "initHeapProfiling");
+    strcpy(prog, prog_name);
+#if defined(mingw32_HOST_OS)
+    // on Windows, drop the .exe suffix if there is one
+    {
+        char *suff;
+        suff = strrchr(prog,'.');
+        if (suff != NULL && !strcmp(suff,".exe")) {
+            *suff = '\0';
+        }
+    }
+#endif
+
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    /* Initialise the log file name */
+    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
+    sprintf(hp_filename, "%s.hp", prog);
+
+    /* open the log file */
+    if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
+      debugBelch("Can't open profiling report file %s\n",
+              hp_filename);
+      RtsFlags.ProfFlags.doHeapProfile = 0;
+      stgFree(prog);
+      return;
+    }
+  }
+
+  stgFree(prog);
 
 #if defined(PROFILING)
     if (doingLDVProfiling() && doingRetainerProfiling()) {
@@ -475,8 +463,6 @@ initHeapProfiling(void)
 
     traceHeapProfBegin(0);
     dumpCostCentresToEventLog();
-
-    return 0;
 }
 
 void
