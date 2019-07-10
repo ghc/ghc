@@ -20,5 +20,11 @@ linters = [
                  message='`#if !defined(x)` is preferred to `#ifndef x`'),
 ]
 
+for l in linters:
+    # Need do document rules!
+    l.add_path_filter(lambda path: not path.startswith('docs/coding-style.html'))
+    # Don't lint vendored code
+    l.add_path_filter(lambda path: not path.name == 'config.guess')
+
 if __name__ == '__main__':
     run_linters(linters)
