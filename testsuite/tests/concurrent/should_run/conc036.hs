@@ -8,7 +8,7 @@ import Prelude hiding (catch)
 import Foreign
 import System.IO
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 sleep n = sleepBlock (n*1000)
 foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
 #else
