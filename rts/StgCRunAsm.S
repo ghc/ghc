@@ -2,7 +2,7 @@
 #include "rts/Constants.h"
 
 #if defined(powerpc64le_HOST_ARCH)
-# ifdef linux_HOST_OS
+# if defined(linux_HOST_OS)
 # define STACK_FRAME_SIZE RESERVED_C_STACK_BYTES+304
 	.file	"StgCRun.c"
 	.abiversion 2

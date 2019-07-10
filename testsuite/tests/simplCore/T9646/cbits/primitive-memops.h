@@ -1,4 +1,4 @@
-#ifndef haskell_primitive_memops_h
+#if !defined(haskell_primitive_memops_h)
 #define haskell_primitive_memops_h
 
 #include <stdlib.h>
