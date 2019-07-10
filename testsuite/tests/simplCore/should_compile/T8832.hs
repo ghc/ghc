@@ -17,7 +17,7 @@ T(i,Int)
 T(i8,Int8)
 T(i16,Int16)
 T(i32,Int32)
-#ifdef T8832_WORDSIZE_64
+#if defined(T8832_WORDSIZE_64)
 T(i64,Int64)
 #endif
 
@@ -25,7 +25,7 @@ T(w,Word)
 T(w8,Word8)
 T(w16,Word16)
 T(w32,Word32)
-#ifdef T8832_WORDSIZE_64
+#if defined(T8832_WORDSIZE_64)
 T(w64,Word64)
 #endif
 

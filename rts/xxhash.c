@@ -49,7 +49,7 @@
  * See http://stackoverflow.com/a/32095106/646947 for details.
  * Prefer these methods in priority order (0 > 1 > 2)
  */
-#ifndef XXH_FORCE_MEMORY_ACCESS   /* can be defined externally, on command line for example */
+#if !defined(XXH_FORCE_MEMORY_ACCESS)   /* can be defined externally, on command line for example */
 #  if defined(__GNUC__) && ( defined(__ARM_ARCH_6__) || defined(__ARM_ARCH_6J__) || defined(__ARM_ARCH_6K__) || defined(__ARM_ARCH_6Z__) || defined(__ARM_ARCH_6ZK__) || defined(__ARM_ARCH_6T2__) )
 #    define XXH_FORCE_MEMORY_ACCESS 2
 #  elif defined(__INTEL_COMPILER) || \
@@ -73,7 +73,7 @@
  * to improve speed for Big-endian CPU.
  * This option has no impact on Little_Endian CPU.
  */
-#ifndef XXH_FORCE_NATIVE_FORMAT   /* can be defined externally */
+#if !defined(XXH_FORCE_NATIVE_FORMAT)   /* can be defined externally */
 #  define XXH_FORCE_NATIVE_FORMAT 0
 #endif
 
@@ -84,7 +84,7 @@
  * set it to 0 when the input is guaranteed to be aligned,
  * or when alignment doesn't matter for performance.
  */
-#ifndef XXH_FORCE_ALIGN_CHECK /* can be defined externally */
+#if !defined(XXH_FORCE_ALIGN_CHECK) /* can be defined externally */
 #  if defined(__i386) || defined(_M_IX86) || defined(__x86_64__) || defined(_M_X64)
 #    define XXH_FORCE_ALIGN_CHECK 0
 #  else
@@ -112,12 +112,12 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
 /* *************************************
 *  Compiler Specific Options
 ***************************************/
-#ifdef _MSC_VER    /* Visual Studio */
+#if defined(_MSC_VER)    /* Visual Studio */
 #  pragma warning(disable : 4127)      /* disable: C4127: conditional expression is constant */
 #  define FORCE_INLINE static __forceinline
 #else
-#  if defined (__cplusplus) || defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
-#    ifdef __GNUC__
+#  if defined(__cplusplus) || defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L   /* C99 */
+#    if defined(__GNUC__)
 #      define FORCE_INLINE static inline __attribute__((always_inline))
 #    else
 #      define FORCE_INLINE static inline
@@ -131,8 +131,8 @@ static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcp
 /* *************************************
 *  Basic Types
 ***************************************/
-#ifndef MEM_MODULE
-# if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+#if !defined(MEM_MODULE)
+# if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
 #   include <stdint.h>
     typedef uint8_t  BYTE;
     typedef uint16_t U16;
@@ -206,7 +206,7 @@ static U32 XXH_swap32 (U32 x)
 typedef enum { XXH_bigEndian=0, XXH_littleEndian=1 } XXH_endianess;
 
 /* XXH_CPU_LITTLE_ENDIAN can be defined externally, for example on the compiler command line */
-#ifndef XXH_CPU_LITTLE_ENDIAN
+#if !defined(XXH_CPU_LITTLE_ENDIAN)
     static const int g_one = 1;
 #   define XXH_CPU_LITTLE_ENDIAN   (*(const char*)(&g_one))
 #endif
@@ -267,7 +267,7 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, size_t len, U32 seed, XXH
     U32 h32;
 #define XXH_get32bits(p) XXH_readLE32_align(p, endian, align)
 
-#ifdef XXH_ACCEPT_NULL_INPUT_POINTER
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER)
     if (p==NULL) {
         len=0;
         bEnd=p=(const BYTE*)(size_t)16;
@@ -380,7 +380,7 @@ FORCE_INLINE XXH_errorcode XXH32_update_endian (XXH32_state_t* state, const void
     const BYTE* p = (const BYTE*)input;
     const BYTE* const bEnd = p + len;
 
-#ifdef XXH_ACCEPT_NULL_INPUT_POINTER
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER)
     if (input==NULL) return XXH_ERROR;
 #endif
 
@@ -513,7 +513,7 @@ XXH_PUBLIC_API XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canonical_t* src
 }
 
 
-#ifndef XXH_NO_LONG_LONG
+#if !defined(XXH_NO_LONG_LONG)
 
 /* *******************************************************************
 *  64-bits hash functions
@@ -521,9 +521,9 @@ XXH_PUBLIC_API XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canonical_t* src
 
 /*======   Memory access   ======*/
 
-#ifndef MEM_MODULE
+#if !defined(MEM_MODULE)
 # define MEM_MODULE
-# if !defined (__VMS) && (defined (__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+# if !defined(__VMS) && (defined(__cplusplus) || (defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
 #   include <stdint.h>
     typedef uint64_t U64;
 # else
@@ -627,7 +627,7 @@ FORCE_INLINE U64 XXH64_endian_align(const void* input, size_t len, U64 seed, XXH
     U64 h64;
 #define XXH_get64bits(p) XXH_readLE64_align(p, endian, align)
 
-#ifdef XXH_ACCEPT_NULL_INPUT_POINTER
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER)
     if (p==NULL) {
         len=0;
         bEnd=p=(const BYTE*)(size_t)32;
@@ -749,7 +749,7 @@ FORCE_INLINE XXH_errorcode XXH64_update_endian (XXH64_state_t* state, const void
     const BYTE* p = (const BYTE*)input;
     const BYTE* const bEnd = p + len;
 
-#ifdef XXH_ACCEPT_NULL_INPUT_POINTER
+#if defined(XXH_ACCEPT_NULL_INPUT_POINTER)
     if (input==NULL) return XXH_ERROR;
 #endif
 

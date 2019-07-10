@@ -1,4 +1,4 @@
-#ifndef RTS_LINKER_UTIL_H
+#if !defined(RTS_LINKER_UTIL_H)
 #define RTS_LINKER_UTIL_H
 
 #include <stdint.h>
