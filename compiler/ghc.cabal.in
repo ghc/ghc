@@ -200,9 +200,6 @@ Library
     Default-Extensions:
         NoImplicitPrelude
 
-    Other-Modules:
-        GhcPrelude
-
     Exposed-Modules:
         HieTypes
         HieDebug
@@ -397,6 +394,7 @@ Library
         GHC
         GhcMake
         GhcPlugins
+        GhcPrelude
         DynamicLoading
         HeaderInfo
         HscMain
