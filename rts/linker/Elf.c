@@ -1122,13 +1122,13 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
        switch (reloc_type) {
-#        ifdef i386_HOST_ARCH
+#        if defined(i386_HOST_ARCH)
        case COMPAT_R_386_NONE:                  break;
        case COMPAT_R_386_32:   *pP = value;     break;
        case COMPAT_R_386_PC32: *pP = value - P; break;
 #        endif
 
-#        ifdef arm_HOST_ARCH
+#        if defined(arm_HOST_ARCH)
        case COMPAT_R_ARM_ABS32:     /* (S + A) | T */
            // Specified by Linux ARM ABI to be equivalent to ABS32
        case COMPAT_R_ARM_TARGET1:

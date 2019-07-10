@@ -103,7 +103,7 @@ main = test_run float_number double_number
 --     in  "0x" ++ str
 -- 
 -- fixEndian :: [a] -> [a]
--- -- #ifdef WORDS_BIGENDIAN
+-- -- #if defined(WORDS_BIGENDIAN)
 -- -- fixEndian = id
 -- -- #else
 -- fixEndian = reverse

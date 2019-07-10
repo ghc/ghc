@@ -3020,7 +3020,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
-#elif defined (mingw32_HOST_OS)
+#elif defined(mingw32_HOST_OS)
                               addOptl "-Wl,--export-all-symbols"
 #else
     -- ignored for compat w/ gcc:

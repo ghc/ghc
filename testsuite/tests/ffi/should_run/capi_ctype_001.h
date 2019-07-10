@@ -1,5 +1,5 @@
 
-#ifndef __capi_ctype_001_H__
+#if !defined(__capi_ctype_001_H__)
 #define __capi_ctype_001_H__
 
 typedef struct {

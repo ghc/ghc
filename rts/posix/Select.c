@@ -23,11 +23,11 @@
 #include "Stats.h"
 #include "GetTime.h"
 
-# ifdef HAVE_SYS_SELECT_H
+# if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
 # endif
 
-# ifdef HAVE_SYS_TYPES_H
+# if defined(HAVE_SYS_TYPES_H)
 #  include <sys/types.h>
 # endif
 

@@ -55,7 +55,7 @@ extra-libraries:
                               ,"bfd", "iberty"  /* for debugging */
 #endif
 #if defined(HAVE_LIBMINGWEX)
-# ifndef INSTALLING                             /* Bundled Mingw is behind */
+# if !defined(INSTALLING)                             /* Bundled Mingw is behind */
                               ,"mingwex"
 # endif
 #endif

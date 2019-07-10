@@ -1,12 +1,12 @@
 #include "Rts.h"
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS)
 #define STG_GLOBAL ".globl "
 #else
 #define STG_GLOBAL ".global "
 #endif
 
-#ifdef LEADING_UNDERSCORE
+#if defined(LEADING_UNDERSCORE)
 #define GETESP "_getesp"
 #else
 #define GETESP "getesp"

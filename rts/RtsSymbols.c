@@ -49,7 +49,7 @@
       SymE_HasProto(libdwPoolRelease)           \
       SymE_HasProto(libdwPoolClear)
 
-#if !defined (mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS                  \
       SymI_HasProto(__hscore_get_saved_termios) \
       SymI_HasProto(__hscore_set_saved_termios) \
