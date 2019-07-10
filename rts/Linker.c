@@ -894,7 +894,7 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
 #if defined(PROFILING)
         // collect any new cost centres & CCSs
         // that were defined during runInit
-        initProfiling2();
+        refreshProfilingCCSs();
 #endif
     }
 
@@ -1675,7 +1675,7 @@ static HsInt resolveObjs_ (void)
 
 #if defined(PROFILING)
     // collect any new cost centres & CCSs that were defined during runInit
-    initProfiling2();
+    refreshProfilingCCSs();
 #endif
 
     IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
@@ -1905,4 +1905,3 @@ void freeSegments (ObjectCode *oc)
         oc->segments = NULL;
     }
 }
-
