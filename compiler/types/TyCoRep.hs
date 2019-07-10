@@ -52,7 +52,8 @@ module TyCoRep (
         isLiftedTypeKind, isUnliftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep,
         isRuntimeRepTy, isRuntimeRepVar,
-        sameVis,
+        sameVis, isUnsafeCo,
+
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -1120,6 +1121,31 @@ isRuntimeRepTy _ = False
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
+isUnsafeCo :: Coercion -> Bool
+isUnsafeCo co = case co of
+    Refl _ -> False
+    GRefl _ _ m_co -> go_mco m_co
+    TyConAppCo _ _ cos -> any isUnsafeCo cos
+    AppCo co1 co2 -> isUnsafeCo co1 || isUnsafeCo co2
+    ForAllCo _ _ co -> isUnsafeCo co
+    FunCo _ co1 co2 -> isUnsafeCo co1 || isUnsafeCo co2
+    CoVarCo _ -> False
+    AxiomInstCo _ _ cos -> any isUnsafeCo cos
+    AxiomRuleCo _ cos -> any isUnsafeCo cos
+    UnivCo UnsafeCoerceProv _ _ _ -> True
+    UnivCo _ _ _ _ -> False
+    SymCo co -> isUnsafeCo co
+    TransCo co1 co2 -> isUnsafeCo co1 || isUnsafeCo co2
+    NthCo _ _ co -> isUnsafeCo co
+    LRCo _ co -> isUnsafeCo co
+    InstCo co1 co2 -> isUnsafeCo co1 || isUnsafeCo co2
+    KindCo co -> isUnsafeCo co
+    SubCo co -> isUnsafeCo co
+    HoleCo _ -> False
+  where
+    go_mco MRefl = False
+    go_mco (MCo co) = isUnsafeCo co
 
 {-
 %************************************************************************
