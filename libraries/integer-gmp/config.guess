@@ -397,7 +397,7 @@ case "$UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION" in
 	# Note that the Sun cc does not turn __LP64__ into 1 like gcc does.
 	# This test works for both compilers.
 	if [ "$CC_FOR_BUILD" != no_compiler_found ]; then
-	    if (echo '#ifdef __amd64'; echo IS_64BIT_ARCH; echo '#endif') | \
+	    if (echo '#if defined(__amd64)'; echo IS_64BIT_ARCH; echo '#endif') | \
 		(CCOPTS="" $CC_FOR_BUILD -E - 2>/dev/null) | \
 		grep IS_64BIT_ARCH >/dev/null
 	    then
@@ -486,7 +486,7 @@ case "$UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION" in
     mips:*:*:UMIPS | mips:*:*:RISCos)
 	set_cc_for_build
 	sed 's/^	//' << EOF > "$dummy.c"
-#ifdef __cplusplus
+#if defined(__cplusplus)
 #include <stdio.h>  /* for printf() prototype */
 	int main (int argc, char *argv[]) {
 #else
@@ -1332,7 +1332,7 @@ EOF
 	fi
 	if test "`echo "$UNAME_RELEASE" | sed -e 's/\..*//'`" -le 10 ; then
 	    if [ "$CC_FOR_BUILD" != no_compiler_found ]; then
-		if (echo '#ifdef __LP64__'; echo IS_64BIT_ARCH; echo '#endif') | \
+		if (echo '#if defined(__LP64__)'; echo IS_64BIT_ARCH; echo '#endif') | \
 		       (CCOPTS="" $CC_FOR_BUILD -E - 2>/dev/null) | \
 		       grep IS_64BIT_ARCH >/dev/null
 		then
@@ -1342,7 +1342,7 @@ EOF
 		    esac
 		fi
 		# On 10.4-10.6 one might compile for PowerPC via gcc -arch ppc
-		if (echo '#ifdef __POWERPC__'; echo IS_PPC; echo '#endif') | \
+		if (echo '#if defined(__POWERPC__)'; echo IS_PPC; echo '#endif') | \
 		       (CCOPTS="" $CC_FOR_BUILD -E - 2>/dev/null) | \
 		       grep IS_PPC >/dev/null
 		then
@@ -1464,7 +1464,7 @@ esac
 # No uname command or uname output not recognized.
 set_cc_for_build
 cat > "$dummy.c" <<EOF
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_)
 #include <sys/types.h>
 #include <sys/utsname.h>
 #endif
@@ -1478,7 +1478,7 @@ main ()
 #else
 #include <sys/param.h>
   printf ("m68k-sony-newsos%s\n",
-#ifdef NEWSOS4
+#if defined(NEWSOS4)
   "4"
 #else
   ""

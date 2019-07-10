@@ -49,17 +49,17 @@
 #include <sys/sysctl.h>
 #endif
 
-#ifndef MAP_FAILED
+#if !defined(MAP_FAILED)
 # define MAP_FAILED ((void *)-1)
 #endif
 
 #if defined(hpux_HOST_OS)
-# ifndef MAP_ANON
+# if !defined(MAP_ANON)
 #  define MAP_ANON MAP_ANONYMOUS
 # endif
 #endif
 
-#ifndef darwin_HOST_OS
+#if !defined(darwin_HOST_OS)
 # undef RESERVE_FLAGS
 # if defined(MAP_GUARD)
 #  define RESERVE_FLAGS  MAP_GUARD /* FreeBSD */

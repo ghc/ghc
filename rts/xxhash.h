@@ -64,7 +64,7 @@ XXH64       13.8 GB/s            1.9 GB/s
 XXH32        6.8 GB/s            6.0 GB/s
 */
 
-#ifndef XXHASH_H_5627135585666179
+#if !defined(XXHASH_H_5627135585666179)
 #define XXHASH_H_5627135585666179 1
 
 #if defined (__cplusplus)
@@ -91,8 +91,8 @@ typedef enum { XXH_OK=0, XXH_ERROR } XXH_errorcode;
 *   `xxhash.c` is automatically included.
 *   It's not useful to compile and link it as a separate module.
 */
-#ifdef XXH_PRIVATE_API
-#  ifndef XXH_STATIC_LINKING_ONLY
+#if defined(XXH_PRIVATE_API)
+#  if !defined(XXH_STATIC_LINKING_ONLY)
 #    define XXH_STATIC_LINKING_ONLY
 #  endif
 #  if defined(__GNUC__)
@@ -119,7 +119,7 @@ with the value of XXH_NAMESPACE (therefore, avoid NULL and numeric values).
 Note that no change is required within the calling program as long as it includes `xxhash.h` :
 regular symbol name will be automatically translated by this header.
 */
-#ifdef XXH_NAMESPACE
+#if defined(XXH_NAMESPACE)
 #  define XXH_CAT(A,B) A##B
 #  define XXH_NAME2(A,B) XXH_CAT(A,B)
 #  define XXH_versionNumber XXH_NAME2(XXH_NAMESPACE, XXH_versionNumber)
@@ -211,7 +211,7 @@ XXH_PUBLIC_API XXH32_hash_t XXH32_hashFromCanonical(const XXH32_canonical_t* src
 */
 
 
-#ifndef XXH_NO_LONG_LONG
+#if !defined(XXH_NO_LONG_LONG)
 /*-**********************************************************************
 *  64-bits hash
 ************************************************************************/
@@ -241,7 +241,7 @@ XXH_PUBLIC_API XXH64_hash_t XXH64_hashFromCanonical(const XXH64_canonical_t* src
 #endif  /* XXH_NO_LONG_LONG */
 
 
-#ifdef XXH_STATIC_LINKING_ONLY
+#if defined(XXH_STATIC_LINKING_ONLY)
 
 /* ================================================================================================
    This section contains definitions which are not guaranteed to remain stable.
@@ -266,7 +266,7 @@ struct XXH32_state_s {
    unsigned reserved;   /* never read nor write, will be removed in a future version */
 };   /* typedef'd to XXH32_state_t */
 
-#ifndef XXH_NO_LONG_LONG   /* remove 64-bits support */
+#if !defined(XXH_NO_LONG_LONG)   /* remove 64-bits support */
 struct XXH64_state_s {
    unsigned long long total_len;
    unsigned long long v1;
@@ -279,7 +279,7 @@ struct XXH64_state_s {
 };   /* typedef'd to XXH64_state_t */
 #endif
 
-#ifdef XXH_PRIVATE_API
+#if defined(XXH_PRIVATE_API)
 #  include "xxhash.c"   /* include xxhash function bodies as `static`, for inlining */
 #endif
 
