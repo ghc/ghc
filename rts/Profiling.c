@@ -51,9 +51,6 @@ static unsigned int CCS_ID = 1;
 static char *prof_filename; /* prof report file name = <program>.prof */
 FILE *prof_file;
 
-static char *hp_filename;       /* heap profile (hp2ps style) log file */
-FILE *hp_file;
-
 // List of all cost centres. Used for reporting.
 CostCentre      *CC_LIST  = NULL;
 // All cost centre stacks temporarily appear here, to be able to make CCS_MAIN a
@@ -190,10 +187,6 @@ void initProfiling (void)
     if (RtsFlags.CcFlags.doCostCentres) {
         initTimeProfiling();
     }
-
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        initHeapProfiling();
-    }
 }
 
 //
@@ -276,21 +269,8 @@ initProfilingLogFile(void)
             // Retainer profiling (`-hr` or `-hr<cc> -h<x>`) writes to
             // both <program>.hp as <program>.prof.
             if (doingRetainerProfiling()) {
-                RtsFlags.ProfFlags.doHeapProfile = 0;
+                RtsFlags.ProfFlags.doHeapProfile = 0; // DXLD: TODO: obsolete?
             }
-        }
-    }
-
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
-        sprintf(hp_filename, "%s.hp", stem);
-
-        /* open the log file */
-        if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
-            debugBelch("Can't open profiling report file %s\n",
-                       hp_filename);
-            RtsFlags.ProfFlags.doHeapProfile = 0;
         }
     }
 }
@@ -307,9 +287,6 @@ endProfiling ( void )
 {
     if (RtsFlags.CcFlags.doCostCentres) {
         stopProfTimer();
-    }
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        endHeapProfiling();
     }
 }
 
