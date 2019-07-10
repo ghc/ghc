@@ -842,7 +842,7 @@ void waitForCapability (Capability **pCap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
@@ -948,7 +948,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
  * get every Capability into the GC.
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 void
 prodCapability (Capability *cap, Task *task)
@@ -970,7 +970,7 @@ prodCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 bool
 tryGrabCapability (Capability *cap, Task *task)

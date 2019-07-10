@@ -576,7 +576,7 @@ only _ = panic "Util: only"
 
 isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 
-# ifndef DEBUG
+# if !defined(DEBUG)
 isIn    _msg x ys = x `elem` ys
 isn'tIn _msg x ys = x `notElem` ys
 

@@ -20,7 +20,7 @@ class (r ~ Tag a) => TagImpl a r | a -> r where
 instance {-# OVERLAPPING #-} (r ~ Tag (Tagged t a)) => TagImpl (Tagged t a) r where
   tag = id
 
-#ifdef WRONG
+#if defined(WRONG)
 instance {-# OVERLAPPING #-} (r ~ Tagged t a, r ~ Tag a) => TagImpl a r where
 #else
 instance {-# OVERLAPPING #-} (r ~ Tagged Int a, r ~ Tag a) => TagImpl a r where

@@ -114,7 +114,7 @@ vdebugBelch(const char*s, va_list ap)
 
 #define BUFSIZE 512
 
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 static int
 isGUIApp(void)
 {

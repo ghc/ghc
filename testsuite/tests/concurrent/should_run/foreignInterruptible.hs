@@ -6,7 +6,7 @@ import Control.Exception
 import Foreign
 import System.IO
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 sleep n = sleepBlock (n*1000)
 foreign import stdcall interruptible "Sleep" sleepBlock :: Int -> IO ()
 #else
