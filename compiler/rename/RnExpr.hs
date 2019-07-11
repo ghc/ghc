@@ -208,8 +208,6 @@ rnExpr (NegApp _ e _)
 
 ------------------------------------------
 -- Template Haskell extensions
--- Don't ifdef-HAVE_INTERPRETER them because we want to fail gracefully
--- (not with an rnExpr crash) in a stage-1 compiler.
 rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
 
 rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice

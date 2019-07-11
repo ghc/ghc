@@ -74,7 +74,6 @@ packageArgs = do
          , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             , notStage0 ? intLib == integerGmp ?
               arg "integer-gmp"
@@ -89,7 +88,6 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
@@ -123,8 +121,6 @@ packageArgs = do
         -- behind the @-fghci@ flag.
         , package ghci ? mconcat
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , notStage0 ? builder (Cabal Flags) ? not windowsHost ? notM cross
-                      ? arg "ext-interp"
           , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
         -------------------------------- haddock -------------------------------

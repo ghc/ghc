@@ -24,11 +24,6 @@ Flag ghci
     Default: False
     Manual: True
 
-Flag ext-interp
-    Description: Build external interpreter support
-    Default: True
-    Manual: True
-
 Flag threaded
     Description: Link the ghc executable against the threaded RTS
     Default: True
@@ -96,12 +91,6 @@ Executable ghc
     -- disabling this flag.
     if flag(threaded)
       ghc-options: -threaded
-
-    if flag(ext-interp)
-      cpp-options: -DHAVE_EXTERNAL_INTERPRETER
-
-    if flag(ghci) || flag(ext-interp)
-      cpp-options: -DHAVE_INTERPRETER
 
     Other-Extensions:
         CPP

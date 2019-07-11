@@ -10,13 +10,10 @@
 --
 module GHCi.InfoTable
   (
-#if defined(HAVE_INTERPRETER)
     mkConInfoTable
-#endif
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
-#if defined(HAVE_INTERPRETER)
 import Foreign
 import Foreign.C
 import GHC.Ptr
@@ -24,7 +21,6 @@ import GHC.Exts
 import GHC.Exts.Heap
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-#endif
 
 ghciTablesNextToCode :: Bool
 #if defined(TABLES_NEXT_TO_CODE)
@@ -33,7 +29,6 @@ ghciTablesNextToCode = True
 ghciTablesNextToCode = False
 #endif
 
-#if defined(HAVE_INTERPRETER) /* To end */
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
 -- If tables_next_to_code is enabled, then it must point the the 'code' field.
 -- Otherwise, it should point to the start of the StgInfoTable.
@@ -387,4 +382,3 @@ wORD_SIZE = (#const SIZEOF_HSINT)
 
 conInfoTableSizeB :: Int
 conInfoTableSizeB = wORD_SIZE + itblSize
-#endif /* HAVE_INTERPRETER */
