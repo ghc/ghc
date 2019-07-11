@@ -22,6 +22,7 @@ module HeaderInfo ( getImports
 
 import GhcPrelude
 
+import GHC.Platform
 import HscTypes
 import Parser           ( parseHeader )
 import Lexer
@@ -307,10 +308,12 @@ checkExtension :: DynFlags -> Located FastString -> Located String
 checkExtension dflags (dL->L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
- =  let ext' = unpackFS ext in
-    if ext' `elem` supportedLanguagesAndExtensions
+  = if ext' `elem` supported
     then cL l ("-X"++ext')
     else unsupportedExtnError dflags l ext'
+  where
+    ext' = unpackFS ext
+    supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
 languagePragParseError dflags loc =
@@ -326,7 +329,8 @@ unsupportedExtnError dflags loc unsup =
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
-     suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
+     supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
+     suggestions = fuzzyMatch unsup supported
 
 
 optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
