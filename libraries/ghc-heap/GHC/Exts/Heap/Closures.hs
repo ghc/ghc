@@ -262,6 +262,19 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
+  | TSOClosure
+      { info :: !StgInfoTable
+      , tsoStack :: !b
+      }
+
+  | StackClosure
+     { info :: !StgInfoTable
+     , size :: !HalfWord
+     , dirty :: !HalfWord
+     , stackPointer :: !b
+     , stack :: [Word]
+     }
+
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
