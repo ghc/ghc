@@ -25,11 +25,6 @@ Flag ghci
     Default: False
     Manual: True
 
-Flag ext-interp
-    Description: Support external interpreter
-    Default: True
-    Manual: True
-
 Flag stage1
     Description: Is this stage 1?
     Default: False
@@ -97,12 +92,6 @@ Library
     if flag(ghci)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
-
-    if flag(ext-interp)
-        CPP-Options: -DHAVE_EXTERNAL_INTERPRETER
-
-    if flag(ghci) || flag(ext-interp)
-        CPP-Options: -DHAVE_INTERPRETER
 
     -- sanity-check to ensure not more than one integer flag is set
     if flag(integer-gmp) && flag(integer-simple)

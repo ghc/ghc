@@ -4346,14 +4346,6 @@ supportedExtensions :: [String]
 supportedExtensions = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(HAVE_INTERPRETER)
-      -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
-      -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
-      -- box. See also GHC #11102 and #16331 for more details about
-      -- the rationale
-      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
-      | flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
-#endif
       | otherwise = [name, noName]
       where
         noName = "No" ++ name

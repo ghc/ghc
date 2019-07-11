@@ -30,12 +30,8 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-#if defined(HAVE_INTERPRETER)
 import DynamicLoading   ( loadFrontendPlugin )
 import Plugins
-#else
-import DynamicLoading   ( pluginError )
-#endif
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import DynamicLoading   ( initializePlugins )
 #endif
@@ -847,15 +843,11 @@ dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 -- Frontend plugin support
 
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
-#if !defined(HAVE_INTERPRETER)
-doFrontend modname _ = pluginError [modname]
-#else
 doFrontend modname srcs = do
     hsc_env <- getSession
     frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
     frontend frontend_plugin
       (reverse $ frontendPluginOpts (hsc_dflags hsc_env)) srcs
-#endif
 
 -- -----------------------------------------------------------------------------
 -- ABI hash support
