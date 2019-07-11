@@ -123,9 +123,11 @@ Task* getTask (void)
 
     task = myTask();
     if (task != NULL) {
+        debugBelch("Using OLD task %p", task);
         return task;
     } else {
         task = newTask(false);
+        debugBelch("Using NEW task %p", task);
 #if defined(THREADED_RTS)
         task->id = osThreadId();
 #endif

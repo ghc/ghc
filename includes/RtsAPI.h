@@ -457,6 +457,9 @@ typedef struct RtsPaused_ {
 RtsPaused rts_pause (void);
 void rts_unpause (RtsPaused paused);
 
+typedef void (*InformCb)(void *user, RtsPaused);
+void rts_inform(InformCb cb, void *user);
+
 // List all live threads. Must be done while RTS is paused.
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);
