@@ -1,10 +1,10 @@
 #include "Rts.h"
 #include "RtsFlags.h"
-#ifdef DEBUG
+#if defined(DEBUG)
 #define INLINE_HEADER
 #endif
 #include "MBlock.h"
-#ifdef DEBUG
+#if defined(DEBUG)
 extern void *getFirstMBlock(void);
 extern void *getNextMBlock(void *mblock);
 #endif
@@ -42,7 +42,7 @@ int main (int argc, char *argv[])
         a[j] = allocGroup_lock(rand() % MAXALLOC + 1);
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     {
         void *p;
         i = 0;

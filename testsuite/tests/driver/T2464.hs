@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -DTEST #-}
 {-# OPTIONS_GHC -fffi #-} -- deprecation warning
-#ifdef TEST
+#if defined(TEST)
 {-# LANGUAGE EmptyDataDecls #-}
 #endif
 

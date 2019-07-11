@@ -11,7 +11,7 @@ import Data.Array.ST
 #include "ghcconfig.h"
 
 reverse_if_bigendian :: [a] -> [a]
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 reverse_if_bigendian = reverse
 #else
 reverse_if_bigendian = id

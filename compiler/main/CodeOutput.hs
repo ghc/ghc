@@ -252,8 +252,8 @@ outputForeignStubs dflags mod location stubs
                                        then Just stub_c
                                        else Nothing )
  where
-   cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
-   cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
+   cplusplus_hdr = "#if defined(__cplusplus)\nextern \"C\" {\n#endif\n"
+   cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
 
 
 -- Don't use doOutput for dumping the f. export stubs
