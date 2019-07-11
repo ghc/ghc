@@ -21,7 +21,7 @@
     The type argument `r` is marked as `Inferred` to prevent it from
     interfering with visible type application.
 
-  * Make `HasResolution` poly-kinded.
+  * Make `Fixed` and `HasResolution` poly-kinded.
 
   * Add `HasResolution` instances for `Nat`s.
 
