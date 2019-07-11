@@ -651,15 +651,27 @@ rts_unlock (Capability *cap)
 
 #ifdef THREADED_RTS
 static bool rts_paused = false;
+static InformCb rts_inform_cb = NULL;
+static void *rts_inform_user = NULL;
 // Halt execution of all Haskell threads.
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
-    printf("pausing");
+    printf("PT %p %p\n", paused.pausing_task, paused.capabilities);
+    paused.pausing_task = NULL;
+    printf("PT2 %p %p\n", paused.pausing_task, paused.capabilities);
     paused.pausing_task = newBoundTask();
-    printf("bound task");
+    printf("PT3 %p %p\n", paused.pausing_task, paused.capabilities);
+    paused.capabilities = NULL;
+    printf("PT1 %p %p\n", paused.pausing_task, paused.capabilities);
     stopAllCapabilities(&paused.capabilities, paused.pausing_task);
-    printf("paused");
+    printf("STC %p %p\n", paused.pausing_task, paused.capabilities);
+    if (rts_inform_cb != NULL){
+      printf("Resuming %p %p\n", paused.pausing_task, paused.capabilities);
+      rts_inform_cb(rts_inform_user, paused);
+      rts_inform_cb = NULL;
+      rts_inform_user = NULL;
+    }
     rts_paused = true;
     return paused;
 }
@@ -671,6 +683,14 @@ void rts_unpause (RtsPaused paused)
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
     printf("Released");
     freeTask(paused.pausing_task);
+}
+
+// On a pause, inform the debugger we have paused.
+// This allows the process to be paused by the debuggee
+void rts_inform(InformCb cb, void *user)
+{
+  rts_inform_cb = cb;
+  rts_inform_user = user;
 }
 
 void rts_listThreads(ListThreadsCb cb, void *user)
