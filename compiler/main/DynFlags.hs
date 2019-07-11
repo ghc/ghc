@@ -4342,26 +4342,25 @@ supportedLanguages = map (flagSpecName . snd) languageFlagsDeps
 supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
-supportedExtensions :: [String]
-supportedExtensions = concatMap toFlagSpecNamePair xFlags
+supportedExtensions :: PlatformMini -> [String]
+supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
       -- the rationale
-      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
-      | flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
-#endif
+      | isAIX, flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
+      | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
       | otherwise = [name, noName]
       where
+        isAIX = platformMini_os targetPlatformMini == OSAIX
         noName = "No" ++ name
         name = flagSpecName flg
 
-supportedLanguagesAndExtensions :: [String]
-supportedLanguagesAndExtensions =
-    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions
+supportedLanguagesAndExtensions :: PlatformMini -> [String]
+supportedLanguagesAndExtensions targetPlatformMini =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions targetPlatformMini
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
