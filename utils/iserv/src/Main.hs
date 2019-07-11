@@ -26,7 +26,7 @@ dieWithUsage = do
     prog <- getProgName
     die $ prog ++ ": " ++ msg
   where
-#ifdef WINDOWS
+#if defined(WINDOWS)
     msg = "usage: iserv <write-handle> <read-handle> [-v]"
 #else
     msg = "usage: iserv <write-fd> <read-fd> [-v]"
