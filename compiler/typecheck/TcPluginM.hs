@@ -3,7 +3,6 @@
 -- access select functions of the 'TcM', principally those to do with
 -- reading parts of the state.
 module TcPluginM (
-#if defined(HAVE_INTERPRETER)
         -- * Basic TcPluginM functionality
         TcPluginM,
         tcPluginIO,
@@ -49,10 +48,8 @@ module TcPluginM (
         newEvVar,
         setEvBind,
         getEvBindsTcPluginM
-#endif
     ) where
 
-#if defined(HAVE_INTERPRETER)
 import GhcPrelude
 
 import qualified TcRnMonad as TcM
@@ -190,7 +187,3 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
-#else
--- this dummy import is needed as a consequence of NoImplicitPrelude
-import GhcPrelude ()
-#endif

@@ -462,11 +462,7 @@ doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
-#if defined(HAVE_INTERPRETER)
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
-#else
-doCorePass pass@CoreDoPluginPass {}  = pprPanic "doCorePass" (ppr pass)
-#endif
 
 doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
 doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
