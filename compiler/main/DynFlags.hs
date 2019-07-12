@@ -1501,7 +1501,7 @@ versionedAppDir dflags = do
   return $ appdir </> versionedFilePath dflags
 
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = uniqueSubdir $ targetPlatform dflags
+versionedFilePath dflags = uniqueSubdir $ platformMini $ targetPlatform dflags
 
 -- | The target code type of the compilation (if any).
 --

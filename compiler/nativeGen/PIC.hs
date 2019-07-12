@@ -565,7 +565,7 @@ pprGotDeclaration _ _ _
 --
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
-pprImportedSymbol dflags (Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
+pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_arch = ArchX86, platformMini_os = OSDarwin } }) importedLbl
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         = case positionIndependent dflags of
            False ->
@@ -618,7 +618,7 @@ pprImportedSymbol dflags (Platform { platformArch = ArchX86, platformOS = OSDarw
         = empty
 
 
-pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
+pprImportedSymbol _ (Platform { platformMini = PlatformMini { platformMini_os = OSDarwin } }) _
         = empty
 
 -- XCOFF / AIX
@@ -632,7 +632,7 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --
 -- NB: No DSO-support yet
 
-pprImportedSymbol dflags (Platform { platformOS = OSAIX }) importedLbl
+pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_os = OSAIX } }) importedLbl
         = case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
@@ -669,7 +669,7 @@ pprImportedSymbol dflags (Platform { platformOS = OSAIX }) importedLbl
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC_64 _ })
+pprImportedSymbol dflags platform@(Platform { platformMini = PlatformMini { platformMini_arch = ArchPPC_64 _ } })
                   importedLbl
         | osElfTarget (platformOS platform)
         = case dynamicLinkerLabelInfo importedLbl of

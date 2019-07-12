@@ -3,7 +3,8 @@
 -- | A description of the platform we're compiling for.
 --
 module GHC.Platform (
-        Platform(..),
+        PlatformMini(..),
+        Platform(..), platformArch, platformOS,
         Arch(..),
         OS(..),
         ArmISA(..),
@@ -29,12 +30,21 @@ where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 
+-- | Contains the bare-bones arch and os information. This isn't enough for
+-- code gen, but useful for tasks where we can fall back upon the host
+-- platform, as this is all we know about the host platform.
+data PlatformMini
+  = PlatformMini
+    { platformMini_arch :: Arch
+    , platformMini_os :: OS
+    }
+    deriving (Read, Show, Eq)
+
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
         = Platform {
-              platformArch                     :: Arch,
-              platformOS                       :: OS,
+              platformMini                     :: PlatformMini,
               -- Word size in bytes (i.e. normally 4 or 8,
               -- for 32bit and 64bit platforms respectively)
               platformWordSize                 :: {-# UNPACK #-} !Int,
@@ -46,6 +56,13 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
+-- | Legacy accessor
+platformArch :: Platform -> Arch
+platformArch = platformMini_arch . platformMini
+
+-- | Legacy accessor
+platformOS :: Platform -> OS
+platformOS = platformMini_os . platformMini
 
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information
