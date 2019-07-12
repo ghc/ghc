@@ -75,6 +75,7 @@ cpsTop hsc_env proc =
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
 
+       ----------- Implement switches ------------------------------------------
        g <- {-# SCC "createSwitchPlans" #-}
             runUniqSM $ cmmImplementSwitchPlans dflags g
        dump Opt_D_dump_cmm_switch "Post switch plan" g
