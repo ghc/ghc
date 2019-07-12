@@ -3277,6 +3277,13 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    with
    out_of_line = True
 
+primop  SaveClosureOp "saveClosure#" GenPrimOp
+   a -> State# s -> (# State# s, () #)
+   { docs }
+   with
+   has_side_effects = True
+   out_of_line = True
+
 primop  ClosureSizeOp "closureSize#" GenPrimOp
    a -> Int#
    { {\tt closureSize\# closure} returns the size of the given closure in

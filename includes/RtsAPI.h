@@ -460,6 +460,9 @@ void rts_unpause (RtsPaused paused);
 typedef void (*InformCb)(void *user, RtsPaused);
 void rts_inform(InformCb cb, void *user);
 
+StgClosure * rts_report_saved(void);
+void rts_save_object(StgClosure *);
+
 // List all live threads. Must be done while RTS is paused.
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);
