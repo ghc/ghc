@@ -32,6 +32,7 @@ main = do
                   | CommandLine.lookupFreeze1 argsMap ]
 
     cwd <- getCurrentDirectory
+    shakeColor <- shouldUseColor
     let options :: ShakeOptions
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
@@ -39,6 +40,7 @@ main = do
             , shakeProgress = progressSimple
             , shakeRebuild  = rebuild
             , shakeTimings  = True
+            , shakeColor    = shakeColor
             , shakeExtra    = extra
 
             -- Enable linting file accesses in the build dir and ghc root dir
