@@ -653,6 +653,7 @@ rts_unlock (Capability *cap)
 static bool rts_paused = false;
 static InformCb rts_inform_cb = NULL;
 static void *rts_inform_user = NULL;
+static StgStablePtr rts_saved_closure = NULL;
 // Halt execution of all Haskell threads.
 RtsPaused rts_pause (void)
 {
@@ -693,6 +694,19 @@ void rts_inform(InformCb cb, void *user)
   rts_inform_user = user;
 }
 
+// Report about which objects were saved, for now there is only
+// one object
+StgClosure * rts_report_saved(void){
+  return (StgClosure *)deRefStablePtr(rts_saved_closure);
+}
+
+void rts_save_object(StgClosure * clos){
+  rts_saved_closure = clos;
+  // getStablePtr(clos);
+}
+
+// Save an object
+
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
     ASSERT(rts_paused);
@@ -726,6 +740,57 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     threadStableNameTable(&list_roots_helper, (void *)&ctx);
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
+
+#else
+static bool rts_paused = false;
+static InformCb rts_inform_cb = NULL;
+static void *rts_inform_user = NULL;
+static StgClosure * rts_saved_closure = NULL;
+// Halt execution of all Haskell threads.
+RtsPaused rts_pause (void)
+{
+    struct RtsPaused_ paused;
+    return paused;
+}
+
+void rts_unpause (RtsPaused paused)
+{
+}
+
+// On a pause, inform the debugger we have paused.
+// This allows the process to be paused by the debuggee
+void rts_inform(InformCb cb, void *user)
+{
+}
+
+// Report about which objects were saved, for now there is only
+// one object
+StgClosure * rts_report_saved(void){
+  return NULL;
+}
+
+void rts_save_object(StgClosure * clos){
+}
+
+// Save an object
+
+void rts_listThreads(ListThreadsCb cb, void *user)
+{
+}
+
+struct list_roots_ctx {
+    ListRootsCb cb;
+    void *user;
+};
+
+// This is an evac_fn.
+void list_roots_helper(void *user, StgClosure **p) {
+}
+
+void rts_listMiscRoots (ListRootsCb cb, void *user)
+{
+}
+
 
 #endif
 
