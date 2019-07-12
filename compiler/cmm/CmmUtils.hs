@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -34,6 +35,8 @@ module CmmUtils(
         cmmOrWord, cmmAndWord,
         cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord,
         cmmToWord,
+
+        cmmMkAssign,
 
         isTrivialCmmExpr, hasNoGlobalRegs, isLit, isComparisonExpr,
 
@@ -76,6 +79,7 @@ import BlockId
 import CLabel
 import Outputable
 import DynFlags
+import Unique
 import CodeGen.Platform
 
 import Data.ByteString (ByteString)
@@ -371,6 +375,13 @@ cmmToWord dflags e
   where
     w = cmmExprWidth dflags e
     word = wordWidth dflags
+
+cmmMkAssign :: DynFlags -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+cmmMkAssign dflags expr uq =
+  let !ty = cmmExprType dflags expr
+      reg = (CmmLocal (LocalReg uq ty))
+  in  (CmmAssign reg expr, CmmReg reg)
+
 
 ---------------------------------------------------
 --

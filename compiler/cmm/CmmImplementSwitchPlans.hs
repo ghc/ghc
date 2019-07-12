@@ -32,6 +32,7 @@ import DynFlags
 -- code generation.
 cmmImplementSwitchPlans :: DynFlags -> CmmGraph -> UniqSM CmmGraph
 cmmImplementSwitchPlans dflags g
+    -- Switch generation done by backend (LLVM/C)
     | targetSupportsSwitch (hscTarget dflags) = return g
     | otherwise = do
     blocks' <- concat `fmap` mapM (visitSwitches dflags) (toBlockList g)
@@ -39,18 +40,41 @@ cmmImplementSwitchPlans dflags g
 
 visitSwitches :: DynFlags -> CmmBlock -> UniqSM [CmmBlock]
 visitSwitches dflags block
-  | (entry@(CmmEntry _ scope), middle, CmmSwitch expr ids) <- blockSplit block
+  | (entry@(CmmEntry _ scope), middle, CmmSwitch vanillaExpr ids) <- blockSplit block
   = do
     let plan = createSwitchPlan ids
+    -- See Note [Floating switch expressions]
+    (assignSimple, simpleExpr) <- floatSwitchExpr dflags vanillaExpr
 
-    (newTail, newBlocks) <- implementSwitchPlan dflags scope expr plan
+    (newTail, newBlocks) <- implementSwitchPlan dflags scope simpleExpr plan
 
-    let block' = entry `blockJoinHead` middle `blockAppend` newTail
+    let block' = entry `blockJoinHead` middle `blockAppend` assignSimple `blockAppend` newTail
 
     return $ block' : newBlocks
 
   | otherwise
   = return [block]
+
+-- Note [Floating switch expressions]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-- When we translate a sparse switch into a search tree we would like
+-- to compute the value we compare against only once.
+
+-- For this purpose we assign the switch expression to a local register
+-- and then use this register when constructing the actual binary tree.
+
+-- This is important as the expression could contain expensive code like
+-- memory loads or divisions which we REALLY don't want to duplicate.
+
+-- This happend in parts of the handwritten RTS Cmm code. See also #16933
+
+-- See Note [Floating switch expressions]
+floatSwitchExpr :: DynFlags -> CmmExpr -> UniqSM (Block CmmNode O O, CmmExpr)
+floatSwitchExpr _      reg@(CmmReg {})  = return (emptyBlock, reg)
+floatSwitchExpr dflags expr             = do
+  (assign, expr') <- cmmMkAssign dflags expr <$> getUniqueM
+  return (BMiddle assign, expr')
 
 
 -- Implementing a switch plan (returning a tail block)

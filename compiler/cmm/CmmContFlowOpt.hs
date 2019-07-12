@@ -18,7 +18,7 @@ import Hoopl.Label
 import BlockId
 import Cmm
 import CmmUtils
-import CmmSwitch (mapSwitchTargets)
+import CmmSwitch (mapSwitchTargets, switchTargetsToList)
 import Maybes
 import Panic
 import Util
@@ -294,6 +294,13 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
             , likelyTrue l || (numPreds f > 1)
             , Just cond' <- maybeInvertCmmExpr cond
             = CmmCondBranch cond' f t (invertLikeliness l)
+
+            -- If all jump destinations of a switch go to the
+            -- same target eliminate the switch.
+            | CmmSwitch _expr targets <- shortcut_last
+            , (t:ts) <- switchTargetsToList targets
+            , all (== t) ts
+            = CmmBranch t
 
             | otherwise
             = shortcut_last
