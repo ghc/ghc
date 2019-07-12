@@ -304,6 +304,7 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- | Link a file tracking the link target. Create the target directory if
 -- missing.
 createFileLink :: FilePath -> FilePath -> Action ()
+createFileLink a b | windowsHost = copyFile' a b
 createFileLink linkTarget link = do
     -- TODO `disableHistory` is a temporary fix (see issue #16866). Remove
     -- `disableHistory` when shake issue is fixed: https://github.com/ndmitchell/shake/issues/683.
