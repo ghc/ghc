@@ -42,6 +42,8 @@ data Setting = BuildArch
              | HostOs
              | HostPlatform
              | HostVendor
+             | HostArchHaskell
+             | HostOsHaskell
              | IconvIncludeDir
              | IconvLibDir
              | LlvmTarget
@@ -58,6 +60,8 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
+             | TargetArchHaskell
+             | TargetOsHaskell
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- | Each 'SettingList' comes from the file @hadrian/cfg/system.config@,
@@ -126,6 +130,8 @@ setting key = lookupValueOrError configFile $ case key of
     HostOs             -> "host-os"
     HostPlatform       -> "host-platform"
     HostVendor         -> "host-vendor"
+    HostArchHaskell    -> "host-arch-haskell"
+    HostOsHaskell      -> "host-os-haskell"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
     LlvmTarget         -> "llvm-target"
@@ -142,6 +148,8 @@ setting key = lookupValueOrError configFile $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
+    TargetArchHaskell  -> "target-arch-haskell"
+    TargetOsHaskell    -> "target-os-haskell"
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
