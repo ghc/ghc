@@ -8,6 +8,7 @@ Handles @deriving@ clauses on @data@ declarations.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 
@@ -67,6 +68,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
+import Data.Foldable
 import Data.List
 
 {-
@@ -568,6 +570,8 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
       failWithTc (nonUnaryErr deriv_pred)
     let [cls_arg_kind] = cls_arg_kinds
         mb_deriv_strat = fmap unLoc mb_lderiv_strat
+    reportFloatingViaTvs "class" via_tvs mb_deriv_strat cls_tvs $
+                         mkClassPred cls cls_tys
     if (className cls == typeableClassName)
     then do warnUselessTypeable
             return Nothing
@@ -693,6 +697,13 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; let mb_deriv_strat' = fmap unLoc mb_lderiv_strat'
              tvs'            = via_tvs' ++ cls_tvs'
              inst_ty'        = last inst_tys'
+
+             cls_pred = mkClassPred cls inst_tys'
+             phi_ty = case deriv_ctxt' of
+                        SupplyContext theta -> mkPhiTy theta cls_pred
+                        InferContext _      -> cls_pred
+       ; reportFloatingViaTvs "instance" via_tvs' mb_deriv_strat' cls_tvs' phi_ty
+
          -- See Note [Unify kinds in deriving]
        ; (tvs, deriv_ctxt, inst_tys) <-
            case mb_deriv_strat' of
@@ -814,6 +825,77 @@ warnUselessTypeable
        ; when warn $ addWarnTc (Reason Opt_WarnDerivingTypeable)
                    $ text "Deriving" <+> quotes (ppr typeableClassName) <+>
                      text "has no effect: all types now auto-derive Typeable" }
+
+-- | Errors if a @via@ type binds any floating type variables.
+-- See @Note [Floating `via` type variables]@.
+reportFloatingViaTvs ::
+     String  -- ^ A description of what the @via@ type scopes over
+             --   (for error reporting only).
+  -> [TyVar] -- ^ The bound type variables from a @via@ type (if any).
+  -> Maybe (DerivStrategy GhcTc)
+             -- ^ The deriving strategy.
+  -> [TyVar] -- ^ The bound type variables from the which which the @via@ type
+             --   scopes over.
+  -> Type    -- ^ The type which the @via@ type scopes over.
+  -> TcM ()
+reportFloatingViaTvs via_scope_desc via_bound_tvs mds inner_bound_tvs inner_ty =
+  case mds of
+    Just (ViaStrategy via_ty) ->
+      checkNoErrs $ traverse_ (report_floating_via_tv via_ty) via_bound_tvs
+    _ -> pure ()
+  where
+    inner_free_tvs :: TyVarSet
+    inner_free_tvs =
+      tyCoVarsOfType inner_ty `minusVarSet` mkVarSet inner_bound_tvs
+
+    report_floating_via_tv :: Type -> TyVar -> TcM ()
+    report_floating_via_tv via_ty via_bound_tv
+      = unless (via_bound_tv `elemVarSet` inner_free_tvs) $ addErr $ vcat
+          [ text "Type variable" <+> quotes (ppr via_bound_tv) <+>
+            text "is bound in the" <+> quotes (text "via") <+>
+            text "type" <+> quotes (ppr via_ty)
+          , text "but is not mentioned in the derived" <+>
+            text via_scope_desc <+> quotes (ppr inner_ty) <>
+            text ", which is illegal" ]
+
+{-
+Note [Floating `via` type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Imagine the following `deriving via` clause:
+
+    data Quux
+      deriving Eq via (Const a Quux)
+
+This should be rejected. Why? Because it would generate the following instance:
+
+    instance Eq Quux where
+      (==) = coerce @(Quux         -> Quux         -> Bool)
+                    @(Const a Quux -> Const a Quux -> Bool)
+                    (==) :: Const a Quux -> Const a Quux -> Bool
+
+This instance is ill-formed, as the `a` in `Const a Quux` is unbound. The
+problem is that `a` is never used anywhere in the derived class `Eq`. Since
+`a` is bound but has no use sites, we refer to it as "floating".
+
+We use the reportFloatingViaTvs function to check that any derived class
+that the `via` type scopes over actually uses all type variables bound by the
+`via` type, and if it doesn't, it throws an error.
+
+reportFloatingViaTvs used to live in the renamer, but there were some classes
+of floating type variables that it could not catch, such as this example
+(#15831):
+
+  newtype Age = MkAge Int
+    deriving Eq via Const Int Any
+
+Although it's not explicitly written out, the `via` type Const Int Any actually
+binds a kind variable `k`—this is more obvious when written out as
+Const @{k} Int Any. Since `k` does not occur in Eq, this program should be
+rejected. The renamer has no way to catch this, however, as it is only privy to
+variables that are written out explicitly in the source code. Therefore,
+reportFloatingViaTvs lives in the typechecker, which is equipped to detect
+these sneaky uses of floating `via` type variables.
+-}
 
 ------------------------------------------------------------------
 deriveTyData :: TyCon -> [Type] -- LHS of data or data instance
