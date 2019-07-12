@@ -1285,14 +1285,24 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
           L _ (HsUnboundVar {}) -> True
           _                     -> False
 
-    go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
-
-    go acc_args n fun_ty (HsArgPar sp : args)
-      = do { (inner_wrap, args', res_ty) <- go acc_args n fun_ty args
-           ; return (inner_wrap, HsArgPar sp : args', res_ty)
+    go _ _ fun_ty [] deferred_args
+      = do { let r_deferred_args = reverse deferred_args
+                 quick_look_args = args_for_quick_look r_deferred_args
+           ; dflags <- getDynFlags
+           ; subst <- if xopt LangExt.ImpredicativeTypes dflags 
+                         then tcQuickLooks quick_look_args
+                         else return emptyTCvSubst
+           ; args' <- handle_args subst r_deferred_args
+           ; return (idHsWrapper, args', fun_ty)
            }
 
-    go acc_args n fun_ty (HsTypeArg l hs_ty_arg : args)
+    go acc_args n fun_ty (arg@(HsArgPar sp) : args) deferred_args
+      = do { let deferred_args' = (arg, Nothing) : deferred_args
+           ; (inner_wrap, args', res_ty) <- go acc_args n fun_ty args deferred_args'
+           ; return (inner_wrap, arg : args', res_ty)
+           }
+
+    go acc_args n fun_ty (arg@(HsTypeArg l hs_ty_arg) : args) deferred_args
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -1318,36 +1328,172 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                                           , debugPprType inner_ty
                                           , debugPprType insted_ty ])
 
+                    ; let deferred_args' = (arg, Nothing) : deferred_args'
                     ; (inner_wrap, args', res_ty)
-                        <- go acc_args (n+1) insted_ty args
+                        <- go acc_args (n+1) insted_ty args deferred_args'
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
                     ; return ( inner_wrap <.> inst_wrap <.> wrap1
-                             , HsTypeArg l hs_ty_arg : args'
+                             , arg : args'
                              , res_ty ) }
                _ -> ty_app_err upsilon_ty hs_ty_arg }
 
-    go acc_args n fun_ty (HsValArg arg : args)
+    go acc_args n fun_ty (HsValArg arg : args) deferred_args
       = do { (wrap, [arg_ty], res_ty)
                <- matchActualFunTysPart herald fun_orig (Just (unLoc fun)) 1 fun_ty
                                         acc_args orig_expr_args_arity
                -- wrap :: fun_ty "->" arg_ty -> res_ty
-           ; arg' <- tcArg fun arg arg_ty n
+           -- ; arg' <- tcArg fun arg arg_ty n
+           ; let deferred_args' = (HsValArg arg, Just (arg_ty, n)) : deferred_args
            ; (inner_wrap, args', inner_res_ty)
-               <- go (arg_ty : acc_args) (n+1) res_ty args
+               <- go (arg_ty : acc_args) (n+1) res_ty args deferred_args'
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
-                    , HsValArg arg' : args'
+                    , {- HsValArg arg' : -} args'
                     , inner_res_ty ) }
       where
         doc = text "When checking the" <+> speakNth n <+>
               text "argument to" <+> quotes (ppr fun)
+
+    args_for_quick_look []
+      = []
+    args_for_quick_look ((HsValArg arg, Just (arg_ty, _)) : args)
+      = (arg, arg_ty) : args_for_quick_look args
+    args_for_quick_look (_ : args)
+      = args_for_quick_look args
+
+    handle_args subst []
+      = return []
+    handle_args subst ((arg, Nothing) : args)
+      = do { args' <- handle_args subst args
+           ; return (arg : args')
+           }
+    handle_args subst ((HsValArg arg, Just (arg_ty, n)) : args)
+      = do { let arg_ty' = substTy subst arg_ty
+           ; arg' <- tcArg fun arg arg_ty' n
+           ; args' <- handle_args subst args
+           ; return (arg' : args')
+           }
+    handle_args _ ((e, Just _) : _) = pprPanic "handle_args" (ppr e)
 
     ty_app_err ty arg
       = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
            ; failWith $
                text "Cannot apply expression of type" <+> quotes (ppr ty) $$
                text "to a visible type argument" <+> quotes (ppr arg) }
+
+tcQuickLooks :: [(LHsExpr GhcRn, TcSigmaType)] -> TcM TCvSubst
+tcQuickLooks = go emptyTCvSubst
+  where
+    go current_subst []
+      = return current_subst
+    go current_subst ((e,ty):rest)
+      = do { let ty' = substTy current_subst ty
+           ; new_subst <- tcQuickLook e ty
+           ; go (composeTCvSubst new_subst current_subst) rest
+           }
+
+tcQuickLook :: LHsExpr GhcRn   -- head of the application
+            -> [LHsExprArgIn]  -- given arguments
+            -> TcSigmaType     -- type to compare with
+            -> TcM TCvSubst
+tcQuickLook (L sp (HsPar _ fun)) args ty
+  = tcQuickLook fun args ty
+tcQuickLook (L _ (HsApp _ fun arg1))
+  = tcQuickLook fun (HsValArg arg1 : args) ty
+tcQuickLook (L _ (HsAppType _ fun ty1)) args ty
+  = tcQuickLook fun (HsTypeArg noSrcSpan ty1 : args) ty
+tcQuickLook (OpApp _ arg1 op arg2) args ty
+  -- 'seq' has special typing rules
+  -- do not mess with them in quick look
+  | (L loc (HsVar _ (L lv op_name))) <- op
+  , op_name `hasKey` seqIdKey
+  = return emptyTCvSubst
+  -- treat ($) with a special rule
+  | (L loc (HsVar _ (L lv op_name))) <- op
+  , op_name `hasKey` dollarIdKey
+  = tcQuickLook arg1 (HsValArg arg2 : args) ty
+  | otherwise
+  = tcQuickLook op (HsValArg arg2 : HsValArg arg1 : args) ty
+tcQuickLook e@(L loc (HsVar _ (L _ fun_id))) args ty
+  -- tagToEnum# and 'seq' have special typing rules
+  -- do not mess with them in quick look
+  | fun_id `hasKey` tagToEnumKey
+  = return emptyTCvSubst
+  | fun_id `hasKey` seqIdKey
+  = return emptyTCvSubst
+  | otherwise
+  = do { (_, fun_ty) <- tcInferId fun_id
+       ; go (lexprCtOrigin e) emptyTCvSubst fun_ty args ty []
+       }
+tcQuickLook _ _ _
+  = return emptyTCvSubst
+
+  where
+    -- go takes care of instantiating the foralls
+    go orig fun_ty (HsTypeArg l hs_ty_arg : args) ty accumulated_args
+      -- executes the same algoritm as `tcArgs`
+      = do { (_, upsilon_ty) <- topInstantiateInferred orig fun_ty
+           ; case tcSplitForAllTy_maybe upsilon_ty of
+              Just (tvb, inner_ty)
+              | binderArgFlag tvb == Specified ->
+              do { let tv   = binderVar tvb
+                       kind = tyVarKind tv
+                 ; ty_arg <- tcHsTypeApp hs_ty_arg kind
+                 ; inner_ty <- zonkTcType inner_ty
+                     -- See Note [Visible type application zonk]
+                 ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [upsilon_ty, ty_arg])
+                       insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
+                 ; go orig insted_ty args ty accumulated_args
+                 }
+              _ -> return emptyTCvSubst 
+           }
+    go orig fun_ty args ty accumulated_args
+      | (tvs, theta, _) = tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { (_, rho) <- topInstantiate orig ty
+           ; go orig fun_ty args ty accumulated_args
+           }
+    go orig fun_ty args ty accumulated_args
+      = go' orig fun_ty args ty accumulated_args
+
+    -- go' assumes the forall's on top have been instantiated
+    go' orig fun_ty [] ty accumulated_args
+      = do { args_subst <- tcQuickLooks (reverse accumulated_args)
+           ; let fun_ty' = substTy args_subst fun_ty
+           ; let res_subst = partial_unify fun_ty' ty
+           ; return (composeTCvSubst res_subst args_subst)
+           }
+    go' _ fun_ty (HsTypeArg _ _ : _) _ _
+      = pprPanic "quickLock/unexpectedTypeArg" (ppr fun_ty)
+    go' orig fun_ty (HsArgPar _ : args) ty accumulated_args
+      = go current_subst fun_ty args ty accumulated_args
+    go' orig fun_ty (HsValArg arg : args) ty accumulated_args
+      | Just (ty_arg, ty_rest) <- tcSplitFunTy_maybe fun_ty
+      = go orig ty_rest args ty ((arg, ty_arg) : accumulated_args)
+      | otherwise
+      = return emptyTCvSubst
+
+    partial_unify ty1 ty2
+      | Just ty1' <- tcView ty1
+      = partial_unify ty1' ty2
+      | Just ty2' <- tcView ty2
+      = partial_unify ty1 ty2'
+      | Just (tc1, args1) <- tcSplitTyConApp_maybe ty1
+      , Just (tc2, args2) <- tcSplitTyConApp_maybe ty2
+      , tc1 == tc2
+      , not (isFunTyCon tc1)
+      , isInjectiveTyCon tc1 Nominal
+      = case tcUnifyTyKis bind_flag args1 args2 of
+          Just subst -> subst
+          Nothing    -> emptyTCvSubst
+    
+    bind_flag tv
+      | isImmutableTyVar tv
+      = Skolem
+      | otherwise
+      = BindMe
+
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
