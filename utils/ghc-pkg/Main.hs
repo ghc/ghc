@@ -35,13 +35,9 @@ import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
 import GHC.Settings (getTargetPlatform, maybeReadFuzzy)
-import GHC.Platform
-  ( platformArch, platformOS
-  , stringEncodeArch, stringEncodeOS
-  )
-import GHC.UniqueSubdir
-  ( uniqueSubdir0
-  )
+import GHC.Platform (platformMini)
+import GHC.Platform.Host (cHostPlatformMini)
+import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
@@ -642,11 +638,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
           -- See Note [Settings File] about this file, and why we need GHC to share it with us.
           let settingsFile = top_dir </> "settings"
           exists_settings_file <- doesFileExist settingsFile
-          (arch, os) <- case exists_settings_file of
+          targetPlatformMini <- case exists_settings_file of
             False -> do
               warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
               warn "cannot know target platform so guessing target == host (native compiler)."
-              pure (HOST_ARCH, HOST_OS)
+              pure cHostPlatformMini
             True -> do
               settingsStr <- readFile settingsFile
               mySettings <- case maybeReadFuzzy settingsStr of
@@ -655,9 +651,9 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                 -- least) but completely inexcusable to have a malformed one.
                 Nothing -> die $ "Can't parse settings file " ++ show settingsFile
               case getTargetPlatform settingsFile mySettings of
-                Right platform -> pure (stringEncodeArch $ platformArch platform, stringEncodeOS $ platformOS platform)
+                Right platform -> pure $ platformMini platform
                 Left e -> die e
-          let subdir = uniqueSubdir0 arch os
+          let subdir = uniqueSubdir targetPlatformMini
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of

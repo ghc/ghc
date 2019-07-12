@@ -119,8 +119,9 @@ generatePackageCode context@(Context stage pkg _) = do
         when (pkg == ghcPrim) $ do
             root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
             root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
-        when (pkg == ghcBoot) $
+        when (pkg == ghcBoot) $ do
             root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
+            root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -296,8 +297,8 @@ generateSettings = do
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
         , ("target platform string", getSetting TargetPlatform)
-        , ("target os", expr $ lookupValueOrError configFile "haskell-target-os")
-        , ("target arch", expr $ lookupValueOrError configFile "haskell-target-arch")
+        , ("target os", getSetting TargetOsHaskell)
+        , ("target arch", getSetting TargetArchHaskell)
         , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
         , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "target-has-gnu-nonexec-stack")
         , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
@@ -460,4 +461,28 @@ generateVersionHs = do
         , ""
         , "cProjectPatchLevel2   :: String"
         , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        ]
+
+-- | Generate @Platform/Host.hs@ files.
+generatePlatformHostHs :: Expr String
+generatePlatformHostHs = do
+    trackGenerateHs
+    cHostPlatformArch <- getSetting HostArchHaskell
+    cHostPlatformOS   <- getSetting HostOsHaskell
+    return $ unlines
+        [ "module GHC.Platform.Host where"
+        , ""
+        , "import GHC.Platform"
+        , ""
+        , "cHostPlatformArch :: Arch"
+        , "cHostPlatformArch = " ++ cHostPlatformArch
+        , ""
+        , "cHostPlatformOS   :: OS"
+        , "cHostPlatformOS   = " ++ cHostPlatformOS
+        , ""
+        , "cHostPlatformMini :: PlatformMini"
+        , "cHostPlatformMini = PlatformMini"
+        , "  { platformMini_arch = cHostPlatformArch"
+        , "  , platformMini_os = cHostPlatformOS"
+        , "  }"
         ]
