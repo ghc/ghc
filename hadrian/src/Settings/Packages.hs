@@ -50,7 +50,7 @@ packageArgs = do
           , builder (Ghc CompileHs) ? mconcat
             [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
             , input "//Parser.hs" ?
-              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
+              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"] ]
 
           , builder (Cabal Setup) ? mconcat
             [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
@@ -71,7 +71,7 @@ packageArgs = do
             , ghcProfiled <$> flavour ?
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-         , builder (Cabal Flags) ? mconcat
+          , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
@@ -172,7 +172,7 @@ packageArgs = do
         -- in Stage1, and at that point the configuration is just wrong.
         , package text ?
           builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure [ "+integer-simple", "-bytestring-builder"] ]
+          pure ["+integer-simple", "-bytestring-builder"] ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
