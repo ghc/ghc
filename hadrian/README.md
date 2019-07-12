@@ -104,10 +104,9 @@ simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 * `--integer-simple`: build GHC using the `integer-simple` integer library
 (instead of `integer-gmp`).
 
-* `--progress-colour=MODE`: choose whether to use colours when printing build
-progress info. There are three settings: `never` (do not use colours), `auto`
-(attempt to detect whether the console supports colours; this is the default
-setting), and `always` (use colours).
+* `--color` and `--no-color`: choose whether to use colors when printing build
+progress info. By default, Hadrian tries to determine if the terminal supports
+colored ouput, and proceeds accordingly.
 
 * `--progress-info=STYLE`: choose how build progress info is printed. There are
 four settings: `none`, `brief` (one line per build command; this is the default
