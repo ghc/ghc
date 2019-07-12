@@ -35,6 +35,7 @@ stages:
     - merge_requests
     - tags
     - web
+    - quick-look
 
 ############################################################
 # Runner Tags
