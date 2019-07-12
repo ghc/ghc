@@ -47,7 +47,8 @@ module HsDecls (
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
   -- ** Deriving strategies
-  DerivStrategy(..), LDerivStrategy, derivStrategyName,
+  DerivStrategy(..), LDerivStrategy,
+  derivStrategyName, foldDerivStrategy, mapDerivStrategy,
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
   RuleBndr(..),LRuleBndr,
@@ -1935,6 +1936,21 @@ derivStrategyName = text . go
     go AnyclassStrategy = "anyclass"
     go NewtypeStrategy  = "newtype"
     go (ViaStrategy {}) = "via"
+
+-- | Eliminate a 'DerivStrategy'.
+foldDerivStrategy :: (p ~ GhcPass pass)
+                  => r -> (XViaStrategy p -> r) -> DerivStrategy p -> r
+foldDerivStrategy other _   StockStrategy    = other
+foldDerivStrategy other _   AnyclassStrategy = other
+foldDerivStrategy other _   NewtypeStrategy  = other
+foldDerivStrategy _     via (ViaStrategy t)  = via t
+
+-- | Map over the @via@ type if dealing with 'ViaStrategy'. Otherwise,
+-- return the 'DerivStrategy' unchanged.
+mapDerivStrategy :: (p ~ GhcPass pass)
+                 => (XViaStrategy p -> XViaStrategy p)
+                 -> DerivStrategy p -> DerivStrategy p
+mapDerivStrategy f ds = foldDerivStrategy ds (ViaStrategy . f) ds
 
 {-
 ************************************************************************

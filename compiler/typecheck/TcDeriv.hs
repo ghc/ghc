@@ -685,22 +685,22 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; let ctxt = TcType.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
-       ; (mb_lderiv_strat', via_tvs') <- tcDerivStrategy mb_lderiv_strat
-       ; (cls_tvs', deriv_ctxt', cls, inst_tys')
-           <- tcExtendTyVarEnv via_tvs' $
+       ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
+       ; (cls_tvs, deriv_ctxt, cls, inst_tys)
+           <- tcExtendTyVarEnv via_tvs $
               tcStandaloneDerivInstType ctxt deriv_ty
-       ; checkTc (not (null inst_tys')) derivingNullaryErr
-       ; let mb_deriv_strat' = fmap unLoc mb_lderiv_strat'
-             tvs'            = via_tvs' ++ cls_tvs'
-             inst_ty'        = last inst_tys'
+       ; checkTc (not (null inst_tys)) derivingNullaryErr
+       ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
+             tvs            = via_tvs ++ cls_tvs
+             inst_ty        = last inst_tys
          -- See Note [Unify kinds in deriving]
-       ; (tvs, deriv_ctxt, inst_tys) <-
-           case mb_deriv_strat' of
+       ; (tvs', deriv_ctxt', inst_tys', mb_deriv_strat') <-
+           case mb_deriv_strat of
              -- Perform an additional unification with the kind of the `via`
              -- type and the result of the previous kind unification.
              Just (ViaStrategy via_ty) -> do
                let via_kind     = tcTypeKind via_ty
-                   inst_ty_kind = tcTypeKind inst_ty'
+                   inst_ty_kind = tcTypeKind inst_ty
                    mb_match     = tcUnifyTy inst_ty_kind via_kind
 
                checkTc (isJust mb_match)
@@ -712,38 +712,42 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                    -- See Note [Unification of two kind variables in deriving]
                    unmapped_tkvs = filter (\v -> v `notElemTCvSubst` kind_subst
                                         && not (v `elemVarSet` ki_subst_range))
-                                          tvs'
+                                          tvs
                    (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
                    (final_deriv_ctxt, final_deriv_ctxt_tys)
-                     = case deriv_ctxt' of
+                     = case deriv_ctxt of
                          InferContext wc -> (InferContext wc, [])
                          SupplyContext theta ->
                            let final_theta = substTheta subst theta
                            in (SupplyContext final_theta, final_theta)
-                   final_inst_tys   = substTys subst inst_tys'
+                   final_inst_tys   = substTys subst inst_tys
+                   final_via_ty     = substTy  subst via_ty
+                   -- See Note [Floating `via` type variables]
                    final_tvs        = tyCoVarsOfTypesWellScoped $
                                       final_deriv_ctxt_tys ++ final_inst_tys
-               pure (final_tvs, final_deriv_ctxt, final_inst_tys)
+                                        ++ [final_via_ty]
+               pure ( final_tvs, final_deriv_ctxt, final_inst_tys
+                    , Just (ViaStrategy final_via_ty) )
 
-             _ -> pure (tvs', deriv_ctxt', inst_tys')
-       ; let cls_tys = take (length inst_tys - 1) inst_tys
-             inst_ty = last inst_tys
+             _ -> pure (tvs, deriv_ctxt, inst_tys, mb_deriv_strat)
+       ; let cls_tys' = take (length inst_tys' - 1) inst_tys'
+             inst_ty' = last inst_tys'
        ; traceTc "Standalone deriving;" $ vcat
-              [ text "tvs:" <+> ppr tvs
-              , text "mb_deriv_strat:" <+> ppr mb_deriv_strat'
-              , text "deriv_ctxt:" <+> ppr deriv_ctxt
+              [ text "tvs':" <+> ppr tvs'
+              , text "mb_deriv_strat':" <+> ppr mb_deriv_strat'
+              , text "deriv_ctxt':" <+> ppr deriv_ctxt'
               , text "cls:" <+> ppr cls
-              , text "tys:" <+> ppr inst_tys ]
+              , text "inst_tys':" <+> ppr inst_tys' ]
                 -- C.f. TcInstDcls.tcLocalInstDecl1
        ; traceTc "Standalone deriving:" $ vcat
               [ text "class:" <+> ppr cls
-              , text "class types:" <+> ppr cls_tys
-              , text "type:" <+> ppr inst_ty ]
+              , text "class types:" <+> ppr cls_tys'
+              , text "type:" <+> ppr inst_ty' ]
 
-       ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys
-                              inst_ty mb_deriv_strat' msg)
+       ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys'
+                              inst_ty' mb_deriv_strat' msg)
 
-       ; case tcSplitTyConApp_maybe inst_ty of
+       ; case tcSplitTyConApp_maybe inst_ty' of
            Just (tc, tc_args)
               | className cls == typeableClassName
               -> do warnUselessTypeable
@@ -751,8 +755,8 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
 
               | otherwise
               -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
-                                    tvs cls cls_tys tc tc_args
-                                    deriv_ctxt mb_deriv_strat'
+                                    tvs' cls cls_tys' tc tc_args
+                                    deriv_ctxt' mb_deriv_strat'
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
@@ -851,66 +855,69 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
         ; checkTc (enough_args && isJust mb_match)
                   (derivingKindErr tc cls cls_tys cls_arg_kind enough_args)
 
-        ; let propagate_subst kind_subst tkvs' cls_tys' tc_args'
-                = (final_tkvs, final_cls_tys, final_tc_args)
+        ; let -- Returns a singleton-element list if using ViaStrategy and an
+              -- empty list otherwise. Useful for free-variable calculations.
+              deriv_strat_tys :: Maybe (DerivStrategy GhcTc) -> [Type]
+              deriv_strat_tys = foldMap (foldDerivStrategy [] (:[]))
+
+              propagate_subst kind_subst tkvs' cls_tys' tc_args' mb_deriv_strat'
+                = (final_tkvs, final_cls_tys, final_tc_args, final_mb_deriv_strat)
                 where
                   ki_subst_range  = getTCvSubstRangeFVs kind_subst
                   -- See Note [Unification of two kind variables in deriving]
                   unmapped_tkvs   = filter (\v -> v `notElemTCvSubst` kind_subst
                                          && not (v `elemVarSet` ki_subst_range))
                                            tkvs'
-                  (subst, _)      = substTyVarBndrs kind_subst unmapped_tkvs
-                  final_tc_args   = substTys subst tc_args'
-                  final_cls_tys   = substTys subst cls_tys'
-                  final_tkvs      = tyCoVarsOfTypesWellScoped $
-                                    final_cls_tys ++ final_tc_args
+                  (subst, _)           = substTyVarBndrs kind_subst unmapped_tkvs
+                  final_tc_args        = substTys subst tc_args'
+                  final_cls_tys        = substTys subst cls_tys'
+                  final_mb_deriv_strat = fmap (mapDerivStrategy (substTy subst))
+                                              mb_deriv_strat'
+                  -- See Note [Floating `via` type variables]
+                  final_tkvs           = tyCoVarsOfTypesWellScoped $
+                                         final_cls_tys ++ final_tc_args
+                                           ++ deriv_strat_tys final_mb_deriv_strat
 
         ; let tkvs = scopedSort $ fvVarList $
                      unionFV (tyCoFVsOfTypes tc_args_to_keep)
                              (FV.mkFVs deriv_tvs)
               Just kind_subst = mb_match
-              (tkvs', final_cls_tys', final_tc_args')
-                = propagate_subst kind_subst tkvs cls_tys tc_args_to_keep
+              (tkvs', cls_tys', tc_args', mb_deriv_strat')
+                = propagate_subst kind_subst tkvs cls_tys
+                                  tc_args_to_keep mb_deriv_strat
 
           -- See Note [Unify kinds in deriving]
-        ; (tkvs, final_cls_tys, final_tc_args, final_mb_deriv_strat) <-
-            case mb_deriv_strat of
+        ; (final_tkvs, final_cls_tys, final_tc_args, final_mb_deriv_strat) <-
+            case mb_deriv_strat' of
               -- Perform an additional unification with the kind of the `via`
               -- type and the result of the previous kind unification.
               Just (ViaStrategy via_ty) -> do
-                let final_via_ty   = via_ty
-                    final_via_kind = tcTypeKind final_via_ty
-                    final_inst_ty_kind
-                              = tcTypeKind (mkTyConApp tc final_tc_args')
-                    via_match = tcUnifyTy final_inst_ty_kind final_via_kind
+                let via_kind = tcTypeKind via_ty
+                    inst_ty_kind
+                              = tcTypeKind (mkTyConApp tc tc_args')
+                    via_match = tcUnifyTy inst_ty_kind via_kind
 
                 checkTc (isJust via_match)
-                        (derivingViaKindErr cls final_inst_ty_kind
-                                            final_via_ty final_via_kind)
+                        (derivingViaKindErr cls inst_ty_kind via_ty via_kind)
 
                 let Just via_subst = via_match
-                    (final_tkvs, final_cls_tys, final_tc_args)
-                      = propagate_subst via_subst tkvs'
-                                        final_cls_tys' final_tc_args'
-                pure ( final_tkvs, final_cls_tys, final_tc_args
-                     , Just $ ViaStrategy $ substTy via_subst via_ty
-                     )
+                pure $ propagate_subst via_subst tkvs' cls_tys'
+                                       tc_args' mb_deriv_strat'
 
-              _ -> pure ( tkvs', final_cls_tys', final_tc_args'
-                        , mb_deriv_strat )
+              _ -> pure (tkvs', cls_tys', tc_args', mb_deriv_strat')
 
         ; traceTc "deriveTyData 1" $ vcat
-            [ ppr mb_deriv_strat, pprTyVars deriv_tvs, ppr tc, ppr tc_args
+            [ ppr final_mb_deriv_strat, pprTyVars deriv_tvs, ppr tc, ppr tc_args
             , pprTyVars (tyCoVarsOfTypesList tc_args)
             , ppr n_args_to_keep, ppr n_args_to_drop
             , ppr inst_ty_kind, ppr cls_arg_kind, ppr mb_match
             , ppr final_tc_args, ppr final_cls_tys ]
 
         ; traceTc "deriveTyData 2" $ vcat
-            [ ppr tkvs ]
+            [ ppr final_tkvs ]
 
         ; let final_tc_app = mkTyConApp tc final_tc_args
-        ; checkTc (allDistinctTyVars (mkVarSet tkvs) args_to_drop)     -- (a, b, c)
+        ; checkTc (allDistinctTyVars (mkVarSet final_tkvs) args_to_drop) -- (a, b, c)
                   (derivingEtaErr cls final_cls_tys final_tc_app)
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
@@ -932,7 +939,7 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
                 -- Check that we aren't deriving an instance of a magical
                 -- type like (~) or Coercible (#14916).
 
-        ; spec <- mkEqnHelp Nothing tkvs
+        ; spec <- mkEqnHelp Nothing final_tkvs
                             cls final_cls_tys tc final_tc_args
                             (InferContext Nothing) final_mb_deriv_strat
         ; traceTc "deriveTyData 3" (ppr spec)
@@ -1137,6 +1144,73 @@ synonym, we will mistakenly believe that f is an eta-reduced type variable and
 fail to derive Functor, even though the code above is correct (see #11416,
 where this was first noticed). For this reason, we expand the type synonyms in
 the eta-reduced types before doing any analysis.
+
+Note [Floating `via` type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When generating a derived instance, it will be of the form:
+
+  instance forall ???. C c_args (D d_args) where ...
+
+To fill in ???, GHC computes the free variables of `c_args` and `d_args`.
+`DerivingVia` adds an extra wrinkle to this formula, since we must also
+include the variables bound by the `via` type when computing the binders
+used to fill in ???. This might seem strange, since if a `via` type binds
+any type variables, then in almost all scenarios it will appear free in
+`c_args` or `d_args`. There are certain corner cases where this does not hold,
+however, such as in the following example (adapted from #15831):
+
+  newtype Age = MkAge Int
+    deriving Eq via Const Int a
+
+In this example, the `via` type binds the type variable `a`, but `a` appears
+nowhere in `Eq Age`. Nevertheless, we include it in the generated instance:
+
+  instance forall a. Eq Age where
+    (==) = coerce @(Const Int a -> Const Int a -> Bool)
+                  @(Age         -> Age         -> Bool)
+                  (==)
+
+The use of `forall a` is certainly required here, since the `a` in
+`Const Int a` would not be in scope otherwise. This instance is somewhat
+strange in that nothing in the instance head `Eq Age` ever determines what `a`
+will be, so any code that uses this instance will invariably instantiate `a`
+to be `Any`. We refer to this property of `a` as being a "floating" `via`
+type variable. Programs with floating `via` type variables are the only known
+class of program in which the `via` type quantifies type variables that aren't
+mentioned in the instance head in the generated instance.
+
+Fortunately, the choice to instantiate floating `via` type variables to `Any`
+is one that is completely transparent to the user (since the instance will
+work as expected regardless of what `a` is instantiated to), so we decide to
+permit them. An alternative design would make programs with floating `via`
+variables illegal, by requiring that every variable mentioned in the `via` type
+is also mentioned in the data header or the derived class. That restriction
+would require the user to pick a particular type (the choice does not matter);
+for example:
+
+  newtype Age = MkAge Int
+    -- deriving Eq via Const Int a  -- Floating 'a'
+    deriving Eq via Const Int ()    -- Choose a=()
+    deriving Eq via Const Int Any   -- Choose a=Any
+
+No expressiveness would be lost thereby, but stylistically it seems preferable
+to allow a type variable to indicate "it doesn't matter".
+
+Note that by quantifying the `a` in `forall a. Eq Age`, we are deferring the
+work of instantiating `a` to `Any` at every use site of the instance. An
+alternative approach would be to generate an instance that directly defaulted
+to `Any`:
+
+  instance Eq Age where
+    (==) = coerce @(Const Int Any -> Const Int Any -> Bool)
+                  @(Age           -> Age           -> Bool)
+                  (==)
+
+We do not implement this approach since it would require a nontrivial amount
+of implementation effort to substitute `Any` for the floating `via` type
+variables, and since the end result isn't distinguishable from the former
+instance (at least from the user's perspective), the amount of engineering
+required to obtain the latter instance just isn't worth it.
 -}
 
 mkEqnHelp :: Maybe OverlapMode
