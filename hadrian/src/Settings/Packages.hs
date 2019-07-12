@@ -50,7 +50,12 @@ packageArgs = do
           , builder (Ghc CompileHs) ? mconcat
             [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
             , input "//Parser.hs" ?
-              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"] ]
+              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"] 
+            -- These files take a very long time to compile with -O1,
+            -- so we use -O0 for them just in Stage0 to speed up the
+            -- build but not affect Stage1+ executables 
+            , inputs ["//HsInstances.hs", "//DynFlags.hs"] ? stage0 ? 
+              pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
             [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
