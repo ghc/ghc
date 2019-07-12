@@ -372,12 +372,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkArch "$HostArch" "HaskellHostArch"
     checkVendor "$HostVendor"
-    checkOS "$HostOS" ""
+    checkOS "$HostOS" "HaskellHostOs"
 
     checkArch "$TargetArch" "HaskellTargetArch"
     checkVendor "$TargetVendor"
     checkOS "$TargetOS" "HaskellTargetOs"
 
+    AC_SUBST(HaskellHostArch)
+    AC_SUBST(HaskellHostOs)
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
     AC_SUBST(HaskellHaveSubsectionsViaSymbols)
