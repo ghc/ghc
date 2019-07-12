@@ -714,7 +714,7 @@ lint-release-changelogs:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j `mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf"
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
   tags:
