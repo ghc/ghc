@@ -854,10 +854,28 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 
+void default_callback(void *user, StgClosure * closure){
+  debugBelch("%p = ", closure);
+  printClosure((StgClosure *)closure);
+}
+
+void
+findPtr(P_ p, int follow){
+  findPtr_gen(&default_callback, NULL, p, follow);
+}
+
+typedef void (*FindPtrCb)(void *user, StgClosure *);
+void findPtr_cb(FindPtrCb cb, void* user, P_ p){
+  findPtr_gen(cb, user, p, 0);
+}
+
+
+void findPtr_gen(FindPtrCb, void*, P_ p, int);            /* keep gcc -Wall happy */
+
 int searched = 0;
 
 static int
-findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 {
     StgPtr q, r, end;
     for (; bd; bd = bd->link) {
@@ -875,8 +893,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
                         }
                         end = r + closure_sizeW((StgClosure*)r);
                         if (q < end) {
-                            debugBelch("%p = ", r);
-                            printClosure((StgClosure *)r);
+                            cb(user, (StgClosure *) r);
                             arr[i++] = r;
                             break;
                         }
@@ -894,7 +911,7 @@ findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
 }
 
 void
-findPtr(P_ p, int follow)
+findPtr_gen(FindPtrCb c, void *user, P_ p, int follow)
 {
   uint32_t g, n;
   bdescr *bd;
@@ -916,20 +933,21 @@ findPtr(P_ p, int follow)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      i = findPtrBlocks(c, user,p,bd,arr,arr_size,i);
       bd = generations[g].large_objects;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
+      i = findPtrBlocks(c, user, p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
       for (n = 0; n < n_capabilities; n++) {
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
+          i = findPtrBlocks(c, user, p, gc_threads[n]->gens[g].part_list,
                             arr, arr_size, i);
-          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
+          i = findPtrBlocks(c, user, p, gc_threads[n]->gens[g].todo_bd,
                             arr, arr_size, i);
       }
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {
       debugBelch("-->\n");
+      // Non-standard callback expects follow=0
       findPtr(arr[0], 1);
   }
 }
