@@ -417,6 +417,7 @@ Library
         SysTools.Info
         SysTools.Process
         SysTools.Tasks
+        SysTools.Settings
         Elf
         TidyPgm
         Ctype
