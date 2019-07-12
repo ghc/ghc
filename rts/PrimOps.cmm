@@ -2077,6 +2077,16 @@ for:
     return (info, dat_arr, ptrArray);
 }
 
+stg_saveClosurezh (P_ clos)
+{
+  W_ sp;
+
+  ("ptr" sp) = ccall getStablePtr(clos "ptr");
+  ccall rts_save_object(sp "ptr");
+  return(1);
+
+}
+
 stg_closureSizzezh (P_ clos)
 {
     W_ len;
