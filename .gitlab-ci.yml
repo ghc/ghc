@@ -209,7 +209,7 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-linux-deb9-hadrian:
+.validate-x86_64-linux-deb8-hadrian:
   extends: .validate-hadrian
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -224,7 +224,7 @@ validate-x86_64-linux-deb9-hadrian:
   tags:
     - x86_64-linux
 
-hadrian-ghc-in-ghci:
+.hadrian-ghc-in-ghci:
   <<: *only-default
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -296,7 +296,7 @@ hadrian-ghc-in-ghci:
 # x86_64-darwin
 #################################
 
-validate-x86_64-darwin:
+.validate-x86_64-darwin:
   extends: .validate
   stage: full-build
   tags:
@@ -419,13 +419,13 @@ validate-x86_64-darwin:
   tags:
     - aarch64-linux
 
-validate-aarch64-linux-deb9:
+.validate-aarch64-linux-deb9:
   extends: .build-aarch64-linux-deb9
   artifacts:
     when: always
     expire_in: 2 week
 
-nightly-aarch64-linux-deb9:
+.nightly-aarch64-linux-deb9:
   extends: .build-aarch64-linux-deb9
   artifacts:
     expire_in: 2 year
@@ -449,13 +449,13 @@ nightly-aarch64-linux-deb9:
   cache:
     key: linux-i386-deb9
 
-validate-i386-linux-deb9:
+.validate-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   artifacts:
     when: always
     expire_in: 2 week
 
-nightly-i386-linux-deb9:
+.nightly-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   variables:
     TEST_TYPE: slowtest
@@ -487,7 +487,7 @@ nightly-i386-linux-deb9:
     when: always
     expire_in: 2 week
 
-nightly-x86_64-linux-deb9:
+.nightly-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   artifacts:
     expire_in: 2 year
@@ -498,7 +498,7 @@ nightly-x86_64-linux-deb9:
       - $NIGHTLY
 
 # N.B. Has DEBUG assertions enabled in stage2
-validate-x86_64-linux-deb9-debug:
+.validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   stage: build
   variables:
@@ -519,7 +519,7 @@ validate-x86_64-linux-deb9-debug:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
 
-nightly-x86_64-linux-deb9-llvm:
+.nightly-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -529,7 +529,7 @@ nightly-x86_64-linux-deb9-llvm:
     variables:
       - $NIGHTLY
 
-validate-x86_64-linux-deb9-integer-simple:
+.validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -537,7 +537,7 @@ validate-x86_64-linux-deb9-integer-simple:
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-deb9-linux-integer-simple.tar.xz"
 
-nightly-x86_64-linux-deb9-integer-simple:
+.nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -550,14 +550,14 @@ nightly-x86_64-linux-deb9-integer-simple:
     variables:
       - $NIGHTLY
 
-validate-x86_64-linux-deb9-unreg:
+.validate-x86_64-linux-deb9-unreg:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
 
-release-x86_64-linux-deb9-dwarf:
+.release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
@@ -576,7 +576,7 @@ release-x86_64-linux-deb9-dwarf:
 # x86_64-linux-deb8
 #################################
 
-release-x86_64-linux-deb8:
+.release-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
@@ -613,12 +613,12 @@ release-x86_64-linux-deb8:
     when: always
     expire_in: 2 week
 
-release-x86_64-linux-alpine:
+.release-x86_64-linux-alpine:
   extends: .build-x86_64-linux-alpine
   only:
     - tags
 
-nightly-x86_64-linux-alpine:
+.nightly-x86_64-linux-alpine:
   extends: .build-x86_64-linux-alpine
   only:
     variables:
@@ -628,7 +628,7 @@ nightly-x86_64-linux-alpine:
 # x86_64-linux-centos7
 #################################
 
-release-x86_64-linux-centos7:
+.release-x86_64-linux-centos7:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
@@ -650,7 +650,7 @@ release-x86_64-linux-centos7:
 # x86_64-linux-fedora27
 #################################
 
-validate-x86_64-linux-fedora27:
+.validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
@@ -735,7 +735,7 @@ validate-x86_64-windows-hadrian:
   cache:
     key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
-nightly-i386-windows-hadrian:
+.nightly-i386-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW32
@@ -775,7 +775,7 @@ nightly-i386-windows-hadrian:
       - ghc-*.tar.xz
       - junit.xml
 
-validate-x86_64-windows:
+.validate-x86_64-windows:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW64
@@ -784,8 +784,8 @@ validate-x86_64-windows:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 # Normal Windows validate builds are profiled; that won't do for releases.
-release-x86_64-windows:
-  extends: validate-x86_64-windows
+.release-x86_64-windows:
+  extends: .validate-x86_64-windows
   variables:
     MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
@@ -793,7 +793,7 @@ release-x86_64-windows:
   only:
     - tags
 
-release-i386-windows:
+.release-i386-windows:
   extends: .build-windows-make
   only:
     - tags
@@ -806,7 +806,7 @@ release-i386-windows:
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-nightly-i386-windows:
+.nightly-i386-windows:
   extends: .build-windows-make
   only:
     variables:
@@ -841,7 +841,7 @@ nightly-i386-windows:
 # [1] https://gitlab.com/gitlab-org/gitlab-runner/issues/3856
 
 # See Note [Cleanup after shell executor]
-cleanup-darwin:
+.cleanup-darwin:
   <<: *only-default
   stage: cleanup
   tags:
@@ -863,15 +863,13 @@ cleanup-darwin:
 # Packaging
 ############################################################
 
-doc-tarball:
+.doc-tarball:
   <<: *only-default
   stage: packaging
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
-  dependencies:
-    - validate-x86_64-linux-deb9-debug
-    - validate-x86_64-windows
+  dependencies: []
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
@@ -899,7 +897,7 @@ doc-tarball:
     - ls -lh
     - mv docs/*.tar.xz docs/index.html .
 
-source-tarball:
+.source-tarball:
   stage: packaging
   tags:
     - x86_64-linux
@@ -942,17 +940,17 @@ source-tarball:
   script:
     - bash .gitlab/start-head.hackage.sh
 
-hackage:
+.hackagejob:
   extends: .hackage
   when: manual
 
-hackage-label:
+.hackage-label:
   extends: .hackage
   only:
     variables:
       - $CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/
 
-nightly-hackage:
+.nightly-hackage:
   extends: .hackage
   only:
     variables:
@@ -962,10 +960,9 @@ nightly-hackage:
 # Nofib testing
 ############################################################
 
-perf-nofib:
+.perf-nofib:
   stage: testing
-  dependencies:
-    - release-x86_64-linux-deb9-dwarf
+  dependencies: []
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   only:
     refs:
@@ -999,10 +996,9 @@ perf-nofib:
 # Documentation deployment via GitLab Pages
 ############################################################
 
-pages:
+.pages:
   stage: deploy
-  dependencies:
-    - doc-tarball
+  dependencies: []
   image: ghcci/x86_64-linux-deb9:0.2
   # Due to Windows allow_failure
   allow_failure: true
