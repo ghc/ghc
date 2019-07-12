@@ -1,4 +1,4 @@
 
-T10598_fail4.hs:3:1: error:
+T10598_fail4.hs:4:12: error:
     Illegal deriving strategy: stock
     Use DerivingStrategies to enable this extension
