@@ -13,7 +13,3 @@ newtype Foo2 a b = Foo2 (a -> b)
     via fooo
 
 data Foo3 deriving Eq via (forall a. a)
-
-newtype Foo4 a = Foo4 a
-deriving via (Identity b)
-  instance Show (Foo4 a)

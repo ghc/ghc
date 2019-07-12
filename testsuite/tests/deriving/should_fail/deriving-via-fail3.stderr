@@ -1,4 +1,4 @@
 
-deriving-via-fail3.hs:3:1: error:
+deriving-via-fail3.hs:3:20: error:
     Illegal deriving strategy: via
     Use DerivingVia to enable this extension
