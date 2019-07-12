@@ -44,6 +44,7 @@ Library
             GHC.ForeignSrcLang
             GHC.HandleEncoding
             GHC.Platform
+            GHC.Platform.Host
             GHC.Settings
             GHC.UniqueSubdir
             GHC.Version
@@ -51,6 +52,7 @@ Library
     -- but done by Hadrian
     -- autogen-modules:
     --         GHC.Version
+    --         GHC.Platform.Host
 
     build-depends: base       >= 4.7 && < 4.14,
                    binary     == 0.8.*,

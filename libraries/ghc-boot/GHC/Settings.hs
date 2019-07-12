@@ -43,8 +43,10 @@ getTargetPlatform settingsFile mySettings = do
   crossCompiling <- getBooleanSetting "cross compiling"
 
   pure $ Platform
-    { platformArch = targetArch
-    , platformOS   = targetOS
+    { platformMini = PlatformMini
+      { platformMini_arch = targetArch
+      , platformMini_os = targetOS
+      }
     , platformWordSize = targetWordSize
     , platformUnregisterised = targetUnregisterised
     , platformHasGnuNonexecStack = targetHasGnuNonexecStack

@@ -58,12 +58,16 @@ host-platform         = @HostPlatform@
 host-arch             = @HostArch_CPP@
 host-os               = @HostOS_CPP@
 host-vendor           = @HostVendor_CPP@
+host-os-haskell       = @HaskellHostOs@
+host-arch-haskell     = @HaskellHostArch@
 
 target-platform       = @TargetPlatform@
 target-platform-full  = @TargetPlatformFull@
 target-arch           = @TargetArch_CPP@
 target-os             = @TargetOS_CPP@
 target-vendor         = @TargetVendor_CPP@
+target-os-haskell     = @HaskellTargetOs@
+target-arch-haskell   = @HaskellTargetArch@
 llvm-target           = @LLVMTarget_CPP@
 
 cross-compiling       = @CrossCompiling@
@@ -141,8 +145,6 @@ settings-clang-command = @SettingsClangCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 
-haskell-target-os = @HaskellTargetOs@
-haskell-target-arch = @HaskellTargetArch@
 target-word-size = @TargetWordSize@
 haskell-have-gnu-nonexec-stack = @HaskellHaveGnuNonexecStack@
 haskell-have-ident-directive = @HaskellHaveIdentDirective@
