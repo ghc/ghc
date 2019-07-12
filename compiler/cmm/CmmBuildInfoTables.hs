@@ -707,18 +707,16 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
 
     -- First resolve all the CAFLabels to SRTEntries
     -- Implements the [Inline] optimisation.
-    resolved =
-       Set.fromList $
-       catMaybes (map (resolveCAF srtMap) (Set.toList nonRec))
+    resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =
-      Set.unions [ lbls | caf <- Set.toList resolved
+      Set.unions [ lbls | caf <- resolved
                         , Just lbls <- [Map.lookup caf (flatSRTs topSRT)] ]
 
     -- Remove SRTEntries that are also in an SRT that we refer to.
     -- Implements the [Filter] optimisation.
-    filtered = Set.difference resolved allBelow
+    filtered = Set.difference (Set.fromList resolved) allBelow
 
   srtTrace "oneSRT:"
      (ppr cafs <+> ppr resolved <+> ppr allBelow <+> ppr filtered) $ return ()
