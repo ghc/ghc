@@ -164,6 +164,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
+    RtsFlags.GcFlags.interIdleGCWait    = 0;
 #if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
 #else
@@ -1179,19 +1180,33 @@ error = true;
                   break;
 
               case 'I': /* idle GC delay */
-                OPTION_UNSAFE;
-                if (rts_argv[arg][2] == '\0') {
-                  /* use default */
-                } else {
-                    Time t = fsecondsToTime(atof(rts_argv[arg]+2));
-                    if (t == 0) {
-                        RtsFlags.GcFlags.doIdleGC = false;
-                    } else {
-                        RtsFlags.GcFlags.doIdleGC = true;
-                        RtsFlags.GcFlags.idleGCDelayTime = t;
-                    }
-                }
-                break;
+                  OPTION_UNSAFE;
+                  switch (rts_argv[arg][2]) {
+                  /* minimum inter-idle GC wait time */
+                  case 'w':
+                      if (rts_argv[arg][3] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.interIdleGCWait = fsecondsToTime(atof(rts_argv[arg]+3));
+                      }
+                      break;
+                  /* idle delay before GC */
+                  case '\0':
+                      /* use default */
+                      break;
+                  default:
+                      {
+                          Time t = fsecondsToTime(atof(rts_argv[arg]+2));
+                          if (t == 0) {
+                              RtsFlags.GcFlags.doIdleGC = false;
+                          } else {
+                              RtsFlags.GcFlags.doIdleGC = true;
+                              RtsFlags.GcFlags.idleGCDelayTime = t;
+                          }
+                      }
+                      break;
+                  }
+                  break;
 
               case 'T':
                   OPTION_SAFE;
