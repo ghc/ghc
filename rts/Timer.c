@@ -28,8 +28,11 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
-/* idle ticks left before we perform a GC */
-static int ticks_to_gc = 0;
+/* idle ticks left before GC allowed */
+static int idle_ticks_to_gc = 0;
+
+/* inter-idle GC ticks left before GC allowed  */
+static int inter_gc_ticks_to_gc = 0;
 
 /*
  * Function: handle_tick()
@@ -53,18 +56,21 @@ handle_tick(int unused STG_UNUSED)
   /*
    * If we've been inactive for idleGCDelayTime (set by +RTS
    * -I), tell the scheduler to wake up and do a GC, to check
-   * for threads that are deadlocked.
+   * for threads that are deadlocked.  However, ensure we wait
+   * at least interIdleGCWait (+RTS -Iw) between idle GCs.
    */
   switch (recent_activity) {
   case ACTIVITY_YES:
       recent_activity = ACTIVITY_MAYBE_NO;
-      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
-                    RtsFlags.MiscFlags.tickInterval;
+      idle_ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
+                         RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
-      if (ticks_to_gc == 0) {
+      if (idle_ticks_to_gc == 0 && inter_gc_ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
               recent_activity = ACTIVITY_INACTIVE;
+              inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
+                                       RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call stopTimer() when it has done
@@ -86,7 +92,8 @@ handle_tick(int unused STG_UNUSED)
 #endif
           }
       } else {
-          ticks_to_gc--;
+              if (idle_ticks_to_gc) idle_ticks_to_gc--;
+              if (inter_gc_ticks_to_gc) inter_gc_ticks_to_gc--;
       }
       break;
   default:
