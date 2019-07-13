@@ -1430,7 +1430,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+    equal to the current size as reported by {\tt sizeofMutableByteArray\#}.}
    with out_of_line = True
         has_side_effects = True
 
