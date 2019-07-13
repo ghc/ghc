@@ -813,7 +813,7 @@ instance Functor ((->) r) where
     fmap = (.)
 
 -- | @since 2.01
-instance Applicative ((->) a) where
+instance Applicative ((->) r) where
     pure = const
     (<*>) f g x = f x (g x)
     liftA2 q f g x = q (f x) (g x)
