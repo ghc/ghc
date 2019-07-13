@@ -142,6 +142,21 @@ filterM p        = foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x
 infixr 1 <=<, >=>
 
 -- | Left-to-right composition of Kleisli arrows.
+--
+-- \'@(as '>=>' bs) a@\' can be understood as the @do@ expression
+--
+-- @
+-- do b <- as a
+--    c <- bs b
+--    pure c
+-- @
+--
+-- or the by the 'Monad' [Right identity] law.
+--
+-- @
+-- do b <- as a
+--    bs b
+-- @
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
@@ -158,6 +173,17 @@ f >=> g     = \x -> f x >>= g
 -- | Repeat an action indefinitely.
 --
 -- ==== __Examples__
+--
+-- Using @ApplicativeDo@: \'@'forever' as@\' can be understood as the
+-- pseudo-@do@ expression
+--
+-- @
+-- do as
+--    as
+--    ..
+-- @
+--
+-- with @as@ repeating.
 --
 -- A common use of 'forever' is to process input from network sockets,
 -- 'System.IO.Handle's, and channels
@@ -268,6 +294,20 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 
 -- | @'replicateM' n act@ performs the action @n@ times,
 -- gathering the results.
+--
+-- Using @ApplicativeDo@: \'@'replicateM' 5 as@\' can be understood as
+-- the @do@ expression
+--
+-- @
+-- do a1 <- as
+--    a2 <- as
+--    a3 <- as
+--    a4 <- as
+--    a5 <- as
+--    pure [a1,a2,a3,a4,a5]
+-- @
+--
+-- Note the @Applicative@ constraint.
 replicateM        :: (Applicative m) => Int -> m a -> m [a]
 {-# INLINABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
