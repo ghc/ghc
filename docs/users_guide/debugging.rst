@@ -404,6 +404,13 @@ These flags dump various phases of GHC's C-\\- pipeline.
     Cmm dumps don't include unreachable blocks since we print
     blocks in reverse post-order.
 
+.. ghc-flag:: -ddump-cmm-verbose-grouped
+    :shortdesc: Write output from main C-\\- pipeline passes to files
+    :type: dynamic
+
+    If used in conjunction with `-ddump-to-file`, writes Dump
+    output from main C-\\- pipeline stages to files (each stage per file).
+
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
     :type: dynamic

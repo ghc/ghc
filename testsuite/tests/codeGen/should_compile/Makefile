@@ -58,3 +58,15 @@ T15155l:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null \
 	| grep -F "= alias %T15155_" | grep -E "@T15155_[ab]_closure.def = " | grep -F "%T15155_a_closure_struct*" \
 	| wc -l | sed -e 's/ *//g' | grep "2"; echo $$?
+
+## check if -ddump-cmm-verbose-grouped generates files
+# for all cmm stages and dumps correspond to correct stage 
+T16930:
+	echo "testing -ddump-cmm-verbose-grouped for T16930 ..."
+	'$(TEST_HC)' $(TEST_HC_OPTS) T16930.hs -fforce-recomp -ddump-cmm-verbose-grouped -ddump-to-file
+	grep -rl "CAFEnv" . --include=\T16930.*
+	grep -rl "Post control-flow optimisations" . --include=\T16930.*
+	grep -rl "Post CPS Cmm" . --include=\T16930.*
+	grep -rl "after setInfoTableStackMap" . --include=\T16930.*
+	grep -rl "Layout Stack" . --include=\T16930.*
+	grep -rl "Post switch plan" . --include=\T16930.*

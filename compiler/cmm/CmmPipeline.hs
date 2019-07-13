@@ -352,9 +352,10 @@ dumpGraph dflags flag name g = do
 
 dumpWith :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpWith dflags flag txt sdoc = do
-         -- ToDo: No easy way of say "dump all the cmm, *and* split
-         -- them into files."  Also, -ddump-cmm-verbose doesn't play
-         -- nicely with -ddump-to-file, since the headers get omitted.
    dumpIfSet_dyn dflags flag txt sdoc
    when (not (dopt flag dflags)) $
-      dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose txt sdoc
+      -- If `-ddump-cmm-verbose-grouped -ddump-to-file` is specified,
+      -- dump each Cmm pipeline stage output to a separate file.  #16930
+      if (dopt Opt_D_dump_cmm_verbose_grouped dflags)
+          then dumpSDoc dflags alwaysQualify flag txt sdoc
+          else dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose txt sdoc

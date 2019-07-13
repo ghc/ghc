@@ -413,6 +413,9 @@ data DumpFlag
    -- All of the cmm subflags (there are a lot!) automatically
    -- enabled if you run -ddump-cmm-verbose
    -- Each flag corresponds to exact stage of Cmm pipeline.
+   | Opt_D_dump_cmm_verbose_grouped
+   -- same as -ddump-cmm-verbose but writes each stage
+   -- to a separate file (if used with -ddump-to-file)
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
    | Opt_D_dump_cmm_switch
@@ -3304,6 +3307,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_raw)
   , make_ord_flag defGhcFlag "ddump-cmm-verbose"
         (setDumpFlag Opt_D_dump_cmm_verbose)
+  , make_ord_flag defGhcFlag "ddump-cmm-verbose-grouped"
+        (setDumpFlag Opt_D_dump_cmm_verbose_grouped)
   , make_ord_flag defGhcFlag "ddump-cmm-cfg"
         (setDumpFlag Opt_D_dump_cmm_cfg)
   , make_ord_flag defGhcFlag "ddump-cmm-cbe"
