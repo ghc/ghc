@@ -1472,7 +1472,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm" (ppr cmm)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" (ppr cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
