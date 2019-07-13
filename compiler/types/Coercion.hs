@@ -1198,6 +1198,7 @@ mkSubCo (FunCo Nominal arg res)
   = FunCo Representational
           (downgradeRole Representational Nominal arg)
           (downgradeRole Representational Nominal res)
+mkSubCo co@(SubCo _) = co
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
