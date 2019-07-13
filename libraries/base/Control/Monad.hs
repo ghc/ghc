@@ -142,6 +142,21 @@ filterM p        = foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x
 infixr 1 <=<, >=>
 
 -- | Left-to-right composition of Kleisli arrows.
+--
+-- @(as '>=>' bs) a@ can be understood as the @do@ expression
+--
+-- @
+-- do b <- as a
+--    c <- bs b
+--    pure c
+-- @
+--
+-- or the by the 'Monad' [Right identity] law.
+--
+-- @
+-- do b <- as a
+--    bs b
+-- @
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
@@ -158,6 +173,16 @@ f >=> g     = \x -> f x >>= g
 -- | Repeat an action indefinitely.
 --
 -- ==== __Examples__
+--
+-- @forever as@ can be understood as the pseudo-@do@ expression
+--
+-- @
+-- do as
+--    as
+--    ..
+-- @
+--
+-- @..@ indicates @as@ repeating indefinitely.
 --
 -- A common use of 'forever' is to process input from network sockets,
 -- 'System.IO.Handle's, and channels
