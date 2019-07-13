@@ -1077,7 +1077,7 @@ ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
 ppr_apps (HsAppType _ (L _ fun) arg)    args
   = ppr_apps fun (Right arg : args)
-ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
+ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
   where
     pp (Left arg)                             = ppr arg
     -- pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
