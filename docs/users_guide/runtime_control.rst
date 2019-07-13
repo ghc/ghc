@@ -653,6 +653,26 @@ performance.
     This is an experimental feature, please let us know if it causes
     problems and/or could benefit from further tuning.
 
+.. rts-flag:: -Iw ⟨seconds⟩
+
+    :default: 0 seconds
+
+    .. index::
+       single: idle GC
+
+    By default, if idle GC is enabled in the threaded runtime, a major
+    GC will be performed every time the process goes idle for a
+    sufficiently long duration (see :rts-flag:`-I ⟨seconds⟩`).  For
+    large server processes accepting regular but infrequent requests
+    (e.g., once per second), an expensive, major GC may run after
+    every request.  As an alternative to shutting off idle GC entirely
+    (with ``-I0``), a minimum wait time between idle GCs can be
+    specified with this flag.  For example, ``-Iw60`` will ensure that
+    an idle GC runs at most once per minute.
+
+    This is an experimental feature, please let us know if it causes
+    problems and/or could benefit from further tuning.
+
 .. rts-flag:: -ki ⟨size⟩
 
     :default: 1k

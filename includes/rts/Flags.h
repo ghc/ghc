@@ -66,6 +66,7 @@ typedef struct _GC_FLAGS {
     bool ringBell;
 
     Time    idleGCDelayTime;    /* units: TIME_RESOLUTION */
+    Time    interIdleGCWait;    /* units: TIME_RESOLUTION */
     bool doIdleGC;
 
     Time    longGCSync;         /* units: TIME_RESOLUTION */
