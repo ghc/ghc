@@ -584,7 +584,7 @@ pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
 pprConArgs :: (OutputableBndrId (GhcPass p))
            => HsConPatDetails (GhcPass p) -> SDoc
-pprConArgs (PrefixCon pats) = sep (map (pprParendLPat appPrec) pats)
+pprConArgs (PrefixCon pats) = fsep (map (pprParendLPat appPrec) pats)
 pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
                                   , pprParendLPat appPrec p2 ]
 pprConArgs (RecCon rpats)   = ppr rpats

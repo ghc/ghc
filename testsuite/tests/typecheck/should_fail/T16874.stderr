@@ -1,0 +1,12 @@
+
+T16874.hs:8:7: error:
+    • The constructor ‘D’ should have 41 arguments, but has been given 40
+    • In the pattern:
+        D a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd
+          ee ff gg hh ii jj kk ll mm nn
+      In an equation for ‘test’:
+          test
+            (D a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd
+               ee ff gg hh ii jj kk ll mm nn)
+            = D a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb cc dd
+                ee ff gg hh ii jj kk ll mm nn
