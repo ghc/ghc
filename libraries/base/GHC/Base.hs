@@ -453,6 +453,13 @@ structure of @f@. Furthermore @f@ needs to adhere to the following:
 
 Note, that the second law follows from the free theorem of the type 'fmap' and
 the first law, so you need only check that the former condition holds.
+
+@fmap f as@ can be understood as the @do@ expression
+
+@
+do a <- as
+   pure (f a)
+@
 -}
 
 class  Functor f  where
@@ -461,6 +468,20 @@ class  Functor f  where
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
+    --
+    -- @a <$ bs@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do _ <- bs
+    --    pure a
+    -- @
+    --
+    -- or
+    --
+    -- @
+    -- do bs
+    --    pure a
+    -- @
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
@@ -537,6 +558,14 @@ class Functor f => Applicative f where
     --
     -- A few functors support an implementation of '<*>' that is more
     -- efficient than the default one.
+    --
+    -- @fs <*> as@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do f <- fs
+    --    a <- as
+    --    pure (f a)
+    -- @
     (<*>) :: f (a -> b) -> f a -> f b
     (<*>) = liftA2 id
 
@@ -549,10 +578,34 @@ class Functor f => Applicative f where
     --
     -- This became a typeclass method in 4.10.0.0. Prior to that, it was
     -- a function defined in terms of '<*>' and 'fmap'.
+    --
+    -- @liftA2 f as bs@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    b <- bs
+    --    pure (f a b)
+    -- @
+
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
     -- | Sequence actions, discarding the value of the first argument.
+    --
+    -- @as *> bs@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do _ <- as
+    --    b <- bs
+    --    pure b
+    -- @
+    --
+    -- or
+    --
+    -- @
+    -- do as
+    --    bs
+    -- @
     (*>) :: f a -> f b -> f b
     a1 *> a2 = (id <$ a1) <*> a2
     -- This is essentially the same as liftA2 (flip const), but if the
@@ -565,22 +618,62 @@ class Functor f => Applicative f where
     -- liftA2, it would likely be better to define (*>) using liftA2.
 
     -- | Sequence actions, discarding the value of the second argument.
+    --
+    -- @as <* bs@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    _ <- bs
+    --    pure a
+    -- @
+    --
+    -- or
+    --
+    -- @
+    -- do a <- as
+    --    bs
+    --    pure a
+    -- @
     (<*) :: f a -> f b -> f a
     (<*) = liftA2 const
 
 -- | A variant of '<*>' with the arguments reversed.
+--
+-- @as <**> fs@ can be understood as the @do@ expression
+--
+-- @
+-- do a <- as
+--    f <- fs
+--    pure (f a)
+-- @
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
 -- Don't use $ here, see the note at the top of the page
 
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
+--
+-- @liftA f as@ can be understood as the @do@ expression
+--
+-- @
+-- do a <- as
+--    pure (f a)
+-- @
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
 -- definition of liftA = fmap.
 
 -- | Lift a ternary function to actions.
+--
+-- @liftA3 f as bs cs@ can be understood as the @do@ expression
+--
+-- @
+-- do a <- as
+--    b <- bs
+--    c <- cs
+--    pure (f a b c)
+-- @
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = liftA2 f a b <*> c
 
@@ -596,6 +689,22 @@ liftA3 f a b c = liftA2 f a b <*> c
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
 -- bound argument into the outer level.
+--
+--
+-- @join ass@ can be understood as the @do@ expression
+--
+-- @
+-- do as <- ass
+--    a  <- as
+--    pure a
+-- @
+--
+-- or
+--
+-- @
+-- do as <- ass
+--    as
+-- @
 --
 -- ==== __Examples__
 --
@@ -657,11 +766,41 @@ defined in the "Prelude" satisfy these laws.
 class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
+    --
+    -- @as >>= k@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    b <- k a
+    --    pure b
+    -- @
+    --
+    -- or
+    --
+    -- @
+    -- do a <- as
+    --    k a
+    -- @
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
 
     -- | Sequentially compose two actions, discarding any value produced
     -- by the first, like sequencing operators (such as the semicolon)
     -- in imperative languages.
+    --
+    -- @as >> bs@ can be understood as the @do@ expression
+    --
+    -- @
+    -- do _ <- as
+    --    b <- bs
+    --    pure b
+    -- @
+    --
+    -- or
+    --
+    -- @
+    -- do as
+    --    bs
+    -- @
     (>>)        :: forall a b. m a -> m b -> m b
     m >> k = m >>= \_ -> k -- See Note [Recursive bindings for Applicative/Monad]
     {-# INLINE (>>) #-}
