@@ -317,7 +317,7 @@ nativeCodeGen' :: (Outputable statics, Outputable instr,Outputable jumpDest,
                -> Stream IO RawCmmGroup ()
                -> IO UniqSupply
 nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
- = do
+ = withTiming (pure dflags) (text "native code generator") (const ()) $ do
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
