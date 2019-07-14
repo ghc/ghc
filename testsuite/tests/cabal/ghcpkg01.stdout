@@ -3,6 +3,7 @@ local01.package.conf
 Reading package info from "test.pkg" ... done.
 name:            testpkg
 version:         1.2.3.4
+visibility:      public
 id:              testpkg-1.2.3.4-XXX
 key:             testpkg-1.2.3.4-XXX
 license:         BSD3
@@ -25,6 +26,7 @@ pkgroot:
 
 name:            testpkg
 version:         1.2.3.4
+visibility:      public
 id:              testpkg-1.2.3.4-XXX
 key:             testpkg-1.2.3.4-XXX
 license:         BSD3
@@ -53,6 +55,7 @@ local01.package.conf
 
 name:            testpkg
 version:         2.0
+visibility:      public
 id:              testpkg-2.0-XXX
 key:             testpkg-2.0-XXX
 license:         BSD3
@@ -74,6 +77,7 @@ pkgroot:
 
 name:            testpkg
 version:         2.0
+visibility:      public
 id:              testpkg-2.0-XXX
 key:             testpkg-2.0-XXX
 license:         BSD3
@@ -95,6 +99,7 @@ pkgroot:
 ---
 name:            testpkg
 version:         1.2.3.4
+visibility:      public
 id:              testpkg-1.2.3.4-XXX
 key:             testpkg-1.2.3.4-XXX
 license:         BSD3
@@ -124,6 +129,7 @@ exposed: False
 Reading package info from "test3.pkg" ... done.
 name:            testpkg
 version:         1.2.3.4
+visibility:      public
 id:              testpkg-1.2.3.4-XXX
 key:             testpkg-1.2.3.4-XXX
 license:         BSD3
