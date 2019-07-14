@@ -149,3 +149,33 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs 29  5 29  6
 :up T16804a.hs 29  8 29  8
 :up T16804a.hs 29 14 29 14
+
+:cp  1 module T16804b where
+:cp 
+:cp  3 import T16804a
+:cp 
+:cp  5 printStuff :: IO ()
+:cp  6 printStuff = do
+:cp  7   print (testFunction A A)
+:putruler1
+:tp T16804b.hs 7 10 7 21
+:tp T16804b.hs 7 10 7 23
+:tp T16804b.hs 7 10 7 25
+:tp T16804b.hs 7 23 7 23
+
+:up T16804b.hs 7 10 7 21
+:up T16804b.hs 7 10 7 25
+:up T16804b.hs 7 23 7 23
+
+:cp  8   print (testFunction2 True)
+:putruler1
+:tp T16804b.hs 8 10 8 22
+:tp T16804b.hs 8 10 8 27
+
+:cp  9   print (testFunction2 False)
+:cp 10   print niceValue
+:putruler2
+:tp T16804b.hs 10 9 10 17
+:up T16804b.hs 10 9 10 17
+
+:cp 11   print niceValue2
