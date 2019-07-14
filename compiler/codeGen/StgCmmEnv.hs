@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -124,24 +125,35 @@ getCgIdInfo id
   = do  { dflags <- getDynFlags
         ; local_binds <- getBinds -- Try local bindings first
         ; case lookupVarEnv local_binds id of {
-            Just info -> return info ;
+            Just cachedInfo -> return cachedInfo ;
             Nothing   -> do {
-
-                -- Should be imported; make up a CgIdInfo for it
-          let name = idName id
-        ; if isExternalName name then
-              let ext_lbl
-                      | isUnliftedType (idType id) =
-                          -- An unlifted external Id must refer to a top-level
-                          -- string literal. See Note [Bytes label] in CLabel.
-                          ASSERT( idType id `eqType` addrPrimTy )
-                          mkBytesLabel name
-                      | otherwise = mkClosureLabel name $ idCafInfo id
-              in return $
-                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
-          else
-              cgLookupPanic id -- Bug
+            ; imported_binds <- getImportCache
+            ; case lookupVarEnv imported_binds id of -- next try import cache
+                Just cachedInfo -> do
+                    -- pprTraceM "Hit:" (ppr id)
+                    return cachedInfo
+                Nothing -> do
+                  -- Should be imported; make up a CgIdInfo for it
+                  let name = idName id
+                  if isExternalName name
+                  then do
+                        -- pprTraceM "Missed:" (ppr id)
+                        let !info = mkCgIdInfo dflags name
+                        setImportCache (extendVarEnv imported_binds id info)
+                        return info
+                  else
+                        cgLookupPanic id -- Bug
         }}}
+  where
+    ext_lbl name
+      | isUnliftedType (idType id) =
+          -- An unlifted external Id must refer to a top-level
+          -- string literal. See Note [Bytes label] in CLabel.
+          ASSERT( idType id `eqType` addrPrimTy )
+          mkBytesLabel name
+      | otherwise = mkClosureLabel name $ idCafInfo id
+    mkCgIdInfo dflags name = litIdInfo dflags id (mkLFImported id) (CmmLabel $ ext_lbl name)
+
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

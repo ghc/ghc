@@ -53,7 +53,7 @@ module StgCmmMonad (
 
         -- more localised access to monad state
         CgIdInfo(..),
-        getBinds, setBinds,
+        getBinds, setBinds, getImportCache, setImportCache,
 
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
@@ -304,6 +304,8 @@ data CgState
 
      cgs_binds :: CgBindings,
 
+     cgs_imports :: !CgCache, -- Cached information about imported ids.
+
      cgs_hp_usg  :: HeapUsage,
 
      cgs_uniqs :: UniqSupply }
@@ -315,6 +317,7 @@ data HeapUsage   -- See Note [Virtual and real heap pointers]
         realHp :: VirtualHpOffset        -- realHp: Virtual offset of real heap ptr
                                          --   Used in instruction addressing modes
     }
+type CgCache = VarEnv CgIdInfo
 
 type VirtualHpOffset = WordOff
 
@@ -355,6 +358,7 @@ initCgState uniqs
   = MkCgState { cgs_stmts  = mkNop
               , cgs_tops   = nilOL
               , cgs_binds  = emptyVarEnv
+              , cgs_imports  = emptyVarEnv
               , cgs_hp_usg = initHpUsage
               , cgs_uniqs  = uniqs }
 
@@ -433,6 +437,19 @@ setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
+
+getImportCache :: FCode (VarEnv CgIdInfo)
+getImportCache = do
+        state <- getState
+        return $! cgs_imports state
+
+setImportCache :: (VarEnv CgIdInfo) -> FCode ()
+setImportCache new_cache = do
+        state <- getState
+        setState $! state {cgs_imports = new_cache}
+
+combineImportCaches :: [CgCache] -> CgCache
+combineImportCaches = plusVarEnvList
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->
@@ -569,9 +586,13 @@ forkClosureBody body_code
         ; let body_info_down = info { cgd_sequel    = initSequel
                                     , cgd_updfr_off = initUpdFrameOff dflags
                                     , cgd_self_loop = Nothing }
-              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+              fork_state_in = (initCgState us) { cgs_binds = cgs_binds state
+                                               , cgs_imports = cgs_imports state
+                                               }
               ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
-        ; setState $ state `addCodeBlocksFrom` fork_state_out }
+        ; setState $ (state `addCodeBlocksFrom` fork_state_out)
+        ; setImportCache (cgs_imports fork_state_out)
+        }
 
 forkLneBody :: FCode a -> FCode a
 -- 'forkLneBody' takes a body of let-no-escape binding and compiles
@@ -584,9 +605,12 @@ forkLneBody body_code
   = do  { info_down <- getInfoDown
         ; us        <- newUniqSupply
         ; state     <- getState
-        ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
+        ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state
+                                               , cgs_imports = cgs_imports state
+                                               }
               (result, fork_state_out) = doFCode body_code info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out
+        ; setImportCache (cgs_imports fork_state_out)
         ; return result }
 
 codeOnly :: FCode () -> FCode ()
@@ -598,9 +622,12 @@ codeOnly body_code
         ; us        <- newUniqSupply
         ; state     <- getState
         ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state
-                                                 , cgs_hp_usg  = cgs_hp_usg state }
+                                                 , cgs_hp_usg  = cgs_hp_usg state
+                                                 , cgs_imports = cgs_imports state
+                                                 }
                 ((), fork_state_out) = doFCode body_code info_down fork_state_in
-        ; setState $ state `addCodeBlocksFrom` fork_state_out }
+        ; setState $ state `addCodeBlocksFrom` fork_state_out
+        }
 
 forkAlts :: [FCode a] -> FCode [a]
 -- (forkAlts' bs d) takes fcodes 'bs' for the branches of a 'case', and
@@ -618,11 +645,14 @@ forkAlts branch_fcodes
                   (us1,us2) = splitUniqSupply us
                   branch_state = (initCgState us1) {
                                         cgs_binds  = cgs_binds state
-                                      , cgs_hp_usg = cgs_hp_usg state }
+                                      , cgs_hp_usg = cgs_hp_usg state
+                                      , cgs_imports = cgs_imports state
+                                      }
               (_us, results) = mapAccumL compile us branch_fcodes
               (branch_results, branch_out_states) = unzip results
         ; setState $ foldl' stateIncUsage state branch_out_states
                 -- NB foldl.  state is the *left* argument to stateIncUsage
+        ; setImportCache . combineImportCaches . map cgs_imports $ branch_out_states
         ; return branch_results }
 
 forkAltPair :: FCode a -> FCode a -> FCode (a,a)
