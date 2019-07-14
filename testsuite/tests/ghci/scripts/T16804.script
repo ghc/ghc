@@ -198,3 +198,10 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :putruler2
 :up T16804c.hs 12 13 12 13
 :up T16804c.hs 12 32 12 32
+
+:cp
+:cp 14 localScope3 :: Test -> Bool
+:cp 15 localScope3 a = testFunction a A
+:putruler2
+:up T16804c.hs 15 13 15 13
+:up T16804c.hs 15 30 15 30
