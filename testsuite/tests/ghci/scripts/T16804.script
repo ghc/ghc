@@ -14,7 +14,7 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :def putruler2 (putruler 3)
 
 :set +c
-:l T16804a.hs T16804b.hs
+:l T16804a.hs T16804b.hs T16804c.hs
 
 :cp  1 module T16804a where
 :putruler1
@@ -178,4 +178,23 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :tp T16804b.hs 10 9 10 17
 :up T16804b.hs 10 9 10 17
 
-:cp 11   print niceValue2
+:cp  5 a :: Test
+:cp  6 a = A
+:putruler1
+:up T16804c.hs 5 1 5 1
+:up T16804c.hs 6 1 6 1
+
+:cp 
+:cp  8 localScope :: Test -> Bool
+:cp  9 localScope arg = testFunction a arg
+:putruler1
+:up T16804c.hs 9 12 9 14
+:up T16804c.hs 9 31 9 31
+:up T16804c.hs 9 33 9 35
+
+:cp 
+:cp 11 localScope2 :: Test -> Bool
+:cp 12 localScope2 a = testFunction B a
+:putruler2
+:up T16804c.hs 12 13 12 13
+:up T16804c.hs 12 32 12 32
