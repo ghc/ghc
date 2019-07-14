@@ -1,4 +1,4 @@
-Collecting type info for 2 module(s) ... 
+Collecting type info for 3 module(s) ... 
 1 module T16804a where
   1234567890
             1234567890
@@ -240,4 +240,46 @@ undefined :: Int
 input: :uses T16804b.hs 10 9 10 17
 T16804a.hs:(22,1)-(22,9)
 T16804b.hs:(10,9)-(10,17)
-11   print niceValue2
+5 a :: Test
+6 a = A
+  1234567890
+            1234567890
+                      1234567890
+                                1234567890
+input: :uses T16804c.hs 5 1 5 1
+input: :uses T16804c.hs 6 1 6 1
+T16804c.hs:(6,1)-(6,1)
+T16804c.hs:(6,1)-(6,1)
+
+8 localScope :: Test -> Bool
+9 localScope arg = testFunction a arg
+  1234567890
+            1234567890
+                      1234567890
+                                1234567890
+input: :uses T16804c.hs 9 12 9 14
+T16804c.hs:(9,12)-(9,14)
+T16804c.hs:(9,33)-(9,35)
+T16804c.hs:(9,12)-(9,14)
+input: :uses T16804c.hs 9 31 9 31
+T16804c.hs:(6,1)-(6,1)
+T16804c.hs:(9,31)-(9,31)
+input: :uses T16804c.hs 9 33 9 35
+T16804c.hs:(9,12)-(9,14)
+T16804c.hs:(9,33)-(9,35)
+T16804c.hs:(9,12)-(9,14)
+
+11 localScope2 :: Test -> Bool
+12 localScope2 a = testFunction B a
+   1234567890
+             1234567890
+                       1234567890
+                                 1234567890
+input: :uses T16804c.hs 12 13 12 13
+T16804c.hs:(12,13)-(12,13)
+T16804c.hs:(12,32)-(12,32)
+T16804c.hs:(12,13)-(12,13)
+input: :uses T16804c.hs 12 32 12 32
+T16804c.hs:(12,13)-(12,13)
+T16804c.hs:(12,32)-(12,32)
+T16804c.hs:(12,13)-(12,13)
