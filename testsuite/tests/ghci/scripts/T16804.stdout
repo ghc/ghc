@@ -194,3 +194,50 @@ input: :uses T16804a.hs 29  3 29  3
 input: :uses T16804a.hs 29  5 29  6
 input: :uses T16804a.hs 29  8 29  8
 input: :uses T16804a.hs 29 14 29 14
+1 module T16804b where
+
+3 import T16804a
+
+5 printStuff :: IO ()
+6 printStuff = do
+7   print (testFunction A A)
+  1234567890
+            1234567890
+                      1234567890
+                                1234567890
+input: :type-at T16804b.hs 7 10 7 21 undefined
+undefined :: Test -> Test -> Bool
+input: :type-at T16804b.hs 7 10 7 23 undefined
+undefined :: Test -> Bool
+input: :type-at T16804b.hs 7 10 7 25 undefined
+undefined :: Bool
+input: :type-at T16804b.hs 7 23 7 23 undefined
+undefined :: Test
+input: :uses T16804b.hs 7 10 7 21
+T16804a.hs:(13,1)-(13,12)
+T16804b.hs:(7,10)-(7,21)
+input: :uses T16804b.hs 7 10 7 25
+T16804a.hs:(13,1)-(13,12)
+T16804b.hs:(7,10)-(7,21)
+input: :uses T16804b.hs 7 23 7 23
+8   print (testFunction2 True)
+  1234567890
+            1234567890
+                      1234567890
+                                1234567890
+input: :type-at T16804b.hs 8 10 8 22 undefined
+undefined :: Bool -> Test
+input: :type-at T16804b.hs 8 10 8 27 undefined
+undefined :: Test
+9   print (testFunction2 False)
+10   print niceValue
+   1234567890
+             1234567890
+                       1234567890
+                                 1234567890
+input: :type-at T16804b.hs 10 9 10 17 undefined
+undefined :: Int
+input: :uses T16804b.hs 10 9 10 17
+T16804a.hs:(22,1)-(22,9)
+T16804b.hs:(10,9)-(10,17)
+11   print niceValue2
