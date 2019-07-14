@@ -76,10 +76,12 @@ import GHC.Generics (K1(..))
 -- Some simple examples are 'Either' and '(,)':
 --
 -- > instance Bitraversable Either where
--- >   bitraverse f _ (Left x) = Left <$> f x
+-- >   bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> (Either a b -> f (Either c d))
+-- >   bitraverse f _ (Left x)  = Left <$> f x
 -- >   bitraverse _ g (Right y) = Right <$> g y
 -- >
 -- > instance Bitraversable (,) where
+-- >   bitraverse :: Applicative f => (a -> f c) -> (b -> f d) -> ((a, b) -> f (c, d))
 -- >   bitraverse f g (x, y) = (,) <$> f x <*> g y
 --
 -- 'Bitraversable' relates to its superclasses in the following ways:

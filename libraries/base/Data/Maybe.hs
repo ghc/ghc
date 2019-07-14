@@ -229,6 +229,12 @@ maybeToList  (Just x)  = [x]
 -- >>> maybeToList $ listToMaybe [1,2,3]
 -- [1]
 --
+-- Transforming the "list of successes" to a maybe:
+--
+-- >>> :set -XTypeApplications
+-- >>> 'unfoldr' (listToMaybe . reads @Int) "0 11 222 3333"
+-- [0,11,222,3333]
+
 listToMaybe :: [a] -> Maybe a
 listToMaybe = foldr (const . Just) Nothing
 {-# INLINE listToMaybe #-}

@@ -79,6 +79,7 @@ infix  4 `elem`, `notElem`
 -- a suitable instance would be
 --
 -- > instance Foldable Tree where
+-- >    foldMap :: Monoid m => (a -> m) -> (Tree a -> m)
 -- >    foldMap f Empty = mempty
 -- >    foldMap f (Leaf x) = f x
 -- >    foldMap f (Node l k r) = foldMap f l `mappend` f k `mappend` foldMap f r
@@ -87,6 +88,7 @@ infix  4 `elem`, `notElem`
 -- to satisfy the monoid laws.  Alternatively, one could define @foldr@:
 --
 -- > instance Foldable Tree where
+-- >    foldr :: (a -> b -> b) -> (b -> Tree a -> b)
 -- >    foldr f z Empty = z
 -- >    foldr f z (Leaf x) = f x z
 -- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l

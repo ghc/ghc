@@ -60,10 +60,12 @@ import GHC.Generics (K1(..))
 -- Common examples are 'Either' and '(,)':
 --
 -- > instance Bifoldable Either where
+-- >   bifoldMap :: Monoid m => (a -> m) -> (b -> m) -> (Either a b -> m)
 -- >   bifoldMap f _ (Left  a) = f a
 -- >   bifoldMap _ g (Right b) = g b
 -- >
 -- > instance Bifoldable (,) where
+-- >   bifoldr :: (a -> c -> c) -> (b -> c -> c) -> (c -> (a, b) -> c)
 -- >   bifoldr f g z (a, b) = f a (g b z)
 --
 -- A minimal 'Bifoldable' definition consists of either 'bifoldMap' or

@@ -76,6 +76,7 @@ import Prelude hiding ((.),id)
 -- newtype Predicate a = Predicate { getPredicate :: a -> Bool }
 --
 -- instance Contravariant Predicate where
+--   contramap :: (a' -> a) -> (Predicate a -> Predicate a')
 --   contramap f (Predicate p) = Predicate (p . f)
 --                                          |   `- First, map the input...
 --                                          `----- then apply the predicate.

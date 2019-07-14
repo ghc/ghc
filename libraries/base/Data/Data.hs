@@ -204,16 +204,20 @@ With the @-XDeriveDataTypeable@ option, GHC can generate instances of the
 GHC will generate an instance that is equivalent to
 
 > instance (Data a, Data b) => Data (T a b) where
+>     gfoldl :: (forall d e. Data d => c (d -> e) -> d -> c e) -> (forall g. g -> c g) -> (T a b -> c (T a b))
 >     gfoldl k z (C1 a b) = z C1 `k` a `k` b
 >     gfoldl k z C2       = z C2
 >
+>     gunfold :: (forall b r. Data b => c (b -> r) -> c r) -> (forall r. r -> c r) -> (Constr -> c (T a b))
 >     gunfold k z c = case constrIndex c of
 >                         1 -> k (k (z C1))
 >                         2 -> z C2
 >
+>     toConstr :: T a b -> Constr
 >     toConstr (C1 _ _) = con_C1
 >     toConstr C2       = con_C2
 >
+>     dataTypeOf  :: T a b -> DataType
 >     dataTypeOf _ = ty_T
 >
 > con_C1 = mkConstr ty_T "C1" [] Prefix
