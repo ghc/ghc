@@ -4,7 +4,8 @@ annotate content row startcol endcol =
     let
         (toDrop, toTake) = calcRows row
         startRows = drop toDrop content
-        rows = map ("> " ++) $ take toTake startRows ++ [annotateRow] ++ take 1 (drop toTake startRows)
+        markFile = map ("> " ++)
+        rows = markFile (take toTake startRows) ++ ["% " ++ annotateRow] ++ markFile (take 1 (drop toTake startRows))
     in unlines rows
   where
     calcRows 1 = (0, 1)
