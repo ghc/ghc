@@ -3975,8 +3975,6 @@ emptyRoleAnnotEnv = emptyNameEnv
 lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl GhcRn)
 lookupRoleAnnot = lookupNameEnv
 
-getRoleAnnots :: [Name] -> RoleAnnotEnv
-              -> ([LRoleAnnotDecl GhcRn], RoleAnnotEnv)
+getRoleAnnots :: [Name] -> RoleAnnotEnv -> [LRoleAnnotDecl GhcRn]
 getRoleAnnots bndrs role_env
-  = ( mapMaybe (lookupRoleAnnot role_env) bndrs
-    , delListFromNameEnv role_env bndrs )
+  = mapMaybe (lookupRoleAnnot role_env) bndrs

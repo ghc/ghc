@@ -1310,8 +1310,8 @@ rnTyClDecls tycl_ds
                                         , group_roles  = []
                                         , group_instds = init_inst_ds }]
 
-             ((final_inst_ds, orphan_roles), groups)
-                = mapAccumL mk_group (rest_inst_ds, role_annot_env) tycl_sccs
+             (final_inst_ds, groups)
+                = mapAccumL (mk_group role_annot_env) rest_inst_ds tycl_sccs
 
 
              all_fvs = plusFV (foldr (plusFV . snd) emptyFVs tycls_w_fvs)
@@ -1319,24 +1319,23 @@ rnTyClDecls tycl_ds
 
              all_groups = first_group ++ groups
 
-       ; ASSERT2( null final_inst_ds,  ppr instds_w_fvs $$ ppr inst_ds_map
+       ; MASSERT2( null final_inst_ds,  ppr instds_w_fvs $$ ppr inst_ds_map
                                        $$ ppr (flattenSCCs tycl_sccs) $$ ppr final_inst_ds  )
-         mapM_ orphanRoleAnnotErr (nameEnvElts orphan_roles)
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
   where
-    mk_group :: (InstDeclFreeVarsMap, RoleAnnotEnv)
+    mk_group :: RoleAnnotEnv
+             -> InstDeclFreeVarsMap
              -> SCC (LTyClDecl GhcRn)
-             -> ( (InstDeclFreeVarsMap, RoleAnnotEnv)
-                , TyClGroup GhcRn )
-    mk_group (inst_map, role_env) scc
-      = ((inst_map', role_env'), group)
+             -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
+    mk_group role_env inst_map scc
+      = (inst_map', group)
       where
         tycl_ds              = flattenSCC scc
         bndrs                = map (tcdName . unLoc) tycl_ds
+        roles                = getRoleAnnots bndrs role_env
         (inst_ds, inst_map') = getInsts      bndrs inst_map
-        (roles,   role_env') = getRoleAnnots bndrs role_env
         group = TyClGroup { group_ext    = noExtField
                           , group_tyclds = tycl_ds
                           , group_roles  = roles
@@ -1422,15 +1421,6 @@ dupRoleAnnotErr list
 
       cmp_annot (dL->L loc1 _) (dL->L loc2 _) = loc1 `compare` loc2
 
-orphanRoleAnnotErr :: LRoleAnnotDecl GhcRn -> RnM ()
-orphanRoleAnnotErr (dL->L loc decl)
-  = addErrAt loc $
-    hang (text "Role annotation for a type previously declared:")
-       2 (ppr decl) $$
-    parens (text "The role annotation must be given where" <+>
-            quotes (ppr $ roleAnnotDeclName decl) <+>
-            text "is declared.")
-
 
 {- Note [Role annotations in the renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1446,21 +1436,8 @@ to do the check *before* renaming to avoid calling all unbound names duplicates
 of one another.
 
 The renaming process, as usual, might identify and report errors for unbound
-names. We exclude the annotations for unbound names in the annotation
-environment to avoid spurious errors for orphaned annotations.
-
-We then (in rnTyClDecls) do a check for orphan role annotations (role
-annotations without an accompanying type decl). The check works by folding
-over components (of type [[Either (TyClDecl Name) (InstDecl Name)]]), selecting
-out the relevant role declarations for each group, as well as diminishing the
-annotation environment. After the fold is complete, anything left over in the
-name environment must be an orphan, and errors are generated.
-
-An earlier version of this algorithm short-cut the orphan check by renaming
-only with names declared in this module. But, this check is insufficient in
-the case of staged module compilation (Template Haskell, GHCi).
-See #8485. With the new lookup process (which includes types declared in other
-modules), we get better error messages, too.
+names. This is done by using lookupSigCtxtOccRn in rnRoleAnnots (using
+lookupGlobalOccRn led to #8485).
 -}
 
 
