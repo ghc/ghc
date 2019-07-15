@@ -76,7 +76,7 @@ Unlifted FFI Types
 .. extension:: UnliftedFFITypes
     :shortdesc: Enable unlifted FFI types
 
-    :since: 6.X.X
+    :since: 6.8.1
 
 The following unlifted unboxed types may be used as basic foreign
 types (see FFI Chapter, Section 8.6) for both ``safe`` and
