@@ -87,21 +87,30 @@ foreign calls: ``Array#``, ``MutableArray#``, ``SmallArray#``,
 ``SmallMutableArray#``, ``ArrayArray#``, ``MutableArrayArray#``,
 ``ByteArray#``, and ``MutableByteArray#``. Additionally, ``ByteArray#``
 and ``MutableByteArray#`` can be passed to ``safe`` foreign calls
-if object is pinned. (Such can be ascertained by judicious use of
+if the object is pinned. (Such can be ascertained by judicious use of
 ``isByteArrayPinned#``, ``isMutableByteArrayPinned#``, or
 ``newPinnedByteArray#``.) Passing an unpinned argument to an ``safe``
-foreign call results in undefined behavior.
+foreign call results in undefined behavior. This table sums up the
+restrictions:
+
++--------------+-----------------------+----------------------------------+
+| Type         | Safe FFI Argument     | Unsafe FFI Argument              |
++--------------+-----------------------+----------------------------------+
+| Array#       | No                    | Yes, but not useful with C calls |
+| SmallArray#  | No                    | Yes, but not useful with C calls |
+| ArrayArray#  | No                    | Yes                              |
+| ByteArray#   | Yes, only when pinned | Yes                              |
++--------------+-----------------------+----------------------------------+
 
 When passing any of the unlifted array types as an argument to
 a foreign C call, a foreign function sees a pointer that refers to the
 payload of the array, not to the
 ``StgArrBytes``/``StgMutArrPtrs``/``StgSmallMutArrPtrs`` heap object
 containing it [1]_. (By contrast, a foreign Cmm call sees the heap object,
-not just the payload.) This means that the foreign function does not need any
-knowledge of the RTS closure types. The following example sums the first
-three bytes in a ``MutableByteArray##``, although note that in practice,
-users should prefer ``readWord8Array#`` to the FFI for something this
-simple::
+not just the payload.) This means that, in some situations, the foreign C
+function might not need any knowledge of the RTS closure types. The
+following example sums the first three bytes in a
+``MutableByteArray#`` [2]_ without using anything from ``Rts.h``::
 
     // C source
     uint8_t add_triplet(uint8_t* arr) {
@@ -113,10 +122,9 @@ simple::
       addTriplet :: MutableByteArray# RealWorld -> IO Word8
 
 In other situations, the C function may need knowledge of the RTS
-closure types. The following example (again, this is not something
-that the FFI is actually needed for) sums the first element of
+closure types. The following example sums the first element of
 each ``ByteArray#`` (interpreting the bytes as an array of ``CInt``)
-element of an ``ArrayArray##``::
+element of an ``ArrayArray##`` [3]_::
     
     // C source, must include the RTS
     #include "Rts.h"
@@ -135,12 +143,12 @@ element of an ``ArrayArray##``::
     foreign import ccall unsafe "sum_first"
       sumFirst :: ArrayArray# -> IO CInt
 
-Mutable arrays of heap objects track mutations for so that garbage
-collection works. ``MutableArray#`` uses a card table, and
+Mutable arrays of heap objects record writes for the purpose of
+garbage collection. ``MutableArray#`` uses a card table, and
 ``SmallMutableArray#`` uses only a dirty bit. When passing
 an array of heap objects into a foreign function, GHC assumes
 that the foreign import does not modify the contents. Consequently,
-it is never safe to write to an array of heap objects in a foreign
+it is not safe to write to an array of heap objects in a foreign
 function. Foreign functions must treat such arrays as read-only.
 However, note that the runtime has no facilities for tracking
 mutation of a ``MutableByteArray#``. It is safe to mutate these
@@ -149,9 +157,9 @@ in a foreign function.
 Although GHC allows the user to pass all unlifted boxed types to
 foreign functions, some of them are not amenable to useful work.
 Although ``Array#`` is unlifted, the elements in its payload are
-lifted, and a foreign function cannot force thunks. Consequently,
-a foreign function could not inspect the elements of an ``Array#``
-other than for operations like a pointer equality check.
+lifted, and a foreign C function cannot safely force thunks. Consequently,
+a foreign C function do anything with the elements of an ``Array#``
+other checking pointer equality as a shortcut.
 
 .. _ffi-newtype-io:
 
@@ -940,3 +948,8 @@ to the floating point state, so that if you really need to use
 .. [1] Prior to GHC 8.10, when passing an ``ArrayArray#`` argument
   to a foreign function, the foreign function would see a pointer
   to the ``StgMutArrPtrs`` rather than just the payload.
+.. [2] In practice, the FFI should not be used for a task as simple
+  as reading bytes from a ``MutableByteArray#``. Users should prefer
+  ``GHC.Exts.readWord8Array#`` for this.
+.. [3] As in [2]_, the FFI is not actually needed for this. ``GHC.Exts``
+  includes primitives for reading from on ``ArrayArray#``.
