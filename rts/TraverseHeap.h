@@ -85,22 +85,25 @@ typedef struct traverseState_ {
 /**
  * Callback called when heap traversal visits a closure.
  *
- * Before this callback is called the profiling header of the visited closure
- * 'c' is zero'd with 'setTravDataToZero' if this closure hasn't been visited in
- * this run yet. See Note [Profiling heap traversal visited bit].
+ * The callback can assume that the closure's profiling data has been
+ * initialized to zero if this is the first visit during a pass.
  *
- * Return 'true' when this is not the first visit to this element. The generic
- * traversal code will then skip traversing the children.
+ * See Note [Profiling heap traversal visited bit].
+ *
+ * Returning 'false' will instruct the heap traversal code to skip processing
+ * this closure's children. If you don't need to traverse any closure more than
+ * once you can simply return 'first_visit'.
  */
 typedef bool (*visitClosure_cb) (
     const StgClosure *c,
     const StgClosure *cp,
     const stackData data,
+    const bool first_visit,
     stackData *child_data);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
-void traverseMaybeInitClosureData(StgClosure *c);
+bool traverseMaybeInitClosureData(StgClosure *c);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);
