@@ -150,3 +150,5 @@ test('T15897',
       run_timeout_multiplier(2),
       fragile(15467)],
      makefile_test, ['T15897'])
+
+test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
