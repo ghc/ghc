@@ -391,25 +391,8 @@ scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs
 
-{-# INLINE [0] strictUncurryScanr #-}
-strictUncurryScanr :: (a -> b -> c) -> (a, b) -> c
-strictUncurryScanr f pair = case pair of
-                              (x, y) -> f x y
-
-{-# INLINE [0] scanrFB #-} -- See Note [Inline FB functions]
-scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
-scanrFB f c = \x (r, est) -> (f x r, r `c` est)
-
-{-# RULES
-"scanr" [~1] forall f q0 ls . scanr f q0 ls =
-  build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) ls))
-"scanrList" [1] forall f q0 ls .
-               strictUncurryScanr (:) (foldr (scanrFB f (:)) (q0,[]) ls) =
-                 scanr f q0 ls
- #-}
-
--- | /O(n)/. 'scanr1' is a variant of 'scanr' that has no starting value
--- argument.
+-- | /O(n)/. 'scanr1' is a variant of 'scanr' that has no starting
+-- value argument.
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
