@@ -46,10 +46,23 @@
  * mutable data. There we do just go over all existing objects to reset the bit
  * manually. See 'resetStaticObjectForProfiling' and 'resetMutableObjects'.
  */
-StgWord flip = 0;
+static StgWord flip = 0;
 
-#define setTravDataToZero(c) \
-  (c)->header.prof.hp.trav = flip
+StgWord getTravData(const StgClosure *c)
+{
+    const StgWord hp_hdr = c->header.prof.hp.trav;
+    return hp_hdr & (STG_WORD_MAX ^ 1);
+}
+
+void setTravData(StgClosure *c, StgWord w)
+{
+    c->header.prof.hp.trav = w | flip;
+}
+
+bool isTravDataValid(const StgClosure *c)
+{
+    return ((c->header.prof.hp.trav & 1) ^ flip) == 0;
+}
 
 typedef enum {
     // Object with fixed layout. Keeps an information about that
@@ -949,7 +962,7 @@ bool
 traverseMaybeInitClosureData(StgClosure *c)
 {
     if (!isTravDataValid(c)) {
-        setTravDataToZero(c);
+        setTravData(c, 0);
         return true;
     }
     return false;
