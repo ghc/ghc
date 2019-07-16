@@ -435,7 +435,7 @@ program. Here's the C code:
     #include <stdio.h>
     #include "HsFFI.h"
 
-    #ifdef __GLASGOW_HASKELL__
+    #if defined(__GLASGOW_HASKELL__)
     #include "Foo_stub.h"
     #endif
 
@@ -454,7 +454,7 @@ program. Here's the C code:
     }
 
 We've surrounded the GHC-specific bits with
-``#ifdef __GLASGOW_HASKELL__``; the rest of the code should be portable
+``#if defined(__GLASGOW_HASKELL__)``; the rest of the code should be portable
 across Haskell implementations that support the FFI standard.
 
 The call to ``hs_init()`` initializes GHC's runtime system. Do NOT try
@@ -498,7 +498,7 @@ GHC-specific API instead of ``hs_init()``:
     #include <stdio.h>
     #include "HsFFI.h"
 
-    #ifdef __GLASGOW_HASKELL__
+    #if defined(__GLASGOW_HASKELL__)
     #include "Foo_stub.h"
     #include "Rts.h"
     #endif
