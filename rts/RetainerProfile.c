@@ -251,7 +251,7 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    RSET(c) = (RetainerSet *)((StgWord)s | flip);
+    RSET(c) = ((StgWord)s | flip);
 }
 
 static bool
