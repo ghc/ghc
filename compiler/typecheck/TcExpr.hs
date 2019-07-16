@@ -1518,10 +1518,7 @@ restrictSubstToTy s ty
   = let tv = tyCoVarsOfType ty
         restricted_tyenv = restrictVarEnv (getTvSubstEnv s) tv
         restricted_coenv = restrictVarEnv (getCvSubstEnv s) tv
-        domain   = nonDetKeysUFM restricted_tyenv ++ nonDetKeysUFM restricted_coenv
-        in_scope = tv `delListFromUniqSet_Directly` domain
-    in flip extendTCvInScopeSet in_scope
-        $ flip setTvSubstEnv restricted_tyenv
+    in flip setTvSubstEnv restricted_tyenv
         $ flip setCvSubstEnv restricted_coenv s
 
 {- Note [Required quantifiers in the type of a term]
