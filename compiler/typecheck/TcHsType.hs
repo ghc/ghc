@@ -379,8 +379,7 @@ tcHsTypeApp wc_ty kind
                tcCheckLHsType hs_ty kind
        -- We do not kind-generalize type applications: we just
        -- instantiate with exactly what the user says.
-       -- (In addition, kind-generalization would lead to an
-       -- impredicative instantiation.)
+       -- See Note [No generalization in type application]
        -- We still must call kindGeneralizeNone, though, according
        -- to Note [Recipe for checking a signature]
        ; kindGeneralizeNone ty
@@ -402,6 +401,21 @@ PartialTypeSignatures flags here to let the typechecker know that it's checking
 a '@_' and do not emit hole constraints on it.
 See related Note [Wildcards in visible kind application]
 and Note [The wildcard story for types] in HsTypes.hs
+
+Note [No generalization in type application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not kind-generalize type applications. Imagine
+
+  id @(Proxy Nothing)
+
+If we kind-generalized, we would get
+
+  id @(forall {k}. Proxy @(Maybe k) (Nothing @k))
+
+which is very sneakily impredicative instantiation.
+
+There is also the possibility of mentioning a wildcard
+(`id @(Proxy _)`), which definitely should not be kind-generalized.
 
 -}
 
@@ -1674,34 +1688,43 @@ Step 2 is necessary for two reasons: most signatures also bring
 implicitly quantified variables into scope, and solving is necessary
 to get these in the right order (see Note [Keeping scoped variables in
 order: Implicit]). Additionally, solving is necessary in order to
-kind-generalize correctly.
+kind-generalize correctly: otherwise, we do not know which metavariables
+are left unsolved.
 
-In Step 3, we have to deal with the fact that metatyvars generated
-in the type may have a bumped TcLevel, because explicit foralls
-raise the TcLevel. To avoid these variables from ever being visible
-in the surrounding context, we must obey the following dictum:
+Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
+kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
+metatyvars generated in the type may have a bumped TcLevel, because explicit
+foralls raise the TcLevel. To avoid these variables from ever being visible in
+the surrounding context, we must obey the following dictum:
 
   Every metavariable in a type must either be
-    (A) promoted
-    (B) generalized, or
-    (C) zapped to Any
+    (A) generalized, or
+    (B) promoted, or        See Note [Promotion in signatures]
+    (C) zapped to Any       See Note [Naughty quantification candidates] in TcMType
 
-If a variable is generalized, then it becomes a skolem and no longer
-has a proper TcLevel. (I'm ignoring the TcLevel on a skolem here, as
-it's not really in play here.) On the other hand, if it is not
-generalized (because we're not generalizing the construct -- e.g., pattern
+The kindGeneralize functions do not require pre-zonking; they zonk as they
+go.
+
+If you are actually doing kind-generalization, you need to bump the level
+before generating constraints, as we will only generalize variables with
+a TcLevel higher than the ambient one.
+
+After promoting/generalizing, we need to zonk again because both
+promoting and generalizing fill in metavariables.
+
+Note [Promotion in signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If an unsolved metavariable in a signature is not generalized
+(because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeSome)
 we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
 in TcType. Note that promotion is identical in effect to generalizing
 and the reinstantiating with a fresh metavariable at the current level.
-
-For more about (C), see Note [Naughty quantification candidates] in TcMType.
+So in some sense, we generalize *all* variables, but then re-instantiate
+some of them.
 
 Here is an example of why we must promote:
-  bar :: (forall c. c -> Proxy True) -> ()
-  bar _ = ()
-
-  foo (x :: forall a. a -> Proxy b) = bar x
+  foo (x :: forall a. a -> Proxy b) = ...
 
 In the pattern signature, `b` is unbound, and will thus be brought into
 scope. We do not know its kind: it will be assigned kappa[2]. Note that
@@ -1713,17 +1736,8 @@ the *body* of foo, though, we need to unify the type of x with the argument
 type of bar. At this point, the ambient TcLevel is 1, and spotting a
 matavariable with level 2 would violate the (MetaTvInv) invariant of
 Note [TcLevel and untouchable type variables]. So, instead of kind-generalizing,
-we promote the metavariable to level 1.
+we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 
-The kindGeneralize functions do not require pre-zonking; they zonk as they
-go.
-
-If you are actually doing kind-generalization, you need to bump the level
-before generating constraints, as we will only generalize variables with
-a TcLevel higher than the ambient one.
-
-After promoting/generalizing, we need to zonk again because both
-promoting and generalizing fill in metavariables.
 -}
 
 tcWildCardBinders :: [Name]
