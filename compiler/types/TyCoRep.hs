@@ -1193,13 +1193,15 @@ data Coercion
   | CoVarCo CoVar      -- :: _ -> (N or R)
                        -- result role depends on the tycon of the variable's type
 
-    -- AxiomInstCo :: e -> _ -> [N] -> e
+    -- AxiomInstCo :: e -> _ -> ?? -> e
   | AxiomInstCo (CoAxiom Branched) BranchIndex [Coercion]
      -- See also [CoAxiom index]
      -- The coercion arguments always *precisely* saturate
      -- arity of (that branch of) the CoAxiom. If there are
      -- any left over, we use AppCo.
      -- See [Coercion axioms applied to coercions]
+     -- The roles of the argument coercions are determined
+     -- by the cab_roles field of the relevant branch of the CoAxiom
 
   | AxiomRuleCo CoAxiomRule [Coercion]
     -- AxiomRuleCo is very like AxiomInstCo, but for a CoAxiomRule
