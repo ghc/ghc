@@ -381,6 +381,8 @@ computeRetainerSet( traverseState *ts )
     StgWeak *weak;
     uint32_t g, n;
 
+    traverseInvalidateClosureData(ts);
+
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
     // This function is called after a major GC, when key, value, and finalizer
