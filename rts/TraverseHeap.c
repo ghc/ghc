@@ -19,18 +19,18 @@
 /** Note [Profiling heap traversal visited bit]
  *
  * If the RTS is compiled with profiling enabled StgProfHeader can be used by
- * profiling code to store per-heap object information.
+ * profiling code to store per-heap object information. Specifically the
+ * 'hp_hdr' field is used to store heap profiling information.
  *
  * The generic heap traversal code reserves the least significant bit of the
- * largest members of the 'trav' union to decide whether we've already visited a
- * given closure in the current pass or not. The rest of the field is free to be
- * used by the calling profiler.
+ * heap profiling word to decide whether we've already visited a given closure
+ * in the current pass or not. The rest of the field is free to be used by the
+ * calling profiler.
  *
- * By doing things this way we implicitly assume that the LSB of the largest
- * field in the 'trav' union is insignificant. This is true at least for the
- * word aligned pointers which the retainer profiler currently stores there and
- * should be maintained by new users of the 'trav' union for example by shifting
- * the real data up by one bit.
+ * By doing things this way we implicitly assume that the LSB is not used by the
+ * user. This is true at least for the word aligned pointers which the retainer
+ * profiler currently stores there and should be maintained by new users for
+ * example by shifting the real data up by one bit.
  *
  * Since we don't want to have to scan the entire heap a second time just to
  * reset the per-object visitied bit before/after the real traversal we make the
@@ -49,7 +49,7 @@
 StgWord flip = 0;
 
 #define setTravDataToZero(c) \
-  (c)->header.prof.hp.trav.lsb = flip
+  (c)->header.prof.hp.trav = flip
 
 typedef enum {
     // Object with fixed layout. Keeps an information about that
