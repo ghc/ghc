@@ -202,7 +202,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                          []
 
                       -- See Note [No PIE when linking]
-                      ++ picCCOpts dflags
+                      ++ pieCCLDOpts dflags
 
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".

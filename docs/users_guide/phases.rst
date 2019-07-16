@@ -181,14 +181,24 @@ the following flags:
     Pass ⟨option⟩ to the C compiler.
 
 .. ghc-flag:: -pgmc-supports-no-pie
-    :shortdesc: Indicate that the C compiler supports ``-no-pie``
+    :shortdesc: *(deprecated)*
+        Indicate that the linker supports ``-no-pie``
     :type: dynamic
     :category: phase-options
 
-    When ``-pgmc`` is used, GHC by default will never pass the ``-no-pie``
+    Does the same thing as ``-pgml-supports-no-pie``, which replaced it.
+
+.. ghc-flag:: -pgml-supports-no-pie
+    :shortdesc: Indicate that the linker supports ``-no-pie``
+    :type: dynamic
+    :category: phase-options
+
+    When ``-pgml`` is used, GHC by default will never pass the ``-no-pie``
     command line flag. The rationale is that it is not known whether the
-    specified compiler will support it. This flag can be used to indicate
-    that ``-no-pie`` is supported. It has to be passed after ``-pgmc``.
+    specified compiler used for linking (recall we use a C compiler to
+    invoke the linker on our behalf) will support it. This flag can be
+    used to indicate that ``-no-pie`` is supported. It has to be passed
+    after ``-pgml``.
 
     This flag is not necessary when ``-pgmc`` is not used, since GHC
     remembers whether the default C compiler supports ``-no-pie`` in

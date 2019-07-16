@@ -177,6 +177,9 @@ module GHC.Driver.Session (
         -- ** DynFlags C compiler options
         picCCOpts, picPOpts,
 
+        -- ** DynFlags C linker options
+        pieCCLDOpts,
+
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
@@ -2060,20 +2063,28 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "pgmF"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
-      $ hasArg $ \f -> alterToolSettings $ \s -> s
-         { toolSettings_pgm_c   = f
-         , -- Don't pass -no-pie with -pgmc
-           -- (see #15319)
-           toolSettings_ccSupportsNoPie = False
-         }
-  , make_ord_flag defFlag "pgmc-supports-no-pie"
-      $ noArg $ alterToolSettings $ \s -> s { toolSettings_ccSupportsNoPie = True }
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_c   = f }
+  , (Deprecated, defFlag  "pgmc-supports-no-pie"
+      $ noArgM  $ \d -> do
+        deprecate $ "use -pgml-supports-no-pie instead"
+        pure $ alterToolSettings (\s -> s { toolSettings_ccSupportsNoPie = True }) d)
   , make_ord_flag defFlag "pgms"
       (HasArg (\_ -> addWarn "Object splitting was removed in GHC 8.8"))
   , make_ord_flag defFlag "pgma"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_a   = (f,[]) }
   , make_ord_flag defFlag "pgml"
-      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_l   = (f,[]) }
+      $ hasArg $ \f -> alterToolSettings $ \s -> s
+         { toolSettings_pgm_l   = (f,[])
+         , -- Don't pass -no-pie with custom -pgml (see #15319). Note
+           -- that this could break when -no-pie is actually needed.
+           -- But the CC_SUPPORTS_NO_PIE check only happens at
+           -- buildtime, and -pgml is a runtime option. A better
+           -- solution would be running this check for each custom
+           -- -pgml.
+           toolSettings_ccSupportsNoPie = False
+         }
+  , make_ord_flag defFlag "pgml-supports-no-pie"
+      $ noArg $ alterToolSettings $ \s -> s { toolSettings_ccSupportsNoPie = True }
   , make_ord_flag defFlag "pgmdll"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_dll = (f,[]) }
   , make_ord_flag defFlag "pgmwindres"
@@ -4414,9 +4425,7 @@ setOptHpcDir arg  = upd $ \ d -> d {hpcDir = arg}
 -- platform.
 
 picCCOpts :: DynFlags -> [String]
-picCCOpts dflags = pieOpts ++ picOpts
-  where
-    picOpts =
+picCCOpts dflags =
       case platformOS (targetPlatform dflags) of
       OSDarwin
           -- Apple prefers to do things the other way round.
@@ -4444,7 +4453,8 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- explicit here, see #15847
        | otherwise -> ["-fno-PIC"]
 
-    pieOpts
+pieCCLDOpts :: DynFlags -> [String]
+pieCCLDOpts dflags
       | gopt Opt_PICExecutable dflags       = ["-pie"]
         -- See Note [No PIE when linking]
       | toolSettings_ccSupportsNoPie (toolSettings dflags) = ["-no-pie"]
