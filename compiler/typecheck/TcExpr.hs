@@ -68,7 +68,7 @@ import PrelNames
 import DynFlags
 import SrcLoc
 import Util
-import VarEnv  ( emptyTidyEnv, mkInScopeSet )
+import VarEnv  ( emptyTidyEnv, mkInScopeSet, restrictVarEnv )
 import ListSetOps
 import Maybes
 import Outputable
@@ -1454,7 +1454,7 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
               _ -> return emptyTCvSubst 
            }
     go orig fun_ty args ty accumulated_args
-      | (tvs, theta, _) <- tcSplitSigmaTy ty
+      | (tvs, theta, _) <- tcSplitSigmaTy fun_ty
       , not (null tvs && null theta)
       = do { (_, rho) <- topInstantiate orig fun_ty
            ; go orig rho args ty accumulated_args
@@ -1465,12 +1465,21 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
     -- go' assumes the forall's on top have been instantiated
     go' _ fun_ty [] ty accumulated_args
       = do { args_subst <- tcQuickLooks (reverse accumulated_args)
+           ; traceTc "tcQuickLook/args" (vcat [ppr args_subst])
            ; let fun_ty' = substTy args_subst fun_ty
            ; let res_subst = partial_unify fun_ty' ty
-           ; return (composeTCvSubst res_subst args_subst)
+           ; traceTc "tcQuickLook/result"
+                     (vcat [ppr fun_ty', ppr ty, ppr res_subst])
+           ; let combined_subst = composeTCvSubst res_subst args_subst
+                 -- restrict the final substitution to the fv of ty
+                 restricted_tyenv
+                   = restrictVarEnv (getTvSubstEnv combined_subst)
+                                    (tyCoVarsOfType ty)
+                 final_subst = setTvSubstEnv combined_subst restricted_tyenv
+           ; return final_subst
            }
     go' _ fun_ty (HsTypeArg _ _ : _) _ _
-      = pprPanic "quickLock/unexpectedTypeArg" (ppr fun_ty)
+      = pprPanic "tcQuickLook/unexpectedTypeArg" (ppr fun_ty)
     go' orig fun_ty (HsArgPar _ : args) ty accumulated_args
       = go orig fun_ty args ty accumulated_args
     go' orig fun_ty (HsValArg arg : args) ty accumulated_args
