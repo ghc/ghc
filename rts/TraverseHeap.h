@@ -22,7 +22,7 @@ void resetStaticObjectForProfiling(StgClosure *static_objects);
 extern StgWord flip;
 
 #define isTravDataValid(c) \
-  ((((StgWord)(c)->header.prof.hp.trav.lsb & 1) ^ flip) == 0)
+  ((((StgWord)(c)->header.prof.hp.trav & 1) ^ flip) == 0)
 
 typedef struct traverseState_ traverseState;
 
