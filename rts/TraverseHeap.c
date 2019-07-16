@@ -16,52 +16,20 @@
 
 #include "TraverseHeap.h"
 
-/** Note [Profiling heap traversal visited bit]
- *
- * If the RTS is compiled with profiling enabled StgProfHeader can be used by
- * profiling code to store per-heap object information. Specifically the
- * 'hp_hdr' field is used to store heap profiling information.
- *
- * The generic heap traversal code reserves the least significant bit of the
- * heap profiling word to decide whether we've already visited a given closure
- * in the current pass or not. The rest of the field is free to be used by the
- * calling profiler.
- *
- * By doing things this way we implicitly assume that the LSB is not used by the
- * user. This is true at least for the word aligned pointers which the retainer
- * profiler currently stores there and should be maintained by new users for
- * example by shifting the real data up by one bit.
- *
- * Since we don't want to have to scan the entire heap a second time just to
- * reset the per-object visitied bit before/after the real traversal we make the
- * interpretation of this bit dependent on the value of a global variable,
- * 'flip'.
- *
- * When the 'trav' bit is equal to the value of 'flip' the closure data is
- * valid otherwise not (see isTravDataValid). We then invert the value of 'flip'
- * on each heap traversal (see traverseWorkStack), in effect marking all
- * closure's data as invalid at once.
- *
- * There are some complications with this approach, namely: static objects and
- * mutable data. There we do just go over all existing objects to reset the bit
- * manually. See 'resetStaticObjectForProfiling' and 'resetMutableObjects'.
- */
-static StgWord flip = 0;
-
 StgWord getTravData(const StgClosure *c)
 {
     const StgWord hp_hdr = c->header.prof.hp.trav;
     return hp_hdr & (STG_WORD_MAX ^ 1);
 }
 
-void setTravData(StgClosure *c, StgWord w)
+void setTravData(const traverseState *ts, StgClosure *c, StgWord w)
 {
-    c->header.prof.hp.trav = w | flip;
+    c->header.prof.hp.trav = w | ts->flip;
 }
 
-bool isTravDataValid(const StgClosure *c)
+bool isTravDataValid(const traverseState *ts, const StgClosure *c)
 {
-    return ((c->header.prof.hp.trav & 1) ^ flip) == 0;
+    return (c->header.prof.hp.trav & 1) == ts->flip;
 }
 
 typedef enum {
@@ -959,10 +927,10 @@ out:
  * See Note [Profiling heap traversal visited bit].
  */
 bool
-traverseMaybeInitClosureData(StgClosure *c)
+traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c)
 {
-    if (!isTravDataValid(c)) {
-        setTravData(c, 0);
+    if (!isTravDataValid(ts, c)) {
+        setTravData(ts, c, 0);
         return true;
     }
     return false;
@@ -1176,7 +1144,7 @@ traversePAP (traverseState *ts,
 }
 
 static void
-resetMutableObjects(void)
+resetMutableObjects(traverseState* ts)
 {
     uint32_t g, n;
     bdescr *bd;
@@ -1195,7 +1163,7 @@ resetMutableObjects(void)
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
             for (ml = bd->start; ml < bd->free; ml++) {
 
-                traverseMaybeInitClosureData((StgClosure *)*ml);
+                traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
             }
           }
         }
@@ -1219,7 +1187,7 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     bool other_children;
 
     // Now we flip the flip bit.
-    flip = flip ^ 1;
+    ts->flip = ts->flip ^ 1;
 
     // c = Current closure                           (possibly tagged)
     // cp = Current closure's Parent                 (NOT tagged)
@@ -1231,7 +1199,7 @@ loop:
 
     if (c == NULL) {
         debug("maxStackSize= %d\n", ts->maxStackSize);
-        resetMutableObjects();
+        resetMutableObjects(ts);
         return;
     }
 
@@ -1309,7 +1277,7 @@ inner_loop:
     stackAccum accum = {};
 
     // If this is the first visit to c, initialize its data.
-    bool first_visit = traverseMaybeInitClosureData(c);
+    bool first_visit = traverseMaybeInitClosureData(ts, c);
     bool traverse_children
         = visit_cb(c, cp, data, first_visit, &accum, &child_data);
     if(!traverse_children)
@@ -1458,7 +1426,7 @@ inner_loop:
  * encountering.
  */
 void
-resetStaticObjectForProfiling( StgClosure *static_objects )
+resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objects )
 {
     uint32_t count = 0;
     StgClosure *p;
@@ -1476,7 +1444,7 @@ resetStaticObjectForProfiling( StgClosure *static_objects )
             p = (StgClosure*)*IND_STATIC_LINK(p);
             break;
         case THUNK_STATIC:
-            traverseMaybeInitClosureData(p);
+            traverseMaybeInitClosureData(ts, p);
             p = (StgClosure*)*THUNK_STATIC_LINK(p);
             break;
         case FUN_STATIC:
@@ -1485,7 +1453,7 @@ resetStaticObjectForProfiling( StgClosure *static_objects )
         case CONSTR_2_0:
         case CONSTR_1_1:
         case CONSTR_NOCAF:
-            traverseMaybeInitClosureData(p);
+            traverseMaybeInitClosureData(ts, p);
             p = (StgClosure*)*STATIC_LINK(get_itbl(p), p);
             break;
         default:
