@@ -16,6 +16,8 @@
 
 #include "TraverseHeap.h"
 
+const stackData nullStackData;
+
 StgWord getTravData(const StgClosure *c)
 {
     const StgWord hp_hdr = c->header.prof.hp.trav;
