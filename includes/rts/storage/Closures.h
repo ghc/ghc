@@ -20,22 +20,13 @@
 typedef struct {
   CostCentreStack *ccs;
   union {
-
-    union {
-      /* Accessor for the least significant bit of the entire union. Invariant:
-       * This must be at least as large as the largest field in this union for
-       * this to work. If you add more fields make sure you maintain this.
-       *
-       * See Note [Profiling heap traversal visited bit].
-       */
-      StgWord lsb;
-
-      /* Retainer Set */
-      struct _RetainerSet *rs;
-    } trav;
-
+    StgWord trav;             /* Heap traversal */
     StgWord ldvw;             /* Lag/Drag/Void Word */
   } hp;
+    // Heap profiling header. This field is shared among the various heap
+    // profiling modes. Currently it is used by ProfHeap.c for Lag/Drag/Void
+    // profiling and by the heap traversal modes using TraverseHeap.c such as
+    // the retainer profiler.
 } StgProfHeader;
 
 /* -----------------------------------------------------------------------------
