@@ -160,6 +160,7 @@ bool isTravDataValid(const traverseState *ts, const StgClosure *c);
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
+void traverseInvalidateClosureData(traverseState* ts);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);
