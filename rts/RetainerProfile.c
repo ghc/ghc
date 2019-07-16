@@ -407,6 +407,8 @@ computeRetainerSet( traverseState *ts )
     rememberOldStableNameAddresses ();
 
     traverseWorkStack(ts, &retainVisitClosure);
+
+    traverseInvalidateClosureData(ts);
 }
 
 /* -----------------------------------------------------------------------------
