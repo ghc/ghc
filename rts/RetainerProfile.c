@@ -78,32 +78,32 @@ static uint32_t timesAnyObjectVisited;  // number of times any objects are
  * If the RTS is compiled with profiling enabled StgProfHeader can be used by
  * profiling code to store per-heap object information.
  *
- * When using the generic heap traversal code we use this field to store
- * profiler specific information. However we reserve the LSB of the *entire*
- * 'trav' union (which will overlap with the other fields) for the generic
- * traversal code. We use the bit to decide whether we've already visited this
- * closure in this pass or not. We do this as the heap may contain cyclic
- * references, it being a graph and all, so we would likely just infinite loop
- * if we didn't.
+ * The generic heap traversal code reserves the least significant bit of the
+ * largest members of the 'trav' union to decide whether we've already visited a
+ * given closure in the current pass or not. The rest of the field is free to be
+ * used by the calling profiler.
  *
- * We assume that at least the LSB of the largest field in the corresponding
- * union is insignificant. This is true at least for the word aligned pointers
- * which the retainer profiler currently stores there and should be maintained
- * by new users of the 'trav' union.
+ * By doing things this way we implicitly assume that the LSB of the largest
+ * field in the 'trav' union is insignificant. This is true at least for the
+ * word aligned pointers which the retainer profiler currently stores there and
+ * should be maintained by new users of the 'trav' union for example by shifting
+ * the real data up by one bit.
  *
- * Now the way the traversal works is that the interpretation of the "visited?"
- * bit depends on the value of the global 'flip' variable. We don't want to have
- * to do another pass over the heap just to reset the bit to zero so instead on
- * each traversal (i.e. each run of the profiling code) we invert the value of
- * the global 'flip' variable. We interpret this as resetting all the "visited?"
- * flags on the heap.
+ * Since we don't want to have to scan the entire heap a second time just to
+ * reset the per-object visitied bit before/after the real traversal we make the
+ * interpretation of this bit dependent on the value of a global variable,
+ * 'flip'.
+ *
+ * When the 'trav' bit is equal to the value of 'flip' the closure data is
+ * valid otherwise not (see isTravDataValid). We then invert the value of 'flip'
+ * on each heap traversal (see traverseWorkStack), in effect marking all
+ * closure's data as invalid at once.
  *
  * There are some complications with this approach, namely: static objects and
  * mutable data. There we do just go over all existing objects to reset the bit
- * manually. See 'resetStaticObjectForProfiling' and 'resetMutableObjects'.
+ * manually. See 'resetStaticObjectForProfiling' and 'computeRetainerSet'.
  */
-StgWord flip = 0;     // flip bit
-                      // must be 0 if DEBUG_RETAINER is on (for static closures)
+StgWord flip = 0;
 
 #define setTravDataToZero(c) \
   (c)->header.prof.hp.trav.lsb = flip
