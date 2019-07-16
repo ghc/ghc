@@ -1162,7 +1162,6 @@ resetMutableObjects(traverseState* ts)
         for (n = 0; n < n_capabilities; n++) {
           for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
             for (ml = bd->start; ml < bd->free; ml++) {
-
                 traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
             }
           }
@@ -1172,9 +1171,7 @@ resetMutableObjects(traverseState* ts)
 
 /**
  * Traverse all closures on the traversal work-stack, calling 'visit_cb' on each
- * closure. See 'visitClosure_cb' for details. This function flips the 'flip'
- * bit and hence every closure's profiling data will be reset to zero upon
- * visiting. See Note [Profiling heap traversal visited bit].
+ * closure. See 'visitClosure_cb' for details.
  */
 void
 traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
@@ -1186,9 +1183,6 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     stackElement *sep;
     bool other_children;
 
-    // Now we flip the flip bit.
-    ts->flip = ts->flip ^ 1;
-
     // c = Current closure                           (possibly tagged)
     // cp = Current closure's Parent                 (NOT tagged)
     // data = current closures' associated data      (NOT tagged)
@@ -1199,7 +1193,6 @@ loop:
 
     if (c == NULL) {
         debug("maxStackSize= %d\n", ts->maxStackSize);
-        resetMutableObjects(ts);
         return;
     }
 
@@ -1398,6 +1391,22 @@ inner_loop:
     cp = c;
     c = first_child;
     goto inner_loop;
+}
+
+/**
+ * This function flips the 'flip' bit and hence every closure's profiling data
+ * will be reset to zero upon visiting. See Note [Profiling heap traversal
+ * visited bit].
+ */
+void
+traverseInvalidateClosureData(traverseState* ts)
+{
+    // First make sure any unvisited mutable objects are valid so they're
+    // invalidated by the flip below
+    resetMutableObjects(ts);
+
+    // Then flip the flip bit, invalidating all closures.
+    ts->flip = ts->flip ^ 1;
 }
 
 /**
