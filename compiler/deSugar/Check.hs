@@ -32,6 +32,7 @@ import DynFlags
 import HsSyn
 import TcHsSyn
 import Id
+import VarEnv
 import ConLike
 import Name
 import FamInstEnv
@@ -136,7 +137,8 @@ data ValVec = ValVec [ValAbs] Delta -- ^ Value Vector Abstractions
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints. TODO: Do the same for the type constraints?
 data Delta = MkDelta { delta_ty_cs :: Bag EvVar
-                     , delta_tm_cs :: TmState }
+                     , delta_tm_cs :: TmState
+                     , delta_cp_ms :: VarEnv [[ConLike]] }
 
 type ValSetAbs = [ValVec]  -- ^ Value Set Abstractions
 type Uncovered = ValSetAbs
@@ -522,7 +524,7 @@ pmInitialTmTyCs = do
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
       initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
-  pure $ MkDelta{ delta_tm_cs = initTmState, delta_ty_cs = initTyCs }
+  pure $ MkDelta initTyCs initTmState emptyVarEnv
 
 {-
 Note [Recovering from unsatisfiable pattern-matching constraints]
@@ -566,7 +568,7 @@ that we expect.
 pmIsSatisfiable
   :: Delta     -- ^ The ambient term and type constraints
                --   (known to be satisfiable).
-  -> TmVarCt      -- ^ The new term constraint.
+  -> TmVarCt   -- ^ The new term constraint.
   -> Bag EvVar -- ^ The new type constraints.
   -> [Type]    -- ^ The strict argument types.
   -> PmM (Maybe Delta)
@@ -592,7 +594,7 @@ pmIsSatisfiable amb_cs new_tm_c new_ty_cs strict_arg_tys = do
 tmTyCsAreSatisfiable
   :: Delta     -- ^ The ambient term and type constraints
                --   (known to be satisfiable).
-  -> TmVarCt      -- ^ The new term constraint.
+  -> TmVarCt   -- ^ The new term constraint.
   -> Bag EvVar -- ^ The new type constraints.
   -> PmM (Maybe Delta)
        -- ^ @'Just' delta@ if the constraints (@delta@) are
@@ -605,9 +607,13 @@ tmTyCsAreSatisfiable
                then pure True
                else tyOracle ty_cs
   pure $ case (sat_ty, solveOneEq amb_tm_cs new_tm_c) of
-           (True, Just term_cs) -> Just $ MkDelta{ delta_ty_cs = ty_cs
-                                                 , delta_tm_cs = term_cs }
+           (True, Just term_cs) -> Just $ MkDelta ty_cs term_cs emptyVarEnv
            _unsat               -> Nothing
+
+residualCompleteMatches :: Delta -> Id -> PmM [[ConLike]]
+residualCompleteMatches delta x = case lookupVarEnv (delta_cp_ms delta) x of
+  Just sets -> pure sets
+  Nothing   -> allCompleteMatches (idType x)
 
 -- | This weeds out 'ValAbs's with 'PmVar's where at least one COMPLETE set is
 -- rendered vacuous by equality constraints. Otherwise tries to turn a singleton
@@ -622,8 +628,8 @@ normaliseValAbs delta = runMaybeT . go_va delta
     go_va delta pm@PmCon{ pm_con_args = args } = do
       (delta', args') <- mapAccumLM go_va delta args
       pure (delta', pm { pm_con_args = args' })
-    go_va delta va@(PmVar x) = do
-      grps <- lift (allCompleteMatches (idType x))
+    go_va delta@MkDelta { delta_cp_ms = cp_ms } va@(PmVar x) = do
+      grps <- lift (residualCompleteMatches delta x)
       incomplete_grps <- lift (traverse (go_grp 0 x delta) grps)
       -- TODO: If performance is a problem for large refutable enums, record
       --       the new incomplete_grps (or its inverse, rather) in delta
@@ -635,6 +641,8 @@ normaliseValAbs delta = runMaybeT . go_va delta
         ]
       -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
       guard (all notNull incomplete_grps)
+      -- Update our knowledge of incomplete groups
+      let delta1 = delta { delta_cp_ms = extendVarEnv cp_ms x incomplete_grps }
       -- See Note [Turn singleton incomplete groups into a constructor]
       case incomplete_grps of
         ([con]:_)
@@ -642,14 +650,14 @@ normaliseValAbs delta = runMaybeT . go_va delta
           , any ((> 1) . length) grps -> do
             -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
             -- recorded in delta'
-            (delta', ic) <- MaybeT $ mkOneSatisfiableConFull delta x con
+            (delta2, ic) <- MaybeT $ mkOneSatisfiableConFull delta1 x con
             lift $ tracePm "normaliseValAbs: single con" $ hcat
               [ ppr x
               , ppr (idType x)
               , ppr (ic_val_abs ic)
               ]
-            pure (delta', ic_val_abs ic)
-        _        -> pure (delta, va)
+            pure (delta2, ic_val_abs ic)
+        _        -> pure (delta1, va)
     go_va delta va = pure (delta, va)
 
     go_grp :: Int -> Id -> Delta -> [ConLike] -> PmM [ConLike]
