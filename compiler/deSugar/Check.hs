@@ -299,7 +299,7 @@ checkSingle' locn var p = do
   tracePm "checkSingle': missing" (vcat (map ppr missing))
                                   -- no guards
   PartialResult cs us ds <- runMany (pmcheckI clause []) missing
-  us' <- UncoveredPatterns <$> normaliseUncovered us
+  let us' = UncoveredPatterns us
   return $ case (cs,ds) of
     (Covered,  _    )         -> PmResult [] us' [] -- useful
     (NotCovered, NotDiverged) -> PmResult m  us' [] -- redundant
@@ -351,10 +351,9 @@ checkMatches' vars matches
       missing    <- mkInitialUncovered vars
       tracePm "checkMatches': missing" (vcat (map ppr missing))
       (rs,us,ds) <- go matches missing
-      us' <- normaliseUncovered us
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = UncoveredPatterns us'
+                 , pmresultUncovered    = UncoveredPatterns us
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
@@ -610,9 +609,12 @@ tmTyCsAreSatisfiable
                                                  , delta_tm_cs = term_cs }
            _unsat               -> Nothing
 
--- | The work-horse of 'normaliseUncovered'. Weeds out a single value
--- abstraction if it is vacuous, or otherwise tries to turn it into the single
--- possible constructor.
+-- | This weeds out 'ValAbs's with 'PmVar's where at least one COMPLETE set is
+-- rendered vacuous by equality constraints. Otherwise tries to turn a singleton
+-- COMPLETE set into the single possible constructor.
+--
+-- This is quite costly due to the many oracle queries, so we call this as
+-- seldom as possible.
 normaliseValAbs :: Delta -> ValAbs -> PmM (Maybe (Delta, ValAbs))
 normaliseValAbs delta = runMaybeT . go_va delta
   where
@@ -664,21 +666,6 @@ normaliseValAbs delta = runMaybeT . go_va delta
       case mb_delta_ic of
         Nothing -> go_grp n_inh x delta group
         Just _  -> (con:) <$> go_grp (n_inh + 1) x delta group
-
--- | This weeds out 'ValVec's with 'PmVar's where at least one COMPLETE set is
--- rendered vacuous by equality constraints.
---
--- This is quite costly due to the many oracle queries, so we only call this as
--- seldom as possible.
-normaliseUncovered :: Uncovered -> PmM Uncovered
-normaliseUncovered us = do
-  us' <- mapMaybeM normalise_val_vec us
-  tracePm "normaliseUncovered" (vcat (map ppr us'))
-  pure us'
-    where
-      normalise_val_vec (ValVec vva delta) = runMaybeT $ do
-        (delta', vva') <- mapAccumLM ((MaybeT .) . normaliseValAbs) delta vva
-        pure (ValVec vva' delta')
 
 {- Note [Turn singleton incomplete groups into a constructor]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2009,11 +1996,7 @@ pmcheck (p : ps) guards (ValVec vas delta)
       let tm_state = extendSubst y e (delta_tm_cs delta)
           delta'   = delta { delta_tm_cs = tm_state }
       pr <- pmcheckI (pv ++ ps) guards (ValVec (PmVar y : vas) delta')
-      -- The heads of the ValVecs in the uncovered set might be vacuous, so
-      -- normalise them. We do so for the whole uncovered set for now, as long
-      -- as performance doesn't bite.
-      us <- normaliseUncovered (presultUncovered pr)
-      pure $ utail pr { presultUncovered = us }
+      pure (utail pr)
 
 pmcheck [] _ (ValVec (_:_) _) = panic "pmcheck: nil-cons"
 pmcheck (_:_) _ (ValVec [] _) = panic "pmcheck: cons-nil"
