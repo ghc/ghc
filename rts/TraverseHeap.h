@@ -69,6 +69,8 @@ typedef union stackData_ {
     retainer c_child_r;
 } stackData;
 
+extern const stackData nullStackData;
+
 typedef union stackAccum_ {
     StgWord subtree_sizeW;
 } stackAccum;
