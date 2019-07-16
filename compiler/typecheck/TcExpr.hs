@@ -77,7 +77,8 @@ import Outputable
 import FastString
 import Control.Monad
 import Class(classTyCon)
-import UniqSet ( nonDetEltsUniqSet )
+import UniqSet ( nonDetEltsUniqSet, delListFromUniqSet_Directly )
+import UniqFM ( nonDetKeysUFM )
 import qualified GHC.LanguageExtensions as LangExt
 import Unify( tcUnifyTyKis, BindFlag(..) )
 
@@ -1377,7 +1378,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; return (HsTypeArg l ty : args')
            }
     handle_args subst ((HsValArg arg, Just (arg_ty, n)) : args)
-      = do { let arg_ty' = substTy subst arg_ty
+      = do { let arg_ty' = substTy (restrictSubstToTy subst arg_ty) arg_ty
            ; arg' <- tcArg fun arg arg_ty' n
            ; args' <- handle_args subst args
            ; return (HsValArg arg' : args')
@@ -1396,7 +1397,7 @@ tcQuickLooks = go emptyTCvSubst
     go current_subst []
       = return current_subst
     go current_subst ((e,ty):rest)
-      = do { let ty' = substTy current_subst ty
+      = do { let ty' = substTy (restrictSubstToTy current_subst ty) ty
            ; new_subst <- tcQuickLook e [] ty'
            ; go (composeTCvSubst new_subst current_subst) rest
            }
@@ -1467,17 +1468,15 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
     -- go' assumes the forall's on top have been instantiated
     go' _ fun_ty [] ty accumulated_args
       = do { args_subst <- tcQuickLooks (reverse accumulated_args)
-           ; traceTc "tcQuickLook/args" (vcat [ppr args_subst])
-           ; let fun_ty' = substTy args_subst fun_ty
-           ; let res_subst = partial_unify fun_ty' ty
+           ; traceTc "tcQuickLook/args" (vcat [ppr args_subst, ppr fun_ty])
+           ; let fun_ty'
+                   = substTy (restrictSubstToTy args_subst fun_ty) fun_ty
+                 res_subst
+                   = partial_unify fun_ty' ty
+                 final_subst
+                   = restrictSubstToTy (composeTCvSubst res_subst args_subst) ty
            ; traceTc "tcQuickLook/result"
-                     (vcat [ppr fun_ty', ppr ty, ppr res_subst])
-           ; let combined_subst = composeTCvSubst res_subst args_subst
-                 -- restrict the final substitution to the fv of ty
-                 restricted_tyenv
-                   = restrictVarEnv (getTvSubstEnv combined_subst)
-                                    (tyCoVarsOfType ty)
-                 final_subst = setTvSubstEnv combined_subst restricted_tyenv
+                     (vcat [ppr fun_ty', ppr ty, ppr final_subst])
            ; return final_subst
            }
     go' _ fun_ty (HsTypeArg _ _ : _) _ _
@@ -1516,6 +1515,16 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
 tcQuickLook _ _ _
   = return emptyTCvSubst
 
+restrictSubstToTy :: TCvSubst -> TcType -> TCvSubst
+restrictSubstToTy s ty
+  = let tv = tyCoVarsOfType ty
+        restricted_tyenv = restrictVarEnv (getTvSubstEnv s) tv
+        restricted_coenv = restrictVarEnv (getCvSubstEnv s) tv
+        domain   = nonDetKeysUFM restricted_tyenv ++ nonDetKeysUFM restricted_coenv
+        in_scope = tv `delListFromUniqSet_Directly` domain
+    in flip extendTCvInScopeSet in_scope
+        $ flip setTvSubstEnv restricted_tyenv
+        $ flip setCvSubstEnv restricted_coenv s
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
