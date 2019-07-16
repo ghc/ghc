@@ -1297,13 +1297,13 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; return (idHsWrapper, args', fun_ty)
            }
 
-    go acc_args n fun_ty (arg@(HsArgPar sp) : args) deferred_args
+    go acc_args n fun_ty (arg@(HsArgPar _) : args) deferred_args
       = do { let deferred_args' = (arg, Nothing) : deferred_args
            ; (inner_wrap, args', res_ty) <- go acc_args n fun_ty args deferred_args'
-           ; return (inner_wrap, HsArgPar sp : args', res_ty)
+           ; return (inner_wrap, {- HsArgPar sp : -} args', res_ty)
            }
 
-    go acc_args n fun_ty (arg@(HsTypeArg l hs_ty_arg) : args) deferred_args
+    go acc_args n fun_ty (arg@(HsTypeArg _ hs_ty_arg) : args) deferred_args
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -1335,7 +1335,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
                     ; return ( inner_wrap <.> inst_wrap <.> wrap1
-                             , HsTypeArg l hs_ty_arg : args'
+                             , {- HsTypeArg l hs_ty_arg : -} args'
                              , res_ty ) }
                _ -> ty_app_err upsilon_ty hs_ty_arg }
 
