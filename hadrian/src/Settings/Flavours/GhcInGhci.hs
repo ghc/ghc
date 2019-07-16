@@ -10,8 +10,11 @@ ghcInGhciFlavour :: Flavour
 ghcInGhciFlavour = defaultFlavour
     { name        = "ghc-in-ghci"
     , args        = defaultBuilderArgs <> ghciArgs <> defaultPackageArgs
-    , libraryWays = pure [vanilla, dynamic]
-    , rtsWays     = pure [vanilla, threaded, dynamic]
+    -- We can't build DLLs on Windows (yet). Actually we should only
+    -- include the dynamic way when we have a dynamic host GHC, but just
+    -- checking for Windows seems simpler for now.
+    , libraryWays = pure [vanilla] <> pure [ dynamic | not windowsHost ]
+    , rtsWays     = pure [vanilla, threaded] <> pure [ dynamic | not windowsHost ]
     , dynamicGhcPrograms = return False }
 
 ghciArgs :: Args
