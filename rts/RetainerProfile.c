@@ -961,16 +961,18 @@ endRetainerProfiling( void )
 
 /**
  * Make sure a closure's profiling data is initialized to zero if it does not
- * conform to the current value of the flip bit.
+ * conform to the current value of the flip bit, returns true in this case.
  *
  * See Note [Profiling heap traversal visited bit].
  */
-void
+bool
 traverseMaybeInitClosureData(StgClosure *c)
 {
     if (!isTravDataValid(c)) {
         setTravDataToZero(c);
+        return true;
     }
+    return false;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1333,7 +1335,7 @@ traversePAP (traverseState *ts,
 }
 
 static bool
-retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, stackData *out_data )
+retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData data, const bool first_visit, stackData *out_data )
 {
     retainer r = data.c_child_r;
     RetainerSet *s, *retainerSetOfc;
@@ -1379,7 +1381,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     } else {
         // This is not the first visit to *c.
         if (isMember(r, retainerSetOfc))
-            return 1;          // no need to process child
+            return 0;          // no need to process child
 
         if (s == NULL)
             associate(c, addElement(r, retainerSetOfc));
@@ -1398,7 +1400,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
         }
 
         if (isRetainer(c))
-            return 1;          // no need to process child
+            return 0;          // no need to process child
 
         // compute c_child_r
         out_data->c_child_r = r;
@@ -1407,7 +1409,7 @@ retainVisitClosure( const StgClosure *c, const StgClosure *cp, const stackData d
     // now, RSET() of all of *c, *cp, and *r is valid.
     // (c, c_child_r) are available.
 
-    return 0;
+    return 1;
 }
 
 static void
@@ -1438,8 +1440,10 @@ resetMutableObjects(void)
 }
 
 /**
- * Traverse all closures on the traversal work-stack, calling 'visit_cb'
- * on each closure. See 'visitClosure_cb' for details.
+ * Traverse all closures on the traversal work-stack, calling 'visit_cb' on each
+ * closure. See 'visitClosure_cb' for details. This function flips the 'flip'
+ * bit and hence every closure's profiling data will be reset to zero upon
+ * visiting. See Note [Profiling heap traversal visited bit].
  */
 void
 traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
@@ -1536,9 +1540,10 @@ inner_loop:
     }
 
     // If this is the first visit to c, initialize its data.
-    traverseMaybeInitClosureData(c);
-
-    if(visit_cb(c, cp, data, (stackData*)&child_data))
+    bool first_visit = traverseMaybeInitClosureData(c);
+    bool traverse_children
+        = visit_cb(c, cp, data, first_visit, (stackData*)&child_data);
+    if(!traverse_children)
         goto loop;
 
     // process child
