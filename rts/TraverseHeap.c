@@ -32,72 +32,6 @@ bool isTravDataValid(const traverseState *ts, const StgClosure *c)
     return (c->header.prof.hp.trav & 1) == ts->flip;
 }
 
-typedef enum {
-    // Object with fixed layout. Keeps an information about that
-    // element was processed. (stackPos.next.step)
-    posTypeStep,
-    // Description of the pointers-first heap object. Keeps information
-    // about layout. (stackPos.next.ptrs)
-    posTypePtrs,
-    // Keeps SRT bitmap (stackPos.next.srt)
-    posTypeSRT,
-    // Keeps a new object that was not inspected yet. Keeps a parent
-    // element (stackPos.next.parent)
-    posTypeFresh,
-    // This stackElement is empty
-    posTypeEmpty
-} nextPosType;
-
-typedef union {
-    // fixed layout or layout specified by a field in the closure
-    StgWord step;
-
-    // layout.payload
-    struct {
-        // See StgClosureInfo in InfoTables.h
-        StgHalfWord pos;
-        StgHalfWord ptrs;
-        StgPtr payload;
-    } ptrs;
-
-    // SRT
-    struct {
-        StgClosure *srt;
-    } srt;
-
-    // parent of the current closure, used only when posTypeFresh is set
-    StgClosure *cp;
-} nextPos;
-
-/**
- * Position pointer into a closure. Determines what the next element to return
- * for a stackElement is.
- */
-typedef struct {
-    nextPosType type;
-    nextPos next;
-} stackPos;
-
-/**
- * An element of the traversal work-stack. Besides the closure itself this also
- * stores it's parent, associated data and an accumulator.
- *
- * When 'info.type == posTypeFresh' a 'stackElement' represents just one
- * closure, namely 'c' and 'cp' being it's parent. Otherwise 'info' specifies an
- * offset into the children of 'c'. This is to support returning a closure's
- * children one-by-one without pushing one element per child onto the stack. See
- * traverseGetChildren() and traversePop().
- *
- */
-typedef struct stackElement_ {
-    stackPos info;
-    StgClosure *c;
-    stackElement *sep; // stackElement of parent closure
-    stackData data;
-    stackAccum accum;
-} stackElement;
-
-
 #if defined(DEBUG)
 unsigned int g_traversalDebugLevel = 0;
 static inline void debug(const char *s, ...)
@@ -333,7 +267,7 @@ pushStackElement(traverseState *ts, const stackElement se)
  *  c    - closure
  *  data - data associated with closure.
  */
-STATIC_INLINE void
+inline void
 traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackElement *sep, stackData data) {
     stackElement se;
 
