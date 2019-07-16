@@ -251,13 +251,18 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    setTravData(c, (StgWord)s);
+    setTravData(&g_retainerTraverseState, c, (StgWord)s);
+}
+
+bool isRetainerSetValid( const StgClosure *c )
+{
+    return isTravDataValid(&g_retainerTraverseState, c);
 }
 
 inline RetainerSet*
 retainerSetOf( const StgClosure *c )
 {
-    ASSERT(isTravDataValid(c));
+    ASSERT(isRetainerSetValid(c));
     return (RetainerSet*)getTravData(c);
 }
 
@@ -355,7 +360,7 @@ retainRoot(void *user, StgClosure **tl)
     // be a root.
 
     c = UNTAG_CLOSURE(*tl);
-    traverseMaybeInitClosureData(c);
+    traverseMaybeInitClosureData(&g_retainerTraverseState, c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
         traversePushRoot(ts, c, c, (stackData)getRetainerFrom(c));
     } else {

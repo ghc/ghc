@@ -16,7 +16,6 @@
 
 #include "BeginPrivate.h"
 
-void resetStaticObjectForProfiling(StgClosure *static_objects);
 
 typedef struct traverseState_ traverseState;
 
@@ -34,6 +33,40 @@ typedef union stackAccum_ {
 typedef struct stackElement_ stackElement;
 
 typedef struct traverseState_ {
+    /** Note [Profiling heap traversal visited bit]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     *
+     * If the RTS is compiled with profiling enabled StgProfHeader can be used
+     * by profiling code to store per-heap object information. Specifically the
+     * 'hp_hdr' field is used to store heap profiling information.
+     *
+     * The generic heap traversal code reserves the least significant bit of the
+     * heap profiling word to decide whether we've already visited a given
+     * closure in the current pass or not. The rest of the field is free to be
+     * used by the calling profiler.
+     *
+     * By doing things this way we implicitly assume that the LSB is not used by
+     * the user. This is true at least for the word aligned pointers which the
+     * retainer profiler currently stores there and should be maintained by new
+     * users for example by shifting the real data up by one bit.
+     *
+     * Since we don't want to have to scan the entire heap a second time just to
+     * reset the per-object visitied bit before/after the real traversal we make
+     * the interpretation of this bit dependent on the value of a global
+     * variable, 'flip' and "flip" this variable when we want to invalidate all
+     * objects.
+     *
+     * When the visited bit is equal to the value of 'flip' the closure data
+     * is valid otherwise not (see isTravDataValid). We then invert the value of
+     * 'flip' after each each profiling run (see traverseWorkStack).
+     *
+     * There are some complications with this approach, namely: static objects
+     * and mutable data. There we do just go over all existing objects to reset
+     * the bit manually. See 'resetStaticObjectForProfiling' and
+     * 'resetMutableObjects'.
+     */
+    StgWord flip;
+
     /**
      * Invariants:
      *
@@ -123,18 +156,20 @@ typedef bool (*visitClosure_cb) (
     stackData *child_data);
 
 StgWord getTravData(const StgClosure *c);
-void setTravData(StgClosure *c, StgWord w);
-bool isTravDataValid(const StgClosure *c);
+void setTravData(const traverseState *ts, StgClosure *c, StgWord w);
+bool isTravDataValid(const traverseState *ts, const StgClosure *c);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
-bool traverseMaybeInitClosureData(StgClosure *c);
+bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);
 int getTraverseStackMaxSize(traverseState *ts);
 
+// for GC.c
 W_ traverseWorkStackBlocks(traverseState *ts);
+void resetStaticObjectForProfiling(const traverseState *ts, StgClosure *static_objects);
 
 #include "EndPrivate.h"
 

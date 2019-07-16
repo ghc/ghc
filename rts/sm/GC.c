@@ -916,7 +916,7 @@ GarbageCollect (uint32_t collect_gen,
   // zeroing below.
 
   // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForProfiling(gct->scavenged_static_objects);
+  resetStaticObjectForProfiling(&g_retainerTraverseState, gct->scavenged_static_objects);
 #endif
 
   // Start any pending finalizers.  Must be after
