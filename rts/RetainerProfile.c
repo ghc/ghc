@@ -1450,6 +1450,9 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     stackData data, child_data;
     StgWord typeOfc;
 
+    // Now we flip the flip bit.
+    flip = flip ^ 1;
+
     // c = Current closure                           (possibly tagged)
     // cp = Current closure's Parent                 (NOT tagged)
     // data = current closures' associated data      (NOT tagged)
@@ -1696,6 +1699,8 @@ computeRetainerSet( traverseState *ts )
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
+
+    // TODO: Move this code to traverseWorkStack
     // The following code resets the rs field of each unvisited mutable
     // object.
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -1795,9 +1800,6 @@ void
 retainerProfile(void)
 {
   stat_startRP();
-
-  // Now we flips flip.
-  flip = flip ^ 1;
 
   numObjectVisited = 0;
   timesAnyObjectVisited = 0;
