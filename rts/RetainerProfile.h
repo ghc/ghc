@@ -20,17 +20,7 @@ void initRetainerProfiling ( void );
 void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
 
-// extract the retainer set field from c
-#define RSET(c)   ((c)->header.prof.hp.trav)
-
-static inline RetainerSet *
-retainerSetOf( const StgClosure *c )
-{
-    ASSERT( isTravDataValid(c) );
-    // StgWord has the same size as pointers, so the following type
-    // casting is okay.
-    return (RetainerSet *)((StgWord)RSET(c) ^ flip);
-}
+RetainerSet* retainerSetOf( const StgClosure *c );
 
 // Used by GC.c
 W_ retainerStackBlocks(void);

@@ -251,7 +251,14 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    RSET(c) = ((StgWord)s | flip);
+    setTravData(c, (StgWord)s);
+}
+
+inline RetainerSet*
+retainerSetOf( const StgClosure *c )
+{
+    ASSERT(isTravDataValid(c));
+    return (RetainerSet*)getTravData(c);
 }
 
 static bool

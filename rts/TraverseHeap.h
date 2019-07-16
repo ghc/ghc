@@ -18,12 +18,6 @@
 
 void resetStaticObjectForProfiling(StgClosure *static_objects);
 
-/* See Note [Profiling heap traversal visited bit]. */
-extern StgWord flip;
-
-#define isTravDataValid(c) \
-  ((((StgWord)(c)->header.prof.hp.trav & 1) ^ flip) == 0)
-
 typedef struct traverseState_ traverseState;
 
 typedef union stackData_ {
@@ -127,6 +121,10 @@ typedef bool (*visitClosure_cb) (
     const bool first_visit,
     stackAccum *accum,
     stackData *child_data);
+
+StgWord getTravData(const StgClosure *c);
+void setTravData(StgClosure *c, StgWord w);
+bool isTravDataValid(const StgClosure *c);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
