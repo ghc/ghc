@@ -56,9 +56,11 @@ typedef struct traverseState_ {
      * variable, 'flip' and "flip" this variable when we want to invalidate all
      * objects.
      *
-     * When the visited bit is equal to the value of 'flip' the closure data
-     * is valid otherwise not (see isTravDataValid). We then invert the value of
-     * 'flip' after each each profiling run (see traverseWorkStack).
+     * When the visited bit is equal to the value of 'flip' the closure data is
+     * valid otherwise not (see isTravDataValid). Both the value of the closure
+     * and global 'flip' value start out as zero, so all closures are considered
+     * valid. Before every traversal we invert the value of 'flip' (see
+     * traverseInvalidateClosureData) invalidating all closures.
      *
      * There are some complications with this approach, namely: static objects
      * and mutable data. There we do just go over all existing objects to reset
@@ -162,6 +164,7 @@ bool isTravDataValid(const traverseState *ts, const StgClosure *c);
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
+void traverseInvalidateClosureData(traverseState* ts);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);
