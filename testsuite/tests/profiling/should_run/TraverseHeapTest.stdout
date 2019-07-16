@@ -1,0 +1,77 @@
+with return
+
+
+push   1000
+visit  1000
+visit  1001
+return 1001
+visit  1002
+return 1002
+visit  1003
+return 1003
+return 1000
+
+
+push   1100
+visit  1100
+visit  1101
+visit  1102
+return 1102
+return 1101
+visit  1102
+visit  1103
+return 1103
+return 1100
+
+
+push   2000
+visit  2000
+visit  2001
+return 2001
+visit  2002
+visit  2004
+visit  2005
+visit  2006
+return 2006
+visit  2007
+return 2007
+visit  2008
+return 2008
+return 2005
+return 2004
+return 2002
+visit  2003
+return 2003
+return 2000
+
+
+
+
+just visit
+
+
+push   1000
+visit  1000
+visit  1001
+visit  1002
+visit  1003
+
+
+push   1100
+visit  1100
+visit  1101
+visit  1102
+visit  1102
+visit  1103
+
+
+push   2000
+visit  2000
+visit  2001
+visit  2002
+visit  2004
+visit  2005
+visit  2006
+visit  2007
+visit  2008
+visit  2003
