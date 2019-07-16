@@ -86,8 +86,8 @@ cmmPipeline hsc_env srtInfo0 prog =
      return (srtInfo1, cmms)
 
 
-cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (CAFEnv, [CmmDecl])
-cpsTop _ _ p@(CmmData {}) = return (mapEmpty, [p])
+cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop _ caf_infos p@(CmmData _ statics) = return (Right (cafAnalData caf_infos statics, p))
 cpsTop hsc_env caf_infos proc =
     do
        -- pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
@@ -118,7 +118,9 @@ cpsTop hsc_env caf_infos proc =
        dump Opt_D_dump_cmm_switch "Post switch plan" g
 
        ----------- Proc points -------------------------------------------------
-       let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       let
+         call_pps :: ProcPointSet -- LabelMap
+         call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
        -- pprTrace "call_pps" (ppr g $$ ppr call_pps) (return ())
        proc_points <-
           if splitting_proc_points
@@ -178,7 +180,7 @@ cpsTop hsc_env caf_infos proc =
             -- See Note [unreachable blocks]
        dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-       return (cafEnv, g)
+       return (Left (cafEnv, g))
 
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
