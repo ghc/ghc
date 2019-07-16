@@ -463,6 +463,7 @@ library
                TopHandler.c
                Trace.c
                TraverseHeap.c
+               TraverseHeapTest.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c
