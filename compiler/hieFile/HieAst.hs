@@ -301,7 +301,8 @@ instance ProtectSig GhcTc where
 instance ProtectSig GhcRn where
   protectSig sc (HsWC a (HsIB b sig)) =
     HsWC a (HsIB b (SH sc sig))
-  protectSig _ _ = panic "protectSig not given HsWC (HsIB)"
+  protectSig _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+  protectSig _ (XHsWildCardBndrs nec) = noExtCon nec
 
 class HasLoc a where
   -- ^ defined so that HsImplicitBndrs and HsWildCardBndrs can
