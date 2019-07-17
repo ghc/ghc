@@ -279,13 +279,7 @@ selectLargestContainedBy sp node
   | otherwise = Nothing
 
 selectSmallestContaining :: Span -> HieAST a -> Maybe (HieAST a)
-selectSmallestContaining sp node
-  | nodeSpan node `containsSpan` sp = getFirst $ mconcat
-      [ foldMap (First . selectSmallestContaining sp) $ nodeChildren node
-      , First (Just node)
-      ]
-  | sp `containsSpan` nodeSpan node = Nothing
-  | otherwise = Nothing
+selectSmallestContaining sp node = smallestContainingSatisfying sp (const True) node
 
 definedInAsts :: M.Map FastString (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of

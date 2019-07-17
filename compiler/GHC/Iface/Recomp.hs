@@ -345,13 +345,11 @@ checkHie mod_summary = do
         hs_date = ms_hs_date mod_summary
     pure $ case gopt Opt_WriteHie dflags of
                False -> UpToDate
-               True -> case hie_date_opt of
-                           Nothing -> RecompBecause "HIE file is missing"
-                           Just hie_date
-                               | hie_date < hs_date
-                               -> RecompBecause "HIE file is out of date"
-                               | otherwise
-                               -> UpToDate
+               True -> case dependencyState hs_date hie_date_opt of
+                           DSMissing -> RecompBecause "HIE file is missing"
+                           DSOlder -> RecompBecause "HIE file is out of date"
+                           DSUpToDate -> UpToDate
+
 
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
@@ -1078,6 +1076,7 @@ sortDependencies d
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
           dep_plgins = sortBy (compare `on` moduleNameFS) (dep_plgins d) }
+
 
 {-
 ************************************************************************

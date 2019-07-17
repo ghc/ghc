@@ -70,6 +70,28 @@ import GHC.Data.StringBuffer
 import GHC.Utils.Outputable hiding ( printForUser, printForUserPartWay )
 
 import GHC.Runtime.Loader ( initializePlugins )
+-- import Module
+-- import Name
+-- import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
+--                   listVisibleModuleNames, pprFlag )
+-- import IfaceSyn ( showToHeader )
+-- import PprTyThing
+-- import PrelNames
+-- import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
+-- import SrcLoc
+-- import qualified Lexer
+
+-- import StringBuffer
+-- import Outputable hiding ( printForUser, printForUserPartWay )
+
+-- import DynamicLoading ( initializePlugins )
+-- import HieUtils
+-- import HieDebug
+-- import HieTypes
+
+-- Iface modules
+import GHC.Iface.Ext.Types
+import GHC.Iface.Ext.Utils
 
 -- Other random utilities
 import GHC.Types.Basic hiding ( isTopLevel )
@@ -232,7 +254,8 @@ ghciCommands = map mkCmd [
   ("complete",  keepGoing completeCmd),
   ("loc-at",    keepGoing' locAtCmd),
   ("type-at",   keepGoing' typeAtCmd),
-  ("uses",      keepGoing' usesCmd)
+  ("uses",      keepGoing' usesCmd),
+  ("dump-hie",  keepGoing' dumpHieCmd)
   ]
  where
   mkCmd (n,a,c) = Command { cmdName = n
@@ -2126,7 +2149,7 @@ typeAtCmd str = runExceptGhcMonad $ do
     infos      <- lift $ mod_infos <$> getGHCiState
     (info, ty) <- findType infos span' sample
     lift $ printForUserModInfo (modinfoInfo info)
-                               (sep [text sample,nest 2 (dcolon <+> ppr ty)])
+                               (sep [text sample,nest 2 (dcolon <+> either text (ppr . hieTypeToIface) ty)])
 
 -----------------------------------------------------------------------------
 -- | @:uses@ command
@@ -2137,6 +2160,18 @@ usesCmd str = runExceptGhcMonad $ do
     infos  <- lift $ mod_infos <$> getGHCiState
     uses   <- findNameUses infos span' sample
     forM_ uses (liftIO . putStrLn . showSrcSpan)
+
+-----------------------------------------------------------------------------
+-- | @:dump-hie@ command
+
+dumpHieCmd :: GhciMonad m => String -> m ()
+dumpHieCmd _ = runExceptGhcMonad $ do
+    dflags <- getDynFlags
+    infos <- lift $ mod_infos <$> getGHCiState
+    forM_ (fmap modinfoHieFile $ M.elems infos) $ \hf ->
+        let types = hie_types hf
+            asts = fmap (hieTypeToIface . flip recoverFullType types) $ hie_asts hf
+        in liftIO $ putStrLn $ showSDocForUser dflags alwaysQualify (ppr asts)
 
 -----------------------------------------------------------------------------
 -- | @:loc-at@ command
@@ -2155,16 +2190,14 @@ allTypesCmd :: GhciMonad m => String -> m ()
 allTypesCmd _ = runExceptGhcMonad $ do
     infos <- lift $ mod_infos <$> getGHCiState
     forM_ (M.elems infos) $ \mi ->
-        forM_ (modinfoSpans mi) (lift . printSpan)
+        forM_ (allTypes (modinfoHieFile mi)) (lift . printSpan)
   where
-    printSpan span'
-      | Just ty <- spaninfoType span' = do
+    printSpan (span', ty) = do
         df <- getDynFlags
         let tyInfo = unwords . words $
-                     showSDocForUser df alwaysQualify (pprTypeForUser ty)
+                     renderHieType df ty
         liftIO . putStrLn $
-            showRealSrcSpan (spaninfoSrcSpan span') ++ ": " ++ tyInfo
-      | otherwise = return ()
+            showRealSrcSpan span' ++ ": " ++ tyInfo
 
 -----------------------------------------------------------------------------
 -- Helpers for locAtCmd/typeAtCmd/usesCmd
