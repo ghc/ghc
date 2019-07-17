@@ -172,8 +172,8 @@ generateRules :: Rules ()
 generateRules = do
     root <- buildRootRules
 
-    (root -/- "ghc-stage1") <~ ghcWrapper Stage1
-    (root -/- "ghc-stage2") <~ ghcWrapper Stage2
+    (root -/- "ghc-stage1") <~+ ghcWrapper Stage1
+    (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
 
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
@@ -188,7 +188,8 @@ generateRules = do
         withTempDir $ \dir -> build $
             target (rtsContext Stage1) DeriveConstants [] [file, dir]
   where
-    file <~ gen = file %> \out -> generate out emptyTarget gen
+    file <~  gen = file %> \out -> generate out emptyTarget gen
+    file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
