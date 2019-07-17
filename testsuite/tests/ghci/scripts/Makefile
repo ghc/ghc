@@ -35,6 +35,10 @@ ghci037:
 ghci056_setup:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ghci056_c.c
 
+.PHONY: T16804a_setup
+T16804a_setup:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fwrite-ide-info -c T16804a.hs
+
 .PHONY: T6106_prep
 T6106_prep:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make T6106_preproc
