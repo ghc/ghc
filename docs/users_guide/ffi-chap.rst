@@ -124,12 +124,12 @@ When passing any of the unlifted array types as an argument to
 a foreign C call, a foreign function sees a pointer that refers to the
 payload of the array, not to the
 ``StgArrBytes``/``StgMutArrPtrs``/``StgSmallMutArrPtrs`` heap object
-containing it [1]_. By contrast, a foreign Cmm call, introduced by
-``foreign import prim``, sees the heap object, not just the payload.
-This means that, in some situations, the foreign C function might not
-need any knowledge of the RTS closure types. The following example
-sums the first three bytes in a
-``MutableByteArray#`` [2]_ without using anything from ``Rts.h``::
+containing it [1]_. By contrast, a :ref:`foreign Cmm call <ffi-prim>`,
+introduced by ``foreign import prim``, sees the heap object, not just
+the payload. This means that, in some situations, the foreign C function
+might not need any knowledge of the RTS closure types. The following example
+sums the first three bytes in a ``MutableByteArray#`` [2]_ without using
+anything from ``Rts.h``::
 
     // C source
     uint8_t add_triplet(uint8_t* arr) {
