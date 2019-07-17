@@ -124,6 +124,10 @@ module Util (
         -- * Utils for flags
         OverridingBool(..),
         overrideWith,
+
+        -- * Utils for timestamps of dependent things
+        DependencyState(..),
+        dependencyState,
     ) where
 
 #include "HsVersions.h"
@@ -1468,3 +1472,18 @@ overrideWith :: Bool -> OverridingBool -> Bool
 overrideWith b Auto   = b
 overrideWith _ Always = True
 overrideWith _ Never  = False
+
+data DependencyState
+  = DSMissing
+  -- ^ the dependee is missing
+  | DSOlder
+  -- ^ the dependee is older
+  | DSUpToDate
+  -- ^ the dependee is up to date
+   deriving Eq
+
+dependencyState :: UTCTime -> Maybe UTCTime -> DependencyState
+dependencyState _ Nothing = DSMissing
+dependencyState depender (Just dependee)
+  | dependee < depender = DSOlder
+  | otherwise = DSUpToDate
