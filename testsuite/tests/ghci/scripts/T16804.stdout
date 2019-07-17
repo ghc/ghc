@@ -1,4 +1,7 @@
 Collecting type info for 3 module(s) ... 
+Recomputing hie file for T16804a.hs
+Recomputing hie file for T16804b.hs
+Recomputing hie file for T16804c.hs
 
 % executing: ":type-at T16804a.hs  1  8  1 14 undefined"
 % file snippet:
@@ -6,7 +9,7 @@ Collecting type info for 3 module(s) ...
 %        ^~~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":uses T16804a.hs  1  8  1 14"
 % file snippet:
@@ -22,7 +25,7 @@ undefined :: forall a. a
 %        ^~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  3  8  3 18 undefined"
 % file snippet:
@@ -31,7 +34,7 @@ undefined :: forall a. a
 %        ^~~~~~~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  3 13  3 18 undefined"
 % file snippet:
@@ -40,7 +43,7 @@ undefined :: forall a. a
 %             ^~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":uses T16804a.hs  3  8  3 11"
 % file snippet:
@@ -73,7 +76,7 @@ undefined :: forall a. a
 %      ^~~^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  5 13  5 13 undefined"
 % file snippet:
@@ -82,7 +85,7 @@ undefined :: forall a. a
 %             ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  5 15  5 15 undefined"
 % file snippet:
@@ -91,7 +94,7 @@ undefined :: forall a. a
 %               ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  5 17  5 17 undefined"
 % file snippet:
@@ -100,7 +103,7 @@ undefined :: forall a. a
 %                 ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  6 13  6 16 undefined"
 % file snippet:
@@ -109,7 +112,7 @@ undefined :: forall a. a
 %             ^~~^
 > instance Monoid Test where
 % output:
-undefined :: [Test] -> ShowS
+undefined :: Int -> Test -> ShowS
 
 % executing: ":uses T16804a.hs  5  6  5  9"
 % file snippet:
@@ -118,6 +121,17 @@ undefined :: [Test] -> ShowS
 %      ^~~^
 >   deriving (Show)
 % output:
+T16804a.hs:(5,6)-(5,9)
+T16804a.hs:(7,17)-(7,20)
+T16804a.hs:(12,17)-(12,20)
+T16804a.hs:(12,25)-(12,28)
+T16804a.hs:(17,26)-(17,29)
+T16804a.hs:(24,15)-(24,18)
+T16804a.hs:(27,20)-(27,23)
+T16804c.hs:(5,6)-(5,9)
+T16804c.hs:(8,15)-(8,18)
+T16804c.hs:(11,16)-(11,19)
+T16804c.hs:(14,16)-(14,19)
 
 % executing: ":uses T16804a.hs  5 13  5 13"
 % file snippet:
@@ -126,6 +140,20 @@ undefined :: [Test] -> ShowS
 %             ^
 >   deriving (Show)
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":uses T16804a.hs  5 15  5 15"
 % file snippet:
@@ -142,6 +170,14 @@ undefined :: [Test] -> ShowS
 %                 ^
 >   deriving (Show)
 % output:
+T16804a.hs:(5,17)-(5,17)
+T16804a.hs:(13,16)-(13,16)
+T16804a.hs:(14,14)-(14,14)
+T16804a.hs:(19,23)-(19,23)
+T16804a.hs:(25,29)-(25,29)
+T16804a.hs:(29,3)-(29,3)
+T16804a.hs:(29,14)-(29,14)
+T16804c.hs:(12,30)-(12,30)
 
 % executing: ":uses T16804a.hs  6 13  6 16"
 % file snippet:
@@ -151,7 +187,6 @@ undefined :: [Test] -> ShowS
 > instance Monoid Test where
 % output:
 T16804a.hs:(6,13)-(6,16)
-T16804a.hs:(6,13)-(6,16)
 
 % executing: ":type-at T16804a.hs  7 10  7 15 undefined"
 % file snippet:
@@ -160,7 +195,7 @@ T16804a.hs:(6,13)-(6,16)
 %          ^~~~~^
 >   mempty = A
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  7 17  7 20 undefined"
 % file snippet:
@@ -169,7 +204,7 @@ undefined :: forall a. a
 %                 ^~~^
 >   mempty = A
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs  7 10  7 20 undefined"
 % file snippet:
@@ -178,7 +213,7 @@ undefined :: forall a. a
 %          ^~~~~~~~~~^
 >   mempty = A
 % output:
-undefined :: [Test] -> Test
+undefined :: Semigroup Test
 
 % executing: ":type-at T16804a.hs  8  3  8  8 undefined"
 % file snippet:
@@ -205,6 +240,7 @@ undefined :: Test
 %          ^~~~~^
 >   mempty = A
 % output:
+T16804a.hs:(7,10)-(7,15)
 
 % executing: ":uses T16804a.hs  7 17  7 20"
 % file snippet:
@@ -213,6 +249,17 @@ undefined :: Test
 %                 ^~~^
 >   mempty = A
 % output:
+T16804a.hs:(5,6)-(5,9)
+T16804a.hs:(7,17)-(7,20)
+T16804a.hs:(12,17)-(12,20)
+T16804a.hs:(12,25)-(12,28)
+T16804a.hs:(17,26)-(17,29)
+T16804a.hs:(24,15)-(24,18)
+T16804a.hs:(27,20)-(27,23)
+T16804c.hs:(5,6)-(5,9)
+T16804c.hs:(8,15)-(8,18)
+T16804c.hs:(11,16)-(11,19)
+T16804c.hs:(14,16)-(14,19)
 
 % executing: ":uses T16804a.hs  7 10  7 20"
 % file snippet:
@@ -221,7 +268,6 @@ undefined :: Test
 %          ^~~~~~~~~~^
 >   mempty = A
 % output:
-T16804a.hs:(7,10)-(7,20)
 T16804a.hs:(7,10)-(7,20)
 
 % executing: ":uses T16804a.hs  8  3  8  8"
@@ -232,7 +278,8 @@ T16804a.hs:(7,10)-(7,20)
 > -- empty for linenumbers in T16804 to be correct
 % output:
 T16804a.hs:(8,3)-(8,8)
-T16804a.hs:(8,3)-(8,8)
+T16804a.hs:(22,39)-(22,44)
+T16804a.hs:(25,39)-(25,44)
 
 % executing: ":uses T16804a.hs  8 12  8 12"
 % file snippet:
@@ -241,6 +288,20 @@ T16804a.hs:(8,3)-(8,8)
 %            ^
 > -- empty for linenumbers in T16804 to be correct
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":type-at T16804a.hs 12  1 12 12 undefined"
 % file snippet:
@@ -249,7 +310,7 @@ T16804a.hs:(8,3)-(8,8)
 % ^~~~~~~~~~~^
 > testFunction A B = True
 % output:
-undefined :: forall a. a
+undefined :: undefined
 
 % executing: ":type-at T16804a.hs 13  1 13 12 undefined"
 % file snippet:
@@ -303,6 +364,14 @@ undefined :: Bool
 % ^~~~~~~~~~~^
 > testFunction A B = True
 % output:
+T16804a.hs:(12,1)-(12,12)
+T16804a.hs:(13,1)-(13,12)
+T16804a.hs:(14,1)-(14,12)
+T16804a.hs:(15,1)-(15,12)
+T16804b.hs:(7,10)-(7,21)
+T16804c.hs:(9,18)-(9,29)
+T16804c.hs:(12,17)-(12,28)
+T16804c.hs:(15,17)-(15,28)
 
 % executing: ":uses T16804a.hs 13  1 13 12"
 % file snippet:
@@ -311,8 +380,14 @@ undefined :: Bool
 % ^~~~~~~~~~~^
 > testFunction B A = True
 % output:
+T16804a.hs:(12,1)-(12,12)
 T16804a.hs:(13,1)-(13,12)
-T16804a.hs:(13,1)-(13,12)
+T16804a.hs:(14,1)-(14,12)
+T16804a.hs:(15,1)-(15,12)
+T16804b.hs:(7,10)-(7,21)
+T16804c.hs:(9,18)-(9,29)
+T16804c.hs:(12,17)-(12,28)
+T16804c.hs:(15,17)-(15,28)
 
 % executing: ":uses T16804a.hs 13 14 13 14"
 % file snippet:
@@ -321,6 +396,20 @@ T16804a.hs:(13,1)-(13,12)
 %              ^
 > testFunction B A = True
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":uses T16804a.hs 13 16 13 16"
 % file snippet:
@@ -329,6 +418,14 @@ T16804a.hs:(13,1)-(13,12)
 %                ^
 > testFunction B A = True
 % output:
+T16804a.hs:(5,17)-(5,17)
+T16804a.hs:(13,16)-(13,16)
+T16804a.hs:(14,14)-(14,14)
+T16804a.hs:(19,23)-(19,23)
+T16804a.hs:(25,29)-(25,29)
+T16804a.hs:(29,3)-(29,3)
+T16804a.hs:(29,14)-(29,14)
+T16804c.hs:(12,30)-(12,30)
 
 % executing: ":uses T16804a.hs 15 16 15 16"
 % file snippet:
@@ -345,6 +442,9 @@ T16804a.hs:(13,1)-(13,12)
 %                    ^~~~^
 > 
 % output:
+T16804a.hs:(15,20)-(15,24)
+T16804a.hs:(19,15)-(19,19)
+T16804b.hs:(9,24)-(9,28)
 
 % executing: ":type-at T16804a.hs 18 15 18 18 undefined"
 % file snippet:
@@ -371,6 +471,10 @@ undefined :: Test
 %               ^~~^
 > testFunction2 False = B
 % output:
+T16804a.hs:(13,20)-(13,23)
+T16804a.hs:(14,20)-(14,23)
+T16804a.hs:(18,15)-(18,18)
+T16804b.hs:(8,24)-(8,27)
 
 % executing: ":uses T16804a.hs 18 22 18 22"
 % file snippet:
@@ -379,6 +483,20 @@ undefined :: Test
 %                      ^
 > testFunction2 False = B
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":type-at T16804a.hs 22 13 22 18 undefined"
 % file snippet:
@@ -432,6 +550,7 @@ undefined :: Sum Int -> Sum Int -> Sum Int
 %             ^~~~~^
 > 
 % output:
+T16804a.hs:(22,13)-(22,18)
 
 % executing: ":uses T16804a.hs 22 21 22 23"
 % file snippet:
@@ -440,6 +559,8 @@ undefined :: Sum Int -> Sum Int -> Sum Int
 %                     ^~^
 > 
 % output:
+T16804a.hs:(22,21)-(22,23)
+T16804a.hs:(22,30)-(22,32)
 
 % executing: ":uses T16804a.hs 22 25 22 25"
 % file snippet:
@@ -464,6 +585,15 @@ undefined :: Sum Int -> Sum Int -> Sum Int
 %                           ^^
 > 
 % output:
+T16804a.hs:(22,27)-(22,28)
+T16804a.hs:(22,36)-(22,37)
+T16804a.hs:(25,16)-(25,17)
+T16804a.hs:(25,21)-(25,22)
+T16804a.hs:(25,26)-(25,27)
+T16804a.hs:(25,31)-(25,32)
+T16804a.hs:(25,36)-(25,37)
+T16804a.hs:(28,5)-(28,6)
+T16804a.hs:(29,5)-(29,6)
 
 % executing: ":type-at T16804a.hs 25 14 25 14 undefined"
 % file snippet:
@@ -499,6 +629,20 @@ undefined :: Test
 %              ^
 > 
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":uses T16804a.hs 25 16 25 17"
 % file snippet:
@@ -507,6 +651,15 @@ undefined :: Test
 %                ^^
 > 
 % output:
+T16804a.hs:(22,27)-(22,28)
+T16804a.hs:(22,36)-(22,37)
+T16804a.hs:(25,16)-(25,17)
+T16804a.hs:(25,21)-(25,22)
+T16804a.hs:(25,26)-(25,27)
+T16804a.hs:(25,31)-(25,32)
+T16804a.hs:(25,36)-(25,37)
+T16804a.hs:(28,5)-(28,6)
+T16804a.hs:(29,5)-(29,6)
 
 % executing: ":uses T16804a.hs 25 39 25 44"
 % file snippet:
@@ -515,6 +668,9 @@ undefined :: Test
 %                                       ^~~~~^
 > 
 % output:
+T16804a.hs:(8,3)-(8,8)
+T16804a.hs:(22,39)-(22,44)
+T16804a.hs:(25,39)-(25,44)
 
 % executing: ":type-at T16804a.hs 28  3 28  3 undefined"
 % file snippet:
@@ -566,7 +722,7 @@ undefined :: Test
 >   B <> _   = B
 %     ^^
 % output:
-undefined :: forall a. a
+undefined :: Test -> Test -> Test
 
 % executing: ":type-at T16804a.hs 29  8 29  8 undefined"
 % file snippet:
@@ -591,6 +747,20 @@ undefined :: Test
 %   ^
 >   B <> _   = B
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":uses T16804a.hs 28  5 28  6"
 % file snippet:
@@ -599,8 +769,15 @@ undefined :: Test
 %     ^^
 >   B <> _   = B
 % output:
+T16804a.hs:(22,27)-(22,28)
+T16804a.hs:(22,36)-(22,37)
+T16804a.hs:(25,16)-(25,17)
+T16804a.hs:(25,21)-(25,22)
+T16804a.hs:(25,26)-(25,27)
+T16804a.hs:(25,31)-(25,32)
+T16804a.hs:(25,36)-(25,37)
 T16804a.hs:(28,5)-(28,6)
-T16804a.hs:(28,5)-(28,6)
+T16804a.hs:(29,5)-(29,6)
 
 % executing: ":uses T16804a.hs 28  8 28 10"
 % file snippet:
@@ -611,7 +788,6 @@ T16804a.hs:(28,5)-(28,6)
 % output:
 T16804a.hs:(28,8)-(28,10)
 T16804a.hs:(28,14)-(28,16)
-T16804a.hs:(28,8)-(28,10)
 
 % executing: ":uses T16804a.hs 28 14 28 16"
 % file snippet:
@@ -622,7 +798,6 @@ T16804a.hs:(28,8)-(28,10)
 % output:
 T16804a.hs:(28,8)-(28,10)
 T16804a.hs:(28,14)-(28,16)
-T16804a.hs:(28,8)-(28,10)
 
 % executing: ":uses T16804a.hs 29  3 29  3"
 % file snippet:
@@ -630,6 +805,14 @@ T16804a.hs:(28,8)-(28,10)
 >   B <> _   = B
 %   ^
 % output:
+T16804a.hs:(5,17)-(5,17)
+T16804a.hs:(13,16)-(13,16)
+T16804a.hs:(14,14)-(14,14)
+T16804a.hs:(19,23)-(19,23)
+T16804a.hs:(25,29)-(25,29)
+T16804a.hs:(29,3)-(29,3)
+T16804a.hs:(29,14)-(29,14)
+T16804c.hs:(12,30)-(12,30)
 
 % executing: ":uses T16804a.hs 29  5 29  6"
 % file snippet:
@@ -637,6 +820,15 @@ T16804a.hs:(28,8)-(28,10)
 >   B <> _   = B
 %     ^^
 % output:
+T16804a.hs:(22,27)-(22,28)
+T16804a.hs:(22,36)-(22,37)
+T16804a.hs:(25,16)-(25,17)
+T16804a.hs:(25,21)-(25,22)
+T16804a.hs:(25,26)-(25,27)
+T16804a.hs:(25,31)-(25,32)
+T16804a.hs:(25,36)-(25,37)
+T16804a.hs:(28,5)-(28,6)
+T16804a.hs:(29,5)-(29,6)
 
 % executing: ":uses T16804a.hs 29  8 29  8"
 % file snippet:
@@ -651,6 +843,14 @@ T16804a.hs:(28,8)-(28,10)
 >   B <> _   = B
 %              ^
 % output:
+T16804a.hs:(5,17)-(5,17)
+T16804a.hs:(13,16)-(13,16)
+T16804a.hs:(14,14)-(14,14)
+T16804a.hs:(19,23)-(19,23)
+T16804a.hs:(25,29)-(25,29)
+T16804a.hs:(29,3)-(29,3)
+T16804a.hs:(29,14)-(29,14)
+T16804c.hs:(12,30)-(12,30)
 
 % executing: ":type-at T16804b.hs 7 10 7 21 undefined"
 % file snippet:
@@ -695,8 +895,14 @@ undefined :: Test
 %          ^~~~~~~~~~~^
 >   print (testFunction2 True)
 % output:
+T16804a.hs:(12,1)-(12,12)
 T16804a.hs:(13,1)-(13,12)
+T16804a.hs:(14,1)-(14,12)
+T16804a.hs:(15,1)-(15,12)
 T16804b.hs:(7,10)-(7,21)
+T16804c.hs:(9,18)-(9,29)
+T16804c.hs:(12,17)-(12,28)
+T16804c.hs:(15,17)-(15,28)
 
 % executing: ":uses T16804b.hs 7 10 7 25"
 % file snippet:
@@ -705,8 +911,6 @@ T16804b.hs:(7,10)-(7,21)
 %          ^~~~~~~~~~~~~~~^
 >   print (testFunction2 True)
 % output:
-T16804a.hs:(13,1)-(13,12)
-T16804b.hs:(7,10)-(7,21)
 
 % executing: ":uses T16804b.hs 7 23 7 23"
 % file snippet:
@@ -715,6 +919,20 @@ T16804b.hs:(7,10)-(7,21)
 %                       ^
 >   print (testFunction2 True)
 % output:
+T16804a.hs:(5,13)-(5,13)
+T16804a.hs:(8,12)-(8,12)
+T16804a.hs:(13,14)-(13,14)
+T16804a.hs:(14,16)-(14,16)
+T16804a.hs:(18,22)-(18,22)
+T16804a.hs:(25,14)-(25,14)
+T16804a.hs:(25,19)-(25,19)
+T16804a.hs:(25,24)-(25,24)
+T16804a.hs:(25,34)-(25,34)
+T16804a.hs:(28,3)-(28,3)
+T16804b.hs:(7,23)-(7,23)
+T16804b.hs:(7,25)-(7,25)
+T16804c.hs:(6,5)-(6,5)
+T16804c.hs:(15,32)-(15,32)
 
 % executing: ":type-at T16804b.hs 8 10 8 22 undefined"
 % file snippet:
@@ -748,6 +966,7 @@ undefined :: Int
 >   print niceValue
 %         ^~~~~~~~^
 % output:
+T16804a.hs:(21,1)-(21,9)
 T16804a.hs:(22,1)-(22,9)
 T16804b.hs:(10,9)-(10,17)
 
@@ -758,6 +977,9 @@ T16804b.hs:(10,9)-(10,17)
 % ^
 > a = A
 % output:
+T16804c.hs:(5,1)-(5,1)
+T16804c.hs:(6,1)-(6,1)
+T16804c.hs:(9,31)-(9,31)
 
 % executing: ":uses T16804c.hs 6 1 6 1"
 % file snippet:
@@ -766,8 +988,9 @@ T16804b.hs:(10,9)-(10,17)
 % ^
 > 
 % output:
+T16804c.hs:(5,1)-(5,1)
 T16804c.hs:(6,1)-(6,1)
-T16804c.hs:(6,1)-(6,1)
+T16804c.hs:(9,31)-(9,31)
 
 % executing: ":uses T16804c.hs 9 12 9 14"
 % file snippet:
@@ -778,7 +1001,6 @@ T16804c.hs:(6,1)-(6,1)
 % output:
 T16804c.hs:(9,12)-(9,14)
 T16804c.hs:(9,33)-(9,35)
-T16804c.hs:(9,12)-(9,14)
 
 % executing: ":uses T16804c.hs 9 31 9 31"
 % file snippet:
@@ -787,6 +1009,7 @@ T16804c.hs:(9,12)-(9,14)
 %                               ^
 > 
 % output:
+T16804c.hs:(5,1)-(5,1)
 T16804c.hs:(6,1)-(6,1)
 T16804c.hs:(9,31)-(9,31)
 
@@ -799,7 +1022,6 @@ T16804c.hs:(9,31)-(9,31)
 % output:
 T16804c.hs:(9,12)-(9,14)
 T16804c.hs:(9,33)-(9,35)
-T16804c.hs:(9,12)-(9,14)
 
 % executing: ":uses T16804c.hs 12 13 12 13"
 % file snippet:
@@ -810,7 +1032,6 @@ T16804c.hs:(9,12)-(9,14)
 % output:
 T16804c.hs:(12,13)-(12,13)
 T16804c.hs:(12,32)-(12,32)
-T16804c.hs:(12,13)-(12,13)
 
 % executing: ":uses T16804c.hs 12 32 12 32"
 % file snippet:
@@ -821,7 +1042,6 @@ T16804c.hs:(12,13)-(12,13)
 % output:
 T16804c.hs:(12,13)-(12,13)
 T16804c.hs:(12,32)-(12,32)
-T16804c.hs:(12,13)-(12,13)
 
 % executing: ":uses T16804c.hs 15 13 15 13"
 % file snippet:
@@ -831,7 +1051,6 @@ T16804c.hs:(12,13)-(12,13)
 % output:
 T16804c.hs:(15,13)-(15,13)
 T16804c.hs:(15,30)-(15,30)
-T16804c.hs:(15,13)-(15,13)
 
 % executing: ":uses T16804c.hs 15 30 15 30"
 % file snippet:
@@ -841,4 +1060,3 @@ T16804c.hs:(15,13)-(15,13)
 % output:
 T16804c.hs:(15,13)-(15,13)
 T16804c.hs:(15,30)-(15,30)
-T16804c.hs:(15,13)-(15,13)

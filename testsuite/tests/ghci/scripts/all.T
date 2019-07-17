@@ -296,15 +296,18 @@ test('T14828', normal, ghci_script, ['T14828.script'])
 test('T16376', normal, ghci_script, ['T16376.script'])
 test('T16527', normal, ghci_script, ['T16527.script'])
 test('T16563', extra_hc_opts("-clear-package-db -global-package-db"), ghci_script, ['T16563.script'])
-test('T16569', normal, ghci_script, ['T16569.script'])
+test('T16569', expect_broken(16804), ghci_script, ['T16569.script'])
 test('T16767', normal, ghci_script, ['T16767.script'])
-test('T16575', normal, ghci_script, ['T16575.script'])
+test('T16575', expect_broken(16575), ghci_script, ['T16575.script'])
 test('T16509', normal, ghci_script, ['T16509.script'])
 # Tests :type-at and :uses
 # historical note: introduced to see the changes in the behaviour
 #   when the implementation of :type-at and :uses will be/was changed
 #   to use hie files
-test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_script, ['T16804.script'])
+test('T16804', [extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), expect_broken(16804)], ghci_script, ['T16804.script'])
+# Test reading a perproduced hie file in ghci
+test('T16804a', [pre_cmd('$MAKE -s --no-print-directory T16804a_setup'), extra_files(['T16804a.hs'])], ghci_script, ['T16804a.script'])
+
 test('T15546', normal, ghci_script, ['T15546.script'])
 test('T16876', normal, ghci_script, ['T16876.script'])
 test('T17345', normal, ghci_script, ['T17345.script'])
