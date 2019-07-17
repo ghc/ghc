@@ -1290,10 +1290,12 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
       = do { let r_deferred_args = reverse deferred_args
                  quick_look_args = args_for_quick_look r_deferred_args
            ; dflags <- getDynFlags
-           ; subst <- if xopt LangExt.ImpredicativeTypes dflags 
-                         then tcQuickLooks quick_look_args
-                         else return emptyTCvSubst
-           ; args' <- handle_args subst r_deferred_args
+           ; if xopt LangExt.ImpredicativeTypes dflags 
+                then do { tcQuickLooks quick_look_args
+                        ; -- TODO: perform the actual unifications
+                        ; return () }
+                else return ()
+           ; args' <- handle_args r_deferred_args
            ; return (idHsWrapper, args', fun_ty)
            }
 
@@ -1363,26 +1365,24 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     args_for_quick_look (_ : args)
       = args_for_quick_look args
 
-    handle_args :: TCvSubst
-                -> [(LHsExprArgIn, Maybe (TcSigmaType, Int))]
+    handle_args :: [(LHsExprArgIn, Maybe (TcSigmaType, Int))]
                 -> TcM [LHsExprArgOut]
-    handle_args _ []
+    handle_args []
       = return []
-    handle_args subst ((HsArgPar sp, Nothing) : args)
-      = do { args' <- handle_args subst args
+    handle_args ((HsArgPar sp, Nothing) : args)
+      = do { args' <- handle_args args
            ; return (HsArgPar sp : args')
            }
-    handle_args subst ((HsTypeArg l ty, Nothing) : args)
-      = do { args' <- handle_args subst args
+    handle_args ((HsTypeArg l ty, Nothing) : args)
+      = do { args' <- handle_args args
            ; return (HsTypeArg l ty : args')
            }
-    handle_args subst ((HsValArg arg, Just (arg_ty, n)) : args)
-      = do { let arg_ty' = substTy subst arg_ty
-           ; arg' <- tcArg fun arg arg_ty' n
-           ; args' <- handle_args subst args
+    handle_args ((HsValArg arg, Just (arg_ty, n)) : args)
+      = do { arg' <- tcArg fun arg arg_ty n
+           ; args' <- handle_args args
            ; return (HsValArg arg' : args')
            }
-    handle_args _ ((e, _) : _) = pprPanic "handle_args" (ppr e)
+    handle_args ((e, _) : _) = pprPanic "handle_args" (ppr e)
 
     ty_app_err ty arg
       = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
