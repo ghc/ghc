@@ -43,10 +43,10 @@ moving heap-allocated Haskell values around arbitrarily.
 
 This greatly constrains library authors since it implies that it is not safe to
 pass any heap object reference to a ``safe`` foreign function call.  For
-instance, it is often desirable to pass an unpinned ``ByteArray#``\s directly
-to native code to avoid making an otherwise-unnecessary copy. However, this can
-only be done safely if the array is guaranteed not to be moved by the garbage
-collector in the middle of the call.
+instance, it is often desirable to pass an :ref:`unpinned <pinned-byte-arrays>`
+``ByteArray#``\s directly to native code to avoid making an otherwise-unnecessary
+copy. However, this can only be done safely if the array is guaranteed not to be
+moved by the garbage collector in the middle of the call.
 
 The Chapter does *not* require implementations to refrain from doing the
 same for ``unsafe`` calls, so strictly Haskell 2010-conforming programs
@@ -82,35 +82,53 @@ Unlifted FFI Types
 The following unlifted unboxed types may be used as basic foreign
 types (see FFI Chapter, Section 8.6) for both ``safe`` and
 ``unsafe`` foreign calls: ``Int#``, ``Word#``, ``Char#``, ``Float#``,
-``Double#``, ``Addr#``, and ``StablePtr# a``. The following unlifted
-boxed types may be used as arguments to (not results of) ``unsafe``
-foreign calls: ``Array#``, ``MutableArray#``, ``SmallArray#``,
-``SmallMutableArray#``, ``ArrayArray#``, ``MutableArrayArray#``,
-``ByteArray#``, and ``MutableByteArray#``. Additionally, ``ByteArray#``
-and ``MutableByteArray#`` can be passed to ``safe`` foreign calls
-if the object is pinned. (Such can be ascertained by judicious use of
-``isByteArrayPinned#``, ``isMutableByteArrayPinned#``, or
-``newPinnedByteArray#``.) Passing an unpinned argument to an ``safe``
-foreign call results in undefined behavior. This table sums up the
+``Double#``, ``Addr#``, and ``StablePtr# a``. Several unlifted boxed
+types may be used as arguments to FFI calls, subject to these
 restrictions:
 
-+--------------+-----------------------+----------------------------------+
-| Type         | Safe FFI Argument     | Unsafe FFI Argument              |
-+--------------+-----------------------+----------------------------------+
-| Array#       | No                    | Yes, but not useful with C calls |
-| SmallArray#  | No                    | Yes, but not useful with C calls |
-| ArrayArray#  | No                    | Yes                              |
-| ByteArray#   | Yes, only when pinned | Yes                              |
-+--------------+-----------------------+----------------------------------+
+* Valid arguments for ``foreign import unsafe`` FFI calls: ``Array#``,
+  ``SmallArray#``, ``ArrayArray#``, ``ByteArray#``, and the mutable
+  counterparts of these types.
+* Valid arguments for ``foreign import safe`` FFI calls: ``ByteArray#``
+  and ``MutableByteArray#``. The byte array must be
+  :ref:`pinned <pinned-byte-arrays>`.
+* Mutation: In both ``foreign import unsafe`` and ``foreign import safe``
+  FFI calls, it is safe to mutate a ``MutableByteArray``. Mutating any
+  other type of array leads to undefined behavior. Reason: Mutable arrays
+  of heap objects record writes for the purpose of garbage collection.
+  An array of heap objects is passed to a foreign C function, the
+  runtime does not record any writes. Consequently, it is not safe to
+  write to an array of heap objects in a foreign function. 
+  Since the runtime has no facilities for tracking mutation of a
+  ``MutableByteArray#``, these can be safely mutated in any foreign
+  function.
+
+None of these restrictions are enforced at compile time. Failure
+to heed these restrictions will lead to runtime errors that can be
+very difficult to track down. (The errors likely will not manifest
+until garbage collection happens.) In tabular form, these restrictions
+are:
+
++------------------+----------------------------------------------------+
+|                  | When value is used as argument to FFI call that is |
++------------------+-----------------------+----------------------------+
+| Type             | Safe                  | Unsafe                     |
++------------------+-----------------------+----------------------------+
+| ``Array#``       | Unsound               | Sound, not useful          |
+| ``SmallArray#``  | Unsound               | Sound, not useful          |
+| ``ArrayArray#``  | Unsound               | Sound                      |
+| ``ByteArray#``   | Sound if pinned       | Sound                      |
++------------------+-----------------------+----------------------------+
 
 When passing any of the unlifted array types as an argument to
 a foreign C call, a foreign function sees a pointer that refers to the
 payload of the array, not to the
 ``StgArrBytes``/``StgMutArrPtrs``/``StgSmallMutArrPtrs`` heap object
-containing it [1]_. (By contrast, a foreign Cmm call sees the heap object,
-not just the payload.) This means that, in some situations, the foreign C
-function might not need any knowledge of the RTS closure types. The
-following example sums the first three bytes in a
+containing it [1]_. By contrast, a foreign Cmm call, introduced by
+``foreign import prim``, sees the heap object, not just the payload.
+This means that, in some situations, the foreign C function might not
+need any knowledge of the RTS closure types. The following example
+sums the first three bytes in a
 ``MutableByteArray#`` [2]_ without using anything from ``Rts.h``::
 
     // C source
@@ -127,7 +145,8 @@ closure types. The following example sums the first element of
 each ``ByteArray#`` (interpreting the bytes as an array of ``CInt``)
 element of an ``ArrayArray##`` [3]_::
     
-    // C source, must include the RTS
+    // C source, must include the RTS to make the struct StgArrBytes
+    // available along with its fields: ptrs and payload.
     #include "Rts.h"
     int sum_first (StgArrBytes **bufs) {
       StgArrBytes **bufs = (StgArrBytes**)bufsTmp;
@@ -138,29 +157,18 @@ element of an ``ArrayArray##`` [3]_::
       return res;
     }
 
-    -- Haskell source, all elements in the array must be
-    -- either ByteArray# or MutableByteArray#. This is not
-    -- enforced by the type system in this example.
+    -- Haskell source, all elements in the argument array must be
+    -- either ByteArray# or MutableByteArray#. This is not enforced
+    -- by the type system in this example since ArrayArray is untyped.
     foreign import ccall unsafe "sum_first"
       sumFirst :: ArrayArray# -> IO CInt
-
-Mutable arrays of heap objects record writes for the purpose of
-garbage collection. ``MutableArray#`` uses a card table, and
-``SmallMutableArray#`` uses only a dirty bit. When passing
-an array of heap objects into a foreign function, GHC assumes
-that the foreign import does not modify the contents. Consequently,
-it is not safe to write to an array of heap objects in a foreign
-function. Foreign functions must treat such arrays as read-only.
-However, note that the runtime has no facilities for tracking
-mutation of a ``MutableByteArray#``. It is safe to mutate these
-in a foreign function.
 
 Although GHC allows the user to pass all unlifted boxed types to
 foreign functions, some of them are not amenable to useful work.
 Although ``Array#`` is unlifted, the elements in its payload are
 lifted, and a foreign C function cannot safely force thunks. Consequently,
-a foreign C function do anything with the elements of an ``Array#``
-other checking pointer equality as a shortcut.
+a foreign C function cannot dereference any of the addresses that comprise
+the payload of the ``Array#``.
 
 .. _ffi-newtype-io:
 
@@ -965,6 +973,26 @@ to the floating point state, so that if you really need to use
 
 -  It is safe to modify the floating-point unit state temporarily during
    a foreign call, because foreign calls are never pre-empted by GHC.
+
+.. _pinned-byte-arrays:
+
+Pinned Byte Arrays
+~~~~~~~~~~~~~~~~~~
+
+A pinned byte array is one that the garbage collector is not allowed
+to move. Consequently, it has a stable address that can be safely
+requested with ``byteArrayContents#``. There are a handful of
+primitive functions in :ghc-prim-ref:`GHC.Prim <GHC-Prim.html>`
+used to enforce or check for pinnedness: ``isByteArrayPinned#``,
+``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
+byte array can be pinned as a result of three possible causes:
+
+1. It was allocated by ``newPinnedByteArray#``.
+2. It is large. Currently, GHC defines large object to be one
+   that is at least as large as 80% of a 4KB block (i.e. at
+   least 3277 bytes).
+3. It has been copied into a compact region. The documentation
+   for ``ghc-compact`` and ``compact`` describes this process.
 
 .. [1] Prior to GHC 8.10, when passing an ``ArrayArray#`` argument
   to a foreign function, the foreign function would see a pointer
