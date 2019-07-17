@@ -1207,8 +1207,10 @@ inner_loop:
 
     // If this is the first visit to c, initialize its data.
     bool first_visit = traverseMaybeInitClosureData(ts, c);
-    bool traverse_children
-        = visit_cb(c, cp, data, first_visit, &accum, &child_data);
+    bool traverse_children = first_visit;
+    if(visit_cb)
+        traverse_children = visit_cb(c, cp, data, first_visit,
+                                     &accum, &child_data);
     if(!traverse_children)
         goto loop;
 
