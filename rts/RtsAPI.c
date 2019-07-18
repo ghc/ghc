@@ -658,17 +658,11 @@ static StgStablePtr rts_saved_closure = NULL;
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
-    printf("PT %p %p\n", paused.pausing_task, paused.capabilities);
     paused.pausing_task = NULL;
-    printf("PT2 %p %p\n", paused.pausing_task, paused.capabilities);
     paused.pausing_task = newBoundTask();
-    printf("PT3 %p %p\n", paused.pausing_task, paused.capabilities);
     paused.capabilities = NULL;
-    printf("PT1 %p %p\n", paused.pausing_task, paused.capabilities);
     stopAllCapabilities(&paused.capabilities, paused.pausing_task);
-    printf("STC %p %p\n", paused.pausing_task, paused.capabilities);
     if (rts_inform_cb != NULL){
-      printf("Resuming %p %p\n", paused.pausing_task, paused.capabilities);
       rts_inform_cb(rts_inform_user, paused);
       rts_inform_cb = NULL;
       rts_inform_user = NULL;
@@ -680,9 +674,7 @@ RtsPaused rts_pause (void)
 void rts_unpause (RtsPaused paused)
 {
     rts_paused = false;
-    printf("Releasing");
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
-    printf("Released");
     freeTask(paused.pausing_task);
 }
 
