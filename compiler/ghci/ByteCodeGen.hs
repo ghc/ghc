@@ -419,8 +419,8 @@ schemeER_wrk d p rhs
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs
 
-getVarOffSets :: DynFlags -> StackDepth -> BCEnv -> [Id] -> [(Id, Word16)]
-getVarOffSets dflags depth env = catMaybes . map getOffSet
+getVarOffSets :: DynFlags -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
+getVarOffSets dflags depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
         Nothing     -> Nothing
