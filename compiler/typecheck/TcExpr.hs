@@ -1300,7 +1300,6 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                         ; return () }
                 else return ()
            ; args' <- handle_args r_deferred_args
-           -- ; fun_ty' <- zonkTcType fun_ty
            ; return (idHsWrapper, args', fun_ty)
            }
 
@@ -1384,7 +1383,8 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; return (HsTypeArg l ty : args')
            }
     handle_args ((HsValArg arg, Just (arg_ty, n)) : args)
-      = do { arg' <- tcArg fun arg arg_ty n
+      = do { arg_ty' <- zonkTcType arg_ty
+           ; arg' <- tcArg fun arg arg_ty' n
            ; args' <- handle_args args
            ; return (HsValArg arg' : args')
            }
