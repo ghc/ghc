@@ -1849,7 +1849,7 @@ kcLHsQTyVars_Cusk name flav
 
        ; let inf_candidates = candidates `delCandidates` spec_req_tkvs
 
-       ; inferred <- quantifyTyVars emptyVarSet inf_candidates
+       ; inferred <- quantifyTyVars inf_candidates
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs
@@ -2289,26 +2289,24 @@ kindGeneralizeSome should_gen kind_or_type
          -- use the "Kind" variant here, as any types we see
          -- here will already have all type variables quantified;
          -- thus, every free variable is really a kv, never a tv.
-       ; dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) <- candidateQTyVarsOfKind kind_or_type
+       ; dvs <- candidateQTyVarsOfKind kind_or_type
 
-       ; let promote_kvs = filterVarSet (not . should_gen) $ dVarSetToVarSet kvs
-             promote_tvs = filterVarSet (not . should_gen) $ dVarSetToVarSet tvs
+       -- So 'dvs' are the variables free in kind_or_type, with a level greater
+       -- than the ambient level, hence candidates for quantification
+       -- Next: filter out the ones we don't want to generalize (specified by should_gen)
+       -- and promote them instead
 
-       ; (_, promoted) <- promoteTyVarSet (promote_kvs `unionVarSet` promote_tvs)
+       ; let (to_promote, dvs') = partitionCandidates dvs (not . should_gen)
 
-       ; gbl_tvs <- tcGetGlobalTyCoVars  -- already zonked
-       ; let dvs' = dvs { dv_kvs = kvs `dVarSetMinusVarSet` promote_kvs
-                        , dv_tvs = tvs `dVarSetMinusVarSet` promote_tvs }
-       ; qkvs <- quantifyTyVars gbl_tvs dvs'
+       ; (_, promoted) <- promoteTyVarSet (dVarSetToVarSet to_promote)
+       ; qkvs <- quantifyTyVars dvs'
 
        ; traceTc "kindGeneralizeSome }" $
          vcat [ text "Kind or type:" <+> ppr kind_or_type
               , text "dvs:" <+> ppr dvs
               , text "dvs':" <+> ppr dvs'
-              , text "promote_kvs:" <+> pprTyVars (nonDetEltsUniqSet promote_kvs)
-              , text "promote_tvs:" <+> pprTyVars (nonDetEltsUniqSet promote_tvs)
+              , text "to_promote:" <+> pprTyVars (dVarSetElems to_promote)
               , text "promoted:" <+> pprTyVars (nonDetEltsUniqSet promoted)
-              , text "gbl_tvs:" <+> pprTyVars (nonDetEltsUniqSet gbl_tvs)
               , text "qkvs:" <+> pprTyVars qkvs ]
 
        ; return qkvs }

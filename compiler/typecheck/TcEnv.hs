@@ -56,9 +56,6 @@ module TcEnv(
         -- Defaults
         tcGetDefaultTys,
 
-        -- Global type variables
-        tcGetGlobalTyCoVars,
-
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel,
         topIdLvl, isBrackStage,
@@ -84,7 +81,6 @@ import PrelNames
 import TysWiredIn
 import Id
 import Var
-import VarSet
 import RdrName
 import InstEnv
 import DataCon ( DataCon )
@@ -108,7 +104,6 @@ import Encoding
 import FastString
 import ListSetOps
 import ErrUtils
-import Util
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -576,7 +571,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- as free in the types of extra_env.
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
         ; env0 <- getLclEnv
-        ; env1 <- tcExtendLocalTypeEnv env0 extra_env
+        ; let env1 = tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
         ; setLclEnv env2 thing_inside }
@@ -594,52 +589,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, ATcId {}) <- pairs] }
 
-tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcM TcLclEnv
+tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
-  | isEmptyVarSet extra_tvs
-  = return (lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things })
-  | otherwise
-  = do { global_tvs <- readMutVar (tcl_tyvars lcl_env)
-       ; new_g_var  <- newMutVar (global_tvs `unionVarSet` extra_tvs)
-       ; return (lcl_env { tcl_tyvars = new_g_var
-                         , tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
-  where
-    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
-
-    get_tvs (_, ATcId { tct_id = id, tct_info = closed }) tvs
-      = case closed of
-          ClosedLet -> ASSERT2( is_closed_type, ppr id $$ ppr (idType id) )
-                       tvs
-          _other    -> tvs `unionVarSet` id_tvs
-        where
-           id_ty          = idType id
-           id_tvs         = tyCoVarsOfType id_ty
-           id_co_tvs      = closeOverKinds (coVarsOfType id_ty)
-           is_closed_type = not (anyVarSet isTyVar (id_tvs `minusVarSet` id_co_tvs))
-           -- We only care about being closed wrt /type/ variables
-           -- E.g. a top-level binding might have a type like
-           --          foo :: t |> co
-           -- where co :: * ~ *
-           -- or some other as-yet-unsolved kind coercion
-
-    get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
-      = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv
-
-    get_tvs (_, ATcTyCon tc) tvs = tvs `unionVarSet` tyCoVarsOfType (tyConKind tc)
-
-    get_tvs (_, AGlobal {})       tvs = tvs
-    get_tvs (_, APromotionErr {}) tvs = tvs
-
-        -- Note [Global TyVars]
-        -- It's important to add the in-scope tyvars to the global tyvar set
-        -- as well.  Consider
-        --      f (_::r) = let g y = y::r in ...
-        -- Here, g mustn't be generalised.  This is also important during
-        -- class and instance decls, when we mustn't generalise the class tyvars
-        -- when typechecking the methods.
-        --
-        -- Nor must we generalise g over any kind variables free in r's kind
-
+  = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
 
 {- *********************************************************************
 *                                                                      *

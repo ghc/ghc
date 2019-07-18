@@ -331,8 +331,7 @@ initTcWithGbl :: HscEnv
               -> TcM r
               -> IO (Messages, Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
- = do { tvs_var      <- newIORef emptyVarSet
-      ; lie_var      <- newIORef emptyWC
+ = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -344,7 +343,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
                 }
@@ -1667,8 +1665,7 @@ setLclTypeEnv :: TcLclEnv -> TcM a -> TcM a
 setLclTypeEnv lcl_env thing_inside
   = updLclEnv upd thing_inside
   where
-    upd env = env { tcl_env = tcl_env lcl_env,
-                    tcl_tyvars = tcl_tyvars lcl_env }
+    upd env = env { tcl_env = tcl_env lcl_env }
 
 traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg

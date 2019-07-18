@@ -764,9 +764,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
-       ; gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
-       ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
+       ; qtkvs <- quantifyTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
 
@@ -1029,7 +1028,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        ; candidates <- defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Step 3: decide which kind/type variables to quantify over
-       ; qtvs <- decideQuantifiedTyVars mono_tvs name_taus psigs candidates
+       ; qtvs <- decideQuantifiedTyVars name_taus psigs candidates
 
        -- Step 4: choose which of the remaining candidate
        --         predicates to actually quantify over
@@ -1081,7 +1080,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        ; taus <- mapM (TcM.zonkTcType . snd) name_taus
 
-       ; mono_tvs0 <- tcGetGlobalTyCoVars
+       ; tc_lvl <- TcM.getTcLevel
        ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
 
              co_vars = coVarsOfTypes (psig_tys ++ taus)
@@ -1092,19 +1091,34 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                -- E.g.  If we can't quantify over co :: k~Type, then we can't
                --       quantify over k either!  Hence closeOverKinds
 
+             mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
+                         tyCoVarsOfTypes candidates
+               -- We need to grab all the non-quantifiable tyvars in the
+               -- candidates so that we can grow this set to find other
+               -- non-quantifiable tyvars. This can happen with something
+               -- like
+               --    f x y = ...
+               --      where z = x 3
+               -- The body of z tries to unify the type of x (call it alpha[1])
+               -- with (beta[2] -> gamma[2]). This unification fails because
+               -- alpha is untouchable. But we need to know not to quantify over
+               -- beta or gamma, because they are in the equality constraint with
+               -- alpha. Actual test case: typecheck/should_compile/tc213
+
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
 
              eq_constraints = filter isEqPrimPred candidates
              mono_tvs2      = growThetaTyVars eq_constraints mono_tvs1
 
-             constrained_tvs = (growThetaTyVars eq_constraints
+             constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
+                               (growThetaTyVars eq_constraints
                                                (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2)
                                `delVarSetList` psig_qtvs
              -- constrained_tvs: the tyvars that we are not going to
-             -- quantify solely because of the moonomorphism restriction
+             -- quantify solely because of the monomorphism restriction
              --
-             -- (`minusVarSet` mono_tvs1`): a type variable is only
+             -- (`minusVarSet` mono_tvs2`): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
              --   free in the environment (#13785)
              --
@@ -1126,7 +1140,6 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        ; traceTc "decideMonoTyVars" $ vcat
            [ text "mono_tvs0 =" <+> ppr mono_tvs0
-           , text "mono_tvs1 =" <+> ppr mono_tvs1
            , text "no_quant =" <+> ppr no_quant
            , text "maybe_quant =" <+> ppr maybe_quant
            , text "eq_constraints =" <+> ppr eq_constraints
@@ -1215,13 +1228,12 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
 ------------------
 decideQuantifiedTyVars
-   :: TyCoVarSet        -- Monomorphic tyvars
-   -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
+   :: [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
    -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
-decideQuantifiedTyVars mono_tvs name_taus psigs candidates
+decideQuantifiedTyVars name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
@@ -1230,7 +1242,6 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
                                                   , pred <- sig_inst_theta sig ]
        ; tau_tys  <- mapM (TcM.zonkTcType . snd) name_taus
-       ; mono_tvs <- TcM.zonkTyCoVarsAndFV mono_tvs
 
        ; let -- Try to quantify over variables free in these types
              psig_tys = psig_tv_tys ++ psig_theta
@@ -1258,7 +1269,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
-       ; quantifyTyVars mono_tvs dvs_plus }
+       ; quantifyTyVars dvs_plus }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
