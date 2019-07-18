@@ -459,7 +459,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds res_info rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds res_info cpr_info rhs
 
   | is_thunk                                   -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -470,6 +470,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   where
     fn_info      = idInfo fn_id
     (wrap_dmds, res_info) = splitStrictSig (strictnessInfo fn_info)
+    cpr_info              = cprInfo fn_info
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -553,12 +554,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> CPRResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info cpr_info rhs
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr_info) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_res_info
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -593,11 +594,11 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                         `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
-                        `setIdStrictness` mkClosedStrictSig work_demands work_res_info
+                        `setIdStrictness` mkClosedStrictSig work_demands res_info
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
-                        `setIdCprInfo` dmdResToCpr work_res_info
+                        `setIdCprInfo` work_cpr_info
 
                         `setIdDemandInfo` worker_demand
 
@@ -651,13 +652,10 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    use_res_info  | isJoinId fn_id = topRes -- Note [Don't CPR join points]
-                  | otherwise      = res_info
-    work_res_info | isJoinId fn_id = res_info -- Worker remains CPR-able
-                  | otherwise
-                  = case returnsCPR_maybe res_info of
-                       Just _  -> topRes    -- Cpr stuff done by wrapper; kill it here
-                       Nothing -> res_info  -- Preserve exception/divergence
+    use_cpr_info  | isJoinId fn_id = topCpr -- Note [Don't CPR join points]
+                  | otherwise      = cpr_info
+    work_cpr_info | isJoinId fn_id = cpr_info -- Worker remains CPR-able
+                  | otherwise      = topCpr   -- Cpr stuff done by wrapper; kill it here
 
 
 {-

@@ -40,8 +40,7 @@ import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
 import Type             ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig, topCpr )
-import Cpr              ( cprFromStrictSig )
+import Demand           ( appIsBottom, isTopSig, isBottomingSig, botCpr )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -1221,9 +1220,8 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
               | otherwise                    = sig
 
     cpr = cprInfo idinfo
-    final_cpr | cpr == topCpr
-              , Just (_, nsig) <- mb_bot_str
-              = cprFromStrictSig nsig
+    final_cpr | Just _ <- mb_bot_str
+              = botCpr
               | otherwise
               = cpr
 
