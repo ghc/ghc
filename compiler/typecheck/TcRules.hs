@@ -110,12 +110,10 @@ tcRule (HsRule { rd_ext  = ext
        -- during zonking (see TcHsSyn.zonkRule)
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
-       ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
-                                      -- monomorphic bindings from the MR; test tc111
        ; forall_tkvs <- candidateQTyVarsOfTypes $
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
-       ; qtkvs <- quantifyTyVars gbls forall_tkvs
+       ; qtkvs <- quantifyTyVars forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
