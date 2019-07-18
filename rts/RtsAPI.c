@@ -649,7 +649,7 @@ rts_unlock (Capability *cap)
     }
 }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static bool rts_paused = false;
 static InformCb rts_inform_cb = NULL;
 static void *rts_inform_user = NULL;
