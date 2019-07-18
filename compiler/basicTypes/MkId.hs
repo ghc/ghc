@@ -1358,8 +1358,8 @@ unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
   where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+    info = noCafIdInfo -- `setInlinePragInfo` alwaysInlinePragma
+                       -- `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
     -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
     --                         (a :: TYPE r1) (b :: TYPE r2).
