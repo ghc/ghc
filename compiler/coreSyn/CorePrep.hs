@@ -815,8 +815,7 @@ cpeApp top_env expr
     collect_args e = go e [] 0
       where
         go (App fun arg)      as !depth
-            = go fun (CpeApp arg : as)
-                (if isTyCoArg arg then depth else depth + 1)
+            = go fun (CpeApp arg : as) (if isTyCoArg arg then depth else depth + 1)
         go (Cast fun co)      as depth
             = go fun (CpeCast co : as) depth
         go (Tick tickish fun) as depth
@@ -848,6 +847,18 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
+    cpe_app env (Var f) (CpeApp (Type _runtimeRep1) :
+                         CpeApp (Type _runtimeRep2) :
+                         CpeApp (Type a) :
+                         CpeApp (Type b) :
+                         CpeApp arg : args) depth
+        | f `hasKey` unsafeCoerceIdKey
+        = pprTrace "cpe_app"
+            (ppr f <+> parens (ppr (Type a :: CoreExpr)) <+> parens (ppr (Type b :: CoreExpr)) <+> parens (ppr arg) <+> text "==>" $$
+             ppr (Cast arg (mkUnsafeCo Representational a b))) $
+              cpe_app env (Cast arg (mkUnsafeCo Representational a b)) args (depth - 2)
+
     cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
         | f `hasKey` runRWKey
         -- See Note [runRW magic]
