@@ -18,6 +18,7 @@
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
+#include "RootProfile.h"
 #include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
@@ -134,6 +135,12 @@ doingRetainerProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
             || RtsFlags.ProfFlags.retainerSelector != NULL);
+}
+
+STATIC_INLINE bool
+doingRootProfiling( void )
+{
+    return RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT;
 }
 #endif /* PROFILING */
 
@@ -362,6 +369,11 @@ initHeapProfiling(void)
 #if defined(PROFILING)
     if (doingLDVProfiling() && doingRetainerProfiling()) {
         errorBelch("cannot mix -hb and -hr");
+        stg_exit(EXIT_FAILURE);
+    }
+    if (doingRootProfiling() &&
+        (doingLDVProfiling() || doingRetainerProfiling())) {
+        errorBelch("cannot mix -ho with -hb or -hr");
         stg_exit(EXIT_FAILURE);
     }
 #if defined(THREADED_RTS)
@@ -812,6 +824,7 @@ dumpCensus( Census *census )
         case HEAP_BY_MOD:
         case HEAP_BY_DESCR:
         case HEAP_BY_TYPE:
+        case HEAP_BY_ROOT:
             fprintf(hp_file, "%s", (char *)ctr->identity);
             traceHeapProfSampleString(0, (char *)ctr->identity,
                                       count * sizeof(W_));
@@ -1158,19 +1171,26 @@ void heapCensus (Time t)
   stat_startHeapCensus();
 #endif
 
-  // Traverse the heap, collecting the census info
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      heapCensusChain( census, generations[g].blocks );
-      // Are we interested in large objects?  might be
-      // confusing to include the stack in a heap profile.
-      heapCensusChain( census, generations[g].large_objects );
-      heapCensusCompactList ( census, generations[g].compact_objects );
+#if defined(PROFILING)
+  if(RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
+      rootProfile( t, census );
+  } else
+#endif
+  {
+      // Traverse the heap, collecting the census info
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+          heapCensusChain( census, generations[g].blocks );
+          // Are we interested in large objects?  might be
+          // confusing to include the stack in a heap profile.
+          heapCensusChain( census, generations[g].large_objects );
+          heapCensusCompactList ( census, generations[g].compact_objects );
 
-      for (n = 0; n < n_capabilities; n++) {
-          ws = &gc_threads[n]->gens[g];
-          heapCensusChain(census, ws->todo_bd);
-          heapCensusChain(census, ws->part_list);
-          heapCensusChain(census, ws->scavd_list);
+          for (n = 0; n < n_capabilities; n++) {
+              ws = &gc_threads[n]->gens[g];
+              heapCensusChain(census, ws->todo_bd);
+              heapCensusChain(census, ws->part_list);
+              heapCensusChain(census, ws->scavd_list);
+          }
       }
   }
 
