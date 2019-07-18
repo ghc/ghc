@@ -2447,15 +2447,15 @@ isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
   = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
 
 pprValVecSubstituted :: ValVec -> SDoc
-pprValVecSubstituted (ValVec vva delta) = pprUncovered (vector, refuts)
+pprValVecSubstituted (ValVec vva delta) = pprUncovered (vector, tm_cs)
   where
-    (subst, refuts) = wrapUpTmState (delta_tm_cs delta)
-    vector          = substInValAbs subst vva
+    tm_cs           = delta_tm_cs delta
+    vector          = substInValAbs tm_cs vva
 
--- | Apply a term substitution to a value vector abstraction. All VAs are
+-- | Deeply lookup a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
-substInValAbs :: TmVarCtEnv -> [ValAbs] -> [PmExpr]
-substInValAbs subst = map (exprDeepLookup subst . vaToPmExpr)
+substInValAbs :: TmState -> [ValAbs] -> [PmExpr]
+substInValAbs ts = map (exprDeepLookup ts . vaToPmExpr)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
