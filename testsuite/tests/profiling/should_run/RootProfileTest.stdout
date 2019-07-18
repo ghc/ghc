@@ -1,0 +1,41 @@
+= simple =
+root xs = 12
+bin xs = 12
+root xs = 17
+bin xs = 17
+root xs = 22
+bin xs = 22
+root xs = 27
+bin xs = 27
+root xs = 32
+bin xs = 32
+root xs = 37
+bin xs = 37
+root xs = 42
+bin xs = 42
+root xs = 47
+bin xs = 47
+root xs = 52
+bin xs = 52
+root xs = 57
+bin xs = 57
+root xs = 62
+bin xs = 62
+
+
+
+
+= sharing =
+root 1 = 0
+root 2 = 27
+root 3 = 22
+root 4 = 17
+root 5 = 12
+root 6 = 7
+root [] = 2
+bin 2 = 5
+bin 2-3 = 5
+bin 2-3-4 = 5
+bin 2-3-4-5 = 5
+bin 2-3-4-5-6 = 5
+bin 2-3-4-5-6-[] = 2

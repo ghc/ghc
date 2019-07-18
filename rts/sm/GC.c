@@ -44,6 +44,7 @@
 #include "STM.h"
 #include "Trace.h"
 #include "RetainerProfile.h"
+#include "RootProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
 #include "StableName.h"
@@ -755,8 +756,16 @@ GarbageCollect (uint32_t collect_gen,
   // resetStaticObjectForProfiling() must be called before
   // zeroing below.
 
+  traverseState *ts = NULL;
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
+      ts = &g_retainerTraverseState;
+  } else if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
+      ts = &g_rootTraverseState;
+  }
+
   // ToDo: fix the gct->scavenged_static_objects below
-  resetStaticObjectForProfiling(&g_retainerTraverseState, gct->scavenged_static_objects);
+  if(ts)
+      resetStaticObjectForProfiling(ts, gct->scavenged_static_objects);
 #endif
 
   // Start any pending finalizers.  Must be after
