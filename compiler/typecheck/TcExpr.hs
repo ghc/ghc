@@ -1289,11 +1289,12 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                  quick_look_args = args_for_quick_look r_deferred_args
            ; dflags <- getDynFlags
            ; if xopt LangExt.ImpredicativeTypes dflags 
-                then do { tcQuickLooks quick_look_args
+                then do { discardConstraints (tcQuickLooks quick_look_args)
                         ; -- TODO: perform the actual unifications
                         ; return () }
                 else return ()
            ; args' <- handle_args r_deferred_args
+           -- ; fun_ty' <- zonkTcType fun_ty
            ; return (idHsWrapper, args', fun_ty)
            }
 
