@@ -1888,7 +1888,8 @@ runTcInteractive hsc_env thing_inside
                          , tcg_imports      = imports
                          }
 
-       ; lcl_env' <- tcExtendLocalTypeEnv lcl_env lcl_ids
+             lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
+
        ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
     (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
@@ -1930,9 +1931,8 @@ types have free RuntimeUnk skolem variables, standing for unknown
 types.  If we don't register these free TyVars as global TyVars then
 the typechecker will try to quantify over them and fall over in
 skolemiseQuantifiedTyVar. so we must add any free TyVars to the
-typechecker's global TyVar set.  That is most conveniently by using
-tcExtendLocalTypeEnv, which automatically extends the global TyVar
-set.
+typechecker's global TyVar set.  That is done by using
+tcExtendLocalTypeEnv.
 
 We do this by splitting out the Ids with open types, using 'is_closed'
 to do the partition.  The top-level things go in the global TypeEnv;

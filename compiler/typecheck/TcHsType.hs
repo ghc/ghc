@@ -1849,7 +1849,7 @@ kcLHsQTyVars_Cusk name flav
 
        ; let inf_candidates = candidates `delCandidates` spec_req_tkvs
 
-       ; inferred <- quantifyTyVars emptyVarSet inf_candidates
+       ; inferred <- quantifyTyVars inf_candidates
                      -- NB: 'inferred' comes back sorted in dependency order
 
        ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs
@@ -2296,10 +2296,9 @@ kindGeneralizeSome should_gen kind_or_type
 
        ; (_, promoted) <- promoteTyVarSet (promote_kvs `unionVarSet` promote_tvs)
 
-       ; gbl_tvs <- tcGetGlobalTyCoVars  -- already zonked
        ; let dvs' = dvs { dv_kvs = kvs `dVarSetMinusVarSet` promote_kvs
                         , dv_tvs = tvs `dVarSetMinusVarSet` promote_tvs }
-       ; qkvs <- quantifyTyVars gbl_tvs dvs'
+       ; qkvs <- quantifyTyVars dvs'
 
        ; traceTc "kindGeneralizeSome }" $
          vcat [ text "Kind or type:" <+> ppr kind_or_type
@@ -2308,7 +2307,6 @@ kindGeneralizeSome should_gen kind_or_type
               , text "promote_kvs:" <+> pprTyVars (nonDetEltsUniqSet promote_kvs)
               , text "promote_tvs:" <+> pprTyVars (nonDetEltsUniqSet promote_tvs)
               , text "promoted:" <+> pprTyVars (nonDetEltsUniqSet promoted)
-              , text "gbl_tvs:" <+> pprTyVars (nonDetEltsUniqSet gbl_tvs)
               , text "qkvs:" <+> pprTyVars qkvs ]
 
        ; return qkvs }
