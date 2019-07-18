@@ -451,6 +451,7 @@ library
                RaiseAsync.c
                RetainerProfile.c
                RetainerSet.c
+               RootProfile.c
                RtsAPI.c
                RtsDllMain.c
                RtsFlags.c
