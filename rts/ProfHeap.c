@@ -14,6 +14,7 @@
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "ProfHeap.h"
+#include "ProfHeapInternal.h"
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
@@ -130,31 +131,7 @@ restore_locale( void )
 unsigned int era;
 static uint32_t max_era;
 
-/* -----------------------------------------------------------------------------
- * Counters
- *
- * For most heap profiles each closure identity gets a simple count
- * of live words in the heap at each census.  However, if we're
- * selecting by biography, then we have to keep the various
- * lag/drag/void counters for each identity.
- * -------------------------------------------------------------------------- */
-typedef struct _counter {
-    const void *identity;
-    union {
-        ssize_t resid;
-        struct {
-            // Total sizes of:
-            ssize_t prim;     // 'inherently used' closures
-            ssize_t not_used; // 'never used' closures
-            ssize_t used;     // 'used at least once' closures
-            ssize_t void_total;  // 'destroyed without being used' closures
-            ssize_t drag_total;  // 'used at least once and waiting to die'
-        } ldv;
-    } c;
-    struct _counter *next;
-} counter;
-
-STATIC_INLINE void
+inline void
 initLDVCtr( counter *ctr )
 {
     ctr->c.ldv.prim = 0;
@@ -163,24 +140,6 @@ initLDVCtr( counter *ctr )
     ctr->c.ldv.void_total = 0;
     ctr->c.ldv.drag_total = 0;
 }
-
-typedef struct {
-    double      time;    // the time in MUT time when the census is made
-    StgWord64   rtime;   // The eventlog time the census was made. This is used
-                         // for the LDV profiling events because they are all
-                         // emitted at the end of compilation so we need to know
-                         // when the sample actually took place.
-    HashTable * hash;
-    counter   * ctrs;
-    Arena     * arena;
-
-    // for LDV profiling, when just displaying by LDV
-    ssize_t    prim;
-    ssize_t    not_used;
-    ssize_t    used;
-    ssize_t    void_total;
-    ssize_t    drag_total;
-} Census;
 
 static Census *censuses = NULL;
 static uint32_t n_censuses = 0;
@@ -998,6 +957,19 @@ dumpCensus( Census *census )
     restore_locale();
 }
 
+inline counter*
+heapInsertNewCounter(Census *census, StgWord identity)
+{
+    counter *ctr = arenaAlloc(census->arena, sizeof(counter));
+
+    initLDVCtr(ctr);
+    insertHashTable( census->hash, identity, ctr );
+    ctr->identity = (void*)identity;
+    ctr->next = census->ctrs;
+    census->ctrs = ctr;
+
+    return ctr;
+}
 
 static void heapProfObject(Census *census, StgClosure *p, size_t size,
                            bool prim
@@ -1050,13 +1022,7 @@ static void heapProfObject(Census *census, StgClosure *p, size_t size,
                                 ctr->c.resid += real_size;
                             }
                         } else {
-                            ctr = arenaAlloc( census->arena, sizeof(counter) );
-                            initLDVCtr(ctr);
-                            insertHashTable( census->hash, (StgWord)identity, ctr );
-                            ctr->identity = identity;
-                            ctr->next = census->ctrs;
-                            census->ctrs = ctr;
-
+                            ctr = heapInsertNewCounter(census, (StgWord)identity);
 #if defined(PROFILING)
                             if (RtsFlags.ProfFlags.bioSelector != NULL) {
                                 if (prim)
