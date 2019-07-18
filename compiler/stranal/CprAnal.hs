@@ -352,7 +352,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     is_var _          = False
 
 set_idCprInfo :: Id -> CprType -> Id
-set_idCprInfo id ty = ASSERT( _ct_arty ty == idArity id ) setIdCprInfo id (ct_cpr ty)
+set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
 
 get_idCprInfo :: Id -> CprType
 get_idCprInfo id = CprType (idArity id) (idCprInfo id)
