@@ -1358,22 +1358,16 @@ unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
   where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+    info = noCafIdInfo
 
     -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
     --                         (a :: TYPE r1) (b :: TYPE r2).
     --                         a -> b
-    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
-                               (\ks -> map tYPE ks)
+    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy] (map tYPE)
 
     [_, _, a, b] = mkTyVarTys bndrs
 
     ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
-
-    [x] = mkTemplateLocals [a]
-    rhs = mkLams (bndrs ++ [x]) $
-          Cast (Var x) (mkUnsafeCo Representational a b)
 
 ------------------------------------------------
 nullAddrId :: Id
