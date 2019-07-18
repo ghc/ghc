@@ -1418,12 +1418,16 @@ distclean : clean
 	$(call removeFiles,libraries/base/include/fs.h)
 	$(call removeFiles,libraries/base/cbits/fs.c)
 
+CLEAN_LIBRARY_GHC_MK_FILES += $(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
+# Don't clean `libraries/ghc-boot/ghc.mk`, since it's intended to be version-controlled (#16953)
+CLEAN_LIBRARY_GHC_MK_FILES := $(filter-out libraries/ghc-boot/ghc.mk,$(CLEAN_LIBRARY_GHC_MK_FILES))
+
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)
 	$(call removeTrees,autom4te.cache $(wildcard libraries/*/autom4te.cache))
 	$(call removeFiles,$(patsubst %, libraries/%/GNUmakefile, \
 	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
-	$(call removeFiles,$(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(CLEAN_LIBRARY_GHC_MK_FILES))
 	$(call removeFiles,$(patsubst %, libraries/%/configure, \
 	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 	$(call removeFiles,libraries/base/include/HsBaseConfig.h.in)
