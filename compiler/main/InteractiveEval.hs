@@ -521,20 +521,17 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
                      IntMap.lookup breakInfo_number (modBreaks_breakInfo breaks)
-       vars      = cgb_vars info
+       mbVars    = cgb_vars info
        result_ty = cgb_resty info
        occs      = modBreaks_vars breaks ! breakInfo_number
        span      = modBreaks_locs breaks ! breakInfo_number
        decl      = intercalate "." $ modBreaks_decls breaks ! breakInfo_number
 
-           -- Filter out any unboxed ids;
+           -- Filter out any unboxed ids by changing them to Nothings;
            -- we can't bind these at the prompt
-       pointers = filter (\(id,_) -> isPointer id) vars
-       isPointer id | [rep] <- typePrimRep (idType id)
-                    , isGcPtrRep rep                   = True
-                    | otherwise                        = False
+       mbPointers = nullUnboxed <$> mbVars
 
-       (ids, offsets) = unzip pointers
+       (ids, offsets, occs') = syncOccs mbPointers occs
 
        free_tvs = tyCoVarsOfTypesList (result_ty:map idType ids)
 
@@ -550,11 +547,12 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
    let tv_subst     = newTyVars us free_tvs
-       filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
+       (filtered_ids, occs'') = unzip         -- again, sync the occ-names
+          [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
                       map (substTy tv_subst . idType) filtered_ids
 
-   new_ids     <- zipWith3M mkNewId occs tidy_tys filtered_ids
+   new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
    result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
    let result_id = Id.mkVanillaGlobal result_name
@@ -590,6 +588,24 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
                     | (tv, uniq) <- tvs `zip` uniqsFromSupply us
                     , let name = setNameUnique (tyVarName tv) uniq ]
+
+   isPointer id | [rep] <- typePrimRep (idType id)
+                , isGcPtrRep rep                   = True
+                | otherwise                        = False
+
+   -- Convert unboxed Id's to Nothings
+   nullUnboxed (Just (fv@(id, _)))
+     | isPointer id          = Just fv
+     | otherwise             = Nothing
+   nullUnboxed Nothing       = Nothing
+
+   -- See Note [Syncing breakpoint info]
+   syncOccs :: [Maybe (a,b)] -> [c] -> ([a], [b], [c])
+   syncOccs mbVs ocs = unzip3 $ catMaybes $ joinOccs mbVs ocs
+     where
+       joinOccs :: [Maybe (a,b)] -> [c] -> [Maybe (a,b,c)]
+       joinOccs = zipWith joinOcc
+       joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
 rttiEnvironment :: HscEnv -> IO HscEnv
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
@@ -632,6 +648,18 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
         ictxt0 = hsc_IC hsc_env
         ictxt1 = ictxt0 { ic_resume = resume : ic_resume ictxt0 }
 
+
+{-
+  Note [Syncing breakpoint info]
+
+  To display the free variables for a single breakpoint, GHCi pulls out the
+  information from the fields `modBreaks_breakInfo` and `modBreaks_vars`
+  of the `ModBreaks` data structure. For a specific breakpoint this gives 2
+  lists of types 'Names` and `OccNames`. They are used to create the Id's
+  for the free variables and must be kept in sync.
+  If we remove an element from the Names list, then we also must remove the
+  corresponding element from the OccNames list. See #8487.
+-}
 -- -----------------------------------------------------------------------------
 -- Abandoning a resume context
 
