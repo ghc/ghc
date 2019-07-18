@@ -577,23 +577,14 @@ endHeapProfiling(void)
 #if defined(PROFILING)
     if (doingRetainerProfiling()) {
         endRetainerProfiling();
-    }
-#endif
-
-#if defined(PROFILING)
-    if (doingLDVProfiling()) {
+    } else if (doingLDVProfiling()) {
         uint32_t t;
         LdvCensusKillAll();
         aggregateCensusInfo();
         for (t = 1; t < era; t++) {
             dumpCensus( &censuses[t] );
         }
-    }
-#endif
 
-#if defined(PROFILING)
-    if (doingLDVProfiling()) {
-        uint32_t t;
         if (RtsFlags.ProfFlags.bioSelector != NULL) {
             for (t = 1; t <= era; t++) {
                 freeEra( &censuses[t] );
