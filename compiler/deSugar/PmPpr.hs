@@ -39,14 +39,14 @@ import TmOracle
 --
 -- When the set of refutable shapes contains more than 3 elements, the
 -- additional elements are indicated by "...".
-pprUncovered :: ([PmExpr], PmRefutEnv) -> SDoc
-pprUncovered (expr_vec, refuts)
+pprUncovered :: ([PmExpr], TmState) -> SDoc
+pprUncovered (expr_vec, tm_cs)
   | null cs   = fsep vec -- there are no literal constraints
   | otherwise = hang (fsep vec) 4 $
                   text "where" <+> vcat (map pprRefutableShapes cs)
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
-    (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts refuts)
+    (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts tm_cs)
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
@@ -87,13 +87,10 @@ substitution to the vectors before printing them out (see function `pprOne' in
 Check.hs) to be more precise.
 -}
 
--- | A 'PmRefutEnv' with pretty names for the occuring variables.
-type PrettyPmRefutEnv = DNameEnv (SDoc, [PmAltCon])
-
--- | Assigns pretty names to constraint variables in the domain of the given
--- 'PmRefutEnv'.
-prettifyRefuts :: PmRefutEnv -> PrettyPmRefutEnv
-prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList
+-- | Extract and assigns pretty names to constraint variables with refutable
+-- shapes.
+prettifyRefuts :: TmState -> DNameEnv (SDoc, [PmAltCon])
+prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList . wrapUpRefutableShapes
   where
     rename new (old, ncons) = (old, (new, ncons))
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
@@ -101,10 +98,10 @@ prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList
     nameList = map text ["p","q","r","s","t"] ++
                  [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
-type PmPprM a = State (PrettyPmRefutEnv, NameSet) a
+type PmPprM a = State (DNameEnv (SDoc, [PmAltCon]), NameSet) a
 -- (the first part of the state is read only. make it a reader?)
 
-runPmPpr :: PmPprM a -> PrettyPmRefutEnv -> (a, [(SDoc,[PmAltCon])])
+runPmPpr :: PmPprM a -> DNameEnv (SDoc, [PmAltCon]) -> (a, [(SDoc,[PmAltCon])])
 runPmPpr m lit_env = (result, mapMaybe is_used (udfmToList lit_env))
   where
     (result, (_lit_env, used)) = runState m (lit_env, emptyNameSet)
