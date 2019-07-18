@@ -2,7 +2,7 @@
 Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms, ViewPatterns #-}
 
 -- | The term equality oracle. The main export of the module are the functions
 -- 'tmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
@@ -12,12 +12,12 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module TmOracle (
 
         -- the term oracle
-        tmOracle, TmVarCtEnv, PmRefutEnv, TmState, initialTmState,
-        wrapUpTmState, solveOneEq, extendSubst, canDiverge,
+        tmOracle, TmState, initialTmState,
+        solveOneEq, extendSubst, canDiverge,
         tryAddRefutableAltCon,
 
         -- misc.
-        exprDeepLookup
+        wrapUpRefutableShapes, exprDeepLookup
     ) where
 
 #include "HsVersions.h"
@@ -30,12 +30,13 @@ import Util
 import Id
 import Name
 import NameEnv
-import UniqFM
-import UniqDFM
 import MonadUtils
 import ListSetOps (unionLists)
 import Maybes
 import Outputable
+import ConLike
+
+import Data.List (delete)
 
 {-
 %************************************************************************
@@ -44,7 +45,7 @@ import Outputable
 %*                                                                      *
 %************************************************************************
 -}
-
+{-
 -- | Pretty much a @['TmVarCt']@ association list where the domain is 'Name'
 -- instead of 'Id'. This is the type of 'tm_pos', where we store solutions for
 -- rigid pattern match variables.
@@ -61,7 +62,8 @@ type TmVarCtEnv = NameEnv PmExpr
 --
 -- See also Note [Refutable shapes] in TmOracle.
 type PmRefutEnv = DNameEnv [PmAltCon]
-
+-}
+{-
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
 -- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
 --
@@ -90,6 +92,32 @@ data TmState = TmS
   -- variable @y@, we merge the refutable shapes of @x@ into those of @y@. See
   -- also Note [The Pos/Neg invariant].
   }
+-}
+
+newtype TmState = TS (DNameEnv VarInfo)
+
+data VarInfo
+  = VI
+  { vi_pos :: !PossibleShape
+  , vi_neg :: ![PmAltCon]
+  }
+
+data PossibleShape
+  = Rigid !PmExpr
+  | CompleteSets ![[ConLike]]
+  | NoInfoYet
+
+isSolved :: PossibleShape -> Maybe (PmAltCon, [PmExpr])
+isSolved (Rigid (PmExprCon alt args)) = Just (alt, args)
+isSolved _                            = Nothing
+
+pattern Solved :: PmAltCon -> [PmExpr] -> PossibleShape
+pattern Solved alt args <- (isSolved -> Just (alt, args))
+
+pattern NotSolvedYet :: PossibleShape
+pattern NotSolvedYet <- (isSolved -> Nothing)
+{-# COMPLETE Solved, NotSolvedYet #-}
+{-# COMPLETE Rigid, NotSolvedYet #-} -- These overlap, even
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -121,38 +149,43 @@ while we can *completely* discard the entry for @x@ in 'tm_neg'.
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr state = braces (fsep (punctuate comma (pos ++ neg)))
+  ppr (TS state) = ppr state
+
+-- | Not user-facing.
+instance Outputable VarInfo where
+  ppr (VI pos neg) = if null neg then pos_pp else braces (neg_pp <> char ',' <+> pos_pp)
     where
-      pos   = map pos_eq (nonDetUFMToList (tm_pos state))
-      neg   = map neg_eq (udfmToList (tm_neg state))
-      pos_eq (l, r) = ppr l <+> char '~' <+> ppr r
-      neg_eq (l, alts) = hsep [ppr l, text "/~", ppr alts]
+      neg_pp = char '¬' <> ppr neg
+      pos_pp = ppr pos
+
+-- | Not user-facing.
+instance Outputable PossibleShape where
+  ppr NoInfoYet = char '?'
+  ppr (Rigid sol) = ppr sol
+  ppr (CompleteSets sets) = ppr sets
+
+emptyVarInfo :: VarInfo
+emptyVarInfo = VI NoInfoYet []
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
-initialTmState = TmS emptyNameEnv emptyDNameEnv
+initialTmState = TS emptyDNameEnv
 
--- | Wrap up the term oracle's state once solving is complete. Return the
--- flattened 'tm_pos' and 'tm_neg'.
-wrapUpTmState :: TmState -> (TmVarCtEnv, PmRefutEnv)
-wrapUpTmState solver_state
-  = (flattenTmVarCtEnv (tm_pos solver_state), tm_neg solver_state)
-
--- | Flatten the triangular subsitution.
-flattenTmVarCtEnv :: TmVarCtEnv -> TmVarCtEnv
-flattenTmVarCtEnv env = mapNameEnv (exprDeepLookup env) env
+lookupVarInfo :: TmState -> Name -> (Name, VarInfo)
+lookupVarInfo ts@(TS env) x = case lookupDNameEnv env x of
+  Just (VI (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
+  mb_vi                             -> (x, fromMaybe emptyVarInfo mb_vi)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
 canDiverge :: Name -> TmState -> Bool
-canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
+canDiverge x ts
   -- If the variable seems not evaluated, there is a possibility for
   -- constraint x ~ BOT to be satisfiable. That's the case when we haven't found
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
-  | (_, PmExprVar y) <- varDeepLookup pos x -- seems not forced
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  , Nothing <- lookupDNameEnv neg y
+  | VI NotSolvedYet [] <- snd (lookupVarInfo ts x)
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
@@ -160,10 +193,10 @@ canDiverge x TmS{ tm_pos = pos, tm_neg = neg }
 
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
-isRefutable :: Name -> PmExpr -> PmRefutEnv -> Bool
-isRefutable x e env = fromMaybe False $ do
+isRefutable :: Name -> PmExpr -> TmState -> Bool
+isRefutable x e ts = fromMaybe False $ do
   alt <- exprToAlt e
-  ncons <- lookupDNameEnv env x
+  let VI _ ncons = snd (lookupVarInfo ts x)
   pure (notNull (filter ((== Just True) . decEqPmAltCon alt) ncons))
 
 -- | Solve an equality (top-level).
@@ -177,11 +210,11 @@ exprToAlt _               = Nothing
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
 tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
-tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
-  = case exprToAlt e of
+tryAddRefutableAltCon original@(TS env) x nalt
+  = case pos of
       -- We have to take care to preserve Note [The Pos/Neg invariant]
-      Nothing        -> Just extended -- Not solved yet
-      Just alt       ->               -- We have a solution
+      NotSolvedYet -> Just extended   -- Not solved yet
+      Solved alt _ ->                 -- We have a solution
         case decEqPmAltCon alt nalt of
           Just True  -> Nothing       -- ... which is contradictory
           Just False -> Just original -- ... which is compatible, rendering the
@@ -189,40 +222,52 @@ tryAddRefutableAltCon original@TmS{ tm_pos = pos, tm_neg = neg } x nalt
           Nothing    -> Just extended -- ... which is incomparable, so might
                                       --     refute later
   where
-    (y, e) = varDeepLookup pos (idName x)
-    extended = original { tm_neg = neg' }
-    neg' = extendDNameEnv_C combineRefutEntries neg y [nalt]
+    (y, VI pos neg) = lookupVarInfo original (idName x)
+    neg' = combineRefutEntries neg [nalt]
+    pos' = deletePossiblePmAltCon nalt pos
+    extended = TS (extendDNameEnv env y (VI pos' neg'))
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
 combineRefutEntries :: [PmAltCon] -> [PmAltCon] -> [PmAltCon]
 combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
 
+-- | Deletes a 'PmAltConLike' from 'CompleteSets'.
+deletePossiblePmAltCon :: PmAltCon -> PossibleShape -> PossibleShape
+deletePossiblePmAltCon (PmAltConLike con) (CompleteSets sets)
+  = CompleteSets (map (delete con) sets)
+deletePossiblePmAltCon _                  ps
+  = ps
+
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
 -- semantically helpful alias for 'lookupNameEnv'.
 isRigid :: TmState -> Name -> Maybe PmExpr
-isRigid TmS{ tm_pos = pos } x = lookupNameEnv pos x
+isRigid (TS env) x = do
+  VI pos _ <- lookupDNameEnv env x
+  case pos of
+    Rigid e -> Just e
+    _       -> Nothing
 
 -- | @isFlexible tms = isNothing . 'isRigid' tms@
 isFlexible :: TmState -> Name -> Bool
-isFlexible tms = isNothing . isRigid tms
+isFlexible ts = isNothing . isRigid ts
 
 -- | Try to unify two 'PmExpr's and record the gained knowledge in the
 -- 'TmState'.
 --
--- Returns @Nothing@ when there's a contradiction. Returns @Just tms@
--- when the constraint was compatible with prior facts, in which case @tms@ has
+-- Returns @Nothing@ when there's a contradiction. Returns @Just ts@
+-- when the constraint was compatible with prior facts, in which case @ts@ has
 -- integrated the knowledge from the equality constraint.
 unify :: TmState -> (PmExpr, PmExpr) -> Maybe TmState
-unify tms eq@(e1, e2) = case eq of
+unify ts eq@(e1, e2) = case eq of
   -- We cannot do a thing about these cases
   (PmExprOther _,_)            -> boring
   (_,PmExprOther _)            -> boring
 
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
     -- See Note [Undecidable Equality for PmAltCons]
-    Just True -> foldlM unify tms (zip ts1 ts2)
+    Just True -> foldlM unify ts (zip ts1 ts2)
     Just False -> unsat
     Nothing -> boring
 
@@ -233,18 +278,18 @@ unify tms eq@(e1, e2) = case eq of
   -- otherwise we get cyclic substitutions. Cf. 'extendSubstAndSolve' and
   -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
   (PmExprVar x, _)
-    | isRefutable x e2 (tm_neg tms) -> unsat
+    | isRefutable x e2 ts -> unsat
   (_, PmExprVar y)
-    | isRefutable y e1 (tm_neg tms) -> unsat
+    | isRefutable y e1 ts -> unsat
   (PmExprVar x, _)
-    | Just e1' <- isRigid tms x     -> unify tms (e1', e2)
+    | Just e1' <- isRigid ts x     -> unify ts (e1', e2)
   (_, PmExprVar y)
-    | Just e2' <- isRigid tms y     -> unify tms (e1, e2')
-  (PmExprVar x, PmExprVar y)        -> Just (equate x y tms)
-  (PmExprVar x, PmExprCon c args)   -> trySolve x c args tms
-  (PmExprCon c args, PmExprVar y)   -> trySolve y c args tms
+    | Just e2' <- isRigid ts y     -> unify ts (e1, e2')
+  (PmExprVar x, PmExprVar y)       -> Just (equate x y ts)
+  (PmExprVar x, PmExprCon c args)  -> trySolve x c args ts
+  (PmExprCon c args, PmExprVar y)  -> trySolve y c args ts
   where
-    boring    = Just tms
+    boring    = Just ts
     unsat     = Nothing
 
 -- | Merges the equivalence classes of @x@ and @y@ by extending the substitution
@@ -252,67 +297,63 @@ unify tms eq@(e1, e2) = case eq of
 -- Preconditions: @x /= y@ and both @x@ and @y@ are flexible (cf.
 -- 'isFlexible'/'isRigid').
 equate :: Name -> Name -> TmState -> TmState
-equate x y tms@TmS{ tm_pos = pos, tm_neg = neg }
+equate x y ts@(TS env)
   = ASSERT( x /= y )
-    ASSERT( isFlexible tms x )
-    ASSERT( isFlexible tms y )
-    tms'
+    ASSERT( isFlexible ts x )
+    ASSERT( isFlexible ts y )
+    ts'
   where
-    pos' = extendNameEnv pos x (PmExprVar y)
+    VI _     neg_x = snd (lookupVarInfo ts x)
+    VI pos_y neg_y = snd (lookupVarInfo ts y)
+    vi_x'          = VI (Rigid (PmExprVar y)) []
     -- Be careful to uphold Note [The Pos/Neg invariant] by merging the refuts
     -- of x into those of y
-    neg'  = case lookupDNameEnv neg x of
-      Nothing -> neg
-      Just entry -> extendDNameEnv_C combineRefutEntries neg y entry
-                      `delFromDNameEnv` x
-    tms'  = TmS { tm_pos = pos', tm_neg = neg' }
+    -- We could compute the intersection of CompleteSets for pos_x and pos_y
+    -- here. Should we? We merge the negs, after all. It's also not so clear
+    -- how to merge different COMPLETE sets.
+    vi_y'          = VI pos_y (combineRefutEntries neg_x neg_y)
+    ts'           = TS (extendDNameEnv (extendDNameEnv env x vi_x') y vi_y')
 
--- | @trySolve x alt args tms@ extends the substitution with a mapping @x: ->
+-- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
 -- solution, reject (@Nothing@) otherwise.
 --
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
 trySolve:: Name -> PmAltCon -> [PmExpr] -> TmState -> Maybe TmState
-trySolve x alt args _tms@TmS{ tm_pos = pos, tm_neg = neg }
-  | ASSERT( isFlexible _tms x )
-    isRefutable x e neg
+trySolve x alt args ts@(TS env)
+  | ASSERT( isFlexible ts x )
+    isRefutable x e ts
   = Nothing
   | otherwise
-  = Just (TmS (extendNameEnv pos x e) (adjustDNameEnv del_compat neg x))
+  = Just ts'
   where
-    e = PmExprCon alt args -- always succeeds, bc @e@ is a solution
+    e = PmExprCon alt args
+    VI _ neg = snd (lookupVarInfo ts x)
     -- Uphold Note [The Pos/Neg invariant]
-    del_compat ncs = filter ((== Nothing) . decEqPmAltCon alt) ncs
+    vi' = VI (Rigid e) (filter ((== Nothing) . decEqPmAltCon alt) neg)
+    ts' = TS (extendDNameEnv env x vi')
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,
 -- @extendSubst@ simply extends the substitution, unlike what
 -- 'extendSubstAndSolve' does.
 extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e solver_state@TmS{ tm_pos = pos }
-  | isNotPmExprOther simpl_e
-  = solver_state { tm_pos = extendNameEnv pos x simpl_e }
-  | otherwise = solver_state
-  where
-    x = idName y
-    simpl_e = exprDeepLookup pos e
-
--- | Apply an (un-flattened) substitution to a variable and return its
--- representative in the triangular substitution @env@ and the completely
--- substituted expression. The latter may just be the representative wrapped
--- with 'PmExprVar' if we haven't found a solution for it yet.
-varDeepLookup :: TmVarCtEnv -> Name -> (Name, PmExpr)
-varDeepLookup env x = case lookupNameEnv env x of
-  Just (PmExprVar y) -> varDeepLookup env y
-  Just e             -> (x, exprDeepLookup env e) -- go deeper
-  Nothing            -> (x, PmExprVar x)          -- terminal
-{-# INLINE varDeepLookup #-}
+extendSubst y e ts@(TS env)
+  | isNotPmExprOther e
+  = TS (extendDNameEnv env (idName y) (VI (Rigid e) []))
+  | otherwise
+  = ts
 
 -- | Apply an (un-flattened) substitution to an expression.
-exprDeepLookup :: TmVarCtEnv -> PmExpr -> PmExpr
-exprDeepLookup env (PmExprVar x)    = snd (varDeepLookup env x)
-exprDeepLookup env (PmExprCon c es) = PmExprCon c (map (exprDeepLookup env) es)
-exprDeepLookup _   e@PmExprOther{}  = e
+exprDeepLookup :: TmState -> PmExpr -> PmExpr
+exprDeepLookup ts (PmExprCon c es) = PmExprCon c (map (exprDeepLookup ts) es)
+exprDeepLookup ts (PmExprVar x)
+  | Rigid e <- vi_pos (snd (lookupVarInfo ts x))
+  = exprDeepLookup ts e
+exprDeepLookup _   e               = e
+
+wrapUpRefutableShapes :: TmState -> DNameEnv [PmAltCon]
+wrapUpRefutableShapes (TS env) = mapDNameEnv vi_neg env
 
 -- | External interface to the term oracle.
 tmOracle :: TmState -> [TmVarCt] -> Maybe TmState
