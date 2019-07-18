@@ -597,6 +597,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
+                        `setIdCprInfo` dmdResToCpr work_res_info
+
                         `setIdDemandInfo` worker_demand
 
                         `setIdArity` work_arity

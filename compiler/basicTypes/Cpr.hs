@@ -1,6 +1,7 @@
 module Cpr (
     CprType (..), topCprType, botCprType, prodCprType, sumCprType,
-    lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy
+    lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
+    cprTypeFromStrictSig, cprFromStrictSig, increaseCprTyArity
   ) where
 
 import GhcPrelude
@@ -60,8 +61,19 @@ ensureCprTyArity n ty@(CprType m _)
   | n == m    = ty
   | otherwise = topCprType
 
+increaseCprTyArity :: Int -> CprType -> CprType
+increaseCprTyArity increase (CprType n cpr) = CprType (n + increase) cpr
+
 trimCprTy :: Bool -> Bool -> CprType -> CprType
 trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)
 
 instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
+
+cprTypeFromStrictSig :: StrictSig -> CprType
+cprTypeFromStrictSig sig = CprType (length demands) (dmdResToCpr res)
+  where
+    (demands, res) = splitStrictSig sig
+
+cprFromStrictSig :: StrictSig -> CPRResult
+cprFromStrictSig = dmdResToCpr . snd . splitStrictSig

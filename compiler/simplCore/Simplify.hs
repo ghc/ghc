@@ -34,14 +34,14 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
                         , StrictnessMark (..) )
 import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
-import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
+import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
+                        , mkClosedStrictSig, botCpr, topDmd, botRes )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreOpt          ( pushCoTyArg, pushCoValArg
                         , joinPointBinding_maybe, joinPointBindings_maybe )
 import Rules            ( mkRuleInfo, lookupRule, getRules )
-import Demand           ( mkClosedStrictSig, topDmd, botRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
@@ -446,6 +446,7 @@ prepareRhs mode top_lvl occ info (Cast rhs co)  -- Note [Float coercions]
         ; return (floats, Cast rhs' co) }
   where
     sanitised_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
+                                   `setCprInfo`        cprInfo info
                                    `setDemandInfo`     demandInfo info
 
 prepareRhs mode top_lvl occ _ rhs0
@@ -730,8 +731,10 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 | is_bot    = info3 `setStrictnessInfo`
-                        mkClosedStrictSig (replicate new_arity topDmd) botRes
+    info4 | is_bot    = info3
+                          `setStrictnessInfo`
+                            mkClosedStrictSig (replicate new_arity topDmd) botRes
+                          `setCprInfo` botCpr
           | otherwise = info3
 
      -- Zap call arity info. We have used it by now (via

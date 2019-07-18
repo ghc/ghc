@@ -352,12 +352,10 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     is_var _          = False
 
 set_idCprInfo :: Id -> CprType -> Id
-set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
--- TODO: Check that `ct_arty res == dmdTypeDepth == idArity`
+set_idCprInfo id ty = ASSERT( _ct_arty ty == idArity id ) setIdCprInfo id (ct_cpr ty)
 
 get_idCprInfo :: Id -> CprType
--- TODO: Encode arity in CprInfo
-get_idCprInfo id = CprType (length (fst (splitStrictSig (idStrictness id)))) (idCprInfo id)
+get_idCprInfo id = CprType (idArity id) (idCprInfo id)
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

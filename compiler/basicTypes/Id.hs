@@ -166,6 +166,7 @@ infixl  1 `setIdUnfolding`,
 
           `setIdDemandInfo`,
           `setIdStrictness`,
+          `setIdCprInfo`,
 
           `asJoinId`,
           `asJoinId_maybe`
@@ -651,7 +652,7 @@ idCprInfo       :: Id -> CPRResult
 idCprInfo       id = cprInfo (idInfo id)
 
 setIdCprInfo :: Id -> CPRResult -> Id
-setIdCprInfo id cpr = modifyIdInfo (\info -> setCprInfo info (idArity id) cpr) id
+setIdCprInfo id cpr = modifyIdInfo (\info -> setCprInfo info cpr) id
 
 zapIdStrictness :: Id -> Id
 zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
@@ -956,11 +957,13 @@ transferPolyIdInfo old_id abstract_wrt new_id
 
     old_strictness  = strictnessInfo old_info
     new_strictness  = increaseStrictSigArity arity_increase old_strictness
+    old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` new_occ_info
                                  `setStrictnessInfo` new_strictness
+                                 `setCprInfo` old_cpr
 
 isNeverLevPolyId :: Id -> Bool
 isNeverLevPolyId = isNeverLevPolyIdInfo . idInfo

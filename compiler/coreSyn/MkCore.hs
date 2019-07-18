@@ -72,6 +72,7 @@ import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
 import IdInfo
 import Demand
+import Cpr
 import Name      hiding ( varName )
 import Outputable
 import FastString
@@ -796,6 +797,7 @@ aBSENT_SUM_FIELD_ERROR_ID
   = mkVanillaGlobalWithInfo absentSumFieldErrorName
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botRes
+                     `setCprInfo` botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs) -- #15038
 
@@ -810,6 +812,7 @@ mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
+                                   `setCprInfo`           botCpr
                                    `setArityInfo`         1
                         -- Make arity and strictness agree
 

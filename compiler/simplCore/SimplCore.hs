@@ -1020,6 +1020,7 @@ transferIdInfo exported_id local_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setStrictnessInfo`    strictnessInfo local_info
+                                 `setCprInfo`           cprInfo local_info
                                  `setUnfoldingInfo`     unfoldingInfo local_info
                                  `setInlinePragInfo`    inlinePragInfo local_info
                                  `setRuleInfo`          addRuleInfo (ruleInfo exp_info) new_info

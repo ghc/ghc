@@ -258,6 +258,9 @@ data IdInfo
         strictnessInfo  :: StrictSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
+        cprInfo         :: CPRResult,
+        -- ^ Information on whether the function will ultimately return a
+        -- freshly allocated constructor when applied to 'arityInfo' arguments.
         demandInfo      :: Demand,
         -- ^ ID demand information
         callArityInfo   :: !ArityInfo,
@@ -302,19 +305,8 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
-cprInfo :: IdInfo -> CPRResult
-cprInfo = dmdResToCpr . snd . splitStrictSig . strictnessInfo
-
-setCprInfo :: IdInfo -> Arity -> CPRResult -> IdInfo
-setCprInfo info arty cpr = dr `seq` info { strictnessInfo = sig' }
-  where
-    sig@(StrictSig (DmdType env args res)) = strictnessInfo info
-    dr
-      | isBotRes res = botRes -- CPR doesn't provide accurate termination info
-      | otherwise    = cprRes cpr
-    sig'
-      | isTopSig sig = StrictSig (DmdType env (take arty (repeat topDmd)) dr)
-      | otherwise    = StrictSig (DmdType env args dr)
+setCprInfo :: IdInfo -> CPRResult -> IdInfo
+setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
@@ -329,6 +321,7 @@ vanillaIdInfo
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
+            cprInfo             = topCpr,
             callArityInfo       = unknownArity,
             levityInfo          = NoLevityInfo
            }
