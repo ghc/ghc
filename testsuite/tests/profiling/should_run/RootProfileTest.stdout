@@ -1,0 +1,24 @@
+= simple =
+bin xs = 9
+bin xs = 14
+bin xs = 19
+bin xs = 24
+bin xs = 29
+bin xs = 34
+bin xs = 39
+bin xs = 44
+bin xs = 49
+bin xs = 54
+bin xs = 59
+
+
+
+
+= sharing =
+bin 1 = 5
+bin 1-2 = 5
+bin 1-2-3 = 5
+bin 1-2-3-4 = 5
+bin 1-2-3-4-5 = 5
+bin 1-2-3-4-5-6 = 5
+bin 1-2-3-4-5-6-[] = 2
