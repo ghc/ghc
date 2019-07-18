@@ -350,6 +350,7 @@ usage_text[] = {
 "                 y = type description",
 "                 r = retainer",
 "                 b = biography (LAG,DRAG,VOID,USE)",
+"                 o = root objects selected by program",
 "  A subset of closures may be selected thusly:",
 "    -hc<cc>,...  specific cost centre(s) (top of stack only)",
 "    -hC<cc>,...  specific cost centre(s) (anywhere in stack)",
@@ -2061,6 +2062,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'B':
     case 'b':
     case 'T':
+    case 'o':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
                 const char *left  = strchr(arg, '{');
@@ -2146,6 +2148,9 @@ static bool read_heap_profiling_flag(const char *arg)
             break;
         case 'T':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
+            break;
+        case 'o':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_ROOT;
             break;
         }
         break;
