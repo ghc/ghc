@@ -19,7 +19,7 @@ config.run_ways           = ['normal', 'hpc']
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways         = ['prof', 'normal_h',
                              'prof_hc_hb','prof_hb',
-                             'prof_hd','prof_hy','prof_hr',
+                             'prof_hd','prof_hy','prof_hr', 'prof_ho'
                              'sanity',
                              'threaded1_ls', 'threaded2_hT', 'debug_numa',
                              'llvm', 'debugllvm',
@@ -87,6 +87,7 @@ config.way_flags = {
     'prof_hd'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hy'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hr'      : ['-O', '-prof', '-static', '-fprof-auto'],
+    'prof_ho'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'dyn'          : ['-O', '-dynamic'],
     'static'       : ['-O', '-static'],
     'debug'        : ['-O', '-g', '-dannot-lint'],
@@ -125,6 +126,7 @@ config.way_rts_flags = {
     'prof_hd'      : ['-hd'],
     'prof_hy'      : ['-hy'],
     'prof_hr'      : ['-hr'],
+    'prof_ho'      : ['-ho', '-i0'],
     'dyn'          : [],
     'static'       : [],
     'debug'        : [],
