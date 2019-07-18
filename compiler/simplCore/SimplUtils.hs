@@ -499,7 +499,7 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- top-level bindings for (say) strings into
                         -- calls to error.  But now we are more careful about
                         -- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-                   if isBotRes result_info then
+                   if isBotDiv result_info then
                         map isStrictDmd demands         -- Finite => result is bottom
                    else
                         map isStrictDmd demands ++ vanilla_stricts

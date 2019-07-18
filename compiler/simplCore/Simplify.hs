@@ -35,7 +35,7 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
 import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
-                        , mkClosedStrictSig, botCpr, topDmd, botRes )
+                        , mkClosedStrictSig, botCpr, topDmd, botDiv )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
@@ -733,7 +733,7 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
     -- Bottoming bindings: see Note [Bottoming bindings]
     info4 | is_bot    = info3
                           `setStrictnessInfo`
-                            mkClosedStrictSig (replicate new_arity topDmd) botRes
+                            mkClosedStrictSig (replicate new_arity topDmd) botDiv
                           `setCprInfo` botCpr
           | otherwise = info3
 

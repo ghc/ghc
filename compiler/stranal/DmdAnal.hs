@@ -66,8 +66,8 @@ dmdAnalTopBind :: AnalEnv
 dmdAnalTopBind env (NonRec id rhs)
   = (extendAnalEnv TopLevel env id2 (idStrictness id2), NonRec id2 rhs2)
   where
-    ( _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing env             cleanEvalDmd id rhs
-    ( _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin env) cleanEvalDmd id rhs1
+    ( _, _,   rhs1) = dmdAnalRhsLetDown Nothing env             cleanEvalDmd id rhs
+    ( _, id2, rhs2) = dmdAnalRhsLetDown Nothing (nonVirgin env) cleanEvalDmd id rhs1
         -- Do two passes to improve CPR information
         -- See Note [CPR for thunks]
         -- See Note [Optimistic CPR in the "virgin" case]
@@ -295,7 +295,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env dmd id rhs
+    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
     env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
@@ -549,7 +549,7 @@ dmdFix top_lvl env let_dmd orig_pairs
         my_downRhs (env, lazy_fv) (id,rhs)
           = ((env', lazy_fv'), (id', rhs'))
           where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env let_dmd id rhs
+            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
             lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
             env'                  = extendAnalEnv top_lvl env id (idStrictness id')
 
@@ -587,14 +587,14 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalRhsLetDown :: TopLevelFlag
-           -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
-           -> AnalEnv -> CleanDemand
-           -> Id -> CoreExpr
-           -> (DmdEnv, Id, CoreExpr)
+dmdAnalRhsLetDown
+  :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
+  -> AnalEnv -> CleanDemand
+  -> Id -> CoreExpr
+  -> (DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
-dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
+dmdAnalRhsLetDown rec_flag env let_dmd id rhs
   = (lazy_fv, id', rhs')
   where
     rhs_arity      = idArity id
@@ -608,9 +608,9 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
       -- NB: rhs_arity
       -- See Note [Demand signatures are computed for a threshold demand based on idArity]
       = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_res, rhs')
+    (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_res')
+    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
     id'            = set_idStrictness env id sig
         -- See Note [NOINLINE and strictness]
 
@@ -623,17 +623,8 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     -- See Note [Lazy and unleashable free variables]
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
 
-    rhs_res'  = trimCPRInfo trim_all trim_sums rhs_res
-    trim_all  = is_thunk && not_strict
-    trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
-
     -- See Note [CPR for thunks]
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict
-       =  isTopLevel top_lvl  -- Top level and recursive things don't
-       || isJust rec_flag     -- get their demandInfo set at all
-       || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
-          -- See Note [Optimistic CPR in the "virgin" case]
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
 -- unleashing on the given function's @rhs@, by creating a call demand of
@@ -908,7 +899,7 @@ a product type.
 -}
 
 unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topRes
+unitDmdType dmd_env = DmdType dmd_env [] topDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)

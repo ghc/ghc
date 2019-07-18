@@ -1758,7 +1758,7 @@ calcSpecStrictness :: Id                     -- The original function
                    -> StrictSig              -- Strictness of specialised thing
 -- See Note [Transfer strictness]
 calcSpecStrictness fn qvars pats
-  = mkClosedStrictSig spec_dmds topRes
+  = mkClosedStrictSig spec_dmds topDiv
   where
     spec_dmds = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     StrictSig (DmdType _ dmds _) = idStrictness fn
