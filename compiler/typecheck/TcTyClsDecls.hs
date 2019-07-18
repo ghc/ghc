@@ -604,7 +604,7 @@ generaliseTcTyCon tc
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
        -- Returned 'inferred' are scope-sorted and skolemised
-       ; inferred <- quantifyTyVars emptyVarSet dvs2
+       ; inferred <- quantifyTyVars dvs2
 
        -- Step 3a: rename all the Specified and Required tyvars back to
        -- TyVars with their oroginal user-specified name.  Example
@@ -2320,7 +2320,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+       ; qtvs <- quantifyTyVars dvs
 
        ; (ze, qtvs) <- zonkTyBndrs qtvs
        ; lhs_ty     <- zonkTcTypeToTypeX ze lhs_ty

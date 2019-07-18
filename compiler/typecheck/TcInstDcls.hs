@@ -820,7 +820,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+       ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
