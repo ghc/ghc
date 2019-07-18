@@ -152,3 +152,6 @@ test('T15897',
      makefile_test, ['T15897'])
 
 test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
+
+test('RootProfileTest', [ extra_ways(['prof_ho']), only_ways(['prof_ho']) ],
+     compile_and_run, ['-debug'])
