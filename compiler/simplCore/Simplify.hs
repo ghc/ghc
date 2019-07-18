@@ -35,7 +35,8 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
 import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
-                        , mkClosedStrictSig, botCpr, topDmd, botDiv )
+                        , mkClosedStrictSig, topDmd, botDiv )
+import Cpr              ( botCpr )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils

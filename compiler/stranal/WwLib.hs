@@ -21,6 +21,7 @@ import Id
 import IdInfo           ( JoinArity )
 import DataCon
 import Demand
+import Cpr
 import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import MkId             ( voidArgId, voidPrimId )
@@ -126,7 +127,7 @@ mkWwBodies :: DynFlags
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
-           -> CPRResult      -- Info about function result
+           -> CprResult      -- Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -996,7 +997,7 @@ left-to-right traversal of the result structure.
 mkWWcpr :: Bool
         -> FamInstEnvs
         -> Type                              -- function body type
-        -> CPRResult                         -- CPR analysis results
+        -> CprResult                         -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker

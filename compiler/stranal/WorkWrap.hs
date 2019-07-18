@@ -22,6 +22,7 @@ import UniqSupply
 import BasicTypes
 import DynFlags
 import Demand
+import Cpr
 import WwLib
 import Util
 import Outputable
@@ -554,7 +555,7 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CPRResult -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr_info) ) do

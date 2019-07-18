@@ -99,6 +99,7 @@ import ForeignCall
 import Outputable
 import Module
 import Demand
+import Cpr
 import Util
 
 -- infixl so you can say (id `set` a `set` b)
@@ -258,7 +259,7 @@ data IdInfo
         strictnessInfo  :: StrictSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
-        cprInfo         :: CPRResult,
+        cprInfo         :: CprResult,
         -- ^ Information on whether the function will ultimately return a
         -- freshly allocated constructor when applied to 'arityInfo' arguments.
         demandInfo      :: Demand,
@@ -305,7 +306,7 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
-setCprInfo :: IdInfo -> CPRResult -> IdInfo
+setCprInfo :: IdInfo -> CprResult -> IdInfo
 setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever

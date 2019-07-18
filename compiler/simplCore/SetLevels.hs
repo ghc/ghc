@@ -85,7 +85,8 @@ import UniqSet          ( nonDetFoldUniqSet )
 import UniqDSet         ( getUniqDSet )
 import VarEnv
 import Literal          ( litIsTrivial )
-import Demand           ( StrictSig, Demand, botCpr, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import Cpr              ( botCpr )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType

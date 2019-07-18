@@ -46,6 +46,7 @@ import DynFlags         ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                         , gopt, hasPprDebug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand
+import Cpr
 import GHC.Serialized   ( deserializeWithData )
 import Util
 import Pair

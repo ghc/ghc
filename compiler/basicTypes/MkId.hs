@@ -61,6 +61,7 @@ import DataCon
 import Id
 import IdInfo
 import Demand
+import Cpr
 import CoreSyn
 import Unique
 import UniqSupply
@@ -552,7 +553,7 @@ mkDataConWorkId wkr_name data_con
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
-dataConCPR :: DataCon -> CPRResult
+dataConCPR :: DataCon -> CprResult
 dataConCPR con
   | isDataTyCon tycon     -- Real data types only; that is,
                           -- not unboxed tuples or newtypes

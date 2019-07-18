@@ -40,7 +40,8 @@ import MkId             ( mkDictSelRhs )
 import IdInfo
 import InstEnv
 import Type             ( tidyTopType )
-import Demand           ( appIsBottom, isTopSig, isBottomingSig, botCpr )
+import Demand           ( appIsBottom, isTopSig, isBottomingSig )
+import Cpr              ( botCpr )
 import BasicTypes
 import Name hiding (varName)
 import NameSet

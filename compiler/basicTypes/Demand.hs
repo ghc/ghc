@@ -28,11 +28,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), CPRResult, lubDivergence, lubCPR,
-        isBotDiv, isTopDiv,
-        isBotCpr, isTopCpr,
-        topCpr, botCpr, sumCpr, prodCpr, trimCpr, returnsCPR_maybe,
-        topDiv, botDiv,
+        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
@@ -899,47 +895,21 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 {-
 ************************************************************************
 *                                                                      *
-                   Demand results
+                   Termination
 *                                                                      *
 ************************************************************************
-
 
 Divergence:     Dunno
                /
           Diverges
 
-
-CPRResult:         NoCPR
-                   /    \
-            RetProd    RetSum ConTag
-                   \    /
-                   BotCPR
-
 In a fixpoint iteration, start from Diverges
 -}
-
-------------------------------------------------------------------------
--- Constructed Product Result
-------------------------------------------------------------------------
 
 data Divergence
   = Diverges    -- Definitely diverges
   | Dunno       -- Might diverge or converge
   deriving( Eq, Show )
-
-data CPRResult = NoCPR          -- Top of the lattice
-               | RetProd        -- Returns a constructor from a product type
-               | RetSum !ConTag -- Returns a constructor from a data type
-               | BotCPR
-               deriving( Eq, Show )
-
-lubCPR :: CPRResult -> CPRResult -> CPRResult
-lubCPR (RetSum t1) (RetSum t2)
-  | t1 == t2               = RetSum t1
-lubCPR RetProd     RetProd = RetProd
-lubCPR BotCPR      cpr     = cpr
-lubCPR cpr         BotCPR  = cpr
-lubCPR _           _       = NoCPR
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
@@ -961,40 +931,9 @@ instance Outputable Divergence where
   ppr Diverges      = char 'b'
   ppr Dunno         = empty
 
-instance Outputable CPRResult where
-  ppr NoCPR        = empty
-  ppr (RetSum n)   = char 'm' <> int n
-  ppr RetProd      = char 'm'
-  ppr BotCPR       = char 'b'
-
 ------------------------------------------------------------------------
 -- Combined demand result                                             --
 ------------------------------------------------------------------------
-
-topCpr :: CPRResult
-topCpr = NoCPR
-
-botCpr :: CPRResult
-botCpr = BotCPR
-
-sumCpr :: ConTag -> CPRResult
-sumCpr = RetSum
-
-prodCpr :: CPRResult
-prodCpr = RetProd
-
-isTopCpr :: CPRResult -> Bool
-isTopCpr cpr = topCpr == cpr
-
-isBotCpr :: CPRResult -> Bool
-isBotCpr cpr = botCpr == cpr
-
-trimCpr :: Bool -> Bool -> CPRResult -> CPRResult
-trimCpr trim_all trim_sums cpr
-  | trim_all  = NoCPR
-  | otherwise = case cpr of
-      RetSum{} | trim_sums -> NoCPR
-      _ -> cpr
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
@@ -1010,12 +949,6 @@ isTopDiv _     = False
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
 isBotDiv _        = False
-
-returnsCPR_maybe :: CPRResult -> Maybe ConTag
-returnsCPR_maybe (RetSum t)  = Just t
-returnsCPR_maybe RetProd     = Just fIRST_TAG
-returnsCPR_maybe NoCPR       = Nothing
-returnsCPR_maybe BotCPR      = Nothing
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
@@ -2069,17 +2002,3 @@ instance Binary Divergence where
               ; case h of
                   0 -> return Dunno
                   _ -> return Diverges }
-
-instance Binary CPRResult where
-    put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
-    put_ bh RetProd      = putByte bh 1
-    put_ bh NoCPR        = putByte bh 2
-    put_ bh BotCPR       = putByte bh 3
-
-    get  bh = do
-            h <- getByte bh
-            case h of
-              0 -> do { n <- get bh; return (RetSum n) }
-              1 -> return RetProd
-              2 -> return NoCPR
-              _ -> return BotCPR
