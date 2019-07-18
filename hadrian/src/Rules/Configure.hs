@@ -19,6 +19,10 @@ configureResults =
 configureRules :: Rules ()
 configureRules = do
     configureResults &%> \outs -> do
+        -- Do not cache the results. The true dependencies of the configure
+        -- script are not tracked. This includes e.g. the ghc source path.
+        historyDisable
+
         skip <- not <$> cmdConfigure
         if skip
         then unlessM (doesFileExist configFile) $
