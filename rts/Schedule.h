@@ -117,10 +117,6 @@ void interruptStgRts (void);
 
 void resurrectThreads (StgTSO *);
 
-#if defined(THREADED_RTS)
-void stopAllCapabilities (Capability **pCap, Task *task);
-void releaseAllCapabilities(uint32_t n, Capability *cap, Task *task);
-#endif
 
 /* -----------------------------------------------------------------------------
  * Some convenient macros/inline functions...
