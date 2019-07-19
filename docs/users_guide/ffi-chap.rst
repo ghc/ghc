@@ -71,6 +71,8 @@ GHC extensions to the FFI Chapter
 The FFI features that are described in this section are specific to GHC.
 Your code will not be portable to other compilers if you use them.
 
+.. _ffi-unlifted-types:
+
 Unlifted FFI Types
 ~~~~~~~~~~~~~~~~~~
 
@@ -109,16 +111,24 @@ very difficult to track down. (The errors likely will not manifest
 until garbage collection happens.) In tabular form, these restrictions
 are:
 
-+------------------+----------------------------------------------------+
-|                  | When value is used as argument to FFI call that is |
-+------------------+-----------------------+----------------------------+
-| Type             | Safe                  | Unsafe                     |
-+------------------+-----------------------+----------------------------+
-| ``Array#``       | Unsound               | Sound, not useful          |
-| ``SmallArray#``  | Unsound               | Sound, not useful          |
-| ``ArrayArray#``  | Unsound               | Sound                      |
-| ``ByteArray#``   | Sound if pinned       | Sound                      |
-+------------------+-----------------------+----------------------------+
++--------------------------------+-----------------------------------------------------+
+|                                | When value is used as argument to FFI call that is  |
++--------------------------------+-------------------------+---------------------------+
+|                                | ``foreign import safe`` | ``foreign import unsafe`` |
++--------------------------------+-----------+-------------+-----------+---------------+
+| Argument Type                  | reads are | writes are  | reads are | writes are    |
++--------------------------------+-----------+-------------+-----------+---------------+
+| ``Array#``                     | Unsound   | Unsound     | Sound     | Unsound       |
+| ``MutableArray#``              | Unsound   | Unsound     | Sound     | Unsound       |
+| ``SmallArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
+| ``MutableSmallArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
+| ``ArrayArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
+| ``MutableArrayArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
+| unpinned ``ByteArray#``        | Unsound   | Unsound     | Sound     | Unsound       |
+| unpinned ``MutableByteArray#`` | Unsound   | Unsound     | Sound     | Sound         |
+| pinned ``ByteArray#``          | Sound     | Unsound     | Sound     | Unsound       |
+| pinned ``MutableByteArray#``   | Sound     | Sound       | Sound     | Sound         |
++--------------------------------+-----------+-------------+-----------+---------------+
 
 When passing any of the unlifted array types as an argument to
 a foreign C call, a foreign function sees a pointer that refers to the
