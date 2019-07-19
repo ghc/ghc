@@ -762,37 +762,47 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = do { let args_to_consider = min (length act_args) (length exp_args)
                  Right (n_act_args, act_res) = tcSplitFunTysN args_to_consider ty_a
                  Right (n_exp_args, exp_res) = tcSplitFunTysN args_to_consider ty_e
-             -- See Note [Co/contra-variance of subsumption checking]
-           ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
-             -- res_wrap :: act-res ~> exp_res
-           ; handle_arguments (zip n_act_args n_exp_args) exp_res res_wrap
+              -- if the result types are guarded, we "quick look" at them now
+           ; if tcIsGuardedType act_res && tcIsGuardedType exp_res
+                then do { _ <- uType TypeLevel eq_orig act_res exp_res ; return () }
+                else return ()
+              -- handle the arguments and the result type at the end
+           ; handle_arguments (zip n_act_args n_exp_args) act_res exp_res
            }
       where
 
         handle_arguments :: [(TcSigmaType, TcSigmaType)]  -- pairs of arguments
-                         -> TcSigmaType -> HsWrapper      -- info about result
+                         -> TcSigmaType -> TcSigmaType    -- actual and expected result
                          -> TcM HsWrapper
         -- GenSigCtxt: See Note [Setting the argument context]
         -- in each case, arg_wrap :: exp_arg ~> act_arg
         handle_arguments [] _ _
           = pprPanic "tc_sub_type_ds" (ppr ty_a <+> ppr ty_e)
-        handle_arguments [(last_act_arg, last_exp_arg)] exp_res res_wrap
-          = do { last_arg_wrap <- tc_sub_tc_type eq_orig (given_orig last_exp_arg)
+        handle_arguments [(last_act_arg, last_exp_arg)] act_res exp_res
+          = do { -- last argument: we should also handle the result type
+                 last_arg_wrap <- tc_sub_tc_type eq_orig (given_orig last_exp_arg)
                                                  GenSigCtxt last_exp_arg last_act_arg
+
+                   -- See Note [Co/contra-variance of subsumption checking]
+                   -- res_wrap :: act-res ~> exp_res
+               ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
+                   
                ; return (mkWpFun last_arg_wrap res_wrap last_exp_arg exp_res doc)
                }
-        handle_arguments ((act_arg, exp_arg) : more_args) exp_res res_wrap
-          | is_guarded_type act_arg
-          , is_guarded_type exp_arg
+        handle_arguments ((act_arg, exp_arg) : more_args) act_res exp_res
+          | tcIsGuardedType act_arg
+          , tcIsGuardedType exp_arg
           = do {  -- Both guarded, do it now
+               ; act_arg' <- zonkTcType act_arg
+               ; exp_arg' <- zonkTcType exp_arg
                ; arg_wrap <- tc_sub_tc_type eq_orig (given_orig exp_arg)
-                                            GenSigCtxt exp_arg act_arg
-               ; more_wrap <- handle_arguments more_args exp_res res_wrap
+                                            GenSigCtxt exp_arg' act_arg'
+               ; more_wrap <- handle_arguments more_args act_res exp_res
                ; return (mkWpFun arg_wrap more_wrap exp_arg more_arrow doc)
                }
           | otherwise
           = do {  -- Some is not guarded guarded, do the rest first
-               ; more_wrap <- handle_arguments more_args exp_res res_wrap
+               ; more_wrap <- handle_arguments more_args act_res exp_res
                ; act_arg' <- zonkTcType act_arg
                ; exp_arg' <- zonkTcType exp_arg
                ; arg_wrap <- tc_sub_tc_type eq_orig (given_orig exp_arg')
@@ -801,12 +811,6 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                }
           where
             more_arrow = mkVisFunTys (map snd more_args) exp_res
-
-        is_guarded_type ty
-          | Just (tc, _) <- tcSplitTyConApp_maybe ty
-          = not (isFunTyCon tc) && isInjectiveTyCon tc Nominal
-          | otherwise
-          = False
           
         given_orig exp_arg = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
