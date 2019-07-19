@@ -697,7 +697,7 @@ void printLargeAndPinnedObjects()
     for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
-        debugBelch("Capability %d: Current pinned object block: %p\n", 
+        debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
         for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
             debugBelch("%p\n", (void*)bd);
@@ -852,25 +852,17 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
-void findPtr(P_ p, int);                /* keep gcc -Wall happy */
+typedef void (*FindPtrCb)(void *user, StgClosure *);
 
-void default_callback(void *user, StgClosure * closure){
+void findPtr(P_ p, int);                /* keep gcc -Wall happy */
+void findPtrCb(FindPtrCb cb, void *, P_ p);  /* keep gcc -Wall happy */
+
+static void findPtr_default_callback(void *user, StgClosure * closure){
+  (void)user;
   debugBelch("%p = ", closure);
   printClosure((StgClosure *)closure);
 }
 
-void
-findPtr(P_ p, int follow){
-  findPtr_gen(&default_callback, NULL, p, follow);
-}
-
-typedef void (*FindPtrCb)(void *user, StgClosure *);
-void findPtr_cb(FindPtrCb cb, void* user, P_ p){
-  findPtr_gen(cb, user, p, 0);
-}
-
-
-void findPtr_gen(FindPtrCb, void*, P_ p, int);            /* keep gcc -Wall happy */
 
 int searched = 0;
 
@@ -910,7 +902,7 @@ findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int
     return i;
 }
 
-void
+static void
 findPtr_gen(FindPtrCb c, void *user, P_ p, int follow)
 {
   uint32_t g, n;
@@ -946,10 +938,20 @@ findPtr_gen(FindPtrCb c, void *user, P_ p, int follow)
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {
+      ASSERT(c == &findPtr_default_callback);
       debugBelch("-->\n");
       // Non-standard callback expects follow=0
       findPtr(arr[0], 1);
   }
+}
+
+void
+findPtr(P_ p, int follow){
+  findPtr_gen(&findPtr_default_callback, NULL, p, follow);
+}
+
+void findPtrCb(FindPtrCb cb, void* user, P_ p){
+  findPtr_gen(cb, user, p, 0);
 }
 
 const char *what_next_strs[] = {
