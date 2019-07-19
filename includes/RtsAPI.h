@@ -446,7 +446,7 @@ void rts_checkSchedStatus (char* site, Capability *);
 
 SchedulerStatus rts_getSchedStatus (Capability *cap);
 
-
+#if defined(THREADED_RTS)
 // Various bits of information that need to be persisted between rts_pause and
 // rts_unpause.
 typedef struct RtsPaused_ {
@@ -464,6 +464,7 @@ void rts_listThreads(ListThreadsCb cb, void *user);
 // List all non-thread GC roots. Must be done while RTS is paused.
 typedef void (*ListRootsCb)(void *user, StgClosure *);
 void rts_listMiscRoots(ListRootsCb cb, void *user);
+#endif
 
 /*
  * The RTS allocates some thread-local data when you make a call into

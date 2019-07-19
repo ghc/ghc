@@ -649,6 +649,8 @@ rts_unlock (Capability *cap)
 #if defined(THREADED_RTS)
 static bool rts_paused = false;
 // Halt execution of all Haskell threads.
+// It is different to rts_lock because it pauses all capabilities. rts_lock
+// only pauses a single capability.
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
@@ -660,7 +662,7 @@ RtsPaused rts_pause (void)
     return paused;
 }
 
-void rts_unpause (RtsPaused paused)
+void rts_unpause (RtsPaused  paused)
 {
     rts_paused = false;
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
@@ -686,7 +688,7 @@ struct list_roots_ctx {
 };
 
 // This is an evac_fn.
-void list_roots_helper(void *user, StgClosure **p) {
+static void list_roots_helper(void *user, StgClosure **p) {
     struct list_roots_ctx *ctx = (struct list_roots_ctx *) user;
     ctx->cb(ctx->user, *p);
 }
@@ -701,38 +703,6 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     threadStableNameTable(&list_roots_helper, (void *)&ctx);
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
-
-#else
-static bool rts_paused = false;
-// Halt execution of all Haskell threads.
-RtsPaused rts_pause (void)
-{
-    struct RtsPaused_ paused;
-    return paused;
-}
-
-void rts_unpause (RtsPaused paused)
-{
-}
-
-
-void rts_listThreads(ListThreadsCb cb, void *user)
-{
-}
-
-struct list_roots_ctx {
-    ListRootsCb cb;
-    void *user;
-};
-
-// This is an evac_fn.
-void list_roots_helper(void *user, StgClosure **p) {
-}
-
-void rts_listMiscRoots (ListRootsCb cb, void *user)
-{
-}
-
 
 #endif
 
