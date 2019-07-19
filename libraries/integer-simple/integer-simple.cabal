@@ -9,6 +9,7 @@ description:
     This package contains a simple Integer library.
 cabal-version:  >=1.10
 build-type: Simple
+extra-source-files: changelog.md
 
 source-repository head
     type:     git
