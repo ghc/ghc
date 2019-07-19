@@ -69,6 +69,7 @@ module TcType (
   tcRepGetNumAppTys,
   tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
+  tcIsGuardingTyCon, tcIsGuardedType,
 
   ---------------------------------
   -- Predicates.
@@ -1291,6 +1292,16 @@ tcSplitTyConApp :: Type -> (TyCon, [Type])
 tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
                         Just stuff -> stuff
                         Nothing    -> pprPanic "tcSplitTyConApp" (pprType ty)
+
+tcIsGuardingTyCon :: TyCon -> Bool
+tcIsGuardingTyCon tc = not (isFunTyCon tc) && isInjectiveTyCon tc Nominal
+
+tcIsGuardedType :: Type -> Bool
+tcIsGuardedType ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty
+  = tcIsGuardingTyCon tc
+  | otherwise
+  = False
 
 -----------------------
 tcSplitFunTys :: Type -> ([Type], Type)
