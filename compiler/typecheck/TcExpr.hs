@@ -68,7 +68,7 @@ import PrelNames
 import DynFlags
 import SrcLoc
 import Util
-import VarEnv  ( emptyTidyEnv, InScopeSet, mkInScopeSet, emptyInScopeSet, unionInScope )
+import VarEnv  ( emptyTidyEnv, mkInScopeSet, emptyInScopeSet, unionInScope )
 import ListSetOps
 import Maybes
 import Outputable
@@ -1207,7 +1207,7 @@ tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
 
        ; traceTc "tcFunApp" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
        ; (wrap_fun, tc_args, actual_res_ty)
-           <- tcArgs rn_fun fun_sigma orig rn_args
+           <- tcArgs rn_fun fun_sigma orig rn_args res_ty
                      (m_herald `orElse` mk_app_msg rn_fun rn_args)
 
             -- this is just like tcWrapResult, but the types don't line
@@ -1259,10 +1259,11 @@ tcArgs :: LHsExpr GhcRn   -- ^ The function itself (for err msgs only)
        -> TcSigmaType    -- ^ the (uninstantiated) type of the function
        -> CtOrigin       -- ^ the origin for the function's type
        -> [LHsExprArgIn] -- ^ the args
+       -> ExpRhoType     -- ^ the expected result type
        -> SDoc           -- ^ the herald for matchActualFunTys
        -> TcM (HsWrapper, [LHsExprArgOut], TcSigmaType)
           -- ^ (a wrapper for the function, the tc'd args, result type)
-tcArgs fun orig_fun_ty fun_orig orig_args herald
+tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
   | fun_is_out_of_scope
   , any isHsTypeArg orig_args
   = failM  -- See Note [VTA for out-of-scope functions]
@@ -1286,17 +1287,24 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 
     go _ _ fun_ty [] deferred_args
       = do { let r_deferred_args = reverse deferred_args
-                 ql_args = args_for_quick_look r_deferred_args
-                 ql_tys  = map snd ql_args
-                 ql_in_scope = mkInScopeSet (tyCoVarsOfTypes ql_tys)
-                 ql_tvs_lst  = tyCoVarsOfTypesList ql_tys 
            ; dflags <- getDynFlags
            ; if xopt LangExt.ImpredicativeTypes dflags 
-                then do { ql_subst <- discardConstraints $
-                                        tcQuickLooks ql_in_scope ql_args
+                then do { let ql_args = args_for_quick_look r_deferred_args
+                              ql_tys  = map snd ql_args
+                              ql_in_scope = mkInScopeSet (tyCoVarsOfTypes ql_tys)
+                              ql_tvs_lst  = tyCoVarsOfTypesList ql_tys
+                            -- first have a quick look on the result
+                        ; let res_subst = case exp_res_ty of 
+                                           Check exp_res_ty'
+                                             -> tcGuardedUnify fun_ty exp_res_ty'
+                                           _ -> mkEmptyTCvSubst ql_in_scope
+                            -- then have a quick look on the arguments
+                        ; ql_subst <- discardConstraints $
+                                        tcQuickLooks res_subst ql_args
+                            -- apply the resulting substitution
                         ; forM_ ql_tvs_lst $ \v ->
                             let v' = mkTyVarTy v
-                            in unifyType Nothing v' (substTy ql_subst v')
+                            in unifyType Nothing v' (substTyAddInScope ql_subst v')
                         ; return () }
                 else return ()
            ; args' <- handle_args r_deferred_args
@@ -1396,8 +1404,8 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                text "Cannot apply expression of type" <+> quotes (ppr ty) $$
                text "to a visible type argument" <+> quotes (ppr arg) }
 
-tcQuickLooks :: InScopeSet -> [(LHsExpr GhcRn, TcSigmaType)] -> TcM TCvSubst
-tcQuickLooks initial_in_scope = go (mkEmptyTCvSubst initial_in_scope)
+tcQuickLooks :: TCvSubst -> [(LHsExpr GhcRn, TcSigmaType)] -> TcM TCvSubst
+tcQuickLooks initial_subst = go initial_subst
   where
     go current_subst []
       = return current_subst
@@ -1479,14 +1487,17 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
 
     -- go' assumes the forall's on top have been instantiated
     go' _ fun_ty [] ty in_scope accumulated_args
-      = do { args_subst <- tcQuickLooks in_scope (reverse accumulated_args)
-           ; traceTc "tcQuickLook/args" (vcat [ppr args_subst, ppr fun_ty])
-           ; let fun_ty'     = substTyAddInScope args_subst fun_ty
-                 res_subst   = composeTCvSubst (partial_unify fun_ty' ty)
+      = do { -- We look *twice* in the result type
+             let res_subst1   = composeTCvSubst (tcGuardedUnify fun_ty ty)
+                                                (mkEmptyTCvSubst in_scope)
+             -- Apply first quick look on the result to arguments
+           ; args_subst <- tcQuickLooks res_subst1 (reverse accumulated_args)
+           ; let args_res1_subst = composeTCvSubst args_subst res_subst1
+             -- Now look again at the result type
+           ; let fun_ty'     = substTyAddInScope args_res1_subst fun_ty
+                 res_subst2  = composeTCvSubst (tcGuardedUnify fun_ty' ty)
                                                (mkEmptyTCvSubst in_scope)
-                 final_subst = composeTCvSubst res_subst args_subst
-           ; traceTc "tcQuickLook/result"
-                     (vcat [ppr fun_ty', ppr ty, ppr final_subst])
+                 final_subst = composeTCvSubst res_subst2 args_res1_subst
            ; return final_subst
            }
     go' _ fun_ty (HsTypeArg _ _ : _) _ _ _
@@ -1499,38 +1510,34 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
       | otherwise
       = return (mkEmptyTCvSubst in_scope)
 
-    partial_unify ty1 ty2
-      | Just ty1' <- tcView ty1
-      = partial_unify ty1' ty2
-      | Just ty2' <- tcView ty2
-      = partial_unify ty1 ty2'
-      | Just (tc1, args1) <- tcSplitTyConApp_maybe ty1
-      , Just (tc2, args2) <- tcSplitTyConApp_maybe ty2
-      , tc1 == tc2
-      , not (isFunTyCon tc1)
-      , isInjectiveTyCon tc1 Nominal
-      = case tcUnifyTyKis bind_flag args1 args2 of
-          Just subst -> subst
-          Nothing    -> emptyTCvSubst
-      | Just (tc1, (arg1 : _)) <- tcSplitTyConApp_maybe ty1
-      , Just (tc2, (arg2 : _)) <- tcSplitTyConApp_maybe ty2
-      , tc1 == tc2
-      , isFunTyCon tc1
-      = case tcUnifyTyKis bind_flag [arg1] [arg2] of
-          Just subst -> subst
-          Nothing    -> emptyTCvSubst
-      | otherwise
-      = emptyTCvSubst
-    
+-- Do not look in any other case
+tcQuickLook _ _ _
+  = return emptyTCvSubst
+
+tcGuardedUnify :: TcType -> TcType -> TCvSubst
+tcGuardedUnify ty1 ty2
+  | Just ty1' <- tcView ty1
+  = tcGuardedUnify ty1' ty2
+  | Just ty2' <- tcView ty2
+  = tcGuardedUnify ty1 ty2'
+  | tcIsGuardedType ty1
+  , tcIsGuardedType ty2
+  = case tcUnifyTyKis bind_flag [ty1] [ty2] of
+      Just subst -> subst
+      Nothing    -> emptyTCvSubst
+  | Just (arg1, _) <- tcSplitFunTy_maybe ty1
+  , Just (arg2, _) <- tcSplitFunTy_maybe ty2
+  = case tcUnifyTyKis bind_flag [arg1] [arg2] of
+      Just subst -> subst
+      Nothing    -> emptyTCvSubst
+  | otherwise
+  = emptyTCvSubst
+  where  
     bind_flag tv
       | isImmutableTyVar tv
       = Skolem
       | otherwise
       = BindMe
-
--- Do not look in any other case
-tcQuickLook _ _ _
-  = return emptyTCvSubst
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
