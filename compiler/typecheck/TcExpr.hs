@@ -378,11 +378,26 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
+           -- have a quick look at the result type
+       ; dflags <- getDynFlags
+       ; arg2_sigma'
+           <- if xopt LangExt.ImpredicativeTypes dflags 
+                 then do { let res_subst = case res_ty of 
+                                             Check res_ty'
+                                               -> tcGuardedUnify op_res_ty res_ty'
+                                             _ -> emptyTCvSubst
+                         ; forM_ (tyCoVarsOfTypesList [op_res_ty]) $ \v ->
+                             let v' = mkTyVarTy v
+                             in unifyType Nothing v' (substTyAddInScope res_subst v')
+                         ; zonkTcType arg2_sigma
+                         }
+                 else return arg2_sigma
+
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
 
-       ; arg2' <- tcArg op arg2 arg2_sigma 2
+       ; arg2' <- tcArg op arg2 arg2_sigma' 2
 
        -- Make sure that the argument type has kind '*'
        --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
@@ -1290,28 +1305,31 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
     go _ _ fun_ty [] deferred_args
       = do { let r_deferred_args = reverse deferred_args
            ; dflags <- getDynFlags
-           ; if xopt LangExt.ImpredicativeTypes dflags 
-                then do { let ql_args = args_for_quick_look r_deferred_args
-                              ql_tys  = map snd ql_args
-                              ql_in_scope = mkInScopeSet (tyCoVarsOfTypes ql_tys)
-                              ql_tvs_lst  = tyCoVarsOfTypesList ql_tys
-                            -- first have a quick look on the result
-                        ; let res_subst = case exp_res_ty of 
-                                           Check exp_res_ty'
-                                             -> tcGuardedUnify fun_ty exp_res_ty'
-                                           _ -> mkEmptyTCvSubst ql_in_scope
-                        ; traceTc "quickLook/result" (ppr res_subst)
-                            -- then have a quick look on the arguments
-                        ; ql_subst <- discardConstraints $
-                                        tcQuickLooks res_subst ql_args
-                            -- apply the resulting substitution
-                        ; forM_ ql_tvs_lst $ \v ->
-                            let v' = mkTyVarTy v
-                            in unifyType Nothing v' (substTyAddInScope ql_subst v')
-                        ; traceTc "quickLook" (vcat [ppr ql_subst, ppr fun_ty]) }
-                else return ()
+           ; fun_ty' 
+               <- if xopt LangExt.ImpredicativeTypes dflags 
+                     then do { let ql_args = args_for_quick_look r_deferred_args
+                                   ql_tys  = map snd ql_args
+                                   ql_in_scope = mkInScopeSet (tyCoVarsOfTypes (fun_ty:ql_tys))
+                                   ql_tvs_lst  = tyCoVarsOfTypesList (fun_ty:ql_tys)
+                                 -- first have a quick look on the result
+                             ; let res_subst = case exp_res_ty of 
+                                                 Check exp_res_ty'
+                                                   -> tcGuardedUnify fun_ty exp_res_ty'
+                                                 _ -> mkEmptyTCvSubst ql_in_scope
+                             ; traceTc "quickLook/result" (ppr res_subst)
+                                 -- then have a quick look on the arguments
+                             ; ql_subst <- discardConstraints $
+                                              tcQuickLooks res_subst ql_args
+                                 -- apply the resulting substitution
+                             ; forM_ ql_tvs_lst $ \v ->
+                                 let v' = mkTyVarTy v
+                                 in unifyType Nothing v' (substTyAddInScope ql_subst v')
+                             ; traceTc "quickLook" (vcat [ppr ql_subst, ppr fun_ty])
+                             ; zonkTcType fun_ty
+                             }
+                     else return fun_ty
            ; args' <- handle_args r_deferred_args
-           ; return (idHsWrapper, args', fun_ty)
+           ; return (idHsWrapper, args', fun_ty')
            }
 
     go acc_args n fun_ty (arg@(HsArgPar _) : args) deferred_args
