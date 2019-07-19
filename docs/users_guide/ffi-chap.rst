@@ -177,7 +177,7 @@ Although GHC allows the user to pass all unlifted boxed types to
 foreign functions, some of them are not amenable to useful work.
 Although ``Array#`` is unlifted, the elements in its payload are
 lifted, and a foreign C function cannot safely force thunks. Consequently,
-a foreign C function cannot dereference any of the addresses that comprise
+a foreign C function may not dereference any of the addresses that comprise
 the payload of the ``Array#``.
 
 .. _ffi-newtype-io:
