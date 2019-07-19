@@ -857,8 +857,8 @@ typedef void (*FindPtrCb)(void *user, StgClosure *);
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
 void findPtrCb(FindPtrCb cb, void *, P_ p);  /* keep gcc -Wall happy */
 
-static void findPtr_default_callback(void *user, StgClosure * closure){
-  (void)user;
+static void
+findPtr_default_callback(void *user STG_UNUSED, StgClosure * closure){
   debugBelch("%p = ", closure);
   printClosure((StgClosure *)closure);
 }
