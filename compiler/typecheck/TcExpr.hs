@@ -1300,6 +1300,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
                                            Check exp_res_ty'
                                              -> tcGuardedUnify fun_ty exp_res_ty'
                                            _ -> mkEmptyTCvSubst ql_in_scope
+                        ; traceTc "quickLook/result" (ppr res_subst)
                             -- then have a quick look on the arguments
                         ; ql_subst <- discardConstraints $
                                         tcQuickLooks res_subst ql_args
@@ -1307,7 +1308,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
                         ; forM_ ql_tvs_lst $ \v ->
                             let v' = mkTyVarTy v
                             in unifyType Nothing v' (substTyAddInScope ql_subst v')
-                        ; return () }
+                        ; traceTc "quickLook" (vcat [ppr ql_subst, ppr fun_ty]) }
                 else return ()
            ; args' <- handle_args r_deferred_args
            ; return (idHsWrapper, args', fun_ty)
