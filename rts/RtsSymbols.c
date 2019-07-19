@@ -630,7 +630,6 @@
       SymI_HasProto(initLinker)                                         \
       SymI_HasProto(initLinker_)                                        \
       SymI_HasProto(stg_unpackClosurezh)                                \
-      SymI_HasProto(stg_saveClosurezh)                                \
       SymI_HasProto(stg_closureSizzezh)                                 \
       SymI_HasProto(stg_getApStackValzh)                                \
       SymI_HasProto(stg_getSparkzh)                                     \
