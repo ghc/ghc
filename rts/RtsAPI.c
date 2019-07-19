@@ -651,9 +651,6 @@ rts_unlock (Capability *cap)
 
 #if defined(THREADED_RTS)
 static bool rts_paused = false;
-static InformCb rts_inform_cb = NULL;
-static void *rts_inform_user = NULL;
-static StgStablePtr rts_saved_closure = NULL;
 // Halt execution of all Haskell threads.
 RtsPaused rts_pause (void)
 {
@@ -662,11 +659,6 @@ RtsPaused rts_pause (void)
     paused.pausing_task = newBoundTask();
     paused.capabilities = NULL;
     stopAllCapabilities(&paused.capabilities, paused.pausing_task);
-    if (rts_inform_cb != NULL){
-      rts_inform_cb(rts_inform_user, paused);
-      rts_inform_cb = NULL;
-      rts_inform_user = NULL;
-    }
     rts_paused = true;
     return paused;
 }
@@ -678,26 +670,6 @@ void rts_unpause (RtsPaused paused)
     freeTask(paused.pausing_task);
 }
 
-// On a pause, inform the debugger we have paused.
-// This allows the process to be paused by the debuggee
-void rts_inform(InformCb cb, void *user)
-{
-  rts_inform_cb = cb;
-  rts_inform_user = user;
-}
-
-// Report about which objects were saved, for now there is only
-// one object
-StgClosure * rts_report_saved(void){
-  return (StgClosure *)deRefStablePtr(rts_saved_closure);
-}
-
-void rts_save_object(StgClosure * clos){
-  rts_saved_closure = clos;
-  // getStablePtr(clos);
-}
-
-// Save an object
 
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
@@ -735,9 +707,6 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 
 #else
 static bool rts_paused = false;
-static InformCb rts_inform_cb = NULL;
-static void *rts_inform_user = NULL;
-static StgClosure * rts_saved_closure = NULL;
 // Halt execution of all Haskell threads.
 RtsPaused rts_pause (void)
 {
@@ -749,22 +718,6 @@ void rts_unpause (RtsPaused paused)
 {
 }
 
-// On a pause, inform the debugger we have paused.
-// This allows the process to be paused by the debuggee
-void rts_inform(InformCb cb, void *user)
-{
-}
-
-// Report about which objects were saved, for now there is only
-// one object
-StgClosure * rts_report_saved(void){
-  return NULL;
-}
-
-void rts_save_object(StgClosure * clos){
-}
-
-// Save an object
 
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
