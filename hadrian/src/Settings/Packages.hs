@@ -360,7 +360,6 @@ rtsWarnings = mconcat
     , arg "-Wmissing-prototypes"
     , arg "-Wmissing-declarations"
     , arg "-Winline"
-    , arg "-Waggregate-return"
     , arg "-Wpointer-arith"
     , arg "-Wmissing-noreturn"
     , arg "-Wnested-externs"
