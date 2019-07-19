@@ -504,6 +504,8 @@ validate-x86_64-linux-deb9-debug:
   stage: build
   variables:
     BUILD_FLAVOUR: validate
+    # Ensure that stage2 also has DEBUG enabled
+    ValidateSpeed: SLOW
     # Override validate flavour default; see #16890.
     BUILD_SPHINX_PDF: "YES"
     TEST_TYPE: slowtest

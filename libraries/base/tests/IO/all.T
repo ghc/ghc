@@ -129,6 +129,6 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('T4808', [exit_code(1)], compile_and_run, [''])
+test('T4808', [fragile_for(16909, ['threaded2']), exit_code(1)], compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])

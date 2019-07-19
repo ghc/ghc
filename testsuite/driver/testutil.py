@@ -8,32 +8,48 @@ import threading
 
 from my_typing import *
 
-def passed():
-    return {'passFail': 'pass'}
+PassFail = NamedTuple('PassFail',
+                      [('passFail', str),
+                       ('reason', str),
+                       ('tag', Optional[str]),
+                       ('stderr', Optional[str]),
+                       ('stdout', Optional[str]),
+                       ('hc_opts', Optional[str]),
+                       ])
 
-def failBecauseStderr(reason, stderr, tag=None):
-    return failBecause(reason, tag, stderr=stderr)
+def passed(hc_opts=None) -> PassFail:
+    return PassFail(passFail='pass',
+                    reason='',
+                    tag=None,
+                    stderr=None,
+                    stdout=None,
+                    hc_opts=hc_opts)
 
-def failBecause(reason, tag=None, **kwargs):
-    return (dict ({'passFail': 'fail', 'reason': reason, 'tag': tag}, **kwargs))
+def failBecause(reason: str,
+                tag: str=None,
+                stderr: str=None,
+                stdout: str=None
+                ) -> PassFail:
+    return PassFail(passFail='fail', reason=reason, tag=tag,
+                    stderr=stderr, stdout=stdout, hc_opts=None)
 
-def strip_quotes(s):
+def strip_quotes(s: str) -> str:
     # Don't wrap commands to subprocess.call/Popen in quotes.
     return s.strip('\'"')
 
-def str_fail(s):
+def str_fail(s: str) -> str:
     return '\033[1m\033[31m' + s + '\033[0m'
 
-def str_pass(s):
+def str_pass(s: str) -> str:
     return '\033[1m\033[32m' + s + '\033[0m'
 
-def str_warn(s):
+def str_warn(s: str) -> str:
     return '\033[1m\033[33m' + s + '\033[0m'
 
-def str_info(s):
+def str_info(s: str) -> str:
     return '\033[1m\033[34m' + s + '\033[0m'
 
-def getStdout(cmd_and_args: "List[str]"):
+def getStdout(cmd_and_args: List[str]):
     # Can't use subprocess.check_output, since we also verify that
     # no stderr was produced
     p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
