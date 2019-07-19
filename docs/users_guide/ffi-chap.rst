@@ -111,24 +111,30 @@ very difficult to track down. (The errors likely will not manifest
 until garbage collection happens.) In tabular form, these restrictions
 are:
 
-+--------------------------------+-----------------------------------------------------+
-|                                | When value is used as argument to FFI call that is  |
-+--------------------------------+-------------------------+---------------------------+
-|                                | ``foreign import safe`` | ``foreign import unsafe`` |
-+--------------------------------+-----------+-------------+-----------+---------------+
-| Argument Type                  | reads are | writes are  | reads are | writes are    |
-+--------------------------------+-----------+-------------+-----------+---------------+
-| ``Array#``                     | Unsound   | Unsound     | Sound     | Unsound       |
-| ``MutableArray#``              | Unsound   | Unsound     | Sound     | Unsound       |
-| ``SmallArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
-| ``MutableSmallArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
-| ``ArrayArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
-| ``MutableArrayArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
-| unpinned ``ByteArray#``        | Unsound   | Unsound     | Sound     | Unsound       |
-| unpinned ``MutableByteArray#`` | Unsound   | Unsound     | Sound     | Sound         |
-| pinned ``ByteArray#``          | Sound     | Unsound     | Sound     | Unsound       |
-| pinned ``MutableByteArray#``   | Sound     | Sound       | Sound     | Sound         |
-+--------------------------------+-----------+-------------+-----------+---------------+
+.. table:: Restrictions on unlifted boxed arguments passed to foreign C calls.
+           Cells marked as "Unsound" represent combinations that lead to
+           undefined runtime behavior. GHC does not reject such unsound
+           programs at compile time.
+   :widths: auto
+
+   +--------------------------------+-----------------------------------------------------+
+   |                                | When value is used as argument to FFI call that is  |
+   +--------------------------------+-------------------------+---------------------------+
+   |                                | ``foreign import safe`` | ``foreign import unsafe`` |
+   +--------------------------------+-----------+-------------+-----------+---------------+
+   | Argument Type                  | reads are | writes are  | reads are | writes are    |
+   +================================+===========+=============+===========+===============+
+   | ``Array#``                     | Unsound   | Unsound     | Sound     | Unsound       |
+   | ``MutableArray#``              | Unsound   | Unsound     | Sound     | Unsound       |
+   | ``SmallArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
+   | ``MutableSmallArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
+   | ``ArrayArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
+   | ``MutableArrayArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
+   | unpinned ``ByteArray#``        | Unsound   | Unsound     | Sound     | Unsound       |
+   | unpinned ``MutableByteArray#`` | Unsound   | Unsound     | Sound     | Sound         |
+   | pinned ``ByteArray#``          | Sound     | Unsound     | Sound     | Unsound       |
+   | pinned ``MutableByteArray#``   | Sound     | Sound       | Sound     | Sound         |
+   +--------------------------------+-----------+-------------+-----------+---------------+
 
 When passing any of the unlifted array types as an argument to
 a foreign C call, a foreign function sees a pointer that refers to the
