@@ -20,9 +20,6 @@
 #include "Weak.h"
 #include "StableName.h"
 
-
-
-
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
 
