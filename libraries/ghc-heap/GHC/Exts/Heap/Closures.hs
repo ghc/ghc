@@ -253,19 +253,6 @@ data GenClosure b
         , queue      :: !b              -- ^ ??
         }
 
-  | TSOClosure
-      { info :: !StgInfoTable
-      , tsoStack :: !b
-      }
-
-  | StackClosure
-     { info :: !StgInfoTable
-     , size :: !HalfWord
-     , dirty :: !HalfWord
-     , stackPointer :: !b
-     , stack :: [Word]
-     }
-
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 

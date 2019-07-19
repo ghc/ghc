@@ -270,32 +270,6 @@ getClosure x = do
 
         --  pure $ OtherClosure itbl pts wds
         --
-        TSO -> do
-            print "TSO"
-            print (length rawWds)
-            print (length pts)
-            print pts
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 ptr argument to TSO, found "
-                        ++ show (length pts)
-            pure $ TSOClosure itbl (pts !! 0)
-        STACK -> do
-            print "STACK"
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 ptr argument to STACK, found "
-                        ++ show (length pts)
-            let splitWord = rawWds !! 0
-            pure $ StackClosure itbl
-#if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
-#else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-#endif
-                (pts !! 0)
-                []
-
         _ ->
             pure $ UnsupportedClosure itbl
 

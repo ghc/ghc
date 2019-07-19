@@ -213,14 +213,6 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
             ptrs[nptrs++] = (StgClosure *)((StgMVar *)closure)->tail;
             ptrs[nptrs++] = ((StgMVar *)closure)->value;
             break;
-        case TSO:
-            // TODO: Not complete
-            ptrs[nptrs++] = (StgClosure *)((StgTSO *)closure)->stackobj;
-            break;
-        case STACK:
-            ptrs[nptrs++] = (StgClosure *)((StgStack *)closure)->sp;
-            break;
-
 
         default:
             fprintf(stderr,"closurePtrs: Cannot handle type %s yet\n",
