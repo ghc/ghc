@@ -23,7 +23,7 @@ module HsDecls (
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
-  TyClGroup(..), mkTyClGroup, emptyTyClGroup,
+  TyClGroup(..),
   tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
@@ -916,9 +916,6 @@ type instance XCTyClGroup (GhcPass _) = NoExtField
 type instance XXTyClGroup (GhcPass _) = NoExtCon
 
 
-emptyTyClGroup :: TyClGroup (GhcPass p)
-emptyTyClGroup = TyClGroup noExtField [] [] []
-
 tyClGroupTyClDecls :: [TyClGroup pass] -> [LTyClDecl pass]
 tyClGroupTyClDecls = concatMap group_tyclds
 
@@ -927,15 +924,6 @@ tyClGroupInstDecls = concatMap group_instds
 
 tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
 tyClGroupRoleDecls = concatMap group_roles
-
-mkTyClGroup :: [LTyClDecl (GhcPass p)] -> [LInstDecl (GhcPass p)]
-            -> TyClGroup (GhcPass p)
-mkTyClGroup decls instds = TyClGroup
-  { group_ext = noExtField
-  , group_tyclds = decls
-  , group_roles = []
-  , group_instds = instds
-  }
 
 
 
