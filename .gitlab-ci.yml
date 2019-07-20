@@ -866,7 +866,7 @@ doc-tarball:
   stage: packaging
   tags:
     - x86_64-linux
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies:
     - validate-x86_64-linux-deb9-debug
     - validate-x86_64-windows
@@ -902,7 +902,7 @@ source-tarball:
   stage: lint
   tags:
     - x86_64-linux
-  image: ghcci/x86_64-linux-deb9:0.2
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies: []
   artifacts:
     paths:
