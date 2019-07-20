@@ -898,13 +898,12 @@ doc-tarball:
     - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
-  stage: packaging
+  <<: *only-default
+  stage: lint
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
   dependencies: []
-  only:
-    - tags
   artifacts:
     paths:
       - ghc-*.tar.xz
