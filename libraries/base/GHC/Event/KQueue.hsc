@@ -87,11 +87,11 @@ delete kq = do
   return ()
 
 modifyFd :: KQueue -> Fd -> E.Event -> E.Event -> IO Bool
-modifyFd kq fd oevt nevt = kqueueControl (kqueueFd kq) evs
+modifyFd kq fd oevt nevt = do
+  kqueueControl (kqueueFd kq) evs
   where
-    evs
-      | nevt == mempty = toEvents fd (toFilter oevt) flagDelete noteEOF
-      | otherwise      = toEvents fd (toFilter nevt) flagAdd noteEOF
+    evs = toEvents fd (toFilter oevt) flagDelete noteEOF
+       <> toEvents fd (toFilter nevt) flagAdd noteEOF
 
 toFilter :: E.Event -> [Filter]
 toFilter e = catMaybes [ check E.evtRead filterRead, check E.evtWrite filterWrite ]
