@@ -19,6 +19,7 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
+  - test
   - lint       # Source linting
   - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
@@ -898,7 +899,7 @@ doc-tarball:
     - mv docs/*.tar.xz docs/index.html .
 
 source-tarball:
-  stage: packaging
+  stage: test
   tags:
     - x86_64-linux
   image: ghcci/x86_64-linux-deb9:0.2
