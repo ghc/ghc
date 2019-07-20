@@ -77,14 +77,16 @@ import Digraph
 
 import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
 
-{-# OPTIONS_GHC #-}
+-- Debugging/Profiling things
+
+import System.CPUTime
+-- import System.IO.Unsafe
 
 -- Grow them trees:
 
 -- #define WITH_NODE_DESC
 
 -- Avoid deep comparisons with reallyUnsafePtrEquality#
-
 maybeEq :: a -> a -> Bool
 maybeEq x1 x2 = isTrue# (reallyUnsafePtrEquality# x1 x2)
 
@@ -238,7 +240,7 @@ data SumInfo
 instance NFData SumInfo where
     rnf NoSumInfo = ()
     rnf TopSumInfo = ()
-    rnf (SumInfo _ fields) = deepseq fields ()
+    rnf (SumInfo _ fields) = rnf fields
 
 instance Ord SumInfo where
     -- TODO: Define comparing for efficiency
@@ -286,19 +288,21 @@ instance Lattice ProdInfo where
     bot = BotProdInfo
     top = TopProdInfo
 
-    lub BotProdInfo x = x
-    lub x BotProdInfo = x
-    lub (FieldProdInfo fields1) (FieldProdInfo fields2)
-        = FieldProdInfo (zipWithEqual "ProdInfo:lub" lub fields1 fields2)
-    lub TopProdInfo _ = TopProdInfo
-    lub _ TopProdInfo = TopProdInfo
+    lub = panic "Not used"
+    glb = panic "Not used"
+    -- lub BotProdInfo x = x
+    -- lub x BotProdInfo = x
+    -- lub (FieldProdInfo fields1) (FieldProdInfo fields2)
+    --     = FieldProdInfo (zipWithEqual "ProdInfo:lub" lub fields1 fields2)
+    -- lub TopProdInfo _ = TopProdInfo
+    -- lub _ TopProdInfo = TopProdInfo
 
-    glb BotProdInfo _x = BotProdInfo
-    glb _x BotProdInfo = BotProdInfo
-    glb (FieldProdInfo fields1) (FieldProdInfo fields2)
-        = FieldProdInfo (zipWithEqual "ProdInfo:glb" glb fields1 fields2)
-    glb TopProdInfo x = x
-    glb x TopProdInfo = x
+    -- glb BotProdInfo _x = BotProdInfo
+    -- glb _x BotProdInfo = BotProdInfo
+    -- glb (FieldProdInfo fields1) (FieldProdInfo fields2)
+    --     = FieldProdInfo (zipWithEqual "ProdInfo:glb" glb fields1 fields2)
+    -- glb TopProdInfo x = x
+    -- glb x TopProdInfo = x
 
 instance Outputable ProdInfo where
     ppr BotProdInfo = text "p _|_"
@@ -540,6 +544,7 @@ setOuterInfo lat info
 -- Zero indexed
 indexField :: EnterLattice -> Int -> EnterLattice
 indexField (LatUndet _) _ = bot
+-- This can only happen if we case on a non-terminating function.
 indexField (LatRec _) _ = bot
 indexField (LatProd _ (FieldProdInfo fields)) n =
     case drop n fields of
@@ -563,7 +568,9 @@ hasOuterTag lat = getOuter lat == NeverEnter
 hasTopFields :: EnterLattice -> Bool
 hasTopFields (LatUnknown    {}) = True
 hasTopFields (LatProd _  TopProdInfo) = True
-hasTopFields (LatSum  _  TopSumInfo) =  True
+hasTopFields (LatSum  _  TopSumInfo)  = True
+hasTopFields (LatProd _ (FieldProdInfo fields)) = all isTopValue fields
+hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
 
 hasTopFields (LatRec        {}) = False
 hasTopFields (LatProd       {}) = False
@@ -907,7 +914,7 @@ isMarkedDone id = do
 
 updateNodeResult :: NodeId -> EnterLattice -> AM ()
 updateNodeResult id result = do
-    node <- deepseq result (getNode id)
+    node <- (getNode id)
     updateNode $ node {node_result = result}
 
 
@@ -1089,15 +1096,15 @@ idMappedInCtxt id ctxt
     go [] = Nothing
 
 -- | Lub like operator between all input node
-mkBranchesNode :: [SynContext] -> [NodeId] -> AM NodeId
-mkBranchesNode ctxt [] = return topNodeId
-mkBranchesNode ctxt [node] = return node
-mkBranchesNode ctxt inputs = do
+mkJoinNode :: [SynContext] -> [NodeId] -> AM NodeId
+mkJoinNode ctxt [] = return topNodeId
+mkJoinNode ctxt [node] = return node
+mkJoinNode ctxt inputs = do
     node_id <- mkUniqueId
     let updater = do
             input_results <- mapM lookupNodeResult inputs
-            let result = foldl1 combineLatticeBranches input_results
-            if False -- isTopValue result
+            let result = foldl1' combineLatticeBranches input_results
+            if isTopValue result
                 then do
                     node <- getNode node_id
                     markDone $ node { node_result = result }
@@ -1137,15 +1144,12 @@ findTags this_mod us binds =
             fs_doneNodes = emptyUFM }
     -- Run the analysis
         (!binds') = (flip evalState) state $ do
-            return $! seqTopBinds binds
             addConstantNodes
             binds' <- nodesTopBinds binds
             _nodes <- solveConstraints
-            -- mapM_ (pprTraceM "res:" . ppr) _nodes
             finalBinds <- rewriteTopBinds binds'
-            return $! seqTopBinds finalBinds
             return $ finalBinds
-    in binds' `seq` pprTrace "foundBinds" (ppr this_mod) binds'
+    in (seqTopBinds binds') `seq` pprTrace "foundBinds" (ppr this_mod) binds'
 
 
 -- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
@@ -1567,7 +1571,7 @@ nodeCase ctxt (StgCase scrut bndr alt_type alts) = do
     bndrNodeId <- nodeCaseBndr scrutNodeId bndr
     let ctxt' = CCaseBndr (bndr,bndrNodeId) : ctxt
     (alts', altNodeIds) <- unzip <$> mapM (nodeAlt ctxt' scrutNodeId) alts
-    caseNodeId <- mkBranchesNode ctxt' altNodeIds
+    caseNodeId <- mkJoinNode ctxt' altNodeIds
     -- pprTraceM "Scrut, alts, rhss" $ ppr (scrut, scrutNodeId, altNodeIds, altsId)
     return (StgCase scrut' bndr alt_type alts' , caseNodeId)
 nodeCase _ _ = panic "Impossible: nodeCase"
@@ -1633,13 +1637,14 @@ nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
                         let result
                                 | is_strict_field
                                 -- Tag things coming out of strict binds
-                                = bndr_res -- setOuterInfo bndr_res NeverEnter
+                                = setOuterInfo bndr_res NeverEnter
                                 | otherwise = bndr_res
                         -- pprTraceM "Updating altBndr:" (ppr (node_id, result) $$
                         --         text "Input:" <+> ppr scrutNodeId $$
                         --         text "scrut_res" <+> ppr scrut_res $$
                         --         text "bndr_res" <+> ppr bndr_res )
-                        if isTopValue result || (is_strict_field && hasTopFields result)
+                        let topFields = hasTopFields result
+                        if (is_strict_field && topFields) || (topFields && getOuter result == MaybeEnter)
                             then do
                                 node <- getNode node_id
                                 markDone $ node { node_result = result }
@@ -1772,9 +1777,8 @@ nodeApp ctxt expr@(StgApp _ f args) = do
                         --     text "inputs:" <+> ppr inputs $$
                         --     ppr input_nodes
                         --     )
-                        if (hasTopFields result)
-                            -- Once the fields reach the top of the lattice, or nesting gets to deep
-                            -- gathering more information becomes pointless.
+                        if (null inputs || isTopValue result )
+                            -- We have collected the final result
                             then do
                                 -- pprTraceM "Limiting nesting for " (ppr node_id)
                                 node <- getNode node_id
@@ -1782,7 +1786,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
                                 return $! result
                             else do
                                 updateNodeResult node_id result
-                                deepseq result $ return result
+                                return result
 
                 addNode $ FlowNode
                     { node_id = node_id, node_result = bot
@@ -1831,6 +1835,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         | isAbsentExpr expr = []
         | OtherRecursion <- recursionKind = []
         | isFun && (not isSat) = []
+        | recTail = []
         | isFun && isSat = [f_node_id]
         | otherwise = [f_node_id]
 
@@ -1845,8 +1850,9 @@ nodeApp ctxt expr@(StgApp _ f args) = do
             return top
 
         | isFun && (not isSat) = return top
-        | SimpleRecursion <- recursionKind
-        , isRecTail ctxt = return $ LatRec RecEnter
+
+        -- App in a direct self-recursive tail call context, returns nothing
+        | recTail = return $ LatRec RecEnter
 
         | SimpleRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
@@ -1870,6 +1876,8 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         | otherwise
         =   -- pprTrace "Unsat?" (ppr (f,args)) $
             return top
+
+    recTail = recursionKind == SimpleRecursion && isRecTail ctxt
     isFun = isFunTy (unwrapType $ idType f)
     arity = idFunRepArity f
     isSat = arity > 0 && (length args == arity)
@@ -1888,7 +1896,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
 nodeApp _ _ = panic "Impossible"
 
 sccNodes :: [FlowNode] -> [FlowNode]
-sccNodes in_nodes = in_nodes
+-- sccNodes in_nodes = in_nodes
 sccNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
   where
     components = stronglyConnCompFromEdgedVerticesUniqR vertices
@@ -1906,7 +1914,7 @@ solveConstraints = do
         -- doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         -- -- mapM_ (pprTraceM "node:" . ppr) (idList ++ uqList ++ doneList)
         -- pprTraceM "Initial: (uqList, doneList)" (ppr (uqCount, doneCount))
-
+        pprTraceM "IterateStart" empty
         iterate 1
         -- iterate (-11)
 
@@ -1958,168 +1966,12 @@ solveConstraints = do
             else do
                 return True
 
--- ------------------------------------------------------------
--- --      Note [Dangling results]
--- ------------------------------------------------------------
-
--- If we abort without having reached a fixpoint we might have
--- dangling results. That is results in which the taggedness of
--- an expression is considered bot when really it should be
--- top.
-
--- Consider this code:
-
---     f x = Cons x (f x) : tagged < top, taggedOf (f x)>
-
--- This will construct a infinite list with the spine being untagged
--- and values being top. So
-
--- info(f x) = tagged < top, untagged < top, untagged ..... >>>
-
--- NB: The outermost taggedness is `tagged` since f, when unapplied,
--- is in WHNF.
-
--- However if we start to analyze this function from the inside out
--- and terminate early what we get is:
-
--- f x = ... : tagged < top, bot >
-
--- As the second pair of the cons cell will taggedness (f x), of the not yet
--- analyzed function f!
-
--- So far this is all quite reasonable. However an issue arises when we
--- compute the taggedness of the following branches based on this result:
-
--- case _e of
---     Branch1 -> f _e1      : tagged < top   , bot    > -- f from above
---     Branch2 -> Cons 1 Nil : tagged < tagged, tagged >
-
---     lub =                 : tagged < tagged, tagged > -- WRONG
---     lub =                 : tagged < tagged, top    > -- Fixed
-
--- If we combine both branches using lub we get: tagged < top, tagged >
--- Which is wrong! Clearly the second cons cell won't be tagged if we take
--- Branch1.
-
--- The easy fix for this would be to use cautios reasoning and use glb for
--- analyzing multiple branches. While this works it removes our ability to
--- analyze patterns like this:
-
--- f x
---     | x < 0     = (Nothing, Nothing) : tagged < tagged, tagged >
---     | otherwise = f (x-1)        : bot
-
-
--- f x | baseCase = Just thunk1 : tagged <bot>
---     | otherwise = f (x-1)    : bot
--- -------------------------------------------------
-
-
--- --
--- NX-1: lub tagged top : (bot => top)
--- --
--- NX: NX-1 `lub` tagged : tagged & wrong
-
--- NX+1: NX `lub` tagged : tagged & wrong
-
--- NX+2: NX+1 `lub` tagged : tagged & wrong
-
--- NX+3: NX+2 `lub` tagged : tagged & wrong
-
-
--- f x : tagged <bot>
-
--- case _..
---     C1 -> f x    : tagged < bot   >
---     C2 -> Just 1 : tagged < tagged>
-
--- If we use glb `f (x-1)` will be assumed bot, hence f x will be bot
--- and we reached a unhelpful fixpoint of `f x : bot`
-
--- If we instead use lub then after the first pass the base case will
--- lift the result for `f x` up the lattice. And we get the fixpoint
--- equivalent to the actual result of `f x : tagged < tagged, tagged>`
-
--- While this neatly solves the issue where an inductive case depends
--- on the base case, it has the issue with dangling results.
-
-
-
--- f x =
---     let x' = f x
---     in  Cons x x'
-
--- nodes:
-
---         ...  tagged ....
--- patient..... bottom ....
---        -------lub-------
--- node : ..... tagged .... -- Wrong
-
--- nodeX: ..... tagged .... -- Wrong
-
--- patient  ..  untagged ..
-
-
-
-
--- ---
-
--- So how do we solve this? At some point we decide to abort the analysis
--- potentially having some dangling results.
-
--- We than take ALL cached results of nodes and turn all remaining bottoms
--- into top values. This is always safe!
-
--- However we might have faulty "leftover" results based on a dangling result.
--- This means we have to also update any node, which directly or transitively
--- used the dangling result as input.
-
--- We can reasonably do so by:
-
--- Keep a list of nodes we fixed up.
-
--- For each node we fixed up:
-
--- * Update the node
--- * Update all nodes depending on this node, skipping nodes already marked done.
--- * For each node
-
-
-
--- This can lead to missanalyzed tags!
-
-
--- Node = Node !a !b Node
-
-
--- func ... = ....... -> Node a b c
-
-
-
--- wfun :: Int -> Int -> (# a, b, Node #)
--- wfun :: Int -> Int -> (# a, b, Node #)[Node !a ! b c]
-
--- wfunc ... = .... seq a b -> (# a, b, c #) :: VC-Node !a ! b c
---                          -> wfunc ...
-
-
-
-
-
-
-
-
-
-
-
-
 
 {-
----------------------------------------------------------
-Add cases around strict fields where required.
+------------------------------------------------------------
+    Add cases around strict fields where required.
+------------------------------------------------------------
 -}
-
 
 rewriteTopBinds :: [InferStgTopBinding] -> AM [TgStgTopBinding]
 rewriteTopBinds binds = mapM (rewriteTop) binds
