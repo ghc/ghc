@@ -70,6 +70,8 @@ module HsTypes (
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
+#include "HsVersions.h"
+
 import GhcPrelude
 
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
@@ -90,7 +92,7 @@ import SrcLoc
 import Outputable
 import FastString
 import Maybes( isJust )
-import Util ( count )
+import Util ( count, debugIsOn )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -949,7 +951,6 @@ gives
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
 -- Get the lexically-scoped type variables of a HsSigType
 --  - the explicitly-given forall'd type variables
---  - the implicitly-bound kind variables
 --  - the named wildcars; see Note [Scoping of named wildcards]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
@@ -957,10 +958,10 @@ hsWcScopedTvs sig_ty
   , HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
-      L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
-                                              hsLTyVarNames tvs
-               -- include kind variables only if the type is headed by forall
-               -- (this is consistent with GHC 7 behaviour)
+      L _ (HsForAllTy { hst_fvf = vis_flag
+                      , hst_bndrs = tvs }) ->
+        ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
+        vars ++ nwcs ++ hsLTyVarNames tvs
       _                                    -> nwcs
 hsWcScopedTvs (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
 hsWcScopedTvs (XHsWildCardBndrs nec) = noExtCon nec
@@ -970,8 +971,10 @@ hsScopedTvs :: LHsSigType GhcRn -> [Name]
 hsScopedTvs sig_ty
   | HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty
-  , L _ (HsForAllTy { hst_bndrs = tvs }) <- sig_ty2
-  = vars ++ hsLTyVarNames tvs
+  , L _ (HsForAllTy { hst_fvf = vis_flag
+                    , hst_bndrs = tvs }) <- sig_ty2
+  = ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
+    vars ++ hsLTyVarNames tvs
   | otherwise
   = []
 
@@ -986,6 +989,48 @@ Consider
 Currently, for better or worse, the "_a" variables are all the same. So
 although there is no explicit forall, the "_a" scopes over the definition.
 I don't know if this is a good idea, but there it is.
+-}
+
+{- Note [hsScopedTvs vis_flag]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-XScopedTypeVariables can be defined in terms of a desugaring to
+-XTypeAbstractions (GHC Proposal #50):
+
+    fn :: forall a b c. tau(a,b,c)            fn :: forall a b c. tau(a,b,c)
+    fn = defn(a,b,c)                   ==>    fn @x @y @z = defn(x,y,z)
+
+That is, for every type variable of the leading 'forall' in the type signature,
+we add an invisible binder at term level.
+
+This model does not extend to visible forall, as discussed here:
+
+* https://gitlab.haskell.org/ghc/ghc/issues/16734#note_203412
+* https://github.com/ghc-proposals/ghc-proposals/pull/238
+
+The conclusion of these discussions can be summarized as follows:
+
+  > Assuming support for visible 'forall' in terms, consider this example:
+  >
+  >     vfn :: forall x y -> tau(x,y)
+  >     vfn = \a b -> ...
+  >
+  > The user has written their own binders 'a' and 'b' to stand for 'x' and
+  > 'y', and we definitely should not desugar this into:
+  >
+  >     vfn :: forall x y -> tau(x,y)
+  >     vfn x y = \a b -> ...         -- bad!
+
+At the moment, GHC does not support visible 'forall' in terms, so we simply cement
+our assumptions with an assert:
+
+    hsScopedTvs (HsForAllTy { hst_fvf = vis_flag, ... }) =
+      ASSERT( vis_flag == ForallInvis )
+      ...
+
+In the future, this assert can be safely turned into a pattern match to support
+visible forall in terms:
+
+    hsScopedTvs (HsForAllTy { hst_fvf = ForallInvis, ... }) = ...
 -}
 
 ---------------------
