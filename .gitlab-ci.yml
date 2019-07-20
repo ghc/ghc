@@ -915,7 +915,7 @@ source-tarball:
     - ./configure
     - make sdist
     - mv sdistprep/*.xz  .
-    - make show VALUE=version > version
+    - make show! VALUE=version > version
 
 
 ############################################################
