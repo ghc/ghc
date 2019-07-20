@@ -704,6 +704,27 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
 
+#else
+RtsPaused rts_pause (void)
+{
+    struct RtsPaused_ paused;
+    paused.pausing_task = NULL;
+    paused.capabilities = NULL;
+    return paused;
+}
+
+void rts_unpause (RtsPaused  paused STG_UNUSED)
+{
+}
+
+
+void rts_listThreads(ListThreadsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+}
+
+void rts_listMiscRoots (ListRootsCb cb STG_UNUSED, void *user STG_UNUSED)
+{
+}
 #endif
 
 void rts_done (void)
