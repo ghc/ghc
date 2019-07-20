@@ -14,7 +14,7 @@ import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.GHC
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
-import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlag, toFlag)
+import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlagOrDefault, toFlag)
 import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, writeFileAtomic,
                                   toUTF8LBS)
 import Distribution.Simple.Build (writeAutogenFiles)
@@ -168,7 +168,7 @@ doCopy directory distDir
                                withPrograms = progs',
                                installDirTemplates = idts,
                                configFlags = cfg,
-                               stripLibs = fromFlag (configStripLibs cfg),
+                               stripLibs = fromFlagOrDefault False (configStripLibs cfg),
                                withSharedLib = withSharedLibs
                            }
 
