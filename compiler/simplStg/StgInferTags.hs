@@ -21,7 +21,7 @@
 
 
 -- {-# LANGUAGE Strict #-}
--- {-# OPTIONS_GHC -O #-}
+-- {-# OPTIONS_GHC -O -fprof-auto #-}
 
 module StgInferTags (findTags) where
 
@@ -32,7 +32,6 @@ import GhcPrelude
 import BasicTypes
 import DataCon
 import Id
-import qualified StgSyn
 import StgUtil
 import Outputable
 import CoreSyn (AltCon(..))
@@ -66,9 +65,8 @@ import Control.Applicative hiding (empty)
 import GHC.Generics
 import Control.DeepSeq -- hiding (deepseq)
 import GHC.Stack
-import Data.Bifunctor
 
-import Unsafe.Coerce
+-- import Unsafe.Coerce
 import ErrUtils
 import System.IO.Unsafe
 import Outputable
@@ -78,11 +76,6 @@ import Digraph
 import VarEnv
 
 import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
-
--- Debugging/Profiling things
-
-import System.CPUTime
--- import System.IO.Unsafe
 
 -- Grow them trees:
 
@@ -352,8 +345,8 @@ combineEnterBranches UndetEnterInfo _       = UndetEnterInfo
 combineEnterBranches _ UndetEnterInfo       = UndetEnterInfo
 combineEnterBranches NeverEnter AlwaysEnter = MaybeEnter
 combineEnterBranches AlwaysEnter NeverEnter = MaybeEnter
-combineEnterBranches x y
-    | x == y = x
+combineEnterBranches AlwaysEnter AlwaysEnter = AlwaysEnter
+combineEnterBranches NeverEnter NeverEnter = NeverEnter
 
 combineProdInfo :: ProdInfo -> ProdInfo -> ProdInfo
 combineProdInfo (FieldProdInfo fs1) (FieldProdInfo fs2)
@@ -433,8 +426,6 @@ hasTopFields (LatProd _ (FieldProdInfo fields)) = all isTopValue fields
 hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
 
 hasTopFields (LatRec        {}) = False
-hasTopFields (LatProd       {}) = False
-hasTopFields (LatSum        {}) = False
 hasTopFields (LatUndet      {}) = False
 
 isTopValue :: EnterLattice -> Bool
@@ -449,17 +440,16 @@ nestingLevelOver (LatSum _ (SumInfo _ fields)) n
 nestingLevelOver _ _ = False
 
 capAtLevel :: Int -> EnterLattice -> EnterLattice
+capAtLevel _ l@(LatUnknown {}) = l
+capAtLevel _ l@(LatRec {}) = l
+capAtLevel _ l@(LatUndet {}) = l
 capAtLevel 0 _ = top
 capAtLevel n (LatProd e (FieldProdInfo fields)) =
     (LatProd e (FieldProdInfo $ map (capAtLevel (n-1)) fields))
 capAtLevel n (LatSum e (SumInfo c fields)) =
     (LatSum e (SumInfo c $ map (capAtLevel (n-1)) fields))
 
-capAtLevel _ l@(LatUnknown {}) = l
-capAtLevel _ l@(LatRec {}) = l
-capAtLevel _ l@(LatUndet {}) = l
-capAtLevel _ l@(LatUndet {}) = l
-capAtLevel _ l = l
+
 
 {-
     -- Note [Constraints/Rules for tag/enter information]
@@ -863,7 +853,7 @@ data FlowNode
     = FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId -- ^ Node id
     , node_inputs :: [NodeId]  -- ^ Input dependencies
-    , node_done :: {-# UNPACK #-} !Bool -- ^ Do no longer update this node
+    , node_done :: !Bool -- ^ Do no longer update this node
     , node_result :: !(EnterLattice) -- ^ Cached result
     , node_update :: (AM EnterLattice) -- ^ Calculates a new value for the node
                                        -- AND updates the environment with it.
@@ -952,6 +942,7 @@ instance Outputable SynContext where
     ppr CNone = text "CNone"
     ppr (CTopLevel map) = text "CTop" <> ppr map
     ppr (CAlt map) = text "CAlt" <> ppr map
+    ppr CCaseScrut = text "CCaseScrut"
     ppr (CCaseBndr map) = text "CCaseBndr" <> ppr map
     ppr (CClosureBody map) = text "CClosure" <> ppr map
     ppr (CLetRec     ids lne) = text "CLetRec"     <> pprLne lne <> ppr ids
@@ -971,10 +962,10 @@ idMappedInCtxt id ctxt
     go [] = Nothing
 
 -- | Lub like operator between all input node
-mkJoinNode :: [SynContext] -> [NodeId] -> AM NodeId
-mkJoinNode ctxt [] = return topNodeId
-mkJoinNode ctxt [node] = return node
-mkJoinNode ctxt inputs = do
+mkJoinNode :: [NodeId] -> AM NodeId
+mkJoinNode []     = return topNodeId
+mkJoinNode [node] = return node
+mkJoinNode inputs = do
     node_id <- mkUniqueId
     let updater = do
             input_results <- mapM lookupNodeResult inputs
@@ -1450,7 +1441,7 @@ nodeCase ctxt (StgCase scrut bndr alt_type alts) = do
     bndrNodeId <- nodeCaseBndr scrutNodeId bndr
     let ctxt' = CCaseBndr (unitVarEnv bndr bndrNodeId) : ctxt
     (alts', altNodeIds) <- unzip <$> mapM (nodeAlt ctxt' scrutNodeId) alts
-    caseNodeId <- mkJoinNode ctxt' altNodeIds
+    caseNodeId <- mkJoinNode altNodeIds
     -- pprTraceM "Scrut, alts, rhss" $ ppr (scrut, scrutNodeId, altNodeIds, altsId)
     return (StgCase scrut' bndr alt_type alts' , caseNodeId)
 nodeCase _ _ = panic "Impossible: nodeCase"
@@ -1647,11 +1638,12 @@ nodeApp ctxt expr@(StgApp _ f args) = do
             | otherwise -> do
                 node_id <- mkUniqueId
                 let updater = do
+                        !result <- mkResult
+
                         -- pprTraceM "Updating " (ppr node_id)
                         -- Try to peek into the function being applied
-                        !result <- mkResult
                         -- node <- getNode node_id
-                        !input_nodes <- mapM getNode inputs
+                        -- !input_nodes <- mapM getNode inputs
                         -- pprTraceM "AppFields" (ppr (f, result) <+> ppr node $$
                         --     text "inputs:" <+> ppr inputs $$
                         --     ppr input_nodes
@@ -1779,7 +1771,6 @@ sccNodes :: [FlowNode] -> [FlowNode]
 -- sccNodes in_nodes = in_nodes
 sccNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
   where
-    components = stronglyConnCompFromEdgedVerticesUniqR vertices
     vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
     mkVertex :: FlowNode -> Node NodeId FlowNode
     mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
@@ -1806,7 +1797,6 @@ solveConstraints = do
         -- mapM_ (pprTraceM "UnfinishedNodes:" . ppr) $ remainingNodes
 
 
-        idList <- map snd . nonDetUFMToList . fs_idNodeMap <$> get
         uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
         doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         let resultNodes =  (uqList ++ doneList)
@@ -1821,7 +1811,6 @@ solveConstraints = do
         -- pprTraceM "iterate - pass " (ppr n)
         uqNodes <- fs_uqNodeMap <$> get
         -- return $! seqEltsUFM rnf uqNodes
-        uqCount <- sizeUFM . fs_uqNodeMap <$> get
         pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
 
         progress <- or <$> (mapM update (sccNodes . nonDetEltsUFM $ uqNodes)) :: AM Bool
@@ -1895,7 +1884,7 @@ rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
     if (null evalArgs)
         then return (StgRhsCon noExtFieldSilent ccs con args)
         else do
-            tagInfo <- lookupNodeResult node_id
+            -- tagInfo <- lookupNodeResult node_id
             -- pprTraceM "Creating closure for " $ ppr _binding <+> ppr (node_id, tagInfo)
             conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
             return $ (StgRhsClosure noExtFieldSilent ccs ReEntrant [] conExpr)
@@ -1907,11 +1896,11 @@ rewriteRhsInplace _binding (StgRhsClosure ext ccs flag args body) = do
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 rewriteRhs :: Id -> InferStgRhs -> AM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs binding (StgRhsCon node_id ccs con args) = do
+rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
     node <- getNode node_id
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
     -- tagInfo <- lookupNodeResult node_id
-    -- pprTraceM "rewriteRhsCon" $ ppr binding <+> ppr tagInfo
+    -- pprTraceM "rewriteRhsCon" $ ppr _binding <+> ppr tagInfo
     -- pprTraceM "rewriteConApp" $ ppr con <+> vcat [
     --     text "args" <+> ppr args,
     --     text "tagInfo" <+> ppr tagInfo,
