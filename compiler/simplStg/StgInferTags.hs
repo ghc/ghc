@@ -2,25 +2,23 @@
 -- Copyright (c) 2019 Andreas Klebinger
 --
 
-{-# LANGUAGE CPP, TypeFamilies, RankNTypes #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE GADTs, TupleSections,DataKinds #-}
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE MagicHash #-}
 
-
--- Vector stuff
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE BangPatterns #-}
-
-
--- {-# LANGUAGE Strict #-}
 -- {-# OPTIONS_GHC -O -fprof-auto #-}
 
 module StgInferTags (findTags) where
@@ -32,16 +30,12 @@ import GhcPrelude
 import BasicTypes
 import DataCon
 import Id
-import StgUtil
 import Outputable
 import CoreSyn (AltCon(..))
 import Module
-
 import VarSet
--- import UniqMap
-
 import TyCon (tyConDataCons)
-import Type -- (tyConAppTyCon, isUnliftedType, Type)
+import Type
 import UniqSupply
 import RepType
 import StgSyn hiding (AlwaysEnter)
@@ -66,25 +60,66 @@ import GHC.Generics
 import Control.DeepSeq -- hiding (deepseq)
 import GHC.Stack
 
--- import Unsafe.Coerce
 import ErrUtils
-import System.IO.Unsafe
-import Outputable
-import DynFlags
 import Digraph
 
 import VarEnv
 
+-- Fast comparisons
 import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
 
--- Grow them trees:
+-- Used for dumping nodes with -ddump-stg-tag-nodes
+import DynFlags
+import System.IO.Unsafe
+
+{-
+
+    Note [Tag Inferrence - The basic idea]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This code has two goals:
+    * Ensure constructors with strict fields are only
+      allocated with tagged pointers in the strict fields.
+    * Infer if a given use site of an id is guaranteed to
+      refer to a tagged pointer.
+
+Id's represent by a tagged pointer do not have to be entered
+when used in an case expression like `case id of ...` which
+can have massive performance benefits for traversals of strict
+data structures.
+
+This Module contains the code for the actual inference and upholding
+the strict field invariant.
+Once computed the infered taggedness is stored in the extension
+point of StgApp. This is then used in StgCmmExpr to determine if we
+need to enter an expression.
+
+
+The inference code has three major parts.
+
+* Building an data flow graph based on the STG AST. This is done by the
+  node* family of functions.
+* Running the analysis on the data flow graph.
+    + The driver of this is solveConstraints.
+    + The actual update function for each node type is defined
+      in it's respective node* function.
+* Updating the AST based on the computed information. This is implemented
+    by the rewrite* functions.
+    + We update the extension points.
+    + We also wrap allocations for constructors in
+      seq statements if required to uphold the taggedness of strict
+      fields.
+
+-}
+
 
 -- #define WITH_NODE_DESC
 
--- Avoid deep comparisons with reallyUnsafePtrEquality#
+-- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
 maybeEq x1 x2 = isTrue# (reallyUnsafePtrEquality# x1 x2)
 
+-- Grow them trees:
 
 type instance BinderP       'InferTags = Id
 type instance XRhsClosure   'InferTags = NoExtFieldSilent
@@ -94,7 +129,6 @@ type instance XLetNoEscape  'InferTags = NoExtFieldSilent
 type instance XStgApp       'InferTags = NodeId
 type instance XStgConApp    'InferTags = NodeId
 
-
 type InferStgTopBinding = GenStgTopBinding 'InferTags
 type InferStgBinding    = GenStgBinding    'InferTags
 type InferStgExpr       = GenStgExpr       'InferTags
@@ -102,54 +136,66 @@ type InferStgRhs        = GenStgRhs        'InferTags
 type InferStgAlt        = GenStgAlt        'InferTags
 
 data RecursionKind
-    = SimpleRecursion
-    -- ^ Simple direction recursion of the (syntactic) form
-    --   let f x = ... if cond then e' else f x'
-
-    | OtherRecursion
-    -- ^ All other kinds
+    = NoMutRecursion -- ^ No mutual recursion.
+    | OtherRecursion -- ^ Potentially mutual recursion
     | NoRecursion
     deriving Eq
 
--- deepseq _ x = x
 
--- Note [Lattice instance for tag analysis]
+{-
+    Note [Lattice instance for tag analysis]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--- We use a semi lattice for the tag analysis, since all results are
--- monotonic towards top for each step of the analysis we never need
--- to use glb.
+We use a lattice for the tag analysis, with each update of a node
+being monotonic towards the top of the lattice.
 
--- We might terminate analysis of an expression early. For example
--- to avoid trying to compute infinite results or when it is clear
--- no more information can be gathered.
+Lattice elements are cross products of two values.
+Both of which are lattices themselves.
 
--- When we do so we use `fixBot` to lift all remaining bot values to
--- the top of the lattice.
+One lattice encodes if we have to enter an object when
+we case on it in the form of `case id of ...` and looks
+like this:
 
--- This is sadly required. Consider code of this form:
+              MaybeEnter
+             /    |    \
+      AlwaysEnter |  NeverEnter
+             \    |    /
+              RecEnter
+                  |
+            UndetEnterInfo
 
--- rhs = case scrut of
---     p1 -> Just 1 : tag = tagged <tagged>
---     p2 -> Just e2: tag = tagged <undet>
+It is also called the "outer" infor about a binding in places.
 
--- We determine the tag of the whole RHS by computing the lub
--- of both alternatives, in this case `lub (tagged <tagged>) (tagged <undet>) = tagged <tagged>`.
-
--- This is incorrect! e2 might be an expression which will not get tagged.
--- So whenever we stop analysing an expression we will take all remaining
--- undetermined values and lift them to the top of the latice.
-
--- The tag information of the rhs therefore becomes:
-
--- `lub (tagged <tagged>) (tagged <unknown>) = tagged <unknown>` which is correct.
+RecEnter is a special value assigned to tail recursive branches.
+See Note [RecEnter Context] for details.
 
 
+The second lattice represents information about bindings which are
+bound to the fields of an id.
+For example if we have "foo = Just bar" then this lattice will
+encode the information we have about bar, potentially also with
+some information about the constructor it came out of.
+
+This lattice has this shape:
+
+           LatUnknown
+            /  |  \
+      LatProd  |  LatSum
+            \  |  /
+             LatRec
+               |
+            LatUndet
+
+Again with a special value for recursive tail calls.
+See Note [RecEnter Context] for details about that.
+
+-}
 
 
-class Lattice a where
-    bot :: a
-    top :: a
-
+bot :: FieldInfo
+bot = LatUndet UndetEnterInfo
+top :: FieldInfo
+top = LatUnknown MaybeEnter
 
 -- | Enterinfo for a binding IF IT USED AS AN UNAPPLIED ATOM.
 --   In particular for
@@ -179,25 +225,10 @@ instance Outputable EnterInfo where
     ppr MaybeEnter      = char 'm'
     ppr NeverEnter      = char 't'
 
-{- |
-              MaybeEnter
-             /    |    \
-      AlwaysEnter |  NeverEnter
-             \    |    /
-              RecEnter
-                  |
-            UndetEnterInfo
 
-Where NeverEnter means something is tagged,
-while AlwaysEnter means something isn't tagged.
-
--}
-instance Lattice EnterInfo where
-    bot = UndetEnterInfo
-    top = MaybeEnter
 
 data SumInfo
-    = SumInfo !DataCon [EnterLattice] -- ^ A constructor application
+    = SumInfo !DataCon [FieldInfo] -- ^ A constructor application
     deriving (Generic)
 
 instance Eq SumInfo where
@@ -211,7 +242,7 @@ instance Outputable SumInfo where
     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
 
 data ProdInfo
-    = FieldProdInfo [EnterLattice]
+    = FieldProdInfo [FieldInfo]
     deriving (Eq,Generic,NFData)
 
 instance Outputable ProdInfo where
@@ -220,15 +251,7 @@ instance Outputable ProdInfo where
 
 {- |
 
-Lattice of roughly this shape:
 
-           LatUnknown
-           |        |
-          / \       |
-    LatProd LatSum  |
-          |    |    |
-           \   |   /
-           LatUndet
 
 
 f x = Just $! Just x : alwaysEnter < tagged < top > >
@@ -280,7 +303,7 @@ information about returned values and "uncomputeable" field information.
 
 -}
 
-data EnterLattice
+data FieldInfo
     -- | At most we can say something about the tag of the value itself.
     --   The fields are not yet known.
     --   Semantically: EnterInfo x bot(fields)
@@ -298,7 +321,7 @@ data EnterLattice
     | LatSum !EnterInfo !SumInfo
     deriving (Generic,NFData)
 
-instance Eq EnterLattice where
+instance Eq FieldInfo where
     (==) lat1 lat2
         | maybeEq lat1 lat2             = True
     (==) (LatUndet o1)   (LatUndet o2)  = o1 == o2
@@ -316,14 +339,14 @@ instance Eq EnterLattice where
 
 
 -- | Get the (outer) EnterInfo value
-getOuter :: EnterLattice -> EnterInfo
+getOuter :: FieldInfo -> EnterInfo
 getOuter (LatUndet x) = x
 getOuter (LatRec x) = x
 getOuter (LatUnknown x) = x
 getOuter (LatProd x _) = x
 getOuter (LatSum x  _) = x
 
-instance Outputable EnterLattice where
+instance Outputable FieldInfo where
     ppr (LatUnknown outer) = ppr outer <+> text "top"
     ppr (LatRec outer)     = ppr outer <+> text "rec"
     ppr (LatUndet   outer) = ppr outer <+> text "undet"
@@ -331,10 +354,6 @@ instance Outputable EnterLattice where
         ppr outer <+> (ppr inner)
     ppr (LatSum outer inner) =
         ppr outer <+> (ppr inner)
-
-instance Lattice EnterLattice where
-    bot = LatUndet UndetEnterInfo
-    top = LatUnknown MaybeEnter
 
 combineEnterBranches :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterBranches RecEnter _             = MaybeEnter
@@ -358,7 +377,7 @@ combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
     | otherwise = Just $! SumInfo c1 $
                   zipWithEqual "SumInfo:combine" combineLatticeBranches fs1 fs2
 
-combineLatticeBranches :: EnterLattice -> EnterLattice -> EnterLattice
+combineLatticeBranches :: FieldInfo -> FieldInfo -> FieldInfo
 combineLatticeBranches x1 x2 | x1 == x2 = x1
 combineLatticeBranches (LatRec o1) x = x `setOuterInfo` (combineEnterBranches o1 $ getOuter x)
 combineLatticeBranches x (LatRec o2) = x `setOuterInfo` (combineEnterBranches (getOuter x) o2)
@@ -382,10 +401,10 @@ combineLatticeBranches (LatProd o1 p1) (LatProd o2 p2) =
     LatProd (combineEnterBranches o1 o2) (combineProdInfo p1 p2)
 
 -- Lattice when we know, and can only know, the outer layer.
-flatLattice :: EnterInfo -> EnterLattice
+flatLattice :: EnterInfo -> FieldInfo
 flatLattice x = LatUnknown x
 
-setOuterInfo :: HasCallStack => EnterLattice -> EnterInfo -> EnterLattice
+setOuterInfo :: HasCallStack => FieldInfo -> EnterInfo -> FieldInfo
 setOuterInfo lat info
     | getOuter lat == info
     = lat
@@ -399,7 +418,7 @@ setOuterInfo lat info
 
 -- Lookup field info, defaulting towards bot
 -- Zero indexed
-indexField :: EnterLattice -> Int -> EnterLattice
+indexField :: FieldInfo -> Int -> FieldInfo
 indexField (LatUndet _) _ = bot
 -- This can only happen if we case on a non-terminating function.
 indexField (LatRec _) _ = bot
@@ -417,10 +436,10 @@ indexField (LatSum _ sum) n
 -- Field information not available
 indexField LatUnknown {} _ = top
 
-hasOuterTag :: EnterLattice -> Bool
+hasOuterTag :: FieldInfo -> Bool
 hasOuterTag lat = getOuter lat == NeverEnter
 
-hasTopFields :: EnterLattice -> Bool
+hasTopFields :: FieldInfo -> Bool
 hasTopFields (LatUnknown    {}) = True
 hasTopFields (LatProd _ (FieldProdInfo fields)) = all isTopValue fields
 hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
@@ -428,10 +447,10 @@ hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
 hasTopFields (LatRec        {}) = False
 hasTopFields (LatUndet      {}) = False
 
-isTopValue :: EnterLattice -> Bool
+isTopValue :: FieldInfo -> Bool
 isTopValue lat = getOuter lat == MaybeEnter && hasTopFields lat
 
-nestingLevelOver :: EnterLattice -> Int -> Bool
+nestingLevelOver :: FieldInfo -> Int -> Bool
 nestingLevelOver _ 0 = True
 nestingLevelOver (LatProd _ (FieldProdInfo fields)) n
     = any (`nestingLevelOver` (n-1)) fields
@@ -439,7 +458,7 @@ nestingLevelOver (LatSum _ (SumInfo _ fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
-capAtLevel :: Int -> EnterLattice -> EnterLattice
+capAtLevel :: Int -> FieldInfo -> FieldInfo
 capAtLevel _ l@(LatUnknown {}) = l
 capAtLevel _ l@(LatRec {}) = l
 capAtLevel _ l@(LatUndet {}) = l
@@ -774,7 +793,7 @@ isMarkedDone id = do
     s <- get
     return $ elemUFM id (fs_doneNodes s)
 
-updateNodeResult :: NodeId -> EnterLattice -> AM ()
+updateNodeResult :: NodeId -> FieldInfo -> AM ()
 updateNodeResult id result = do
     node <- (getNode id)
     updateNode $ node {node_result = result}
@@ -789,7 +808,7 @@ getNode node_id = do
 
 
 -- TODO: Can we make sure we never try to query non-existing nodes?
-lookupNodeResult :: HasCallStack => NodeId -> AM EnterLattice
+lookupNodeResult :: HasCallStack => NodeId -> AM FieldInfo
 lookupNodeResult node_id = do
     s <- get
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
@@ -854,8 +873,8 @@ data FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId -- ^ Node id
     , node_inputs :: [NodeId]  -- ^ Input dependencies
     , node_done :: !Bool -- ^ Do no longer update this node
-    , node_result :: !(EnterLattice) -- ^ Cached result
-    , node_update :: (AM EnterLattice) -- ^ Calculates a new value for the node
+    , node_result :: !(FieldInfo) -- ^ Cached result
+    , node_update :: (AM FieldInfo) -- ^ Calculates a new value for the node
                                        -- AND updates the environment with it.
 #if defined(WITH_NODE_DESC)
     , _node_desc :: SDoc -- ^ Debugging purposes
@@ -988,7 +1007,7 @@ mkJoinNode inputs = do
 
 -- Gives the lattice for evaluating con with arguments of the given taggedness.
 -- | Take a lattice argument per constructor argument to simplify things.
-mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
+mkOutConLattice :: DataCon -> EnterInfo -> [FieldInfo] -> FieldInfo
 mkOutConLattice con outer fields
     | conCount == 1 = LatProd outer (FieldProdInfo out_fields)
     | conCount > 1  = LatSum outer (SumInfo con out_fields)
@@ -1062,7 +1081,7 @@ addConstantNodes = do
     addNode $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
 
 
-mkConstNode :: NodeId -> EnterLattice -> FlowNode
+mkConstNode :: NodeId -> FieldInfo -> FlowNode
 mkConstNode id val =
     FlowNode
     { node_id = id
@@ -1449,13 +1468,13 @@ nodeCase _ _ = panic "Impossible: nodeCase"
 
 -- Take the result of the scrutinee and mark it as tagged.
 nodeCaseBndr :: NodeId -> Id -> AM NodeId
-nodeCaseBndr scrutNodeId bndr = do
+nodeCaseBndr scrutNodeId _bndr = do
     bndrNodeId <- mkUniqueId
     addNode $ FlowNode  { node_id = bndrNodeId
                         , node_inputs = [scrutNodeId], node_done = False
                         , node_result = bot, node_update = updater bndrNodeId
 #if defined(WITH_NODE_DESC)
-                        , _node_desc = text "caseBndr" <-> parens (ppr scrutNodeId) <-> ppr bndr
+                        , _node_desc = text "caseBndr" <-> parens (ppr scrutNodeId) <-> ppr _bndr
 #endif
                         }
     return bndrNodeId
@@ -1501,7 +1520,7 @@ nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
           | otherwise = do
                 node_id <- mkUniqueId --Shadows existing binds
                 let updater = do
-                        scrut_res <- lookupNodeResult scrutNodeId :: AM EnterLattice
+                        scrut_res <- lookupNodeResult scrutNodeId :: AM FieldInfo
                         let bndr_res = (indexField scrut_res n)
                         let is_strict_field = elem bndr strictBnds
                         let result
@@ -1573,8 +1592,8 @@ nodeConApp ctxt (StgConApp _ext con args tys) = do
     mapM_ addImportedNode [v | StgVarArg v <- args]
     inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
     let updater = do
-            fieldResults <- mapM lookupNodeResult inputs :: AM [EnterLattice]
-            let result = mkOutConLattice con top fieldResults
+            fieldResults <- mapM lookupNodeResult inputs :: AM [FieldInfo]
+            let result = mkOutConLattice con MaybeEnter fieldResults
             -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
             updateNodeResult node_id result
             return result
@@ -1711,7 +1730,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         | isFun && isSat = [f_node_id]
         | otherwise = [f_node_id]
 
-    mkResult :: AM EnterLattice
+    mkResult :: AM FieldInfo
     mkResult
         | isAbsent = pprTrace "Absent:" (ppr f) $ return $ flatLattice NeverEnter
 
@@ -1726,7 +1745,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         -- App in a direct self-recursive tail call context, returns nothing
         | recTail = return $ LatRec RecEnter
 
-        | SimpleRecursion <- recursionKind =
+        | NoMutRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
             lookupNodeResult f_node_id
 
@@ -1749,7 +1768,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         =   -- pprTrace "Unsat?" (ppr (f,args)) $
             return top
 
-    recTail = recursionKind == SimpleRecursion && isRecTail ctxt
+    recTail = recursionKind == NoMutRecursion && isRecTail ctxt
     isFun = isFunTy (unwrapType $ idType f)
     arity = idFunRepArity f
     isSat = arity > 0 && (length args == arity)
@@ -1763,7 +1782,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
 
     getRecursionKind [] = NoRecursion
     getRecursionKind ((CLetRec ids _) : _) | f `elemVarEnv` ids =
-                if sizeUFM ids == 1 then SimpleRecursion else OtherRecursion
+                if sizeUFM ids == 1 then NoMutRecursion else OtherRecursion
     getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ = panic "Impossible"
 
@@ -1876,7 +1895,7 @@ rewriteRhsInplace :: HasCallStack => Id -> InferStgRhs -> AM TgStgRhs
 rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
     node <- getNode node_id
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,EnterLattice)]
+    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,FieldInfo)]
     let needsEval = map fst . filter (not . hasOuterTag . snd) $ strictIndices :: [Int]
     -- TODO: selectIndices is not a performant solution, fix that.
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
@@ -1885,7 +1904,7 @@ rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
         then return (StgRhsCon noExtFieldSilent ccs con args)
         else do
             -- tagInfo <- lookupNodeResult node_id
-            -- pprTraceM "Creating closure for " $ ppr _binding <+> ppr (node_id, tagInfo)
+            pprTraceM "Creating closure for " $ ppr _binding <+> ppr node_id
             conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
             return $ (StgRhsClosure noExtFieldSilent ccs ReEntrant [] conExpr)
 
@@ -1911,7 +1930,7 @@ rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
     --     ]
 
     -- TODO: use zip3
-    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,EnterLattice)]
+    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,FieldInfo)]
     let needsEval = map fst . filter (not . hasOuterTag . snd) $ strictIndices :: [Int]
     -- TODO: selectIndices is not a performant solution, fix that.
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
@@ -1920,7 +1939,7 @@ rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
         then return (StgRhsCon noExtFieldSilent ccs con args, id)
         else do
             -- tagInfo <- lookupNodeResult node_id
-            -- pprTraceM "Creating seqs (wrapped) for " $ ppr binding <+> ppr (node_id, tagInfo)
+            pprTraceM "Creating seqs (wrapped) for " $ ppr _binding <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
             let varMap = zip evalArgs evaldArgs -- Match them up with original ids
@@ -1985,12 +2004,12 @@ rewriteConApp (StgConApp nodeId con args tys) = do
     -- We look at the INPUT because the output of this node will always have tagged
     -- strict fields in the end.
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip3 [(0 :: Int) ..] fieldInfos args) :: [(Int,EnterLattice, StgArg)]
+    let strictIndices = getStrictConArgs con (zip3 [(0 :: Int) ..] fieldInfos args) :: [(Int,FieldInfo, StgArg)]
     let needsEval = map fstOf3 . filter (not . hasOuterTag . sndOf3) $ strictIndices :: [Int]
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
     if (not $ null evalArgs)
         then do
-            -- pprTraceM "Creating conAppSeqs for " $ ppr nodeId <+> parens ( ppr evalArgs ) <+> parens ( ppr fieldInfos )
+            pprTraceM "Creating conAppSeqs for " $ ppr nodeId <+> parens ( ppr evalArgs ) -- <+> parens ( ppr fieldInfos )
             mkSeqs evalArgs con args tys
         else return (StgConApp noExtFieldSilent con args tys)
 

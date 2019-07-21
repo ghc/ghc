@@ -831,7 +831,7 @@ emitTagTrap what fun expectTag = do
                 lret lfault Nothing <*>
       outOfLine lfault (mkStore (CmmLit $ CmmInt 0 W64) (CmmLit $ CmmInt 0 W64) <*> mkBranch lret,tscope) <*>
       mkLabel lret tscope
-  } 
+  }
 
 
 cgIdApp :: AppEnters -> Id -> [StgArg] -> FCode ReturnKind
@@ -868,7 +868,7 @@ cgIdApp strict fun_id args = do
             -- (emitTagTrap fun_id fun True)
 
             tickyTagged
-            -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
+            pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
             emitReturn [fun]
 
         EnterIt untagged -> ASSERT( null args )  -- Discarding arguments

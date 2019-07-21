@@ -26,9 +26,6 @@ import RepType
 import StgSyn
 
 import VarSet
-import UniqSet (nonDetEltsUniqSet) -- toListVarSet basically
-import UniqFM
-import Digraph
 import Util
 import Outputable
 
@@ -84,6 +81,7 @@ bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
 bindersOfTop (StgTopLifted bind) = bindersOf bind
 bindersOfTop (StgTopStringLit binder _) = [binder]
 
+-- All ids we bind something to on the top level.
 bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> IdSet
 bindersOfTopBinds binds = mapUnionVarSet (mkVarSet . bindersOfTop) binds
 
@@ -112,35 +110,36 @@ seqTopBinds :: [GenStgTopBinding p] -> ()
 seqTopBinds binds = seqList (map seqTop binds) ()
 
 seqTop :: GenStgTopBinding p -> ()
-seqTop (StgTopStringLit !v !s) = ()
+seqTop (StgTopStringLit !_v !_s) = ()
 seqTop (StgTopLifted bind)     = seqBinds bind
 
 seqBinds :: GenStgBinding p -> ()
-seqBinds (StgNonRec !v rhs) = (seqRhs rhs)
+seqBinds (StgNonRec !_v rhs) = (seqRhs rhs)
 seqBinds (StgRec pairs)    = seqList (map (\v rhs -> v `seq` seqRhs rhs) pairs) ()
 
 -- For top level lets we have to turn lets into closures.
 seqRhs :: GenStgRhs p -> ()
-seqRhs (StgRhsCon !x !ccs !con !args)             = ()
-seqRhs (StgRhsClosure !ext !ccs !flag !args body) = seqExpr body
+seqRhs (StgRhsCon !_x !_ccs !_con args)             = seqArgs args
+seqRhs (StgRhsClosure !_ext !_ccs !_flag args body) = seqExpr body `seq` seqList args ()
 
 seqExpr :: GenStgExpr p -> ()
-seqExpr (StgCase scrut !bndr !ty alts) = seqList (map seqAlt alts) (seqExpr scrut)
-seqExpr (StgLet !x binds body)         = (seqBinds binds) `seq` (seqExpr body)
-seqExpr (StgLetNoEscape !x binds body) = (seqBinds binds) `seq` (seqExpr body)
-seqExpr (StgTick !t e)                 = seqExpr e
-seqExpr (StgConApp !x !con !args  tys) = ()
+seqExpr (StgCase scrut !_bndr !_ty alts) = seqList (map seqAlt alts) (seqExpr scrut)
+seqExpr (StgLet !_x binds body)         = (seqBinds binds) `seq` (seqExpr body)
+seqExpr (StgLetNoEscape !_x binds body) = (seqBinds binds) `seq` (seqExpr body)
+seqExpr (StgTick !_t e)                 = seqExpr e
+seqExpr (StgConApp !_x !_con args _tys) = seqArgs args
 
-seqExpr (StgApp !x !f !args)           = ()
-seqExpr (StgLit !lit)                  = ()
-seqExpr (StgOpApp !op !args !res_ty)   = ()
+seqExpr (StgApp !_x !_f args)           = seqArgs args
+seqExpr (StgLit !_lit)                  = ()
+seqExpr (StgOpApp !_op args !_res_ty)   = seqArgs args
 seqExpr (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
 
 seqAlt :: GenStgAlt p -> ()
-seqAlt (!altCon, !bndrs, rhs) = seqExpr rhs
+seqAlt (!_altCon, !_bndrs, rhs) = seqExpr rhs
 
 seqArgs :: [StgArg] -> ()
 seqArgs args = seqList (map seqArg args) ()
 
-seqArg (StgVarArg !v) = ()
-seqArg (StgLitArg !l) = ()
+seqArg :: StgArg -> ()
+seqArg (StgVarArg !_v) = ()
+seqArg (StgLitArg !_l) = ()
