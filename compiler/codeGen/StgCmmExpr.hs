@@ -41,7 +41,7 @@ import Id
 import PrimOp
 import TyCon
 import Type             ( isUnliftedType )
-import RepType          ( isVoidTy, countConRepArgs, primRepSlot )
+import RepType          ( isVoidTy, countConRepArgs )
 import CostCentre       ( CostCentreStack, currentCCS )
 import Maybes
 import Util
@@ -50,7 +50,6 @@ import Outputable
 
 import Control.Monad (unless,void)
 import Control.Arrow (first)
-import Data.Function ( on )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -410,57 +409,17 @@ cgCase (StgApp v []) _ (PrimAlt _) alts
   , [(DEFAULT, _, rhs)] <- alts
   = cgExpr rhs
 
-{- Note [Dodgy unsafeCoerce 1]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-    case (x :: HValue) |> co of (y :: MutVar# Int)
-        DEFAULT -> ...
-We want to gnerate an assignment
-     y := x
-We want to allow this assignment to be generated in the case when the
-types are compatible, because this allows some slightly-dodgy but
-occasionally-useful casts to be used, such as in RtClosureInspect
-where we cast an HValue to a MutVar# so we can print out the contents
-of the MutVar#.  If instead we generate code that enters the HValue,
-then we'll get a runtime panic, because the HValue really is a
-MutVar#.  The types are compatible though, so we can just generate an
-assignment.
--}
 cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
-  | isUnliftedType (idType v)  -- Note [Dodgy unsafeCoerce 1]
-  || reps_compatible
+  | isUnliftedType (idType v)
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
-       ; unless reps_compatible $
-           pprPanic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
-                    (pp_bndr v $$ pp_bndr bndr)
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
        -- Add bndr to the environment
        ; _ <- bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
-  where
-    reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
-      -- Must compare SlotTys, not proper PrimReps, because with unboxed sums,
-      -- the types of the binders are generated from slotPrimRep and might not
-      -- match. Test case:
-      --   swap :: (# Int | Int #) -> (# Int | Int #)
-      --   swap (# x | #) = (# | x #)
-      --   swap (# | y #) = (# y | #)
 
-    pp_bndr id = ppr id <+> dcolon <+> ppr (idType id) <+> parens (ppr (idPrimRep id))
-
-{- Note [Dodgy unsafeCoerce 2, #3132]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In all other cases of a lifted Id being cast to an unlifted type, the
-Id should be bound to bottom, otherwise this is an unsafe use of
-unsafeCoerce.  We can generate code to enter the Id and assume that
-it will never return.  Hence, we emit the usual enter/return code, and
-because bottom must be untagged, it will be entered.  The Sequel is a
-type-correct assignment, albeit bogus.  The (dead) continuation loops;
-it would be better to invoke some kind of panic function here.
--}
 cgCase scrut@(StgApp v []) _ (PrimAlt _) _
   = do { dflags <- getDynFlags
        ; mb_cc <- maybeSaveCostCentre True
