@@ -21,7 +21,7 @@
 
 
 -- {-# LANGUAGE Strict #-}
--- {-# OPTIONS_GHC -O0 #-}
+-- {-# OPTIONS_GHC -O #-}
 
 module StgInferTags (findTags) where
 
@@ -75,6 +75,8 @@ import Outputable
 import DynFlags
 import Digraph
 
+import VarEnv
+
 import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
 
 -- Debugging/Profiling things
@@ -84,7 +86,7 @@ import System.CPUTime
 
 -- Grow them trees:
 
-#define WITH_NODE_DESC
+-- #define WITH_NODE_DESC
 
 -- Avoid deep comparisons with reallyUnsafePtrEquality#
 maybeEq :: a -> a -> Bool
@@ -203,22 +205,21 @@ instance Lattice EnterInfo where
 
 data SumInfo
     = SumInfo !DataCon [EnterLattice] -- ^ A constructor application
-    deriving (Eq,Generic)
+    deriving (Generic)
+
+instance Eq SumInfo where
+    (==) (SumInfo c1 fs1) (SumInfo c2 fs2) =
+        c1 == c2 && fs1 == fs2
 
 instance NFData SumInfo where
     rnf (SumInfo _ fields) = rnf fields
-
-instance Ord SumInfo where
-    -- TODO: Define comparing for efficiency
-    SumInfo con1 lat1 <= SumInfo con2 lat2
-        = (dataConTag con1, lat1) <= (dataConTag con2, lat2)
 
 instance Outputable SumInfo where
     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
 
 data ProdInfo
     = FieldProdInfo [EnterLattice]
-    deriving (Eq, Ord,Generic,NFData)
+    deriving (Eq,Generic,NFData)
 
 instance Outputable ProdInfo where
     ppr (FieldProdInfo fields) = text "p" <+> ppr fields
@@ -299,10 +300,10 @@ data EnterLattice
     -- about it's return values as well.
     | LatUndet !EnterInfo
 
+    -- Don't unpack Sum/Prod infos, as EnterInfo is modified somewhat often.
     | LatProd !EnterInfo !ProdInfo
-
     | LatSum !EnterInfo !SumInfo
-    deriving (Ord,Generic,NFData)
+    deriving (Generic,NFData)
 
 instance Eq EnterLattice where
     (==) lat1 lat2
@@ -882,7 +883,7 @@ node_desc :: FlowNode -> SDoc
 #if defined(WITH_NODE_DESC)
 node_desc n = _node_desc n
 #else
-node_desc n = empty
+node_desc _n = empty
 #endif
 
 instance NFData FlowNode where
@@ -918,31 +919,34 @@ pprLne NotLNE = empty
 pprLne LNE = text "-LNE"
 
 data SynContext
-    = CTopLevel     [(Id,NodeId)] -- ^ Maps top level binds to ids
-    | CLetRec       [(Id,NodeId)] !IsLNE
-    | CLetRecBody   [(Id,NodeId)] !IsLNE
-    | CLet          !(Id,NodeId)  !IsLNE
-    | CLetBody      !(Id,NodeId)  !IsLNE
-    | CClosureBody  [(Id,NodeId)] -- ^ Args of a closure mapped to nodes in the body
+    = CTopLevel     (VarEnv NodeId) -- ^ Maps top level binds to ids
+    | CLetRec       (VarEnv NodeId) !IsLNE
+    | CLetRecBody   (VarEnv NodeId) !IsLNE
+    | CLet          (VarEnv NodeId)  !IsLNE
+    | CLetBody      (VarEnv NodeId)  !IsLNE
+    | CClosureBody  (VarEnv NodeId) -- ^ Args of a closure mapped to nodes in the body
     | CCaseScrut                  -- ^ Inside a case scrutinee
-    | CCaseBndr     !(Id,NodeId)  -- ^ Case binder mapping
-    | CAlt          [(Id,NodeId)] -- ^ Alt binder mappings
+    | CCaseBndr     (VarEnv NodeId)  -- ^ Case binder mapping
+    | CAlt          (VarEnv NodeId) -- ^ Alt binder mappings
     | CNone                       -- ^ No Context given
     deriving Eq
 
-getCtxtIdMap :: SynContext -> Maybe [(Id,NodeId)]
+getCtxtIdMap :: SynContext -> Maybe (VarEnv NodeId)
 getCtxtIdMap (CClosureBody m) = Just m
-getCtxtIdMap (CCaseBndr m) = Just [m]
+getCtxtIdMap (CCaseBndr m) = Just $ m
 getCtxtIdMap (CCaseScrut) = Nothing
 getCtxtIdMap (CAlt m) = Just m
 getCtxtIdMap (CLetRec m _) = Just m
 getCtxtIdMap (CLetRecBody m _) = Just m
-getCtxtIdMap (CLet m _) = Just [m]
-getCtxtIdMap (CLetBody m _) = Just [m]
+getCtxtIdMap (CLet m _) = Just m
+getCtxtIdMap (CLetBody m _) = Just m
 getCtxtIdMap (CTopLevel m) = Just m
 getCtxtIdMap (CNone) = Nothing
 
-
+-- | isSingleMapOf v env == fromList [(v',_)] && v == v'
+isSingleMapOf :: Id -> VarEnv NodeId -> Bool
+isSingleMapOf v env =
+    sizeUFM env == 1 && elemVarEnv v env
 
 instance Outputable SynContext where
     ppr CNone = text "CNone"
@@ -961,7 +965,7 @@ idMappedInCtxt id ctxt
   where
     go (ctxt:_)
         | Just argMap <- getCtxtIdMap ctxt
-        , Just node <- lookup id argMap
+        , Just node <- lookupVarEnv argMap id
         = Just node
     go (_:todo) = go todo
     go [] = Nothing
@@ -1020,7 +1024,7 @@ findTags this_mod us binds =
             _nodes <- solveConstraints
             finalBinds <- rewriteTopBinds binds'
             return $ finalBinds
-    in -- (seqTopBinds binds') `seq`
+    in  (seqTopBinds binds') `seq`
         pprTrace "foundBinds" (ppr this_mod) binds'
 
 
@@ -1237,7 +1241,7 @@ nodesTopBinds :: [StgTopBinding] -> AM [InferStgTopBinding]
 nodesTopBinds binds = do
     let top_level_binds = (bindersOfTopBinds binds) :: IdSet
     -- TODO: Should is a map instead of a lookup list.
-    mappings <- mapM (mkCtxtEntry [CNone]) (nonDetEltsUniqSet top_level_binds) ::  AM [(Id,NodeId)]
+    mappings <- mkVarEnv <$> mapM (mkCtxtEntry [CNone]) (nonDetEltsUniqSet top_level_binds) ::  AM (VarEnv NodeId)
     -- TODOT: Better solution than stub nodes?
     -- mapM (\(v,u) -> mkStubNode u (ppr (v,u))) mappings
     let topCtxt = CTopLevel mappings
@@ -1268,13 +1272,13 @@ nodesTop ctxt (StgTopLifted bind)  = do
 -- nodeRhs. Returns the context including the let
 nodesBind :: [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStgBinding, [SynContext])
 nodesBind ctxt top lne (StgNonRec v rhs) = do
-    boundId <- mkCtxtEntry ctxt v
+    boundId <- uncurry unitVarEnv <$> mkCtxtEntry ctxt v
     let ctxt' = ((CLet boundId lne):ctxt)
     (rhs',_) <- (nodeRhs ctxt' top v rhs)
     return (StgNonRec v rhs', (CLetBody boundId lne):ctxt)
 nodesBind ctxt top lne (StgRec binds) = do
     let ids = map fst binds
-    boundIds <- mapM (mkCtxtEntry ctxt) ids :: AM [(Id, NodeId)]
+    boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
     let ctxt' = (CLetRec boundIds lne) : ctxt
     (rhss', _) <- unzip <$> mapM (uncurry (nodeRhs ctxt' top )) binds
     return $ (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
@@ -1340,8 +1344,8 @@ nodeRhs ctxt topFlag binding (StgRhsCon _ _ccs con args)
                 -- However we do not do this for recursive binds
                 -- for now. TODO: Could be done also for recursive binds in the common case.
                 | not (isTopLevel topFlag)
-                , (CLet (v,_) _ : _) <- ctxt
-                , v == binding
+                , (CLet vmap _ : _) <- ctxt
+                , elemVarEnv binding vmap
                 =   -- pprTrace "Avoided tag by wrapping" (ppr binding)
                     NeverEnter
                 -- All lazy fields
@@ -1407,7 +1411,8 @@ nodeRhs ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
         | null args = text "rhsThunk:" <> (ppr binding)
         | otherwise = text "rhsFunc:" <> (ppr binding)
 #endif
-    ctxt' = (CClosureBody (zip args (replicate arity topNodeId)):ctxt)
+    varMap = mkVarEnv (zip args (replicate arity topNodeId))
+    ctxt' = (CClosureBody varMap :ctxt)
     arity = length args
     enterInfo
         | isAbsentExpr body = NeverEnter
@@ -1443,7 +1448,7 @@ nodeCase :: [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeCase ctxt (StgCase scrut bndr alt_type alts) = do
     (scrut',scrutNodeId) <- nodeExpr (CCaseScrut:ctxt) scrut
     bndrNodeId <- nodeCaseBndr scrutNodeId bndr
-    let ctxt' = CCaseBndr (bndr,bndrNodeId) : ctxt
+    let ctxt' = CCaseBndr (unitVarEnv bndr bndrNodeId) : ctxt
     (alts', altNodeIds) <- unzip <$> mapM (nodeAlt ctxt' scrutNodeId) alts
     caseNodeId <- mkJoinNode ctxt' altNodeIds
     -- pprTraceM "Scrut, alts, rhss" $ ppr (scrut, scrutNodeId, altNodeIds, altsId)
@@ -1480,7 +1485,7 @@ nodeCaseBndr scrutNodeId bndr = do
 nodeAlt :: HasCallStack => [SynContext] -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
 nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
   | otherwise = do
-    bndrMappings <- zipWithM mkAltBndrNode [0..] bndrs
+    bndrMappings <- mkVarEnv <$> zipWithM mkAltBndrNode [0..] bndrs
     let ctxt' = (CAlt bndrMappings):ctxt
     (rhs', rhs_id) <- nodeExpr ctxt' rhs
     return ((altCon, bndrs, rhs'), rhs_id)
@@ -1645,7 +1650,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
                         -- pprTraceM "Updating " (ppr node_id)
                         -- Try to peek into the function being applied
                         !result <- mkResult
-                        !node <- getNode node_id
+                        -- node <- getNode node_id
                         !input_nodes <- mapM getNode inputs
                         -- pprTraceM "AppFields" (ppr (f, result) <+> ppr node $$
                         --     text "inputs:" <+> ppr inputs $$
@@ -1657,7 +1662,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
                                 -- pprTraceM "Limiting nesting for " (ppr node_id)
                                 node <- getNode node_id
                                 markDone $ node { node_result = result }
-                                return $! result
+                                return $ result
                             else do
                                 updateNodeResult node_id result
                                 return result
@@ -1679,28 +1684,29 @@ nodeApp ctxt expr@(StgApp _ f args) = do
     isRecTail :: [SynContext] -> Bool
     isRecTail (CTopLevel _ : _) = False
     isRecTail (CLetRec bnds _: _)
-        | [(v,_)] <- bnds
-        , v == f
+        | isSingleMapOf f bnds
         = True
     isRecTail (CLetRec _ LNE    : ctxt) = isRecTail ctxt
     isRecTail (CLetRec _ NotLNE : _   ) = False
     isRecTail (CLetRecBody bnds _ :ctxt)
-        | f `elem` (map fst bnds) = False
+        | f `elemVarEnv` bnds = False
         | otherwise = isRecTail ctxt
     isRecTail (CLet _ LNE    : ctxt) = isRecTail ctxt
     isRecTail (CLet _ NotLNE : _) = False
-    isRecTail (CLetBody (v,_) _ : ctxt) = isRecTail ctxt
+    isRecTail (CLetBody bnds _ : ctxt)
+        | elemVarEnv f bnds = False
+        | otherwise = isRecTail ctxt
     isRecTail (CClosureBody args : ctxt)
-        | f `elem` (map fst args) = False
+        | f `elemVarEnv` args = False
         | otherwise = isRecTail ctxt
     isRecTail (CCaseScrut : _) = False
-    isRecTail (CCaseBndr (v,_) : ctxt )
-        | v == f
+    isRecTail (CCaseBndr bnd : ctxt )
+        | elemVarEnv f bnd
         = False
         | otherwise
         = isRecTail ctxt
     isRecTail (CAlt bnds : ctxt)
-        | f `elem` (map fst bnds) = False
+        | f `elemVarEnv` bnds = False
         | otherwise = isRecTail ctxt
     isRecTail (CNone : _) = panic "impossible"
     isRecTail x = pprPanic "Incomplete" $ ppr x
@@ -1764,8 +1770,8 @@ nodeApp ctxt expr@(StgApp _ f args) = do
     recursionKind = getRecursionKind ctxt
 
     getRecursionKind [] = NoRecursion
-    getRecursionKind ((CLetRec ids _) : _) | f `elem` (map fst ids) =
-                if length ids == 1 then SimpleRecursion else OtherRecursion
+    getRecursionKind ((CLetRec ids _) : _) | f `elemVarEnv` ids =
+                if sizeUFM ids == 1 then SimpleRecursion else OtherRecursion
     getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ = panic "Impossible"
 
@@ -1924,7 +1930,7 @@ rewriteRhs binding (StgRhsCon node_id ccs con args) = do
     if (null evalArgs)
         then return (StgRhsCon noExtFieldSilent ccs con args, id)
         else do
-            tagInfo <- lookupNodeResult node_id
+            -- tagInfo <- lookupNodeResult node_id
             -- pprTraceM "Creating seqs (wrapped) for " $ ppr binding <+> ppr (node_id, tagInfo)
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders

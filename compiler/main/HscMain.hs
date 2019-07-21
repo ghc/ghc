@@ -1514,7 +1514,7 @@ doCodeGen hsc_env this_mod data_tycons
     let dflags = hsc_dflags hsc_env
 
     us <- mkSplitUniqSupply 't'
-    -- return $! seqTopBinds stg_binds
+    return $! seqTopBinds stg_binds
     !start <- getTime
     let !stg_binds_w_tags = {-# SCC "StgTagFields" #-}
                           findTags this_mod us stg_binds :: [TgStgTopBinding]
