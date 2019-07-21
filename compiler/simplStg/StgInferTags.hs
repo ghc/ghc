@@ -84,7 +84,7 @@ import System.CPUTime
 
 -- Grow them trees:
 
--- #define WITH_NODE_DESC
+#define WITH_NODE_DESC
 
 -- Avoid deep comparisons with reallyUnsafePtrEquality#
 maybeEq :: a -> a -> Bool
@@ -153,8 +153,6 @@ data RecursionKind
 
 class Lattice a where
     bot :: a
-    lub :: a -> a -> a
-    glb :: a -> a -> a
     top :: a
 
 
@@ -203,110 +201,26 @@ instance Lattice EnterInfo where
     bot = UndetEnterInfo
     top = MaybeEnter
 
-    lub _ _ = panic "Not used"
-    glb = panic "not used"
-
-    -- lub UndetEnterInfo x = x
-    -- lub x UndetEnterInfo = x
-
-    -- lub AlwaysEnter NeverEnter = MaybeEnter
-    -- lub NeverEnter AlwaysEnter  = MaybeEnter
-
-    -- lub AlwaysEnter AlwaysEnter = AlwaysEnter
-    -- lub NeverEnter NeverEnter = NeverEnter
-
-    -- lub MaybeEnter _ = MaybeEnter
-    -- lub _ MaybeEnter = MaybeEnter
-
-    -- glb UndetEnterInfo _x = UndetEnterInfo
-    -- glb _x UndetEnterInfo = UndetEnterInfo
-
-    -- glb AlwaysEnter NeverEnter = UndetEnterInfo
-    -- glb NeverEnter AlwaysEnter  = UndetEnterInfo
-
-    -- glb AlwaysEnter AlwaysEnter = AlwaysEnter
-    -- glb NeverEnter NeverEnter = NeverEnter
-
-    -- glb MaybeEnter x = x
-    -- glb x MaybeEnter = x
-
-
 data SumInfo
-    = NoSumInfo -- ^ Default
-    | SumInfo !DataCon [EnterLattice] -- ^ A constructor application
-    | TopSumInfo -- ^ Result could be different constructors
+    = SumInfo !DataCon [EnterLattice] -- ^ A constructor application
     deriving (Eq,Generic)
 
 instance NFData SumInfo where
-    rnf NoSumInfo = ()
-    rnf TopSumInfo = ()
     rnf (SumInfo _ fields) = rnf fields
 
 instance Ord SumInfo where
     -- TODO: Define comparing for efficiency
-    NoSumInfo <= _  = True
-    _ <= NoSumInfo  = False
-    _ <= TopSumInfo = True
-    TopSumInfo <= _ = False
     SumInfo con1 lat1 <= SumInfo con2 lat2
         = (dataConTag con1, lat1) <= (dataConTag con2, lat2)
 
 instance Outputable SumInfo where
-    ppr NoSumInfo = text "_|_"
     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
-    ppr TopSumInfo = char 'T'
-
-instance Lattice SumInfo where
-    bot = NoSumInfo
-    top = TopSumInfo
-
-    lub NoSumInfo x = x
-    lub x NoSumInfo = x
-    lub TopSumInfo _ = TopSumInfo
-    lub _ TopSumInfo = TopSumInfo
-    lub (SumInfo con1 lat1) (SumInfo con2 lat2)
-        | con1 == con2
-        = SumInfo con1 (zipWithEqual "SumInfo:lub" lub lat1 lat2)
-        | otherwise = TopSumInfo
-
-    glb NoSumInfo _x = NoSumInfo
-    glb _x NoSumInfo = NoSumInfo
-    glb TopSumInfo x = x
-    glb x TopSumInfo = x
-    glb (SumInfo con1 lat1) (SumInfo con2 lat2)
-        | con1 == con2
-        = SumInfo con1 (zipWithEqual "SumInfo:glb" glb lat1 lat2)
-        | otherwise = NoSumInfo
 
 data ProdInfo
-    = BotProdInfo
-    | FieldProdInfo [EnterLattice]
-    | TopProdInfo
+    = FieldProdInfo [EnterLattice]
     deriving (Eq, Ord,Generic,NFData)
 
-instance Lattice ProdInfo where
-    bot = BotProdInfo
-    top = TopProdInfo
-
-    lub = panic "Not used"
-    glb = panic "Not used"
-    -- lub BotProdInfo x = x
-    -- lub x BotProdInfo = x
-    -- lub (FieldProdInfo fields1) (FieldProdInfo fields2)
-    --     = FieldProdInfo (zipWithEqual "ProdInfo:lub" lub fields1 fields2)
-    -- lub TopProdInfo _ = TopProdInfo
-    -- lub _ TopProdInfo = TopProdInfo
-
-    -- glb BotProdInfo _x = BotProdInfo
-    -- glb _x BotProdInfo = BotProdInfo
-    -- glb (FieldProdInfo fields1) (FieldProdInfo fields2)
-    --     = FieldProdInfo (zipWithEqual "ProdInfo:glb" glb fields1 fields2)
-    -- glb TopProdInfo x = x
-    -- glb x TopProdInfo = x
-
 instance Outputable ProdInfo where
-    ppr BotProdInfo = text "p _|_"
-    ppr TopProdInfo = text "p  T "
     ppr (FieldProdInfo fields) = text "p" <+> ppr fields
 
 
@@ -428,51 +342,6 @@ instance Lattice EnterLattice where
     bot = LatUndet UndetEnterInfo
     top = LatUnknown MaybeEnter
 
-    lub = panic "Not used"
-    -- -- Compare LatUnknown to remaining constructors
-    -- lub (LatUnknown outer1) (LatProd outer2 _)
-    --     = LatUnknown (lub outer1 outer2)
-    -- lub (LatProd outer1 _) (LatUnknown outer2)
-    --     = LatUnknown (lub outer1 outer2)
-
-    -- lub (LatUnknown outer1) (LatSum outer2 _)
-    --     = LatUnknown (lub outer1 outer2)
-    -- lub (LatSum outer1 _) (LatUnknown outer2)
-    --     = LatUnknown (lub outer1 outer2)
-
-    -- lub (LatUnknown o1) (LatUnknown o2)
-    --     = LatUnknown (lub o1 o2)
-
-    -- lub (LatUnknown o1) (LatUndet o2) = LatUnknown (lub o1 o2)
-    -- lub (LatUndet o1) (LatUnknown o2) = LatUnknown (lub o1 o2)
-
-    -- -- Compare LatUndet to remaining constructors
-    -- lub (LatUndet o1) (LatUndet o2)
-    --     = LatUndet (lub o1 o2)
-
-    -- lub (LatUndet o1) (LatSum o2 fs1) = LatSum (lub o1 o2) (fs1)
-    -- lub (LatSum o1 fs1) (LatUndet o2)  = LatSum (lub o1 o2) (fs1)
-
-    -- lub (LatUndet o1) (LatProd o2 fs1) = LatProd (lub o1 o2) (fs1)
-    -- lub (LatProd o1 fs1) (LatUndet o2)  = LatProd (lub o1 o2) (fs1)
-
-    -- -- Compare LatProd/LatSum
-    -- lub (LatProd outer1 inner1) (LatProd outer2 inner2) =
-    --     LatProd (lub outer1 outer2) (lub inner1 inner2)
-
-    -- lub (LatSum outer1 fields1) (LatSum outer2 fields2)
-    --     = LatSum (lub outer1 outer2) (lub fields1 fields2)
-
-    -- -- See Note [Comparing Sums and Products]
-    -- lub (LatProd o1 _ ) (LatSum o2 _) =
-    --     LatUnknown (lub o1 o2)
-
-    -- lub (LatSum o1 _) (LatProd o2 _ ) =
-    --     LatUnknown (lub o1 o2)
-
-
-    glb _ _ = panic "glb not used"
-
 combineEnterBranches :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterBranches RecEnter _             = MaybeEnter
 combineEnterBranches _ RecEnter             = MaybeEnter
@@ -486,21 +355,13 @@ combineEnterBranches x y
     | x == y = x
 
 combineProdInfo :: ProdInfo -> ProdInfo -> ProdInfo
-combineProdInfo TopProdInfo _ = TopProdInfo
-combineProdInfo _ TopProdInfo = TopProdInfo
-combineProdInfo BotProdInfo _ = BotProdInfo
-combineProdInfo _ BotProdInfo = BotProdInfo
 combineProdInfo (FieldProdInfo fs1) (FieldProdInfo fs2)
     = FieldProdInfo $ zipWithEqual "ProdInfo:combine" combineLatticeBranches fs1 fs2
 
-combineSumInfo :: SumInfo -> SumInfo -> SumInfo
-combineSumInfo TopSumInfo _ = TopSumInfo
-combineSumInfo _ TopSumInfo = TopSumInfo
-combineSumInfo NoSumInfo _ = NoSumInfo
-combineSumInfo _ NoSumInfo = NoSumInfo
+combineSumInfo :: SumInfo -> SumInfo -> Maybe SumInfo
 combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
-    | c1 /= c2  = TopSumInfo
-    | otherwise = SumInfo c1 $
+    | c1 /= c2  = Nothing
+    | otherwise = Just $! SumInfo c1 $
                   zipWithEqual "SumInfo:combine" combineLatticeBranches fs1 fs2
 
 combineLatticeBranches :: EnterLattice -> EnterLattice -> EnterLattice
@@ -520,7 +381,9 @@ combineLatticeBranches (LatProd o1 _) (LatSum o2 _) = LatUnknown $ combineEnterB
 combineLatticeBranches (LatSum o1 _) (LatProd o2 _) = LatUnknown $ combineEnterBranches o1 o2
 
 combineLatticeBranches (LatSum o1 s1) (LatSum o2 s2) =
-    LatSum (combineEnterBranches o1 o2) (combineSumInfo s1 s2)
+    let outer = (combineEnterBranches o1 o2)
+        fields = (combineSumInfo s1 s2)
+    in maybe (LatUnknown outer) (LatSum outer) fields
 combineLatticeBranches (LatProd o1 p1) (LatProd o2 p2) =
     LatProd (combineEnterBranches o1 o2) (combineProdInfo p1 p2)
 
@@ -550,8 +413,6 @@ indexField (LatProd _ (FieldProdInfo fields)) n =
     case drop n fields of
         [] -> bot
         (x:_xs) -> x
-indexField (LatProd _ BotProdInfo) _ = bot
-indexField (LatProd _ TopProdInfo) _ = top
 indexField (LatSum _ sum) n
     | SumInfo _con fields <- sum
     = case drop n fields of
@@ -567,8 +428,6 @@ hasOuterTag lat = getOuter lat == NeverEnter
 
 hasTopFields :: EnterLattice -> Bool
 hasTopFields (LatUnknown    {}) = True
-hasTopFields (LatProd _  TopProdInfo) = True
-hasTopFields (LatSum  _  TopSumInfo)  = True
 hasTopFields (LatProd _ (FieldProdInfo fields)) = all isTopValue fields
 hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
 
@@ -588,6 +447,18 @@ nestingLevelOver (LatSum _ (SumInfo _ fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
+capAtLevel :: Int -> EnterLattice -> EnterLattice
+capAtLevel 0 _ = top
+capAtLevel n (LatProd e (FieldProdInfo fields)) =
+    (LatProd e (FieldProdInfo $ map (capAtLevel (n-1)) fields))
+capAtLevel n (LatSum e (SumInfo c fields)) =
+    (LatSum e (SumInfo c $ map (capAtLevel (n-1)) fields))
+
+capAtLevel _ l@(LatUnknown {}) = l
+capAtLevel _ l@(LatRec {}) = l
+capAtLevel _ l@(LatUndet {}) = l
+capAtLevel _ l@(LatUndet {}) = l
+capAtLevel _ l = l
 
 {-
     -- Note [Constraints/Rules for tag/enter information]
@@ -1149,7 +1020,8 @@ findTags this_mod us binds =
             _nodes <- solveConstraints
             finalBinds <- rewriteTopBinds binds'
             return $ finalBinds
-    in (seqTopBinds binds') `seq` pprTrace "foundBinds" (ppr this_mod) binds'
+    in -- (seqTopBinds binds') `seq`
+        pprTrace "foundBinds" (ppr this_mod) binds'
 
 
 -- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
@@ -1489,8 +1361,9 @@ nodeRhs ctxt topFlag binding (StgRhsCon _ _ccs con args)
         -- Strict fields need to marked as neverEnter here, even if they are not analysed as such
         -- This is because when we READ the result of this rhs they will have been tagged.
         let result = mkOutConLattice con outerTag fieldResults
-        updateNodeResult this_id result
-        return $ result
+        let cappedResult = capAtLevel 10 result
+        updateNodeResult this_id cappedResult
+        return $ cappedResult
 
 
 
@@ -1544,12 +1417,13 @@ nodeRhs ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
     node_update this_id body_id = do
         bodyInfo <- lookupNodeResult body_id
         let result = setOuterInfo bodyInfo enterInfo
-        if hasTopFields result
+        let cappedResult = capAtLevel 10 result
+        if hasTopFields cappedResult
             then do
                 node <- getNode this_id
-                markDone $ node { node_result = result }
-            else updateNodeResult this_id result
-        return result
+                markDone $ node { node_result = cappedResult }
+            else updateNodeResult this_id cappedResult
+        return cappedResult
 
 nodeExpr :: [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeExpr ctxt (e@StgCase {})          = nodeCase ctxt e
@@ -2135,10 +2009,12 @@ rewriteApp True (StgApp nodeId f args)
     return $ StgApp enter f args
   where
     enterInfo AlwaysEnter       = -- pprTrace "alwaysEnter" (ppr f)
-                                  StgSyn.AlwaysEnter
-                                --   StgSyn.MayEnter
+                                --   StgSyn.AlwaysEnter
+                                -- Reenters evaluated closures too often
+                                  StgSyn.MayEnter
     enterInfo NeverEnter        = StgSyn.NoEnter
     enterInfo MaybeEnter        = StgSyn.MayEnter
+    enterInfo RecEnter          = StgSyn.MayEnter
     enterInfo UndetEnterInfo    = StgSyn.MayEnter
 
 rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args -- TODO? Also apply here?
