@@ -13,12 +13,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE MagicHash #-}
-
+{-# LANGUAGE BangPatterns #-}
 -- {-# OPTIONS_GHC -O -fprof-auto #-}
 
 module StgInferTags (findTags) where
@@ -840,7 +839,6 @@ instance Uniquable FlowNode where
 data FlowState
     = FlowState
     { fs_mod :: !Module
-    , fs_iteration :: !Int -- ^ Current iteration
     , fs_us :: !UniqSupply
     , fs_idNodeMap :: !(UniqFM FlowNode) -- ^ Map of imported id nodes (indexed by `Id`).
     , fs_uqNodeMap :: !(UniqFM FlowNode) -- ^ Transient results, index by `NodeId`
@@ -861,33 +859,30 @@ instance MonadUnique AM where
         put $! s {fs_us = us}
         return $! u
 
--- TODOT: addNode == updateNode
--- | Add new (unfinished) node.
-addNode :: FlowNode -> AM ()
-addNode node = do
+isDone :: Bool
+isDone = True
+
+notDone :: Bool
+notDone = False
+
+-- | Add new node, maybe mark it done.
+addNode :: Bool -> FlowNode -> AM ()
+addNode done node = do
     s <- get
-    if node_done node
+    -- if node_done node
+    if done
         then put $ s { fs_doneNodes = addToUFM (fs_doneNodes s) node node
                      , fs_uqNodeMap = delFromUFM (fs_uqNodeMap s) node }
-        else put $ s { fs_uqNodeMap = addToUFM (fs_uqNodeMap s) node node }
-
-updateNode :: FlowNode -> AM ()
-updateNode node = do
-    s <- get
-    let !id = node_id node
-    let done = node_done node
-    -- pprTraceM "Updating node" (ppr id)
-    put $   if done
-                then s  { fs_doneNodes = addToUFM (fs_doneNodes s) id node
-                        , fs_uqNodeMap =
-                                -- pprTrace "DeletingNode" (ppr id) $
-                                delFromUFM (fs_uqNodeMap s) id }
-                else s  { fs_uqNodeMap = addToUFM (fs_uqNodeMap s) id node }
+        else do
+            -- done' <- isMarkedDone $ node_id node
+            -- when done' (pprTraceM "Warning - Not already done!" empty)
+            put $ s { fs_uqNodeMap = addToUFM (fs_uqNodeMap s) node node }
 
 -- | Move the node from the updateable to the finished set
 markDone :: FlowNode -> AM ()
 markDone node = do
-    updateNode (node { node_done = True })
+    -- addNode (node { node_done = True })
+    addNode isDone node
 
 -- | Pessimistic check, defaulting to False when it's not clear.
 isMarkedDone :: HasCallStack => NodeId -> AM Bool
@@ -898,7 +893,7 @@ isMarkedDone id = do
 updateNodeResult :: NodeId -> EnterLattice -> AM ()
 updateNodeResult id result = do
     node <- (getNode id)
-    updateNode $ node {node_result = result}
+    addNode notDone (node {node_result = result})
 
 
 getNode :: HasCallStack => NodeId -> AM FlowNode
@@ -976,7 +971,7 @@ data FlowNode
     = FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId    -- ^ Node id
     , node_inputs :: [NodeId]               -- ^ Input dependencies
-    , node_done :: !Bool                    -- ^ Do no longer update this node
+    -- , node_done :: !Bool                    -- ^ Do no longer update this node
     , node_result :: !(EnterLattice)        -- ^ Cached result
     , node_update :: (AM EnterLattice)      -- ^ Calculates a new value for the node
                                             -- AND updates the value in the environment.
@@ -1003,7 +998,7 @@ instance NFData FlowNode where
     rnf (   FlowNode
                 { node_id = _
                 , node_inputs = node_inputs
-                , node_done = _
+                -- , node_done = _
                 , node_result = node_result
                 , node_update = _
 #if defined(WITH_NODE_DESC)
@@ -1021,8 +1016,8 @@ instance Outputable FlowNode where
         pprId node =
             case node_id node of
                 NodeId uq -> ppr uq
-        pprDone node =
-            if node_done node then text "done" else empty
+        pprDone _node = empty
+            -- if node_done node then text "done" else empty
 
 data IsLNE = LNE | NotLNE deriving (Eq)
 
@@ -1034,15 +1029,15 @@ instance Outputable IsLNE where
 -- Syntactic context of a node, potentially including a mapping
 -- of in-scope ids to their data flow nodes.
 data SynContext
-    = CTopLevel     (VarEnv NodeId)
-    | CLetRec       (VarEnv NodeId) !IsLNE
-    | CLetRecBody   (VarEnv NodeId) !IsLNE
-    | CLet          (VarEnv NodeId) !IsLNE
-    | CLetBody      (VarEnv NodeId) !IsLNE
-    | CClosureBody  (VarEnv NodeId)
+    = CTopLevel     !(VarEnv NodeId)
+    | CLetRec       !(VarEnv NodeId) !IsLNE
+    | CLetRecBody   !(VarEnv NodeId) !IsLNE
+    | CLet          !(VarEnv NodeId) !IsLNE
+    | CLetBody      !(VarEnv NodeId) !IsLNE
+    | CClosureBody  !(VarEnv NodeId)
     | CCaseScrut
-    | CCaseBndr     (VarEnv NodeId)
-    | CAlt          (VarEnv NodeId)
+    | CCaseBndr     !(VarEnv NodeId)
+    | CAlt          !(VarEnv NodeId)
     | CNone
     deriving Eq
 
@@ -1104,8 +1099,8 @@ mkJoinNode inputs = do
                 else updateNodeResult node_id result
             return result
 
-    addNode $ FlowNode { node_id = node_id, node_result = bot
-                       , node_inputs = inputs, node_done = False
+    addNode notDone $ FlowNode { node_id = node_id, node_result = bot
+                       , node_inputs = inputs -- , node_done = False
                        , node_update = updater
 #if defined(WITH_NODE_DESC)
                        , _node_desc = text "branches"
@@ -1130,7 +1125,6 @@ findTags this_mod us binds =
     -- pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
             fs_mod = this_mod,
-            fs_iteration = 0,
             fs_us = us,
             fs_idNodeMap = mempty,
             fs_uqNodeMap = emptyUFM,
@@ -1181,12 +1175,12 @@ findTags this_mod us binds =
 -- Constant mappings
 addConstantNodes :: AM ()
 addConstantNodes = do
-    addNode litNode
+    markDone litNode
     markDone $ mkConstNode botNodeId bot
-    addNode $ mkConstNode topNodeId top
-    addNode $ mkConstNode neverNodeId (flatLattice NeverEnter)
-    addNode $ mkConstNode maybeNodeId (flatLattice MaybeEnter)
-    addNode $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
+    markDone $ mkConstNode topNodeId top
+    markDone $ mkConstNode neverNodeId (flatLattice NeverEnter)
+    markDone $ mkConstNode maybeNodeId (flatLattice MaybeEnter)
+    markDone $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
 
 
 mkConstNode :: NodeId -> EnterLattice -> FlowNode
@@ -1194,7 +1188,7 @@ mkConstNode id val =
     FlowNode
     { node_id = id
     , node_inputs = []
-    , node_done = True
+    --, node_done = True
     , node_result = val
     , node_update = (return $ val)
 #if defined(WITH_NODE_DESC)
@@ -1422,14 +1416,14 @@ nodeRhs ctxt topFlag binding (StgRhsCon _ _ccs con args)
         let node =  FlowNode
                         { node_id = node_id
                         , node_inputs = node_inputs
-                        , node_done   = False
+                        --, node_done   = False
                         , node_result = bot
                         , node_update = node_update node_id node_inputs
 #if defined(WITH_NODE_DESC)
                         , _node_desc = (text "rhsCon")
 #endif
                         }
-        addNode node
+        addNode notDone node
         return (StgRhsCon node_id _ccs con args)
   where
     node_id = mkLocalIdNodeId ctxt binding
@@ -1496,14 +1490,14 @@ nodeRhs ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
     let node = FlowNode { node_id = node_id
                         , node_inputs = [body_id]
                         -- ^ We might infer things about nested fields once evaluated.
-                        , node_done   = False
+                        -- , node_done   = False
                         , node_result = EnterLattice enterInfo LatUndet
                         , node_update = node_update node_id body_id
 #if defined(WITH_NODE_DESC)
                         , _node_desc = node_desc
 #endif
                         }
-    addNode node
+    addNode notDone node
     return (StgRhsClosure _ext _ccs _flag args body')
 
   where
@@ -1562,8 +1556,8 @@ nodeCase _ _ = panic "Impossible: nodeCase"
 nodeCaseBndr :: NodeId -> Id -> AM NodeId
 nodeCaseBndr scrutNodeId _bndr = do
     bndrNodeId <- mkUniqueId
-    addNode $ FlowNode  { node_id = bndrNodeId
-                        , node_inputs = [scrutNodeId], node_done = False
+    addNode notDone $ FlowNode  { node_id = bndrNodeId
+                        , node_inputs = [scrutNodeId] --, node_done = False
                         , node_result = bot, node_update = updater bndrNodeId
 #if defined(WITH_NODE_DESC)
                         , _node_desc = text "caseBndr" <-> parens (ppr scrutNodeId) <-> ppr _bndr
@@ -1607,7 +1601,7 @@ nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
           , not (isUnboxedSumType bndrTy)
           = do
                 node_id <- mkUniqueId
-                addNode litNode { node_id = node_id }
+                addNode isDone litNode { node_id = node_id }
                 return (bndr,node_id)
           | otherwise = do
                 node_id <- mkUniqueId --Shadows existing binds
@@ -1632,10 +1626,10 @@ nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
                             else
                                 updateNodeResult node_id result
                         return $! result
-                addNode FlowNode
+                addNode notDone FlowNode
                     { node_id = node_id
                     , node_result = bot
-                    , node_done = False
+                    -- , node_done = False
                     , node_inputs = [scrutNodeId]
                     , node_update = updater
 #if defined(WITH_NODE_DESC)
@@ -1690,11 +1684,11 @@ nodeConApp ctxt (StgConApp _ext con args tys) = do
             updateNodeResult node_id result
             return result
 
-    addNode FlowNode
+    addNode notDone FlowNode
         { node_id = node_id
         , node_result = bot
         , node_inputs = inputs
-        , node_done = False
+        -- , node_done = False
         , node_update = updater
 #if defined(WITH_NODE_DESC)
         , _node_desc = text "conApp"
@@ -1740,9 +1734,10 @@ nodeApp ctxt expr@(StgApp _ f args) = do
                                 updateNodeResult node_id result
                                 return result
 
-                addNode $ FlowNode
+                addNode notDone $ FlowNode
                     { node_id = node_id, node_result = bot
-                    , node_inputs = inputs, node_done = False
+                    , node_inputs = inputs
+                    -- , node_done = False
                     , node_update = updater
 #if defined(WITH_NODE_DESC)
                     , _node_desc = text "app" <-> ppr f <> ppr args
@@ -1968,11 +1963,11 @@ rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
             -- tagInfo <- lookupNodeResult node_id
             pprTraceM "Creating closure for " $ ppr _binding <+> ppr node_id
             conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
-            return $ (StgRhsClosure noExtFieldSilent ccs ReEntrant [] conExpr)
+            return $ (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr)
 
 rewriteRhsInplace _binding (StgRhsClosure ext ccs flag args body) = do
     -- pprTraceM "rewriteRhsClosure" $ ppr binding <+> ppr tagInfo
-    StgRhsClosure ext ccs flag args <$> rewriteExpr False body
+    StgRhsClosure ext ccs flag args <$!> rewriteExpr False body
 
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
