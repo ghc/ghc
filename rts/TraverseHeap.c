@@ -1348,29 +1348,25 @@ traverseInvalidateClosureData(traverseState* ts)
 }
 
 /**
- *  Traverse all static objects for which we compute retainer sets,
- *  and reset their rs fields to NULL, which is accomplished by
- *  invoking traverseMaybeInitClosureData(). This function must be called
- *  before zeroing all objects reachable from scavenged_static_objects
- *  in the case of major garbage collections. See GarbageCollect() in
- *  GC.c.
- *  Note:
- *    The mut_once_list of the oldest generation must also be traversed?
- *    Why? Because if the evacuation of an object pointed to by a static
- *    indirection object fails, it is put back to the mut_once_list of
- *    the oldest generation.
- *    However, this is not necessary because any static indirection objects
- *    are just traversed through to reach dynamic objects. In other words,
- *    they are not taken into consideration in computing retainer sets.
+ * Traverse all static objects and invalidate their traversal-data. This ensures
+ * that when doing the actual traversal no static closures will seem to have
+ * been visited already because they weren't visited in the last run.
  *
- * SDM (20/7/2011): I don't think this is doing anything sensible,
- * because it happens before retainerProfile() and at the beginning of
- * retainerProfil() we change the sense of 'flip'.  So all of the
- * calls to traverseMaybeInitClosureData() here are initialising retainer sets
- * with the wrong flip.  Also, I don't see why this is necessary.  I
- * added a traverseMaybeInitClosureData() call to retainRoot(), and that seems
- * to have fixed the assertion failure in retainerSetOf() I was
- * encountering.
+ * This function must be called before zeroing all objects reachable from
+ * scavenged_static_objects in the case of major garbage collections. See
+ * GarbageCollect() in GC.c.
+ *
+ * Note:
+ *
+ *   The mut_once_list of the oldest generation must also be traversed?
+ *
+ *   Why? Because if the evacuation of an object pointed to by a static
+ *   indirection object fails, it is put back to the mut_once_list of the oldest
+ *   generation.
+ *
+ *   However, this is not necessary because any static indirection objects are
+ *   just traversed through to reach dynamic objects. In other words, they are
+ *   never visited during traversal.
  */
 void
 resetStaticObjectForProfiling( const traverseState *ts, StgClosure *static_objects )
