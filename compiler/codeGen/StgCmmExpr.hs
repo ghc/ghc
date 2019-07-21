@@ -868,7 +868,7 @@ cgIdApp strict fun_id args = do
             -- (emitTagTrap fun_id fun True)
 
             tickyTagged
-            pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
+            -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
             emitReturn [fun]
 
         EnterIt untagged -> ASSERT( null args )  -- Discarding arguments
