@@ -143,7 +143,7 @@ data RecursionKind
 
 
 {-
-    Note [Lattice instance for tag analysis]
+    Note [Lattice for tag analysis]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We use a lattice for the tag analysis, with each update of a node
@@ -167,7 +167,7 @@ like this:
 It is also called the "outer" infor about a binding in places.
 
 RecEnter is a special value assigned to tail recursive branches.
-See Note [RecEnter Context] for details.
+See Note [Recursive Functions] for details.
 
 
 The second lattice represents information about bindings which are
@@ -187,33 +187,164 @@ This lattice has this shape:
             LatUndet
 
 Again with a special value for recursive tail calls.
-See Note [RecEnter Context] for details about that.
+See Note [Recursive Functions] for details about that.
+
+    Note [The lattice element combinators]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We do use neither the lub nor glb to combine multiple branches.
+Instead we have a combine operator implemented by the combine*
+functions which behaves as follows.
+
+In general when comparing against top/bot/rec:
+
+combine x y | x == y = x
+combine Rec x = x
+combine Top x = x
+combine Bot x = x
+
+For enter information we additionally have:
+
+combine Enter NoEnter = MaybeEnter
+
+For field infos we combine field information pointwise
+if the branches are compatible. Currently this means
+that both branches agree in their type AND constructor.
+
+We could relax this towards structural compatibilty or even
+compare branches whos resulting field count disagrees.
+
+But currently we do not do so to rule out a source of errors
+in the implementation.
+
+    Note [Recursive Functions]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Why we do not use lub/glb requires a bit of explaining.
+
+Consider this function:
+
+    f x
+        | x < 0 = Just $! Nothing
+        | otherwise = f $ x-1
+
+It's fairly obvious that it will return a value whos first
+field will contain a tagged&evaluated value.
+
+    Why not glb:
+    ------------
+
+If we use glb to combine the two branches the following
+happens:
+* We initialize all nodes to bot.
+* This causes the `otherwise` branch to be evaluated to
+  bot.
+* when using glb as combinator the result will therefore
+  also be bot.
+
+We have reached the unhelpful fixpoint bot and miss the
+oppertunity to proof the field as always tagged.
+
+    Why not lub:
+    ------------
+
+lub seems to solve this problem conveniently as all branches
+will combined will return the result of the branch with the
+result closest to the top of the lattice.
+
+However this is also subtly wrong!
+We have to deal with functions without a fixpoint in our lattice
+like repeat.
+We do so by allowing termination of the analysis before a fixpoint
+is reached. To guarantee that this is correct we guarantee that any
+intermediate result will be valid (but maybe not complete) no matter
+what order we process the data flow nodes in.
+
+However if we have a function of three branches:
+
+f x | c1 = Just $! Nothing
+    | c2 = f x'
+    | c3 = Just <thunkExpr>
+    where
+        ...
+
+And we evaluate the nodes associated with c1, then the node combining
+the branches, and then stob, lub will incorrectly conclude that the first
+field of the result will be tagged!
+
+    Our solution
+    ------------
+
+We deal with this by looking for branches in a functions body
+which are tail calls to the function itself. In our domain we can
+pretend these branches do not return a value. Indeed any value
+eventually produced by a function must come from a branch NOT
+consisting of a recursive tail call.
+
+For any of these tail calls we mark the result with the special
+Rec element of the lattice. When combining these values they
+always "give way" to the result of the non-recursive branches.
+
+This is correct as after all the recursive branch represents the
+combination of all non-recursive branches.
+
+It even works our for silly things like f x = f x, we infer a value
+of rec for `f x` which means if f is called in a branch somewhere else
+that branch too will give way to the terminating branches.
+
+Beyond this we are cautios when combining the result of branches.
+bot/top combined with any other value will result in the same so
+the result of multiple branches will only be inferred once all the
+branches have been analyzed.
+
+Implementation wise we check for tail calls by looking at the syntactic
+context of function applications. This is implemented in `isRecTail`
+and looks through join points (LNE) as well.
+
+This does not solve the problem of mutual recursion however, in which
+case we just throw our hands up in the air and conclude that we
+can't conclude anything (resulting in the top of the lattice.)
+
+    Note [Infering recursive tail calls]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating the data flow graph we also keep track of
+the context in which an expression occurs.
+This is required to deal with shadowing of ids but also allows
+us to infer if a function application is in a tail call position.
+
+The rules are not that complicated and for the most part implemented
+in isRecTail, except for saturation of the call. They are similar to
+the rules for join points.
+
+It's not a tail call if:
+    * If it's not saturated
+    * If it's in a case scrutinee
+    * If it's in a non recursive let definition
+    * If it's defined in a potentially mutually recursive binding group.
+It is a tail call if it's none of the above and in a tail call position in
+    * the body of a let
+    * the definition of a let-no-escape
+    * a case alternative
+    * a closure
 
 -}
 
+---------------------------------
+--      The Lattice Types      --
+---------------------------------
 
-bot :: FieldInfo
-bot = LatUndet UndetEnterInfo
-top :: FieldInfo
-top = LatUnknown MaybeEnter
 
--- | Enterinfo for a binding IF IT USED AS AN UNAPPLIED ATOM.
---   In particular for
---     case (food<NoEnter> ingredients) of ...
---   we WILL need to evaluate food either way.
--- However if an id is determined to be NeverEnter we can say
--- that we can put it directly in strict fields without violating
--- the tagging invariant as well as casing on it as data without entering
--- eg the code:
--- case determineBurger<NoEnter> of
---     CheeseBurger -> e1
---     Regular -> e2
--- does not require us to emite code for entering determineBurger to branch on it's value.
+bot :: EnterLattice
+bot = EnterLattice UndetEnterInfo LatUndet
+top :: EnterLattice
+top = EnterLattice MaybeEnter LatUnknown
+
+-- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
-    = UndetEnterInfo    -- ^ Not yet determined, happens for rhsCon if we don't
-                        --   know if the strict fields are already tagged.
+    = UndetEnterInfo    -- ^ Not yet determined.
     | RecEnter          -- ^ Direct tail recursion
-    | AlwaysEnter        -- ^ WILL need to be entered
+    | AlwaysEnter       -- ^ WILL need to be entered
     | MaybeEnter        -- ^ Could be either
     | NeverEnter        -- ^ Does NOT need to be entered.
     deriving (Eq,Ord,Show,Enum,Generic,NFData)
@@ -228,7 +359,8 @@ instance Outputable EnterInfo where
 
 
 data SumInfo
-    = SumInfo !DataCon [FieldInfo] -- ^ A constructor application
+    = SumInfo !DataCon [EnterLattice]
+    -- ^ A sum type constructor application
     deriving (Generic)
 
 instance Eq SumInfo where
@@ -242,35 +374,17 @@ instance Outputable SumInfo where
     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
 
 data ProdInfo
-    = FieldProdInfo [FieldInfo]
+    = ProdInfo [EnterLattice]
     deriving (Eq,Generic,NFData)
 
 instance Outputable ProdInfo where
-    ppr (FieldProdInfo fields) = text "p" <+> ppr fields
+    ppr (ProdInfo fields) = text "p" <+> ppr fields
 
 
-{- |
-
-
-
-
-f x = Just $! Just x : alwaysEnter < tagged < top > >
-
-
-LatUnknown represents things over which we can't know anything except their enter behaviour.
-LatUndet represents cases where we haven't been able to compute field information yet.
-
-Prod/Sum tell us something about the values returned.
-
-LatUndet/Unknown allows us to differentiate between lack of
-information about returned values and "uncomputeable" field information.
-
-
-
-    Note [Comparing Sums and Products]
+{-  Note [Comparing Sums and Products]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    At a glance it makes sense that we would ever compare sum and product results.
+    At a glance it makes sense that we would never compare sum and product results.
     However consider this case:
 
     case v of
@@ -291,182 +405,170 @@ information about returned values and "uncomputeable" field information.
     widen the fields of any product and sum type comparison
     to the top of the latice.
 
-
-    Note [Representing taggedness of recursive types]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    None of this is implemented yet, but here are some thoughts
-    and an idea that on the surface seems feasible:
-
-    TODO
-
-
 -}
+
+data EnterLattice = EnterLattice
+    { enterInfo :: !EnterInfo
+    , fieldInfo :: !FieldInfo
+    }
+    deriving (Eq, Generic, NFData)
 
 data FieldInfo
     -- | At most we can say something about the tag of the value itself.
-    --   The fields are not yet known.
-    --   Semantically: EnterInfo x bot(fields)
-    = LatUnknown !EnterInfo
+    --   The fields are impossible to known.
+    = LatUnknown
 
     -- | Direct tail recursion
-    | LatRec !EnterInfo
+    | LatRec
 
-    -- | We know something about the value itself, and we can find out more
-    -- about it's return values as well.
-    | LatUndet !EnterInfo
+    -- | We might find out more about the fields
+    | LatUndet
 
-    -- Don't unpack Sum/Prod infos, as EnterInfo is modified somewhat often.
-    | LatProd !EnterInfo !ProdInfo
-    | LatSum !EnterInfo !SumInfo
-    deriving (Generic,NFData)
-
-instance Eq FieldInfo where
-    (==) lat1 lat2
-        | maybeEq lat1 lat2             = True
-    (==) (LatUndet o1)   (LatUndet o2)  = o1 == o2
-    (==) (LatUndet _ )   (_)            = False
-    (==) (LatRec o1)     (LatRec o2)    = o1 == o2
-    (==) (LatRec _ )     (_)            = False
-    (==) (LatProd o1 p1) (LatProd o2 p2)= o1 == o2 && p1 == p2
-    (==) (LatProd _  _ ) (_) = False
-    (==) (LatSum o1 s1)  (LatSum o2 s2) = o1 == o2 && s1 == s2
-    (==) (LatSum _  _ )  (_) = False
-    (==) (LatUnknown o1) (LatUnknown o2) = o1 == o2
-    (==) (LatUnknown _ ) (_) = False
+    -- TODO: Fold these into FieldInfo directly.
+    | LatProd {-# UNPACK #-} !ProdInfo
+    | LatSum  {-# UNPACK #-} !SumInfo
+    deriving (Eq,Generic,NFData)
 
 
+-- TODO: Is it worth using maybeEq in the instance?
+-- instance Eq FieldInfo where
+--     (==) lat1 lat2
+--         | maybeEq lat1 lat2             = True
+--     (==) (LatUndet o1)   (LatUndet o2)  = o1 == o2
+--     (==) (LatUndet _ )   (_)            = False
+--     (==) (LatRec o1)     (LatRec o2)    = o1 == o2
+--     (==) (LatRec _ )     (_)            = False
+--     (==) (LatProd o1 p1) (LatProd o2 p2)= o1 == o2 && p1 == p2
+--     (==) (LatProd _  _ ) (_) = False
+--     (==) (LatSum o1 s1)  (LatSum o2 s2) = o1 == o2 && s1 == s2
+--     (==) (LatSum _  _ )  (_) = False
+--     (==) (LatUnknown o1) (LatUnknown o2) = o1 == o2
+--     (==) (LatUnknown _ ) (_) = False
 
-
--- | Get the (outer) EnterInfo value
-getOuter :: FieldInfo -> EnterInfo
-getOuter (LatUndet x) = x
-getOuter (LatRec x) = x
-getOuter (LatUnknown x) = x
-getOuter (LatProd x _) = x
-getOuter (LatSum x  _) = x
+instance Outputable EnterLattice where
+    ppr (EnterLattice enterInfo fieldInfo)
+        = ppr enterInfo <> char 'x' <> ppr fieldInfo
 
 instance Outputable FieldInfo where
-    ppr (LatUnknown outer) = ppr outer <+> text "top"
-    ppr (LatRec outer)     = ppr outer <+> text "rec"
-    ppr (LatUndet   outer) = ppr outer <+> text "undet"
-    ppr (LatProd outer inner) =
-        ppr outer <+> (ppr inner)
-    ppr (LatSum outer inner) =
-        ppr outer <+> (ppr inner)
+    ppr LatUnknown        = text "top"
+    ppr LatRec            = text "rec"
+    ppr LatUndet          = text "undet"
+    ppr (LatProd prodInfo)= ppr prodInfo
+    ppr (LatSum sumInfo)  = ppr sumInfo
 
-combineEnterBranches :: EnterInfo -> EnterInfo -> EnterInfo
-combineEnterBranches RecEnter _             = MaybeEnter
-combineEnterBranches _ RecEnter             = MaybeEnter
-combineEnterBranches MaybeEnter _           = MaybeEnter
-combineEnterBranches _ MaybeEnter           = MaybeEnter
-combineEnterBranches UndetEnterInfo _       = UndetEnterInfo
-combineEnterBranches _ UndetEnterInfo       = UndetEnterInfo
-combineEnterBranches NeverEnter AlwaysEnter = MaybeEnter
-combineEnterBranches AlwaysEnter NeverEnter = MaybeEnter
-combineEnterBranches AlwaysEnter AlwaysEnter = AlwaysEnter
-combineEnterBranches NeverEnter NeverEnter = NeverEnter
+combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
+combineEnterInfo RecEnter _             = MaybeEnter
+combineEnterInfo _ RecEnter             = MaybeEnter
+combineEnterInfo MaybeEnter _           = MaybeEnter
+combineEnterInfo _ MaybeEnter           = MaybeEnter
+combineEnterInfo UndetEnterInfo _       = UndetEnterInfo
+combineEnterInfo _ UndetEnterInfo       = UndetEnterInfo
+combineEnterInfo NeverEnter AlwaysEnter = MaybeEnter
+combineEnterInfo AlwaysEnter NeverEnter = MaybeEnter
+combineEnterInfo AlwaysEnter AlwaysEnter= AlwaysEnter
+combineEnterInfo NeverEnter NeverEnter  = NeverEnter
 
 combineProdInfo :: ProdInfo -> ProdInfo -> ProdInfo
-combineProdInfo (FieldProdInfo fs1) (FieldProdInfo fs2)
-    = FieldProdInfo $ zipWithEqual "ProdInfo:combine" combineLatticeBranches fs1 fs2
+combineProdInfo (ProdInfo fs1) (ProdInfo fs2)
+    = ProdInfo $ zipWithEqual "ProdInfo:combine" combineLattices fs1 fs2
 
-combineSumInfo :: SumInfo -> SumInfo -> Maybe SumInfo
+combineSumInfo :: SumInfo -> SumInfo -> FieldInfo
 combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
-    | c1 /= c2  = Nothing
-    | otherwise = Just $! SumInfo c1 $
-                  zipWithEqual "SumInfo:combine" combineLatticeBranches fs1 fs2
+    | c1 /= c2  = LatUnknown
+    | otherwise = LatSum $! SumInfo c1 $
+                  zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
 
-combineLatticeBranches :: FieldInfo -> FieldInfo -> FieldInfo
-combineLatticeBranches x1 x2 | x1 == x2 = x1
-combineLatticeBranches (LatRec o1) x = x `setOuterInfo` (combineEnterBranches o1 $ getOuter x)
-combineLatticeBranches x (LatRec o2) = x `setOuterInfo` (combineEnterBranches (getOuter x) o2)
+combineLattices :: EnterLattice -> EnterLattice -> EnterLattice
+combineLattices x1 x2 | maybeEq x1 x2 || x1 == x2 = x1
+combineLattices (EnterLattice ei1 fi1) (EnterLattice ei2 fi2)
+    = EnterLattice (combineEnterInfo ei1 ei2) (combineFieldInfos fi1 fi2)
+
+combineFieldInfos :: FieldInfo -> FieldInfo -> FieldInfo
+combineFieldInfos LatRec x = x
+combineFieldInfos x LatRec = x
 -- Top stays top
-combineLatticeBranches (LatUnknown o1) (LatUnknown o2) = LatUnknown (combineEnterBranches o1 o2)
-combineLatticeBranches (LatUnknown o1) y = LatUnknown (combineEnterBranches o1 (getOuter y))
-combineLatticeBranches x (LatUnknown o2) = LatUnknown (combineEnterBranches (getOuter x) o2)
+combineFieldInfos (LatUnknown) _ = LatUnknown
+combineFieldInfos _ (LatUnknown) = LatUnknown
 -- Bot stays bot (unless compared against top)
-combineLatticeBranches (LatUndet o1) (LatUndet o2) = LatUndet (combineEnterBranches o1 o2)
-combineLatticeBranches (LatUndet o1) y = LatUndet (combineEnterBranches o1 (getOuter y))
-combineLatticeBranches x (LatUndet o2) = LatUndet (combineEnterBranches (getOuter x) o2)
+combineFieldInfos (LatUndet) _ = LatUndet
+combineFieldInfos _ (LatUndet) = LatUndet
 -- We currently do NOT combine results of different types
-combineLatticeBranches (LatProd o1 _) (LatSum o2 _) = LatUnknown $ combineEnterBranches o1 o2
-combineLatticeBranches (LatSum o1 _) (LatProd o2 _) = LatUnknown $ combineEnterBranches o1 o2
+combineFieldInfos (LatProd _) (LatSum _) = LatUnknown
+combineFieldInfos (LatSum _) (LatProd _) = LatUnknown
 
-combineLatticeBranches (LatSum o1 s1) (LatSum o2 s2) =
-    let outer = (combineEnterBranches o1 o2)
-        fields = (combineSumInfo s1 s2)
-    in maybe (LatUnknown outer) (LatSum outer) fields
-combineLatticeBranches (LatProd o1 p1) (LatProd o2 p2) =
-    LatProd (combineEnterBranches o1 o2) (combineProdInfo p1 p2)
+combineFieldInfos (LatSum s1)  (LatSum s2)   =
+    (combineSumInfo s1 s2)
+combineFieldInfos (LatProd p1) (LatProd p2) =
+    LatProd (combineProdInfo p1 p2)
+
+------------------------------------------------------------
+--      Utility functions to deal with lattices           --
+------------------------------------------------------------
+
 
 -- Lattice when we know, and can only know, the outer layer.
-flatLattice :: EnterInfo -> FieldInfo
-flatLattice x = LatUnknown x
+flatLattice :: EnterInfo -> EnterLattice
+flatLattice x = EnterLattice x LatUnknown
 
-setOuterInfo :: HasCallStack => FieldInfo -> EnterInfo -> FieldInfo
-setOuterInfo lat info
-    | getOuter lat == info
+setEnterInfo :: HasCallStack => EnterLattice -> EnterInfo -> EnterLattice
+setEnterInfo lat@(EnterLattice enter fields) newEnter
+    | enter == newEnter
     = lat
-    | otherwise =
-        case lat of
-            LatUndet _       -> LatUndet info
-            LatRec _         -> LatRec info
-            LatUnknown _     -> LatUnknown info
-            LatProd _ fields -> LatProd info fields
-            LatSum  _ fields -> LatSum info fields
+    | otherwise = EnterLattice newEnter fields
 
--- Lookup field info, defaulting towards bot
+-- Lookup field of the returned valued.
+-- Defaulting towards bot
 -- Zero indexed
-indexField :: FieldInfo -> Int -> FieldInfo
-indexField (LatUndet _) _ = bot
--- This can only happen if we case on a non-terminating function.
-indexField (LatRec _) _ = bot
-indexField (LatProd _ (FieldProdInfo fields)) n =
-    case drop n fields of
-        [] -> bot
-        (x:_xs) -> x
-indexField (LatSum _ sum) n
-    | SumInfo _con fields <- sum
-    = case drop n fields of
-        -- We treat [] equal to [bot, bot, bot, ...]
-        [] -> bot
-        (x:_xs) -> x
-    | otherwise = bot
--- Field information not available
-indexField LatUnknown {} _ = top
+indexField :: EnterLattice -> Int -> EnterLattice
+indexField lat n =
+    case fieldInfo lat of
+        LatUndet -> bot
+        LatUnknown -> top
+        LatRec -> bot
+        LatSum  (SumInfo _ fields) -> getField fields
+        LatProd (ProdInfo fields)  -> getField fields
+  where
+    getField fields =
+        case drop n fields of
+            -- We treat [] equal to [bot, bot, bot, ...]
+            [] -> bot
+            (x:_xs) -> x
 
-hasOuterTag :: FieldInfo -> Bool
-hasOuterTag lat = getOuter lat == NeverEnter
+hasOuterTag :: EnterLattice -> Bool
+hasOuterTag lat = enterInfo lat == NeverEnter
 
-hasTopFields :: FieldInfo -> Bool
-hasTopFields (LatUnknown    {}) = True
-hasTopFields (LatProd _ (FieldProdInfo fields)) = all isTopValue fields
-hasTopFields (LatSum  _ (SumInfo _ fields)) = all isTopValue fields
+-- We use these to stop iterating on nodes which are already at the top of the lattice.
 
-hasTopFields (LatRec        {}) = False
-hasTopFields (LatUndet      {}) = False
+hasTopFields :: EnterLattice -> Bool
+hasTopFields lat = areTopFields $ fieldInfo lat
 
-isTopValue :: FieldInfo -> Bool
-isTopValue lat = getOuter lat == MaybeEnter && hasTopFields lat
+areTopFields :: FieldInfo -> Bool
+areTopFields (LatUnknown ) = True
+areTopFields (LatRec  )    = False
+areTopFields (LatUndet)    = False
+areTopFields (LatProd (ProdInfo fields))  = all isTopValue fields
+areTopFields (LatSum  (SumInfo _ fields)) = all isTopValue fields
 
-nestingLevelOver :: FieldInfo -> Int -> Bool
+isTopValue :: EnterLattice -> Bool
+isTopValue lat = enterInfo lat == MaybeEnter && hasTopFields lat
+
+nestingLevelOver :: EnterLattice -> Int -> Bool
 nestingLevelOver _ 0 = True
-nestingLevelOver (LatProd _ (FieldProdInfo fields)) n
+nestingLevelOver (EnterLattice _ (LatProd (ProdInfo fields))) n
     = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver (LatSum _ (SumInfo _ fields)) n
+nestingLevelOver (EnterLattice _  (LatSum (SumInfo _ fields))) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
-capAtLevel :: Int -> FieldInfo -> FieldInfo
-capAtLevel _ l@(LatUnknown {}) = l
-capAtLevel _ l@(LatRec {}) = l
-capAtLevel _ l@(LatUndet {}) = l
+capAtLevel :: Int -> EnterLattice -> EnterLattice
+capAtLevel _ l@(EnterLattice _ LatUnknown ) = l
+capAtLevel _ l@(EnterLattice _ LatRec     ) = l
+capAtLevel _ l@(EnterLattice _ LatUndet   ) = l
 capAtLevel 0 _ = top
-capAtLevel n (LatProd e (FieldProdInfo fields)) =
-    (LatProd e (FieldProdInfo $ map (capAtLevel (n-1)) fields))
-capAtLevel n (LatSum e (SumInfo c fields)) =
-    (LatSum e (SumInfo c $ map (capAtLevel (n-1)) fields))
+capAtLevel n (EnterLattice e (LatProd (ProdInfo fields))) =
+    EnterLattice e (LatProd (ProdInfo $ map (capAtLevel (n-1)) fields))
+capAtLevel n (EnterLattice e (LatSum (SumInfo c fields))) =
+    EnterLattice e (LatSum (SumInfo c $ map (capAtLevel (n-1)) fields))
 
 
 
@@ -793,7 +895,7 @@ isMarkedDone id = do
     s <- get
     return $ elemUFM id (fs_doneNodes s)
 
-updateNodeResult :: NodeId -> FieldInfo -> AM ()
+updateNodeResult :: NodeId -> EnterLattice -> AM ()
 updateNodeResult id result = do
     node <- (getNode id)
     updateNode $ node {node_result = result}
@@ -808,7 +910,7 @@ getNode node_id = do
 
 
 -- TODO: Can we make sure we never try to query non-existing nodes?
-lookupNodeResult :: HasCallStack => NodeId -> AM FieldInfo
+lookupNodeResult :: HasCallStack => NodeId -> AM EnterLattice
 lookupNodeResult node_id = do
     s <- get
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
@@ -868,14 +970,16 @@ getConArgNodeId ctxt (StgVarArg v )
     | otherwise
     = mkIdNodeId ctxt v
 
+-- TODO: node_done can be removed, and replaced with a lookup
+-- in the set of done nodes.
 data FlowNode
     = FlowNode
-    { node_id :: {-# UNPACK  #-} !NodeId -- ^ Node id
-    , node_inputs :: [NodeId]  -- ^ Input dependencies
-    , node_done :: !Bool -- ^ Do no longer update this node
-    , node_result :: !(FieldInfo) -- ^ Cached result
-    , node_update :: (AM FieldInfo) -- ^ Calculates a new value for the node
-                                       -- AND updates the environment with it.
+    { node_id :: {-# UNPACK  #-} !NodeId    -- ^ Node id
+    , node_inputs :: [NodeId]               -- ^ Input dependencies
+    , node_done :: !Bool                    -- ^ Do no longer update this node
+    , node_result :: !(EnterLattice)        -- ^ Cached result
+    , node_update :: (AM EnterLattice)      -- ^ Calculates a new value for the node
+                                            -- AND updates the value in the environment.
 #if defined(WITH_NODE_DESC)
     , _node_desc :: SDoc -- ^ Debugging purposes
 #endif
@@ -907,7 +1011,6 @@ instance NFData FlowNode where
 #endif
                 })  = deepseq (node_inputs,node_result) ()
 
-
 instance Outputable FlowNode where
     ppr node =
         hang
@@ -923,21 +1026,24 @@ instance Outputable FlowNode where
 
 data IsLNE = LNE | NotLNE deriving (Eq)
 
-pprLne :: IsLNE -> SDoc
-pprLne NotLNE = empty
-pprLne LNE = text "-LNE"
+instance Outputable IsLNE where
+    -- ppr :: IsLNE -> SDoc
+    ppr NotLNE = empty
+    ppr LNE = text "-LNE"
 
+-- Syntactic context of a node, potentially including a mapping
+-- of in-scope ids to their data flow nodes.
 data SynContext
-    = CTopLevel     (VarEnv NodeId) -- ^ Maps top level binds to ids
+    = CTopLevel     (VarEnv NodeId)
     | CLetRec       (VarEnv NodeId) !IsLNE
     | CLetRecBody   (VarEnv NodeId) !IsLNE
-    | CLet          (VarEnv NodeId)  !IsLNE
-    | CLetBody      (VarEnv NodeId)  !IsLNE
-    | CClosureBody  (VarEnv NodeId) -- ^ Args of a closure mapped to nodes in the body
-    | CCaseScrut                  -- ^ Inside a case scrutinee
-    | CCaseBndr     (VarEnv NodeId)  -- ^ Case binder mapping
-    | CAlt          (VarEnv NodeId) -- ^ Alt binder mappings
-    | CNone                       -- ^ No Context given
+    | CLet          (VarEnv NodeId) !IsLNE
+    | CLetBody      (VarEnv NodeId) !IsLNE
+    | CClosureBody  (VarEnv NodeId)
+    | CCaseScrut
+    | CCaseBndr     (VarEnv NodeId)
+    | CAlt          (VarEnv NodeId)
+    | CNone
     deriving Eq
 
 getCtxtIdMap :: SynContext -> Maybe (VarEnv NodeId)
@@ -958,17 +1064,18 @@ isSingleMapOf v env =
     sizeUFM env == 1 && elemVarEnv v env
 
 instance Outputable SynContext where
-    ppr CNone = text "CNone"
-    ppr (CTopLevel map) = text "CTop" <> ppr map
-    ppr (CAlt map) = text "CAlt" <> ppr map
-    ppr CCaseScrut = text "CCaseScrut"
-    ppr (CCaseBndr map) = text "CCaseBndr" <> ppr map
-    ppr (CClosureBody map) = text "CClosure" <> ppr map
-    ppr (CLetRec     ids lne) = text "CLetRec"     <> pprLne lne <> ppr ids
-    ppr (CLetRecBody ids lne) = text "CLetRecBody" <> pprLne lne <> ppr ids
-    ppr (CLet id lne)         = text "CLet"        <> pprLne lne <> ppr id
-    ppr (CLetBody id lne)     = text "CLetBody"    <> pprLne lne <> ppr id
+    ppr CNone                 = text "CNone"
+    ppr (CTopLevel map)       = text "CTop"        <> ppr map
+    ppr (CAlt map)            = text "CAlt"        <> ppr map
+    ppr CCaseScrut            = text "CCaseScrut"
+    ppr (CCaseBndr map)       = text "CCaseBndr"   <> ppr map
+    ppr (CClosureBody map)    = text "CClosure"    <> ppr map
+    ppr (CLetRec     ids lne) = text "CLetRec"     <> ppr lne <> ppr ids
+    ppr (CLetRecBody ids lne) = text "CLetRecBody" <> ppr lne <> ppr ids
+    ppr (CLet id lne)         = text "CLet"        <> ppr lne <> ppr id
+    ppr (CLetBody id lne)     = text "CLetBody"    <> ppr lne <> ppr id
 
+-- | Is the given id mapped to a data flow node by it's context?
 idMappedInCtxt :: Id -> [SynContext] -> Maybe NodeId
 idMappedInCtxt id ctxt
     = go ctxt
@@ -981,6 +1088,7 @@ idMappedInCtxt id ctxt
     go [] = Nothing
 
 -- | Lub like operator between all input node
+-- See Note [The lattice element combinators]
 mkJoinNode :: [NodeId] -> AM NodeId
 mkJoinNode []     = return topNodeId
 mkJoinNode [node] = return node
@@ -988,7 +1096,7 @@ mkJoinNode inputs = do
     node_id <- mkUniqueId
     let updater = do
             input_results <- mapM lookupNodeResult inputs
-            let result = foldl1' combineLatticeBranches input_results
+            let result = foldl1' combineLattices input_results
             if isTopValue result
                 then do
                     node <- getNode node_id
@@ -1007,13 +1115,13 @@ mkJoinNode inputs = do
 
 -- Gives the lattice for evaluating con with arguments of the given taggedness.
 -- | Take a lattice argument per constructor argument to simplify things.
-mkOutConLattice :: DataCon -> EnterInfo -> [FieldInfo] -> FieldInfo
+mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
 mkOutConLattice con outer fields
-    | conCount == 1 = LatProd outer (FieldProdInfo out_fields)
-    | conCount > 1  = LatSum outer (SumInfo con out_fields)
+    | conCount == 1 = EnterLattice outer $ LatProd (ProdInfo out_fields)
+    | conCount > 1  = EnterLattice outer $ LatSum (SumInfo con out_fields)
     | otherwise = panic "mkOutConLattice"
   where
-    out_fields = mapStrictConArgs con (`setOuterInfo` NeverEnter) fields
+    out_fields = mapStrictConArgs con (`setEnterInfo` NeverEnter) fields
     conCount = length (tyConDataCons $ dataConTyCon con)
 
 {-# NOINLINE findTags #-}
@@ -1081,7 +1189,7 @@ addConstantNodes = do
     addNode $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
 
 
-mkConstNode :: NodeId -> FieldInfo -> FlowNode
+mkConstNode :: NodeId -> EnterLattice -> FlowNode
 mkConstNode id val =
     FlowNode
     { node_id = id
@@ -1095,8 +1203,7 @@ mkConstNode id val =
 
     }
 
--- We don't realy do anything with literals, but for a uniform approach we
--- map them to (NeverEnter x Bot)
+-- Some nodes we can reuse.
 litNodeId, botNodeId, topNodeId, neverNodeId, maybeNodeId, alwaysNodeId :: NodeId
 litNodeId       = NodeId $ mkUnique 'c' 2
 botNodeId       = NodeId $ mkUnique 'c' 3 -- Always returns bot
@@ -1113,61 +1220,15 @@ litNode =
         { _node_desc = text "lit" }
 #endif
 
-{-
-    Note [Shadowing and NodeIds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Shadowing makes things slightly more complex.
-
-Let bindings are guaranteed to be unique as otherwise
-this would result in linker errors, so we assign them NodeIds
-based on their actual Id (Var).
-
-For constructs potentially introducing a shadowing id like
-case binders, or the binders of case alternatives we create
-a new NodeId when traversing the AST. When we want to get the
-nodeId for a particular we use mkIdNodeId.
-
-This function checks if we assigned the id to a non-id based nodeId
-and otherwise constructs a NodeId based on the actual Id (Var).
-
--}
-
--- Based on the ID look up the nodeid.
--- Checking if the ID has a mapping to a nodeId in the
--- context first.
-mkIdNodeId :: HasCallStack => [SynContext] -> Id -> AM NodeId
-mkIdNodeId ctxt id
-    | Just node <- idMappedInCtxt id ctxt
-    = return node
-    | otherwise = do
-        s <- get
-        return $ fromMaybe (pprPanic "Unmapped id" (ppr id)) $
-            node_id <$> lookupUFM (fs_idNodeMap s) id
-
--- | Same as mkIdNodeId but does NOT handle imported ids.
-mkLocalIdNodeId :: HasCallStack => [SynContext] -> Id -> NodeId
-mkLocalIdNodeId ctxt id
-    | Just node <- idMappedInCtxt id ctxt
-    = node
-    | otherwise = pprPanic "Local id not mapped:" (ppr id)
-
-
-mkUniqueId :: AM NodeId
-mkUniqueId = NodeId <$> getUniqueM
-
-{-
-    Note [Imported Ids]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-  Note [Imported Ids]
+    ~~~~~~~~~~~~~~~~~~~
 
 We want to keep our Ids a simple newtype around Unique.
 This is "easy" for things brought into scope by AST nodes,
 we put a mapping from the Id to the NodeId into SynContext
-which we can use to loop up the actual ids.
+which we can use to look up the actual node.
 
-This is required in any way in order to avoid shadowing.
-
-However imported Id's can show up in any place without context.
+However imported Id's can show up in any place in the AST.
 We solve this by creating a Node and NodeId for each imported
 id when we come across the id the first time.
 
@@ -1179,10 +1240,45 @@ TODO: Currently we store the id-based nodes twice, once in idNodeMap
 and once in uniqNodeMap. idNodeMap should only store the nodeId instead.
 
 TODO: Once we can export taggedness in the Interface file we
-will want to
+will want to also import tag info when we create a node id.
 
+
+    Note [Shadowing and NodeIds]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Shadowing makes things slightly more complex.
+
+For constructs potentially introducing a shadowing id like
+case binders, or the binders of case alternatives we create
+a new NodeId when traversing the AST. When we want to get the
+nodeId for a particular id given a context we use mkLocalIdNodeId.
+
+We use mkIdNodeId if the id might be imported, which runs in our
+monad and adds it to a map of ids which maps Id -> NodeId.
 
 -}
+
+-- See Note [Shadowing and NodeIds]
+mkIdNodeId :: HasCallStack => [SynContext] -> Id -> AM NodeId
+mkIdNodeId ctxt id
+    | Just node <- idMappedInCtxt id ctxt
+    = return node
+    | otherwise = do
+        s <- get
+        return $ fromMaybe (pprPanic "Unmapped id" (ppr id)) $
+            node_id <$> lookupUFM (fs_idNodeMap s) id
+
+-- See Note [Shadowing and NodeIds]
+mkLocalIdNodeId :: HasCallStack => [SynContext] -> Id -> NodeId
+mkLocalIdNodeId ctxt id
+    | Just node <- idMappedInCtxt id ctxt
+    = node
+    | otherwise = pprPanic "Local id not mapped:" (ppr id)
+
+mkUniqueId :: AM NodeId
+mkUniqueId = NodeId <$> getUniqueM
+
+
 
 
 -- | This adds nodes with information we can figure out about imported ids into the env.
@@ -1214,8 +1310,7 @@ addImportedNode id = do
 
                         -- General case, a potentially unevaluated imported id.
                         | not isFun
-                        ->  -- pprTrace "addImported_gen" (ppr id) $
-                            Just $! (mkConstNode node_id (flatLattice MaybeEnter))
+                        ->  Just $! (mkConstNode node_id (flatLattice MaybeEnter))
                                     `set_desc` (text "ext_unknown_enter" <-> ppr id)
 
                         -- May or may not be entered.
@@ -1244,16 +1339,13 @@ importedFuncNode this_mod var_id
             Just node_id -> return $ Just node_id
             Nothing -> pprPanic "Imported id not mapped" (ppr var_id)
 
--- TODO: Should we put stg bindings in dependency order?
-
 {-# NOINLINE nodesTopBinds #-}
 nodesTopBinds :: [StgTopBinding] -> AM [InferStgTopBinding]
 nodesTopBinds binds = do
     let top_level_binds = (bindersOfTopBinds binds) :: IdSet
-    -- TODO: Should is a map instead of a lookup list.
+    -- We preallocate node ids for the case where we must reference an node by id
+    -- before we traversed the defining binding.
     mappings <- mkVarEnv <$> mapM (mkCtxtEntry [CNone]) (nonDetEltsUniqSet top_level_binds) ::  AM (VarEnv NodeId)
-    -- TODOT: Better solution than stub nodes?
-    -- mapM (\(v,u) -> mkStubNode u (ppr (v,u))) mappings
     let topCtxt = CTopLevel mappings
     mapM (nodesTop topCtxt) binds
 
@@ -1267,8 +1359,8 @@ mkCtxtEntry ctxt v
         return (v, node_id)
 
 nodesTop :: SynContext -> StgTopBinding -> AM InferStgTopBinding
--- Always "tagged"
 nodesTop ctxt (StgTopStringLit v str) = do
+    -- String literals are never entered.
     let node_id = mkLocalIdNodeId [ctxt] v
     let node = mkConstNode node_id (flatLattice NeverEnter)
                     `set_desc` text "c_str"
@@ -1284,13 +1376,13 @@ nodesBind :: [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStg
 nodesBind ctxt top lne (StgNonRec v rhs) = do
     boundId <- uncurry unitVarEnv <$> mkCtxtEntry ctxt v
     let ctxt' = ((CLet boundId lne):ctxt)
-    (rhs',_) <- (nodeRhs ctxt' top v rhs)
+    rhs' <- (nodeRhs ctxt' top v rhs)
     return (StgNonRec v rhs', (CLetBody boundId lne):ctxt)
 nodesBind ctxt top lne (StgRec binds) = do
     let ids = map fst binds
     boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
     let ctxt' = (CLetRec boundIds lne) : ctxt
-    (rhss', _) <- unzip <$> mapM (uncurry (nodeRhs ctxt' top )) binds
+    rhss' <- mapM (uncurry (nodeRhs ctxt' top )) binds
     return $ (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
 
 -- TODO: If we have a recursive let, but non of the recursive ids are in strict fields
@@ -1315,13 +1407,13 @@ nodesBind ctxt top lne (StgRec binds) = do
 
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
-nodeRhs :: HasCallStack => [SynContext] -> TopLevelFlag -> Id -> StgRhs -> AM (InferStgRhs, NodeId)
+nodeRhs :: HasCallStack => [SynContext] -> TopLevelFlag -> Id -> StgRhs -> AM InferStgRhs
 nodeRhs ctxt topFlag binding (StgRhsCon _ _ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
         let node = mkConstNode node_id (flatLattice NeverEnter)
         markDone $ node `set_desc` text "rhsConNullary"
-        return (StgRhsCon node_id _ccs con args, node_id)
+        return (StgRhsCon node_id _ccs con args)
   | otherwise = do
 
         mapM_ addImportedNode [v | StgVarArg v <- args]
@@ -1338,21 +1430,21 @@ nodeRhs ctxt topFlag binding (StgRhsCon _ _ccs con args)
 #endif
                         }
         addNode node
-        return (StgRhsCon node_id _ccs con args, node_id)
+        return (StgRhsCon node_id _ccs con args)
   where
     node_id = mkLocalIdNodeId ctxt binding
     node_update this_id node_inputs = do
         fieldResults <- mapM (lookupNodeResult) node_inputs
         let strictResults = getStrictConArgs con fieldResults
-        let strictOuter = map getOuter strictResults :: [EnterInfo]
+        let strictOuter = map enterInfo strictResults :: [EnterInfo]
         -- pprTraceM "RhsCon" (ppr con <+> ppr this_id <+> ppr fieldResults)
         -- Rule 2
         let outerTag
                 -- Non-toplevel bindings are wrapped with a case expr.
                 -- This means we can always tag the resulting let,
                 -- although it might no longer be static.
-                -- However we do not do this for recursive binds
-                -- for now. TODO: Could be done also for recursive binds in the common case.
+                -- However we do not do this for recursive binds for now.
+                -- TODO: Could be done also for recursive binds in the common case.
                 | not (isTopLevel topFlag)
                 , (CLet vmap _ : _) <- ctxt
                 , elemVarEnv binding vmap
@@ -1405,14 +1497,14 @@ nodeRhs ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
                         , node_inputs = [body_id]
                         -- ^ We might infer things about nested fields once evaluated.
                         , node_done   = False
-                        , node_result = LatUndet enterInfo
+                        , node_result = EnterLattice enterInfo LatUndet
                         , node_update = node_update node_id body_id
 #if defined(WITH_NODE_DESC)
                         , _node_desc = node_desc
 #endif
                         }
     addNode node
-    return (StgRhsClosure _ext _ccs _flag args body', node_id)
+    return (StgRhsClosure _ext _ccs _flag args body')
 
   where
     node_id = mkLocalIdNodeId ctxt binding
@@ -1431,7 +1523,7 @@ nodeRhs ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
                                     -- are only entered when applied.
     node_update this_id body_id = do
         bodyInfo <- lookupNodeResult body_id
-        let result = setOuterInfo bodyInfo enterInfo
+        let result = setEnterInfo bodyInfo enterInfo
         let cappedResult = capAtLevel 10 result
         if hasTopFields cappedResult
             then do
@@ -1481,7 +1573,7 @@ nodeCaseBndr scrutNodeId _bndr = do
       where
         updater bndrNodeId = do
             scrutResult <- lookupNodeResult scrutNodeId
-            let result = setOuterInfo scrutResult NeverEnter
+            let result = setEnterInfo scrutResult NeverEnter
             if hasTopFields result
                 then do
                     node <- getNode bndrNodeId
@@ -1520,20 +1612,20 @@ nodeAlt ctxt scrutNodeId (altCon, bndrs, rhs)
           | otherwise = do
                 node_id <- mkUniqueId --Shadows existing binds
                 let updater = do
-                        scrut_res <- lookupNodeResult scrutNodeId :: AM FieldInfo
+                        scrut_res <- lookupNodeResult scrutNodeId :: AM EnterLattice
                         let bndr_res = (indexField scrut_res n)
                         let is_strict_field = elem bndr strictBnds
                         let result
                                 | is_strict_field
                                 -- Tag things coming out of strict binds
-                                = setOuterInfo bndr_res NeverEnter
+                                = setEnterInfo bndr_res NeverEnter
                                 | otherwise = bndr_res
                         -- pprTraceM "Updating altBndr:" (ppr (node_id, result) $$
                         --         text "Input:" <+> ppr scrutNodeId $$
                         --         text "scrut_res" <+> ppr scrut_res $$
                         --         text "bndr_res" <+> ppr bndr_res )
                         let topFields = hasTopFields result
-                        if (is_strict_field && topFields) || (topFields && getOuter result == MaybeEnter)
+                        if (is_strict_field && topFields) || (topFields && enterInfo result == MaybeEnter)
                             then do
                                 node <- getNode node_id
                                 markDone $ node { node_result = result }
@@ -1592,7 +1684,7 @@ nodeConApp ctxt (StgConApp _ext con args tys) = do
     mapM_ addImportedNode [v | StgVarArg v <- args]
     inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
     let updater = do
-            fieldResults <- mapM lookupNodeResult inputs :: AM [FieldInfo]
+            fieldResults <- mapM lookupNodeResult inputs :: AM [EnterLattice]
             let result = mkOutConLattice con MaybeEnter fieldResults
             -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
             updateNodeResult node_id result
@@ -1612,37 +1704,7 @@ nodeConApp ctxt (StgConApp _ext con args tys) = do
     return (StgConApp node_id con args tys, node_id)
 nodeConApp _ _ = panic "Impossible"
 
-{-
-    * A recursive call won't produce any new information.
-    * Neither will imported functions
 
-    Note [RecEnter Context]
-
-Consider this function:
-
-    f x
-        | x < 0 = Just Nothing
-        | otherwise = f $ x-1
-
-After initializing all nodes to bot the `otherwise` branch
-would naivly be analyzed as bottom. This means the body of
-f x would evaluate to bot, and we will never be able to
-reasonably analyze the result of f.
-
-We deal with this by looking for branches in a functions body
-which are tail calls to the function itself.
-
-In any such case we assign the branch a special value representing
-this kind of recursion. When combining branches this value behaves
-different to bot, as Rec `combine` x will always result in x.
-
-
-
-
-
-    -- TODO:    Mutual recursion
-
--}
 nodeApp :: HasCallStack => [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeApp ctxt expr@(StgApp _ f args) = do
     mapM_ addImportedNode (f:[v | StgVarArg v <- args])
@@ -1691,7 +1753,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
   where
     -- Determine if f in this position is a recursive tail call
     -- and as such safe to set to RecEnter
-    -- See Note [RecEnter Context]
+    -- See Note [Recursive Functions]
     isRecTail :: [SynContext] -> Bool
     isRecTail (CTopLevel _ : _) = False
     isRecTail (CLetRec bnds _: _)
@@ -1730,7 +1792,7 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         | isFun && isSat = [f_node_id]
         | otherwise = [f_node_id]
 
-    mkResult :: AM FieldInfo
+    mkResult :: AM EnterLattice
     mkResult
         | isAbsent = pprTrace "Absent:" (ppr f) $ return $ flatLattice NeverEnter
 
@@ -1743,13 +1805,13 @@ nodeApp ctxt expr@(StgApp _ f args) = do
         | isFun && (not isSat) = return top
 
         -- App in a direct self-recursive tail call context, returns nothing
-        | recTail = return $ LatRec RecEnter
+        | recTail = return $ EnterLattice RecEnter LatRec
 
         | NoMutRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
             lookupNodeResult f_node_id
 
-        | isFun && isSat = (`setOuterInfo` MaybeEnter) <$> lookupNodeResult f_node_id
+        | isFun && isSat = (`setEnterInfo` MaybeEnter) <$> lookupNodeResult f_node_id
 
 
         -- TODO: If we build a pap, but keep track of the field values we should
@@ -1847,7 +1909,7 @@ solveConstraints = do
         result <- node_update node
         done <- and <$> (mapM isMarkedDone (node_inputs node))
         let node' = node { node_result = result }
-        when (done || result `nestingLevelOver` 10) (markDone node')
+        when (done || result `nestingLevelOver` 12) (markDone node')
         if (result == old_result)
             -- Nothing to do this round
             then return False
@@ -1867,19 +1929,19 @@ rewriteTopBinds binds = mapM (rewriteTop) binds
 rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
-    (StgTopLifted . fst) <$> (rewriteBinds TopLevel bind)
+    (StgTopLifted . fst) <$!> (rewriteBinds TopLevel bind)
 
 rewriteBinds :: TopLevelFlag -> InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
 rewriteBinds topFlag (StgNonRec v rhs)
     | TopLevel    <- topFlag = do
-        bind <- (StgNonRec v <$> rewriteRhsInplace v rhs)
+        !bind <- (StgNonRec v <$> rewriteRhsInplace v rhs)
         return (bind, id)
     | NotTopLevel <- topFlag = do
-        (rhs, wrapper) <-  rewriteRhs v rhs
+        (!rhs, wrapper) <-  rewriteRhs v rhs
         return (StgNonRec v rhs, wrapper)
 rewriteBinds topFlag (StgRec binds)
     | TopLevel    <- topFlag = do
-        bind <- mkRec <$> mapM (uncurry rewriteRhsInplace) binds
+        !bind <- mkRec <$!> mapM (uncurry rewriteRhsInplace) binds
         return (bind, id)
     | NotTopLevel <- topFlag = do
         rhss <- mapM (uncurry rewriteRhsInplace) binds :: AM ([TgStgRhs])
@@ -1895,7 +1957,7 @@ rewriteRhsInplace :: HasCallStack => Id -> InferStgRhs -> AM TgStgRhs
 rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
     node <- getNode node_id
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,FieldInfo)]
+    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,EnterLattice)]
     let needsEval = map fst . filter (not . hasOuterTag . snd) $ strictIndices :: [Int]
     -- TODO: selectIndices is not a performant solution, fix that.
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
@@ -1930,10 +1992,10 @@ rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
     --     ]
 
     -- TODO: use zip3
-    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,FieldInfo)]
+    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,EnterLattice)]
     let needsEval = map fst . filter (not . hasOuterTag . snd) $ strictIndices :: [Int]
     -- TODO: selectIndices is not a performant solution, fix that.
-    let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
+    let evalArgs = [v | StgVarArg !v <- selectIndices needsEval args] :: [Id]
 
     if (null evalArgs)
         then return (StgRhsCon noExtFieldSilent ccs con args, id)
@@ -2004,7 +2066,7 @@ rewriteConApp (StgConApp nodeId con args tys) = do
     -- We look at the INPUT because the output of this node will always have tagged
     -- strict fields in the end.
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip3 [(0 :: Int) ..] fieldInfos args) :: [(Int,FieldInfo, StgArg)]
+    let strictIndices = getStrictConArgs con (zip3 [(0 :: Int) ..] fieldInfos args) :: [(Int,EnterLattice, StgArg)]
     let needsEval = map fstOf3 . filter (not . hasOuterTag . sndOf3) $ strictIndices :: [Int]
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
     if (not $ null evalArgs)
@@ -2019,17 +2081,17 @@ rewriteApp :: IsScrut -> InferStgExpr -> AM TgStgExpr
 rewriteApp True (StgApp nodeId f args)
     | null args = do
     tagInfo <- lookupNodeResult nodeId
-    let !enter = (enterInfo $ getOuter tagInfo)
+    let !enter = (extInfo $ enterInfo tagInfo)
     return $ StgApp enter f args
   where
-    enterInfo AlwaysEnter       = -- pprTrace "alwaysEnter" (ppr f)
+    extInfo AlwaysEnter       = -- pprTrace "alwaysEnter" (ppr f)
                                 --   StgSyn.AlwaysEnter
                                 -- Reenters evaluated closures too often
                                   StgSyn.MayEnter
-    enterInfo NeverEnter        = StgSyn.NoEnter
-    enterInfo MaybeEnter        = StgSyn.MayEnter
-    enterInfo RecEnter          = StgSyn.MayEnter
-    enterInfo UndetEnterInfo    = StgSyn.MayEnter
+    extInfo NeverEnter        = StgSyn.NoEnter
+    extInfo MaybeEnter        = StgSyn.MayEnter
+    extInfo RecEnter          = StgSyn.MayEnter
+    extInfo UndetEnterInfo    = StgSyn.MayEnter
 
 rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args -- TODO? Also apply here?
 rewriteApp _ _ = panic "Impossible"
