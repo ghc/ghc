@@ -57,6 +57,8 @@ import SrcLoc
 import Outputable
 import Module           ( Module )
 import qualified ErrUtils as Err
+import StgCmmClosure    ( idPrimRep )
+
 import Control.Applicative ((<|>))
 import Control.Monad
 
@@ -202,12 +204,42 @@ lintStgExpr (StgLetNoEscape _ binds body) = do
 
 lintStgExpr (StgTick _ expr) = lintStgExpr expr
 
-lintStgExpr (StgCase scrut bndr alts_type alts) = do
+lintStgExpr (StgCase scrut bndr alt_type alts) = do
     lintStgExpr scrut
 
-    lf <- getLintFlags
-    let in_scope = stgCaseBndrInScope alts_type (lf_unarised lf)
+    -- Check unsafe coercions. This checks a relaxed version of (b) in Note [bad
+    -- unsafe coercion] in CoreLint: we allow coercing smaller prim type to a
+    -- larger prim type (e.g. Int32# to Int64#).
+    --
+    -- Two places where we can introduce such coercions:
+    -- - With unsafeCoerce# in user programs
+    -- - UnariseStg can use the same memory location for different integer types
+    --   in different alternatives of an unboxed sum type.
+    --   E.g. for (# Int32# | Int64# #) we use an Int64# binder for the values
+    --   in both alternatives.
+    --
+    case (scrut, alt_type) of
+      (StgApp v [], PrimAlt _) ->
+        let
+          scrut_slot  = primRepSlot (idPrimRep v)
+          bndr_slot   = primRepSlot (idPrimRep bndr)
+          merged_slot = slotFitsIn scrut_slot bndr_slot
 
+          reject reason =
+            addErrL (hang (text "Unsafe coercion " <+> parens (text reason))
+                          2 (text "From (scrutinee):" <+> ppr scrut_slot <+> parens (ppr scrut) $$
+                             text "To (case binder):" <+> ppr bndr_slot <+> parens (ppr bndr)))
+        in
+          case merged_slot of
+            Nothing ->
+              reject "incompatible scrutinee and case binder"
+            Just merged_slot' ->
+              unless (merged_slot' <= bndr_slot) $
+                reject "scrutinee type larger than case binder type"
+      _ -> return ()
+
+    lf <- getLintFlags
+    let in_scope = stgCaseBndrInScope alt_type (lf_unarised lf)
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 
 lintAlt
