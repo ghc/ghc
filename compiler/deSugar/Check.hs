@@ -622,7 +622,7 @@ ensureInhabited delta x = forgetSatisfiable <$> find_one delta
           -- Run this candidate through the type oracle
           let delta1 = delta{ delta_tm_cs = tm_cs' }
           mkOneSatisfiableConFull delta1 x con >>= \case
-            Just (delta2, _) -> pure (Satisfiable delta2 con) -- success
+            Just (_, _) -> pure (Satisfiable delta1 con) -- success
             Nothing -> do
               -- Nope, try again, term oracle!
               tryAddRefutableAltCon (delta_tm_cs delta1) nm ty (PmAltConLike con) >>= \case
