@@ -150,6 +150,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
         ; (useful1, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
+        ; pprTrace "mkWwBodies" (ppr fun_id <+> ppr cpr_info) (return ())
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty cpr_info

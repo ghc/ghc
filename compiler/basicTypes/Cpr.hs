@@ -1,5 +1,5 @@
 module Cpr (
-    CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe,
+    CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe, seqCprResult,
     CprType (..), topCprType, botCprType, prodCprType, sumCprType,
     lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy
   ) where
@@ -62,6 +62,9 @@ returnsCPR_maybe RetProd     = Just fIRST_TAG
 returnsCPR_maybe NoCPR       = Nothing
 returnsCPR_maybe BotCPR      = Nothing
 
+seqCprResult :: CprResult -> ()
+seqCprResult cpr = cpr `seq` ()
+
 --
 -- * CprType
 --
@@ -69,7 +72,7 @@ returnsCPR_maybe BotCPR      = Nothing
 -- | The abstract domain \(A_t\) from the original 'CPR for Haskell' paper.
 data CprType
   = CprType
-  { _ct_arty :: !Arity    -- ^ Number of arguments the denoted expression eats
+  { ct_arty :: !Arity    -- ^ Number of arguments the denoted expression eats
                           --   before returning the 'ct_cpr'
   , ct_cpr  :: !CprResult -- ^ 'CprResult' eventually unleashed when applied to
                           --   'ct_arty' arguments
@@ -77,7 +80,7 @@ data CprType
 
 instance Eq CprType where
   a == b =  ct_cpr a == ct_cpr b
-         && (_ct_arty a == _ct_arty b || ct_cpr a == topCpr)
+         && (ct_arty a == ct_arty b || ct_cpr a == topCpr)
 
 topCprType :: CprType
 topCprType = CprType 0 topCpr
