@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule: m
-UnsatFun.f: <B,1*U(U)><B,A>b
+UnsatFun.f: <B,1*U(U)><B,A>bb
 UnsatFun.g: <B,1*U(U)>b
 UnsatFun.g': <L,1*U(U)>
 UnsatFun.g3: <L,U(U)>m
@@ -13,7 +13,7 @@ UnsatFun.h3: <C(S),1*C1(U)>m
 
 ==================== Strictness signatures ====================
 UnsatFun.$trModule: m
-UnsatFun.f: <B,1*U(U)><B,A>b
+UnsatFun.f: <B,1*U(U)><B,A>bb
 UnsatFun.g: <B,1*U(U)>b
 UnsatFun.g': <L,1*U(U)>
 UnsatFun.g3: <L,U(U)>m

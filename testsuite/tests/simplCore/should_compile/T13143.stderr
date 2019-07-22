@@ -7,7 +7,7 @@ Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall a. GHC.Prim.Void# -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Unf=OtherCon []]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Cpr=b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 end Rec }
 
@@ -17,6 +17,7 @@ f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
  Arity=1,
  Caf=NoCafRefs,
  Str=<B,A>b,
+ Cpr=b,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
@@ -35,7 +36,7 @@ T13143.$trModule4 = "main"#
 T13143.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
@@ -52,7 +53,7 @@ T13143.$trModule2 = "T13143"#
 T13143.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
- Str=m1,
+ Cpr=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
@@ -61,7 +62,7 @@ T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
 T13143.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
- Str=m,
+ Cpr=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T13143.$trModule
@@ -69,7 +70,7 @@ T13143.$trModule
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
-[GblId, Str=b]
+[GblId, Str=b, Cpr=b]
 lvl = T13143.$wf @Int GHC.Prim.void#
 
 Rec {
@@ -97,7 +98,8 @@ end Rec }
 g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
- Str=<S,1*U><S,1*U><S,1*U(U)>m,
+ Str=<S,1*U><S,1*U><S,1*U(U)>,
+ Cpr=m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
@@ -113,6 +115,3 @@ g = \ (w :: Bool) (w1 :: Bool) (w2 :: Int) ->
       case w2 of { GHC.Types.I# ww1 ->
       case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
       }
-
-
-

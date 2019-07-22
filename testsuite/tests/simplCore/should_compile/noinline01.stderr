@@ -1,5 +1,4 @@
 
-==================== STG: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
@@ -14,7 +13,7 @@ Noinline01.$trModule4 :: GHC.Prim.Addr#
     "main"#;
 
 Noinline01.$trModule3 :: GHC.Types.TrName
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+[GblId, Caf=NoCafRefs, Cpr=m1, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
@@ -22,12 +21,10 @@ Noinline01.$trModule2 :: GHC.Prim.Addr#
     "Noinline01"#;
 
 Noinline01.$trModule1 :: GHC.Types.TrName
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+[GblId, Caf=NoCafRefs, Cpr=m1, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
-[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+[GblId, Caf=NoCafRefs, Cpr=m, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
-
-

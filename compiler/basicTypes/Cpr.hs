@@ -50,11 +50,11 @@ prodCpr :: CprResult
 prodCpr = RetProd
 
 trimCpr :: Bool -> Bool -> CprResult -> CprResult
-trimCpr trim_all trim_sums cpr
-  | trim_all  = NoCPR
-  | otherwise = case cpr of
-      RetSum{} | trim_sums -> NoCPR
-      _ -> cpr
+trimCpr trim_all trim_sums RetSum{}
+  | trim_all || trim_sums      = NoCPR
+trimCpr trim_all _         RetProd
+  | trim_all                   = NoCPR
+trimCpr _        _         cpr = cpr
 
 returnsCPR_maybe :: CprResult -> Maybe ConTag
 returnsCPR_maybe (RetSum t)  = Just t

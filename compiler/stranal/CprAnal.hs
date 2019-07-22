@@ -55,7 +55,7 @@ cprAnal, cprAnal'
   -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
   -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
 
-cprAnal env e = -- pprTrace "cprAnal" (ppr n <+> ppr e) $
+cprAnal env e = -- pprTraceWith "cprAnal" (\res -> ppr (fst (res)) $$ ppr e) $
                   cprAnal' env e
 
 cprAnal' _ (Lit lit)     = (topCprType, Lit lit)
@@ -518,6 +518,15 @@ With thunk-splitting, we get instead
                 let $j x = let k = I#x in ...body strict in k...
                 in if ... then $j a else $j b
 This is much better; there's a good chance the I# won't get allocated.
+
+But what about botCpr? Consider
+    lvl = error "boom"
+    fac -1 = lvl
+    fac 0 = 1
+    fac n = n * fac (n-1)
+fac won't have the CPR property here when we trim every thunk! But the
+assumption is that error cases are rarely entered and we are diverging anyway,
+so WW doesn't hurt.
 
 Note [CPR examples]
 ~~~~~~~~~~~~~~~~~~~~

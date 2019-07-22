@@ -1361,7 +1361,7 @@ dumpStrSig binds = vcat (map printId ids)
   ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
   getIds (NonRec i _) = [ i ]
   getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
+  printId id | isExportedId id = ppr id <> colon <+> (pprIfaceStrictSig (idStrictness id) <> ppr (idCprInfo id))
              | otherwise       = empty
 
 {- Note [CPR in a product case alternative]

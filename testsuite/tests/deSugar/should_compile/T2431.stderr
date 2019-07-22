@@ -7,7 +7,7 @@ Result size of Tidy Core
 T2431.$WRefl [InlPrag=INLINE[0]] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
- Str=m,
+ Cpr=m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
@@ -17,7 +17,7 @@ T2431.$WRefl
 
 -- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>b, Unf=OtherCon []]
+[GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>b, Cpr=b, Unf=OtherCon []]
 absurd = \ (@a) (x :: Int :~: Bool) -> case x of { }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -110,6 +110,3 @@ T2431.$tc'Refl
       $tc'Refl2
       1#
       $krep3
-
-
-
