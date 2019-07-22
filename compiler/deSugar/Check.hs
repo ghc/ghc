@@ -11,6 +11,7 @@ Pattern Matching Coverage Checking.
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
 {-# LANGUAGE MultiWayIf     #-}
+{-# LANGUAGE LambdaCase     #-}
 
 module Check (
         -- Checking and printing
@@ -32,7 +33,6 @@ import DynFlags
 import HsSyn
 import TcHsSyn
 import Id
-import VarEnv
 import ConLike
 import Name
 import FamInstEnv
@@ -46,7 +46,7 @@ import FastString
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
-import BasicTypes (Boxity(..))
+import BasicTypes (Boxity(..), Satisfiability(..), forgetSatisfiable)
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
@@ -57,13 +57,13 @@ import TyCoRep
 import Type
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (MaybeT (..), expectJust)
+import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
 import Data.Maybe    (catMaybes, isJust, fromMaybe)
-import Control.Monad (forM, when, guard, forM_, zipWithM, filterM)
-import Control.Monad.Trans.Class (lift)
+import Data.Void     (Void)
+import Control.Monad (forM, when, forM_, zipWithM, filterM)
 import Coercion
 import TcEvidence
 import TcSimplify    (tcNormalise)
@@ -137,8 +137,7 @@ data ValVec = ValVec [ValAbs] Delta -- ^ Value Vector Abstractions
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints. TODO: Do the same for the type constraints?
 data Delta = MkDelta { delta_ty_cs :: Bag EvVar
-                     , delta_tm_cs :: TmState
-                     , delta_cp_ms :: VarEnv [[ConLike]] }
+                     , delta_tm_cs :: TmState }
 
 type ValSetAbs = [ValVec]  -- ^ Value Set Abstractions
 type Uncovered = ValSetAbs
@@ -524,7 +523,7 @@ pmInitialTmTyCs = do
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
       initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
-  pure $ MkDelta initTyCs initTmState emptyVarEnv
+  pure $ MkDelta initTyCs initTmState
 
 {-
 Note [Recovering from unsatisfiable pattern-matching constraints]
@@ -607,106 +606,28 @@ tmTyCsAreSatisfiable
                then pure True
                else tyOracle ty_cs
   pure $ case (sat_ty, solveOneEq amb_tm_cs new_tm_c) of
-           (True, Just term_cs) -> Just $ MkDelta ty_cs term_cs emptyVarEnv
+           (True, Just term_cs) -> Just $ MkDelta ty_cs term_cs
            _unsat               -> Nothing
 
-residualCompleteMatches :: Delta -> Id -> PmM [[ConLike]]
-residualCompleteMatches delta x = case lookupVarEnv (delta_cp_ms delta) x of
-  Just sets -> pure sets
-  Nothing   -> allCompleteMatches (idType x)
-
--- | This weeds out 'ValAbs's with 'PmVar's where at least one COMPLETE set is
--- rendered vacuous by equality constraints. Otherwise tries to turn a singleton
--- COMPLETE set into the single possible constructor.
---
--- This is quite costly due to the many oracle queries, so we call this as
--- seldom as possible.
-normaliseValAbs :: Delta -> ValAbs -> PmM (Maybe (Delta, ValAbs))
-normaliseValAbs delta = runMaybeT . go_va delta
+ensureInhabited :: Delta -> Id -> PmM (Satisfiability Delta Void)
+ensureInhabited delta x = forgetSatisfiable <$> find_one delta
   where
-    go_va :: Delta -> ValAbs -> MaybeT PmM (Delta, ValAbs)
-    go_va delta pm@PmCon{ pm_con_args = args } = do
-      (delta', args') <- mapAccumLM go_va delta args
-      pure (delta', pm { pm_con_args = args' })
-    go_va delta@MkDelta { delta_cp_ms = cp_ms } va@(PmVar x) = do
-      grps <- lift (residualCompleteMatches delta x)
-      incomplete_grps <- lift (traverse (go_grp 0 x delta) grps)
-      -- TODO: If performance is a problem for large refutable enums, record
-      --       the new incomplete_grps (or its inverse, rather) in delta
-      lift $ tracePm "normaliseValAbs: incomplete_grps" $ hcat
-        [ ppr x
-        , ppr (idType x)
-        , ppr grps
-        , ppr incomplete_grps
-        ]
-      -- If all cons of any COMPLETE set are matched, the ValAbs is vacuous.
-      guard (all notNull incomplete_grps)
-      -- Update our knowledge of incomplete groups
-      let delta1 = delta { delta_cp_ms = extendVarEnv cp_ms x incomplete_grps }
-      -- See Note [Turn singleton incomplete groups into a constructor]
-      case incomplete_grps of
-        ([con]:_)
-          | all (== [con]) incomplete_grps
-          , any ((> 1) . length) grps -> do
-            -- mkOneSatisfiableConFull, so that the new constraint x ~ con is
-            -- recorded in delta'
-            (delta2, ic) <- MaybeT $ mkOneSatisfiableConFull delta1 x con
-            lift $ tracePm "normaliseValAbs: single con" $ hcat
-              [ ppr x
-              , ppr (idType x)
-              , ppr (ic_val_abs ic)
-              ]
-            pure (delta2, ic_val_abs ic)
-        _        -> pure (delta1, va)
-    go_va delta va = pure (delta, va)
-
-    go_grp :: Int -> Id -> Delta -> [ConLike] -> PmM [ConLike]
-    go_grp _ _ _ []
-      = pure []
-    go_grp n_inh _ _ group
-      | n_inh > 1
-      -- Don't attempt to reduce the group any further when there is more than
-      -- one inhabitant! There's nothing to gain from this information.
-      -- For huge groups, this saves a lot of unnecessary oracle queries!
-      = pure group
-    go_grp n_inh x delta (con:group) = do
-      mb_delta_ic <- mkOneSatisfiableConFull delta x con
-      case mb_delta_ic of
-        Nothing -> go_grp n_inh x delta group
-        Just _  -> (con:) <$> go_grp (n_inh + 1) x delta group
-
-{- Note [Turn singleton incomplete groups into a constructor]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The general idea is that if there's a unique singleton incomplete group, we turn
-it into the single possible constructor. This makes for better warning messges.
-Example:
-
-  data D2 = A2 | B2
-  f1 A2 = ()
-
-We want to warn that f1 lacks a clause for the B case and not the more cryptic
-message 'p where p is not one of {A}'. But on the other hand, we don't want this
-to happen for product types, so that we don't generate a warning like 'Just ()'
-instead of 'Just _' here:
-
-  f2 :: Maybe () -> ()
-  f2 Nothing = ()
-
-Things get more complicated in the presence of multiple elible COMPLETE sets.
-Example:
-
-  data D3 = A3 | B3 | C3
-  {-# COMPLETE A3, B3 #-}
-  f3 A3 = ()
-
-rather than give preference to a particular complete set and warn that f3 lacks
-a clause for B1, we prefer the message 'p where p is not one of {A3}' here.
-
-So: When all incomplete sets are singletons of the same non-product constructor,
-replace the value abstraction by one for that constructor.
-
-See also the test case SinglePossibleCon.
--}
+    find_one delta = do
+      let ty = idType x -- TODO: normalize?
+      let nm = idName x
+      suggestPossibleConLike (delta_tm_cs delta) nm ty >>= \case
+        Unsatisfiable              -> pure Unsatisfiable -- -XEmptyDataDecls
+        PossiblySatisfiable tm_cs' -> pure (PossiblySatisfiable delta{ delta_tm_cs = tm_cs' })
+        Satisfiable tm_cs' con -> do
+          -- Run this candidate through the type oracle
+          let delta1 = delta{ delta_tm_cs = tm_cs' }
+          mkOneSatisfiableConFull delta1 x con >>= \case
+            Just (delta2, _) -> pure (Satisfiable delta2 con) -- success
+            Nothing -> do
+              -- Nope, try again, term oracle!
+              tryAddRefutableAltCon (delta_tm_cs delta1) nm ty (PmAltConLike con) >>= \case
+                Nothing -> pure Unsatisfiable -- term oracle says we are out of options
+                Just ts -> find_one (delta1{ delta_tm_cs = ts })
 
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of
@@ -2318,17 +2239,17 @@ forceIfCanDiverge x tms
 mkUnmatched :: Id -> PmAltCon -> ValVec -> PmM PartialResult
 mkUnmatched x nalt (ValVec vva delta) =
   -- See Note [Refutable shapes] in TmOracle
-  case tryAddRefutableAltCon (delta_tm_cs delta) x nalt of
+  tryAddRefutableAltCon (delta_tm_cs delta) (idName x) (idType x) nalt >>= \case
     Nothing -> pure mempty
     Just tms -> do
       -- We need to normalise here to catch uninhabitable vars that would
       -- otherwise
       --  * hide redundant pattern match warnings
       --  * turn redundant pattern match warnings into inaccessible RHS
-      res <- normaliseValAbs (delta {delta_tm_cs = tms}) (PmVar x)
-      case res of
-        Nothing            -> pure mempty
-        Just (delta', va') -> pure (usimple [ValVec (va':vva) delta'])
+      ensureInhabited (delta {delta_tm_cs = tms}) x >>= \case
+        Unsatisfiable              -> pure mempty
+        PossiblySatisfiable delta' -> pure (usimple [ValVec (PmVar x:vva) delta'])
+        Satisfiable _ _            -> panic "mkUnmatched" -- kind of embarassing
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
