@@ -25,7 +25,7 @@ module NameEnv (
 
         emptyDNameEnv,
         lookupDNameEnv,
-        delFromDNameEnv,
+        delFromDNameEnv, filterDNameEnv,
         mapDNameEnv,
         adjustDNameEnv, alterDNameEnv, extendDNameEnv,
         -- ** Dependency analysis
@@ -150,6 +150,9 @@ lookupDNameEnv = lookupUDFM
 
 delFromDNameEnv :: DNameEnv a -> Name -> DNameEnv a
 delFromDNameEnv = delFromUDFM
+
+filterDNameEnv :: (a -> Bool) -> DNameEnv a -> DNameEnv a
+filterDNameEnv = filterUDFM
 
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM

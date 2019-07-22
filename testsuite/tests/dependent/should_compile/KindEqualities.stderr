@@ -2,4 +2,5 @@
 KindEqualities.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘zero’:
-        Patterns not matched: (TyApp (TyApp _ _) _)
+        Patterns not matched:
+            (TyApp p _) where p is not one of {TyBool, TyMaybe, TyInt}

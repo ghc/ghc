@@ -1,0 +1,6 @@
+
+<no location info>: warning: [-Wmissed-extra-shared-lib (in -Wdefault)]
+    libgmp.so: cannot open shared object file: No such file or directory
+    It's OK if you don't want to use symbols from it directly.
+    (the package DLL is loaded by the system linker
+     which manages dependencies by itself).
