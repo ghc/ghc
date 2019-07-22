@@ -214,6 +214,32 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
     return nptrs;
 }
 
+StgArrBytes *heap_view_closurePtrsAsWords(Capability *cap, StgClosure *closure) {
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
+
+    StgWord size = heap_view_closureSize(closure);
+
+    // First collect all pointers here, with the comfortable memory bound
+    // of the whole closure. Afterwards we know how many pointers are in
+    // the closure and then we can allocate space on the heap and copy them
+    // there
+    StgClosure *ptrs[size];
+    StgWord nptrs = collect_pointers(closure, ptrs, size);
+
+    size = nptrs + mutArrPtrsCardTableSize(nptrs);
+    StgArrBytes *arr =
+        (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + size);
+    TICK_ALLOC_PRIM(sizeofW(StgArrBytes), nptrs, 0);
+    SET_HDR(arr, &stg_ARR_BYTES_info, cap->r.rCCCS);
+    arr->bytes = sizeof(StgWord) * nptrs;
+
+    for (StgWord i = 0; i<nptrs; i++) {
+        arr->payload[i] = ptrs[i];
+    }
+
+    return arr;
+}
+
 StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
 
