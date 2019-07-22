@@ -9,7 +9,7 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmLitType,
+        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmExprFVs, pmLitType,
         isNotPmExprOther, hsOverLitAsHsLit, lhsExprToPmExpr, hsExprToPmExpr,
         mkPmExprLit, decEqPmAltCon, PmExprList(..), pmExprAsList
     ) where
@@ -24,6 +24,7 @@ import FastString (FastString, unpackFS)
 import HsSyn
 import Id
 import Name
+import NameSet
 import DataCon
 import ConLike
 import TcEvidence (isErasableHsWrapper)
@@ -82,6 +83,11 @@ decEqPmLit _              _              = Nothing
 -- | Syntactic equality.
 instance Eq PmLit where
   a == b = decEqPmLit a b == Just True
+
+pmExprFVs :: PmExpr -> NameSet
+pmExprFVs (PmExprVar x)      = unitNameSet x
+pmExprFVs (PmExprCon _ args) = unionNameSets (map pmExprFVs args)
+pmExprFVs (PmExprOther _)    = emptyNameSet
 
 -- | Type of a PmLit
 pmLitType :: PmLit -> Type

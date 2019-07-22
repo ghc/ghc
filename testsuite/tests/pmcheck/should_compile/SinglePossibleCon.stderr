@@ -3,17 +3,17 @@ SinglePossibleCon.hs:8:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f1’:
         Patterns not matched:
-            A1 B1
-            B1 A1
+            A1 p where p is not one of {A1}
+            B1 p where p is not one of {B1}
 
 SinglePossibleCon.hs:16:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f2’:
         Patterns not matched:
             A2 p where p is not one of {A2}
-            B2 q where q is not one of {B2}
-            C2 q where q is not one of {C2}
-            D2 q where q is not one of {D2}
+            B2 p where p is not one of {B2}
+            C2 p where p is not one of {C2}
+            D2 p where p is not one of {D2}
 
 SinglePossibleCon.hs:31:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -22,4 +22,5 @@ SinglePossibleCon.hs:31:1: warning: [-Wincomplete-patterns (in -Wextra)]
 
 SinglePossibleCon.hs:35:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f4’: Patterns not matched: (Just _)
+    In an equation for ‘f4’:
+        Patterns not matched: p where p is not one of {Nothing}

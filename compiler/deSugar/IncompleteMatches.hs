@@ -1,5 +1,5 @@
 module IncompleteMatches (
-        IncompleteMatches, initIM, markMatchedIM, unmatchedConLikeIM
+        IncompleteMatches, initIM, markMatchedIM, unmatchedConLikesIM
     ) where
 
 import GhcPrelude
@@ -57,10 +57,10 @@ markMatchedIM :: ConLike -> IncompleteMatches -> IncompleteMatches
 markMatchedIM con (IM ms) = IM (fmap (`delOneFromUniqSet` con) ms)
 
 -- | Returns 'Nothing' when one of the incomplete match sets has become empty
--- (thus the match has become complete) and 'Just' an arbitrary unmatched
--- 'ConLike' otherwise.
-unmatchedConLikeIM :: IncompleteMatches -> Maybe ConLike
-unmatchedConLikeIM (IM ms) = NonEmpty.head <$> traverse f ms
+-- (thus the match has become complete) and 'Just' a non-empty list of arbitrary
+-- unmatched 'ConLike's from every incomplete match otherwise.
+unmatchedConLikesIM :: IncompleteMatches -> Maybe (NonEmpty ConLike)
+unmatchedConLikesIM (IM ms) = traverse f ms
   where
     f cs = case nonDetEltsUniqSet cs of
       -- TODO: Figure out why nonDetEltsUniqSet is OK here. I guess it is, as

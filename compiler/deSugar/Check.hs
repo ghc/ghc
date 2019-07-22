@@ -46,7 +46,7 @@ import FastString
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
-import BasicTypes (Boxity(..), Satisfiability(..), forgetSatisfiable)
+import BasicTypes (Boxity(..), Satisfiability(..))
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
@@ -61,6 +61,7 @@ import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
+import Data.List.NonEmpty (toList)
 import Data.Maybe    (catMaybes, isJust, fromMaybe)
 import Data.Void     (Void)
 import Control.Monad (forM, when, forM_, zipWithM, filterM)
@@ -610,24 +611,26 @@ tmTyCsAreSatisfiable
            _unsat               -> Nothing
 
 ensureInhabited :: Delta -> Id -> PmM (Satisfiability Delta Void)
-ensureInhabited delta x = forgetSatisfiable <$> find_one delta
+ensureInhabited delta x = find_one_in_each_set delta
   where
-    find_one delta = do
+    find_one_in_each_set delta = do
       let ty = idType x -- TODO: normalize?
       let nm = idName x
-      suggestPossibleConLike (delta_tm_cs delta) nm ty >>= \case
+      suggestPossibleConLikes (delta_tm_cs delta) nm ty >>= \case
         Unsatisfiable              -> pure Unsatisfiable -- -XEmptyDataDecls
         PossiblySatisfiable tm_cs' -> pure (PossiblySatisfiable delta{ delta_tm_cs = tm_cs' })
-        Satisfiable tm_cs' con -> do
-          -- Run this candidate through the type oracle
-          let delta1 = delta{ delta_tm_cs = tm_cs' }
-          mkOneSatisfiableConFull delta1 x con >>= \case
-            Just _  -> pure (Satisfiable delta1 con) -- success
-            Nothing -> do
-              -- Nope, try again, term oracle!
-              tryAddRefutableAltCon (delta_tm_cs delta1) nm ty (PmAltConLike con) >>= \case
-                Nothing -> pure Unsatisfiable -- term oracle says we are out of options
-                Just ts -> find_one (delta1{ delta_tm_cs = ts })
+        Satisfiable tm_cs' cons ->
+          -- Run these candidates through the type oracle
+          go delta{ delta_tm_cs = tm_cs' } (toList cons)
+          where
+            go delta []         = pure (PossiblySatisfiable delta)
+            go delta (con:cons) = mkOneSatisfiableConFull delta x con >>= \case
+              Just _  -> go delta cons -- success
+              Nothing -> do
+                -- Nope, try again, term oracle!
+                tryAddRefutableAltCon (delta_tm_cs delta) nm ty (PmAltConLike con) >>= \case
+                  Nothing -> pure Unsatisfiable -- term oracle says we are out of options
+                  Just ts -> find_one_in_each_set (delta{ delta_tm_cs = ts })
 
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of

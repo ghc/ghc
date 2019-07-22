@@ -14,7 +14,7 @@ module TmOracle (
         -- the term oracle
         tmOracle, TmState, initialTmState,
         solveOneEq, extendSubst, canDiverge,
-        tryAddRefutableAltCon, suggestPossibleConLike,
+        tryAddRefutableAltCon, suggestPossibleConLikes,
 
         -- misc.
         wrapUpRefutableShapes, exprDeepLookup
@@ -39,6 +39,8 @@ import ConLike
 import IncompleteMatches
 import Type
 import DsMonad
+
+import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 %************************************************************************
@@ -221,7 +223,7 @@ tryAddRefutableAltCon ts@(TS env) x ty nalt = do
     go pos@(CompleteSets im) =
       case nalt of
         PmAltConLike cl
-          | let im' = markMatchedIM cl im, isJust (unmatchedConLikeIM im')
+          | let im' = markMatchedIM cl im, isJust (unmatchedConLikesIM im')
           -> Just (VI (CompleteSets im') neg')
           | otherwise
           -> Nothing
@@ -236,17 +238,17 @@ tryAddRefutableAltCon ts@(TS env) x ty nalt = do
                                           --     refute later
     go pos = pure (VI pos neg')
 
-suggestPossibleConLike :: TmState -> Name -> Type -> DsM (Satisfiability TmState ConLike)
-suggestPossibleConLike ts@(TS env) x ty = do
+suggestPossibleConLikes :: TmState -> Name -> Type -> DsM (Satisfiability TmState (NonEmpty ConLike))
+suggestPossibleConLikes ts@(TS env) x ty = do
   let (y, VI pos neg) = lookupVarInfo ts x
   pos' <- initIncompleteMatches ty pos
   let ts' = TS (extendDNameEnv env y (VI pos' neg))
   case pos' of
-    CompleteSets im -> case unmatchedConLikeIM im of
-      Nothing -> pure Unsatisfiable
-      Just cl -> pure (Satisfiable ts' cl)
+    CompleteSets im -> case unmatchedConLikesIM im of
+      Nothing  -> pure Unsatisfiable
+      Just cls -> pure (Satisfiable ts' cls)
     Rigid (exprToAlt -> Just (PmAltConLike cl))
-      -> pure (Satisfiable ts' cl)
+      -> pure (Satisfiable ts' (cl :| []))
     _ -> pure (PossiblySatisfiable ts')
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
@@ -368,7 +370,7 @@ exprDeepLookup ts (PmExprVar x)
 exprDeepLookup _   e               = e
 
 wrapUpRefutableShapes :: TmState -> DNameEnv [PmAltCon]
-wrapUpRefutableShapes ts@(TS env) = mapDNameEnv f env
+wrapUpRefutableShapes ts@(TS env) = filterDNameEnv notNull (mapDNameEnv f env)
   where
     -- Unfortunate overlap with lookupVarInfo here, because we don't have the
     -- Name

@@ -108,7 +108,7 @@ module BasicTypes(
 
         SpliceExplicitFlag(..),
 
-        Satisfiability (..), forgetSatisfiable
+        Satisfiability (..)
    ) where
 
 import GhcPrelude
@@ -119,7 +119,6 @@ import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
 import Data.Bits
-import Data.Void
 
 {-
 ************************************************************************
@@ -1650,17 +1649,9 @@ data SpliceExplicitFlag
 
 -- | Satisfiability decisions as a data type. The @state@ is useful for
 -- recording any new facts deduced, while the @proof@ can carry a witness for
--- satisfiability and might even be instantiated to 'Void' to degenerate into a
--- semi-decision predicate (see 'forgetSatisfiable').
+-- satisfiability and might even be instantiated to 'Data.Void.Void' to
+-- degenerate into a semi-decision predicate.
 data Satisfiability state proof
   = Unsatisfiable
   | PossiblySatisfiable state
   | Satisfiable state !proof
-
--- | Turn 'Satisfiable' into 'PossiblySatisfiable', signifying that we don't
--- care about the proof. This has the advantage that use sites don't need to
--- handle 'Satisfiable' and 'PossiblySatsifiable' as two separate branches.
-forgetSatisfiable :: Satisfiability state proof -> Satisfiability state Void
-forgetSatisfiable Unsatisfiable            = Unsatisfiable
-forgetSatisfiable (PossiblySatisfiable st) = PossiblySatisfiable st
-forgetSatisfiable (Satisfiable st _)       = PossiblySatisfiable st
