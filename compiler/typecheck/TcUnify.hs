@@ -18,7 +18,7 @@ module TcUnify (
   buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind,
+  unifyType, unifyKind, uTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
@@ -64,7 +64,7 @@ import DynFlags
 import BasicTypes
 import Bag
 import Util
-import qualified GHC.LanguageExtensions as LangExt
+-- import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 
 import Data.Maybe( isNothing )
@@ -759,81 +759,20 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go ty_a ty_e
-      | (act_args@(_ : _), _) <- tcSplitFunTys ty_a
-      , (exp_args@(_ : _), _) <- tcSplitFunTys ty_e
-      = do { let args_to_consider = min (length act_args) (length exp_args)
-                 Right (n_act_args, act_res) = tcSplitFunTysN args_to_consider ty_a
-                 Right (n_exp_args, exp_res) = tcSplitFunTysN args_to_consider ty_e
-              -- if the result types are guarded, we "quick look" at them now
-           ; if tcIsGuardedType act_res && tcIsGuardedType exp_res
-                then do { _ <- uType TypeLevel eq_orig act_res exp_res ; return () }
-                else return ()
-              -- handle the arguments and the result type at the end
-           ; handle_arguments (zip n_act_args n_exp_args) act_res exp_res
-           }
-      where
-
-        handle_arguments :: [(TcSigmaType, TcSigmaType)]  -- pairs of arguments
-                         -> TcSigmaType -> TcSigmaType    -- actual and expected result
-                         -> TcM HsWrapper
-        -- GenSigCtxt: See Note [Setting the argument context]
-        -- in each case, arg_wrap :: exp_arg ~> act_arg
-        handle_arguments [] _ _
-          = pprPanic "tc_sub_type_ds" (ppr ty_a <+> ppr ty_e)
-        handle_arguments [(last_act_arg, last_exp_arg)] act_res exp_res
-          = do { -- last argument: we should also handle the result type
-                 last_arg_wrap <- tc_sub_tc_type eq_orig (given_orig last_exp_arg)
-                                                 GenSigCtxt last_exp_arg last_act_arg
-
-                   -- See Note [Co/contra-variance of subsumption checking]
-                   -- res_wrap :: act-res ~> exp_res
-               ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
-                   
-               ; return (mkWpFun last_arg_wrap res_wrap last_exp_arg exp_res doc)
-               }
-        handle_arguments ((act_arg, exp_arg) : more_args) act_res exp_res
-          | tcIsGuardedType act_arg
-          , tcIsGuardedType exp_arg
-          = do {  -- Both guarded, do it now
-               ; act_arg' <- zonkTcType act_arg
-               ; exp_arg' <- zonkTcType exp_arg
-               ; arg_wrap <- tc_sub_tc_type eq_orig (given_orig exp_arg)
-                                            GenSigCtxt exp_arg' act_arg'
-               ; more_wrap <- handle_arguments more_args act_res exp_res
-               ; return (mkWpFun arg_wrap more_wrap exp_arg more_arrow doc)
-               }
-          | otherwise
-          = do {  -- Some is not guarded guarded, do the rest first
-               ; more_wrap <- handle_arguments more_args act_res exp_res
-               ; act_arg' <- zonkTcType act_arg
-               ; exp_arg' <- zonkTcType exp_arg
-               ; arg_wrap <- tc_sub_tc_type eq_orig (given_orig exp_arg')
-                                            GenSigCtxt exp_arg' act_arg'
-               ; return (mkWpFun arg_wrap more_wrap exp_arg' more_arrow doc)
-               }
-          where
-            more_arrow = mkVisFunTys (map snd more_args) exp_res
-          
-        given_orig exp_arg = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
-        doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
-              text "is more polymorphic than" <+> quotes (ppr ty_expected)
-
-    {-
     go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
        (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = 
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
-           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
+        do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig exp_arg act_arg
+           ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
+           -- ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
-        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
+        -- given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
-    -}
 
     go ty_a ty_e
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
@@ -1497,13 +1436,13 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; case lookup_res of
                Filled ty1   -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped tv1 ty2 }
+               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped False tv1 ty2 }
     go ty1 (TyVarTy tv2)
       = do { lookup_res <- lookupTcTyVar tv2
            ; case lookup_res of
                Filled ty2   -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped tv2 ty1 }
+               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped False tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
@@ -1686,10 +1625,19 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 -}
 
+uTryFillPoly :: CtOrigin -> TcTyVar -> TcSigmaType -> TcM ()
+uTryFillPoly origin tv1 ty2
+  = do { lookup_res <- lookupTcTyVar tv1
+       ; case lookup_res of
+           Filled _ -> return ()
+           Unfilled _ -> do { _ <- uUnfilledVar origin TypeLevel NotSwapped True tv1 ty2
+                            ; return () } }
+
 ----------
 uUnfilledVar :: CtOrigin
              -> TypeOrKind
              -> SwapFlag
+             -> Bool           -- can unify tv with polytypes?
              -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                --    definitely not a /filled/ meta-tyvar
              -> TcTauType      -- Type 2
@@ -1697,28 +1645,29 @@ uUnfilledVar :: CtOrigin
 -- "Unfilled" means that the variable is definitely not a filled-in meta tyvar
 --            It might be a skolem, or untouchable, or meta
 
-uUnfilledVar origin t_or_k swapped tv1 ty2
+uUnfilledVar origin t_or_k swapped can_unify_poly_tv tv1 ty2
   = do { ty2 <- zonkTcType ty2
              -- Zonk to expose things to the
              -- occurs check, and so that if ty2
              -- looks like a type variable then it
              -- /is/ a type variable
-       ; uUnfilledVar1 origin t_or_k swapped tv1 ty2 }
+       ; uUnfilledVar1 origin t_or_k swapped can_unify_poly_tv tv1 ty2 }
 
 ----------
 uUnfilledVar1 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
+              -> Bool           -- can unify tv with polytypes?
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
-uUnfilledVar1 origin t_or_k swapped tv1 ty2
+uUnfilledVar1 origin t_or_k swapped can_unify_poly_tv tv1 ty2
   | Just tv2 <- tcGetTyVar_maybe ty2
   = go tv2
 
   | otherwise
-  = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+  = uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
 
   where
     -- 'go' handles the case where both are
@@ -1734,28 +1683,28 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
                      -- not have happened yet, and it's an invariant of
                      -- uUnfilledTyVar2 that ty2 is fully zonked
                      -- Omitting this caused #16902
-                ; uUnfilledVar2 origin t_or_k (flipSwap swapped)
+                ; uUnfilledVar2 origin t_or_k (flipSwap swapped) can_unify_poly_tv
                            tv2 (mkTyVarTy tv1) }
 
            | otherwise
-           = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+           = uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
 
 ----------
 uUnfilledVar2 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
+              -> Bool           -- can unify tv with polytypes?
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
-uUnfilledVar2 origin t_or_k swapped tv1 ty2
-  = do { dflags  <- getDynFlags
-       ; cur_lvl <- getTcLevel
-       ; go dflags cur_lvl }
+uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
+  = do { cur_lvl <- getTcLevel
+       ; go cur_lvl }
   where
-    go dflags cur_lvl
+    go cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+      , Just ty2' <- metaTyVarUpdateOK can_unify_poly_tv tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -2249,8 +2198,8 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 -- Check whether
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
-occCheckForErrors dflags tv ty
-  = case preCheck dflags True tv ty of
+occCheckForErrors _dflags tv ty
+  = case preCheck True True tv ty of
       MTVU_OK _   -> MTVU_OK ()
       MTVU_Bad    -> MTVU_Bad
       MTVU_Occurs -> case occCheckExpand [tv] ty of
@@ -2258,7 +2207,7 @@ occCheckForErrors dflags tv ty
                        Just _  -> MTVU_OK ()
 
 ----------------
-metaTyVarUpdateOK :: DynFlags
+metaTyVarUpdateOK :: Bool                -- are polytypes allowed
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> Maybe TcType        -- possibly-expanded ty
@@ -2285,15 +2234,15 @@ metaTyVarUpdateOK :: DynFlags
 --
 -- See Note [Refactoring hazard: checkTauTvUpdate]
 
-metaTyVarUpdateOK dflags tv ty
-  = case preCheck dflags False tv ty of
+metaTyVarUpdateOK can_unify_poly_tv tv ty
+  = case preCheck False can_unify_poly_tv tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
       MTVU_OK _   -> Just ty
       MTVU_Bad    -> Nothing  -- forall, predicate, or type function
       MTVU_Occurs -> occCheckExpand [tv] ty
 
-preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+preCheck :: Bool -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- A quick check for
 --   (a) a forall type (unless -XImpredicativeTypes)
 --   (b) a predicate type (unless -XImpredicativeTypes)
@@ -2304,11 +2253,11 @@ preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- inside the kinds of variables it mentions.  But for (c) we do
 -- look in the kinds of course.
 
-preCheck dflags ty_fam_ok tv ty
+preCheck ty_fam_ok can_unify_poly_tv tv ty
   = fast_check ty
   where
     details          = tcTyVarDetails tv
-    impredicative_ok = canUnifyWithPolyType dflags details
+    impredicative_ok = canUnifyWithPolyType details can_unify_poly_tv
 
     ok :: MetaTyVarUpdateResult ()
     ok = MTVU_OK ()
@@ -2356,10 +2305,10 @@ preCheck dflags ty_fam_ok tv ty
       | not (ty_fam_ok        || isFamFreeTyCon tc) = True
       | otherwise                                   = False
 
-canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
-canUnifyWithPolyType dflags details
+canUnifyWithPolyType :: TcTyVarDetails -> Bool -> Bool
+canUnifyWithPolyType details can_unify_poly_tv
   = case details of
       MetaTv { mtv_info = TyVarTv }    -> False
-      MetaTv { mtv_info = TauTv }      -> xopt LangExt.ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv }      -> can_unify_poly_tv -- xopt LangExt.ImpredicativeTypes dflags
       _other                           -> True
           -- We can have non-meta tyvars in given constraints

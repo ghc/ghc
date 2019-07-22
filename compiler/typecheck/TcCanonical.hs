@@ -2019,8 +2019,8 @@ canEqTyVar2 :: DynFlags
 -- LHS is an inert type variable,
 -- and RHS is fully rewritten, but with type synonyms
 -- preserved as much as possible
-canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
-  | Just rhs' <- metaTyVarUpdateOK dflags tv1 rhs  -- No occurs check
+canEqTyVar2 _dflags ev eq_rel swapped tv1 rhs
+  | Just rhs' <- metaTyVarUpdateOK False tv1 rhs  -- No occurs check
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...)
      -- #12593
