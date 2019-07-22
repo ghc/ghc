@@ -19,7 +19,7 @@ import ConLike
 import DataCon
 import TysWiredIn
 import Outputable
-import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Reader
 import Maybes
 import Data.List.NonEmpty (toList)
 
@@ -41,12 +41,14 @@ import TmOracle
 -- additional elements are indicated by "...".
 pprUncovered :: ([PmExpr], TmState) -> SDoc
 pprUncovered (expr_vec, tm_cs)
-  | null cs   = fsep vec -- there are no literal constraints
-  | otherwise = hang (fsep vec) 4 $
-                  text "where" <+> vcat (map pprRefutableShapes cs)
+  | isNullUDFM refuts = fsep vec -- there are no refutations
+  | otherwise         = hang (fsep vec) 4 $
+                          text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
-    (vec,cs) = runPmPpr sdoc_vec (prettifyRefuts tm_cs)
+    fvs      = unionNameSets (map pmExprFVs expr_vec)
+    refuts   = prettifyRefuts fvs tm_cs
+    vec      = runPmPpr sdoc_vec refuts
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
@@ -89,8 +91,11 @@ Check.hs) to be more precise.
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: TmState -> DNameEnv (SDoc, [PmAltCon])
-prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList . wrapUpRefutableShapes
+prettifyRefuts :: UniqSet Name -> TmState -> DNameEnv (SDoc, [PmAltCon])
+prettifyRefuts fvs
+  = listToUDFM . zipWith rename nameList
+  . filter ((`elemUniqSet_Directly` fvs) . fst) . udfmToList
+  . wrapUpRefutableShapes
   where
     rename new (old, ncons) = (old, (new, ncons))
     -- Try nice names p,q,r,s,t before using the (ugly) t_i
@@ -98,24 +103,14 @@ prettifyRefuts = listToUDFM . zipWith rename nameList . udfmToList . wrapUpRefut
     nameList = map text ["p","q","r","s","t"] ++
                  [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
-type PmPprM a = State (DNameEnv (SDoc, [PmAltCon]), NameSet) a
--- (the first part of the state is read only. make it a reader?)
+type PmPprM a = Reader (DNameEnv (SDoc, [PmAltCon])) a
 
-runPmPpr :: PmPprM a -> DNameEnv (SDoc, [PmAltCon]) -> (a, [(SDoc,[PmAltCon])])
-runPmPpr m lit_env = (result, mapMaybe is_used (udfmToList lit_env))
-  where
-    (result, (_lit_env, used)) = runState m (lit_env, emptyNameSet)
-
-    is_used (k,v)
-      | elemUniqSet_Directly k used = Just v
-      | otherwise                   = Nothing
-
-addUsed :: Name -> PmPprM ()
-addUsed x = modify (\(negated, used) -> (negated, extendNameSet used x))
+runPmPpr :: PmPprM a -> DNameEnv (SDoc, [PmAltCon]) -> a
+runPmPpr = runReader
 
 checkNegation :: Name -> PmPprM (Maybe SDoc) -- the clean name if it is negated
 checkNegation x = do
-  negated <- gets fst
+  negated <- ask
   return $ case lookupDNameEnv negated x of
     Just (new, _) -> Just new
     Nothing       -> Nothing
@@ -124,11 +119,7 @@ checkNegation x = do
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
 pprPmExpr :: PmExpr -> PmPprM SDoc
-pprPmExpr (PmExprVar x) = do
-  mb_name <- checkNegation x
-  case mb_name of
-    Just name -> addUsed x >> return name
-    Nothing   -> return underscore
+pprPmExpr (PmExprVar x)        = fromMaybe underscore <$> checkNegation x
 pprPmExpr (PmExprCon con args) = pprPmExprCon con args
 pprPmExpr (PmExprOther _)      = return underscore -- don't show
 

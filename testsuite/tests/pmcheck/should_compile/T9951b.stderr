@@ -3,8 +3,8 @@ T9951b.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
-            ('a':'b':_:_)
+            ('a':'b':p) where p is not one of {[]}
             ('a':p:_) where p is not one of {'b'}
-            ['a']
+            ('a':p) where p is not one of {:}
             (p:_) where p is not one of {'a'}
             ...

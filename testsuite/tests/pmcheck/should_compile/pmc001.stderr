@@ -3,14 +3,14 @@ pmc001.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
         Patterns not matched:
-            MkT1 MkT3
-            (MkT2 _) MkT3
-            MkT3 q where q is not one of {MkT3}
+            MkT1 p where p is not one of {MkT1, MkT2}
+            (MkT2 _) p where p is not one of {MkT2, MkT1}
+            MkT3 p where p is not one of {MkT3}
 
 pmc001.hs:19:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
         Patterns not matched:
-            MkT1 MkT3
-            (MkT2 _) MkT3
-            MkT3 q where q is not one of {MkT3}
+            MkT1 p where p is not one of {MkT1, MkT2}
+            (MkT2 _) p where p is not one of {MkT2, MkT1}
+            MkT3 p where p is not one of {MkT3}
