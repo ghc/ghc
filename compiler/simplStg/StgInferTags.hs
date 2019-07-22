@@ -635,7 +635,8 @@ instance Uniquable NodeId where
 instance Uniquable FlowNode where
     getUnique = getUnique . node_id
 
-
+-- TODO: The UniqSupply is only used during creation of the data flow nodes
+--       so could be pulled out if performance becomes an issue.
 data FlowState
     = FlowState
     { fs_us :: !UniqSupply
@@ -760,13 +761,13 @@ getConArgNodeId ctxt (StgVarArg v )
     | otherwise
     = mkIdNodeId ctxt v
 
--- TODO: node_done can be removed, and replaced with a lookup
--- in the set of done nodes.
+-- TODO: We could put the result into it's own map of NodeId -> EnterLattice
+--       or even an array. But that complicates the code somewhat and performance
+--       doesn't seem to be an issue currently.
 data FlowNode
     = FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId    -- ^ Node id
     , node_inputs :: [NodeId]               -- ^ Input dependencies
-    -- , node_done :: !Bool                    -- ^ Do no longer update this node
     , node_result :: !(EnterLattice)        -- ^ Cached result
     , node_update :: (AM EnterLattice)      -- ^ Calculates a new value for the node
                                             -- AND updates the value in the environment.
@@ -1071,8 +1072,6 @@ mkUniqueId = NodeId <$> getUniqueM
 
 -- | This adds nodes with information we can figure out about imported ids into the env.
 --   Mimics somewhat what we do in StgCmmClosure.hs:mkLFImported
---   It's helpful to think about this adding the semantics as if the imported ID
---   was defined as an top level binding.
 addImportedNode :: Module -> Id -> AM ()
 addImportedNode this_mod id
     -- Local id, it has to be mapped to an id via SynContext
@@ -1168,10 +1167,14 @@ nodesBind this_mod ctxt top lne (StgRec binds) = do
     rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' top )) binds
     return $! (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
 
--- TODO: If we have a recursive let, but non of the recursive ids are in strict fields
---       we and should can still tag the resulting let.
+
 
 {-
+TODO: If we have a recursive let, but non of the recursive ids are in strict fields
+      we and should can still tag the resulting let.
+
+    For example:
+
     data Foo a = Foo Foo !a
     ...
     let x = Foo y bla
@@ -1329,6 +1332,57 @@ nodeExpr _ _ctxt  (StgLit lit)              = return $! (StgLit lit, litNodeId)
 nodeExpr _ _ctxt  (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty, topNodeId)
 nodeExpr _ _ctxt  (StgLam {})               = error "Invariant violated: No lambdas in STG representation."
 
+{-  Note [Case Data Flow Nodes]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Case expressions result in a few control flow nodes.
+
+Information between the different nodes for a case expression
+is best shown by example:
+
+    case e1 of bndr
+    {   C1 f1 f2 -> alt1;
+        C2 -> alt2; }
+
+This result in data flow nodes and data flow between them
+as shown below.
+
+                              Always NoEnter
++-----------+                   +--------+
+| Scrutinee +---- fieldInfo --->+  bndr  |
++-----+-----+                   +--------+
+      |
+      +
+  fieldInfo
+      +     bind field info
+      |      to alt bndrs
+      v          |
+      |    +-----------+         +--------+
+      |    |           |         |        |
+      +--->+  f1  f2   +-------->+  Alt1  +---------+
+      |    |           |         |        |         |
+      |    +-----------+         +--------+         v           +-----------+
+      |                              |        +----+----+       |           |
+      v                    result of alt rhs  | Combine +------>+ Case Node |
+      |                              |        +----+----+       |           |
+      |                          +--------+        ^            +-----------+
+      |                          |        |        |
+      +--------->------->------->+  Alt2  +--------+
+                                 |        |
+                                 +--------+
+
+This behaves mostly as expected.
+A noteworthy detail is that for any alt binder coming out of a strict field
+we set enterInfo to NeverEnter.
+This is useful as it allows avoiding enter code for these bindings even when
+the scrutinee is opaque to our analysis, like for example mutual recursive
+functions.
+
+How branches are combined is explained in Note [The lattice element combinators].
+
+-}
+
+-- See Note [Case Data Flow Node]
 nodeCase :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeCase this_mod ctxt (StgCase scrut bndr alt_type alts) = do
     (scrut',scrutNodeId) <- nodeExpr this_mod (CCaseScrut:ctxt) scrut
@@ -1365,8 +1419,6 @@ nodeCaseBndr scrutNodeId _bndr = do
                     updateNodeResult bndrNodeId result
             return $! result
 
-
--- TODO: Shadowing is possible here for the alt bndrs
 nodeAlt :: HasDebugCallStack => Module -> [SynContext] -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
 nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
   | otherwise = do
@@ -1445,6 +1497,33 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
 -- of binding ids to node ids, however we use different
 -- constructors in order to be able to differentiate between tail
 -- call branches and regular references to an id.
+-- See Note [Recursive Functions] for the details.
+
+{-  Note [Let Data Flow]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This is rather simple:
+We bind the result of the RHS to the variable which binds the rhs.
+This can be referenced from the body or the rhs itself
+for let recs. The overall result of the let expression
+is the result of the body.
+
+        +-------+
+    +-> +  rhs  |
+    |   +---+---+
+            |
+    ^       | result available
+            | via the bindings id
+    |       v
+        +---+----+
+    +-- +  var   |
+        +---+----+
+            v
+        +---+----+    +----------+
+        |  body  | == | let node |
+        +--------+    +----------+
+
+-}
 
 
 nodeLet :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)

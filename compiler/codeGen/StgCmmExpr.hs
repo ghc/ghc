@@ -857,9 +857,6 @@ cgIdApp strict fun_id args = do
         -- A value in WHNF, but determined by StgCSR.
         -- See Note [CSR for Stg]
         retKind
-          -- | isWHNF && isVoidTy (idType fun_id) ->
-            -- pprTrace "WHNFv:" (ppr fun_id) $
-          --   emitReturn []
           | isWHNF && not (isVoidTy (idType fun_id))
           -- , not profiling
           -> do
@@ -868,7 +865,7 @@ cgIdApp strict fun_id args = do
             -- (emitTagTrap fun_id fun True)
 
             tickyTagged
-            -- pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
+            pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
             emitReturn [fun]
 
         EnterIt untagged -> ASSERT( null args )  -- Discarding arguments
