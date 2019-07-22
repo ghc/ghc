@@ -6,7 +6,8 @@ completesig06.hs:13:1: warning: [-Wincomplete-patterns (in -Wextra)]
 
 completesig06.hs:16:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘m2’: Patterns not matched: A
+    In an equation for ‘m2’:
+        Patterns not matched: p where p is not one of {B, C}
 
 completesig06.hs:20:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -17,8 +18,8 @@ completesig06.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘m4’:
         Patterns not matched:
-            A D
-            B D
+            A p where p is not one of {E, F}
+            B p where p is not one of {F, E}
 
 completesig06.hs:29:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
