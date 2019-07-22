@@ -3277,6 +3277,15 @@ primop  UnpackClosureOp "unpackClosure#" GenPrimOp
    with
    out_of_line = True
 
+primop  UnpackClosureWOp "unpackClosureW#" GenPrimOp
+   a -> (# Addr#, ByteArray#, ByteArray# #)
+   { {\tt unpackClosure\# closure} copies the closure and pointers in the
+     payload of the given closure into two new arrays, and returns a pointer to
+     the first word of the closure's info table, a non-pointer array for the raw
+     bytes of the closure, and a pointer array for the pointers in the payload. }
+   with
+   out_of_line = True
+
 primop  ClosureSizeOp "closureSize#" GenPrimOp
    a -> Int#
    { {\tt closureSize\# closure} returns the size of the given closure in

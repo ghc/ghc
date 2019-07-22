@@ -84,6 +84,7 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
     StgClosure **end;
     const StgInfoTable *info = get_itbl(closure);
     StgWord nptrs = 0;
+    StgWord i;
 
     switch (info->type) {
         case INVALID_OBJECT:
@@ -240,17 +241,17 @@ StgArrBytes *heap_view_closurePtrsAsWords(Capability *cap, StgClosure *closure) 
     // the closure and then we can allocate space on the heap and copy them
     // there
     StgClosure *ptrs[size];
-    StgWord nptrs = collect_pointers(closure, ptrs, size);
+    StgWord nptrs = collect_pointers(closure, size, ptrs);
 
     size = nptrs + mutArrPtrsCardTableSize(nptrs);
     StgArrBytes *arr =
         (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + size);
     TICK_ALLOC_PRIM(sizeofW(StgArrBytes), nptrs, 0);
-    SET_HDR(arr, &stg_ARR_BYTES_info, cap->r.rCCCS);
+    SET_HDR(arr, &stg_ARR_WORDS_info, cap->r.rCCCS);
     arr->bytes = sizeof(StgWord) * nptrs;
 
     for (StgWord i = 0; i<nptrs; i++) {
-        arr->payload[i] = ptrs[i];
+        arr->payload[i] = (StgWord)ptrs[i];
     }
 
     return arr;
@@ -266,7 +267,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     // the closure and then we can allocate space on the heap and copy them
     // there
     StgClosure *ptrs[size];
-    StgWord nptrs = collect_pointers(closure, ptrs, size);
+    StgWord nptrs = collect_pointers(closure, size, ptrs);
 
     size = nptrs + mutArrPtrsCardTableSize(nptrs);
     StgMutArrPtrs *arr =

@@ -2034,6 +2034,49 @@ stg_mkApUpd0zh ( P_ bco )
     return (ap);
 }
 
+stg_unpackClosureWzh ( P_ closure )
+{
+    W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
+    info  = %GET_STD_INFO(UNTAG(closure));
+    prim_read_barrier;
+
+    ptrs  = TO_W_(%INFO_PTRS(info));
+    nptrs = TO_W_(%INFO_NPTRS(info));
+
+    W_ clos;
+    clos = UNTAG(closure);
+
+    W_ len;
+    // The array returned is the raw data for the entire closure.
+    // The length is variable based upon the closure type, ptrs, and non-ptrs
+    (len) = foreign "C" heap_view_closureSize(clos "ptr");
+
+    W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
+    dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
+
+    ALLOC_PRIM_P (dat_arr_sz, stg_unpackClosurezh, closure);
+
+    dat_arr = Hp - dat_arr_sz + WDS(1);
+
+
+    SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(dat_arr) = WDS(len);
+    p = 0;
+for:
+    if(p < len) {
+         W_[BYTE_ARR_CTS(dat_arr) + WDS(p)] = W_[clos + WDS(p)];
+         p = p + 1;
+         goto for;
+    }
+
+    W_ ptrArray;
+
+    // Follow the pointers
+    ("ptr" ptrArray) = foreign "C" heap_view_closurePtrsAsWords(MyCapability() "ptr", clos "ptr");
+
+    return (info, dat_arr, ptrArray);
+}
+
 stg_unpackClosurezh ( P_ closure )
 {
     W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
