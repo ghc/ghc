@@ -146,7 +146,7 @@ cprTransform :: AnalEnv         -- ^ The analysis environment
              -> Id              -- ^ The function
              -> CprType         -- ^ The demand type of the function
 cprTransform env id
-  = pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
     sig
   where
     sig
