@@ -377,32 +377,21 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
            -- have a quick look at the result type
-       ; dflags <- getDynFlags
-       ; arg2_sigma'
-           <- if xopt LangExt.ImpredicativeTypes dflags 
-                 then do { let res_subst = case res_ty of 
-                                             Check res_ty'
-                                               -> tcGuardedSubsumption op_res_ty res_ty'
-                                             _ -> emptyTCvSubst
-                         ; forM_ (tyCoVarsOfTypesList [op_res_ty]) $ \v ->
-                             let v' = mkTyVarTy v
-                             in unifyType Nothing v' (substTyAddInScope res_subst v')
-                         ; zonkTcType arg2_sigma
-                         }
-                 else return arg2_sigma
+       ; op_res_ty' <- tcPerformQuickLook orig1 (op_res_ty, res_ty) [] []
+       ; arg2_sigma' <- zonkTcType arg2_sigma
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
-
+       
        ; arg2' <- tcArg op arg2 arg2_sigma' 2
 
        -- Make sure that the argument type has kind '*'
        --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
        -- Eg we do not want to allow  (D#  $  4.0#)   #5570
        --    (which gives a seg fault)
-       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma))
-                        (tcTypeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy arg2_sigma'))
+                        (tcTypeKind arg2_sigma') liftedTypeKind
            -- Ignore the evidence. arg2_sigma must have type * or #,
            -- because we know (arg2_sigma -> op_res_ty) is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -413,9 +402,9 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        -- have any kind (#8739), so we don't need to check anything for that
 
        ; op_id  <- tcLookupId op_name
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep op_res_ty
-                                               , arg2_sigma
-                                               , op_res_ty])
+       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep op_res_ty'
+                                               , arg2_sigma'
+                                               , op_res_ty'])
                                    (HsVar noExtField (L lv op_id)))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
@@ -423,7 +412,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
              expr' = OpApp fix (mkLHsWrap wrap_arg1 arg1') op' arg2'
 
-       ; tcWrapResult expr expr' op_res_ty res_ty }
+       ; tcWrapResult expr expr' op_res_ty' res_ty }
 
   | (L loc (HsRecFld _ (Ambiguous _ lbl))) <- op
   , Just sig_ty <- obviousSig (unLoc arg1)
@@ -1294,19 +1283,9 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
            IFR_BadVTA ty arg
              -> ty_app_err ty arg
            IFR_OK arg_tys act_res_ty wrapper
-             -> do { -- perform quick look if ImpredicativeTypes is on
-                     dflags <- getDynFlags
-                   ; act_res_ty'
-                       <- if xopt LangExt.ImpredicativeTypes dflags
-                             then do { (ql_subst, ql_vars)
-                                         <- discardConstraints $
-                                              tcQuickLooks (act_res_ty, exp_res_ty)
-                                                            orig_args arg_tys
-                                     ; forM_ ql_vars $ \v ->
-                                         uTryFillPoly fun_orig v (substTyAddInScope ql_subst (mkTyVarTy v))
-                                     ; traceTc "quickLook" (ppr ql_subst)
-                                     ; zonkTcType act_res_ty }
-                             else return act_res_ty
+             -> do { act_res_ty' <- tcPerformQuickLook fun_orig
+                                                       (act_res_ty, exp_res_ty)
+                                                       orig_args arg_tys
                    ; out_args <- tc_args 1 orig_args arg_tys
                    ; return (wrapper, out_args, act_res_ty')
                    }
@@ -1429,7 +1408,25 @@ tcInstantiateFun defer_arrow fun fun_ty fun_orig orig_args herald
         doc = text "When checking the" <+> speakNth n <+>
               text "argument to" <+> quotes (ppr fun)
 
-tcQuickLooks :: (TcSigmaType, ExpRhoType)        -- ^ Result types
+tcPerformQuickLook :: CtOrigin
+                   -> (TcRhoType, ExpRhoType)  -- ^ Result types
+                   -> [LHsExprArgIn]           -- ^ arguments
+                   -> [TcSigmaType]            -- ^ and their types
+                   -> TcM TcRhoType
+tcPerformQuickLook orig (act_res_ty, exp_res_ty) args arg_tys
+  = do { dflags <- getDynFlags
+         -- only perform quick look if ImpredicativeTypes is on
+       ; if xopt LangExt.ImpredicativeTypes dflags
+            then do { (ql_subst, ql_vars)
+                        <- discardConstraints $
+                             tcQuickLooks (act_res_ty, exp_res_ty) args arg_tys
+                    ; forM_ ql_vars $ \v ->
+                        uTryFillPoly orig v (substTyAddInScope ql_subst (mkTyVarTy v))
+                    ; traceTc "tcPerformQuickLook" (ppr ql_subst)
+                    ; zonkTcType act_res_ty }
+            else return act_res_ty }
+
+tcQuickLooks :: (TcRhoType, ExpRhoType)        -- ^ Result types
              -> [LHsExprArgIn]                   -- ^ arguments
              -> [TcSigmaType]                    -- ^ and their types
              -> TcM (TCvSubst, [TcTyVar])
@@ -1503,12 +1500,13 @@ tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
   = do { (_, fun_ty) <- tcInferId fun_id
        ; ifr <- tcInstantiateFun IFA_DoNotDefer e fun_ty (lexprCtOrigin e) args underscore
        ; case ifr of
-           IFR_BadVTA _ _
-             -> return (mkEmptyTCvSubst emptyInScopeSet)
            IFR_OK arg_tys act_res_ty _
-             -> fmap fst (tcQuickLooks (act_res_ty, Check ty) args arg_tys)
+             -> do { (subst, _) <- tcQuickLooks (act_res_ty, Check ty) args arg_tys
+                   ; traceTc "tcQuickLook/OK" (ppr subst)
+                   ; return subst }
            -- if there is any problem, just return empty substitution
-           _ -> return (mkEmptyTCvSubst emptyInScopeSet) }
+           _ -> do { traceTc "tcQuickLook/Bad" (ppr fun_ty)
+                   ; return (mkEmptyTCvSubst emptyInScopeSet) } }
 
 -- Do not look in any other case
 tcQuickLook _ _ _
@@ -1520,7 +1518,7 @@ tcGuardedSubsumption ty1 ty2
   = tcGuardedSubsumption ty1' ty2
   | Just ty2' <- tcView ty2
   = tcGuardedSubsumption ty1 ty2'
-  | tcIsGuardedType ty2  -- it is OK if ty1 is a variable
+  | tcIsGuardedType ty1 || tcIsGuardedType ty2
   = case tcUnifyTyKis bind_flag [ty1] [ty2] of
       Just subst -> subst
       Nothing    -> emptyTCvSubst
@@ -1931,10 +1929,14 @@ CLong, as it should.
 tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
-       ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
-                                                          actual_res_ty res_ty }
+       ; (wrap, actual_rho_ty) <- topInstantiate (OccurrenceOf name) actual_res_ty
+       ; actual_rho_ty' <- tcPerformQuickLook id_orig (actual_rho_ty, res_ty) [] []
+       ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr actual_rho_ty', ppr res_ty])
+       ; expr' <- addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
+                  tcWrapResultO id_orig (HsVar noExtField (noLoc name)) expr actual_rho_ty' res_ty
+       ; return (mkHsWrap wrap expr') }
+  where
+    id_orig = OccurrenceOf name
 
 tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty
