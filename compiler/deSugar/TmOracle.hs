@@ -2,7 +2,7 @@
 Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE CPP, LambdaCase, PatternSynonyms, ViewPatterns #-}
 
 -- | The term equality oracle. The main export of the module are the functions
 -- 'tmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
@@ -14,7 +14,7 @@ module TmOracle (
         -- the term oracle
         tmOracle, TmState, initialTmState,
         solveOneEq, extendSubst, canDiverge,
-        tryAddRefutableAltCon,
+        tryAddRefutableAltCon, suggestPossibleConLike,
 
         -- misc.
         wrapUpRefutableShapes, exprDeepLookup
@@ -26,6 +26,7 @@ import GhcPrelude
 
 import PmExpr
 
+import BasicTypes
 import Util
 import Id
 import Name
@@ -35,8 +36,9 @@ import ListSetOps (unionLists)
 import Maybes
 import Outputable
 import ConLike
-
-import Data.List (delete)
+import IncompleteMatches
+import Type
+import DsMonad
 
 {-
 %************************************************************************
@@ -104,20 +106,8 @@ data VarInfo
 
 data PossibleShape
   = Rigid !PmExpr
-  | CompleteSets ![[ConLike]]
+  | CompleteSets !IncompleteMatches
   | NoInfoYet
-
-isSolved :: PossibleShape -> Maybe (PmAltCon, [PmExpr])
-isSolved (Rigid (PmExprCon alt args)) = Just (alt, args)
-isSolved _                            = Nothing
-
-pattern Solved :: PmAltCon -> [PmExpr] -> PossibleShape
-pattern Solved alt args <- (isSolved -> Just (alt, args))
-
-pattern NotSolvedYet :: PossibleShape
-pattern NotSolvedYet <- (isSolved -> Nothing)
-{-# COMPLETE Solved, NotSolvedYet #-}
-{-# COMPLETE Rigid, NotSolvedYet #-} -- These overlap, even
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,11 +175,14 @@ canDiverge x ts
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI NotSolvedYet [] <- snd (lookupVarInfo ts x)
+  | VI pos [] <- snd (lookupVarInfo ts x), not_solved_yet pos
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
   | otherwise = False
+  where
+    not_solved_yet (Rigid PmExprCon{}) = False
+    not_solved_yet _                   = True
 
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
@@ -207,37 +200,59 @@ exprToAlt :: PmExpr -> Maybe PmAltCon
 exprToAlt (PmExprCon c _) = Just c
 exprToAlt _               = Nothing
 
+-- This is the only actual 'DsM' side-effect in the entire module
+initIncompleteMatches :: Type -> PossibleShape -> DsM PossibleShape
+initIncompleteMatches ty NoInfoYet = initIM ty >>= \case
+  Nothing -> pure NoInfoYet
+  Just im -> pure (CompleteSets im)
+initIncompleteMatches _  pos       = pure pos
+
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
-tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> Maybe TmState
-tryAddRefutableAltCon original@(TS env) x nalt
-  = case pos of
-      -- We have to take care to preserve Note [The Pos/Neg invariant]
-      NotSolvedYet -> Just extended   -- Not solved yet
-      Solved alt _ ->                 -- We have a solution
-        case decEqPmAltCon alt nalt of
-          Just True  -> Nothing       -- ... which is contradictory
-          Just False -> Just original -- ... which is compatible, rendering the
-                                      --     refutation redundant
-          Nothing    -> Just extended -- ... which is incomparable, so might
-                                      --     refute later
+tryAddRefutableAltCon :: TmState -> Name -> Type -> PmAltCon -> DsM (Maybe TmState)
+tryAddRefutableAltCon ts@(TS env) x ty nalt = do
+  pos' <- initIncompleteMatches ty pos
+  pure (TS . extendDNameEnv env y <$> go pos')
   where
-    (y, VI pos neg) = lookupVarInfo original (idName x)
+    (y, VI pos neg) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
-    pos' = deletePossiblePmAltCon nalt pos
-    extended = TS (extendDNameEnv env y (VI pos' neg'))
+
+    go NoInfoYet = Just (VI NoInfoYet neg')
+    go pos@(CompleteSets im) =
+      case nalt of
+        PmAltConLike cl
+          | let im' = markMatchedIM cl im, isJust (unmatchedConLikeIM im')
+          -> Just (VI (CompleteSets im') neg')
+          | otherwise
+          -> Nothing
+        _ -> Just (VI pos neg')
+    go pos@(Rigid (exprToAlt -> Just alt)) =
+      -- We have to take care to preserve Note [The Pos/Neg invariant]
+      case decEqPmAltCon alt nalt of      -- We have a solution
+        Just True  -> Nothing             -- ... that is contradictory
+        Just False -> Just (VI pos neg)   -- ... that is compatible, rendering
+                                          --     the refutation redundant
+        Nothing    -> Just (VI pos neg')  -- ... which is incomparable, so might
+                                          --     refute later
+    go pos = pure (VI pos neg')
+
+suggestPossibleConLike :: TmState -> Name -> Type -> DsM (Satisfiability TmState ConLike)
+suggestPossibleConLike ts@(TS env) x ty = do
+  let (y, VI pos neg) = lookupVarInfo ts x
+  pos' <- initIncompleteMatches ty pos
+  let ts' = TS (extendDNameEnv env y (VI pos' neg))
+  case pos' of
+    CompleteSets im -> case unmatchedConLikeIM im of
+      Nothing -> pure Unsatisfiable
+      Just cl -> pure (Satisfiable ts' cl)
+    Rigid (exprToAlt -> Just (PmAltConLike cl))
+      -> pure (Satisfiable ts' cl)
+    _ -> pure (PossiblySatisfiable ts')
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
 combineRefutEntries :: [PmAltCon] -> [PmAltCon] -> [PmAltCon]
 combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
-
--- | Deletes a 'PmAltConLike' from 'CompleteSets'.
-deletePossiblePmAltCon :: PmAltCon -> PossibleShape -> PossibleShape
-deletePossiblePmAltCon (PmAltConLike con) (CompleteSets sets)
-  = CompleteSets (map (delete con) sets)
-deletePossiblePmAltCon _                  ps
-  = ps
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
