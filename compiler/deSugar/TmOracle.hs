@@ -368,7 +368,12 @@ exprDeepLookup ts (PmExprVar x)
 exprDeepLookup _   e               = e
 
 wrapUpRefutableShapes :: TmState -> DNameEnv [PmAltCon]
-wrapUpRefutableShapes (TS env) = mapDNameEnv vi_neg env
+wrapUpRefutableShapes ts@(TS env) = mapDNameEnv f env
+  where
+    -- Unfortunate overlap with lookupVarInfo here, because we don't have the
+    -- Name
+    f (VI (Rigid (PmExprVar y)) _) = vi_neg (snd (lookupVarInfo ts y))
+    f (VI _ neg)                   = neg
 
 -- | External interface to the term oracle.
 tmOracle :: TmState -> [TmVarCt] -> Maybe TmState
