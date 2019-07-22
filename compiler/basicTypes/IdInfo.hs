@@ -13,7 +13,8 @@ Haskell. [WDP 94/11])
 
 module IdInfo (
         -- * The IdDetails type
-        IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
+        IdDetails(..), pprIdDetails, coVarDetails,
+        isCoVarDetails, isCoercionHoleDetails,
         JoinArity, isJoinIdDetails_maybe,
         RecSelParent(..),
 
@@ -160,6 +161,7 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
+  | CoercionHoleId
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
        -- Note [Join points] in CoreSyn
 
@@ -185,6 +187,11 @@ isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
 
+-- | Check if an 'IdDetails' says 'CoercionHoleId'.
+isCoercionHoleDetails :: IdDetails -> Bool
+isCoercionHoleDetails CoercionHoleId = True
+isCoercionHoleDetails _              = False
+
 isJoinIdDetails_maybe :: IdDetails -> Maybe JoinArity
 isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity
 isJoinIdDetails_maybe _                   = Nothing
@@ -208,6 +215,7 @@ pprIdDetails other     = brackets (pp other)
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
+   pp CoercionHoleId          = text "CoercionHoleId"
    pp (JoinId arity)          = text "JoinId" <> parens (int arity)
 
 {-

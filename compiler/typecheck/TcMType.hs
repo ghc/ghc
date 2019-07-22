@@ -104,6 +104,7 @@ import Var
 import TcRnMonad        -- TcType, amongst others
 import TcEvidence
 import Id
+import IdInfo (IdDetails(CoercionHoleId))
 import Name
 import VarSet
 import TysWiredIn
@@ -295,9 +296,14 @@ predTypeOccName ty = case classifyPredType ty of
 ************************************************************************
 -}
 
+newCoHoleVar :: TcPredType -> TcRnIf gbl lbl CoVar
+newCoHoleVar ty = do { var <- newEvVar ty
+                     ; return $ setIdDetails var CoercionHoleId
+                     }
+
 newCoercionHole :: TcPredType -> TcM CoercionHole
 newCoercionHole pred_ty
-  = do { co_var <- newEvVar pred_ty
+  = do { co_var <- newCoHoleVar pred_ty
        ; traceTc "New coercion hole:" (ppr co_var)
        ; ref <- newMutVar Nothing
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }

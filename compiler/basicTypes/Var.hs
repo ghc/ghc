@@ -56,7 +56,7 @@ module Var (
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
+        isLocalVar, isLocalId, isCoVar, isCoercionHole, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
@@ -91,7 +91,8 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
-import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
+import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails,
+                                isCoVarDetails, isCoercionHoleDetails,
                                 vanillaIdInfo, pprIdDetails )
 
 import Name hiding (varName)
@@ -725,6 +726,10 @@ isId _       = False
 isCoVar :: Var -> Bool
 isCoVar (Id { id_details = details }) = isCoVarDetails details
 isCoVar _                             = False
+
+isCoercionHole :: Var -> Bool
+isCoercionHole (Id { id_details = details }) = isCoercionHoleDetails details
+isCoercionHole _                             = False
 
 -- | Is this a term variable ('Id') that is /not/ a coercion variable?
 -- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
