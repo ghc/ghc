@@ -1303,8 +1303,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
                                               tcQuickLooks (act_res_ty, exp_res_ty)
                                                             orig_args arg_tys
                                      ; forM_ ql_vars $ \v ->
-                                         let v' = mkTyVarTy v
-                                         in unifyType Nothing v' (substTyAddInScope ql_subst v')
+                                         uTryFillPoly fun_orig v (substTyAddInScope ql_subst (mkTyVarTy v))
                                      ; traceTc "quickLook" (ppr ql_subst)
                                      ; zonkTcType act_res_ty }
                              else return act_res_ty
