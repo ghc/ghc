@@ -1489,28 +1489,46 @@ tcQuickLook (L _ (OpApp _ arg1 op arg2)) args ty
   | otherwise
   = tcQuickLook op (HsValArg arg2 : HsValArg arg1 : args) ty
 
-tcQuickLook e@(L _ (HsVar _ (L _ fun_id))) args ty
+-- We are done accumulating arguments,
+-- now go into the actual rule
+tcQuickLook e args ty
+  = do { m_fun_ty <- tcQuickLookFun e
+       ; case m_fun_ty of
+           Nothing
+             -> return emptyTCvSubst
+           Just fun_ty
+             -> do { ifr <- tcInstantiateFun IFA_DoNotDefer e fun_ty (lexprCtOrigin e) args underscore
+                   ; case ifr of
+                       IFR_OK arg_tys act_res_ty _
+                         -> do { (subst, _) <- tcQuickLooks (act_res_ty, Check ty) args arg_tys
+                               ; traceTc "tcQuickLook/OK" (ppr subst)
+                               ; return subst }
+                       -- if there is any problem, just return empty substitution
+                       _ -> do { traceTc "tcQuickLook/Bad" (ppr fun_ty)
+                               ; return (mkEmptyTCvSubst emptyInScopeSet) } } }
+
+tcQuickLookFun :: LHsExpr GhcRn -> TcM (Maybe TcSigmaType)
+tcQuickLookFun (L _ (HsPar _ e))
+  = tcQuickLookFun e
+tcQuickLookFun (L _ (HsVar _ (L _ fun_id)))
   -- tagToEnum# and 'seq' have special typing rules
   -- do not mess with them in quick look
   | fun_id `hasKey` tagToEnumKey
-  = return emptyTCvSubst
+  = return Nothing
   | fun_id `hasKey` seqIdKey
-  = return emptyTCvSubst
+  = return Nothing
   | otherwise
-  = do { (_, fun_ty) <- tcInferId fun_id
-       ; ifr <- tcInstantiateFun IFA_DoNotDefer e fun_ty (lexprCtOrigin e) args underscore
-       ; case ifr of
-           IFR_OK arg_tys act_res_ty _
-             -> do { (subst, _) <- tcQuickLooks (act_res_ty, Check ty) args arg_tys
-                   ; traceTc "tcQuickLook/OK" (ppr subst)
-                   ; return subst }
-           -- if there is any problem, just return empty substitution
-           _ -> do { traceTc "tcQuickLook/Bad" (ppr fun_ty)
-                   ; return (mkEmptyTCvSubst emptyInScopeSet) } }
-
--- Do not look in any other case
-tcQuickLook _ _ _
-  = return emptyTCvSubst
+  = fmap (Just . snd) (tcInferId fun_id)
+tcQuickLookFun (L _ (ExprWithTySig _ _ sig_ty))
+  = ifErrsM (return Nothing)
+            (do { let loc = getLoc (hsSigWcType sig_ty)
+                ; sig_info <- tcUserTypeSig loc sig_ty Nothing
+                ; case sig_info of
+                    CompleteSig { sig_bndr = poly_id, sig_loc = _ }
+                      -> return (Just (idType poly_id))
+                    _ -> return Nothing })
+tcQuickLookFun _
+  = return Nothing
 
 tcGuardedSubsumption :: TcType -> TcType -> TCvSubst
 tcGuardedSubsumption ty1 ty2
