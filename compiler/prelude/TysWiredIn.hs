@@ -68,7 +68,7 @@ module TysWiredIn (
         justDataCon, justDataConName, promotedJustDataCon,
 
         -- * Tuples
-        mkTupleTy, mkBoxedTupleTy,
+        mkTupleTy, mkTupleTy1, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
@@ -695,9 +695,18 @@ for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data Unit a = Unit a
   data (a,b)  = (a,b)
 
+There is no way to write a boxed one-tuple in Haskell, but it can be
+created in Template Haskell or in, e.g., `deriving` code. There is
+nothing special about one-tuples in Core; in particular, they have no
+custom pretty-printing, just using `Unit`.
+
 NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
 decl in GHC.Classes, so I think this part may not work properly. But
 it's unused I think.
+
+See also Note [Flattening one-tuples] in MkCore and
+Note [Don't flatten tuples from HsSyn] in MkCore.
+
 -}
 
 -- | Built-in syntax isn't "in scope" so these OccNames map to wired-in Names
@@ -1556,15 +1565,24 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 -}
 
 -- | Make a tuple type. The list of types should /not/ include any
--- RuntimeRep specifications.
+-- RuntimeRep specifications. Boxed 1-tuples are flattened.
+-- See Note [One-tuples]
 mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy Boxed   [ty] = ty
-mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
-mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map getRuntimeRep tys ++ tys)
+mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
+
+-- | Make a tuple type. The list of types should /not/ include any
+-- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
+-- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
+-- in MkCore
+mkTupleTy1 :: Boxity -> [Type] -> Type
+mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
+mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
+                                         (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
+-- Flattens 1-tuples. See Note [One-tuples].
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 

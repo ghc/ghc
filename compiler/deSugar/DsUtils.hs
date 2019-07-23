@@ -32,7 +32,7 @@ module DsUtils (
         seqVar,
 
         -- LHs tuples
-        mkLHsVarPatTup, mkLHsPatTup, mkVanillaTuplePat,
+        mkLHsPatTup, mkVanillaTuplePat,
         mkBigLHsVarTupId, mkBigLHsTupId, mkBigLHsVarPatTupId, mkBigLHsPatTupId,
 
         mkSelectorBinds,
@@ -755,9 +755,6 @@ mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = cL (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
-
-mkLHsVarPatTup :: [Id] -> LPat GhcTc
-mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
 mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
