@@ -99,17 +99,26 @@ data TmState = TmS
 -}
 
 newtype TmState = TS (DNameEnv VarInfo)
+  -- Deterministic so that we generate deterministic error messages
 
 data VarInfo
   = VI
-  { vi_pos :: !PossibleShape
-  , vi_neg :: ![PmAltCon]
+  { vi_pos :: !PossibleShape  -- Positive info: things it could be
+  , vi_neg :: ![PmAltCon]     -- Negative info: it is not headed by these AltCons
+      -- Invariant: vi_pos and vi_neg never contradict each other
+
   }
 
 data PossibleShape
   = Rigid !PmExpr
+      -- Get this in the "taken" branch of a pattern match;
+      --   e.g. f x@(Just y) = <rhs>
+      --   In <rhs> we have x ~ Just y
+      -- Usually the PmExpr is: a data con application, literal, or variable
+
   | CompleteSets !IncompleteMatches
-  | NoInfoYet
+
+  | NoInfoYet    -- The type of the variable is not (yet) a data type
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
