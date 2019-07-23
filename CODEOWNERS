@@ -17,6 +17,7 @@
 
 # The compiler
 /compiler/parser/                 @int-index
+/compiler/hsSyn/                  @simonpj @rae
 /compiler/typecheck/              @simonpj @rae
 /compiler/rename/                 @simonpj @rae
 /compiler/types/                  @simonpj @rae
