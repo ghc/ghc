@@ -854,8 +854,8 @@ cgIdApp strict fun_id args = do
           | otherwise                -> emitReturn [fun]
           -- ToDo: does ReturnIt guarantee tagged?
 
-        -- A value in WHNF, but determined by StgCSR.
-        -- See Note [CSR for Stg]
+        -- A value in WHNF, but determined by Tag inference.
+        -- TODO: This is a terrible hack and should be done inside getCallMethod.
         retKind
           | isWHNF && not (isVoidTy (idType fun_id))
           -- , not profiling
