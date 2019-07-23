@@ -13,22 +13,24 @@
 module IOEnv (
         IOEnv, -- Instance of Monad
 
-        -- Monad utilities
+        -- * Monad utilities
         module MonadUtils,
 
-        -- Errors
+        -- * Errors
         failM, failWithM,
         IOEnvFailure(..),
 
-        -- Getting at the environment
+        -- * Getting at the environment
         getEnv, setEnv, updEnv,
 
         runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
 
-        -- I/O operations
+        -- * I/O operations
+        -- | These operations are generally strict to avoid the potential
+        -- for space leaks.
         IORef, newMutVar, readMutVar, writeMutVar, updMutVar,
-        atomicUpdMutVar, atomicUpdMutVar'
+        atomicUpdMutVar'
   ) where
 
 import GhcPrelude
@@ -38,7 +40,7 @@ import Exception
 import Module
 import Panic
 
-import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef',
                           atomicModifyIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
@@ -183,22 +185,20 @@ instance MonadPlus (IOEnv env)
 instance MonadIO (IOEnv env) where
     liftIO io = IOEnv (\ _ -> io)
 
+-- | Strict in initial value.
 newMutVar :: a -> IOEnv env (IORef a)
-newMutVar val = liftIO (newIORef val)
+newMutVar val = liftIO (newIORef $! val)
 
+-- | Strict write.
 writeMutVar :: IORef a -> a -> IOEnv env ()
-writeMutVar var val = liftIO (writeIORef var val)
+writeMutVar var val = liftIO (writeIORef var $! val)
 
 readMutVar :: IORef a -> IOEnv env a
 readMutVar var = liftIO (readIORef var)
 
+-- | Strict update.
 updMutVar :: IORef a -> (a -> a) -> IOEnv env ()
-updMutVar var upd = liftIO (modifyIORef var upd)
-
--- | Atomically update the reference.  Does not force the evaluation of the
--- new variable contents.  For strict update, use 'atomicUpdMutVar''.
-atomicUpdMutVar :: IORef a -> (a -> (a, b)) -> IOEnv env b
-atomicUpdMutVar var upd = liftIO (atomicModifyIORef var upd)
+updMutVar var upd = liftIO (modifyIORef' var upd)
 
 -- | Strict variant of 'atomicUpdMutVar'.
 atomicUpdMutVar' :: IORef a -> (a -> (a, b)) -> IOEnv env b
