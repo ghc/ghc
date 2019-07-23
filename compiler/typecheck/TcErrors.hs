@@ -898,7 +898,9 @@ addDeferredBinding ctxt err ct
              -> addTcEvBind ev_binds_var $ mkWantedEvBind evar err_tm
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
-                     let co_var = coHoleCoVar hole
+                     uniq <- newUnique
+                   ; let co_var = mkLocalCoVar (mkSystemVarName uniq (fsLit "deferred_co"))
+                                               (varType (coHoleCoVar hole))
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
                    ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
 
@@ -1028,6 +1030,10 @@ Instead, we invent a new EvVar, bind it to an error and then make a coercion
 from that EvVar, filling the hole with that coercion. Because coercions'
 types are unlifted, the error is guaranteed to be hit before we get to the
 coercion.
+
+We make a new variable for the coercion so that its IdDetails say that it's
+a CoVar, not a CoercionHole. (This step is very roughly like skolemisation
+of TcTyVars.)
 
 Note [Do not report derived but soluble errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
