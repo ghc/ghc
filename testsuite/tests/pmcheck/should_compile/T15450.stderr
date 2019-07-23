@@ -8,4 +8,5 @@ T15450.hs:6:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 T15450.hs:9:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: False
+    In a case alternative:
+        Patterns not matched: p where p is not one of {True}
