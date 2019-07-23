@@ -4,7 +4,7 @@ DmdAnalGADTs.$tc'A: m
 DmdAnalGADTs.$tc'B: m
 DmdAnalGADTs.$tcD: m
 DmdAnalGADTs.$trModule: m
-DmdAnalGADTs.diverges: b
+DmdAnalGADTs.diverges: bb
 DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>m
 DmdAnalGADTs.g: <S,1*U>
@@ -18,7 +18,7 @@ DmdAnalGADTs.$tc'A: m
 DmdAnalGADTs.$tc'B: m
 DmdAnalGADTs.$tcD: m
 DmdAnalGADTs.$trModule: m
-DmdAnalGADTs.diverges: b
+DmdAnalGADTs.diverges: bb
 DmdAnalGADTs.f: <S,1*U>
 DmdAnalGADTs.f': <S,1*U>m
 DmdAnalGADTs.g: <S,1*U>
