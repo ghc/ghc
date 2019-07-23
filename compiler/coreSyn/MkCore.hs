@@ -21,7 +21,7 @@ module MkCore (
         FloatBind(..), wrapFloat, wrapFloats, floatBindings,
 
         -- * Constructing small tuples
-        mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
+        mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
         mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
@@ -344,12 +344,22 @@ We could do one of two things:
   We use a suffix "1" to indicate this.
 
 Usually we want the former, but occasionally the latter.
--}
 
--- | Build a small tuple holding the specified variables
--- One-tuples are flattened; see Note [Flattening one-tuples]
-mkCoreVarTup :: [Id] -> CoreExpr
-mkCoreVarTup ids = mkCoreTup (map Var ids)
+NB: The logic in tupleDataCon knows about () and Unit and (,), etc.
+
+Note [Don't flatten tuples from HsSyn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we get an explicit 1-tuple from HsSyn somehow (likely: Template Haskell),
+we should treat it really as a 1-tuple, without flattening. Note that a
+1-tuple and a flattened value have different performance and laziness
+characteristics, so should just do what we're asked.
+
+This arose from discussions in #16881.
+
+One-tuples that arise internally depend on the circumstance; often flattening
+is a good idea. Decisions are made on a case-by-case basis.
+
+-}
 
 -- | Build the type of a small tuple that holds the specified variables
 -- One-tuples are flattened; see Note [Flattening one-tuples]
@@ -359,9 +369,14 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 -- | Build a small tuple holding the specified expressions
 -- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
-mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
-mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
+mkCoreTup cs  = mkCoreTup1 cs   -- non-1-tuples are uniform
+
+-- | Build a small tuple holding the specified expressions
+-- One-tuples are *not* flattened; see Note [Flattening one-tuples]
+-- See also Note [Don't flatten tuples from HsSyn]
+mkCoreTup1 :: [CoreExpr] -> CoreExpr
+mkCoreTup1 cs = mkCoreConApps (tupleDataCon Boxed (length cs))
                               (map (Type . exprType) cs ++ cs)
 
 -- | Build a small unboxed tuple holding the specified expressions,
@@ -375,9 +390,9 @@ mkCoreUbxTup tys exps
     mkCoreConApps (tupleDataCon Unboxed (length tys))
              (map (Type . getRuntimeRep) tys ++ map Type tys ++ exps)
 
--- | Make a core tuple of the given boxity
+-- | Make a core tuple of the given boxity; don't flatten 1-tuples
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr
-mkCoreTupBoxity Boxed   exps = mkCoreTup exps
+mkCoreTupBoxity Boxed   exps = mkCoreTup1 exps
 mkCoreTupBoxity Unboxed exps = mkCoreUbxTup (map exprType exps) exps
 
 -- | Build a big tuple holding the specified variables
