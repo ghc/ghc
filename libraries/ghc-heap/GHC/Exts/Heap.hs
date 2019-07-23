@@ -110,7 +110,11 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
 
 getClosureRawW :: a -> IO (Ptr StgInfoTable, [Word], [Word])
 getClosureRawW x = do
+#if MIN_VERSION_ghc_prim(0,6,1)
     case unpackClosureW# x of
+#else
+    case undefined of
+#endif
 -- This is a hack to cover the bootstrap compiler using the old version of
 -- 'unpackClosure'. The new 'unpackClosure' return values are not merely
 -- a reordering, so using the old version would not work.
@@ -282,7 +286,10 @@ getClosureX get_closure_raw x = do
                         ++ "found " ++ show (length rawWds)
             pure $ SmallMutArrClosure itbl (rawWds !! 0) pts
 
-        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY ->
+        t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY -> do
+            unless (length pts >= 1) $
+                fail $ "Expected at least 1 words to MUT_VAR, found "
+                        ++ show (length pts)
             pure $ MutVarClosure itbl (head pts)
 
         t | t == MVAR_CLEAN || t == MVAR_DIRTY -> do
