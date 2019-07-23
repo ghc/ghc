@@ -31,14 +31,14 @@ import Util
 import Id
 import Name
 import NameEnv
-import MonadUtils
 import ListSetOps (unionLists)
 import Maybes
 import Outputable
 import ConLike
 import IncompleteMatches
 import Type
-import DsMonad
+import DsMonad hiding (foldlM)
+import Data.Foldable (foldlM)
 
 import Data.List.NonEmpty (NonEmpty (..))
 
@@ -387,7 +387,7 @@ wrapUpRefutableShapes ts@(TS env) = filterDNameEnv notNull (mapDNameEnv f env)
     f (VI _ neg)                   = neg
 
 -- | External interface to the term oracle.
-tmOracle :: TmState -> [TmVarCt] -> Maybe TmState
+tmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
 tmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
 
 {- Note [Refutable shapes]
