@@ -12,7 +12,6 @@ variables:
   GIT_DEPTH: 0
 
 before_script:
-  - python3 .gitlab/fix-submodules.py
   - git submodule sync --recursive
   - git submodule update --init --recursive
   - git checkout .gitmodules
@@ -217,7 +216,6 @@ validate-x86_64-linux-deb9-hadrian:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -232,7 +230,6 @@ hadrian-ghc-in-ghci:
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
-    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -313,7 +310,6 @@ validate-x86_64-darwin:
     TEST_ENV: "x86_64-darwin"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -347,7 +343,6 @@ validate-x86_64-darwin:
     TEST_ENV: "x86_64-darwin"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -379,7 +374,6 @@ validate-x86_64-darwin:
     - x86_64-linux
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
-    - python3 .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
@@ -684,7 +678,6 @@ validate-x86_64-linux-fedora27:
       set TEMP=%cd%\tmp
 
     - set PATH=C:\msys64\usr\bin;%PATH%
-    - python .gitlab/fix-submodules.py
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
