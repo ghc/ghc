@@ -591,8 +591,9 @@ tc_rn_src_decls ds
                ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
 
                  -- Glue them on the front of the remaining decls and loop
+               ; tcg_env `addTcgDUs` usesOnly splice_fvs
                ; (tcg_env, tcl_env, lie2) <-
-                   setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
+                   setGblEnv tcg_env $
                    tc_rn_src_decls (spliced_decls ++ rest_ds)
 
                ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
@@ -1472,11 +1473,9 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                                       ++ flattenRuleDecls rules
                                  , tcg_anns    = tcg_anns tcg_env ++ annotations
                                  , tcg_ann_env = extendAnnEnvList (tcg_ann_env tcg_env) annotations
-                                 , tcg_fords   = tcg_fords tcg_env ++ foe_decls ++ fi_decls
-                                 , tcg_dus     = tcg_dus tcg_env `plusDU` usesOnly fo_fvs } } ;
-                                 -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
-
+                                 , tcg_fords   = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
         -- See Note [Newtype constructor usage in foreign declarations]
+        addTcgDUs tcg_env' $ usesOnly fo_fvs ;
         addUsedGREs (bagToList fo_gres) ;
 
         return (tcg_env', tcl_env)
@@ -1760,13 +1759,12 @@ check_main dflags tcg_env explicit_mod_hdr
                         mkHsDictLet ev_binds main_expr
               ; main_bind = mkVarBind root_main_id rhs }
 
-        ; return (tcg_env { tcg_main  = Just main_name,
-                            tcg_binds = tcg_binds tcg_env
-                                        `snocBag` main_bind,
-                            tcg_dus   = tcg_dus tcg_env
-                                        `plusDU` usesOnly (unitFV main_name)
+        ; addTcgDUs tcg_env $ usesOnly (unitFV main_name)
                         -- Record the use of 'main', so that we don't
                         -- complain about it being defined but not used
+        ; return (tcg_env { tcg_main  = Just main_name,
+                            tcg_binds = tcg_binds tcg_env
+                                        `snocBag` main_bind
                  })
     }}}
   where

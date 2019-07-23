@@ -189,7 +189,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                       tcg_dependent_files = dependent_files
                     }
   = do
-          let used_names = mkUsedNames tc_result
+          used_names <- mkUsedNames tc_result
           let pluginModules =
                 map lpModule (cachedPlugins (hsc_dflags hsc_env))
           deps <- mkDependencies

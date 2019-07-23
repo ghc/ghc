@@ -556,7 +556,7 @@ data TcGblEnv
           --      (mkIfaceTc, as well as in HscMain)
           --    - To create the Dependencies field in interface (mkDependencies)
 
-        tcg_dus       :: DefUses,   -- ^ What is defined in this module and what is used.
+        tcg_dus       :: TcRef DefUses, -- ^ What is defined in this module and what is used.
         tcg_used_gres :: TcRef [GlobalRdrElt],  -- ^ Records occurrences of imported entities
           -- One entry for each occurrence; but may have different GREs for
           -- the same Name See Note [Tracking unused binding and imports]
@@ -765,6 +765,23 @@ We gather two sorts of usage information
                files (see MkIface.mkUsedNames)
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
+
+   tcg_dus is a TcRef because we update its contents within in the Coercible
+   solver whenever we solve for uses of `coerce`. For instance, in this
+   program (#10347):
+
+       module T10347 (N, mkN) where
+
+       import Data.Coerce
+
+       newtype N a = MkN Int
+
+       mkN :: Int -> N a
+       mkN = coerce
+
+   We wish to record `MkN` as used, since it is (morally) used to perform the
+   coercion in `mkN`. To do so, the Coercible solver updates tcg_dus' TcRef
+   whenever it encounters a use of `coerce` that crosses newtype boundaries.
 
  * tcg_used_gres
       Used only to report unused import declarations

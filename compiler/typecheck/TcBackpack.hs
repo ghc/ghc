@@ -674,6 +674,7 @@ mergeSignatures
         warns | null warn_occs = NoWarnings
               | otherwise = WarnSome $ map (\o -> (o, inheritedSigPvpWarning)) warn_occs
         -}
+    writeMutVar (tcg_dus tcg_env) $ usesOnly (availsToNameSetWithSelectors exports)
     setGblEnv tcg_env {
         -- The top-level GlobalRdrEnv is quite interesting.  It consists
         -- of two components:
@@ -689,7 +690,6 @@ mergeSignatures
         -- rexports are picked up correctly
         tcg_imports = tcg_imports orig_tcg_env,
         tcg_exports = exports,
-        tcg_dus     = usesOnly (availsToNameSetWithSelectors exports),
         tcg_warns   = warns
         } $ do
     tcg_env <- getGblEnv

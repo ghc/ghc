@@ -222,20 +222,20 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                 -- Instance decls may have occurrences of things bound in bind_dus
                 -- so we must put other_fvs last
 
-        final_tcg_env = let tcg_env' = (last_tcg_env `addTcgDUs` src_dus)
-                        in -- we return the deprecs in the env, not in the HsGroup above
-                        tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
+        final_tcg_env = -- we return the deprecs in the env, not in the HsGroup above
+                        last_tcg_env { tcg_warns = tcg_warns last_tcg_env `plusWarns` rn_warns };
        } ;
+   last_tcg_env `addTcgDUs` src_dus ;
    traceRn "finish rnSrc" (ppr rn_group) ;
    traceRn "finish Dus" (ppr src_dus ) ;
    return (final_tcg_env, rn_group)
                     }}}}
 rnSrcDecls (XHsGroup nec) = noExtCon nec
 
-addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
+addTcgDUs :: TcGblEnv -> DefUses -> RnM ()
 -- This function could be defined lower down in the module hierarchy,
 -- but there doesn't seem anywhere very logical to put it.
-addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
+addTcgDUs tcg_env dus = updMutVar (tcg_dus tcg_env) (`plusDU` dus)
 
 rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
 rnList f xs = mapFvRn (wrapLocFstM f) xs

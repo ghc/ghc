@@ -101,8 +101,8 @@ mkDependencies iuid pluginModules
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
 
-mkUsedNames :: TcGblEnv -> NameSet
-mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
+mkUsedNames :: TcGblEnv -> IO NameSet
+mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses <$> readIORef dus
 
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
             -> [(Module, Fingerprint)] -> [ModIface] -> IO [Usage]

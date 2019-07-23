@@ -17,6 +17,7 @@ import TcEnv
 import TcType
 import RnNames
 import RnEnv
+import RnSource
 import RnUnbound ( reportUnboundName )
 import ErrUtils
 import Id
@@ -201,13 +202,12 @@ tcRnExports explicit_mod exports
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
+        ; addTcgDUs tcg_env $ usesOnly final_ns
         ; let new_tcg_env =
                   tcg_env { tcg_exports    = final_avails,
                              tcg_rn_exports = case tcg_rn_exports tcg_env of
                                                 Nothing -> Nothing
-                                                Just _  -> rn_exports,
-                            tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly final_ns }
+                                                Just _  -> rn_exports }
         ; failIfErrsM
         ; return new_tcg_env }
 

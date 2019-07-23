@@ -19,7 +19,7 @@ module TcSMonad (
     nestTcS, nestImplicTcS, setEvBindsTcS,
     checkConstraintsTcS, checkTvConstraintsTcS,
 
-    runTcPluginTcS, addUsedGRE, addUsedGREs,
+    runTcPluginTcS, addUsedGRE, addUsedGREs, addTcgDUs,
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
@@ -134,6 +134,7 @@ import InstEnv
 import FamInst
 import FamInstEnv
 
+import qualified RnSource as TcM ( addTcgDUs )
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
@@ -153,6 +154,7 @@ import TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
 import Name
+import NameSet
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
 import qualified RnEnv as TcM
@@ -3066,6 +3068,8 @@ addUsedGREs gres = wrapTcS  $ TcM.addUsedGREs gres
 addUsedGRE :: Bool -> GlobalRdrElt -> TcS ()
 addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
 
+addTcgDUs :: TcGblEnv -> DefUses -> TcS ()
+addTcgDUs tcg_env dus = wrapTcS $ TcM.addTcgDUs tcg_env dus
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

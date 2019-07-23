@@ -56,6 +56,7 @@ import {-# SOURCE #-} TcSplice
     )
 
 import TcHsSyn
+import OrdList
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
@@ -152,16 +153,18 @@ rn_bracket _ (TypBr x t) = do { (t', fvs) <- rnLHsType TypBrCtx t
 rn_bracket _ (DecBrL x decls)
   = do { group <- groupDecls decls
        ; gbl_env  <- getGblEnv
-       ; let new_gbl_env = gbl_env { tcg_dus = emptyDUs }
+       ; du_var   <- newMutVar nilOL
+       ; let new_gbl_env = gbl_env { tcg_dus = du_var }
                           -- The emptyDUs is so that we just collect uses for this
                           -- group alone in the call to rnSrcDecls below
        ; (tcg_env, group') <- setGblEnv new_gbl_env $
                               rnSrcDecls group
+       ; dus <- readMutVar (tcg_dus tcg_env)
 
               -- Discard the tcg_env; it contains only extra info about fixity
-        ; traceRn "rn_bracket dec" (ppr (tcg_dus tcg_env) $$
-                   ppr (duUses (tcg_dus tcg_env)))
-        ; return (DecBrG x group', duUses (tcg_dus tcg_env)) }
+        ; traceRn "rn_bracket dec" (ppr dus $$
+                   ppr (duUses dus))
+        ; return (DecBrG x group', duUses dus) }
   where
     groupDecls :: [LHsDecl GhcPs] -> RnM (HsGroup GhcPs)
     groupDecls decls

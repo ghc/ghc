@@ -178,6 +178,7 @@ import Annotations
 import BasicTypes( TopLevelFlag )
 import Maybes
 import CostCentreState
+import OrdList
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -212,6 +213,7 @@ initTc :: HscEnv
 initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
  = do { keep_var     <- newIORef emptyNameSet ;
         used_gre_var <- newIORef [] ;
+        du_var       <- newIORef nilOL ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
         th_locs_var  <- newIORef Set.empty ;
@@ -279,7 +281,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
-                tcg_dus            = emptyDUs,
+                tcg_dus            = du_var,
 
                 tcg_rn_imports     = [],
                 tcg_rn_exports     =
