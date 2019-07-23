@@ -2252,7 +2252,11 @@ mkUnmatched x nalt (ValVec vva delta) =
       ensureInhabited (delta {delta_tm_cs = tms}) x >>= \case
         Unsatisfiable              -> pure mempty
         PossiblySatisfiable delta' -> pure (usimple [ValVec (PmVar x:vva) delta'])
-        Satisfiable _ _            -> panic "mkUnmatched" -- kind of embarassing
+#if __GLASGOW_HASKELL__ < 808
+        -- GHC before 8.8 will say that this match is needed, while GHC 8.8
+        -- will correctly flag it as redundant.
+        Satisfiable _ _            -> panic "mkUnmatched"
+#endif
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
