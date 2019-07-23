@@ -393,6 +393,7 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                 -- The reverse is because foldM goes left-to-right
                       (\(lam_vars, args) -> mkCoreLams lam_vars $
                                             mkCoreTupBoxity boxity args) }
+                        -- See Note [Don't flatten tuples from HsSyn] in MkCore
 
 ds_expr _ (ExplicitSum types alt arity expr)
   = do { dsWhenNoErrs (dsLExprNoLP expr)

@@ -110,7 +110,8 @@ hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
 hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
 hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
-hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
+hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
+                  -- See Note [Don't flatten tuples from HsSyn] in MkCore
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
 hsPatType (ConPatOut { pat_con = lcon
                      , pat_arg_tys = tys })

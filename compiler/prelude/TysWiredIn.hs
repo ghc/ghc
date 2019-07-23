@@ -68,7 +68,7 @@ module TysWiredIn (
         justDataCon, justDataConName, promotedJustDataCon,
 
         -- * Tuples
-        mkTupleTy, mkBoxedTupleTy,
+        mkTupleTy, mkTupleTy1, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
@@ -1541,15 +1541,24 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 -}
 
 -- | Make a tuple type. The list of types should /not/ include any
--- RuntimeRep specifications.
+-- RuntimeRep specifications. Boxed 1-tuples are flattened.
+-- See Note [One-tuples] in MkCore
 mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy Boxed   [ty] = ty
-mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
-mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map getRuntimeRep tys ++ tys)
+mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
+
+-- | Make a tuple type. The list of types should /not/ include any
+-- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
+-- See Note [One-tuples] in MkCore and Note [Don't flatten tuples from HsSyn]
+-- in MkCore
+mkTupleTy1 :: Boxity -> [Type] -> Type
+mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
+mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
+                                         (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
+-- Flattens 1-tuples. See Note [One-tuples] in MkCore.
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
