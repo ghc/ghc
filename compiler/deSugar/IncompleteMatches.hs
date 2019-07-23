@@ -18,6 +18,10 @@ import qualified Data.List.NonEmpty as NonEmpty
 type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
 
 newtype IncompleteMatches = IM (NonEmpty ConLikeSet)
+  -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
+  --
+  -- NonEmpty because the empty case would mean that there
+  --   are no matching constructors at all
 
 instance Outputable IncompleteMatches where
   ppr (IM cs) = ppr (NonEmpty.toList cs)

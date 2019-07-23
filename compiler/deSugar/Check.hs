@@ -137,8 +137,8 @@ data ValVec = ValVec [ValAbs] Delta -- ^ Value Vector Abstractions
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints. TODO: Do the same for the type constraints?
-data Delta = MkDelta { delta_ty_cs :: Bag EvVar
-                     , delta_tm_cs :: TmState }
+data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
+                     , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
 
 type ValSetAbs = [ValVec]  -- ^ Value Set Abstractions
 type Uncovered = ValSetAbs
@@ -611,11 +611,19 @@ tmTyCsAreSatisfiable
            _unsat               -> Nothing
 
 ensureInhabited :: Delta -> Id -> PmM (Satisfiability Delta Void)
+-- Given (x :: ty) and Delta (what we know about x),
+--   figure out if anything can match 'x'.
+-- We return a new Delta, logically equivalent to the old Delta,
+--   but perhaps with some work done on it
+-- Monadic because we may need to look up the possible
+--   COMPLETE sets of a data type, and so we can run the
+--   type oracle
 ensureInhabited delta x = find_one_in_each_set delta
   where
+    ty = idType x -- TODO: normalize?
+    nm = idName x
+
     find_one_in_each_set delta = do
-      let ty = idType x -- TODO: normalize?
-      let nm = idName x
       suggestPossibleConLikes (delta_tm_cs delta) nm ty >>= \case
         Unsatisfiable              -> pure Unsatisfiable -- -XEmptyDataDecls
         PossiblySatisfiable tm_cs' -> pure (PossiblySatisfiable delta{ delta_tm_cs = tm_cs' })
