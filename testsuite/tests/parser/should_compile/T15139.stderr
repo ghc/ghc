@@ -1,21 +1,24 @@
 
 T15139.hs:11:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f1’: Patterns not matched: False
+    In an equation for ‘f1’:
+        Patterns not matched: p where p is not one of {True}
    |
 11 | f1 True = case can'tHappen of {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 T15139.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f2’: Patterns not matched: False
+    In an equation for ‘f2’:
+        Patterns not matched: p where p is not one of {True}
    |
 12 | f2 True = case can'tHappen of
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 T15139.hs:13:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘g’: Patterns not matched: False
+    In an equation for ‘g’:
+        Patterns not matched: p where p is not one of {True}
    |
 13 | g  True = case () of () -> True
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
