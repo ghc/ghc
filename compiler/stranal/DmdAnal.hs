@@ -227,9 +227,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isJust (isDataProductTyCon_maybe tycon)
-  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_w_tc                 = env { ae_rec_tc = rec_tc' }
+        env_w_tc                 = env
         env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
         (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
