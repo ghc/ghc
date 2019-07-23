@@ -170,6 +170,7 @@ idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep1 (idType id)
     -- NB: typePrimRep1 fails on unboxed tuples,
     --     but by StgCmm no Ids have unboxed tuple type
+    -- See also Note [VoidRep] in RepType
 
 addIdReps :: [NonVoid Id] -> [NonVoid (PrimRep, Id)]
 addIdReps = map (\id -> let id' = fromNonVoid id

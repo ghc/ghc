@@ -407,6 +407,8 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | FloatRep        -- ^ a 32-bit floating point number
                 | DoubleRep       -- ^ a 64-bit floating point number
 
+-- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
+-- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
 
 -- | Length of a SIMD vector type
