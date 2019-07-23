@@ -390,13 +390,13 @@ checkEmptyCase' var = do
 
     -- A list of inhabitant candidates is available: Check for each
     -- one for the satisfiability of the constraints it gives rise to.
-    Right (_, candidates) -> do
+    Right (_, va, candidates) -> do
       missing_m <- flip mapMaybeM candidates $
           \InhabitationCandidate{ ic_tm_cs = tm_cs
                                 , ic_ty_cs = ty_cs
                                 , ic_strict_arg_tys = strict_arg_tys } -> do
         mb_sat <- pmIsSatisfiable tm_ty_css tm_cs ty_cs strict_arg_tys
-        pure $ fmap (ValVec [var]) mb_sat
+        pure $ fmap (ValVec [va]) mb_sat
       return $ if null missing_m
         then emptyPmResult
         else PmResult [] (UncoveredPatterns missing_m) []
@@ -665,7 +665,7 @@ nonVoid
 nonVoid rec_ts amb_cs strict_arg_ty = do
   mb_cands <- inhabitationCandidates (delta_ty_cs amb_cs) strict_arg_ty
   case mb_cands of
-    Right (tc, cands)
+    Right (tc, _, cands)
       |  Just rec_ts' <- checkRecTc rec_ts tc
       -> anyM (cand_is_inhabitable rec_ts' amb_cs) cands
            -- A strict argument type is inhabitable by a terminating value if
@@ -794,7 +794,7 @@ equalities (such as i ~ Int) that may be in scope.
 -- one accompanied by the term- and type- constraints it gives rise to.
 -- See also Note [Checking EmptyCase Expressions]
 inhabitationCandidates :: Bag EvVar -> Type
-                       -> PmM (Either Type (TyCon, [InhabitationCandidate]))
+                       -> PmM (Either Type (TyCon, ValAbs, [InhabitationCandidate]))
 inhabitationCandidates ty_cs ty = do
   fam_insts   <- dsGetFamInstEnvs
   mb_norm_res <- pmTopNormaliseType_maybe fam_insts ty_cs ty
@@ -814,7 +814,7 @@ inhabitationCandidates ty_cs ty = do
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
     alts_to_check :: Type -> Type -> [DataCon]
-                  -> PmM (Either Type (TyCon, [InhabitationCandidate]))
+                  -> PmM (Either Type (TyCon, ValAbs, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
       Just (tc, _)
         |  tc `elem` trivially_inhabited
@@ -823,7 +823,7 @@ inhabitationCandidates ty_cs ty = do
              (_:_) -> do inner <- mkPmId core_ty
                          let expr = build_tm (idToPmExpr inner) dcs
                          outer <- mkPmId src_ty
-                         return $ Right (tc, [InhabitationCandidate
+                         return $ Right (tc, outer, [InhabitationCandidate
                            { ic_tm_cs = unitBag (TVC outer expr)
                            , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }])
 
@@ -837,7 +837,7 @@ inhabitationCandidates ty_cs ty = do
              outer <- mkPmId src_ty
              let new_tm_ct = TVC outer (build_tm (idToPmExpr inner) dcs)
              let wrap_dcs alt = alt{ ic_tm_cs = new_tm_ct `consBag` ic_tm_cs alt}
-             return $ Right (tc, map wrap_dcs alts)
+             return $ Right (tc, outer, map wrap_dcs alts)
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
 
