@@ -1932,9 +1932,8 @@ tcCheckId name res_ty
        ; (wrap, actual_rho_ty) <- topInstantiate (OccurrenceOf name) actual_res_ty
        ; actual_rho_ty' <- tcPerformQuickLook id_orig (actual_rho_ty, res_ty) [] []
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr actual_rho_ty', ppr res_ty])
-       ; expr' <- addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
-                  tcWrapResultO id_orig (HsVar noExtField (noLoc name)) expr actual_rho_ty' res_ty
-       ; return (mkHsWrap wrap expr') }
+       ; addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
+         tcWrapResultO id_orig (HsVar noExtField (noLoc name)) (mkHsWrap wrap expr) actual_rho_ty' res_ty }
   where
     id_orig = OccurrenceOf name
 
