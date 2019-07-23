@@ -62,6 +62,7 @@ import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq )
 import UniqSet
+import OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -217,7 +218,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                               src_fvs5, src_fvs6, src_fvs7] ;
                 -- It is tiresome to gather the binders from type and class decls
 
-        src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
+        src_dus = unitOL other_def `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
                 -- Instance decls may have occurrences of things bound in bind_dus
                 -- so we must put other_fvs last
 
