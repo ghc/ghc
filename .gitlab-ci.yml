@@ -691,6 +691,7 @@ validate-x86_64-linux-fedora27:
   variables:
     FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
+    SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
   cache:
     paths:
       - cabal-cache
