@@ -12,6 +12,8 @@ A lint pass to check basic STG invariants:
 - If linting after unarisation, invariants listed in Note [Post-unarisation
   invariants].
 
+- RhsClosure should not consist of a sole StgConApp.
+
 Because we don't have types and coercions in STG we can't really check types
 here.
 
@@ -149,7 +151,16 @@ checkNoCurrentCCS rhs@(StgRhsCon _ ccs _ _)
 checkNoCurrentCCS _
   = return ()
 
+isConApp :: GenStgExpr p -> Bool
+isConApp (StgConApp {}) = True
+isConApp _ = False
+
 lintStgRhs :: (OutputablePass a, BinderP a ~ Id) => GenStgRhs a -> LintM ()
+
+lintStgRhs rhs@(StgRhsClosure _ _ _ _ expr)
+  | isConApp expr
+  , pprTrace "StgRhsClosure is an StgConApp:" (ppr rhs) $ False
+  = undefined
 
 lintStgRhs (StgRhsClosure _ _ _ [] expr)
   = lintStgExpr expr

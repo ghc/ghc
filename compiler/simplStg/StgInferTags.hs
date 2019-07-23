@@ -100,7 +100,7 @@ can have massive performance benefits for traversals of strict
 data structures.
 
 This Module contains the code for the actual inference and upholding
-the strict field invariant.
+the strict field invariant. See Note [The strict field invariant]
 Once computed the infered taggedness is stored in the extension
 point of StgApp. This is then used in StgCmmExpr to determine if we
 need to enter an expression.
@@ -120,6 +120,24 @@ The inference code has three major parts.
     + We also wrap allocations for constructors in
       seq statements if required to uphold the taggedness of strict
       fields.
+
+
+    Note [The strict field invariant]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The code in this module transforms the STG AST such
+that all strict fields will only contain tagged values
+with the exception of functions and absentError values.
+
+This is done by adding seq's where required around allocation
+of constructors with strict fields.
+
+The purpose of this invariant is that it allows us to eliminate
+the tag check when casing on values coming out of strict fields.
+
+In particular when traversing the strict spine of a data structure
+this eliminates a significant amount of code being executed leading
+to significant speedups. (10% and up for the traversal!)
 
 -}
 
@@ -157,6 +175,8 @@ data RecursionKind
     Note [Lattice for tag analysis]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# The EnterInfo Lattice
+
 We use a lattice for the tag analysis, with each update of a node
 being monotonic towards the top of the lattice.
 
@@ -177,9 +197,43 @@ like this:
 
 It is also called the "outer" infor about a binding in places.
 
-RecEnter is a special value assigned to tail recursive branches.
-See Note [Recursive Functions] for details.
+What these values represent is the requirement of a binding in
+a context like
 
+    `case val of`
+
+in regards to weither or not it has to be entered. Which for values
+coincides with a value being tagged.
+
+The consequence of this is that it does not matter what enter info
+we use for things like functions.
+
+RecEnter is a special value assigned to tail recursive branches.
+See Note [Recursive Functions] for why we need this.
+If we end up assigning RecEnter to a *bindings* enterInfo then
+this binding represents a computation which won't return as it
+will tail call itself forever.
+This happens for example for `f x = f x`.
+
+RecEnter is also a fixpoint in the lattice. Once a data flow node
+has been assigned enterInfo RecEnter it's enterInfo won't change
+anymore.
+
+NeverEnter means the thing referenced by the binding won't ever be
+entered as a *value*. It might be calles as a function though.
+
+AlwaysEnter implies something is a thunk of some form. However since GC
+can also evaluate certain forms of thunks we currently treat this for the
+most part just like MaybeEnter.
+
+MaybeEnter represents the union of things where:
+* We don't care about the enter behaviour.
+* We know we can't know the enter behaviour.
+* We know it could be either enter or no-enter depending on
+  branches taken at runtime.
+
+
+# The FieldInfo Lattice
 
 The second lattice represents information about bindings which are
 bound to the fields of an id.
@@ -458,7 +512,7 @@ data FieldInfo
 
 instance Outputable EnterLattice where
     ppr (EnterLattice enterInfo fieldInfo)
-        = ppr enterInfo <> char 'x' <> ppr fieldInfo
+        = ppr enterInfo <> text " x " <> ppr fieldInfo
 
 instance Outputable FieldInfo where
     ppr LatUnknown        = text "top"
@@ -1012,6 +1066,8 @@ litNode =
 {-  Note [Imported Ids]
     ~~~~~~~~~~~~~~~~~~~
 
+# Assigning data flow nodes to imported ids.
+
 We want to keep our Ids a simple newtype around Unique.
 This is "easy" for things brought into scope by AST nodes,
 we put a mapping from the Id to the NodeId into SynContext
@@ -1028,8 +1084,21 @@ same node.
 TODO: Currently we store the id-based nodes twice, once in idNodeMap
 and once in uniqNodeMap. idNodeMap should only store the nodeId instead.
 
+# Taggedness of imported ids
+
+This is currently determined fully in addImportedNode since
+the result of tag inference is not exported in interface files.
+
+The rules are simply:
+    * Field info is always Unknown
+
+    Enterinfo is:
+    * NeverEnter for functions with known Arity
+    * NeverEnter for nullarry constructors
+    * MaybeEnter otherwise.
+
 TODO: Once we can export taggedness in the Interface file we
-will want to also import tag info when we create a node id.
+will want to use the imported tag info instead of these rules.
 
 
     Note [Shadowing and NodeIds]
@@ -1072,6 +1141,7 @@ mkUniqueId = NodeId <$> getUniqueM
 
 -- | This adds nodes with information we can figure out about imported ids into the env.
 --   Mimics somewhat what we do in StgCmmClosure.hs:mkLFImported
+--   See also Note [Imported Ids]
 addImportedNode :: Module -> Id -> AM ()
 addImportedNode this_mod id
     -- Local id, it has to be mapped to an id via SynContext
@@ -1191,6 +1261,71 @@ TODO: If we have a recursive let, but non of the recursive ids are in strict fie
 
 -}
 
+{-  Note [RhsCon data flow]
+    ~~~~~~~~~~~~~~~~~~~~~~~
+
++-----+      +------+
+| con |      | args |
++--+--+      +--+---+
+   |         |         implicit
+   v         v            |
+   +---------+    +-------------+
+   | rhsNode | == | bindingNode |
+   +---------+    +-------------+
+
+The behaviour here is very similar to the one for
+nodeConApp with a few alterations to account for the fact
+that the result will be associated with a binding.
+
+The EnterLattices of the arguments are stored in the FieldInfo of the result.
+The only exception is that we set the enterInfo for strict fields to
+NeverEnter because of the strict field invariant.
+See also Note [The strict field invariant]
+
+Doing this is implemented in mkOutConLattice.
+
+The enterinfo is determined by a number of rules.
+The main drivers are:
+1) By default we can tag all constructors allocated via a StgRhsCon
+2) Top level constructors might turn into thunks if we need to wrap them in seqs
+3) Recursive groups are not well supported yet in the first iteration
+
+The enterInfo of the result is determined by checking these conditions
+in order:
+
+a) If the binding is not defined at the top level
+   and is a non recursive binding:
+->  NeverEnter, we can just wrap the expression in a Case.
+
+b) If there are no strict fields
+->  NeverEnter, see 1)
+
+c) If all strict field arguments are tagged
+-> NeverEnter, see 1)
+
+d) If any strict field arguments are undetermined
+-> UndetEnterInfo, if we don't know if a strict argument is already tagged
+                   then we don't know if we need to wrap this allocation in
+                   a seq.
+
+e) Otherwise
+-> MaybeEnter
+
+For us to reach e the strict fields must contain one of AlwaysEnter/MaybeEnter/RecEnter.
+
+If there is a value of MaybeEnter/NeverEnter for one of the strict arguments
+we need to evaluate this argument before allocation.
+In order to do this we will turn this RhsCon into a RhsClosure.
+Removing the ability to tag the binding as it will turn into a thunk.
+
+If there is a RecEnter this represents storing the result of a computation
+in a strict field which will not return.
+We treat this the same as the AlwaysEnter/MaybeEnter/RecEnter case.
+Mostly since it means the constructr will never be allocated and as such
+wrappting it in a seq is of little consequence.
+
+-}
+
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag -> Id -> StgRhs -> AM InferStgRhs
@@ -1240,12 +1375,13 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ _ccs con args)
                 | not $ any isMarkedStrict $ dataConRepStrictness con
                 =   NeverEnter
 
-                -- If any of the inputs are undetermined so is the output,
+                -- If all of the strict inputs are tagged so is the output.
+                | all (==NeverEnter) strictOuter
+                = NeverEnter
+
                 | any (== UndetEnterInfo) strictOuter
                 = UndetEnterInfo
 
-                | all (==NeverEnter) strictOuter
-                = NeverEnter
 
                 | otherwise
                 = MaybeEnter
@@ -1269,15 +1405,44 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ _ccs con args)
 TODO: Partial applications
 
 * RhsCon is never partially applied
-* Partially applied RhsClosures will have arity info exposed.
+* If we can tell a RhsClosures is partially applied we know it's arity.
 * This means we can assign the field info EVEN for partial results,
   we just have to make sure to only use field info for fully applied
   results.
 
 
+    Note [RhsClosure data flow]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    +--------------+
+    |              |
+    | closure expr | (case, let, Con, app, lit)
+    |              |
+    +--------------+
+    |
+    |                   implicit
+    v                      |
+    +---------+    +-------------+
+    | rhsNode | == | bindingNode |
+    +---------+    +-------------+
+
+This is rather simple:
+
+We assign the fields of the closures body to the rhsNode.
+
+We mark it's enterInfo as:
+    NeverEnter if it represents an absentError.
+    AlwaysEnter if it takes no arguments.
+    NeverEnter otherwise - Functions are called, not entered like values.
+
+We currently do not consider arguments at all, this would require a
+guarantee that there are no call sites outside of this module.
+Something currently not tracked by GHC.
+
 -}
+
+
 nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
-    mapM_ (addImportedNode this_mod) args
     (body', body_id) <- nodeExpr this_mod ctxt' body
     let node = FlowNode { node_id = node_id
                         , node_inputs = [body_id]
@@ -1305,7 +1470,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
     enterInfo
         | isAbsentExpr body = NeverEnter
         | null args = AlwaysEnter
-        | otherwise = MaybeEnter      -- Thunks with arity > 0
+        | otherwise = NeverEnter      -- Thunks with arity > 0
                                     -- are only entered when applied.
     node_update this_id body_id = do
         bodyInfo <- lookupNodeResult body_id
@@ -1342,7 +1507,7 @@ is best shown by example:
 
     case e1 of bndr
     {   C1 f1 f2 -> alt1;
-        C2 -> alt2; }
+        C2       -> alt2; }
 
 This result in data flow nodes and data flow between them
 as shown below.
@@ -1359,15 +1524,15 @@ as shown below.
       v          |
       |    +-----------+         +--------+
       |    |           |         |        |
-      +--->+  f1  f2   +-------->+  Alt1  +---------+
-      |    |           |         |        |         |
-      |    +-----------+         +--------+         v           +-----------+
+      +--->+  f1  f2   +-------->+  alt1  +--------+
+      |    |           |         |        |        |
+      |    +-----------+         +--------+        v            +-----------+
       |                              |        +----+----+       |           |
       v                    result of alt rhs  | Combine +------>+ Case Node |
       |                              |        +----+----+       |           |
       |                          +--------+        ^            +-----------+
       |                          |        |        |
-      +--------->------->------->+  Alt2  +--------+
+      +--------->------->------->+  alt2  +--------+
                                  |        |
                                  +--------+
 
@@ -1499,8 +1664,8 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
 -- call branches and regular references to an id.
 -- See Note [Recursive Functions] for the details.
 
-{-  Note [Let Data Flow]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-  Note [Let/ Data Flow]
+    ~~~~~~~~~~~~~~~~~~~~
 
 This is rather simple:
 We bind the result of the RHS to the variable which binds the rhs.
@@ -1523,6 +1688,8 @@ is the result of the body.
         |  body  | == | let node |
         +--------+    +----------+
 
+The interesting things happen inside the rhs.
+
 -}
 
 
@@ -1540,6 +1707,41 @@ nodeLetNoEscape this_mod ctxt (StgLetNoEscape ext bind expr) = do
     return $! (StgLetNoEscape ext bind' expr', node)
 nodeLetNoEscape _ _ _ = panic "Impossible"
 
+{-  Note [ConApp Data Flow]
+    ~~~~~~~~~~~~~~~~~~~~~~~
+
+Information from the constructor used (strict fields)
+and arguments is used to determine the result.
+
++-----+       +------+
+| con |       | args |
++--+--+       +--+---+
+   |             |
+   v             v
+   +-------------+
+   | ConApp node |
+   +-------------+
+
+The enterInfo from this node is never used directly as it appears
+in expression contexts. In cases like (StgRhsClosure ... expr), expr == StgConApp
+we determine the enterInfo of the rhs based on the fact that it's a RhsClosure.
+In other contexts it's enterInfo will never be used by another node.
+
+But to keep the code simple we use MaybeEnter here.
+
+As far as data flow rules are concerned this is rather simple.
+
+The EnterLattices of the arguments are stored in the FieldInfo of the result.
+The only exception is that we set the enterInfo for strict fields to
+NeverEnter because of the strict field invariant.
+See also Note [The strict field invariant]
+
+Doing this is implemented in mkOutConLattice.
+
+
+
+
+-}
 nodeConApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
@@ -1566,6 +1768,53 @@ nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     return $! (StgConApp node_id con args tys, node_id)
 nodeConApp _ _ _ = panic "Impossible"
 
+{-  Note [App Data Flow]
+    ~~~~~~~~~~~~~~~~~~~~
+
+This is one of the more complicated data flow constructs.
+The actual data flow is rather simple:
+
+    `StgApp f arg`
+
+Induces this data flow
+
++---+     +------+
+| f |     | args |
++-+-+     +--+---+
+  |          |
+  v          v
+  +----------+
+  | app node |
+  +----------+
+
+However there are a lot of rules which go into how the "app node"
+actually uses the information give.
+
+If f is imported:
+->  We use it's information unconditionally (See Note [Imported Ids])
+
+If f is an absent expression:
+->  We treat it as NeverEnter with Unknown field information.
+
+If f is potentially part of mutual recursive binds
+or   is a unsaturated function call:
+->  We throw up our hands and determine we know nothing.
+
+If f is a simple recursive tail call:
+->  We mark the result as such: RecEnter x RecFields
+    See [Recursive Functions] for details.
+
+If f is a saturated function:
+->  We determine MaybeEnter x fieldInfoOf(f)
+
+If f is not a function, and has no args:
+->  We reuse the information of f
+
+TODO: Under what circumstances can this happen?
+In any other case:
+->  We throw up our hands and determine we know nothing.
+
+-}
 
 nodeApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeApp this_mod ctxt expr@(StgApp _ f args) = do
@@ -1652,6 +1901,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
         | isFun && isSat = [f_node_id]
         | otherwise = [f_node_id]
 
+    -- See Note [App Data Flow]
     mkResult :: AM EnterLattice
     mkResult
         | isAbsent = pprTrace "Absent:" (ppr f) $ return $! flatLattice NeverEnter
