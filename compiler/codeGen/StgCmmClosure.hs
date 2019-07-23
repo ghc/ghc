@@ -98,25 +98,6 @@ import Demand
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 
--- Note [Tagging imported bindings]
---
--- We used to just omit tagging imported bindings - see #16559.
--- This is bad for the same reasons tagging is good.
--- In particular we should care for two reasons:
---
--- * If we have strict fields and don't tag these it works against
---   the valuable invariant that strict fields will always be tagged.
--- * For the same reason we care about tagging to begin with -
---   avoiding entering evaluated closures.
-
--- In order to tag these imports we need two things:
--- * A guarantee that a binding is evaluated.
--- * The tag to use.
---
--- We get the tag to use from the result of CPR analysis.
--- We get the evaluatedness from the unfolding info.
-
-
 -----------------------------------------------------------------------------
 --                Data types and synonyms
 -----------------------------------------------------------------------------
