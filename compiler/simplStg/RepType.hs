@@ -305,11 +305,45 @@ fitsIn ty1 ty2
 *                                                                       *
                    PrimRep
 *                                                                       *
-********************************************************************** -}
+*************************************************************************
+
+Note [RuntimeRep and PrimRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TyCon.PrimRep enumerates the possible shape of primitive representations
+(atoms) in the back end. We often have a list of such representations, in
+order to deal with unboxed tuples and unboxed sums.
+
+Representations are associated with *kinds*. That is, given (e :: ty)
+and (ty :: ki), the shape of e's representation is determined by ki. ki
+must have the form (TYPE rep) for some (rep :: RuntimeRep). (The type
+system, i.e. Core Lint, guarantees that "must".) So, to get the
+representation for an Id (so we can, e.g., allocate registers), we
+get the Id's type ty (using idType), then ty's kind ki (using typeKind),
+then pattern-match on ki to extract rep (in kindPrimRep), then extract
+the PrimRep from the RuntimeRep (in runtimeRepPrimRep).
+
+runtimeRepPrimRep works by using tyConRuntimeRepInfo. That function
+should be passed the TyCon produced by promoting one of the constructors
+of RuntimeRep into type-level data. The RuntimeRep promoted datacons are
+associated with a RuntimeRepInfo (stored directly in the PromotedDataCon
+constructor of TyCon). This pairing happens in TysWiredIn. A RuntimeRepInfo
+usually(*) contains a function from [Type] to [PrimRep]: the [Type] are
+the arguments to the promoted datacon. These arguments are necessary
+for the TupleRep and SumRep constructors, so that this process can recur,
+producing a flattened list of PrimReps. Calling this extracted function
+happens in runtimeRepPrimRep; the functions themselves are defined in
+tupleRepDataCon and sumRepDataCon, both in TysWiredIn.
+
+The (*) above is to support vector representations. RuntimeRep refers
+to VecCount and VecElem, whose promoted datacons have nuggets of information
+related to vectors; these form the other alternatives for RuntimeRepInfo.
+
+-}
 
 -- | Discovers the primitive representation of a 'Type'. Returns
 -- a list of 'PrimRep': it's a list because of the possibility of
 -- no runtime representation (void) or multiple (unboxed tuple/sum)
+-- See also Note [RuntimeRep and PrimRep]
 typePrimRep :: HasDebugCallStack => Type -> [PrimRep]
 typePrimRep ty = kindPrimRep (text "typePrimRep" <+>
                               parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
@@ -317,6 +351,7 @@ typePrimRep ty = kindPrimRep (text "typePrimRep" <+>
 
 -- | Like 'typePrimRep', but assumes that there is precisely one 'PrimRep' output;
 -- an empty list of PrimReps becomes a VoidRep
+-- See also Note [RuntimeRep and PrimRep]
 typePrimRep1 :: HasDebugCallStack => UnaryType -> PrimRep
 typePrimRep1 ty = case typePrimRep ty of
   []    -> VoidRep
@@ -325,6 +360,7 @@ typePrimRep1 ty = case typePrimRep ty of
 
 -- | Find the runtime representation of a 'TyCon'. Defined here to
 -- avoid module loops. Returns a list of the register shapes necessary.
+-- See also Note [RuntimeRep and PrimRep]
 tyConPrimRep :: HasDebugCallStack => TyCon -> [PrimRep]
 tyConPrimRep tc
   = kindPrimRep (text "kindRep tc" <+> ppr tc $$ ppr res_kind)
@@ -334,6 +370,7 @@ tyConPrimRep tc
 
 -- | Like 'tyConPrimRep', but assumed that there is precisely zero or
 -- one 'PrimRep' output
+-- See also Note [RuntimeRep and PrimRep]
 tyConPrimRep1 :: HasDebugCallStack => TyCon -> PrimRep
 tyConPrimRep1 tc = case tyConPrimRep tc of
   []    -> VoidRep
@@ -342,6 +379,7 @@ tyConPrimRep1 tc = case tyConPrimRep tc of
 
 -- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
 -- of values of types of this kind.
+-- See also Note [RuntimeRep and PrimRep]
 kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
   | Just ki' <- coreView ki
@@ -353,7 +391,7 @@ kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
--- it encodes.
+-- it encodes. See also Note [RuntimeRep and PrimRep]
 runtimeRepPrimRep :: HasDebugCallStack => SDoc -> Type -> [PrimRep]
 runtimeRepPrimRep doc rr_ty
   | Just rr_ty' <- coreView rr_ty
@@ -366,5 +404,6 @@ runtimeRepPrimRep doc rr_ty
 
 -- | Convert a PrimRep back to a Type. Used only in the unariser to give types
 -- to fresh Ids. Really, only the type's representation matters.
+-- See also Note [RuntimeRep and PrimRep]
 primRepToType :: PrimRep -> Type
 primRepToType = anyTypeOfKind . tYPE . primRepToRuntimeRep
