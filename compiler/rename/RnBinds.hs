@@ -56,6 +56,7 @@ import Util
 import Outputable
 import UniqSet
 import Maybes           ( orElse )
+import OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -568,7 +569,7 @@ depAnalBinds :: Bag (LHsBind GhcRn, [Name], Uses)
 -- Dependency analysis; this is important so that
 -- unused-binding reporting is accurate
 depAnalBinds binds_w_dus
-  = (map get_binds sccs, map get_du sccs)
+  = (map get_binds sccs, toOL $ map get_du sccs)
   where
     sccs = depAnal (\(_, defs, _) -> defs)
                    (\(_, _, uses) -> nonDetEltsUniqSet uses)
