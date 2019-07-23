@@ -470,6 +470,7 @@ RTS_FUN_DECL(stg_readTVarIOzh);
 RTS_FUN_DECL(stg_writeTVarzh);
 
 RTS_FUN_DECL(stg_unpackClosurezh);
+RTS_FUN_DECL(stg_unpackClosureWzh);
 RTS_FUN_DECL(stg_closureSizzezh);
 RTS_FUN_DECL(stg_getApStackValzh);
 RTS_FUN_DECL(stg_getSparkzh);
