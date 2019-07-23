@@ -36,6 +36,7 @@ module NameSet (
 import GhcPrelude
 
 import Name
+import OrdList
 import UniqSet
 import Data.List (sortBy)
 
@@ -160,19 +161,19 @@ type DefUse  = (Maybe Defs, Uses)
 
 -- | A number of 'DefUse's in dependency order: earlier 'Defs' scope over later 'Uses'
 --   In a single (def, use) pair, the defs also scope over the uses
-type DefUses = [DefUse]
+type DefUses = OrdList DefUse
 
 emptyDUs :: DefUses
-emptyDUs = []
+emptyDUs = nilOL
 
 usesOnly :: Uses -> DefUses
-usesOnly uses = [(Nothing, uses)]
+usesOnly uses = unitOL (Nothing, uses)
 
 mkDUs :: [(Defs,Uses)] -> DefUses
-mkDUs pairs = [(Just defs, uses) | (defs,uses) <- pairs]
+mkDUs pairs = toOL [(Just defs, uses) | (defs,uses) <- pairs]
 
 plusDU :: DefUses -> DefUses -> DefUses
-plusDU = (++)
+plusDU = appOL
 
 duDefs :: DefUses -> Defs
 duDefs dus = foldr get emptyNameSet dus
