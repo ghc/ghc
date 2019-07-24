@@ -302,6 +302,20 @@ getClosureX get_closure_raw x = do
                 (pts !! 0)
                 []
 
+
+        WEAK -> do
+            unless (length pts >= 5) $
+                fail $ "Expected at least 5 ptr argument to WEAK, found "
+                        ++ show (length pts)
+            pure $ WeakClosure
+                { info = itbl
+                , cfinalizers = pts !! 0
+                , key = pts !! 1
+                , value = pts !! 2
+                , finalizer = pts !! 3
+                , link = pts !! 4
+                }
+
         _ ->
             pure $ UnsupportedClosure itbl
 

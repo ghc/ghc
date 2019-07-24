@@ -268,6 +268,15 @@ data GenClosure b
      , stack :: [Word]
      }
 
+  | WeakClosure
+        { info        :: !StgInfoTable
+        , cfinalizers :: !b
+        , key         :: !b
+        , value       :: !b
+        , finalizer   :: !b
+        , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
+        }
+
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
