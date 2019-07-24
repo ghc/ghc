@@ -18,7 +18,7 @@ module CoreToStg ( coreToStg ) where
 import GhcPrelude
 
 import CoreSyn
-import CoreUtils        ( exprType, findDefault, isJoinBind
+import CoreUtils        ( exprType, isJoinBind
                         , exprIsTickedString_maybe )
 import CoreArity        ( manifestArity )
 import StgSyn
@@ -26,7 +26,6 @@ import StgUtil
 
 import Type
 import RepType
-import TyCon
 import MkId             ( coercionTokenId )
 import Id
 import IdInfo
