@@ -48,6 +48,7 @@ import Hoopl.Collections
 import GHC.Platform
 import Maybes
 import DynFlags
+import ErrUtils (withTiming)
 import Panic
 import UniqSupply
 import MonadUtils
@@ -70,12 +71,16 @@ cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
             -> IO (Stream IO RawCmmGroup ())
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one uniqs cmm = do
-                case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
-                  (b,uniqs') -> return (uniqs',b)
-                  -- NB. strictness fixes a space leak.  DO NOT REMOVE.
+       ; let do_one uniqs cmm =
+               -- NB. strictness fixes a space leak.  DO NOT REMOVE.
+               withTiming (return dflags) (text "Cmm -> Raw Cmm") forceRes $
+                 case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
+                   (b,uniqs') -> return (uniqs',b)
        ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
        }
+
+    where forceRes (uniqs, rawcmms) =
+            uniqs `seq` foldr (\decl r -> decl `seq` r) () rawcmms
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is
