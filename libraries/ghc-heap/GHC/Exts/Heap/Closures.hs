@@ -259,7 +259,7 @@ data GenClosure b
         , key         :: !b
         , value       :: !b
         , finalizer   :: !b
-        , link        :: !b -- ^ WeakClosure
+        , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
     ------------------------------------------------------------
