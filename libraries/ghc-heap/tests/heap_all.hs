@@ -12,6 +12,7 @@ import GHC.Int
 import GHC.IO
 import GHC.IORef
 import GHC.MVar
+import GHC.Prim
 import GHC.Stack
 import GHC.STRef
 import GHC.Word
@@ -147,6 +148,16 @@ exBlockingQClosure = BlockingQueueClosure
     , queue = asBox []
     }
 
+exWeakClosure :: Closure
+exWeakClosure = WeakClosure
+    { info = exItbl{tipe=WEAK}
+    , cfinalizers = asBox []
+    , key = asBox []
+    , value = asBox []
+    , finalizer = asBox []
+    , link = asBox []
+    }
+
 exIntClosure :: Closure
 exIntClosure = IntClosure
     { ptipe = PInt, intVal = 42 }
@@ -188,6 +199,7 @@ data BA = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
 data B = B BCO#
 data APC a = APC a
+data WK v = WK (Weak# v)
 
 main :: IO ()
 main = do
@@ -287,6 +299,13 @@ main = do
     -- getClosureData (Just 1) >>=
     --    assertClosuresEq exBlockingQClosure
 
+    -- Weak pointer
+    WK wk <- IO $ \s ->
+        case mkWeakNoFinalizer# (1 :: Int) (1 :: Int) s of
+            (# s1, w #) -> (# s1, WK w #)
+    getClosureData wk >>=
+        assertClosuresEq exWeakClosure
+
     -----------------------------------------------------
     -- Unboxed unlifted types
 
@@ -378,6 +397,7 @@ compareClosures expected actual =
                     MVarClosure{}           -> [ sEq (tipe . info) ]
                     MutVarClosure{}         -> [ sEq (tipe . info) ]
                     BlockingQueueClosure{}  -> [ sEq (tipe . info) ]
+                    WeakClosure{}           -> [ sEq (tipe . info) ]
                     IntClosure{}            -> [ sEq ptipe
                                                , sEq intVal    ]
                     WordClosure{}           -> [ sEq ptipe
