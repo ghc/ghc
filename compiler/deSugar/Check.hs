@@ -57,15 +57,16 @@ import TyCoRep
 import Type
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (expectJust, mapMaybe, isJust, fromMaybe)
+import Maybes        (expectJust, catMaybes, mapMaybe, isJust, fromMaybe)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
 import Data.List.NonEmpty (toList)
 import Data.Void     (Void)
-import Control.Monad (forM, when, forM_, filterM)
+import Control.Monad (forM, when, forM_, filterM, zipWithM)
 import Coercion
 import TcEvidence
+import TcRnTypes     (pprEvVarWithType)
 import TcSimplify    (tcNormalise)
 import IOEnv
 import qualified Data.Semigroup as Semi
@@ -137,18 +138,21 @@ data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~I
 type ValSetAbs = [ValVec]  -- ^ Value Set Abstractions
 type Uncovered = ValSetAbs
 
--- | Should be user-facing. See 'pprValVecSubstituted' for a function intended
--- to produce user-facing output.
+-- | Not user-facing. See 'pprValVecSubstituted' for a function intended to
+-- produce user-facing output.
 instance Outputable ValVec where
-  ppr (ValVec vva delta) = ppr_vec vva <+> text "|>" <+> ppr_delta delta
+  ppr (ValVec vva delta) = ppr_vec vva <+> text "|>" <+> ppr delta
     where
       ppr_vec = brackets . fsep . punctuate comma . map ppr
-      ppr_delta _d = hcat [
-          -- intentionally formatted this way enable the dev to comment in only
-          -- the info she needs
-          ppr (delta_tm_cs delta),
-          ppr (delta_ty_cs delta)
-        ]
+
+instance Outputable Delta where
+  ppr delta = hcat [
+      -- intentionally formatted this way enable the dev to comment in only
+      -- the info she needs
+      ppr (delta_tm_cs delta),
+      ppr (pprEvVarWithType <$> delta_ty_cs delta)
+      --ppr (delta_ty_cs delta)
+    ]
 
 -- Instead of keeping the whole sets in memory, we keep a boolean for both the
 -- covered and the divergent set (we store the uncovered set though, since we
@@ -833,7 +837,7 @@ inhabitationCandidates ty_cs ty = do
            -- them extremely misleading.
         -> do
              inner <- mkPmId core_ty -- it would be wrong to unify x
-             alts <- mapM (fmap fst . mkOneConFull inner . RealDataCon) (tyConDataCons tc)
+             alts <- mapM (fmap fstOf3 . mkOneConFull inner . RealDataCon) (tyConDataCons tc)
              outer <- mkPmId src_ty
              let new_tm_ct = TVC outer (build_tm (idToPmExpr inner) dcs)
              let wrap_dcs alt = alt{ ic_tm_cs = new_tm_ct `consBag` ic_tm_cs alt}
@@ -1302,7 +1306,7 @@ The pattern match checker did not know how to handle coerced patterns `CoPat`
 efficiently, which gave rise to #11276. The original approach translated
 `CoPat`s:
 
-    pat |> co    ===>    x (pat <- (e |> co))
+    pat |> co    ===>    x (pat <- (x |> co))
 
 Why did we do this seemingly unnecessary expansion in the first place?
 The reason is that the type of @pat |> co@ (which is the type of the value
@@ -1502,7 +1506,7 @@ instance Outputable InhabitationCandidate where
 -- | Generate an 'InhabitationCandidate' for a given 'ConLike'.
 -- Generate fresh variables of the appropriate type for arguments and return
 -- them alongside.
-mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [ValAbs])
+mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [TyVar], [ValAbs])
 --  *  x :: T tys, where T is an algebraic data type
 --     NB: in the case of a data family, T is the *representation* TyCon
 --     e.g.   data instance T (a,b) = T1 a b
@@ -1513,12 +1517,13 @@ mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [ValAbs])
 --  * 'con' K is a conlike of data type T
 --
 -- After instantiating the universal tyvars of K we get
---          K tys :: forall bs. Q => s1 .. sn -> T tys
+--          K tys :: forall e1 .. en. Q => s1 .. sn -> T tys
 --
 -- Suppose y1 is a strict field. Then we get
 -- Results: ic_tm_cs:          x ~ K (y1::s1) .. (yn::sn)
 --          ic_ty_cs:          Q
 --          ic_strict_arg_tys: [s1]
+--          [e1,..,en]
 --          [y1,..,yn]
 mkOneConFull x con = do
   let res_ty  = idType x
@@ -1535,7 +1540,7 @@ mkOneConFull x con = do
                   PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
                                     -- See Note [Pattern synonym result type] in PatSyn
 
-  (subst, _ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
+  (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
   let arg_tys' = substTys subst arg_tys
   -- Fresh term variables (VAs) as arguments to the constructor
@@ -1551,13 +1556,15 @@ mkOneConFull x con = do
            , ic_ty_cs          = listToBag evvars
            , ic_strict_arg_tys = strict_arg_tys
            }
-  return (ic, vars)
+  return (ic, ex_tvs', vars)
 
 -- | Invoke 'mkOneConFull' and immediately check whether the resulting
 -- 'InhabitationCandidate' @ic@ with arguments @arg_vars@ is inhabited by
--- consulting 'pmIsSatisfiable'. Return @Just (new_delta, ic, arg_vars)@ if it
--- is.
-mkOneSatisfiableConFull :: Delta -> Id -> ConLike -> PmM (Maybe (Delta, InhabitationCandidate, [ValAbs]))
+-- consulting 'pmIsSatisfiable'. Return @Just (new_delta, ic, ex_tvs, arg_vars)@
+-- if it is.
+mkOneSatisfiableConFull
+  :: Delta -> Id -> ConLike
+  -> PmM (Maybe (Delta, InhabitationCandidate, [TyVar], [ValAbs]))
 mkOneSatisfiableConFull delta x con = do
   -- mkOneConFull doesn't cope with type families, so we have to normalise
   -- x's result type first and introduce an auxiliary binding.
@@ -1566,10 +1573,10 @@ mkOneSatisfiableConFull delta x con = do
   let res_ty = fromMaybe (idType x) (fstOf3 <$> mb_res_ty)
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
-  (ic, arg_vars) <- mkOneConFull y con
+  (ic, ex_tvs, arg_vars) <- mkOneConFull y con
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
-  tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr (delta_tm_cs delta') $$ ppr (delta_tm_cs <$> mb_delta))
-  pure ((,ic,arg_vars) <$> mb_delta)
+  tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
+  pure ((,ic,ex_tvs,arg_vars) <$> mb_delta)
 
 -- ----------------------------------------------------------------------------
 -- * More smart constructors and fresh variable generation
@@ -1954,15 +1961,30 @@ pmcheckHd p@PmCon{} ps guards x vva@(ValVec vas delta) = do
   -- (and the already known impossible constructors).
   let con = pm_con_con p
   let args = pm_con_args p
+  let ex_tvs1 = pm_con_tvs p
 
   -- For the value vector of the current constructor, we directly recurse into
   -- checking the the current case, so we get back a PartialResult
   pr_pos <- mkOneSatisfiableConFull delta x con >>= \case
     Nothing -> pure mempty
-    Just (delta', _ic, arg_vas) -> do
-      tracePm "matched at all" (ppr (delta_tm_cs delta'))
-      pr <- pmcheckI (args ++ ps) guards (ValVec (arg_vas ++ vas) delta')
-      kcon (PmAltConLike con) (pmPatType p) pr
+    Just (delta1, _ic, ex_tvs2, arg_vas) -> do
+      let to_evvar tv1 tv2 = nameType "pmConCon" $
+                             mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
+          mb_to_evvar tv1 tv2
+              -- If we have identical constructors but different existential
+              -- tyvars, then generate extra equality constraints to ensure the
+              -- existential tyvars.
+              -- See Note [Coverage checking and existential tyvars].
+            | tv1 == tv2 = pure Nothing
+            | otherwise  = Just <$> to_evvar tv1 tv2
+      evvars <- (listToBag . catMaybes) <$>
+                ASSERT(ex_tvs1 `equalLength` ex_tvs2)
+                (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
+      let delta2 = delta1 { delta_ty_cs = evvars `unionBags` delta_ty_cs delta1 }
+
+      tracePm "matched at all" (ppr (delta_tm_cs delta2))
+      let vva' = ValVec (arg_vas ++ vas) delta2
+      kcon (PmAltConLike con) x <$> pmcheckI (args ++ ps) guards vva'
 
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge x (delta_tm_cs delta) pr_pos
@@ -1973,13 +1995,13 @@ pmcheckHd p@PmCon{} ps guards x vva@(ValVec vas delta) = do
   pure (mkUnion pr_pos' pr_neg)
 
 -- LitVar
-pmcheckHd p@(PmLit l) ps guards x vva@(ValVec vas delta) = do
+pmcheckHd (PmLit l) ps guards x vva@(ValVec vas delta) = do
   pr_pos <- case solveOneEq (delta_tm_cs delta) (TVC x (mkPmExprLit l)) of
     Nothing -> pure mempty
     Just tms -> do
       tracePm "matched at all" (ppr (delta_tm_cs delta))
       let vva'= ValVec vas (delta { delta_tm_cs = tms })
-      pmcheckI ps guards vva' >>= kcon (PmAltLit l) (pmPatType p)
+      kcon (PmAltLit l) x <$> pmcheckI ps guards vva'
 
   -- The var is forced regardless of whether @l@ was satisfiable.
   -- Although for literals I can't think of a scenario where the var is not
@@ -2131,22 +2153,19 @@ ucon va = updateVsa upd
   where
     upd vsa = [ ValVec (va:vva) delta | ValVec vva delta <- vsa ]
 
--- | Given a 'PmAltCon' of arity `a` and an uncovered set containing
--- value vector abstractions of length `(a+n)`, pass the first `n` value
--- abstractions to the constructor (Hence, the resulting value vector
--- abstractions will have length `n+1`)
-kcon :: PmAltCon -> Type -> PartialResult -> PmM PartialResult
-kcon con ty pr = do
-  x <- mkPmId ty
+-- | Given a 'PmAltCon' of arity `a` which is the solution of a value
+-- abstraction `x` and an uncovered set containing value vector abstractions of
+-- length `(a+n)`, pass the first `n` value abstractions to the constructor
+-- (Hence, the resulting value vector abstractions will have length `n+1`)
+kcon :: PmAltCon -> Id -> PartialResult -> PartialResult
+kcon con x =
   let n = pmAltConArity con
       upd vsa =
-        [ ValVec (x:vva) delta{ delta_tm_cs = ts' }
+        [ ValVec (x:vva) delta
         | ValVec vva' delta <- vsa
-        , let (args, vva) = splitAt n vva'
-        , let e = PmExprCon con (map idToPmExpr args)
-        , let Just ts' = solveOneEq (delta_tm_cs delta) (TVC x e)
+        , let (_args, vva) = splitAt n vva'
         ]
-  pure (updateVsa upd pr)
+  in updateVsa upd
 
 -- | Get the union of two covered, uncovered and divergent value set
 -- abstractions. Since the covered and divergent sets are represented by a
