@@ -28,7 +28,6 @@ module GHC.Exts.Heap (
     , PrimType(..)
     , HasHeapRep(getClosureDataX)
     , getClosureData
-    , getClosureDataW
 
     -- * Info Table types
     , StgInfoTable(..)
@@ -41,7 +40,6 @@ module GHC.Exts.Heap (
 
      -- * Closure inspection
     , getBoxedClosureData
-    , getBoxedClosureDataW
     , allClosures
 
     -- * Boxes
@@ -108,30 +106,6 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
     getClosureDataX _ x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
-getClosureRawW :: a -> IO (Ptr StgInfoTable, [Word], [Word])
-getClosureRawW x = do
-#if MIN_VERSION_ghc_prim(0,6,1)
-    case unpackClosureW# x of
-#else
-    case undefined of
-#endif
--- This is a hack to cover the bootstrap compiler using the old version of
--- 'unpackClosure'. The new 'unpackClosure' return values are not merely
--- a reordering, so using the old version would not work.
-#if MIN_VERSION_ghc_prim(0,5,3)
-        (# iptr, dat, pointers #) -> do
-#else
-        (# iptr, pointers, dat #) -> do
-#endif
-            let nelems = (I# (sizeofByteArray# dat)) `div` wORD_SIZE
-                end = fromIntegral nelems - 1
-                rawWds = [W# (indexWordArray# dat i) | I# i <- [0.. end] ]
-
-            let nelems_ptrs = (I# (sizeofByteArray# pointers)) `div` wORD_SIZE
-                end_ptrs = fromIntegral nelems_ptrs - 1
-                rawPtrs = [W# (indexWordArray# pointers i) | I# i <- [0.. end_ptrs] ]
-            pure (Ptr iptr, rawWds, rawPtrs)
-
 --- From compiler/ghci/RtClosureInspect.hs
 amap' :: (t -> b) -> Array Int t -> [b]
 amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
@@ -160,8 +134,6 @@ getClosureRaw x = do
 getClosureData :: a -> IO Closure
 getClosureData = getClosureDataX getClosureRaw
 
-getClosureDataW :: a -> IO (GenClosure Word)
-getClosureDataW = getClosureDataX getClosureRawW
 
 -- | This function returns a parsed heap representation of the argument _at
 -- this moment_, even if it is unevaluated or an indirection or other exotic
@@ -337,6 +309,3 @@ getClosureX get_closure_raw x = do
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
 
--- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
-getBoxedClosureDataW :: Box -> IO ClosureW
-getBoxedClosureDataW (Box a) = getClosureDataW a

@@ -242,7 +242,6 @@ StgArrBytes *heap_view_closurePtrsAsWords(Capability *cap, StgClosure *closure) 
     // there
     StgClosure *ptrs[size];
     StgWord nptrs = collect_pointers(closure, size, ptrs);
-    printf("NPTRS: %d\n", nptrs);
     StgArrBytes *arr =
         (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + nptrs);
     TICK_ALLOC_PRIM(sizeofW(StgArrBytes), nptrs, 0);
