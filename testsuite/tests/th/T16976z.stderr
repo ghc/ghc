@@ -1,0 +1,5 @@
+
+T16976z.hs:7:20: error:
+    • Stage error: the non-top-level quoted name 'str
+      must be used at the same stage at which it is bound
+    • In the Template Haskell quotation 'str
