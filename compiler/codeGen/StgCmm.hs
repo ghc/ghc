@@ -32,6 +32,7 @@ import CLabel
 
 import StgSyn
 import DynFlags
+import ErrUtils
 
 import HscTypes
 import CostCentre
@@ -70,7 +71,7 @@ codeGen dflags this_mod data_tycons
         ; cgref <- liftIO $ newIORef =<< initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
-                cmm <- liftIO $ do
+                cmm <- liftIO . withTiming (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
