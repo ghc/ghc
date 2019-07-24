@@ -278,15 +278,11 @@ getClosureX get_closure_raw x = do
         --  pure $ OtherClosure itbl pts wds
         --
         TSO -> do
-            print "TSO"
-            print (length rawWds)
-            print (length pts)
             unless (length pts >= 1) $
                 fail $ "Expected at least 1 ptr argument to TSO, found "
                         ++ show (length pts)
             pure $ TSOClosure itbl (pts !! 0)
         STACK -> do
-            print "STACK"
             unless (length pts >= 1) $
                 fail $ "Expected at least 1 ptr argument to STACK, found "
                         ++ show (length pts)
