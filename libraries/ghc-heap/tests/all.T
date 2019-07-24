@@ -6,6 +6,14 @@ test('heap_all',
      ],
      compile_and_run, [''])
 
+test('heap_weak',
+     [when(have_profiling(), extra_ways(['prof'])),
+      # These ways produce slightly different heap representations.
+      # Currently we don't test them.
+      omit_ways(['ghci', 'hpc'])
+     ],
+     compile_and_run, [''])
+
 # Test everything except FUNs and PAPs in all ways.
 test('closure_size',
      [extra_files(['ClosureSizeUtils.hs']),
