@@ -1522,18 +1522,20 @@ mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [ValAbs])
 --          [y1,..,yn]
 mkOneConFull x con = do
   let res_ty  = idType x
-      (univ_tvs, _ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
+      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
       -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
       -- be fine after type-checking.
       (_, tc_args) = splitAppTys res_ty
-  let subst  = case con of
+  let subst1 = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args
                   -- The expectJust is always satisfied as long as we filter
                   -- with 'isValidCompleteMatch' in 'allCompleteMatches'
                   PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
                                     -- See Note [Pattern synonym result type] in PatSyn
+
+  (subst, _ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
   let arg_tys' = substTys subst arg_tys
   -- Fresh term variables (VAs) as arguments to the constructor
@@ -1565,8 +1567,8 @@ mkOneSatisfiableConFull delta x con = do
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
   (ic, arg_vars) <- mkOneConFull y con
-  tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr (delta_tm_cs delta'))
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
+  tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr (delta_tm_cs delta') $$ ppr (delta_tm_cs <$> mb_delta))
   pure ((,ic,arg_vars) <$> mb_delta)
 
 -- ----------------------------------------------------------------------------
