@@ -253,6 +253,15 @@ data GenClosure b
         , queue      :: !b              -- ^ ??
         }
 
+  | WeakClosure
+        { info        :: !StgInfoTable
+        , cfinalizers :: !b
+        , key         :: !b
+        , value       :: !b
+        , finalizer   :: !b
+        , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
+        }
+
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
@@ -335,6 +344,7 @@ allClosures (MutVarClosure {..}) = [var]
 allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
+allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer, link]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
 
