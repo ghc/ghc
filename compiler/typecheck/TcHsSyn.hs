@@ -691,10 +691,12 @@ zonkLTcSpecPrags env ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: ZonkEnv
-            -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-            -> MatchGroup GhcTcId (Located (body GhcTcId))
-            -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
+zonkMatchGroup
+  :: Traversable f
+  => ZonkEnv
+  -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
+  -> MatchGroup' f GhcTcId (Located (body GhcTcId))
+  -> TcM (MatchGroup' f GhcTc (Located (body GhcTc)))
 zonkMatchGroup env zBody (MG { mg_alts = (dL->L l ms)
                              , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
@@ -706,10 +708,12 @@ zonkMatchGroup env zBody (MG { mg_alts = (dL->L l ms)
                      , mg_origin = origin }) }
 zonkMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
-zonkMatch :: ZonkEnv
-          -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-          -> LMatch GhcTcId (Located (body GhcTcId))
-          -> TcM (LMatch GhcTc (Located (body GhcTc)))
+zonkMatch
+  :: Traversable f
+  => ZonkEnv
+  -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
+  -> LMatch' f GhcTcId (Located (body GhcTcId))
+  -> TcM (LMatch' f GhcTc (Located (body GhcTc)))
 zonkMatch env zBody (dL->L loc match@(Match { m_pats = pats
                                             , m_grhss = grhss }))
   = do  { (env1, new_pats) <- zonkPats env pats
@@ -1490,11 +1494,8 @@ zonkConStuff env (RecCon (HsRecFields rpats dd))
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------
-zonkPats :: ZonkEnv -> [OutPat GhcTcId] -> TcM (ZonkEnv, [OutPat GhcTc])
-zonkPats env []         = return (env, [])
-zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
-                             ; (env', pats') <- zonkPats env1 pats
-                             ; return (env', pat':pats') }
+zonkPats :: Traversable f => ZonkEnv -> f (OutPat GhcTcId) -> TcM (ZonkEnv, f (OutPat GhcTc))
+zonkPats env = mapAccumLM zonkPat env
 
 {-
 ************************************************************************

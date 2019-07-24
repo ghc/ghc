@@ -7,9 +7,11 @@ TcPat: Typechecking patterns
 -}
 
 {-# LANGUAGE CPP, RankNTypes, TupleSections #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
              , tcPat, tcPat_O, tcPats
@@ -54,6 +56,9 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import ListSetOps ( getNth )
 
+import Control.Monad.Trans.Cont
+import Data.Tuple (swap)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -79,11 +84,22 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
+
 tcPats :: HsMatchContext Name
        -> [LPat GhcRn]            -- Patterns,
        -> [ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
        -> TcM ([LPat GhcTcId], a)
+tcPats ctxt pats pat_tys thing_inside =
+  ASSERT2( equalLength pats pat_tys, ppr pats $$ ppr pat_tys )
+  tcPats' ctxt (zipEqual "tc_lpats" pats pat_tys) thing_inside
+
+tcPats'
+  :: Traversable f
+  => HsMatchContext Name
+  -> f (LPat GhcRn, ExpSigmaType) -- ^ Patterns, and their types
+  -> TcM a -- ^ and the checker for the body
+  -> TcM (f (LPat GhcTcId), a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -96,8 +112,8 @@ tcPats :: HsMatchContext Name
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside
-  = tc_lpats penv pats pat_tys thing_inside
+tcPats' ctxt pats thing_inside
+  = tc_lpats' penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
@@ -270,30 +286,49 @@ Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 -}
 
 --------------------
+
+-- | c.f. http://hackage.haskell.org/package/foldl/docs/Control-Scanl.html
+--
+-- Not sure how similar this is.
 type Checker inp out =  forall r.
                           inp
                        -> PatEnv
                        -> TcM r
                        -> TcM (out, r)
 
-tcMultiple :: Checker inp out -> Checker [inp] [out]
-tcMultiple tc_pat args penv thing_inside
-  = do  { err_ctxt <- getErrCtxt
-        ; let loop _ []
-                = do { res <- thing_inside
-                     ; return ([], res) }
+tcMultiple
+  :: forall f inp out
+  .  Traversable f
+  => f ~ []
+  => Checker inp out
+  -> Checker (f inp) (f out)
+tcMultiple tc_pat args penv (thing_inside :: TcM r) = do
+  err_ctxt <- getErrCtxt
+  let
+    args' :: [TcM (r, f out) -> TcM (out, (r, f out))]
+    args' = fmap
+      (\arg -> (fmap . fmap) swap . tc_pat arg penv . setErrCtxt err_ctxt . fmap swap)
+      args
 
-              loop penv (arg:args)
-                = do { (p', (ps', res))
-                                <- tc_pat arg penv $
-                                   setErrCtxt err_ctxt $
-                                   loop penv args
-                -- setErrCtxt: restore context before doing the next pattern
-                -- See note [Nesting] above
+    outer
+      :: forall g a
+      .  Functor g
+      => TcM (g (f a))
+      -> f (TcM (g (f a)) -> TcM (a, g (f a)))
+      -> TcM (g (f a))
+    outer init = loop
+      where
+        loop
+          :: [TcM (g (f a)) -> TcM (a, g (f a))]
+          -> TcM (g (f a))
+        loop [] = init
+        loop (arg:args) = do
+          (p', g) <- arg $ loop args
+          return $ (\ps -> p':ps) <$> g
 
-                     ; return (p':ps', res) }
-
-        ; loop penv args }
+  fmap swap $ flip outer args' $ do
+    res <- thing_inside
+    pure (res, [])
 
 --------------------
 tc_lpat :: LPat GhcRn
@@ -307,15 +342,14 @@ tc_lpat (dL->L span pat) pat_ty penv thing_inside
                                           thing_inside
         ; return (cL span pat', res) }
 
-tc_lpats :: PatEnv
-         -> [LPat GhcRn] -> [ExpSigmaType]
-         -> TcM a
-         -> TcM ([LPat GhcTcId], a)
-tc_lpats penv pats tys thing_inside
-  = ASSERT2( equalLength pats tys, ppr pats $$ ppr tys )
-    tcMultiple (\(p,t) -> tc_lpat p t)
-                (zipEqual "tc_lpats" pats tys)
-                penv thing_inside
+tc_lpats'
+  :: Traversable f
+  => PatEnv
+  -> f (LPat GhcRn, ExpSigmaType)
+  -> TcM a
+  -> TcM (f (LPat GhcTcId), a)
+tc_lpats' penv patsAndTys thing_inside
+  = tcMultiple (\(p,t) -> tc_lpat p t) patsAndTys penv thing_inside
 
 --------------------
 tc_pat  :: PatEnv
