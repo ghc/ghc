@@ -98,14 +98,8 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    what = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
+    what = FunRhs { mc_fun = fn, mc_fixity = Prefix }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
-    strictness
-      | [L _ match] <- unLoc $ mg_alts matches
-      , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
-      = SrcStrict
-      | otherwise
-      = NoSrcStrict
 
 {-
 @tcMatchesCase@ doesn't do the argument-count check because the

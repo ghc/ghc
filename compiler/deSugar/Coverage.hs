@@ -12,9 +12,12 @@ module Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude
 
+import Data.Array
+import Data.Foldable (toList)
+import Data.List
+
 import qualified GHCi
 import GHCi.RemoteTypes
-import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
 import Type
@@ -34,7 +37,6 @@ import CostCentreState
 import CoreSyn
 import Id
 import VarSet
-import Data.List
 import FastString
 import HscTypes
 import TyCon
@@ -656,7 +658,7 @@ addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders $ toList pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
 addTickMatch _ _ (XMatch nec) = noExtCon nec
@@ -911,7 +913,7 @@ addTickCmdMatchGroup (XMatchGroup nec) = noExtCon nec
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders $ toList pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 addTickCmdMatch (XMatch nec) = noExtCon nec

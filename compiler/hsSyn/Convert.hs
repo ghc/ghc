@@ -41,7 +41,8 @@ import Outputable
 import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
-import Control.Monad( unless, ap )
+import Data.List.NonEmpty (NonEmpty)
+import Control.Monad( (<=<), unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
@@ -830,7 +831,7 @@ cvtLocalDecs doc ds
         failWith (text "Implicit parameters mixed with other bindings")
 
 cvtClause :: HsMatchContext RdrName
-          -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
+          -> TH.Clause -> CvtM (Either (Hs.LMatch GhcPs (LHsExpr GhcPs)))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; let pps = map (parenthesizePat appPrec) ps'
@@ -1222,7 +1223,7 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ "\"" ++ s ++ "\""
 
-cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
+cvtPats :: Traversable t => t TH.Pat -> CvtM (t (Hs.LPat GhcPs))
 cvtPats pats = mapM cvtPat pats
 
 cvtPat :: TH.Pat -> CvtM (Hs.LPat GhcPs)

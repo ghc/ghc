@@ -22,7 +22,7 @@ module HsBinds where
 import GhcPrelude
 
 import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
-                               MatchGroup, pprFunBind,
+                               MatchGroup, MatchGroup', pprFunBind,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
@@ -158,13 +158,11 @@ type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-The distinction between FunBind and PatBind is a bit subtle. FunBind covers
-patterns which resemble function bindings and simple variable bindings.
+The distinction between FunBind and PatBind matches the spec (unlike before). FunBind covers
+patterns which resemble function bindings.
 
     f x = e
     f !x = e
-    f = e
-    !x = e          -- FunRhs has SrcStrict
     x `f` y = e     -- FunRhs has Infix
 
 The actual patterns and RHSs of a FunBind are encoding in fun_matches.
@@ -175,10 +173,6 @@ two bits of information about the match,
     function binder in that match.  E.g. this is legal:
          f True False  = e1
          True `f` True = e2
-
-  * The mc_strictness field is used /only/ for nullary FunBinds: ones
-    with one Match, which has no pats. For these, it describes whether
-    the match is decorated with a bang (e.g. `!x = e`).
 
 By contrast, PatBind represents data constructor patterns, as well as a few
 other interesting cases. Namely,
@@ -1308,4 +1302,4 @@ instance Traversable RecordPatSynField where
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (MatchGroup' [] id (LHsExpr id))
