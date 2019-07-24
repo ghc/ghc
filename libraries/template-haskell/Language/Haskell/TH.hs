@@ -34,6 +34,8 @@ module Language.Haskell.TH(
         lookupValueName, -- :: String -> Q (Maybe Name)
         -- *** Fixity lookup
         reifyFixity,
+        -- *** Type lookup
+        reifyType,
         -- *** Instance lookup
         reifyInstances,
         isInstance,

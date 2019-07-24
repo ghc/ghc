@@ -19,6 +19,9 @@
   * Make the `Lift` typeclass levity-polymorphic and add instances for unboxed
     tuples, unboxed sums, `Int#`, `Word#`, `Addr#`, `Float#`, and `Double#`.
 
+  * Introduce `reifyType` to reify the type or kind of a thing referenced by
+    `Name`.
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
