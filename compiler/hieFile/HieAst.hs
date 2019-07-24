@@ -53,6 +53,116 @@ import Data.Maybe                 ( listToMaybe )
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 
+{- Note [Updating HieAst for changes in the GHC AST]
+
+When adding new syntax or changing a bit of syntax in HIE files, you need
+to pay attention to the following things:
+
+1) Symbols (Names/Vars/Modules) in the following categories:
+
+   a) Symbols that appear in the source file that directly correspond to
+   something the user typed
+   b) Symbols that don't appear in the source, but should be in some sense
+   "visible" to a user, particularly via IDE tooling or the like. This
+   includes things like the names introduced by RecordWildcards (We record
+   all the names introduced by a (..) in HIE files), and will include implicit
+   parameters and evidence variables after one of my pending MRs lands.
+
+2) Subtrees that may contain such symbols
+
+For 1), you need to call `toHie` for one of the following instances
+
+instance ToHie (Context (Located Name)) where ...
+instance ToHie (Context (Located Var)) where ...
+instance ToHie (IEContext (Located ModuleName)) where ...
+
+`Context` is a data type that looks like:
+
+data Context a = C ContextInfo a -- Used for names and bindings
+
+`ContextInfo` is defined in `HieTypes`, and looks like
+
+data ContextInfo
+  = Use                -- ^ regular variable
+  | MatchBind
+  | IEThing IEType     -- ^ import/export
+  | TyDecl
+  -- | Value binding
+  | ValBind
+      BindType     -- ^ whether or not the binding is in an instance
+      Scope        -- ^ scope over which the value is bound
+      (Maybe Span) -- ^ span of entire binding
+  ...
+
+It is used to annotate symbols in the .hie files with some extra information on
+the context in which they occur and should be fairly self explanatory. You need
+to select one that looks appropriate for the symbol usage. In very rare cases,
+you might need to extend this sum type if none of the cases seem appropriate.
+
+If you select one that corresponds to a binding site, you will need to
+provide a `Scope` and a `Span` for your binding. Both of these are basically
+`SrcSpans`.
+
+The `SrcSpan` in the `Scope` is supposed to span over the part of the source
+where the symbol can be legally allowed to occur. For more details on how to
+calculate this, see Note [Capturing Scopes and other non local information]
+in HieAst.
+
+The binding `Span` is supposed to be the span of the entire binding for
+the name.
+
+For a function definition `foo`:
+
+foo x = x + y
+  where y = x^2
+
+This is the span of the entire function definition from `foo x` to `x^2`.
+For a class definition, this is the span of the entire class, and so on.
+If this isn't well defined for your bit of syntax (like a variable bound by
+a lambda), then you can just supply a `Nothing`
+
+There is a test that checks that all symbols in the resulting HIE file
+occur inside their stated `Scope`. This can be turned on by passing the
+-fvalidate-ide-info flag to ghc along with -fwrite-ide-info to generate the
+.hie file.
+
+You may also want to provide a test in testsuite/test/hiefile that includes
+a file containing your new construction, and tests that the calculated scope
+is valid (by using -fvalidate-ide-info)
+
+For subtrees in the AST that may contain symbols, the procedure is fairly
+straightforward.  If you are extending the GHC AST, you will need to provide a
+`ToHie` instance for any new types you may have introduced in the AST.
+
+Here are is an extract from the `ToHie` instance for (LHsExpr (GhcPass p)):
+
+  toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
+      HsVar _ (L _ var) ->
+        [ toHie $ C Use (L mspan var)
+             -- Patch up var location since typechecker removes it
+        ]
+      HsConLikeOut _ con ->
+        [ toHie $ C Use $ L mspan $ conLikeName con
+        ]
+      ...
+      HsApp _ a b ->
+        [ toHie a
+        , toHie b
+        ]
+
+
+If your subtree is `Located` or has a `SrcSpan` available, the output list
+should contain a HieAst `Node` corresponding to the subtree. You can use
+either `makeNode` or `getTypeNode` for this purpose, depending on whether it
+makes sense to assign a `Type` to the subtree. After this, you just need
+to concatenate the result of calling `toHie` on all subexpressions and
+appropriately annotated symbols contained in the subtree.
+
+If your subtree doesn't have a span available, you can omit the `makeNode`
+call and just recurse directly in to the subexpressions.
+
+-}
+
 -- These synonyms match those defined in main/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
@@ -369,6 +479,8 @@ instance HasRealDataConName GhcTc where
     L sp (setVarName var (conLikeName con))
 
 -- | The main worker class
+-- See Note [Updating HieAst for changes in the GHC AST] for more information
+-- on how to add/modify instances for this.
 class ToHie a where
   toHie :: a -> HieM [HieAST Type]
 
