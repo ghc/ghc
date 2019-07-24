@@ -37,6 +37,7 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
+import DynFlags
 import ForeignCall
 import Id
 import PrimOp
@@ -49,7 +50,7 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (unless,void)
+import Control.Monad (unless,void,when)
 import Control.Arrow (first)
 import Data.Function ( on )
 
@@ -854,8 +855,9 @@ cgIdApp strict fun_id args = do
               -- For debugging purposes
               trace = do
                 tickyTagged
-                emitTagTrap (showSDoc dflags (ppr fun_id <> char '-' <> ppr fun)) fun
-                pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
+                when (gopt Opt_DoTagInferenceChecks dflags) $ do
+                  emitTagTrap (showSDoc dflags (ppr fun_id <> char '-' <> ppr fun)) fun
+                  pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun

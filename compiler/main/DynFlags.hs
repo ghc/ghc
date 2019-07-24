@@ -507,6 +507,8 @@ data GeneralFlag
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
+   | Opt_DoTagInferenceChecks          -- ^ Insert runtime checks confirming
+                                       -- the results of tag inference.
    | Opt_NoLlvmMangler                 -- hidden flag
    | Opt_FastLlvm                      -- hidden flag
 
@@ -3474,6 +3476,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_DoAsmLinting))
   , make_ord_flag defGhcFlag "dannot-lint"
         (NoArg (setGeneralFlag Opt_DoAnnotationLinting))
+  , make_ord_flag defGhcFlag "dtag-inference-checks"
+        (NoArg (setGeneralFlag Opt_DoTagInferenceChecks))
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
   , make_ord_flag defGhcFlag "dfaststring-stats"
