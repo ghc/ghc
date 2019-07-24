@@ -10,7 +10,6 @@
 module GHC.Exts.Heap.Closures (
     -- * Closures
       Closure
-    , ClosureW
     , GenClosure(..)
     , PrimType(..)
     , allClosures
@@ -99,7 +98,6 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
 -- Closures
 
 type Closure = GenClosure Box
-type ClosureW = GenClosure Word
 
 -- | This is the representation of a Haskell value on the heap. It reflects
 -- <https://gitlab.haskell.org/ghc/ghc/blob/master/includes/rts/storage/Closures.h>
