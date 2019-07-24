@@ -477,13 +477,13 @@ checkCanonicalInstances cls poly_ty mbinds = do
       | cls == applicativeClassName  = do
           forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
               case mbind of
-                  FunBind { fun_id = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == pureAName, isAliasMG mg == Just returnMName
+                  PatBind { pat_lhs = VarPat _ (dL->L _ name)
+                          , pat_rhs = rhs }
+                      | name == pureAName, isAliasRHS rhs == Just returnMName
                       -> addWarnNonCanonicalMethod1
                             Opt_WarnNonCanonicalMonadInstances "pure" "return"
 
-                      | name == thenAName, isAliasMG mg == Just thenMName
+                      | name == thenAName, isAliasRHS rhs == Just thenMName
                       -> addWarnNonCanonicalMethod1
                             Opt_WarnNonCanonicalMonadInstances "(*>)" "(>>)"
 
@@ -492,13 +492,13 @@ checkCanonicalInstances cls poly_ty mbinds = do
       | cls == monadClassName  = do
           forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
               case mbind of
-                  FunBind { fun_id = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == returnMName, isAliasMG mg /= Just pureAName
+                  PatBind { pat_lhs = VarPat _ (dL->L _ name)
+                          , pat_rhs = rhs }
+                      | name == returnMName, isAliasRHS rhs /= Just pureAName
                       -> addWarnNonCanonicalMethod2
                             Opt_WarnNonCanonicalMonadInstances "return" "pure"
 
-                      | name == thenMName, isAliasMG mg /= Just thenAName
+                      | name == thenMName, isAliasRHS rhs /= Just thenAName
                       -> addWarnNonCanonicalMethod2
                             Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
 
@@ -523,9 +523,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
       | cls == semigroupClassName  = do
           forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
               case mbind of
-                  FunBind { fun_id      = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == sappendName, isAliasMG mg == Just mappendName
+                  PatBind { pat_lhs = VarPat _ (dL->L _ name)
+                          , pat_rhs = rhs }
+                      | name == sappendName, isAliasRHS rhs == Just mappendName
                       -> addWarnNonCanonicalMethod1
                             Opt_WarnNonCanonicalMonoidInstances "(<>)" "mappend"
 
@@ -534,9 +534,9 @@ checkCanonicalInstances cls poly_ty mbinds = do
       | cls == monoidClassName  = do
           forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
               case mbind of
-                  FunBind { fun_id = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == mappendName, isAliasMG mg /= Just sappendName
+                  PatBind { pat_lhs = VarPat _ (dL->L _ name)
+                          , pat_rhs = rhs }
+                      | name == mappendName, isAliasRHS rhs /= Just sappendName
                       -> addWarnNonCanonicalMethod2NoDefault
                             Opt_WarnNonCanonicalMonoidInstances "mappend" "(<>)"
 
@@ -546,14 +546,11 @@ checkCanonicalInstances cls poly_ty mbinds = do
 
     -- | test whether MatchGroup represents a trivial \"lhsName = rhsName\"
     -- binding, and return @Just rhsName@ if this is the case
-    isAliasMG :: MatchGroup GhcRn (LHsExpr GhcRn) -> Maybe Name
-    isAliasMG MG {mg_alts = (dL->L _
-                             [dL->L _ (Match { m_pats = []
-                                             , m_grhss = grhss })])}
-        | GRHSs _ [dL->L _ (GRHS _ [] body)] lbinds <- grhss
-        , EmptyLocalBinds _ <- unLoc lbinds
+    isAliasRHS :: GRHSs GhcRn (LHsExpr GhcRn) -> Maybe Name
+    isAliasRHS (GRHSs _ [dL->L _ (GRHS _ [] body)] lbinds)
+        | EmptyLocalBinds _ <- unLoc lbinds
         , HsVar _ lrhsName  <- unLoc body  = Just (unLoc lrhsName)
-    isAliasMG _ = Nothing
+    isAliasRHS _ = Nothing
 
     -- got "lhs = rhs" but expected something different
     addWarnNonCanonicalMethod1 flag lhs rhs = do

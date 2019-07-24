@@ -1158,10 +1158,12 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
-rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext Name
-             -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-             -> MatchGroup GhcPs (Located (body GhcPs))
-             -> RnM (MatchGroup GhcRn (Located (body GhcRn)), FreeVars)
+rnMatchGroup
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> MatchGroup' f GhcPs (Located (body GhcPs))
+  -> RnM (MatchGroup' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
   = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
@@ -1169,16 +1171,20 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
 rnMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
-rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> LMatch GhcPs (Located (body GhcPs))
-        -> RnM (LMatch GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> LMatch' f GhcPs (Located (body GhcPs))
+  -> RnM (LMatch' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
-rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
-         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-         -> Match GhcPs (Located (body GhcPs))
-         -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch'
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> Match' f GhcPs (Located (body GhcPs))
+  -> RnM (Match' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
   = do  { -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do

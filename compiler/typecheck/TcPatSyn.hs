@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -53,9 +54,13 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
+
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )
+import Data.List.NonEmpty( NonEmpty (..) )
+import Data.Traversable( for )
+import qualified Data.List.NonEmpty as NEL
 
 #include "HsVersions.h"
 
@@ -818,58 +823,62 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
   | isUnidirectional dir
   = return emptyBag
 
-  | Left why <- mb_match_group       -- Can't invert the pattern
-  = setSrcSpan (getLoc lpat) $ failWithTc $
-    vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
-                 <+> quotes (ppr name) <> colon)
-              2 why
-         , text "RHS pattern:" <+> ppr lpat ]
+  | otherwise
+  = do
+    patsyn <- tcLookupPatSyn name
+    case patSynBuilder patsyn of
+      Nothing -> return emptyBag
+        -- This case happens if we found a type error in the
+        -- pattern synonym, recovered, and put a placeholder
+        -- with patSynBuilder=Nothing in the environment
 
-  | Right match_group <- mb_match_group  -- Bidirectional
-  = do { patsyn <- tcLookupPatSyn name
-       ; case patSynBuilder patsyn of {
-           Nothing -> return emptyBag ;
-             -- This case happens if we found a type error in the
-             -- pattern synonym, recovered, and put a placeholder
-             -- with patSynBuilder=Nothing in the environment
+      Just (builder_id, need_dummy_arg) -> case mb_match_group need_dummy_arg of -- Normal case
+        Left why -> -- Can't invert the pattern
+          setSrcSpan (getLoc lpat) $ failWithTc $
+          vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
+                       <+> quotes (ppr name) <> colon)
+                    2 why
+               , text "RHS pattern:" <+> ppr lpat ]
 
-           Just (builder_id, need_dummy_arg) ->  -- Normal case
-    do { -- Bidirectional, so patSynBuilder returns Just
-         let match_group' | need_dummy_arg = add_dummy_arg match_group
-                          | otherwise      = match_group
+        Right match_group -> do -- Bidirectional, so patSynBuilder returns Just
+          let match_group' | need_dummy_arg = add_dummy_arg match_group
+                           | otherwise      = match_group
 
-             bind = FunBind { fun_ext = placeHolderNamesTc
-                            , fun_id      = cL loc (idName builder_id)
-                            , fun_matches = match_group'
-                            , fun_co_fn   = idHsWrapper
-                            , fun_tick    = [] }
+              bind = FunBind { fun_ext = placeHolderNamesTc
+                             , fun_id      = cL loc (idName builder_id)
+                             , fun_matches = match_group'
+                             , fun_co_fn   = idHsWrapper
+                             , fun_tick    = [] }
 
-             sig = completeSigFromId (PatSynCtxt name) builder_id
+              sig = completeSigFromId (PatSynCtxt name) builder_id
 
-       ; traceTc "tcPatSynBuilderBind {" $
-         ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
-       ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
-       ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
-       ; return builder_binds } } }
+          traceTc "tcPatSynBuilderBind {" $
+            ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
+          (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
+          traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
+          return builder_binds
 
-  | otherwise = panic "tcPatSynBuilderBind"  -- Both cases dealt with
   where
-    mb_match_group
+    mb_match_group :: MatchGroup GhcRn (LHsExpr GhcRn)
+    mb_match_group need_dummy_arg
        = case dir of
-           ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr name args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
+           ExplicitBidirectional explicit_mg -> Right explicit_mg
+           ImplicitBidirectional -> do
+             body <- tcPatToExpr name args0 lpat
+             let builder_args0 = (if need_dummy_arg then nlWildPatName L else id) $
+                   for args0 $ \(dL->L loc n) ->
+                     cL loc $ VarPat noExtField $ cL loc n
+             pure $ case NEL.nonEmpty builder_args0 of
+               Nothing -> asdf
+               Just builder_args -> mkMatchGroup Generated [builder_match]
+                 where
+                   builder_match = mkMatch (mkPrefixFunRhs (cL loc name))
+                     builder_args body
+                     (noLoc (EmptyLocalBinds noExtField))
 
-    mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup Generated [builder_match]
-          where
-            builder_args  = [cL loc (VarPat noExtField (cL loc n))
-                            | (dL->L loc n) <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (cL loc name))
-                                    builder_args body
-                                    (noLoc (EmptyLocalBinds noExtField))
-
-    args = case details of
+    args0 :: [Located Name]
+    args0 = case details of
               PrefixCon args     -> args
               InfixCon arg1 arg2 -> [arg1, arg2]
               RecCon args        -> map recordPatSynPatVar args
@@ -879,7 +888,7 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
     add_dummy_arg mg@(MG { mg_alts =
                            (dL->L l [dL->L loc
                                            match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = cL l [cL loc (match { m_pats = nlWildPatName : pats })] }
+      = mg { mg_alts = cL l [cL loc (match { m_pats = nlWildPatName `NEL.cons` pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
