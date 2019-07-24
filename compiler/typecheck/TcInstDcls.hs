@@ -1686,9 +1686,13 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
+       ; let lm_bind = case meth_bind of
+               FunBind {} -> meth_bind
+                 { fun_id = L bndr_loc (idName local_meth_id) }
+               PatBind {} -> meth_bind
+                 { pat_lhs = VarPat noExtField $ L bndr_loc $ idName local_meth_id }
+               _ -> panic "Impossible method binding"
                        -- Substitute the local_meth_name for the binder
-                       -- NB: the binding is always a FunBind
 
             -- taking instance signature into account might change the type of
             -- the local_meth_id
@@ -1913,8 +1917,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
-              bind = noLoc $ mkTopFunBind Generated fn $
-                             [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
+              bind = noLoc $ mkTopHsVarBind0 fn rhs
 
         ; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
                    (vcat [ppr clas <+> ppr inst_tys,

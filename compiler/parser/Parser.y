@@ -40,6 +40,7 @@ import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
 import Data.Char
 import Data.Maybe       ( maybeToList )
+import Data.List.NonEmpty (NonEmpty (..))
 import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
 
@@ -2403,7 +2404,7 @@ decl_no_th :: { LHsDecl GhcPs }
         | '!' aexp rhs          {% runECP_P $2 >>= \ $2 ->
                                    do { let { e = patBuilderBang (getLoc $1) $2
                                             ; l = comb2 $1 $> };
-                                        (ann, r) <- checkValDef SrcStrict e Nothing $3 ;
+                                        (ann, r) <- checkValDef e Nothing $3 ;
                                         runPV $ hintBangPat (comb2 $1 $2) (unLoc e) ;
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
@@ -2418,7 +2419,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         return $! (sL l $ ValD noExtField r) } }
 
         | infixexp_top opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
-                                       do { (ann,r) <- checkValDef NoSrcStrict $1 (snd $2) $3;
+                                       do { (ann,r) <- checkValDef $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
@@ -2711,7 +2712,7 @@ aexp    :: { ECP }
                       amms (mkHsLamPV (comb2 $1 $>) (mkMatchGroup FromSource
                             [sLL $1 $> $ Match { m_ext = noExtField
                                                , m_ctxt = LambdaExpr
-                                               , m_pats = $2:$3
+                                               , m_pats = $2 :| $3
                                                , m_grhss = unguardedGRHSs $5 }]))
                           [mj AnnLam $1, mu AnnRarrow $4] }
         | 'let' binds 'in' exp          {  ECP $
@@ -3137,7 +3138,7 @@ alt     :: { forall b. DisambECP b => PV (LMatch GhcPs (Located b)) }
            : pat alt_rhs  { $2 >>= \ $2 ->
                             ams (sLL $1 $> (Match { m_ext = noExtField
                                                   , m_ctxt = CaseAlt
-                                                  , m_pats = [$1]
+                                                  , m_pats = pure $1
                                                   , m_grhss = snd $ unLoc $2 }))
                                       (fst $ unLoc $2)}
 

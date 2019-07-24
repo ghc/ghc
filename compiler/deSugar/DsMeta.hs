@@ -1,6 +1,8 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedLists #-}
 
 -----------------------------------------------------------------------------
 --
@@ -61,9 +63,11 @@ import Util
 import Maybes
 import MonadUtils
 
-import Data.ByteString ( unpack )
 import Control.Monad
+import Data.ByteString ( unpack )
+import Data.Foldable ( toList )
 import Data.List
+import Data.List.NonEmpty (NonEmpty (..))
 
 -----------------------------------------------------------------------------
 dsBracket :: HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
@@ -1410,10 +1414,14 @@ repMatchTup (dL->L _ (Match { m_pats = [p]
      ; wrapGenSyms (ss1++ss2) match }}}
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
-repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.ClauseQ)
-repClauseTup (dL->L _ (Match { m_pats = ps
+repClauseTup
+  :: Foldable f
+  => LMatch' f GhcRn (LHsExpr GhcRn)
+  -> DsM (Core TH.ClauseQ)
+repClauseTup (dL->L _ (Match { m_pats = ps0
                              , m_grhss = GRHSs _ guards (dL->L _ wheres) })) =
-  do { ss1 <- mkGenSyms (collectPatsBinders ps)
+  do { let ps = toList ps0
+     ; ss1 <- mkGenSyms $ collectPatsBinders $ toList ps
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
      ; (ss2,ds) <- repBinds wheres
@@ -1638,7 +1646,7 @@ rep_bind (dL->L loc (FunBind { fun_id = fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (loc, ans) }
 
-rep_bind (dL->L _ (FunBind { fun_matches = XMatchGroup nec })) = noExtCon nec
+rep_bind (dL->L _ (FunBind { fun_matches = XMatchGroup nec })) = noExtCon1 nec
 
 rep_bind (dL->L loc (PatBind { pat_lhs = pat
                              , pat_rhs = GRHSs _ guards (dL->L _ wheres) }))
@@ -1741,7 +1749,7 @@ repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
 repPatSynDir (ExplicitBidirectional (MG { mg_alts = (dL->L _ clauses) }))
   = do { clauses' <- mapM repClauseTup clauses
        ; repExplBidirPatSynDir (nonEmptyCoreList clauses') }
-repPatSynDir (ExplicitBidirectional (XMatchGroup nec)) = noExtCon nec
+repPatSynDir (ExplicitBidirectional (XMatchGroup nec)) = noExtCon1 nec
 
 repExplBidirPatSynDir :: Core [TH.ClauseQ] -> DsM (Core TH.PatSynDirQ)
 repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
@@ -1777,8 +1785,10 @@ repLambda (dL->L _ (Match { m_pats = ps
                                               (dL->L _ (EmptyLocalBinds _)) } ))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
-      ; lam <- addBinds ss (
-                do { xs <- repLPs ps; body <- repLE e; repLam xs body })
+      ; lam <- addBinds ss $ do
+        xs <- repLPs $ toList ps
+        body <- repLE e
+        repLam xs body
       ; wrapGenSyms ss lam }
 
 repLambda (dL->L _ m) = notHandled "Guarded labmdas" (pprMatch m)
@@ -2664,8 +2674,13 @@ coreList' elt_ty es = MkC (mkListExpr elt_ty (map unC es ))
 nonEmptyCoreList :: [Core a] -> Core [a]
   -- The list must be non-empty so we can get the element type
   -- Otherwise use coreList
-nonEmptyCoreList []           = panic "coreList: empty argument"
-nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
+nonEmptyCoreList [] = panic "coreList: empty argument"
+nonEmptyCoreList (x : xs) = safeNonEmptyCoreList $ x :| xs
+
+safeNonEmptyCoreList :: NonEmpty (Core a) -> Core [a]
+  -- The list must be non-empty so we can get the element type
+  -- Otherwise use coreList
+safeNonEmptyCoreList xs@(MkC x :| _) = MkC $ mkListExpr (exprType x) (unC <$> toList xs)
 
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }

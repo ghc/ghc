@@ -65,6 +65,7 @@ import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List          ( nubBy, partition, (\\) )
+import Data.List.NonEmpty (NonEmpty (..))
 import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
@@ -1282,7 +1283,7 @@ checkPrecMatch op (MG { mg_alts = (dL->L _ ms) })
   = mapM_ check ms
   where
     check (dL->L _ (Match { m_pats = (dL->L l1 p1)
-                                   : (dL->L l2 p2)
+                                   :| (dL->L l2 p2)
                                    : _ }))
       = setSrcSpan (combineSrcSpans l1 l2) $
         do checkPrec op p1 False
@@ -1296,7 +1297,7 @@ checkPrecMatch op (MG { mg_alts = (dL->L _ ms) })
         -- but the second eqn has no args (an error, but not discovered
         -- until the type checker).  So we don't want to crash on the
         -- second eqn.
-checkPrecMatch _ (XMatchGroup nec) = noExtCon nec
+checkPrecMatch _ (XMatchGroup nec) = noExtCon1 nec
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
