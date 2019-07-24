@@ -55,6 +55,7 @@ import Unique
 import UniqDFM
 
 import Control.Monad( when, unless )
+import Data.Foldable ( toList )
 import Data.List ( groupBy )
 import qualified Data.Map as Map
 
@@ -721,12 +722,17 @@ JJQC 30-Nov-1997
 matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
                              , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
-  = do  { dflags <- getDynFlags
+  = do  { --let matches :: [Match' [] _ _]
+          --    matches = runIdentity $
+          --      (traverse . traverse)
+          --      (traverseMatch $ Identity . toList)
+          --      matches0
+        ; dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM newSysLocalDsNoLP arg_tys
-                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
+                           []    -> mapM newSysLocalDsNoLP $ toList arg_tys
+                           (m:_) -> selectMatchVars (map unLoc (toList $ hsLMatchPats m))
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
@@ -743,7 +749,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
   where
     mk_eqn_info vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
-           ; let upats = map (unLoc . decideBangHood dflags) pats
+           ; let upats = map (unLoc . decideBangHood dflags) $ toList pats
                  dicts = collectEvVarsPats upats
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
@@ -758,7 +764,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
-matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
+matchWrapper _ _ (XMatchGroup nec) = noExtCon1 nec
 
 matchEquations  :: HsMatchContext Name
                 -> [MatchId] -> [EquationInfo] -> Type

@@ -5,12 +5,13 @@ Pattern Matching Coverage Checking.
 -}
 
 {-# LANGUAGE CPP            #-}
-{-# LANGUAGE GADTs          #-}
 {-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE GADTs          #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiWayIf     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
-{-# LANGUAGE MultiWayIf     #-}
 
 module Check (
         -- Checking and printing
@@ -59,6 +60,7 @@ import DsUtils       (isTrueLHsExpr)
 import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Foldable (toList)
 import Data.List     (find)
 import Data.Maybe    (catMaybes, isJust, fromMaybe)
 import Control.Monad (forM, when, forM_, zipWithM, filterM)
@@ -383,8 +385,10 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
 checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
-checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
+checkMatches
+  :: Foldable f
+  => DynFlags -> DsMatchContext
+  -> [Id] -> [LMatch' f GhcTc (LHsExpr GhcTc)] -> DsM ()
 checkMatches dflags ctxt vars matches = do
   tracePmD "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
@@ -402,7 +406,10 @@ checkMatches dflags ctxt vars matches = do
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
-checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> PmM PmResult
+checkMatches'
+  :: forall f
+  .  Foldable f
+  => [Id] -> [LMatch' f GhcTc (LHsExpr GhcTc)] -> PmM PmResult
 checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
@@ -412,15 +419,15 @@ checkMatches' vars matches
       (prov, rs,us,ds) <- go matches missing
       return $ PmResult {
                    pmresultProvenance   = prov
-                 , pmresultRedundant    = map hsLMatchToLPats rs
+                 , pmresultRedundant    = fmap hsLMatchToLPats rs
                  , pmresultUncovered    = UncoveredPatterns us
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
-    go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
+    go :: [LMatch' f GhcTc (LHsExpr GhcTc)] -> Uncovered
        -> PmM (Provenance
-              , [LMatch GhcTc (LHsExpr GhcTc)]
+              , [LMatch' f GhcTc (LHsExpr GhcTc)]
               , Uncovered
-              , [LMatch GhcTc (LHsExpr GhcTc)])
+              , [LMatch' f GhcTc (LHsExpr GhcTc)])
     go []     missing = return (mempty, [], missing, [])
     go (m:ms) missing = do
       tracePm "checkMatches': go" (ppr m $$ ppr missing)
@@ -435,12 +442,12 @@ checkMatches' vars matches
         -- useful
         (Covered,  _    )        -> (final_prov,  rs, final_u,   is)
         -- redundant
-        (NotCovered, NotDiverged) -> (final_prov, m:rs, final_u,is)
+        (NotCovered, NotDiverged) -> (final_prov, m : rs, final_u,is)
         -- inaccessible
         (NotCovered, Diverged )   -> (final_prov,  rs, final_u, m:is)
 
-    hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
+    hsLMatchToLPats :: LMatch' f id body -> Located [LPat id]
+    hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l $ toList pats
     hsLMatchToLPats _                                   = panic "checkMatches'"
 
 -- | Check an empty case expression. Since there are no clauses to process, we
@@ -1245,8 +1252,11 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       | otherwise = subsetOf (x:xs) ys
 
 -- Translate a single match
-translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM (PatVec,[PatVec])
+translateMatch
+  :: Foldable f
+  => FamInstEnvs
+  -> LMatch' f GhcTc (LHsExpr GhcTc)
+  -> DsM (PatVec,[PatVec])
 translateMatch fam_insts (dL->L _ (Match { m_pats = lpats, m_grhss = grhss })) =
   do
   pats'   <- concat <$> translatePatVec fam_insts pats
@@ -1257,7 +1267,7 @@ translateMatch fam_insts (dL->L _ (Match { m_pats = lpats, m_grhss = grhss })) =
     extractGuards (dL->L _ (GRHS _ gs _)) = map unLoc gs
     extractGuards _                       = panic "translateMatch"
 
-    pats   = map unLoc lpats
+    pats   = map unLoc $ toList lpats
     guards = map extractGuards (grhssGRHSs grhss)
 translateMatch _ _ = panic "translateMatch"
 

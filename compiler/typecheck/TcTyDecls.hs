@@ -13,6 +13,7 @@ files for imported data types.
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedLists #-}
 
 module TcTyDecls(
         RolesInfo,
@@ -66,6 +67,7 @@ import FV
 import Module
 
 import Control.Monad
+import Data.List.NonEmpty ()
 
 {-
 ************************************************************************

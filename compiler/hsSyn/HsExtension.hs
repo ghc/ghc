@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE EmptyDataDeriving #-}
@@ -6,10 +7,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 
@@ -73,6 +74,15 @@ instance Outputable NoExtField where
 noExtField :: NoExtField
 noExtField = NoExtField
 
+data NoExtField1 a = NoExtField1
+  deriving (Data,Eq,Ord)
+
+instance Outputable (NoExtField1 a) where
+  ppr NoExtField1 = text "NoExtField"
+
+noExtField1 :: NoExtField1 a
+noExtField1 = NoExtField1
+
 -- | Used in TTG extension constructors that have yet to be extended with
 -- anything. If an extension constructor has 'NoExtCon' as its field, it is
 -- not intended to ever be constructed anywhere, and any function that consumes
@@ -91,6 +101,15 @@ instance Outputable NoExtCon where
 -- | Eliminate a 'NoExtCon'. Much like 'Data.Void.absurd'.
 noExtCon :: NoExtCon -> a
 noExtCon x = case x of {}
+
+data NoExtCon1 a
+  deriving (Data,Eq,Ord)
+
+instance Outputable (NoExtCon1 a) where
+  ppr = noExtCon1
+
+noExtCon1 :: NoExtCon1 a -> b
+noExtCon1 x = case x of {}
 
 {-
 Note [NoExtCon and strict fields]
@@ -725,12 +744,14 @@ type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
 
 -- -------------------------------------
 
-type family XMG           x b
-type family XXMatchGroup  x b
+-- TODO make type constructor be representational in functor argument.
 
-type ForallXMatchGroup (c :: * -> Constraint) (x :: *) (b :: *) =
-       ( c (XMG          x b)
-       , c (XXMatchGroup x b)
+type family XMG           x b :: (Type -> Type) -> Type
+type family XXMatchGroup  x b :: (Type -> Type) -> Type
+
+type ForallXMatchGroup (c :: * -> Constraint) (x :: *) (b :: *) (f :: * -> *) =
+       ( c (XMG          x b f)
+       , c (XXMatchGroup x b f)
        )
 
 -- -------------------------------------

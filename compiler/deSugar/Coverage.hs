@@ -12,9 +12,12 @@ module Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude
 
+import Data.Array
+import Data.Foldable (toList)
+import Data.List
+
 import qualified GHCi
 import GHCi.RemoteTypes
-import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
 import Type
@@ -34,7 +37,6 @@ import CostCentreState
 import CoreSyn
 import Id
 import VarSet
-import Data.List
 import FastString
 import HscTypes
 import TyCon
@@ -650,13 +652,13 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = dL->L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = cL l matches' }
-addTickMatchGroup _ (XMatchGroup nec) = noExtCon nec
+addTickMatchGroup _ (XMatchGroup nec) = noExtCon1 nec
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
 addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats
                                                , m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders $ toList pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
 addTickMatch _ _ (XMatch nec) = noExtCon nec
@@ -907,11 +909,11 @@ addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
 addTickCmdMatchGroup mg@(MG { mg_alts = (dL->L l matches) }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
   return $ mg { mg_alts = cL l matches' }
-addTickCmdMatchGroup (XMatchGroup nec) = noExtCon nec
+addTickCmdMatchGroup (XMatchGroup nec) = noExtCon1 nec
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
-  bindLocals (collectPatsBinders pats) $ do
+  bindLocals (collectPatsBinders $ toList pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
 addTickCmdMatch (XMatch nec) = noExtCon nec
