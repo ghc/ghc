@@ -17,8 +17,6 @@ import GhcPrelude hiding ((<*>))
 
 import {-# SOURCE #-} StgCmmBind ( cgBind )
 
-import CmmUtils (cmmIsNotTagged)
-
 import StgCmmMonad
 import StgCmmHeap
 import StgCmmEnv
@@ -39,7 +37,6 @@ import Cmm
 import CmmInfo
 import CoreSyn
 import DataCon
-import DynFlags
 import ForeignCall
 import Id
 import PrimOp
@@ -52,7 +49,7 @@ import Util
 import FastString
 import Outputable
 
-import Control.Monad (unless,void, when)
+import Control.Monad (unless,void)
 import Control.Arrow (first)
 import Data.Function ( on )
 
@@ -816,21 +813,19 @@ cgConApp con stg_args
 
 -- | Cause memory fault on tag missprediction
 --   expectTag informs if we expect a tag or not.
-emitTagTrap :: Outputable what => what -> CmmExpr -> Bool -> FCode ()
-emitTagTrap what fun expectTag = do
+-- TODO: Call barf instead        -> Maybe Int            -- size prefix
+emitTagTrap :: String -> CmmExpr -> FCode ()
+emitTagTrap onWhat fun = do
   { dflags <- getDynFlags
-
   ; lret <- newBlockId
   ; lfault <- newBlockId
-  ; tscope <- getTickScope
-  ; pprTraceM "emitTagTrap" (ppr what)
-  ; let check = if expectTag then cmmIsTagged else cmmIsNotTagged
-  ; emit $
-      -- The actual debug code block
-      mkCbranch (check dflags fun)
-                lret lfault Nothing <*>
-      outOfLine lfault (mkStore (CmmLit $ CmmInt 0 W64) (CmmLit $ CmmInt 0 W64) <*> mkBranch lret,tscope) <*>
-      mkLabel lret tscope
+  -- ; tscope <- getTickScope
+  ; pprTraceM "emitTagTrap" (ppr onWhat)
+  ; emit $ mkCbranch (cmmIsTagged dflags fun)
+                     lret lfault Nothing
+  ; emitLabel lfault
+  ; emitBarf ("Tag inference failed on:" ++ onWhat)
+  ; emitLabel lret
   }
 
 
@@ -840,7 +835,6 @@ cgIdApp strict fun_id args = do
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
     let fun_arg     = StgVarArg fun_id
-        profiling   = WayProf `elem` ways dflags
         fun_name    = idName    fun_id
         fun         = idInfoToAmode fun_info :: CmmExpr
         lf_info     = cg_lf         fun_info
@@ -852,24 +846,19 @@ cgIdApp strict fun_id args = do
         ReturnIt
           | isVoidTy (idType fun_id) -> emitReturn []
           | otherwise                -> emitReturn [fun]
-          -- ToDo: does ReturnIt guarantee tagged?
 
-        -- A value in WHNF, but determined by Tag inference.
-        -- TODO: This is a terrible hack and should be done inside getCallMethod.
-        retKind
-          | isWHNF && not (isVoidTy (idType fun_id))
-          -- , not profiling
-          -> do
-            -- TODO: Enable for debug
-            -- when debugIsOn
-            -- (emitTagTrap fun_id fun True)
+        InferedReturnIt
+          | isVoidTy (idType fun_id) -> trace >> emitReturn []
+          | otherwise                -> trace >> emitReturn [fun]
+            where
+              -- For debugging purposes
+              trace = do
+                tickyTagged
+                emitTagTrap (showSDoc dflags (ppr fun_id <> char '-' <> ppr fun)) fun
+                pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
 
-            tickyTagged
-            pprTraceM "WHNF:" (ppr fun_id <+> ppr args <+> ppr retKind)
-            emitReturn [fun]
-
-        EnterIt untagged -> ASSERT( null args )  -- Discarding arguments
-                   emitEnter untagged fun
+        EnterIt -> ASSERT( null args )  -- Discarding arguments
+                   emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines
                 { tickySlowCall lf_info args
@@ -890,16 +879,6 @@ cgIdApp strict fun_id args = do
           ; emitMultiAssign lne_regs cmm_args
           ; emit (mkBranch blk_id)
           ; return AssignedDirectly }
-
-      where
-        isWHNF | not (null args)
-               = False
-              --  = pprPanic "Strict value applied to args:" (ppr fun_id <+> text "args:" <+> ppr args)
-               | NoEnter <- strict
-               = ASSERT( null args )
-                 True
-              --  | null args = True
-               | otherwise = False
 
 -- Note [Self-recursive tail calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1008,8 +987,8 @@ cgIdApp strict fun_id args = do
 -- we can turn a call into a self-recursive jump.
 --
 
-emitEnter :: AppEnters -> CmmExpr -> FCode ReturnKind
-emitEnter untagged fun = do
+emitEnter :: CmmExpr -> FCode ReturnKind
+emitEnter fun = do
   { dflags <- getDynFlags
   ; adjustHpBackwards
   ; sequel <- getSequel
@@ -1023,7 +1002,7 @@ emitEnter untagged fun = do
       --
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
-      Return -> when (untagged /= MayEnter) (pprTraceM "Return " $ ppr (untagged, fun)) >> do
+      Return -> do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkJump dflags NativeNodeCall entry
                         [cmmUntag dflags fun] updfr_off
@@ -1055,10 +1034,7 @@ emitEnter untagged fun = do
       -- that the continuation can be reused by the heap-check failure
       -- code in the enclosing case expression.
       --
-      -- If we statically know we have to enter the result then we omit
-      -- the tag check and the associated conditional jump.
-      --
-      AssignTo res_regs _ -> do -- when (untagged /= MayEnter) (pprTraceM "Assign " $ ppr (untagged, fun)) >> do
+      AssignTo res_regs _ -> do
        { lret <- newBlockId
        ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
        ; lcall <- newBlockId
@@ -1069,28 +1045,18 @@ emitEnter untagged fun = do
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry :: Bool -> CmmExpr
-             entry untagNode
-                -- | untagNode = entryCode dflags (closureInfoPtr dflags (cmmUntag dflags (CmmReg nodeReg)))
-                | otherwise = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
-             the_call untagNode = toCall (entry untagNode) (Just lret) updfr_off off outArgs regs
+       ; let entry = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
+             the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
-       -- We either jump directly when we can assume the pointer will be untagged,
-       -- or only after a tag check otherwise.
-       ; let untag = untagged == AlwaysEnter
-       ; when( untag ) $ do
-          tickyUntagged (cmmIsTagged dflags fun)
-          emit $ mkComment (fsLit "expect untagged")
        ; emit $
            copyout <*>
-           (if untag
-            then mkAssign (nodeReg) (cmmUntag dflags $ CmmReg nodeReg) <*> mkBranch lcall
-            else mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
-                     lret lcall Nothing) <*>
-           outOfLine lcall (the_call untag,tscope) <*>
+           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
+                     lret lcall Nothing <*>
+           outOfLine lcall (the_call,tscope) <*>
            mkLabel lret tscope <*>
            copyin
        ; return (ReturnedTo lret off)
+
        }
   }
 

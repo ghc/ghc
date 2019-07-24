@@ -145,9 +145,7 @@ getCgIdInfo id
                           ASSERT( idType id `eqType` addrPrimTy )
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
-              in return $
-                  -- pprTrace "getCgIdInfoExtern" (ppr id <+> ppr (mkLFImported id)) $
-                  litIdInfo dflags id (mkLFImported dflags id) (CmmLabel ext_lbl)
+              in return $ litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}
