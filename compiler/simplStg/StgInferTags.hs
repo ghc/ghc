@@ -986,7 +986,8 @@ findTags this_mod us binds =
             finalBinds <- rewriteTopBinds binds'
             return $! finalBinds
     in  (seqTopBinds binds') `seq`
-        pprTrace "foundBinds" (ppr this_mod) binds'
+            -- pprTrace "foundBinds" (ppr this_mod) 
+                binds'
 
 
 -- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
@@ -1903,7 +1904,9 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     -- See Note [App Data Flow]
     mkResult :: AM EnterLattice
     mkResult
-        | isAbsent = pprTrace "Absent:" (ppr f) $ return $! flatLattice NeverEnter
+        | isAbsent = 
+            -- pprTrace "Absent:" (ppr f) $ 
+            return $! flatLattice NeverEnter
 
         -- I'm fairly certain we can do better than this on mutual recursion.
         -- But it also seems to change hardly anything on GHC
@@ -1975,7 +1978,7 @@ solveConstraints = do
         -- doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         -- -- mapM_ (pprTraceM "node:" . ppr) (idList ++ uqList ++ doneList)
         -- pprTraceM "Initial: (uqList, doneList)" (ppr (uqCount, doneCount))
-        pprTraceM "IterateStart" empty
+        -- pprTraceM "IterateStart" empty
         iterate 1
         -- iterate (-11)
 
@@ -2001,7 +2004,7 @@ solveConstraints = do
         -- pprTraceM "iterate - pass " (ppr n)
         uqNodes <- fs_uqNodeMap <$> get
         -- return $! seqEltsUFM rnf uqNodes
-        pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
+        -- pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
 
         progress <- or <$> (mapM update (sccNodes . nonDetEltsUFM $ uqNodes)) :: AM Bool
         if (not progress)
@@ -2073,7 +2076,7 @@ rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
         then return $! (StgRhsCon noExtFieldSilent ccs con args)
         else do
             -- tagInfo <- lookupNodeResult node_id
-            pprTraceM "Creating closure for " $ ppr _binding <+> ppr node_id
+            -- pprTraceM "Creating closure for " $ ppr _binding <+> ppr node_id
             conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
             return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr)
 
@@ -2108,7 +2111,7 @@ rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
         then return $! (StgRhsCon noExtFieldSilent ccs con args, id)
         else do
             -- tagInfo <- lookupNodeResult node_id
-            pprTraceM "Creating seqs (wrapped) for " $ ppr _binding <+> ppr node_id
+            -- pprTraceM "Creating seqs (wrapped) for " $ ppr _binding <+> ppr node_id
 
             evaldArgs <- mapM mkLocalArgId evalArgs -- Create case binders
             let varMap = zip evalArgs evaldArgs -- Match them up with original ids
@@ -2178,7 +2181,7 @@ rewriteConApp (StgConApp nodeId con args tys) = do
     let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
     if (not $ null evalArgs)
         then do
-            pprTraceM "Creating conAppSeqs for " $ ppr nodeId <+> parens ( ppr evalArgs ) -- <+> parens ( ppr fieldInfos )
+            -- pprTraceM "Creating conAppSeqs for " $ ppr nodeId <+> parens ( ppr evalArgs ) -- <+> parens ( ppr fieldInfos )
             mkSeqs evalArgs con args tys
         else return $! (StgConApp noExtFieldSilent con args tys)
 
