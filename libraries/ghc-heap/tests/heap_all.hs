@@ -14,6 +14,7 @@ import GHC.IORef
 import GHC.MVar
 import GHC.Stack
 import GHC.STRef
+import GHC.Weak
 import GHC.Word
 import System.Environment
 import System.Mem
@@ -145,6 +146,16 @@ exBlockingQClosure = BlockingQueueClosure
     , blackHole = asBox []
     , owner = asBox []
     , queue = asBox []
+    }
+
+exWeakClosure :: Closure
+exWeakClosure = WeakClosure
+    { info = exItbl{tipe=WEAK}
+    , cfinalizers = asBox []
+    , key = asBox []
+    , value = asBox []
+    , finalizer = asBox []
+    , link = asBox []
     }
 
 exIntClosure :: Closure
@@ -287,6 +298,12 @@ main = do
     -- getClosureData (Just 1) >>=
     --    assertClosuresEq exBlockingQClosure
 
+    -- Weak pointer
+    Weak wk <- mkWeak (1 :: Int) (1 :: Int) Nothing
+
+    getClosureData wk >>=
+        assertClosuresEq exWeakClosure
+
     -----------------------------------------------------
     -- Unboxed unlifted types
 
@@ -378,6 +395,7 @@ compareClosures expected actual =
                     MVarClosure{}           -> [ sEq (tipe . info) ]
                     MutVarClosure{}         -> [ sEq (tipe . info) ]
                     BlockingQueueClosure{}  -> [ sEq (tipe . info) ]
+                    WeakClosure{}           -> [ sEq (tipe . info) ]
                     IntClosure{}            -> [ sEq ptipe
                                                , sEq intVal    ]
                     WordClosure{}           -> [ sEq ptipe
