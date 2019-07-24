@@ -23,7 +23,6 @@ module StgLiftLams.Analysis (
 import GhcPrelude
 
 import BasicTypes
-import DataCon (StrictnessMark(..))
 import Demand
 import DynFlags
 import Id

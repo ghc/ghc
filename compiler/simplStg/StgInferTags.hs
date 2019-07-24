@@ -1329,12 +1329,12 @@ wrappting it in a seq is of little consequence.
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag -> Id -> StgRhs -> AM InferStgRhs
-nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ _ccs con args)
+nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
         let node = mkConstNode node_id (flatLattice NeverEnter)
         markDone $ node `set_desc` text "rhsConNullary"
-        return $! (StgRhsCon node_id _ccs con args)
+        return $! (StgRhsCon node_id ccs con args)
   | otherwise = do
 
         mapM_ (addImportedNode this_mod ) [v | StgVarArg v <- args]
@@ -1351,7 +1351,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ _ccs con args)
 #endif
                         }
         addNode notDone node
-        return $! (StgRhsCon node_id _ccs con args)
+        return $! (StgRhsCon node_id ccs con args)
   where
     node_id = mkLocalIdNodeId ctxt binding
     node_update this_id node_inputs = do
@@ -1440,7 +1440,6 @@ guarantee that there are no call sites outside of this module.
 Something currently not tracked by GHC.
 
 -}
-
 
 nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
     (body', body_id) <- nodeExpr this_mod ctxt' body
