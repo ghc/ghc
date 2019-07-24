@@ -12,9 +12,9 @@ import GHC.Int
 import GHC.IO
 import GHC.IORef
 import GHC.MVar
-import GHC.Prim
 import GHC.Stack
 import GHC.STRef
+import GHC.Weak
 import GHC.Word
 import System.Environment
 import System.Mem
@@ -199,7 +199,6 @@ data BA = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
 data B = B BCO#
 data APC a = APC a
-data WK v = WK (Weak# v)
 
 main :: IO ()
 main = do
@@ -300,9 +299,8 @@ main = do
     --    assertClosuresEq exBlockingQClosure
 
     -- Weak pointer
-    WK wk <- IO $ \s ->
-        case mkWeakNoFinalizer# (1 :: Int) (1 :: Int) s of
-            (# s1, w #) -> (# s1, WK w #)
+    Weak wk <- mkWeak (1 :: Int) (1 :: Int) Nothing
+
     getClosureData wk >>=
         assertClosuresEq exWeakClosure
 
