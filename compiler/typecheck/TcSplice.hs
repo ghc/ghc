@@ -2029,7 +2029,10 @@ reifyTypeOfThing th_name = do
       reifyPatSynType (patSynSig ps)
     ATcId{tct_id = id} -> zonkTcType (idType id) >>= reifyType
     ATyVar _ tctv -> zonkTcTyVar tctv >>= reifyType
-    _ -> failWithTc (text "No type or kind associated with" <+> ppr thing)
+    -- Impossible cases, supposedly:
+    AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
+    ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"
+    APromotionErr _ -> panic "reifyTypeOfThing: APromotionErr"
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget
