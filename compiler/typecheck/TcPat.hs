@@ -79,11 +79,21 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
+
 tcPats :: HsMatchContext Name
        -> [LPat GhcRn]            -- Patterns,
        -> [ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
        -> TcM ([LPat GhcTcId], a)
+tcPats ctxt pats pat_tys thing_inside = 
+  tcPats' ctxt (zip pats pat_tys) thing_inside
+
+tcPats'
+  :: Traversable f
+  => HsMatchContext Name
+  -> f (LPat GhcRn, ExpSigmaType) -- ^ Patterns, and their types
+  -> TcM a -- ^ and the checker for the body
+  -> TcM (f (LPat GhcTcId), a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -96,8 +106,8 @@ tcPats :: HsMatchContext Name
 --   3. Check the body
 --   4. Check that no existentials escape
 
-tcPats ctxt pats pat_tys thing_inside
-  = tc_lpats penv pats pat_tys thing_inside
+tcPats' ctxt pats thing_inside
+  = tc_lpats penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 

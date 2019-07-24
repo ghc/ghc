@@ -15,6 +15,7 @@ free variables.
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module RnExpr (
         rnLExpr, rnExpr, rnStmts
@@ -62,6 +63,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Ord
 import Data.Array
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 
 import Unique           ( mkVarOccUnique )
@@ -2134,7 +2136,7 @@ getMonadFailOp
                       (nlHsApp (noLoc $ syn_expr fromStringExpr)
                                 (noLoc $ syn_expr arg_syn_expr))
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
+              unLoc $ mkHsLam (pure @NonEmpty $ noLoc $ VarPat noExtField $ noLoc arg_name) body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

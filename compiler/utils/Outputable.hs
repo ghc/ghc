@@ -116,7 +116,6 @@ import Data.Foldable (toList)
 import Data.Int
 import qualified Data.IntMap as IM
 import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NEL
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String

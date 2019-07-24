@@ -65,6 +65,7 @@ import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List          ( nubBy, partition, (\\) )
+import Data.List.NonEmpty (NonEmpty (..))
 import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
@@ -1282,7 +1283,7 @@ checkPrecMatch op (MG { mg_alts = (dL->L _ ms) })
   = mapM_ check ms
   where
     check (dL->L _ (Match { m_pats = (dL->L l1 p1)
-                                   : (dL->L l2 p2)
+                                   :| (dL->L l2 p2)
                                    : _ }))
       = setSrcSpan (combineSrcSpans l1 l2) $
         do checkPrec op p1 False
