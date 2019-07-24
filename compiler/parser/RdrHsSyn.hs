@@ -123,7 +123,7 @@ import ForeignCall
 import PrelNames        ( allNameStrings )
 import SrcLoc
 import Unique           ( hasKey )
-import OrdList          ( OrdList, fromOL )
+import OrdList          ( OrdList, NonEmptyOrdList, fromOL, fromOLNE )
 import Bag              ( emptyBag, consBag )
 import Outputable
 import FastString
@@ -137,6 +137,7 @@ import ErrUtils ( Messages )
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
@@ -576,7 +577,7 @@ tyConToDataCon loc tc
 
 mkPatSynMatchGroup :: Located RdrName
                    -> Located (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (MatchGroup' [] GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (dL->L loc patsyn_name) (dL->L _ decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr loc)
@@ -589,12 +590,14 @@ mkPatSynMatchGroup (dL->L loc patsyn_name) (dL->L _ decls) =
                wrongNameBindingErr loc decl
            ; match <- case details of
                PrefixCon pats -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt, m_pats = pats
-                                                , m_grhss = rhs }
+                                                , m_ctxt = ctxt
+                                                , m_pats = pats
+                                                , m_grhss = rhs
+                                                }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
-                                   , mc_strictness = NoSrcStrict }
+                                   }
 
                InfixCon p1 p2 -> return $ Match { m_ext = noExtField
                                                 , m_ctxt = ctxt
@@ -603,7 +606,7 @@ mkPatSynMatchGroup (dL->L loc patsyn_name) (dL->L _ decls) =
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
-                                   , mc_strictness = NoSrcStrict }
+                                   }
 
                RecCon{} -> recordPatSynErr loc pat
            ; return $ cL loc match }
@@ -1167,7 +1170,7 @@ checkFunBind :: SrcStrictness
              -> SrcSpan
              -> Located RdrName
              -> LexicalFixity
-             -> [Located (PatBuilder GhcPs)]
+             -> NonEmpty (Located (PatBuilder GhcPs))
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
 checkFunBind strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
@@ -1180,7 +1183,7 @@ checkFunBind strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
                                         , m_ctxt = FunRhs
                                             { mc_fun    = fun
                                             , mc_fixity = is_infix
-                                            , mc_strictness = strictness }
+                                            }
                                         , m_pats = ps
                                         , m_grhss = grhss })])
         -- The span of the match covers the entire equation.
@@ -1269,7 +1272,7 @@ splitBang _ = Nothing
 
 -- See Note [isFunLhs vs mergeDataCon]
 isFunLhs :: Located (PatBuilder GhcPs)
-      -> P (Maybe (Located RdrName, LexicalFixity, [Located (PatBuilder GhcPs)],[AddAnn]))
+      -> P (Maybe (Located RdrName, LexicalFixity, NonEmpty (Located (PatBuilder GhcPs)),[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --
