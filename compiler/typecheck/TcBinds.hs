@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -18,7 +19,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
 
 import GhcPrelude
 
-import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
+import {-# SOURCE #-} TcMatches ( tcGRHSsVar, tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import CoreSyn (Tickish (..))
@@ -1266,7 +1267,7 @@ tcMonoBinds is_rec sig_fn no_gen
   , Nothing <- sig_fn name   -- ...with no type signature
   =     -- Note [Single function non-recursive binding special-case]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        -- In this very special case we infer the type of the
+        -- In these very special case we infer the type of the
         -- right hand side first (it may have a higher-rank type)
         -- and *then* make the monomorphic Id for the LHS
         -- e.g.         f = \(x::forall a. a->a) -> <body>
@@ -1291,6 +1292,43 @@ tcMonoBinds is_rec sig_fn no_gen
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
 
+-- TODO stricter interleaving of spans with trees that grow would make this more
+-- obviously needed,
+tcMonoBinds is_rec sig_fn no_gen
+           [ dL->L b_loc pb@(PatBind { pat_lhs = XPat (L _ vp@(VarPat _ _)) }) ]
+  = tcMonoBinds is_rec sig_fn no_gen [ L b_loc $ pb { pat_lhs = vp }]
+
+-- See Note [Single function non-recursive binding special-case], same special
+-- case but for no-arg binders being handled here.
+tcMonoBinds is_rec sig_fn no_gen
+           [ dL->L b_loc (PatBind { pat_lhs = VarPat x (dL->L nm_loc name)
+                                  , pat_rhs = grhs
+                                  , pat_ext = fvs })]
+  | NonRecursive <- is_rec
+  , Nothing <- sig_fn name
+  = setSrcSpan b_loc $ do
+    -- See previous case of @tcMonoBinds@ for details
+    -- TODO where to put co_fn!
+    ((co_fn, grhs'), rhs_ty)
+      <- tcInferInst $ \ exp_ty ->
+         tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
+         tcGRHSsVar name grhs exp_ty
+
+    mono_id <- newLetBndr no_gen name rhs_ty
+    pure
+      ( unitBag $ cL b_loc $ PatBind
+          { pat_lhs = VarPat x $ cL nm_loc mono_id
+          , pat_rhs = grhs'
+          , pat_ext = NPatBindTc fvs rhs_ty -- TODO sketchy which type here
+          , pat_ticks = ([], [])
+          }
+      , pure @[] $ MBI
+          { mbi_poly_name = name
+          , mbi_sig       = Nothing
+          , mbi_mono_id   = mono_id
+          }
+      )
+
 tcMonoBinds _ sig_fn no_gen binds
   = do  { tc_binds <- mapM (wrapLocM (tcLhs sig_fn no_gen)) binds
 
@@ -1312,7 +1350,6 @@ tcMonoBinds _ sig_fn no_gen binds
                     mapM (wrapLocM tcRhs) tc_binds
 
         ; return (listToBag binds', mono_infos) }
-
 
 ------------------------
 -- tcLhs typechecks the LHS of the bindings, to construct the environment in which
