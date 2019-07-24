@@ -12,12 +12,19 @@ can be appended in linear time.
 
 module OrdList (
         OrdList,
-        nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
-        headOL,
-        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse
+        nilOL, isNilOL,
+        unitOL, appOL, consOL, snocOL, concatOL, lastOL, headOL,
+        mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
+        NonEmptyOrdList,
+        unitOLNE, appOLNE, consOLNE, snocOLNE, concatOLNE, lastOLNE, headOLNE,
+        mapOLNE, fromOLNE, toOLNE, foldrOLNE, foldlOLNE, reverseOLNE, fromOLReverseNE
 ) where
 
 import GhcPrelude
+
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NEL
 
 import Outputable
 
@@ -29,19 +36,29 @@ infixr 5  `consOL`
 
 data OrdList a
   = None
-  | One a
-  | Many [a]          -- Invariant: non-empty
+  | NE {-# UNPACK #-} !(NonEmptyOrdList a)
+  deriving (Functor)
+
+data NonEmptyOrdList a
+  = One a
+  | Many (NonEmpty a)
   | Cons a (OrdList a)
   | Snoc (OrdList a) a
-  | Two (OrdList a) -- Invariant: non-empty
-        (OrdList a) -- Invariant: non-empty
+  | Two (NonEmptyOrdList a)
+        (NonEmptyOrdList a)
   deriving (Functor)
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
 
+instance Outputable a => Outputable (NonEmptyOrdList a) where
+  ppr ol = ppr (fromOLNE ol)  -- Convert to list and print that
+
 instance Semigroup (OrdList a) where
   (<>) = appOL
+
+instance Semigroup (NonEmptyOrdList a) where
+  (<>) = appOLNE
 
 instance Monoid (OrdList a) where
   mempty = nilOL
@@ -51,8 +68,14 @@ instance Monoid (OrdList a) where
 instance Foldable OrdList where
   foldr = foldrOL
 
+instance Foldable NonEmptyOrdList where
+  foldr = foldrOLNE
+
 instance Traversable OrdList where
   traverse f xs = toOL <$> traverse f (fromOL xs)
+
+instance Traversable NonEmptyOrdList where
+  traverse f xs = toOLNE <$> traverse f (fromOLNE xs)
 
 nilOL    :: OrdList a
 isNilOL  :: OrdList a -> Bool
@@ -65,84 +88,140 @@ concatOL :: [OrdList a] -> OrdList a
 headOL   :: OrdList a   -> a
 lastOL   :: OrdList a   -> a
 
+unitOLNE   :: a           -> NonEmptyOrdList a
+snocOLNE   :: OrdList a   -> a         -> NonEmptyOrdList a
+consOLNE   :: a           -> OrdList a -> NonEmptyOrdList a
+appOLNE    :: NonEmptyOrdList a   -> NonEmptyOrdList a -> NonEmptyOrdList a
+concatOLNE :: NonEmpty (NonEmptyOrdList a) -> NonEmptyOrdList a
+headOLNE   :: NonEmptyOrdList a   -> a
+lastOLNE   :: NonEmptyOrdList a   -> a
+
 
 nilOL        = None
-unitOL as    = One as
-snocOL as   b    = Snoc as b
-consOL a    bs   = Cons a bs
+unitOL as    = NE $ unitOLNE as
+snocOL as   b    = NE $ snocOLNE as b
+consOL a    bs   = NE $ consOLNE a bs
 concatOL aas = foldr appOL None aas
 
+unitOLNE as    = One as
+snocOLNE as   b    = Snoc as b
+consOLNE a    bs   = Cons a bs
+concatOLNE aas = foldr1 appOLNE aas
+
 headOL None        = panic "headOL"
-headOL (One a)     = a
-headOL (Many as)   = head as
-headOL (Cons a _)  = a
-headOL (Snoc as _) = headOL as
-headOL (Two as _)  = headOL as
+headOL (NE ol)     = headOLNE ol
+
+headOLNE (One a)     = a
+headOLNE (Many as)   = NEL.head as
+headOLNE (Cons a _)  = a
+headOLNE (Snoc as _) = headOL as
+headOLNE (Two as _)  = headOLNE as
 
 lastOL None        = panic "lastOL"
-lastOL (One a)     = a
-lastOL (Many as)   = last as
-lastOL (Cons _ as) = lastOL as
-lastOL (Snoc _ a)  = a
-lastOL (Two _ as)  = lastOL as
+lastOL (NE ol)     = lastOLNE ol
+
+lastOLNE (One a)     = a
+lastOLNE (Many as)   = NEL.last as
+lastOLNE (Cons _ as) = lastOL as
+lastOLNE (Snoc _ a)  = a
+lastOLNE (Two _ as)  = lastOLNE as
 
 isNilOL None = True
 isNilOL _    = False
 
 None  `appOL` b     = b
 a     `appOL` None  = a
-One a `appOL` b     = Cons a b
-a     `appOL` One b = Snoc a b
-a     `appOL` b     = Two a b
+NE a  `appOL` NE b  = NE $ a `appOLNE` b
+
+One a `appOLNE` b     = Cons a (NE b)
+a     `appOLNE` One b = Snoc (NE a) b
+a     `appOLNE` b     = Two a b
 
 fromOL :: OrdList a -> [a]
-fromOL a = go a []
-  where go None       acc = acc
-        go (One a)    acc = a : acc
-        go (Cons a b) acc = a : go b acc
-        go (Snoc a b) acc = go a (b:acc)
-        go (Two a b)  acc = go a (go b acc)
-        go (Many xs)  acc = xs ++ acc
+fromOL a = fromOLAcc a []
+
+fromOLNE :: NonEmptyOrdList a -> NonEmpty a
+fromOLNE a = fromOLAccNE a []
 
 fromOLReverse :: OrdList a -> [a]
-fromOLReverse a = go a []
-        -- acc is already in reverse order
-  where go :: OrdList a -> [a] -> [a]
-        go None       acc = acc
-        go (One a)    acc = a : acc
-        go (Cons a b) acc = go b (a : acc)
-        go (Snoc a b) acc = b : go a acc
-        go (Two a b)  acc = go b (go a acc)
-        go (Many xs)  acc = reverse xs ++ acc
+fromOLReverse a = fromOLReverseAcc a []
+
+fromOLReverseNE :: NonEmptyOrdList a -> NonEmpty a
+fromOLReverseNE a = fromOLReverseAccNE a []
+
+fromOLAcc :: OrdList a -> [a] -> [a]
+fromOLAcc None       acc = acc
+fromOLAcc (NE ol)    acc = toList $ fromOLAccNE ol acc
+
+fromOLAccNE :: NonEmptyOrdList a -> [a] -> NonEmpty a
+fromOLAccNE (One a)    acc = a :| acc
+fromOLAccNE (Cons a b) acc = a :| fromOLAcc b acc
+fromOLAccNE (Snoc a b) acc = x :| xs
+  where
+    -- incomplete is OK because accum is non-empty
+    x : xs = fromOLAcc a (b : acc)
+fromOLAccNE (Two a b)  acc = fromOLAccNE a (toList $ fromOLAccNE b acc)
+fromOLAccNE (Many (x :| xs)) acc = x :| (xs ++ acc)
+
+-- acc is already in reverse order
+fromOLReverseAcc :: OrdList a -> [a] -> [a]
+fromOLReverseAcc None       acc = acc
+fromOLReverseAcc (NE ol)    acc = toList $ fromOLReverseAccNE ol acc
+
+fromOLReverseAccNE :: NonEmptyOrdList a -> [a] -> NonEmpty a
+fromOLReverseAccNE (One a)    acc = a :| acc
+fromOLReverseAccNE (Cons a b) acc = x :| xs
+  where
+    -- incomplete is OK because accum is non-empty
+    x : xs = fromOLReverseAcc b (a : acc)
+fromOLReverseAccNE (Snoc a b) acc = b :| fromOLReverseAcc a acc
+fromOLReverseAccNE (Two a b)  acc = fromOLReverseAccNE b (toList $ fromOLReverseAccNE a acc)
+fromOLReverseAccNE (Many xs)  acc = x' :| (xs' ++ acc)
+  where x' :| xs' = NEL.reverse xs
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
 mapOL = fmap
 
+mapOLNE :: (a -> b) -> NonEmptyOrdList a -> NonEmptyOrdList b
+mapOLNE = fmap
+
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL _ z None        = z
-foldrOL k z (One x)     = k x z
-foldrOL k z (Cons x xs) = k x (foldrOL k z xs)
-foldrOL k z (Snoc xs x) = foldrOL k (k x z) xs
-foldrOL k z (Two b1 b2) = foldrOL k (foldrOL k z b2) b1
-foldrOL k z (Many xs)   = foldr k z xs
+foldrOL k z (NE ol)     = foldrOLNE k z ol
+
+foldrOLNE :: (a->b->b) -> b -> NonEmptyOrdList a -> b
+foldrOLNE k z (One x)     = k x z
+foldrOLNE k z (Cons x xs) = k x (foldrOL k z xs)
+foldrOLNE k z (Snoc xs x) = foldrOL k (k x z) xs
+foldrOLNE k z (Two b1 b2) = foldrOLNE k (foldrOLNE k z b2) b1
+foldrOLNE k z (Many xs)   = foldr k z xs
 
 foldlOL :: (b->a->b) -> b -> OrdList a -> b
 foldlOL _ z None        = z
-foldlOL k z (One x)     = k z x
-foldlOL k z (Cons x xs) = foldlOL k (k z x) xs
-foldlOL k z (Snoc xs x) = k (foldlOL k z xs) x
-foldlOL k z (Two b1 b2) = foldlOL k (foldlOL k z b1) b2
-foldlOL k z (Many xs)   = foldl k z xs
+foldlOL k z (NE ol)     = foldlOLNE k z ol
+
+foldlOLNE :: (b->a->b) -> b -> NonEmptyOrdList a -> b
+foldlOLNE k z (One x)     = k z x
+foldlOLNE k z (Cons x xs) = foldlOL k (k z x) xs
+foldlOLNE k z (Snoc xs x) = k (foldlOL k z xs) x
+foldlOLNE k z (Two b1 b2) = foldlOLNE k (foldlOLNE k z b1) b2
+foldlOLNE k z (Many xs)   = foldl k z xs
 
 toOL :: [a] -> OrdList a
 toOL [] = None
-toOL [x] = One x
-toOL xs = Many xs
+toOL (x : xs) = NE $ toOLNE $ x :| xs
+
+toOLNE :: NonEmpty a -> NonEmptyOrdList a
+toOLNE (x :| []) = One x
+toOLNE xs = Many xs
 
 reverseOL :: OrdList a -> OrdList a
 reverseOL None = None
-reverseOL (One x) = One x
-reverseOL (Cons a b) = Snoc (reverseOL b) a
-reverseOL (Snoc a b) = Cons b (reverseOL a)
-reverseOL (Two a b)  = Two (reverseOL b) (reverseOL a)
-reverseOL (Many xs)  = Many (reverse xs)
+reverseOL (NE ol) = NE $ reverseOLNE ol
+
+reverseOLNE :: NonEmptyOrdList a -> NonEmptyOrdList a
+reverseOLNE (One x) = One x
+reverseOLNE (Cons a b) = Snoc (reverseOL b) a
+reverseOLNE (Snoc a b) = Cons b (reverseOL a)
+reverseOLNE (Two a b)  = Two (reverseOLNE b) (reverseOLNE a)
+reverseOLNE (Many xs)  = Many (NEL.reverse xs)

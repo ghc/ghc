@@ -112,8 +112,11 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
 import qualified Data.Map as M
+import Data.Foldable (toList)
 import Data.Int
 import qualified Data.IntMap as IM
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NEL
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String
@@ -824,6 +827,9 @@ instance Outputable () where
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
+
+instance (Outputable a) => Outputable (NonEmpty a) where
+    ppr xs = ppr $ toList xs
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
