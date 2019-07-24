@@ -6,7 +6,10 @@
 Desugaring expressions.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -221,6 +224,10 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
 
 dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
+-- | TODO 'Vec 2' someday
+data SamePair a = SamePair a a
+  deriving (Functor, Foldable, Traversable)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -228,6 +235,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 *                                                                      *
 ************************************************************************
 -}
+
 
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
@@ -371,8 +379,8 @@ ds_expr _ e@(SectionR _ op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
-                 (\[x_id, y_id] -> bindNonRec y_id y_core $
+    dsWhenNoErrs (mapM newSysLocalDsNoLP $ SamePair x_ty y_ty)
+                 (\(SamePair x_id y_id) -> bindNonRec y_id y_core $
                                    Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
                                                           core_op [Var x_id, Var y_id]))
 
