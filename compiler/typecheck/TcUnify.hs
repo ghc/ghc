@@ -225,7 +225,7 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType, Bool)
+                  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
 matchActualFunTys herald ct_orig mb_thing arity ty
@@ -240,10 +240,10 @@ matchActualFunTysPart :: SDoc -- See Note [Herald for matchExpectedFunTys]
                       -> TcSigmaType
                       -> [TcSigmaType] -- reversed args. See (*) below.
                       -> Arity   -- overall arity of the function, for errs
-                      -> TcM (HsWrapper, [TcSigmaType], TcSigmaType, Bool)
+                      -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
 matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
                       orig_old_args full_arity
-  = go arity orig_old_args orig_ty False
+  = go arity orig_old_args orig_ty
 -- Does not allocate unnecessary meta variables: if the input already is
 -- a function, we just take it apart.  Not only is this efficient,
 -- it's important for higher rank: the argument might be of form
@@ -273,37 +273,35 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go :: Arity
        -> [TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
-       -> Bool          -- whether the previous step was an instantiation
-       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType, Bool)
-    go 0 _ ty last_was_poly = return (idHsWrapper, [], ty, last_was_poly)
+       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+    go 0 _ ty = return (idHsWrapper, [], ty)
 
-    go n acc_args ty _
+    go n acc_args ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (wrap2, arg_tys, res_ty, last_was_poly) <- go n acc_args rho True
-           ; return (wrap2 <.> wrap1, arg_tys, res_ty, last_was_poly) }
+           ; (wrap2, arg_tys, res_ty) <- go n acc_args rho
+           ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go n acc_args ty last_was_poly
-      | Just ty' <- tcView ty = go n acc_args ty' last_was_poly
+    go n acc_args ty
+      | Just ty' <- tcView ty = go n acc_args ty'
 
-    go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty }) _
+    go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, tys, ty_r, last_was_poly)
-                <- go (n-1) (arg_ty : acc_args) res_ty False
+        do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
-                    , arg_ty : tys, ty_r, last_was_poly ) }
+                    , arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
 
-    go n acc_args ty@(TyVarTy tv) last_was_poly
+    go n acc_args ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n acc_args ty' last_was_poly
-               Flexi        -> defer n ty last_was_poly }
+               Indirect ty' -> go n acc_args ty'
+               Flexi        -> defer n ty }
 
        -- In all other cases we bale out into ordinary unification
        -- However unlike the meta-tyvar case, we are sure that the
@@ -320,16 +318,16 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
        --
        -- But in that case we add specialized type into error context
        -- anyway, because it may be useful. See also #9605.
-    go n acc_args ty last_was_poly
-      = addErrCtxtM (mk_ctxt (reverse acc_args) ty) $ defer n ty last_was_poly
+    go n acc_args ty = addErrCtxtM (mk_ctxt (reverse acc_args) ty) $
+                       defer n ty
 
     ------------
-    defer n fun_ty last_was_poly
+    defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
            ; let unif_fun_ty = mkVisFunTys arg_tys res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_tys, res_ty, last_was_poly) }
+           ; return (mkWpCastN co, arg_tys, res_ty) }
 
     ------------
     mk_ctxt :: [TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
