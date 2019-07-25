@@ -1075,7 +1075,7 @@ pprIfaceSigmaType show_forall ty
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
    = sdocWithDynFlags $ \dflags ->
-     -- See Note [When to print foralls]
+     -- See Note [When to print foralls] in this module.
      ppWhen (any tv_has_kind_var tvs
              || any tv_is_required tvs
              || gopt Opt_PrintExplicitForalls dflags) $

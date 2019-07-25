@@ -49,6 +49,8 @@ import Kind
 import Type
 import RepType
 import TyCoRep       -- checks validity of types/coercions
+import TyCoSubst
+import TyCoFVs
 import TyCon
 import CoAxiom
 import BasicTypes
@@ -1051,7 +1053,7 @@ lintTyApp fun_ty arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
         -- uniques that are already in scope.
-        -- See Note [The substitution invariant] in TyCoRep
+        -- See Note [The substitution invariant] in TyCoSubst
         ; return (substTyWithInScope in_scope [tv] [arg_ty] body_ty) }
 
   | otherwise
@@ -1495,7 +1497,7 @@ lint_app :: SDoc -> LintedKind -> [(LintedType,LintedKind)] -> LintM Kind
 lint_app doc kfn kas
     = do { in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
-         -- Note [The substitution invariant] in TyCoRep
+         -- Note [The substitution invariant] in TyCoSubst
          ; foldlM (go_app in_scope) kfn kas }
   where
     fail_msg extra = vcat [ hang (text "Kind application error in") 2 doc
@@ -1717,7 +1719,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `tv2` has the same unique as `tv1`.
-                     -- See Note [The substitution invariant]
+                     -- See Note [The substitution invariant] in TyCoSubst.
                      unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
              tyr = mkInvForAllTy tv2 $
                    substTy subst t2
@@ -1748,7 +1750,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `cv2` has the same unique as `cv1`.
-                     -- See Note [The substitution invariant]
+                     -- See Note [The substitution invariant] in TyCoSubst.
                      unitVarEnv cv1 (eta1 `mkTransCo` (mkCoVarCo cv2)
                                           `mkTransCo` (mkSymCo eta2))
              tyr = mkTyCoInvForAllTy cv2 $

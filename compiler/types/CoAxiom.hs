@@ -31,7 +31,8 @@ module CoAxiom (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep ( Type, pprType )
+import {-# SOURCE #-} TyCoRep ( Type )
+import {-# SOURCE #-} TyCoPpr ( pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
 import FastString
