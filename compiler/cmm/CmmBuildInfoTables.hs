@@ -727,7 +727,7 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
     -- important that we don't do this for static functions or CAFs,
     -- see Note [Invalid optimisation: shortcutting].
     updateSRTMap srtEntry =
-      when (not isCAF && not isStaticFun) $ do
+      when (not isCAF && (not isStaticFun || isNothing srtEntry)) $ do
         let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
         put (Map.union newSRTMap srtMap)
 
