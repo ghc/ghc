@@ -547,6 +547,10 @@ Library
         Kind
         Type
         TyCoRep
+        TyCoFVs
+        TyCoSubst
+        TyCoPpr
+        TyCoTidy
         Unify
         Bag
         Binary
