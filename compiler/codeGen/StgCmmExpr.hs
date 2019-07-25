@@ -821,7 +821,7 @@ emitTagTrap onWhat fun = do
   ; lret <- newBlockId
   ; lfault <- newBlockId
   -- ; tscope <- getTickScope
-  ; pprTraceM "emitTagTrap" (ppr onWhat)
+  ; pprTraceM "emitTagTrap" (text onWhat)
   ; emit $ mkCbranch (cmmIsTagged dflags fun)
                      lret lfault Nothing
   ; emitLabel lfault

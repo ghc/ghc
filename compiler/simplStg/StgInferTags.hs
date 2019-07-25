@@ -142,7 +142,7 @@ to significant speedups. (10% and up for the traversal!)
 -}
 
 
--- #define WITH_NODE_DESC
+#define WITH_NODE_DESC
 
 -- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
@@ -1334,7 +1334,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
         let node = mkConstNode node_id (flatLattice NeverEnter)
-        markDone $ node `set_desc` text "rhsConNullary"
+        markDone $ node `set_desc` (ppr binding <-> text "rhsConNullary")
         return $! (StgRhsCon node_id ccs con args)
   | otherwise = do
 
@@ -1348,7 +1348,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
                         , node_result = bot
                         , node_update = node_update node_id node_inputs
 #if defined(WITH_NODE_DESC)
-                        , _node_desc = (text "rhsCon")
+                        , _node_desc = (ppr binding <-> text "rhsCon")
 #endif
                         }
         addNode notDone node
