@@ -413,6 +413,7 @@ initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
 
         ; let { env = Env { env_top = hsc_env,
                             env_us  = us_var,
+                            env_uqMask = uniq_tag,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
 
@@ -600,12 +601,9 @@ escapeArrowScope
 
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
- = do { env <- getEnv ;
-        let { u_var = env_us env } ;
-        us <- readMutVar u_var ;
-        case takeUniqFromSupply us of { (uniq, us') -> do {
-        writeMutVar u_var us' ;
-        return $! uniq }}}
+ = do { env <- getEnv
+      ; let mask = env_uqMask env
+      ; liftIO (newUnique' mask) }
    -- NOTE 1: we strictly split the supply, to avoid the possibility of leaving
    -- a chain of unevaluated supplies behind.
    -- NOTE 2: we use the uniq in the supply from the MutVar directly, and

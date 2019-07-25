@@ -282,6 +282,7 @@ data Env gbl lcl
 
         env_us   :: {-# UNPACK #-} !(IORef UniqSupply),
                              -- Unique supply for local variables
+        env_uqMask :: {-# UNPACK #-} !Char,
 
         env_gbl  :: gbl,     -- Info about things defined at the top level
                              -- of the module being compiled
