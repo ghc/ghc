@@ -1,5 +1,5 @@
 module Flavour
-  ( Flavour (..), werror
+  ( Flavour (..), addArgs, werror
   , DocTargets, DocTarget(..)
   , splitSections, splitSectionsIf
   ) where
@@ -64,7 +64,11 @@ data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
-werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
+
+-- | Append some 'Args' to the given 'Flavour'.
+addArgs :: Args -> Flavour -> Flavour
+addArgs args' fl = fl { args = args fl <> args' }
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate. You can
