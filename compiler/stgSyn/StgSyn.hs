@@ -732,7 +732,7 @@ pprGenStgBinding (StgNonRec bndr rhs)
 
 pprGenStgBinding (StgRec pairs)
   = vcat [ text "Rec {"
-         , vcat (map ppr_bind pairs)
+         , vcat (intersperse blankLine (map ppr_bind pairs))
          , text "end Rec }" ]
   where
     ppr_bind (bndr, expr)
