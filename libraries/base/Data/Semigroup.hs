@@ -570,7 +570,7 @@ instance Semigroup a => Monoid (Option a) where
 
 
 -- | Use 'Compose Maybe First' and 'Compose Maybe Last' to get the old First and Last Functor and Applicative instances.
-instance Semigroup m (n a) => Semigroup (Compose m n a) where
+instance Semigroup (m (n a)) => Semigroup (Compose m n a) where
   Compose mnx <> Compose mny = Compose (mnx <> mny)
 
 instance Monoid m (n a) => Monoid (Compose m n a) where
