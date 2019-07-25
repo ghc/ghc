@@ -21,6 +21,7 @@ module TcUnify (
   unifyType, unifyKind, uTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
+  tcGuardedSubsumption,
 
   --------------------------------
   -- Holes
@@ -64,8 +65,9 @@ import DynFlags
 import BasicTypes
 import Bag
 import Util
--- import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.LanguageExtensions as LangExt
 import Outputable
+import Unify( tcUnifyTyKis, BindFlag(..) )
 
 import Data.Maybe( isNothing )
 import Control.Monad
@@ -778,10 +780,20 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
+              -- quick look
+           ; dflags <- getDynFlags
+           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
+                           then do { let ql_subst = tcGuardedSubsumption in_rho ty_e
+                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
+                                       uTryFillPoly inst_orig v
+                                                    (substTyAddInScope ql_subst (mkTyVarTy v))
+                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
+                                   ; zonkTcType in_rho }
+                           else return in_rho
            ; body_wrap <- tc_sub_type_ds
-                            (eq_orig { uo_actual = in_rho
+                            (eq_orig { uo_actual = in_rho'
                                      , uo_expected = ty_expected })
-                            inst_orig ctxt in_rho ty_e
+                            inst_orig ctxt in_rho' ty_e
            ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
@@ -813,6 +825,33 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+
+tcGuardedSubsumption :: TcType -> TcType -> TCvSubst
+tcGuardedSubsumption ty1 ty2
+  | Just ty1' <- tcView ty1
+  = tcGuardedSubsumption ty1' ty2
+  | Just ty2' <- tcView ty2
+  = tcGuardedSubsumption ty1 ty2'
+  | tcIsGuardedType ty1
+  = case tcUnifyTyKis bind_flag [ty1] [ty2] of
+      Just subst -> subst
+      Nothing    -> emptyTCvSubst
+  | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
+  , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
+  = case tcUnifyTyKis bind_flag [arg1] [arg2] of
+      Nothing -> tcGuardedSubsumption res1 res2
+      Just subst1
+        -> let res1' = substTyAddInScope subst1 res1
+               res2' = substTyAddInScope subst1 res2
+           in composeTCvSubst (tcGuardedSubsumption res1' res2') subst1
+  | otherwise
+  = emptyTCvSubst
+  where  
+    bind_flag tv
+      | isImmutableTyVar tv
+      = Skolem
+      | otherwise
+      = BindMe
 
 {- Note [Settting the argument context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
