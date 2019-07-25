@@ -8,6 +8,7 @@ import {-# SOURCE #-} Var( Var, ArgFlag, AnonArgFlag )
 data Type
 data TyThing
 data Coercion
+data CoercionHole
 data UnivCoProvenance
 data TyLit
 data TyCoBinder
@@ -23,5 +24,7 @@ mkFunTy   :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
 
 isRuntimeRepTy :: Type -> Bool
+
+coHoleCoVar :: CoercionHole -> Var
 
 instance Data Type  -- To support Data instances in CoAxiom
