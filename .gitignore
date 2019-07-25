@@ -51,6 +51,9 @@ stage0
 stage1
 stage2
 _build
+*/generated/
+*/ghc-stage1
+.shake.*
 .hadrian_ghci
 
 # -----------------------------------------------------------------------------
@@ -221,5 +224,12 @@ GIT_COMMIT_ID
 # ghc.nix
 ghc.nix/
 
-
+# gdb
 .gdb_history
+.gdbinit
+
+# Tooling - direnv
+.envrc 
+
+# Tooling - vscode
+.vscode
