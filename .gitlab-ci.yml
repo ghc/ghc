@@ -195,6 +195,7 @@ lint-release-changelogs:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
+    - cp .gitlab/hadrian/ValidateSettings.hs hadrian/UserSettings.hs
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
@@ -359,6 +360,7 @@ validate-x86_64-darwin:
     - cabal update
     - ./boot
     - ./configure $CONFIGURE_ARGS
+    - cp .gitlab/hadrian/ValidateSettings.hs hadrian/UserSettings.hs
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
     - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
@@ -715,6 +717,7 @@ validate-x86_64-linux-fedora27:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
+    - cp .gitlab/hadrian/ValidateSettings.hs hadrian/UserSettings.hs
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     # FIXME: Testsuite disabled due to #16156.
