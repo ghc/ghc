@@ -77,7 +77,6 @@ import Control.Monad
 import Class(classTyCon)
 import UniqSet ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
-import Unify( tcUnifyTyKis, BindFlag(..) )
 
 import Data.Function
 import Data.List
@@ -1469,6 +1468,13 @@ tcQuickLook :: LHsExpr GhcRn   -- head of the application
             -> [LHsExprArgIn]  -- given arguments
             -> TcSigmaType     -- type to compare with
             -> TcM TCvSubst
+
+-- Do not look at polymorphic return types
+tcQuickLook _ [] ty
+  | let (tvs, theta, _) = tcSplitSigmaTy ty
+  , not (null tvs && null theta)
+  = return emptyTCvSubst
+
 -- Accumulate arguments
 tcQuickLook (L _ (HsPar _ fun)) args ty
   = tcQuickLook fun args ty
@@ -1529,30 +1535,6 @@ tcQuickLookFun (L _ (ExprWithTySig _ _ sig_ty))
                     _ -> return Nothing })
 tcQuickLookFun _
   = return Nothing
-
-tcGuardedSubsumption :: TcType -> TcType -> TCvSubst
-tcGuardedSubsumption ty1 ty2
-  | Just ty1' <- tcView ty1
-  = tcGuardedSubsumption ty1' ty2
-  | Just ty2' <- tcView ty2
-  = tcGuardedSubsumption ty1 ty2'
-  | tcIsGuardedType ty1 || tcIsGuardedType ty2
-  = case tcUnifyTyKis bind_flag [ty1] [ty2] of
-      Just subst -> subst
-      Nothing    -> emptyTCvSubst
-  | Just (arg1, _) <- tcSplitFunTy_maybe ty1
-  , Just (arg2, _) <- tcSplitFunTy_maybe ty2
-  = case tcUnifyTyKis bind_flag [arg1] [arg2] of
-      Just subst -> subst
-      Nothing    -> emptyTCvSubst
-  | otherwise
-  = emptyTCvSubst
-  where  
-    bind_flag tv
-      | isImmutableTyVar tv
-      = Skolem
-      | otherwise
-      = BindMe
 
 {- Note [Required quantifiers in the type of a term]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1947,13 +1929,10 @@ CLong, as it should.
 tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
-       ; (wrap, actual_rho_ty) <- topInstantiate (OccurrenceOf name) actual_res_ty
-       ; actual_rho_ty' <- tcPerformQuickLook id_orig (actual_rho_ty, res_ty) [] []
-       ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr actual_rho_ty', ppr res_ty])
+       ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt False (HsVar noExtField (noLoc name)) actual_res_ty res_ty $
-         tcWrapResultO id_orig (HsVar noExtField (noLoc name)) (mkHsWrap wrap expr) actual_rho_ty' res_ty }
-  where
-    id_orig = OccurrenceOf name
+         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
+                                              actual_res_ty res_ty }
 
 tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty
