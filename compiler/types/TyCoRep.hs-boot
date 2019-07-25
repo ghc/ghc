@@ -10,7 +10,6 @@ data Type
 data TyThing
 data Coercion
 data UnivCoProvenance
-data TCvSubst
 data TyLit
 data TyCoBinder
 data MCoercion
@@ -21,8 +20,6 @@ type ThetaType = [PredType]
 type CoercionN = Coercion
 type MCoercionN = MCoercion
 
-pprKind :: Kind -> SDoc
-pprType :: Type -> SDoc
 mkFunTy   :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
 

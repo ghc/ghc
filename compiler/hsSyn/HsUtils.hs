@@ -106,6 +106,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
+import TyCoFVs ( tyConAppNeedsKindSig )
 import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags )
 import TysWiredIn ( unitTy )
 import TcType
