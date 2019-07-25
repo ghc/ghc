@@ -780,7 +780,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
               -- quick look
            ; dflags <- getDynFlags
            ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
-                           then do { let ql_subst = tcGuardedSubsumption in_rho ty_e
+                           then do { ql_subst <- tcGuardedSubsumption in_rho ty_e
                                    ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
                                        uTryFillPoly inst_orig v
                                                     (substTyAddInScope ql_subst (mkTyVarTy v))
@@ -823,7 +823,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tcGuardedSubsumption :: TcType -> TcType -> TCvSubst
+tcGuardedSubsumption :: TcType -> TcType -> TcM TCvSubst
 tcGuardedSubsumption ty1 ty2
   | Just ty1' <- tcView ty1
   = tcGuardedSubsumption ty1' ty2
@@ -831,8 +831,8 @@ tcGuardedSubsumption ty1 ty2
   = tcGuardedSubsumption ty1 ty2'
   | tcIsGuardedType ty1
   = case tcUnifyTyKis bind_flag [ty1] [ty2] of
-      Just subst -> subst
-      Nothing    -> emptyTCvSubst
+      Just subst -> return subst
+      Nothing    -> return emptyTCvSubst
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
   = case tcUnifyTyKis bind_flag [arg1] [arg2] of
@@ -840,9 +840,15 @@ tcGuardedSubsumption ty1 ty2
       Just subst1
         -> let res1' = substTyAddInScope subst1 res1
                res2' = substTyAddInScope subst1 res2
-           in composeTCvSubst (tcGuardedSubsumption res1' res2') subst1
+           in flip composeTCvSubst subst1 <$> tcGuardedSubsumption res1' res2'
+  | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
+  , TyVarTy tv2 <- ty2, isMetaTyVar tv2
+  = do { beta <- newFlexiTyVarTy (tcTypeKind res1)
+       ; let new_fun_ty = mkVisFunTy arg1 beta
+       ; subst' <- tcGuardedSubsumption ty1 new_fun_ty
+       ; return (composeTCvSubst subst' (zipTvSubst [tv2] [new_fun_ty])) }
   | otherwise
-  = emptyTCvSubst
+  = return emptyTCvSubst
   where  
     bind_flag tv
       | isImmutableTyVar tv
