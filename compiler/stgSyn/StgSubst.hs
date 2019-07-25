@@ -72,7 +72,7 @@ extendInScope :: Id -> Subst -> Subst
 extendInScope id (Subst in_scope env) = Subst (in_scope `extendInScopeSet` id) env
 
 -- | Add a substitution for an 'Id' to the 'Subst': you must ensure that the
--- in-scope set is such that TyCORep Note [The substitution invariant]
+-- in-scope set is such that TyCoSubst Note [The substitution invariant]
 -- holds after extending the substitution like this.
 extendSubst :: Id -> Id -> Subst -> Subst
 extendSubst id new_id (Subst in_scope env)

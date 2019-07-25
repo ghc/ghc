@@ -35,6 +35,7 @@ import Type
 import Coercion
 import CoAxiom
 import TyCoRep    -- needs to build types & coercions in a knot
+import TyCoSubst ( substTyCoVars )
 import HscTypes
 import Annotations
 import InstEnv
