@@ -112,6 +112,7 @@ import           Data.Semigroup.Internal
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Fix
+import           Data.Functor.Compose
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
@@ -566,3 +567,12 @@ instance Semigroup a => Semigroup (Option a) where
 -- | @since 4.9.0.0
 instance Semigroup a => Monoid (Option a) where
   mempty = Option Nothing
+
+
+-- | Use 'Compose Maybe First' and 'Compose Maybe Last' to get the old First and Last Functor and Applicative instances.
+instance Semigroup m (n a) => Semigroup (Compose m n a) where
+  Compose mnx <> Compose mny = Compose (mnx <> mny)
+
+instance Monoid m (n a) => Monoid (Compose m n a) where
+  mempty = Compose mempty
+
