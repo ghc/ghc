@@ -131,7 +131,7 @@ getClosureRaw x = do
                  ptrList = amap' Box $ Array 0 (pelems - 1) pelems pointers
              pure (Ptr iptr, rawWds, ptrList)
 
-getClosureData :: a -> IO Closure
+getClosureData :: forall rep (a :: TYPE rep) . HasHeapRep a => a -> IO Closure
 getClosureData = getClosureDataX getClosureRaw
 
 
