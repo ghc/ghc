@@ -49,6 +49,8 @@ import Kind
 import Type
 import RepType
 import TyCoRep       -- checks validity of types/coercions
+import TyCoSubst
+import TyCoFVs
 import TyCon
 import CoAxiom
 import BasicTypes

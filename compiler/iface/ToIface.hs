@@ -68,6 +68,7 @@ import Var
 import VarEnv
 import VarSet
 import TyCoRep
+import TyCoTidy ( tidyCo )
 import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
