@@ -18,7 +18,10 @@ userFlavours :: [Flavour]
 userFlavours = [validateFlavour]
 
 validateFlavour :: Flavour
-validateFlavour = werror $ defaultFlavour { name = "validate" }
+validateFlavour =
+  werror
+  $ addArgs (builder Ghc ? notStage0 ? arg "-DDEBUG")
+  $ defaultFlavour { name = "validate" }
 
 verboseCommand :: Predicate
 verboseCommand = do
