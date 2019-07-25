@@ -54,6 +54,7 @@ import PrelNames
 import VarSet
 import VarEnv
 import Id
+import FV
 import Name     ( Name )
 import Var
 import IdInfo
@@ -700,9 +701,10 @@ substDVarSet :: Subst -> DVarSet -> DVarSet
 substDVarSet subst fvs
   = mkDVarSet $ fst $ foldr (subst_fv subst) ([], emptyVarSet) $ dVarSetElems fvs
   where
+  subst_fv :: Subst -> Var -> ([Var], VarSet) -> ([Var], VarSet)
   subst_fv subst fv acc
-     | isId fv = expr_fvs (lookupIdSubst (text "substDVarSet") subst fv) isLocalVar emptyVarSet $! acc
-     | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
+     | isId fv = (runFV $ expr_fvs (lookupIdSubst (text "substDVarSet") subst fv)) isLocalVar emptyVarSet $! acc
+     | otherwise = (runFV $ tyCoFVsOfType (lookupTCvSubst subst fv)) (const True) emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> Tickish Id -> Tickish Id
