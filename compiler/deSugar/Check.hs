@@ -26,7 +26,7 @@ module Check (
 import GhcPrelude
 
 import PmExpr
-import TmOracle
+import PmOracle
 import PmPpr
 import Unify( tcMatchTy )
 import DynFlags
@@ -521,7 +521,7 @@ pmInitialTmTyCs = do
   tm_cs  <- bagToList <$> getTmCsDs
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
-      initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
+      initTmState = fromMaybe initialTmState (pmOracle initialTmState tm_cs)
   pure $ MkDelta initTyCs initTmState
 
 {-
@@ -604,7 +604,7 @@ tmTyCsAreSatisfiable
   sat_ty <- if isEmptyBag new_ty_cs
                then pure True
                else tyOracle ty_cs
-  pure $ case (sat_ty, tmOracle amb_tm_cs new_tm_cs) of
+  pure $ case (sat_ty, pmOracle amb_tm_cs new_tm_cs) of
            (True, Just term_cs) -> Just $ MkDelta ty_cs term_cs
            _unsat               -> Nothing
 
@@ -1367,7 +1367,7 @@ the paper. This Note serves as a reference for these new features.
   See Note [Strict argument type constraints]
 * Efficient handling of literal splitting, large enumerations and accurate
   redundancy warnings for `COMPLETE` groups through the term oracle.
-  See Note [Refutable shapes] in TmOracle.
+  See Note [Refutable shapes] in PmOracle.
 
 Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2191,7 +2191,7 @@ forceIfCanDiverge x tms
 
 mkUnmatched :: Id -> PmAltCon -> ValVec -> PmM PartialResult
 mkUnmatched x nalt (ValVec vva delta) =
-  -- See Note [Refutable shapes] in TmOracle
+  -- See Note [Refutable shapes] in PmOracle
   tryAddRefutableAltCon (delta_tm_cs delta) (idName x) (idType x) nalt >>= \case
     Nothing -> pure mempty
     Just tms -> do
