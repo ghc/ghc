@@ -24,7 +24,7 @@ import Maybes
 import Data.List.NonEmpty (toList)
 
 import PmExpr
-import TmOracle
+import PmOracle
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.

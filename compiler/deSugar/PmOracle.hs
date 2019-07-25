@@ -5,14 +5,14 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, PatternSynonyms, ViewPatterns #-}
 
 -- | The term equality oracle. The main export of the module are the functions
--- 'tmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
+-- 'pmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
 --
 -- If you are looking for an oracle that can solve type-level constraints, look
 -- at 'TcSimplify.tcCheckSatisfiability'.
-module TmOracle (
+module PmOracle (
 
         -- the term oracle
-        tmOracle, TmState, initialTmState,
+        pmOracle, TmState, initialTmState,
         solveOneEq, extendSubst, canDiverge,
         tryAddRefutableAltCon, suggestPossibleConLikes,
 
@@ -64,7 +64,7 @@ type TmVarCtEnv = NameEnv PmExpr
 -- 'PmPpr.pprUncovered'. We don't do the same for 'TmVarCtEnv', so that is a plain
 -- 'NameEnv'.
 --
--- See also Note [Refutable shapes] in TmOracle.
+-- See also Note [Refutable shapes] in PmOracle.
 type PmRefutEnv = DNameEnv [PmAltCon]
 -}
 {-
@@ -387,8 +387,8 @@ wrapUpRefutableShapes ts@(TS env) = filterDNameEnv notNull (mapDNameEnv f env)
     f (VI _ neg)                   = neg
 
 -- | External interface to the term oracle.
-tmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
-tmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
+pmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
+pmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
 
 {- Note [Refutable shapes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
