@@ -9064,8 +9064,9 @@ However, kind inference behaves differently in several prominent ways.
   The kind-polymorphism from the class declaration makes ``D1``
   kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
 
-- As suggested above, GHC *only* considers the contents of a
-  declaration when inferring kinds.  Consider: ::
+- When kind-checking a function's type signature, GHC considers only what is
+  written in that type when figuring out how to generalise the type's
+  kind.  The function's definitions are checked separately.  Consider: ::
 
     data Proxy a    -- Proxy :: forall k. k -> Type
     p :: forall a. Proxy a
@@ -9097,24 +9098,6 @@ However, kind inference behaves differently in several prominent ways.
   Note that ``k1`` and ``k2`` are written in braces, indicating that they
   were not explicit in the original program, but rather inferred by GHC.
 
-- Whereas it is possible to stop GHC from inferring type parameters by
-  writing an explicit ``forall``, GHC will infer kind parameters regardless.
-  In the following example,
-  an explicit ``forall`` makes GHC refuse to infer the omitted type
-  parameter ``b``, yet it will still happily infer the kind
-  parameter ``k``: ::
-
-    data Proxy (a :: k)
-    
-    f1 :: forall k (b :: k). Proxy b -> () -- All parameters explicit
-    f2 :: Proxy b -> ()                    -- Inferred parameters b and k
-    f3 :: forall. Proxy b -> ()            -- Error, b is not bound!
-    f4 :: forall b. Proxy b -> ()          -- Ok, inferred parameter k
-
-  If you want to ensure that all kind variables are explicit,
-  it helps to put an explicit kind signature on each type variable, as
-  shown with ``f1`` above.
-
 - GHC's variable scoping rules are refined to support the dependent typing
   that typically arises with kind polymorphism.  A kind signature in
   a ``forall``-bound type can refer to types mentioned earlier in the
@@ -9129,7 +9112,7 @@ However, kind inference behaves differently in several prominent ways.
   for further details. If you are using kind polymorphism and are confused as to
   why GHC is rejecting (or accepting) your program, we encourage you to turn on
   these flags, especially :ghc-flag:`-fprint-explicit-kinds`.
-  To have GHC print the full type, use the
+  To have GHC show kind parameters that it inferred, use the
   :ghc-flag:`-fprint-explicit-foralls` flag.
 
 Sections :ref:`inferring-variable-order` through :ref:`kind-indexed-gadts`
@@ -9152,7 +9135,8 @@ After analysing this declaration, GHC will discover that ``a`` and
   T :: forall {k2 :: Type} (k :: Type). (k2 -> Type) -> k -> k2 -> Type
 
 Note that ``k2`` is placed *before* ``k``, and that ``k`` is placed *before*
-``a``. Also, note that ``k2`` is an inferred parameter, and thus not available
+``a``. Also, note that ``k2`` is an inferred parameter
+(See :ref:`inferred-vs-specified`), and thus not available
 for visible type application.
 
 The general principle is this:
