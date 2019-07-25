@@ -10,6 +10,7 @@ import GhcPrelude
 
 import DynFlags
 import TyCoRep
+import TyCoSubst
 import Coercion
 import Type hiding( substTyVarBndr, substTy )
 import TcType       ( exactTyCoVarsOfType )

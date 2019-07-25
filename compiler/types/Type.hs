@@ -214,7 +214,7 @@ module Type (
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
-        pprTyVar, pprTyVars,
+        pprTyVar, pprTyVars, debugPprType,
         pprWithTYPE,
 
         -- * Tidying type related things up for printing
@@ -240,6 +240,10 @@ import BasicTypes
 
 import Kind
 import TyCoRep
+import TyCoSubst
+import TyCoTidy
+import TyCoPpr
+import TyCoFVs
 
 -- friends:
 import Var
@@ -365,7 +369,7 @@ tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
   = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
                -- The free vars of 'rhs' should all be bound by 'tenv', so it's
                -- ok to use 'substTy' here.
-               -- See also Note [The substitution invariant] in TyCoRep.
+               -- See also Note [The substitution invariant] in TyCoSubst.
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
@@ -2104,108 +2108,6 @@ predTypeEqRel ty
   = ReprEq
   | otherwise
   = NomEq
-
-{-
-%************************************************************************
-%*                                                                      *
-         Well-scoped tyvars
-*                                                                      *
-************************************************************************
-
-Note [ScopedSort]
-~~~~~~~~~~~~~~~~~
-Consider
-
-  foo :: Proxy a -> Proxy (b :: k) -> Proxy (a :: k2) -> ()
-
-This function type is implicitly generalised over [a, b, k, k2]. These
-variables will be Specified; that is, they will be available for visible
-type application. This is because they are written in the type signature
-by the user.
-
-However, we must ask: what order will they appear in? In cases without
-dependency, this is easy: we just use the lexical left-to-right ordering
-of first occurrence. With dependency, we cannot get off the hook so
-easily.
-
-We thus state:
-
- * These variables appear in the order as given by ScopedSort, where
-   the input to ScopedSort is the left-to-right order of first occurrence.
-
-Note that this applies only to *implicit* quantification, without a
-`forall`. If the user writes a `forall`, then we just use the order given.
-
-ScopedSort is defined thusly (as proposed in #15743):
-  * Work left-to-right through the input list, with a cursor.
-  * If variable v at the cursor is depended on by any earlier variable w,
-    move v immediately before the leftmost such w.
-
-INVARIANT: The prefix of variables before the cursor form a valid telescope.
-
-Note that ScopedSort makes sense only after type inference is done and all
-types/kinds are fully settled and zonked.
-
--}
-
--- | Do a topological sort on a list of tyvars,
---   so that binders occur before occurrences
--- E.g. given  [ a::k, k::*, b::k ]
--- it'll return a well-scoped list [ k::*, a::k, b::k ]
---
--- This is a deterministic sorting operation
--- (that is, doesn't depend on Uniques).
---
--- It is also meant to be stable: that is, variables should not
--- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in RnTypes
-
-scopedSort :: [TyCoVar] -> [TyCoVar]
-scopedSort = go [] []
-  where
-    go :: [TyCoVar] -- already sorted, in reverse order
-       -> [TyCoVarSet] -- each set contains all the variables which must be placed
-                       -- before the tv corresponding to the set; they are accumulations
-                       -- of the fvs in the sorted tvs' kinds
-
-                       -- This list is in 1-to-1 correspondence with the sorted tyvars
-                       -- INVARIANT:
-                       --   all (\tl -> all (`subVarSet` head tl) (tail tl)) (tails fv_list)
-                       -- That is, each set in the list is a superset of all later sets.
-
-       -> [TyCoVar] -- yet to be sorted
-       -> [TyCoVar]
-    go acc _fv_list [] = reverse acc
-    go acc  fv_list (tv:tvs)
-      = go acc' fv_list' tvs
-      where
-        (acc', fv_list') = insert tv acc fv_list
-
-    insert :: TyCoVar       -- var to insert
-           -> [TyCoVar]     -- sorted list, in reverse order
-           -> [TyCoVarSet]  -- list of fvs, as above
-           -> ([TyCoVar], [TyCoVarSet])   -- augmented lists
-    insert tv []     []         = ([tv], [tyCoVarsOfType (tyVarKind tv)])
-    insert tv (a:as) (fvs:fvss)
-      | tv `elemVarSet` fvs
-      , (as', fvss') <- insert tv as fvss
-      = (a:as', fvs `unionVarSet` fv_tv : fvss')
-
-      | otherwise
-      = (tv:a:as, fvs `unionVarSet` fv_tv : fvs : fvss)
-      where
-        fv_tv = tyCoVarsOfType (tyVarKind tv)
-
-       -- lists not in correspondence
-    insert _ _ _ = panic "scopedSort"
-
--- | Get the free vars of a type in scoped order
-tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
-tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
-
--- | Get the free vars of types in scoped order
-tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
 
 ------------- Closing over kinds -----------------
 

@@ -397,7 +397,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
                   -- satisfy the substitution invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
-                  -- See also Note [The substitution invariant] in TyCoRep.
+                  -- See also Note [The substitution invariant] in TyCoSubst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }

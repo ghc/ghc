@@ -79,9 +79,9 @@ import Data.List
 --
 -- Some invariants apply to how you use the substitution:
 --
--- 1. Note [The substitution invariant] in TyCoRep
+-- 1. Note [The substitution invariant] in TyCoSubst
 --
--- 2. Note [Substitutions apply only once] in TyCoRep
+-- 2. Note [Substitutions apply only once] in TyCoSubst
 data Subst
   = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
                       -- applying the substitution
@@ -89,7 +89,7 @@ data Subst
           TvSubstEnv  -- Substitution from TyVars to Types
           CvSubstEnv  -- Substitution from CoVars to Coercions
 
-        -- INVARIANT 1: See TyCoRep Note [The substitution invariant]
+        -- INVARIANT 1: See TyCoSubst Note [The substitution invariant]
         -- This is what lets us deal with name capture properly
         -- It's a hard invariant to check...
         --
@@ -104,7 +104,7 @@ Note [Extending the Subst]
 For a core Subst, which binds Ids as well, we make a different choice for Ids
 than we do for TyVars.
 
-For TyVars, see Note [Extending the TCvSubst] with Type.TvSubstEnv
+For TyVars, see Note [Extending the TCvSubst] in TyCoSubst.
 
 For Ids, we have a different invariant
         The IdSubstEnv is extended *only* when the Unique on an Id changes
@@ -171,7 +171,7 @@ mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 mkSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> IdSubstEnv -> Subst
 mkSubst in_scope tvs cvs ids = Subst in_scope ids tvs cvs
 
--- | Find the in-scope set: see TyCoRep Note [The substitution invariant]
+-- | Find the in-scope set: see TyCoSubst Note [The substitution invariant]
 substInScope :: Subst -> InScopeSet
 substInScope (Subst in_scope _ _ _) = in_scope
 
@@ -181,7 +181,7 @@ zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 
 -- | Add a substitution for an 'Id' to the 'Subst': you must ensure that the in-scope set is
--- such that TyCoRep Note [The substitution invariant]
+-- such that TyCoSubst Note [The substitution invariant]
 -- holds after extending the substitution like this
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
@@ -198,7 +198,7 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- | Add a substitution for a 'TyVar' to the 'Subst'
 -- The 'TyVar' *must* be a real TyVar, and not a CoVar
 -- You must ensure that the in-scope set is such that
--- TyCoRep Note [The substitution invariant] holds
+-- TyCoSubst Note [The substitution invariant] holds
 -- after extending the substitution like this.
 extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
@@ -214,7 +214,7 @@ extendTvSubstList subst vrs
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst':
 -- you must ensure that the in-scope set satisfies
--- TyCoRep Note [The substitution invariant]
+-- TyCoSubst Note [The substitution invariant]
 -- after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r
@@ -339,7 +339,7 @@ instance Outputable Subst where
 
 -- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only
 -- apply the substitution /once/:
--- see Note [Substitutions apply only once] in TyCoRep
+-- See Note [Substitutions apply only once] in TyCoSubst
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]

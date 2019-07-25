@@ -26,7 +26,8 @@ module Class (
 import GhcPrelude
 
 import {-# SOURCE #-} TyCon     ( TyCon )
-import {-# SOURCE #-} TyCoRep   ( Type, PredType, pprType )
+import {-# SOURCE #-} TyCoRep   ( Type, PredType )
+import {-# SOURCE #-} TyCoPpr   ( pprType )
 import Var
 import Name
 import BasicTypes

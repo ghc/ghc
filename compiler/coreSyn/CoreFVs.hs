@@ -72,6 +72,7 @@ import VarSet
 import Var
 import Type
 import TyCoRep
+import TyCoFVs
 import TyCon
 import CoAxiom
 import FamInstEnv
