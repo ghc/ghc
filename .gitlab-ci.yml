@@ -215,6 +215,8 @@ validate-x86_64-linux-deb9-hadrian:
   extends: .validate-hadrian
   stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-hadrian"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -345,7 +347,7 @@ validate-x86_64-darwin:
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
-    TEST_ENV: "x86_64-darwin"
+    TEST_ENV: "x86_64-darwin-hadrian"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - python3 .gitlab/fix-submodules.py
@@ -733,6 +735,7 @@ validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
+    TEST_ENV: "x86_64-windows-hadrian"
   cache:
     key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -740,6 +743,7 @@ nightly-i386-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW32
+    TEST_ENV: "x86_64-windows-hadrian"
   only:
     variables:
       - $NIGHTLY
@@ -781,6 +785,7 @@ validate-x86_64-windows:
   variables:
     MSYSTEM: MINGW64
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
+    TEST_ENV: "x86_64-windows"
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -791,6 +796,7 @@ release-x86_64-windows:
     MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
+    TEST_ENV: "x86_64-windows"
   only:
     - tags
 
@@ -804,6 +810,7 @@ release-i386-windows:
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
     # Due to #15934
     BUILD_PROF_LIBS: "NO"
+    TEST_ENV: "i386-windows"
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -817,6 +824,7 @@ nightly-i386-windows:
     CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
     # Due to #15934
     BUILD_PROF_LIBS: "NO"
+    TEST_ENV: "i386-windows"
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
