@@ -11,7 +11,7 @@ main :: IO ()
 main = do
     key <- newIORef "key"
     let val = "val"
-    wk@Weak w <- mkWeak key val Nothing
+    wk@(Weak w) <- mkWeak key val Nothing
 
     getClosureData w >>= \case
       WeakClosure{} -> putStrLn "OK"
