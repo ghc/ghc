@@ -1437,16 +1437,16 @@ tcQuickLooks res_tys args arg_tys = go res_tys
     go (act_res_ty, Check exp_res_ty)
       = do { let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty:exp_res_ty:arg_tys))
              -- We look *twice* in the result type
-           ; let res_subst1 = composeTCvSubst (tcGuardedSubsumption act_res_ty exp_res_ty)
-                                              (mkEmptyTCvSubst in_scope)
+           ; res_subst1 <- composeTCvSubst (mkEmptyTCvSubst in_scope)
+                              <$> tcGuardedSubsumption act_res_ty exp_res_ty
              -- Apply first quick look on the result to arguments
            ; args_subst <- go_args res_subst1 args arg_tys
            ; let args_res1_subst = composeTCvSubst args_subst res_subst1
            ; let act_res_ty' = substTyAddInScope args_res1_subst act_res_ty
                  exp_res_ty' = substTyAddInScope args_res1_subst exp_res_ty
              -- Now look again at the result type
-           ; let res_subst2  = composeTCvSubst (tcGuardedSubsumption act_res_ty' exp_res_ty')
-                                               (mkEmptyTCvSubst in_scope)
+           ; res_subst2 <- composeTCvSubst (mkEmptyTCvSubst in_scope)
+                              <$> tcGuardedSubsumption act_res_ty' exp_res_ty'
            ; return ( composeTCvSubst res_subst2 args_res1_subst
                     , tyCoVarsOfTypesList (act_res_ty:exp_res_ty:arg_tys) ) }
     go (act_res_ty, _)
