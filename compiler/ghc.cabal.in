@@ -565,6 +565,7 @@ Library
         Fingerprint
         FiniteMap
         FV
+        FVM
         GraphBase
         GraphColor
         GraphOps
