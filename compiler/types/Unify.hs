@@ -35,7 +35,9 @@ import Name( Name )
 import Type hiding ( getTvSubstEnv )
 import Coercion hiding ( getCvSubstEnv )
 import TyCon
-import TyCoRep hiding ( getTvSubstEnv, getCvSubstEnv )
+import TyCoRep
+import TyCoFVs ( tyCoVarsOfCoList, tyCoFVsOfTypes )
+import TyCoSubst ( mkTvSubst )
 import FV( FV, fvVarSet, fvVarList )
 import Util
 import Pair
