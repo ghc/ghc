@@ -1,0 +1,91 @@
+/* ----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * API for configuring the GHC RTS
+ *
+ * To understand the structure of the RTS headers, see the wiki:
+ *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
+ *
+ * --------------------------------------------------------------------------*/
+
+#pragma once
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#include <stdbool.h>
+
+#include "Stg.h"
+#include "rts/EventLogWriter.h"
+
+/* ----------------------------------------------------------------------------
+   RTS configuration settings, for passing to hs_init_ghc()
+   ------------------------------------------------------------------------- */
+
+typedef enum {
+    RtsOptsNone,         // +RTS causes an error
+    RtsOptsIgnore,       // Ignore command line arguments
+    RtsOptsIgnoreAll,    // Ignore command line and Environment arguments
+    RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
+    RtsOptsAll           // all RTS options allowed
+  } RtsOptsEnabledEnum;
+
+struct GCDetails_;
+
+// The RtsConfig struct is passed (by value) to hs_init_ghc().  The
+// reason for using a struct is extensibility: we can add more
+// fields to this later without breaking existing client code.
+typedef struct {
+
+    // Whether to interpret +RTS options on the command line
+    RtsOptsEnabledEnum rts_opts_enabled;
+
+    // Whether to give RTS flag suggestions
+    bool rts_opts_suggestions;
+
+    // additional RTS options
+    const char *rts_opts;
+
+    // True if GHC was not passed -no-hs-main
+    bool rts_hs_main;
+
+    // Whether to retain CAFs (default: false)
+    bool keep_cafs;
+
+    // Writer a for eventlog.
+    const EventLogWriter *eventlog_writer;
+
+    // Called before processing command-line flags, so that default
+    // settings for RtsFlags can be provided.
+    void (* defaultsHook) (void);
+
+    // Called just before exiting
+    void (* onExitHook) (void);
+
+    // Called on a stack overflow, before exiting
+    void (* stackOverflowHook) (W_ stack_size);
+
+    // Called on heap overflow, before exiting
+    void (* outOfHeapHook) (W_ request_size, W_ heap_size);
+
+    // Called when malloc() fails, before exiting
+    void (* mallocFailHook) (W_ request_size /* in bytes */, const char *msg);
+
+    // Called for every GC
+    void (* gcDoneHook) (const struct GCDetails_ *stats);
+
+    // Called when GC sync takes too long (+RTS --long-gc-sync=<time>)
+    void (* longGCSync) (uint32_t this_cap, Time time_ns);
+    void (* longGCSyncEnd) (Time time_ns);
+} RtsConfig;
+
+// Clients should start with defaultRtsConfig and then customise it.
+// Bah, I really wanted this to be a const struct value, but it seems
+// you can't do that in C (it generates code).
+extern const RtsConfig defaultRtsConfig;
+
+#if defined(__cplusplus)
+}
+#endif
