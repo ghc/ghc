@@ -263,7 +263,7 @@ initProfilingLogFile(void)
         sprintf(prof_filename, "%s.prof", stem);
 
         /* open the log file */
-        if ((prof_file = __rts_fopen(prof_filename, "w")) == NULL) {
+        if ((prof_file = __rts_fopen(prof_filename, "w+")) == NULL) {
             debugBelch("Can't open profiling report file %s\n", prof_filename);
             RtsFlags.CcFlags.doCostCentres = 0;
             // Retainer profiling (`-hr` or `-hr<cc> -h<x>`) writes to

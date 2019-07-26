@@ -388,7 +388,7 @@ exitHpc(void) {
   // not clober the .tix file.
 
   if (hpc_pid == getpid()) {
-    FILE *f = __rts_fopen(tixFilename,"w");
+    FILE *f = __rts_fopen(tixFilename,"w+");
     writeTix(f);
   }
 
