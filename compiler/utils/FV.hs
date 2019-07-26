@@ -22,6 +22,9 @@ module FV
     -- * Non-deterministic free variable computation
   , NonDetFV
   , nonDetFVSet
+    -- * Non-deterministic free coercion variable computation
+  , NonDetCoFV
+  , nonDetCoFVSet
   ) where
 
 import GhcPrelude
@@ -96,6 +99,39 @@ instance FVM NonDetFV where
 
 nonDetFVSet :: NonDetFV -> TyCoVarSet
 nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
+
+
+--------------------------------------------------------------------------------
+-- Non-deterministic free coercion variable sets
+--------------------------------------------------------------------------------
+
+-- | A free variables (restricted to coercion variables) traversal that
+-- produces a non-deterministic 'CoVarSet'.
+newtype NonDetCoFV = NonDetCoFV { runNonDetFV :: CoVarSet -> CoVarSet -> CoVarSet }
+
+instance Monoid NonDetCoFV where
+  mempty = NonDetCoFV $ \_ acc -> acc
+  {-# INLINE mempty #-}
+
+instance Semigroup NonDetCoFV where
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> g is (f is acc)
+  {-# INLINE (<>) #-}
+
+instance FVM NonDetCoFV where
+  coholeFV hole = unitFV $ coHoleCoVar hole
+  unitFV v = NonDetCoFV $ \is acc ->
+    if | not (isCoVar v)    -> acc
+       | v `elemVarSet` is  -> acc
+       | v `elemVarSet` acc -> acc
+       | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet (extendVarSet acc v)
+  bindVar v (NonDetCoFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) acc
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+nonDetFVSet :: NonDetCoFV -> CoVarSet
+nonDetFVSet (NonDetCoFV f) = f emptyVarSet emptyVarSet
 
 
 --------------------------------------------------------------------------------
