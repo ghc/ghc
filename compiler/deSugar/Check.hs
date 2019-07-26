@@ -1131,43 +1131,14 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
   let delta' = expectJust "y was fresh" $ solveVar delta y e
   pmcheckI (pv ++ ps) guards (y : vva) delta'
 
-pmcheck [] _ (_:_) _ = panic "pmcheck: nil-cons"
-pmcheck (_:_) _ [] _ = panic "pmcheck: cons-nil"
-
-pmcheck (p:ps) guards (va:vva) delta = pmcheckHdI p ps guards va vva delta
-
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheckHd`
-pmcheckHdI :: PmPat -> PatVec -> [PatVec] -> Id -> ValVec -> Delta
-           -> PmM PartialResult
-pmcheckHdI p ps guards va vva delta = do
-  n <- incrCheckPmIterDs
-  tracePm "pmCheckHdI" (ppr n <> colon <+> ppr p
-                        $$ hang (text "patterns:") 2 (ppr ps)
-                        $$ hang (text "guards:") 2 (ppr guards)
-                        $$ ppr va
-                        $$ ppr vva
-                        $$ ppr delta)
-
-  res <- pmcheckHd p ps guards va vva delta
-  tracePm "pmCheckHdI: res" (ppr res)
-  return res
-{-# INLINE pmcheckHdI #-}
-
--- | Worker function: Implements all cases described in the paper for all three
--- functions (`covered`, `uncovered` and `divergent`) apart from the `Guard`
--- cases which are handled by `pmcheck`
-pmcheckHd :: PmPat -> PatVec -> [PatVec] -> Id -> ValVec -> Delta
-          -> PmM PartialResult
-
 -- Var
-pmcheckHd (PmVar x) ps guards y vva delta = pmcheckI ps guards vva delta'
+pmcheck (PmVar x : ps) guards (y : vva) delta = pmcheckI ps guards vva delta'
   where
     delta' = expectJust "x is fresh" $ solveVar delta x (idToPmExpr y)
 
 -- ConVar
-pmcheckHd p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs }
-          ps guards x vva delta = do
+pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
+        guards (x : vva) delta = do
   -- Split the value vector into two value vectors: One representing the current
   -- constructor, the other representing everything but the current constructor
   -- (and the already known impossible constructors).
@@ -1190,9 +1161,8 @@ pmcheckHd p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs }
   -- Combine both into a single PartialResult
   pure (mkUnion pr_pos' pr_neg)
 
--- Impossible: handled by pmcheck
-pmcheckHd PmFake     _ _ _ _ _ = panic "pmcheckHd: Fake"
-pmcheckHd (PmGrd {}) _ _ _ _ _ = panic "pmcheckHd: Guard"
+pmcheck [] _ (_:_) _ = panic "pmcheck: nil-cons"
+pmcheck (_:_) _ [] _ = panic "pmcheck: cons-nil"
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
