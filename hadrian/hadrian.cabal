@@ -96,6 +96,7 @@ executable hadrian
                        , Settings.Flavours.Quick
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
+                       , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Warnings
                        , Stage
