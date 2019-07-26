@@ -36,7 +36,7 @@ typedef int64_t Time;
 
 // Use instead of SecondsToTime() when we have a floating-point
 // seconds value, to avoid truncating it.
-INLINE_HEADER Time fsecondsToTime (double t)
+static inline Time fsecondsToTime (double t)
 {
     return (Time)(t * TIME_RESOLUTION);
 }
