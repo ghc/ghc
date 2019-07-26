@@ -384,11 +384,11 @@ coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
   -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
   -- a STG to Cmm pass.
   = coreToStgExpr (Var unitDataConId)
-coreToStgExpr (Var v)      = coreToStgApp Nothing v               [] []
-coreToStgExpr (Coercion _) = coreToStgApp Nothing coercionTokenId [] []
+coreToStgExpr (Var v)      = coreToStgApp v               [] []
+coreToStgExpr (Coercion _) = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp Nothing f args ticks
+  = coreToStgApp f args ticks
   where
     (f, args, ticks) = myCollectArgs expr
 
@@ -502,18 +502,11 @@ mkStgAltType bndr alts
 -- Applications
 -- ---------------------------------------------------------------------------
 
-coreToStgApp
-         :: Maybe UpdateFlag            -- Just upd <=> this application is
-                                        -- the rhs of a thunk binding
-                                        --      x = [...] \upd [] -> the_app
-                                        -- with specified update flag
-        -> Id                           -- Function
-        -> [CoreArg]                    -- Arguments
-        -> [Tickish Id]                 -- Debug ticks
-        -> CtsM StgExpr
-
-
-coreToStgApp _ f args ticks = do
+coreToStgApp :: Id            -- Function
+             -> [CoreArg]     -- Arguments
+             -> [Tickish Id]  -- Debug ticks
+             -> CtsM StgExpr
+coreToStgApp f args ticks = do
     (args', ticks') <- coreToStgArgs args
     how_bound <- lookupVarCts f
 
