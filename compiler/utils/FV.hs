@@ -101,13 +101,22 @@ instance Semigroup FV where
   FV f <> FV g = FV $ \fv_cand in_scope acc -> f fv_cand in_scope $! g fv_cand in_scope $! acc
   {-# INLINE (<>) #-}
 
+whenIsInteresting :: Var -> FV -> FV
+whenIsInteresting var (FV f) = FV g
+  where
+    g fv_cand in_scope acc@(have, have_set)
+      | var `elemVarSet` in_scope  -> acc
+      | var `elemVarSet` haveSet   -> acc
+      | fv_cand var                -> f fv_cand in_scope acc
+      | otherwise                  -> acc
+
+addFV :: Var -> FV
+addFV var = FV $ \fv_cand in_scope (have, have_set) ->
+  (var : have, extendVarSet have_set var)
+
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
-  unitFV var = FV $ \fv_cand in_scope acc@(have, haveSet) ->
-    if | var `elemVarSet` in_scope  -> acc
-       | var `elemVarSet` haveSet   -> acc
-       | fv_cand var                -> (var : have, extendVarSet haveSet var)
-       | otherwise                  -> acc
+  unitFV var = whenIsInteresting var $ addFV var <> typeFVs (varType var)
   tycoVarsFV fvs = foldMap unitFV (dVarSetElems fvs) -- can we do better than this?
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
     f fv_cand (extendVarSet in_scope tv) acc
