@@ -187,6 +187,8 @@ lint-release-changelogs:
 
 .validate-hadrian:
   <<: *only-default
+  variables:
+    FLAVOUR: "validate"
   script:
     - cabal update
     - git clean -xdf && git submodule foreach git clean -xdf
@@ -194,8 +196,8 @@ lint-release-changelogs:
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   cache:
     key: hadrian
@@ -344,6 +346,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
+    FLAVOUR: "validate"
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
     - git submodule sync --recursive
@@ -357,8 +360,8 @@ validate-x86_64-darwin:
     - cabal update
     - ./boot
     - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
@@ -706,15 +709,16 @@ validate-x86_64-linux-fedora27:
   stage: full-build
   variables:
     GHC_VERSION: "8.6.5"
+    FLAVOUR: "validate"
   # due to #16574 this currently fails
   allow_failure: true
   script:
     - |
       python boot
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf"
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
   tags:
