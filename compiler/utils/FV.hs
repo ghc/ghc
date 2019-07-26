@@ -48,7 +48,6 @@ instance Semigroup AnyFVs where
 instance FVM AnyFVs where
   coholeFV _hole = mempty
   unitFV v = AnyFVs $ \in_scope -> not (v `elemVarSet` in_scope)
-  tycoVarsFV fvs = AnyFVs $ \in_scope -> not $ isEmptyVarSet $ dVarSetToVarSet fvs `minusVarSet` in_scope
   bindVar tv (AnyFVs f) = AnyFVs $ \in_scope -> f (extendVarSet in_scope tv)
 
   {-# INLINE coholeFV #-}
@@ -78,7 +77,6 @@ instance FVM NonDetFV where
     if | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet (extendVarSet acc v)
-  tycoVarsFV fvs = NonDetFV $ \is acc -> acc `unionVarSet` (dVarSetToVarSet fvs `minusVarSet` is)
   bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) acc
 
   {-# INLINE coholeFV #-}
@@ -117,13 +115,11 @@ addFV var = FV $ \fv_cand in_scope (have, have_set) ->
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
   unitFV var = whenIsInteresting var $ addFV var <> typeFVs (varType var)
-  tycoVarsFV fvs = foldMap unitFV (dVarSetElems fvs) -- can we do better than this?
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
     f fv_cand (extendVarSet in_scope tv) acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
-  {-# INLINE tycoVarsFV #-}
   {-# INLINE bindVar #-}
 
 fvVarListVarSet :: FV ->  ([Var], VarSet)

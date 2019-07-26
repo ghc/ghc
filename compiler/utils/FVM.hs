@@ -8,7 +8,8 @@ import VarSet
 import Data.Monoid (Monoid)
 
 class Monoid m => FVM m where
+  -- | Introduce a free 'CohercionHole'.
   coholeFV  :: CoercionHole -> m
+  -- | Introduce a free variable (and any free variables of its type/kind).
   unitFV   :: Var -> m
-  tycoVarsFV :: DVarSet -> m
   bindVar :: Var -> m -> m
