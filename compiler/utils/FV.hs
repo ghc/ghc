@@ -102,19 +102,19 @@ instance Semigroup FV where
 whenIsInteresting :: Var -> FV -> FV
 whenIsInteresting var (FV f) = FV g
   where
-    g fv_cand in_scope acc@(have, have_set)
+    g fv_cand in_scope acc@(_have, have_set)
       | var `elemVarSet` in_scope  = acc
       | var `elemVarSet` have_set  = acc
       | fv_cand var                = f fv_cand in_scope acc
       | otherwise                  = acc
 
-addFV :: Var -> FV
-addFV var = FV $ \fv_cand in_scope (have, have_set) ->
-  (var : have, extendVarSet have_set var)
-
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
-  unitFV var = whenIsInteresting var $ addFV var <> typeFVs (varType var)
+  unitFV var = whenIsInteresting var $ add_fv var <> typeFVs (varType var)
+    where
+      add_fv :: Var -> FV
+      add_fv var = FV $ \_fv_cand _in_scope (have, have_set) ->
+        (var : have, extendVarSet have_set var)
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
     f fv_cand (extendVarSet in_scope tv) acc
 
