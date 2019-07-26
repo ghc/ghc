@@ -1426,8 +1426,8 @@ tcPerformQuickLook orig (act_res_ty, exp_res_ty) args arg_tys
             else return act_res_ty }
 
 tcQuickLooks :: (TcRhoType, ExpRhoType)        -- ^ Result types
-             -> [LHsExprArgIn]                   -- ^ arguments
-             -> [TcSigmaType]                    -- ^ and their types
+             -> [LHsExprArgIn]                 -- ^ arguments
+             -> [TcSigmaType]                  -- ^ and their types
              -> TcM (TCvSubst, [TcTyVar])
 tcQuickLooks res_tys args arg_tys = go res_tys
   where
@@ -1506,7 +1506,12 @@ tcQuickLook e args ty
              -> do { ifr <- tcInstantiateFun IFA_DoNotDefer e fun_ty (lexprCtOrigin e) args underscore
                    ; case ifr of
                        IFR_OK arg_tys act_res_ty _
-                         -> do { (subst, _) <- tcQuickLooks (act_res_ty, Check ty) args arg_tys
+                         -> do { -- Instantiate act_res_ty if ty is guarding
+                                act_res_ty'
+                                  <- if tcIsGuardedType ty || isFunTy ty
+                                        then snd <$> topInstantiate AppOrigin act_res_ty
+                                        else return act_res_ty
+                               ; (subst, _) <- tcQuickLooks (act_res_ty', Check ty) args arg_tys
                                ; traceTc "tcQuickLook/OK" (ppr subst)
                                ; return subst }
                        -- if there is any problem, just return empty substitution
