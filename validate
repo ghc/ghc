@@ -225,9 +225,15 @@ then
     $make -j$threads
     # For a "debug make", add "--debug=b --debug=m"
 else
-    # TODO: define a hadrian Flavour that mimics
-    # mk/flavours/validate.mk and use it here
-    $hadrian
+    case $speed in
+    SLOW)
+      flavour=slow-validate ;;
+    NORMAL)
+      flavour=validate ;;
+    FAST)
+      flavour=validate ;;
+    esac
+    $hadrian --flavour=$flavour
 fi
 
 check_packages post-build
