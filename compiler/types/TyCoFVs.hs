@@ -356,20 +356,17 @@ See #14880.
 
 -}
 
-getCoVarSet :: FV -> CoVarSet
-getCoVarSet fv = fvVarSet (filterFV isCoVar fv)
-
 coVarsOfType :: Type -> CoVarSet
-coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
+coVarsOfType ty = nonDetCoFVSet (typeFVs ty)
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
-coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
+coVarsOfTypes tys = nonDetCoFVSet (foldMap typeFVs tys)
 
 coVarsOfCo :: Coercion -> CoVarSet
-coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
+coVarsOfCo co = nonDetCoFVSet (coFVs co)
 
 coVarsOfCos :: [Coercion] -> CoVarSet
-coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
+coVarsOfCos cos = nonDetCoFVSet (foldMap coFVs cos)
 
 ----- Whether a covar is /Almost Devoid/ in a type or coercion ----
 
