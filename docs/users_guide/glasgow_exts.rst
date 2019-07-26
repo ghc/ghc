@@ -7850,6 +7850,42 @@ using a parameter in the kind annotation: ::
 In this case the kind parameter ``k`` is actually an implicit parameter
 of the type family.
 
+At definition site, the arity determines what inputs can be matched on: ::
+
+    data PT (a :: Type)
+
+    type family F1 :: k -> Type
+    type instance F1 = PT
+      -- OK, 'k' can be matched on.
+
+    type family F0 :: forall k. k -> Type
+    type instance F0 = PT
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘PT’ has kind ‘Type -> Type’
+      --   • In the type ‘PT’
+      --     In the type instance declaration for ‘F0’
+
+Both ``F1`` and ``F0`` have kind ``forall k. k -> Type``, but their arity
+differs.
+
+At use sites, the arity determines if the definition can be used in a
+higher-rank scenario: ::
+
+    type HRK (f :: forall k. k -> Type) = (f Int, f Maybe, f True)
+
+    type H1 = HRK F0  -- OK
+    type H2 = HRK F1
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘F1’ has kind ‘k0 -> Type’
+      --   • In the first argument of ‘HRK’, namely ‘F1’
+      --     In the type ‘HRK F1’
+      --     In the type declaration for ‘H2’
+
+This is a consequence of the requirement that all applications of a type family
+must be fully saturated with respect to their arity.
+
 .. _type-instance-declarations:
 
 Type instance declarations
@@ -9292,10 +9328,39 @@ for ``T``, and this signature is used for all the calls to ``T``
 including the recursive ones. In particular, the recursive use of ``T``
 is at kind ``Type``.
 
-Note that while a top-level kind signature determines the kind of a type
-constructor, it does not determine its arity. This is of particular importance
-for type families and type synonyms, as they cannot be partially applied. See
-type-family-declarations_ for more information about arity.
+While a top-level kind signature determines the kind of a type constructor, it
+does not determine its arity. This is of particular importance for type
+families and type synonyms, as they cannot be partially applied. See
+:ref:`type-family-declarations` for more information about arity.
+
+The arity can be specified using explicit binders and inline kind annotations::
+
+    -- arity F0 = 0
+    type F0 :: forall k. k -> Type
+    type family F0 :: forall k. k -> Type
+
+    -- arity F1 = 1
+    type F1 :: forall k. k -> Type
+    type family F1 :: k -> Type
+
+    -- arity F2 = 2
+    type F2 :: forall k. k -> Type
+    type family F2 a :: Type
+
+In absence of an inline kind annotation, the inferred arity includes all
+explicitly bound parameters and all immediately following invisible
+parameters::
+
+    -- arity FD1 = 1
+    type FD1 :: forall k. k -> Type
+    type FD1
+
+    -- arity FD2 = 2
+    type FD2 :: forall k. k -> Type
+    type FD2 a
+
+Note that ``F0``, ``F1``, ``F2``, ``FD1``, and ``FD2`` all have identical
+top-level kind signatures. The arity is inferred from the type family header.
 
 Top-level kind signatures and declaration headers
 -------------------------------------------------
@@ -9350,24 +9415,40 @@ Classes are subject to the same rules: ::
 
 On the other hand, type families are exempt from this rule: ::
 
-    type T :: Type -> Type
-    type family T
+    type F :: Type -> Type
+    type family F
       -- OK.
 
 Data families are tricky territory. Their headers are exempt from this rule,
 but their instances are not: ::
 
-    type T :: Type -> Type
+    type T :: k -> Type
     data family T
       -- OK.
 
     data instance T Int = MkT1
       -- OK.
 
-    data instance T = MkT2
+    data instance T = MkT3
       -- Error:
       --   • Expecting one more argument to ‘T’
-      --     Expected a type, but ‘T’ has kind ‘Type -> Type’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
+      --   • In the data instance declaration for ‘T’
+
+This also applies to GADT-style data instances: ::
+
+    data instance T (a :: Nat) where MkN4 :: T 4
+                                     MKN9 :: T 9
+      -- OK.
+
+    data instance T :: Symbol -> Type where MkSN :: T "Neptune"
+                                            MkSJ :: T "Jupiter"
+      -- OK.
+
+    data instance T where MkT4 :: T x
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
       --   • In the data instance declaration for ‘T’
 
 

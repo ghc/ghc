@@ -56,8 +56,9 @@ Language
       TyMaybe :: TypeRep Maybe
       TyApp   :: TypeRep a -> TypeRep b -> TypeRep (a b)
 
-  Analogous to function type signatures, a top-level kind signature enables
-  polymorphic recursion.  This feature is a replacement for :extension:`CUSKs`.
+  Analogous to function type signatures, a :ref:`top-level kind signature
+  <top-level-kind-signatures>` enables polymorphic recursion. This feature is
+  a replacement for :extension:`CUSKs`.
 
 - GHC now parses visible, dependent quantifiers (as proposed in
   `GHC proposal 35
@@ -66,8 +67,8 @@ Language
 
     data Proxy :: forall k -> k -> Type
 
-  See the `section on explicit kind quantification
-  <#explicit-kind-quantification>`__ for more details.
+  See the :ref:`section on explicit kind quantification
+  <explicit-kind-quantification>` for more details.
 
 - Type variables in associated type family default declarations can now be
   explicitly bound with a ``forall`` when :extension:`ExplicitForAll` is
