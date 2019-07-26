@@ -743,8 +743,10 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
     pp_kind    =
       sdocWithDynFlags $ \dflags ->
-        ppUnless (xopt LangExt.TopLevelKindSignatures dflags ||
-                  isIfaceLiftedTypeKind kind)
+        ppUnless (xopt LangExt.TopLevelKindSignatures dflags
+                    -- With -XTopLevelKindSignatures enabled, we print the full TLKS
+                    -- which obsoletes the inline result kind signature.
+                  || isIfaceLiftedTypeKind kind)
                  (dcolon <+> ppr kind)
 
     pp_lhs = case parent of
