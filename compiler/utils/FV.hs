@@ -103,10 +103,10 @@ whenIsInteresting :: Var -> FV -> FV
 whenIsInteresting var (FV f) = FV g
   where
     g fv_cand in_scope acc@(have, have_set)
-      | var `elemVarSet` in_scope  -> acc
-      | var `elemVarSet` haveSet   -> acc
-      | fv_cand var                -> f fv_cand in_scope acc
-      | otherwise                  -> acc
+      | var `elemVarSet` in_scope  = acc
+      | var `elemVarSet` haveSet   = acc
+      | fv_cand var                = f fv_cand in_scope acc
+      | otherwise                  = acc
 
 addFV :: Var -> FV
 addFV var = FV $ \fv_cand in_scope (have, have_set) ->
