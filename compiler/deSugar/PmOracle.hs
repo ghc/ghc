@@ -34,9 +34,9 @@ import BasicTypes
 import Util
 import Bag
 import Id
+import VarEnv
 import Var           (EvVar)
 import Name
-import NameEnv
 import UniqSupply
 import FastString
 import SrcLoc
@@ -83,7 +83,7 @@ mkPmId ty = getUniqueM >>= \unique ->
 
 -- | Convert an 'Id' (or 'ValAbs') into an expression
 idToPmExpr :: Id -> PmExpr
-idToPmExpr = PmExprVar . idName
+idToPmExpr = PmExprVar
 
 -- | Introduce a new 'Id' that has the given type and is in the same equivalence
 -- class as the argument.
@@ -564,11 +564,8 @@ ensureInhabited :: Delta -> Id -> PmM (Satisfiability Delta Void)
 --   type oracle
 ensureInhabited delta x = find_one_in_each_set delta
   where
-    ty = idType x -- TODO: normalize?
-    nm = idName x
-
     find_one_in_each_set delta = do
-      suggestPossibleConLikes (delta_tm_cs delta) nm ty >>= \case
+      suggestPossibleConLikes (delta_tm_cs delta) x >>= \case
         Unsatisfiable              -> pure Unsatisfiable -- -XEmptyDataDecls
         PossiblySatisfiable tm_cs' -> pure (PossiblySatisfiable delta{ delta_tm_cs = tm_cs' })
         Satisfiable tm_cs' cons ->
@@ -580,7 +577,7 @@ ensureInhabited delta x = find_one_in_each_set delta
               Just _  -> go delta cons -- success
               Nothing -> do
                 -- Nope, try again, term oracle!
-                tryAddRefutableAltCon (delta_tm_cs delta) nm ty (PmAltConLike con) >>= \case
+                tryAddRefutableAltCon (delta_tm_cs delta) x (PmAltConLike con) >>= \case
                   Nothing -> pure Unsatisfiable -- term oracle says we are out of options
                   Just ts -> find_one_in_each_set (delta{ delta_tm_cs = ts })
 
@@ -709,10 +706,9 @@ tyOracle evs
 %************************************************************************
 -}
 {-
--- | Pretty much a @['TmVarCt']@ association list where the domain is 'Name'
--- instead of 'Id'. This is the type of 'tm_pos', where we store solutions for
--- rigid pattern match variables.
-type TmVarCtEnv = NameEnv PmExpr
+-- | Pretty much a @['TmVarCt']@ association list. This is the type of 'tm_pos',
+-- where we store solutions for rigid pattern match variables.
+type TmVarCtEnv = IdEnv PmExpr
 
 -- | An environment assigning shapes to variables that immediately lead to a
 -- refutation. So, if this maps @x :-> [Just]@, then trying to solve a
@@ -721,10 +717,10 @@ type TmVarCtEnv = NameEnv PmExpr
 --
 -- Determinism is important since we use this for warning messages in
 -- 'PmPpr.pprUncovered'. We don't do the same for 'TmVarCtEnv', so that is a plain
--- 'NameEnv'.
+-- 'IdEnv'.
 --
 -- See also Note [Refutable shapes] in PmOracle.
-type PmRefutEnv = DNameEnv [PmAltCon]
+type PmRefutEnv = DIdEnv [PmAltCon]
 -}
 {-
 -- | The state of the term oracle. Tracks all term-level facts of the form "x is
@@ -757,7 +753,7 @@ data TmState = TmS
   }
 -}
 
-newtype TmState = TS (DNameEnv VarInfo)
+newtype TmState = TS (DIdEnv VarInfo)
   -- Deterministic so that we generate deterministic error messages
 
 data VarInfo
@@ -829,10 +825,10 @@ emptyVarInfo = VI NoInfoYet []
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
-initialTmState = TS emptyDNameEnv
+initialTmState = TS emptyDVarEnv
 
-lookupVarInfo :: TmState -> Name -> (Name, VarInfo)
-lookupVarInfo ts@(TS env) x = case lookupDNameEnv env x of
+lookupVarInfo :: TmState -> Id -> (Id, VarInfo)
+lookupVarInfo ts@(TS env) x = case lookupDVarEnv env x of
   Just (VI (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
   mb_vi                             -> (x, fromMaybe emptyVarInfo mb_vi)
 
@@ -845,7 +841,7 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI pos [] <- snd (lookupVarInfo ts (idName x)), not_solved_yet pos
+  | VI pos [] <- snd (lookupVarInfo ts x), not_solved_yet pos
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
@@ -856,7 +852,7 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
 
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
-isRefutable :: Name -> PmExpr -> TmState -> Bool
+isRefutable :: Id -> PmExpr -> TmState -> Bool
 isRefutable x e ts = fromMaybe False $ do
   alt <- exprToAlt e
   let VI _ ncons = snd (lookupVarInfo ts x)
@@ -864,7 +860,7 @@ isRefutable x e ts = fromMaybe False $ do
 
 -- | Solve an equality (top-level).
 solveOneEq :: TmState -> TmVarCt -> Maybe TmState
-solveOneEq solver_env (TVC x e) = unify solver_env (PmExprVar (idName x), e)
+solveOneEq solver_env (TVC x e) = unify solver_env (PmExprVar x, e)
 
 exprToAlt :: PmExpr -> Maybe PmAltCon
 exprToAlt (PmExprCon c _) = Just c
@@ -880,7 +876,7 @@ initIncompleteMatches _  pos       = pure pos
 addRefutableAltCon :: Delta -> Id -> PmAltCon -> PmM (Maybe Delta)
 addRefutableAltCon delta x nalt =
   -- See Note [Refutable shapes] in PmOracle
-  tryAddRefutableAltCon (delta_tm_cs delta) (idName x) (idType x) nalt >>= \case
+  tryAddRefutableAltCon (delta_tm_cs delta) x nalt >>= \case
     Nothing -> pure Nothing
     Just tms ->
       -- We need to normalise here to catch uninhabitable vars that would
@@ -1049,10 +1045,10 @@ solveVar delta x e =
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
-tryAddRefutableAltCon :: TmState -> Name -> Type -> PmAltCon -> DsM (Maybe TmState)
-tryAddRefutableAltCon ts@(TS env) x ty nalt = do
-  pos' <- initIncompleteMatches ty pos
-  pure (TS . extendDNameEnv env y <$> go pos')
+tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> DsM (Maybe TmState)
+tryAddRefutableAltCon ts@(TS env) x nalt = do
+  pos' <- initIncompleteMatches (idType x) pos
+  pure (TS . extendDVarEnv env y <$> go pos')
   where
     (y, VI pos neg) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
@@ -1076,11 +1072,11 @@ tryAddRefutableAltCon ts@(TS env) x ty nalt = do
                                           --     refute later
     go pos = pure (VI pos neg')
 
-suggestPossibleConLikes :: TmState -> Name -> Type -> DsM (Satisfiability TmState (NonEmpty ConLike))
-suggestPossibleConLikes ts@(TS env) x ty = do
+suggestPossibleConLikes :: TmState -> Id -> DsM (Satisfiability TmState (NonEmpty ConLike))
+suggestPossibleConLikes ts@(TS env) x = do
   let (y, VI pos neg) = lookupVarInfo ts x
-  pos' <- initIncompleteMatches ty pos
-  let ts' = TS (extendDNameEnv env y (VI pos' neg))
+  pos' <- initIncompleteMatches (idType x) pos
+  let ts' = TS (extendDVarEnv env y (VI pos' neg))
   case pos' of
     CompleteSets im -> case unmatchedConLikesIM im of
       Nothing  -> pure Unsatisfiable
@@ -1096,16 +1092,16 @@ combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
 
 -- | Is the given variable /rigid/ (i.e., we have a solution for it) or
 -- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
--- semantically helpful alias for 'lookupNameEnv'.
-isRigid :: TmState -> Name -> Maybe PmExpr
+-- semantically helpful alias for 'lookupVarEnv'.
+isRigid :: TmState -> Id -> Maybe PmExpr
 isRigid (TS env) x = do
-  VI pos _ <- lookupDNameEnv env x
+  VI pos _ <- lookupDVarEnv env x
   case pos of
     Rigid e -> Just e
     _       -> Nothing
 
 -- | @isFlexible tms = isNothing . 'isRigid' tms@
-isFlexible :: TmState -> Name -> Bool
+isFlexible :: TmState -> Id -> Bool
 isFlexible ts = isNothing . isRigid ts
 
 -- | Try to unify two 'PmExpr's and record the gained knowledge in the
@@ -1151,7 +1147,7 @@ unify ts eq@(e1, e2) = case eq of
 -- with @x :-> y@.
 -- Preconditions: @x /= y@ and both @x@ and @y@ are flexible (cf.
 -- 'isFlexible'/'isRigid').
-equate :: Name -> Name -> TmState -> TmState
+equate :: Id -> Id -> TmState -> TmState
 equate x y ts@(TS env)
   = ASSERT( x /= y )
     ASSERT( isFlexible ts x )
@@ -1167,14 +1163,14 @@ equate x y ts@(TS env)
     -- here. Should we? We merge the negs, after all. It's also not so clear
     -- how to merge different COMPLETE sets.
     vi_y'          = VI pos_y (combineRefutEntries neg_x neg_y)
-    ts'           = TS (extendDNameEnv (extendDNameEnv env x vi_x') y vi_y')
+    ts'           = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
 
 -- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
 -- solution, reject (@Nothing@) otherwise.
 --
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
-trySolve:: Name -> PmAltCon -> [PmExpr] -> TmState -> Maybe TmState
+trySolve:: Id -> PmAltCon -> [PmExpr] -> TmState -> Maybe TmState
 trySolve x alt args ts@(TS env)
   | ASSERT( isFlexible ts x )
     isRefutable x e ts
@@ -1186,7 +1182,7 @@ trySolve x alt args ts@(TS env)
     VI _ neg = snd (lookupVarInfo ts x)
     -- Uphold Note [The Pos/Neg invariant]
     vi' = VI (Rigid e) (filter ((== Nothing) . decEqPmAltCon alt) neg)
-    ts' = TS (extendDNameEnv env x vi')
+    ts' = TS (extendDVarEnv env x vi')
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,
@@ -1195,7 +1191,7 @@ trySolve x alt args ts@(TS env)
 extendSubst :: Id -> PmExpr -> TmState -> TmState
 extendSubst y e ts@(TS env)
   | isNotPmExprOther e
-  = TS (extendDNameEnv env (idName y) (VI (Rigid e) []))
+  = TS (extendDVarEnv env y (VI (Rigid e) []))
   | otherwise
   = ts
 
@@ -1207,12 +1203,12 @@ exprDeepLookup delta (PmExprVar x)
   = exprDeepLookup delta e
 exprDeepLookup _   e               = e
 
-wrapUpRefutableShapes :: Delta -> DNameEnv [PmAltCon]
+wrapUpRefutableShapes :: Delta -> DVarEnv [PmAltCon]
 wrapUpRefutableShapes MkDelta{ delta_tm_cs = ts@(TS env) }
-  = filterDNameEnv notNull (mapDNameEnv f env)
+  = filterDVarEnv notNull (mapDVarEnv f env)
   where
     -- Unfortunate overlap with lookupVarInfo here, because we don't have the
-    -- Name
+    -- Id
     f (VI (Rigid (PmExprVar y)) _) = vi_neg (snd (lookupVarInfo ts y))
     f (VI _ neg)                   = neg
 
