@@ -675,13 +675,13 @@ we do the following:
    For an example see also Note [Type normalisation for EmptyCase]
    in types/FamInstEnv.hs.
 
-2. Function checkEmptyCase' performs the check:
+2. Function Check.checkEmptyCase' performs the check:
    - If core_ty is not an algebraic type, then we cannot check for
      inhabitation, so we emit (_ :: src_ty) as missing, conservatively assuming
      that the type is inhabited.
    - If core_ty is an algebraic type, then we unfold the scrutinee to all
      possible constructor patterns, using inhabitationCandidates, and then
-     check each one for constraint satisfiability, same as we for normal
+     check each one for constraint satisfiability, same as we do for normal
      pattern match checking.
 -}
 
@@ -914,6 +914,122 @@ refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
       tracePm "matched at all" (ppr (delta_tm_cs delta2))
       pure (Just (delta2, arg_vas))
 
+{-
+Note [Coverage checking and existential tyvars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC's implementation of the pattern-match coverage algorithm (as described in
+the GADTs Meet Their Match paper) must take some care to emit enough type
+constraints when handling data constructors with exisentially quantified type
+variables. To better explain what the challenge is, consider a constructor K
+of the form:
+
+  K @e_1 ... @e_m ev_1 ... ev_v ty_1 ... ty_n :: T u_1 ... u_p
+
+Where:
+
+* e_1, ..., e_m are the existentially bound type variables.
+* ev_1, ..., ev_v are evidence variables, which may inhabit a dictionary type
+  (e.g., Eq) or an equality constraint (e.g., e_1 ~ Int).
+* ty_1, ..., ty_n are the types of K's fields.
+* T u_1 ... u_p is the return type, where T is the data type constructor, and
+  u_1, ..., u_p are the universally quantified type variables.
+
+In the ConVar case, the coverage algorithm will have in hand the constructor
+K as well as a pattern variable (pv :: T PV_1 ... PV_p), where PV_1, ..., PV_p
+are some types that instantiate u_1, ... u_p. The idea is that we should
+substitute PV_1 for u_1, ..., and PV_p for u_p when forming a PmCon (the
+mkOneConFull function accomplishes this) and then hand this PmCon off to the
+ConCon case.
+
+The presence of existentially quantified type variables adds a significant
+wrinkle. We always grab e_1, ..., e_m from the definition of K to begin with,
+but we don't want them to appear in the final PmCon, because then
+calling (mkOneConFull K) for other pattern variables might reuse the same
+existential tyvars, which is certainly wrong.
+
+Previously, GHC's solution to this wrinkle was to always create fresh names
+for the existential tyvars and put them into the PmCon. This works well for
+many cases, but it can break down if you nest GADT pattern matches in just
+the right way. For instance, consider the following program:
+
+    data App f a where
+      App :: f a -> App f (Maybe a)
+
+    data Ty a where
+      TBool :: Ty Bool
+      TInt  :: Ty Int
+
+    data T f a where
+      C :: T Ty (Maybe Bool)
+
+    foo :: T f a -> App f a -> ()
+    foo C (App TBool) = ()
+
+foo is a total program, but with the previous approach to handling existential
+tyvars, GHC would mark foo's patterns as non-exhaustive.
+
+When foo is desugared to Core, it looks roughly like so:
+
+    foo @f @a (C co1 _co2) (App @a1 _co3 (TBool |> co1)) = ()
+
+(Where `a1` is an existential tyvar.)
+
+That, in turn, is processed by the coverage checker to become:
+
+    foo @f @a (C co1 _co2) (App @a1 _co3 (pmvar123 :: f a1))
+      | TBool <- pmvar123 |> co1
+      = ()
+
+Note that the type of pmvar123 is `f a1`—this will be important later.
+
+Now, we proceed with coverage-checking as usual. When we come to the
+ConVar case for App, we create a fresh variable `a2` to represent its
+existential tyvar. At this point, we have the equality constraints
+`(a ~ Maybe a2, a ~ Maybe Bool, f ~ Ty)` in scope.
+
+However, when we check the guard, it will use the type of pmvar123, which is
+`f a1`. Thus, when considering if pmvar123 can match the constructor TInt,
+it will generate the constraint `a1 ~ Int`. This means our final set of
+equality constraints would be:
+
+    f  ~ Ty
+    a  ~ Maybe Bool
+    a  ~ Maybe a2
+    a1 ~ Int
+
+Which is satisfiable! Freshening the existential tyvar `a` to `a2` doomed us,
+because GHC is unable to relate `a2` to `a1`, which really should be the same
+tyvar.
+
+Luckily, we can avoid this pitfall. Recall that the ConVar case was where we
+generated a PmCon with too-fresh existentials. But after ConVar, we have the
+ConCon case, which considers whether each constructor of a particular data type
+can be matched on in a particular spot.
+
+In the case of App, when we get to the ConCon case, we will compare our
+original App PmCon (from the source program) to the App PmCon created from the
+ConVar case. In the former PmCon, we have `a1` in hand, which is exactly the
+existential tyvar we want! Thus, we can force `a1` to be the same as `a2` here
+by emitting an additional `a1 ~ a2` constraint. Now our final set of equality
+constraints will be:
+
+    f  ~ Ty
+    a  ~ Maybe Bool
+    a  ~ Maybe a2
+    a1 ~ Int
+    a1 ~ a2
+
+Which is unsatisfiable, as we desired, since we now have that
+Int ~ a1 ~ a2 ~ Bool.
+
+In general, App might have more than one constructor, in which case we
+couldn't reuse the existential tyvar for App for a different constructor. This
+means that we can only use this trick in ConCon when the constructors are the
+same. But this is fine, since this is the only scenario where this situation
+arises in the first place!
+-}
+
+
 equateTyVars :: [TyVar] -> [TyVar] -> PmM [EvVar]
 equateTyVars ex_tvs1 ex_tvs2
   = ASSERT(ex_tvs1 `equalLength` ex_tvs2)
@@ -1104,7 +1220,131 @@ wrapUpRefutableShapes MkDelta{ delta_tm_cs = ts@(TS env) }
 pmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
 pmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
 
-{- Note [Refutable shapes]
+{- Note [Strict argument type constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the ConVar case of clause processing, each conlike K traditionally
+generates two different forms of constraints:
+
+* A term constraint (e.g., x ~ K y1 ... yn)
+* Type constraints from the conlike's context (e.g., if K has type
+  forall bs. Q => s1 .. sn -> T tys, then Q would be its type constraints)
+
+As it turns out, these alone are not enough to detect a certain class of
+unreachable code. Consider the following example (adapted from #15305):
+
+  data K = K1 | K2 !Void
+
+  f :: K -> ()
+  f K1 = ()
+
+Even though `f` doesn't match on `K2`, `f` is exhaustive in its patterns. Why?
+Because it's impossible to construct a terminating value of type `K` using the
+`K2` constructor, and thus it's impossible for `f` to ever successfully match
+on `K2`.
+
+The reason is because `K2`'s field of type `Void` is //strict//. Because there
+are no terminating values of type `Void`, any attempt to construct something
+using `K2` will immediately loop infinitely or throw an exception due to the
+strictness annotation. (If the field were not strict, then `f` could match on,
+say, `K2 undefined` or `K2 (let x = x in x)`.)
+
+Since neither the term nor type constraints mentioned above take strict
+argument types into account, we make use of the `nonVoid` function to
+determine whether a strict type is inhabitable by a terminating value or not.
+
+`nonVoid ty` returns True when either:
+1. `ty` has at least one InhabitationCandidate for which both its term and type
+   constraints are satifiable, and `nonVoid` returns `True` for all of the
+   strict argument types in that InhabitationCandidate.
+2. We're unsure if it's inhabited by a terminating value.
+
+`nonVoid ty` returns False when `ty` is definitely uninhabited by anything
+(except bottom). Some examples:
+
+* `nonVoid Void` returns False, since Void has no InhabitationCandidates.
+  (This is what lets us discard the `K2` constructor in the earlier example.)
+* `nonVoid (Int :~: Int)` returns True, since it has an InhabitationCandidate
+  (through the Refl constructor), and its term constraint (x ~ Refl) and
+  type constraint (Int ~ Int) are satisfiable.
+* `nonVoid (Int :~: Bool)` returns False. Although it has an
+  InhabitationCandidate (by way of Refl), its type constraint (Int ~ Bool) is
+  not satisfiable.
+* Given the following definition of `MyVoid`:
+
+    data MyVoid = MkMyVoid !Void
+
+  `nonVoid MyVoid` returns False. The InhabitationCandidate for the MkMyVoid
+  constructor contains Void as a strict argument type, and since `nonVoid Void`
+  returns False, that InhabitationCandidate is discarded, leaving no others.
+
+* Performance considerations
+
+We must be careful when recursively calling `nonVoid` on the strict argument
+types of an InhabitationCandidate, because doing so naïvely can cause GHC to
+fall into an infinite loop. Consider the following example:
+
+  data Abyss = MkAbyss !Abyss
+
+  stareIntoTheAbyss :: Abyss -> a
+  stareIntoTheAbyss x = case x of {}
+
+In principle, stareIntoTheAbyss is exhaustive, since there is no way to
+construct a terminating value using MkAbyss. However, both the term and type
+constraints for MkAbyss are satisfiable, so the only way one could determine
+that MkAbyss is unreachable is to check if `nonVoid Abyss` returns False.
+There is only one InhabitationCandidate for Abyss—MkAbyss—and both its term
+and type constraints are satisfiable, so we'd need to check if `nonVoid Abyss`
+returns False... and now we've entered an infinite loop!
+
+To avoid this sort of conundrum, `nonVoid` uses a simple test to detect the
+presence of recursive types (through `checkRecTc`), and if recursion is
+detected, we bail out and conservatively assume that the type is inhabited by
+some terminating value. This avoids infinite loops at the expense of making
+the coverage checker incomplete with respect to functions like
+stareIntoTheAbyss above. Then again, the same problem occurs with recursive
+newtypes, like in the following code:
+
+  newtype Chasm = MkChasm Chasm
+
+  gazeIntoTheChasm :: Chasm -> a
+  gazeIntoTheChasm x = case x of {} -- Erroneously warned as non-exhaustive
+
+So this limitation is somewhat understandable.
+
+Note that even with this recursion detection, there is still a possibility that
+`nonVoid` can run in exponential time. Consider the following data type:
+
+  data T = MkT !T !T !T
+
+If we call `nonVoid` on each of its fields, that will require us to once again
+check if `MkT` is inhabitable in each of those three fields, which in turn will
+require us to check if `MkT` is inhabitable again... As you can see, the
+branching factor adds up quickly, and if the recursion depth limit is, say,
+100, then `nonVoid T` will effectively take forever.
+
+To mitigate this, we check the branching factor every time we are about to call
+`nonVoid` on a list of strict argument types. If the branching factor exceeds 1
+(i.e., if there is potential for exponential runtime), then we limit the
+maximum recursion depth to 1 to mitigate the problem. If the branching factor
+is exactly 1 (i.e., we have a linear chain instead of a tree), then it's okay
+to stick with a larger maximum recursion depth.
+
+Another microoptimization applies to data types like this one:
+
+  data S a = ![a] !T
+
+Even though there is a strict field of type [a], it's quite silly to call
+nonVoid on it, since it's "obvious" that it is inhabitable. To make this
+intuition formal, we say that a type is definitely inhabitable (DI) if:
+
+  * It has at least one constructor C such that:
+    1. C has no equality constraints (since they might be unsatisfiable)
+    2. C has no strict argument types (since they might be uninhabitable)
+
+It's relatively cheap to check if a type is DI, so before we call `nonVoid`
+on a list of strict argument types, we filter out all of the DI ones.
+
+Note [Refutable shapes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Consider a pattern match like
