@@ -3,7 +3,6 @@ module FVM (FVM(..)) where
 import {-# SOURCE #-} TyCoRep (CoercionHole)
 
 import Var
-import VarSet
 
 import Data.Monoid (Monoid)
 
