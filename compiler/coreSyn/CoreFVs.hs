@@ -81,7 +81,7 @@ import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
 import Outputable
-import FV
+import FV hiding ( noFVs )
 
 {-
 ************************************************************************
@@ -239,45 +239,37 @@ exprsSomeFreeVarsDSet fv_cand e =
 --      SLPJ Feb06
 
 addBndr :: CoreBndr -> FV -> FV
-addBndr bndr fv fv_cand in_scope acc
-  = (varTypeTyCoFVs bndr `unionFV`
+addBndr bndr fv
+  = varTypeTyCoFVs bndr `unionFV`
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
-     FV.delFV bndr fv) fv_cand in_scope acc
+     FV.delFV bndr fv
 
 addBndrs :: [CoreBndr] -> FV -> FV
 addBndrs bndrs fv = foldr addBndr fv bndrs
 
 expr_fvs :: CoreExpr -> FV
-expr_fvs (Type ty) fv_cand in_scope acc =
-  tyCoFVsOfType ty fv_cand in_scope acc
-expr_fvs (Coercion co) fv_cand in_scope acc =
-  tyCoFVsOfCo co fv_cand in_scope acc
-expr_fvs (Var var) fv_cand in_scope acc = FV.unitFV var fv_cand in_scope acc
-expr_fvs (Lit _) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-expr_fvs (Tick t expr) fv_cand in_scope acc =
-  (tickish_fvs t `unionFV` expr_fvs expr) fv_cand in_scope acc
-expr_fvs (App fun arg) fv_cand in_scope acc =
-  (expr_fvs fun `unionFV` expr_fvs arg) fv_cand in_scope acc
-expr_fvs (Lam bndr body) fv_cand in_scope acc =
-  addBndr bndr (expr_fvs body) fv_cand in_scope acc
-expr_fvs (Cast expr co) fv_cand in_scope acc =
-  (expr_fvs expr `unionFV` tyCoFVsOfCo co) fv_cand in_scope acc
+expr_fvs (Type ty) = tyCoFVsOfType ty
+expr_fvs (Coercion co) = tyCoFVsOfCo co
+expr_fvs (Var var) = FV.unitFV var
+expr_fvs (Lit _) = emptyFV
+expr_fvs (Tick t expr) = tickish_fvs t `unionFV` expr_fvs expr
+expr_fvs (App fun arg) = expr_fvs fun `unionFV` expr_fvs arg
+expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
+expr_fvs (Cast expr co) = expr_fvs expr `unionFV` tyCoFVsOfCo co
 
-expr_fvs (Case scrut bndr ty alts) fv_cand in_scope acc
-  = (expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
-      (mapUnionFV alt_fvs alts)) fv_cand in_scope acc
+expr_fvs (Case scrut bndr ty alts)
+  = expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
+      (mapUnionFV alt_fvs alts)
   where
     alt_fvs (_, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
 
-expr_fvs (Let (NonRec bndr rhs) body) fv_cand in_scope acc
-  = (rhs_fvs (bndr, rhs) `unionFV` addBndr bndr (expr_fvs body))
-      fv_cand in_scope acc
+expr_fvs (Let (NonRec bndr rhs) body)
+  = rhs_fvs (bndr, rhs) `unionFV` addBndr bndr (expr_fvs body)
 
-expr_fvs (Let (Rec pairs) body) fv_cand in_scope acc
+expr_fvs (Let (Rec pairs) body)
   = addBndrs (map fst pairs)
              (mapUnionFV rhs_fvs pairs `unionFV` expr_fvs body)
-               fv_cand in_scope acc
 
 ---------
 rhs_fvs :: (Id, CoreExpr) -> FV

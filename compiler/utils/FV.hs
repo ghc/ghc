@@ -8,12 +8,13 @@ module FV
     -- * Are there any free variables at all?
   , AnyFVs, noFVs
     -- * Deterministic free variable computation
-  , FV
+  , FV(..)
   , fvVarListVarSet
   , fvVarList
   , fvDVarSet
   , fvVarSet
   , filterFV
+  , InterestingVarFun
   , emptyFV
   , delFV
   , delFVs

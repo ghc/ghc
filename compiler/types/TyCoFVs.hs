@@ -286,10 +286,6 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
 
-tyCoFVsOfMCo :: MCoercion -> FV
-tyCoFVsOfMCo MRefl    = emptyFV
-tyCoFVsOfMCo (MCo co) = tyCoFVsOfCo co
-
 tyCoVarsOfCosSet :: CoVarEnv Coercion -> TyCoVarSet
 tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
   -- It's OK to use nonDetEltsUFM here because we immediately forget the
@@ -309,7 +305,7 @@ coFVs (GRefl _ ty mco) = typeFVs ty <> mcoFVs mco
 coFVs (CoVarCo cv) = unitFV cv
 coFVs (TyConAppCo _ _ cos) = foldMap coFVs cos
 coFVs (AppCo co arg) = coFVs co <> coFVs arg
-coFVs (ForAllCo tv kind_co co) = coFVs kind_co <> bindVar tv (coFVs co)
+coFVs (ForAllCo tv kind_co co) = coFVs kind_co <> tyCoFVsVarBndr tv (coFVs co)
 coFVs (FunCo _ co1 co2) = coFVs co1 <> coFVs co2
 coFVs (HoleCo hole) = coholeFV hole
 coFVs (AxiomInstCo _ _ cos) = foldMap coFVs cos
