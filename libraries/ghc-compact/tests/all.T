@@ -22,3 +22,8 @@ test('compact_share', omit_ways(['ghci', 'profasm', 'profthreaded']),
 test('compact_bench', [ ignore_stdout, extra_run_opts('100') ],
                        compile_and_run, [''])
 test('T17044', normal, compile_and_run, [''])
+# N.B. Sanity check times out due to large list.
+test('T16992', [when(wordsize(32), skip), # Resource limit exceeded on 32-bit
+                high_memory_usage,
+                run_timeout_multiplier(5),
+                omit_ways(['sanity'])], compile_and_run, [''])

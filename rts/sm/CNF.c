@@ -1016,8 +1016,9 @@ cmp_fixup_table_item (const void *e1, const void *e2)
 {
     const StgWord *w1 = e1;
     const StgWord *w2 = e2;
-
-    return *w1 - *w2;
+    if (*w1 > *w2) return +1;
+    else if (*w1 < *w2) return -1;
+    else return 0;
 }
 
 static StgWord *
