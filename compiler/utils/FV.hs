@@ -17,24 +17,22 @@ module FV
   , emptyFV
   , delFV
   , delFVs
+  , unionFV, mapUnionFV, mkFVs
     -- * Non-deterministic free variable computation
   , NonDetFV
-  , runNonDetFV
+  , nonDetFVSet
   ) where
 
 import GhcPrelude
-import Data.Semigroup (Semigroup((<>)))
 
-import {-# SOURCE #-} TyCoRep (Type, Coercion, CoercionHole, coHoleCoVar)
+import FVM
+
+import {-# SOURCE #-} TyCoRep (coHoleCoVar)
+import {-# SOURCE #-} TyCoFVs (typeFVs)
 import Var
 import VarSet
 
-class Monoid m => FVM m where
-  coholeFV  :: CoercionHole -> m
-  unitFV   :: Var -> m
-  tycoVarsFV :: DVarSet -> m
-  bindVar :: Var -> m -> m
-
+import Data.Semigroup (Semigroup((<>)))
 
 newtype AnyFVs = AnyFVs (VarSet -> Bool)
 
@@ -47,7 +45,7 @@ instance Semigroup AnyFVs where
   {-# INLINE (<>) #-}
 
 instance FVM AnyFVs where
-  coholeFV hole = mempty
+  coholeFV _hole = mempty
   unitFV v = AnyFVs $ \in_scope -> not (v `elemVarSet` in_scope)
   tycoVarsFV fvs = AnyFVs $ \in_scope -> not $ isEmptyVarSet $ dVarSetToVarSet fvs `minusVarSet` in_scope
   bindVar tv (AnyFVs f) = AnyFVs $ \in_scope -> f (extendVarSet in_scope tv)
@@ -80,18 +78,22 @@ instance FVM NonDetFV where
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet (extendVarSet acc v)
   tycoVarsFV fvs = NonDetFV $ \is acc -> acc `unionVarSet` (dVarSetToVarSet fvs `minusVarSet` is)
-  bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet v is) acc
+  bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
   {-# INLINE bindVar #-}
+
+nonDetFVSet :: NonDetFV -> TyCoVarSet
+nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
+
 
 type InterestingVarFun = Var -> Bool
 
 newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> ([Var], VarSet) -> ([Var], VarSet) }
 
 instance Monoid FV where
-  mempty = FV $ \_ acc -> acc
+  mempty = FV $ \_ _ acc -> acc
   {-# INLINE mempty #-}
 
 instance Semigroup FV where
@@ -100,14 +102,14 @@ instance Semigroup FV where
 
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
-  unitFV v = FV $ \fv_cand in_scope acc@(have, haveSet) ->
-    if | v `elemVarSet` in_scope  -> acc
-       | v `elemVarSet` haveSet   -> acc
-       | fv_cand var              -> (var: have, extendVarSet haveSet var)
-       | otherwise                -> acc
-  tycoVarsFV fvs = foldMap tyvar (dvarSetElems fvs) -- can we do better than this?
+  unitFV var = FV $ \fv_cand in_scope acc@(have, haveSet) ->
+    if | var `elemVarSet` in_scope  -> acc
+       | var `elemVarSet` haveSet   -> acc
+       | fv_cand var                -> (var : have, extendVarSet haveSet var)
+       | otherwise                  -> acc
+  tycoVarsFV fvs = foldMap unitFV (dVarSetElems fvs) -- can we do better than this?
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
-    f fv_cand (extendVarSet tv in_scope) acc
+    f fv_cand (extendVarSet in_scope tv) acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -121,7 +123,7 @@ fvVarList :: FV -> [Var]
 fvVarList = fst . fvVarListVarSet
 
 fvDVarSet :: FV -> DVarSet
-fvDVarSet (FV fv) = mkDVarSet $ fst $ fvVarListVarSet fv
+fvDVarSet fv = mkDVarSet $ fst $ fvVarListVarSet fv
 
 fvVarSet :: FV -> VarSet
 fvVarSet = snd . fvVarListVarSet
@@ -147,3 +149,12 @@ delFVs :: VarSet -> FV -> FV
 delFVs vars (FV fv) = FV $ \fv_cand !in_scope acc ->
   fv fv_cand (in_scope `unionVarSet` vars) acc
 {-# INLINE delFVs #-}
+
+mapUnionFV :: (a -> FV) -> [a] -> FV
+mapUnionFV = foldMap
+
+unionFV :: FV -> FV -> FV
+unionFV = (<>)
+
+mkFVs :: [Var] -> FV
+mkFVs = foldMap unitFV

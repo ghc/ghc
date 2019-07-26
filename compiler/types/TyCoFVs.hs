@@ -10,7 +10,8 @@ module TyCoFVs
         tyCoVarsOfCo, tyCoVarsOfCos,
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
-        tyCoVarsOfCoList, tyCoVarsOfProv,
+        tyCoVarsOfCoList,
+        typeFVs,
         almostDevoidCoVarOfCo,
         injectiveVarsOfType, tyConAppNeedsKindSig,
 
@@ -37,6 +38,8 @@ import VarSet
 import VarEnv
 import Util
 import Panic
+
+import Data.Semigroup ((<>))
 
 {-
 %************************************************************************
@@ -167,26 +170,26 @@ And that's it.
 
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfType ty = runNonDetFVs (typeFVs ty)
+tyCoVarsOfType ty = nonDetFVSet (typeFVs ty)
 
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = runNonDetFVs $ foldMap typeFVs tys
+tyCoVarsOfTypes tys = nonDetFVSet $ foldMap typeFVs tys
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfCo co = runNonDetFVs (coFVs co)
+tyCoVarsOfCo co = nonDetFVSet (coFVs co)
 
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = runNonDetFVs (foldMap coFVs cos)
+tyCoVarsOfCos cos = nonDetFVSet (foldMap coFVs cos)
 
 
 -- | Generates an in-scope set from the free variables in a list of types
 -- and a list of coercions
 mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
 mkTyCoInScopeSet tys cos
-  = mkInScopeSet (runNonDetFVs $ foldMap typeFVs tys <> foldMap coFVs cos)
+  = mkInScopeSet (nonDetFVSet $ foldMap typeFVs tys <> foldMap coFVs cos)
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -239,14 +242,14 @@ tyCoFVsOfType :: Type -> FV
 tyCoFVsOfType = typeFVs
 
 typeFVs :: FVM m => Type -> m
-typeFVs (TyVarTy v) = tyvarFV v
+typeFVs (TyVarTy v)        = unitFV v
 typeFVs (TyConApp _ tys)   = foldMap typeFVs tys
 typeFVs (LitTy {})         = mempty
 typeFVs (AppTy fun arg)    = typeFVs fun <> typeFVs arg
 typeFVs (FunTy _ arg res)  = typeFVs arg <> typeFVs res
-typeFVs (ForAllTy (Bndr tv _) ty) = typeFVs (varType tv) <> bindTyvar tv (typeFVs ty)
-typeFVs (CastTy ty co)     = typeFVsty <> coFVs co
-typeFVs (CoercionTy co)    = ty_co_vars_of_co co is acc
+typeFVs (ForAllTy bndr ty) = tyCoFVsBndr bndr (typeFVs ty)
+typeFVs (CastTy ty co)     = typeFVs ty <> coFVs co
+typeFVs (CoercionTy co)    = coFVs co
 {-# SPECIALISE typeFVs :: Type -> FV #-}
 {-# SPECIALISE typeFVs :: Type -> NonDetFV #-}
 
@@ -265,7 +268,7 @@ tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
 tyCoFVsVarBndr :: FVM m => Var -> m -> m
 tyCoFVsVarBndr var fvs
   = typeFVs (varType var)   -- Free vars of its type/kind
-    <> bindTyvar var fvs       -- Delete it from the thing-inside
+    <> bindVar var fvs       -- Delete it from the thing-inside
 {-# SPECIALISE tyCoFVsVarBndr :: Var -> FV -> FV #-}
 {-# SPECIALISE tyCoFVsVarBndr :: Var -> NonDetFV -> NonDetFV #-}
 
@@ -297,21 +300,16 @@ tyCoFVsOfCo :: Coercion -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfCo = coFVs
 
-tyCoFVsOfProv :: UnivCoProvenance -> FV
-tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
-tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos = foldMap coFVs
 
 coFVs :: FVM m => Coercion -> m
 coFVs (Refl ty) = typeFVs ty
 coFVs (GRefl _ ty mco) = typeFVs ty <> mcoFVs mco
-coFVs (TyConAppCo_ _ cos) = foldMap coFVs cos
+coFVs (CoVarCo cv) = unitFV cv
+coFVs (TyConAppCo _ _ cos) = foldMap coFVs cos
 coFVs (AppCo co arg) = coFVs co <> coFVs arg
-coFVs (ForAllCo tv kind_co co) = coFVs kind_co <> bindTyvar tv (coFVs co)
+coFVs (ForAllCo tv kind_co co) = coFVs kind_co <> bindVar tv (coFVs co)
 coFVs (FunCo _ co1 co2) = coFVs co1 <> coFVs co2
 coFVs (HoleCo hole) = coholeFV hole
 coFVs (AxiomInstCo _ _ cos) = foldMap coFVs cos
@@ -323,7 +321,7 @@ coFVs (LRCo _ co) = coFVs co
 coFVs (InstCo co arg) = coFVs co <> coFVs arg
 coFVs (KindCo co) = coFVs co
 coFVs (SubCo co) = coFVs co
-coFVs (AxiomRuleCo _ cos) = foldMap coFVs co
+coFVs (AxiomRuleCo _ cos) = foldMap coFVs cos
 {-# SPECIALISE coFVs :: Coercion -> FV #-}
 {-# SPECIALISE coFVs :: Coercion -> NonDetFV #-}
 
@@ -338,9 +336,6 @@ provFVs (PhantomProv co)    = coFVs co
 provFVs (ProofIrrelProv co) = coFVs co
 provFVs UnsafeCoerceProv    = mempty
 provFVs (PluginProv _)      = mempty
-provFVs (ZappedProv fvs)    = tycoVarsFV fvs
-provFVs (TcZappedProv fvs coholes)
-                            = foldMap (tyvarFV . coHoleCoVar) coholes <> tyscoVarsFV fvs
 {-# SPECIALISE provFVs :: UnivCoProvenance -> FV #-}
 {-# SPECIALISE provFVs :: UnivCoProvenance -> NonDetFV #-}
 
@@ -366,7 +361,7 @@ See #14880.
 -}
 
 getCoVarSet :: FV -> CoVarSet
-getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
+getCoVarSet fv = fvVarSet (filterFV isCoVar fv)
 
 coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
@@ -493,13 +488,13 @@ injectiveVarsOfType = go
   where
     go ty                 | Just ty' <- coreView ty
                           = go ty'
-    go (TyVarTy v)        = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (TyVarTy v)        = unitFV v <> go (tyVarKind v)
+    go (AppTy f a)        = go f <> go a
+    go (FunTy _ ty1 ty2)  = go ty1 <> go ty2
     go (TyConApp tc tys)  =
       case tyConInjectivityInfo tc of
         NotInjective  -> emptyFV
-        Injective inj -> mapUnionFV go $
+        Injective inj -> foldMap go $
                          filterByList (inj ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
@@ -549,8 +544,7 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
           = splitAt n_args tc_binders
         result_kind  = mkTyConKind remaining_binders tc_res_kind
         result_vars  = tyCoVarsOfType result_kind
-        dropped_vars = fvVarSet $
-                       mapUnionFV injective_vars_of_binder dropped_binders
+        dropped_vars = fvVarSet $ foldMap injective_vars_of_binder dropped_binders
 
     in not (subVarSet result_vars dropped_vars)
   where
@@ -565,8 +559,8 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
       case vis of
         AnonTCB VisArg -> injectiveVarsOfType (varType tv)
         NamedTCB argf  | source_of_injectivity argf
-                       -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
-        _              -> emptyFV
+                       -> unitFV tv <> injectiveVarsOfType (varType tv)
+        _              -> mempty
 
     source_of_injectivity Required  = True
     source_of_injectivity Specified = spec_inj_pos
