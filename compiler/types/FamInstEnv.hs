@@ -1574,43 +1574,155 @@ can see that (F x x) can reduce to Double. So, it had better be the
 case that (F blah blah) can reduce to Double, no matter what (blah)
 is!  Flattening as done below ensures this.
 
+The algorithm works by building up a TypeMap TyVar, mapping
+type family applications to fresh variables. This mapping must
+be threaded through all the function calls, as any entry in
+the mapping must be propagated to all future nodes in the tree.
+
+The algorithm also must track the set of in-scope variables, in
+order to make fresh variables as it flattens. (We are far from a
+source of fresh Uniques.) See Wrinkle 2, below.
+
+There are wrinkles, of course:
+
+1. The flattening algorithm must account for the possibility
+   of inner `forall`s. (A `forall` seen here can happen only
+   because of impredicativity. However, the flattening operation
+   is an algorithm in Core, which is impredicative.)
+   Suppose we have (forall b. F b) -> (forall b. F b). Of course,
+   those two bs are entirely unrelated, and so we should certainly
+   not flatten the two calls F b to the same variable. Instead, they
+   must be treated separately. We thus carry a substitution that
+   freshens variables; we must apply this substitution (in
+   `coreFlattenTyFamApp`) before looking up an application in the environment.
+   Note that the range of the substitution contains only TyVars, never anything
+   else.
+
+   For the sake of efficiency, we only apply this substitution when absolutely
+   necessary. Namely:
+
+   * We do not perform the substitution at all if it is empty.
+   * We only need to worry about the arguments of a type family that are within
+     the arity of said type family, so we can get away with not applying the
+     substitution to any oversaturated type family arguments.
+   * Importantly, we do /not/ achieve this substitution by recursively
+     flattening the arguments, as this would be wrong. Consider `F (G a)`,
+     where F and G are type families. We might decide that `F (G a)` flattens
+     to `beta`. Later, the substitution is non-empty (but does not map `a`) and
+     so we flatten `G a` to `gamma` and try to flatten `F gamma`. Of course,
+     `F gamma` is unknown, and so we flatten it to `delta`, but it really
+     should have been `beta`! Argh!
+
+     Moral of the story: instead of flattening the arguments, just substitute
+     them directly.
+
+2. There are two different reasons we might add a variable
+   to the in-scope set as we work:
+
+     A. We have just invented a new flattening variable.
+     B. We have entered a `forall`.
+
+   Annoying here is that in-scope variable source (A) must be
+   threaded through the calls. For example, consider (F b -> forall c. F c).
+   Suppose that, when flattening F b, we invent a fresh variable c.
+   Now, when we encounter (forall c. F c), we need to know c is already in
+   scope so that we locally rename c to c'. However, if we don't thread through
+   the in-scope set from one argument of (->) to the other, we won't know this
+   and might get very confused.
+
+   In contrast, source (B) increases only as we go deeper, as in-scope sets
+   normally do. However, even here we must be careful. The TypeMap TyVar that
+   contains mappings from type family applications to freshened variables will
+   be threaded through both sides of (forall b. F b) -> (forall b. F b). We
+   thus must make sure that the two `b`s don't get renamed to the same b1. (If
+   they did, then looking up `F b1` would yield the same flatten var for
+   each.) So, even though `forall`-bound variables should really be in the
+   in-scope set only when they are in scope, we retain these variables even
+   outside of their scope. This ensures that, if we enounter a fresh
+   `forall`-bound b, we will rename it to b2, not b1. Note that keeping a
+   larger in-scope set than strictly necessary is always OK, as in-scope sets
+   are only ever used to avoid collisions.
+
+   Sadly, the freshening substitution described in (1) really musn't bind
+   variables outside of their scope: note that its domain is the *unrenamed*
+   variables. This means that the substitution gets "pushed down" (like a
+   reader monad) while the in-scope set gets threaded (like a state monad).
+   Because a TCvSubst contains its own in-scope set, we don't carry a TCvSubst;
+   instead, we just carry a TvSubstEnv down, tying it to the InScopeSet
+   traveling separately as necessary.
+
+3. Consider `F ty_1 ... ty_n`, where F is a type family with arity k:
+
+     type family F ty_1 ... ty_k :: res_k
+
+   It's tempting to just flatten `F ty_1 ... ty_n` to `alpha`, where alpha is a
+   flattening skolem. But we must instead flatten it to
+   `alpha ty_(k+1) ... ty_n`—that is, by only flattening up to the arity of the
+   type family.
+
+   Why is this better? Consider the following concrete example from #16995:
+
+     type family Param :: Type -> Type
+
+     type family LookupParam (a :: Type) :: Type where
+       LookupParam (f Char) = Bool
+       LookupParam x        = Int
+
+     foo :: LookupParam (Param ())
+     foo = 42
+
+   In order for `foo` to typecheck, `LookupParam (Param ())` must reduce to
+   `Int`. But if we flatten `Param ()` to `alpha`, then GHC can't be sure if
+   `alpha` is apart from `f Char`, so it won't fall through to the second
+   equation. But since the `Param` type family has arity 0, we can instead
+   flatten `Param ()` to `alpha ()`, about which GHC knows with confidence is
+   apart from `f Char`, permitting the second equation to be reached.
+
+   Not only does this allow more programs to be accepted, it's also important
+   for correctness. Not doing this was the root cause of the Core Lint error
+   in #16995.
+
 flattenTys is defined here because of module dependencies.
 -}
 
-data FlattenEnv = FlattenEnv { fe_type_map :: TypeMap TyVar
-                             , fe_subst    :: TCvSubst }
+data FlattenEnv
+  = FlattenEnv { fe_type_map :: TypeMap TyVar
+                 -- domain: exactly-saturated type family applications
+                 -- range: fresh variables
+               , fe_in_scope :: InScopeSet }
+                 -- See Note [Flattening]
 
 emptyFlattenEnv :: InScopeSet -> FlattenEnv
 emptyFlattenEnv in_scope
   = FlattenEnv { fe_type_map = emptyTypeMap
-               , fe_subst    = mkEmptyTCvSubst in_scope }
+               , fe_in_scope = in_scope }
 
--- See Note [Flattening]
+updateInScopeSet :: FlattenEnv -> (InScopeSet -> InScopeSet) -> FlattenEnv
+updateInScopeSet env upd = env { fe_in_scope = upd (fe_in_scope env) }
+
 flattenTys :: InScopeSet -> [Type] -> [Type]
-flattenTys in_scope tys = snd $ coreFlattenTys env tys
-  where
-    -- when we hit a type function, we replace it with a fresh variable
-    -- but, we need to make sure that this fresh variable isn't mentioned
-    -- *anywhere* in the types we're flattening, even if locally-bound in
-    -- a forall. That way, we can ensure consistency both within and outside
-    -- of that forall.
-    all_in_scope = in_scope `extendInScopeSetSet` allTyCoVarsInTys tys
-    env          = emptyFlattenEnv all_in_scope
+-- See Note [Flattening]
+-- NB: the returned types may mention fresh type variables,
+--     arising from the flattening.  We don't return the
+--     mapping from those fresh vars to the ty-fam
+--     applications they stand for (we could, but no need)
+flattenTys in_scope tys
+  = snd $ coreFlattenTys emptyTvSubstEnv (emptyFlattenEnv in_scope) tys
 
-coreFlattenTys :: FlattenEnv -> [Type] -> (FlattenEnv, [Type])
-coreFlattenTys = go []
-  where
-    go rtys env []         = (env, reverse rtys)
-    go rtys env (ty : tys)
-      = let (env', ty') = coreFlattenTy env ty in
-        go (ty' : rtys) env' tys
+coreFlattenTys :: TvSubstEnv -> FlattenEnv
+               -> [Type] -> (FlattenEnv, [Type])
+coreFlattenTys subst = mapAccumL (coreFlattenTy subst)
 
-coreFlattenTy :: FlattenEnv -> Type -> (FlattenEnv, Type)
-coreFlattenTy = go
+coreFlattenTy :: TvSubstEnv -> FlattenEnv
+              -> Type -> (FlattenEnv, Type)
+coreFlattenTy subst = go
   where
     go env ty | Just ty' <- coreView ty = go env ty'
 
-    go env (TyVarTy tv)    = (env, substTyVar (fe_subst env) tv)
+    go env (TyVarTy tv)
+      | Just ty <- lookupVarEnv subst tv = (env, ty)
+      | otherwise                        = let (env', ki) = go env (tyVarKind tv) in
+                                           (env', mkTyVarTy $ setTyVarKind tv ki)
     go env (AppTy ty1 ty2) = let (env1, ty1') = go env  ty1
                                  (env2, ty2') = go env1 ty2 in
                              (env2, AppTy ty1' ty2')
@@ -1618,11 +1730,10 @@ coreFlattenTy = go
          -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
          -- which are generative and thus can be preserved during flattening
       | not (isGenerativeTyCon tc Nominal)
-      = let (env', tv) = coreFlattenTyFamApp env tc tys in
-        (env', mkTyVarTy tv)
+      = coreFlattenTyFamApp subst env tc tys
 
       | otherwise
-      = let (env', tys') = coreFlattenTys env tys in
+      = let (env', tys') = coreFlattenTys subst env tys in
         (env', mkTyConApp tc tys')
 
     go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
@@ -1631,122 +1742,78 @@ coreFlattenTy = go
         (env2, ty { ft_arg = ty1', ft_res = ty2' })
 
     go env (ForAllTy (Bndr tv vis) ty)
-      = let (env1, tv') = coreFlattenVarBndr env tv
-            (env2, ty') = go env1 ty in
+      = let (env1, subst', tv') = coreFlattenVarBndr subst env tv
+            (env2, ty') = coreFlattenTy subst' env1 ty in
         (env2, ForAllTy (Bndr tv' vis) ty')
 
     go env ty@(LitTy {}) = (env, ty)
 
-    go env (CastTy ty co) = let (env1, ty') = go env ty
-                                (env2, co') = coreFlattenCo env1 co in
-                            (env2, CastTy ty' co')
+    go env (CastTy ty co)
+      = let (env1, ty') = go env ty
+            (env2, co') = coreFlattenCo subst env1 co in
+        (env2, CastTy ty' co')
 
-    go env (CoercionTy co) = let (env', co') = coreFlattenCo env co in
-                             (env', CoercionTy co')
+    go env (CoercionTy co)
+      = let (env', co') = coreFlattenCo subst env co in
+        (env', CoercionTy co')
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type
-coreFlattenCo :: FlattenEnv -> Coercion -> (FlattenEnv, Coercion)
-coreFlattenCo env co
+coreFlattenCo :: TvSubstEnv -> FlattenEnv
+              -> Coercion -> (FlattenEnv, Coercion)
+coreFlattenCo subst env co
   = (env2, mkCoVarCo covar)
   where
-    (env1, kind') = coreFlattenTy env (coercionType co)
     fresh_name    = mkFlattenFreshCoName
-    subst1        = fe_subst env1
-    in_scope      = getTCvInScope subst1
-    covar         = uniqAway in_scope (mkCoVar fresh_name kind')
-    env2          = env1 { fe_subst = subst1 `extendTCvInScope` covar }
+    (env1, kind') = coreFlattenTy subst env (coercionType co)
+    covar         = uniqAway (fe_in_scope env1) (mkCoVar fresh_name kind')
+    -- Add the covar to the FlattenEnv's in-scope set.
+    -- See Note [Flattening], wrinkle 2A.
+    env2          = updateInScopeSet env1 (flip extendInScopeSet covar)
 
-coreFlattenVarBndr :: FlattenEnv -> TyCoVar -> (FlattenEnv, TyCoVar)
-coreFlattenVarBndr env tv
-  | kind' `eqType` kind
-  = ( env { fe_subst = extendTCvSubst old_subst tv (mkTyCoVarTy tv) }
-             -- override any previous binding for tv
-    , tv)
-
-  | otherwise
-  = let new_tv    = uniqAway (getTCvInScope old_subst) (setVarType tv kind')
-        new_subst = extendTCvSubstWithClone old_subst tv new_tv
-    in
-    (env' { fe_subst = new_subst }, new_tv)
+coreFlattenVarBndr :: TvSubstEnv -> FlattenEnv
+                   -> TyCoVar -> (FlattenEnv, TvSubstEnv, TyVar)
+coreFlattenVarBndr subst env tv
+  = (env2, subst', tv')
   where
+    -- See Note [Flattening], wrinkle 2B.
     kind          = varType tv
-    (env', kind') = coreFlattenTy env kind
-    old_subst     = fe_subst env
+    (env1, kind') = coreFlattenTy subst env kind
+    tv'           = uniqAway (fe_in_scope env1) (setVarType tv kind')
+    subst'        = extendVarEnv subst tv (mkTyVarTy tv')
+    env2          = updateInScopeSet env1 (flip extendInScopeSet tv')
 
-coreFlattenTyFamApp :: FlattenEnv
+coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> TyCon         -- type family tycon
-                    -> [Type]        -- args
-                    -> (FlattenEnv, TyVar)
-coreFlattenTyFamApp env fam_tc fam_args
+                    -> [Type]        -- args, already flattened
+                    -> (FlattenEnv, Type)
+coreFlattenTyFamApp tv_subst env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env, tv)
-              -- we need fresh variables here, but this is called far from
-              -- any good source of uniques. So, we just use the fam_tc's unique
-              -- and trust uniqAway to avoid clashes. Recall that the in_scope set
-              -- contains *all* tyvars, even locally bound ones elsewhere in the
-              -- overall type, so this really is fresh.
+      Just tv -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
-                     tv = uniqAway (getTCvInScope subst) $
-                          mkTyVar tyvar_name (typeKind fam_ty)
-                     env' = env { fe_type_map = extendTypeMap type_map fam_ty tv
-                                , fe_subst = extendTCvInScope subst tv }
-                 in (env', tv)
-  where fam_ty   = mkTyConApp fam_tc fam_args
-        FlattenEnv { fe_type_map = type_map
-                   , fe_subst = subst } = env
+                     tv         = uniqAway in_scope $
+                                  mkTyVar tyvar_name (typeKind fam_ty)
 
--- | Get the set of all type/coercion variables mentioned anywhere in the list
--- of types. These variables are not necessarily free.
-allTyCoVarsInTys :: [Type] -> VarSet
-allTyCoVarsInTys []       = emptyVarSet
-allTyCoVarsInTys (ty:tys) = allTyCoVarsInTy ty `unionVarSet` allTyCoVarsInTys tys
-
--- | Get the set of all type/coercion variables mentioned anywhere in a type.
-allTyCoVarsInTy :: Type -> VarSet
-allTyCoVarsInTy = go
+                     ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
+                     env'' = env' { fe_type_map = extendTypeMap type_map fam_ty tv
+                                  , fe_in_scope = extendInScopeSet in_scope tv }
+                 in (env'', ty')
   where
-    go (TyVarTy tv)      = unitVarSet tv
-    go (TyConApp _ tys)  = allTyCoVarsInTys tys
-    go (AppTy ty1 ty2)   = (go ty1) `unionVarSet` (go ty2)
-    go (FunTy _ ty1 ty2) = (go ty1) `unionVarSet` (go ty2)
-    go (ForAllTy (Bndr tv _) ty) = unitVarSet tv     `unionVarSet`
-                                   go (tyVarKind tv) `unionVarSet`
-                                   go ty
-                                   -- Don't remove the tv from the set!
-    go (LitTy {})        = emptyVarSet
-    go (CastTy ty co)    = go ty `unionVarSet` go_co co
-    go (CoercionTy co)   = go_co co
-
-    go_mco MRefl    = emptyVarSet
-    go_mco (MCo co) = go_co co
-
-    go_co (Refl ty)             = go ty
-    go_co (GRefl _ ty mco)      = go ty `unionVarSet` go_mco mco
-    go_co (TyConAppCo _ _ args) = go_cos args
-    go_co (AppCo co arg)        = go_co co `unionVarSet` go_co arg
-    go_co (ForAllCo tv h co)
-      = unionVarSets [unitVarSet tv, go_co co, go_co h]
-    go_co (FunCo _ c1 c2)       = go_co c1 `unionVarSet` go_co c2
-    go_co (CoVarCo cv)          = unitVarSet cv
-    go_co (HoleCo h)            = unitVarSet (coHoleCoVar h)
-    go_co (AxiomInstCo _ _ cos) = go_cos cos
-    go_co (UnivCo p _ t1 t2)    = go_prov p `unionVarSet` go t1 `unionVarSet` go t2
-    go_co (SymCo co)            = go_co co
-    go_co (TransCo c1 c2)       = go_co c1 `unionVarSet` go_co c2
-    go_co (NthCo _ _ co)        = go_co co
-    go_co (LRCo _ co)           = go_co co
-    go_co (InstCo co arg)       = go_co co `unionVarSet` go_co arg
-    go_co (KindCo co)           = go_co co
-    go_co (SubCo co)            = go_co co
-    go_co (AxiomRuleCo _ cs)    = go_cos cs
-
-    go_cos = foldr (unionVarSet . go_co) emptyVarSet
-
-    go_prov UnsafeCoerceProv    = emptyVarSet
-    go_prov (PhantomProv co)    = go_co co
-    go_prov (ProofIrrelProv co) = go_co co
-    go_prov (PluginProv _)      = emptyVarSet
+    arity = tyConArity fam_tc
+    tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
+    (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
+                                    splitAt arity fam_args
+    -- Apply the substitution before looking up an application in the
+    -- environment. See Note [Flattening], wrinkle 1.
+    -- NB: substTys short-cuts the common case when the substitution is empty.
+    sat_fam_args' = substTys tcv_subst sat_fam_args
+    (env', leftover_args') = coreFlattenTys tv_subst env leftover_args
+    -- `fam_tc` may be over-applied to `fam_args` (see Note [Flattening],
+    -- wrinkle 3), so we split it into the arguments needed to saturate it
+    -- (sat_fam_args') and the rest (leftover_args')
+    fam_ty = mkTyConApp fam_tc sat_fam_args'
+    FlattenEnv { fe_type_map = type_map
+               , fe_in_scope = in_scope } = env'
 
 mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq
