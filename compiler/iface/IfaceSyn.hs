@@ -1011,9 +1011,14 @@ pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
           <+> pprIfaceTyConBinders
-                (xopt LangExt.TopLevelKindSignatures dflags)
+                (suppress_bndr_sig dflags)
                 (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
+  where
+    suppress_bndr_sig dflags = SuppressBndrSig $
+      -- With -XTopLevelKindSignatures enabled, we print the full TLKS
+      -- which obsoletes individual inline binder signatures.
+      xopt LangExt.TopLevelKindSignatures dflags
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr
