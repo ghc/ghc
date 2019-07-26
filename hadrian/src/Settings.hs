@@ -22,6 +22,7 @@ import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
 import Settings.Flavours.GhcInGhci
+import Settings.Flavours.Validate
 
 import Control.Monad.Except
 import Data.Either
@@ -46,7 +47,7 @@ hadrianFlavours =
     , developmentFlavour Stage2, performanceFlavour, profiledFlavour
     , quickFlavour, quickestFlavour, quickCrossFlavour, benchmarkLlvmFlavour
     , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
-    , ghcInGhciFlavour ]
+    , ghcInGhciFlavour, validateFlavour, slowValidateFlavour ]
 
 -- | This action looks up a flavour with the name given on the
 --   command line with @--flavour@, defaulting to 'userDefaultFlavour'
