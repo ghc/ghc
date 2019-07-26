@@ -101,6 +101,7 @@ executable hadrian
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
                        , Settings.Flavours.GhcInGhci
+                       , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Parser
                        , Settings.Program
