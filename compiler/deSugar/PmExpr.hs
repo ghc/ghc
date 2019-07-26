@@ -10,8 +10,9 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmExprFVs, pmLitType,
-        pmAltConArity, isNotPmExprOther, hsOverLitAsHsLit, lhsExprToPmExpr,
-        hsExprToPmExpr, mkPmExprLit, decEqPmAltCon, PmExprList(..), pmExprAsList
+        pmAltConType, pmAltConArity, isNotPmExprOther, hsOverLitAsHsLit,
+        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, decEqPmAltCon,
+        PmExprList(..), pmExprAsList
     ) where
 
 #include "HsVersions.h"
@@ -89,10 +90,15 @@ pmExprFVs (PmExprVar x)      = unitNameSet x
 pmExprFVs (PmExprCon _ args) = unionNameSets (map pmExprFVs args)
 pmExprFVs (PmExprOther _)    = emptyNameSet
 
--- | Type of a PmLit
+-- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
 pmLitType (PmSLit   lit) = hsLitType   lit
 pmLitType (PmOLit _ lit) = overLitType lit
+
+-- | Type of a 'PmAltCon'
+pmAltConType :: PmAltCon -> [Type] -> Type
+pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
+pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 
 -- | Undecidable equality for values represented by 'ConLike's.
 -- See Note [Undecidable Equality for PmAltCons].
