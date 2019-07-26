@@ -93,7 +93,10 @@ mkExtraObjToLinkIntoBinary dflags = do
                   _                      -> exeMain
 
     exeMain = vcat [
-        text "#include \"Rts.h\"",
+        -- We use RtsConfig.h instead of the catch-all Rts.h to minimize the
+        -- amount of work the C compiler must do to compile this stub. See
+        -- Note [Keep RtsConfig.h small] for details.
+        text "#include \"RtsConfig.h\"",
         text "extern StgClosure ZCMain_main_closure;",
         text "int main(int argc, char *argv[])",
         char '{',
