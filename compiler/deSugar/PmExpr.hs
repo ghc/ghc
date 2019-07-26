@@ -24,8 +24,7 @@ import BasicTypes (SourceText, IntegralLit(..), negateIntegralLit)
 import FastString (FastString, unpackFS)
 import HsSyn
 import Id
-import Name
-import NameSet
+import VarSet
 import DataCon
 import ConLike
 import TcEvidence (isErasableHsWrapper)
@@ -58,7 +57,7 @@ refer to variables that are otherwise substituted away.
 -- ** Types
 
 -- | Lifted expressions for pattern match checking.
-data PmExpr = PmExprVar   Name
+data PmExpr = PmExprVar   Id
             | PmExprCon   PmAltCon [PmExpr]
             | PmExprOther (HsExpr GhcTc)  -- Note [PmExprOther in PmExpr]
 
@@ -85,10 +84,10 @@ decEqPmLit _              _              = Nothing
 instance Eq PmLit where
   a == b = decEqPmLit a b == Just True
 
-pmExprFVs :: PmExpr -> NameSet
-pmExprFVs (PmExprVar x)      = unitNameSet x
-pmExprFVs (PmExprCon _ args) = unionNameSets (map pmExprFVs args)
-pmExprFVs (PmExprOther _)    = emptyNameSet
+pmExprFVs :: PmExpr -> IdSet
+pmExprFVs (PmExprVar x)      = unitVarSet x
+pmExprFVs (PmExprCon _ args) = unionVarSets (map pmExprFVs args)
+pmExprFVs (PmExprOther _)    = emptyVarSet
 
 -- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
@@ -329,7 +328,7 @@ hsExprToPmExpr :: HsExpr GhcTc -> PmExpr
 -- and identify syntactically equal occurrences by the same rigid meta variable,
 -- but we can't compare the wrapped HsExpr for equality. Hence we are stuck with
 -- this hack.
-hsExprToPmExpr (HsVar        _ x) = PmExprVar (idName (unLoc x))
+hsExprToPmExpr (HsVar        _ x) = PmExprVar (unLoc x)
 
 -- Translating HsConLikeOut to a flexible meta variable is misleading.
 -- For an example why, consider `consAreRigid` in
@@ -408,7 +407,7 @@ pmExprToDataConApp _                                             = Nothing
 -- | The result of 'pmExprAsList'.
 data PmExprList
   = NilTerminated [PmExpr]
-  | WcVarTerminated (NonEmpty PmExpr) Name
+  | WcVarTerminated (NonEmpty PmExpr) Id
 
 -- | Extract a list of 'PmExpr's out of a sequence of cons cells, optionally
 -- terminated by a wildcard variable instead of @[]@. Some examples:
