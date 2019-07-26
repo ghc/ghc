@@ -1618,8 +1618,7 @@ coreFlattenTy = go
          -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
          -- which are generative and thus can be preserved during flattening
       | not (isGenerativeTyCon tc Nominal)
-      = let (env', tv) = coreFlattenTyFamApp env tc tys in
-        (env', mkTyVarTy tv)
+      = coreFlattenTyFamApp env tc tys
 
       | otherwise
       = let (env', tys') = coreFlattenTys env tys in
@@ -1677,24 +1676,59 @@ coreFlattenVarBndr env tv
 coreFlattenTyFamApp :: FlattenEnv
                     -> TyCon         -- type family tycon
                     -> [Type]        -- args
-                    -> (FlattenEnv, TyVar)
+                    -> (FlattenEnv, Type)
 coreFlattenTyFamApp env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env, tv)
+      Just tv -> (env, mkTyVarTy tv)
               -- we need fresh variables here, but this is called far from
               -- any good source of uniques. So, we just use the fam_tc's unique
               -- and trust uniqAway to avoid clashes. Recall that the in_scope set
               -- contains *all* tyvars, even locally bound ones elsewhere in the
               -- overall type, so this really is fresh.
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
+                     arity      = tyConArity fam_tc
                      tv = uniqAway (getTCvInScope subst) $
                           mkTyVar tyvar_name (typeKind fam_ty)
+
+                            -- See Note [Flatten up to type family arity]
+                     ty'  = mkAppTys (mkTyVarTy tv) (drop arity fam_args)
                      env' = env { fe_type_map = extendTypeMap type_map fam_ty tv
                                 , fe_subst = extendTCvInScope subst tv }
-                 in (env', tv)
+                 in (env', ty')
   where fam_ty   = mkTyConApp fam_tc fam_args
         FlattenEnv { fe_type_map = type_map
                    , fe_subst = subst } = env
+
+{-
+Note [Flatten up to type family arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider `F ty_1 ... ty_n`, where F is a type family with arity k:
+
+  type family F ty_1 ... ty_k :: res_k
+
+It's tempting to just flatten `F ty_1 ... ty_n` to `alpha`, where alpha is a
+flattening skolem. But we can do better by instead flattening it to
+`alpha ty_(k+1) ... ty_n`—that is, by only flattening up to the arity of the
+type family.
+
+Why is this better? Consider the following concrete example from #16995:
+
+  type family Param :: Type -> Type
+
+  type family LookupParam (a :: Type) :: Type where
+    LookupParam (f Char) = Bool
+    LookupParam x        = Int
+
+  foo :: LookupParam (Param ())
+  foo = 42
+
+In order for `foo` to typecheck, `LookupParam (Param ())` must reduce to `Int`.
+But if we flatten `Param ()` to `alpha`, then GHC can't be sure if `alpha` is
+apart from `f Char`, so it won't fall through to the second equation. But since
+the `Param` type family has arity 0, we can instead flatten `Param ()` to
+`alpha ()`, about which GHC knows with confidence is apart from `f Char`,
+permitting the second equation to be reached.
+-}
 
 -- | Get the set of all type/coercion variables mentioned anywhere in the list
 -- of types. These variables are not necessarily free.
