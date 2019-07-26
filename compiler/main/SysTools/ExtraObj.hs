@@ -93,18 +93,18 @@ mkExtraObjToLinkIntoBinary dflags = do
                   _                      -> exeMain
 
     exeMain = vcat [
-        text "#include \"Rts.h\"",
+        text "#include \"rts/SimpleMain.h\"",
         text "extern StgClosure ZCMain_main_closure;",
         text "int main(int argc, char *argv[])",
         char '{',
-        text " RtsConfig __conf = defaultRtsConfig;",
+        text " RtsSimpleConfig __conf;",
         text " __conf.rts_opts_enabled = "
             <> text (show (rtsOptsEnabled dflags)) <> semi,
         text " __conf.rts_opts_suggestions = "
             <> text (if rtsOptsSuggestions dflags
                         then "true"
                         else "false") <> semi,
-        text "__conf.keep_cafs = "
+        text " __conf.keep_cafs = "
             <> text (if gopt Opt_KeepCAFs dflags
                        then "true"
                        else "false") <> semi,
@@ -112,8 +112,9 @@ mkExtraObjToLinkIntoBinary dflags = do
             Nothing   -> Outputable.empty
             Just opts -> text "    __conf.rts_opts= " <>
                           text (show opts) <> semi,
-        text " __conf.rts_hs_main = true;",
-        text " return hs_main(argc,argv,&ZCMain_main_closure,__conf);",
+        -- N.B. this does not return; hs_main() rather exit()s.
+        text " hs_simple_main(argc,argv,&ZCMain_main_closure,__conf);",
+        text " return 0;",
         char '}',
         char '\n' -- final newline, to keep gcc happy
         ]

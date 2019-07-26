@@ -99,4 +99,36 @@ int hs_main ( int argc, char *argv[],       // program args
     shutdownHaskellAndExit(exit_status, 0 /* !fastExit */);
     // No code beyond this point. Dead code elimination will remove it
 }
+
+/*
+ * Note [Simple main]
+ * ~~~~~~~~~~~~~~~~~~
+ *
+ * When GHC compiles a Haskell executable it generates a small C stub which
+ * calls into the runtime system. Previously this stub would include Rts.h,
+ * pulling in dozens upon dozens of GHC and system header files. Compiling the
+ * ten line stub would consequently produce nearly 6000 lstat calls and take
+ * several dozen milliseconds. In a build with lots of executables this can
+ * really add up.
+ *
+ * Consequently we now expose hs_simple_main, which is declared in
+ * includes/SimpleMain.h and can be compiled with a minimal set of headers.
+ *
+ * N.B. this does not return; hs_main() rather exit()s.
+ */
+
+void hs_simple_main (int argc,
+                     char *argv[],
+                     struct StgClosure_ *main_closure,
+                     struct RtsSimpleConfig rts_config)
+{
+    RtsConfig conf = defaultRtsConfig;
+    conf.rts_opts_enabled = rts_config.rts_opts_enabled;
+    conf.rts_opts_suggestions = rts_config.rts_opts_suggestions;
+    conf.keep_cafs = rts_config.keep_cafs;
+    conf.rts_opts = rts_config.rts_opts;
+    conf.rts_hs_main = true;
+    hs_main(argc, argv, main_closure, conf);
+}
+
 # endif /* BATCH_MODE */
