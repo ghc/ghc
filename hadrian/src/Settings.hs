@@ -17,6 +17,7 @@ import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
+import Settings.Flavours.Validate
 
 getArgs :: Args
 getArgs = expr flavour >>= args
@@ -36,7 +37,7 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
     , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour
-    , quickCrossFlavour ]
+    , quickCrossFlavour, validateFlavour, slowValidateFlavour ]
 
 flavour :: Action Flavour
 flavour = do
