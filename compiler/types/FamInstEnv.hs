@@ -1577,17 +1577,9 @@ is!  Flattening as done below ensures this.
 flattenTys is defined here because of module dependencies.
 -}
 
-data FlattenEnv = FlattenEnv { fe_type_map :: TypeMap TyVar
-                             , fe_subst    :: TCvSubst }
-
-emptyFlattenEnv :: InScopeSet -> FlattenEnv
-emptyFlattenEnv in_scope
-  = FlattenEnv { fe_type_map = emptyTypeMap
-               , fe_subst    = mkEmptyTCvSubst in_scope }
-
 -- See Note [Flattening]
 flattenTys :: InScopeSet -> [Type] -> [Type]
-flattenTys in_scope tys = snd $ coreFlattenTys env tys
+flattenTys in_scope tys = snd $ coreFlattenTys subst emptyTypeMap tys
   where
     -- when we hit a type function, we replace it with a fresh variable
     -- but, we need to make sure that this fresh variable isn't mentioned
@@ -1595,92 +1587,90 @@ flattenTys in_scope tys = snd $ coreFlattenTys env tys
     -- a forall. That way, we can ensure consistency both within and outside
     -- of that forall.
     all_in_scope = in_scope `extendInScopeSetSet` allTyCoVarsInTys tys
-    env          = emptyFlattenEnv all_in_scope
+    subst        = mkEmptyTCvSubst all_in_scope
 
-coreFlattenTys :: FlattenEnv -> [Type] -> (FlattenEnv, [Type])
-coreFlattenTys = go []
+coreFlattenTys :: TCvSubst -> TypeMap TyVar
+               -> [Type] -> (TypeMap TyVar, [Type])
+coreFlattenTys subst = go []
   where
-    go rtys env []         = (env, reverse rtys)
-    go rtys env (ty : tys)
-      = let (env', ty') = coreFlattenTy env ty in
-        go (ty' : rtys) env' tys
+    go rtys type_map []         = (type_map, reverse rtys)
+    go rtys type_map (ty : tys)
+      = let (type_map', ty') = coreFlattenTy subst type_map ty in
+        go (ty' : rtys) type_map' tys
 
-coreFlattenTy :: FlattenEnv -> Type -> (FlattenEnv, Type)
-coreFlattenTy = go
+coreFlattenTy :: TCvSubst -> TypeMap TyVar
+              -> Type -> (TypeMap TyVar, Type)
+coreFlattenTy subst = go
   where
-    go env ty | Just ty' <- coreView ty = go env ty'
+    go type_map ty | Just ty' <- coreView ty = go type_map ty'
 
-    go env (TyVarTy tv)    = (env, substTyVar (fe_subst env) tv)
-    go env (AppTy ty1 ty2) = let (env1, ty1') = go env  ty1
-                                 (env2, ty2') = go env1 ty2 in
-                             (env2, AppTy ty1' ty2')
-    go env (TyConApp tc tys)
+    go type_map (TyVarTy tv)    = (type_map, substTyVar subst tv)
+    go type_map (AppTy ty1 ty2) = let (type_map1, ty1') = go type_map  ty1
+                                      (type_map2, ty2') = go type_map1 ty2 in
+                                  (type_map2, AppTy ty1' ty2')
+    go type_map (TyConApp tc tys)
          -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
          -- which are generative and thus can be preserved during flattening
       | not (isGenerativeTyCon tc Nominal)
-      = let (env', tv) = coreFlattenTyFamApp env tc tys in
-        (env', mkTyVarTy tv)
+      = coreFlattenTyFamApp subst type_map tc tys
 
       | otherwise
-      = let (env', tys') = coreFlattenTys env tys in
-        (env', mkTyConApp tc tys')
+      = let (type_map', tys') = coreFlattenTys subst type_map tys in
+        (type_map', mkTyConApp tc tys')
 
-    go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
-      = let (env1, ty1') = go env  ty1
-            (env2, ty2') = go env1 ty2 in
-        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+    go type_map ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+      = let (type_map1, ty1') = go type_map  ty1
+            (type_map2, ty2') = go type_map1 ty2 in
+        (type_map2, ty { ft_arg = ty1', ft_res = ty2' })
 
-    go env (ForAllTy (Bndr tv vis) ty)
-      = let (env1, tv') = coreFlattenVarBndr env tv
-            (env2, ty') = go env1 ty in
-        (env2, ForAllTy (Bndr tv' vis) ty')
+    go type_map (ForAllTy (Bndr tv vis) ty)
+      = let (type_map1, tv') = coreFlattenVarBndr subst type_map tv
+            (type_map2, ty') = go type_map1 ty in
+        (type_map2, ForAllTy (Bndr tv' vis) ty')
 
-    go env ty@(LitTy {}) = (env, ty)
+    go type_map ty@(LitTy {}) = (type_map, ty)
 
-    go env (CastTy ty co) = let (env1, ty') = go env ty
-                                (env2, co') = coreFlattenCo env1 co in
-                            (env2, CastTy ty' co')
+    go type_map (CastTy ty co)
+      = let (type_map1, ty') = go type_map ty
+            (type_map2, co') = coreFlattenCo subst type_map1 co in
+        (type_map2, CastTy ty' co')
 
-    go env (CoercionTy co) = let (env', co') = coreFlattenCo env co in
-                             (env', CoercionTy co')
+    go type_map (CoercionTy co)
+      = let (type_map', co') = coreFlattenCo subst type_map co in
+        (type_map', CoercionTy co')
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type
-coreFlattenCo :: FlattenEnv -> Coercion -> (FlattenEnv, Coercion)
-coreFlattenCo env co
-  = (env2, mkCoVarCo covar)
+coreFlattenCo :: TCvSubst -> TypeMap TyVar
+              -> Coercion -> (TypeMap TyVar, Coercion)
+coreFlattenCo subst type_map co
+  = (type_map', mkCoVarCo covar)
   where
-    (env1, kind') = coreFlattenTy env (coercionType co)
-    fresh_name    = mkFlattenFreshCoName
-    subst1        = fe_subst env1
-    in_scope      = getTCvInScope subst1
-    covar         = uniqAway in_scope (mkCoVar fresh_name kind')
-    env2          = env1 { fe_subst = subst1 `extendTCvInScope` covar }
+    (type_map', kind') = coreFlattenTy subst type_map (coercionType co)
+    fresh_name         = mkFlattenFreshCoName
+    in_scope           = getTCvInScope subst
+    covar              = uniqAway in_scope (mkCoVar fresh_name kind')
 
-coreFlattenVarBndr :: FlattenEnv -> TyCoVar -> (FlattenEnv, TyCoVar)
-coreFlattenVarBndr env tv
+coreFlattenVarBndr :: TCvSubst -> TypeMap TyVar
+                   -> TyCoVar -> (TypeMap TyVar, TyCoVar)
+coreFlattenVarBndr subst type_map tv
   | kind' `eqType` kind
-  = ( env { fe_subst = extendTCvSubst old_subst tv (mkTyCoVarTy tv) }
-             -- override any previous binding for tv
-    , tv)
+  = (type_map, tv)
 
   | otherwise
-  = let new_tv    = uniqAway (getTCvInScope old_subst) (setVarType tv kind')
-        new_subst = extendTCvSubstWithClone old_subst tv new_tv
-    in
-    (env' { fe_subst = new_subst }, new_tv)
+  = let new_tv = uniqAway (getTCvInScope subst) (setVarType tv kind') in
+    (type_map', new_tv)
   where
-    kind          = varType tv
-    (env', kind') = coreFlattenTy env kind
-    old_subst     = fe_subst env
+    kind               = varType tv
+    (type_map', kind') = coreFlattenTy subst type_map kind
 
-coreFlattenTyFamApp :: FlattenEnv
+coreFlattenTyFamApp :: TCvSubst -> TypeMap TyVar
                     -> TyCon         -- type family tycon
                     -> [Type]        -- args
-                    -> (FlattenEnv, TyVar)
-coreFlattenTyFamApp env fam_tc fam_args
+                    -> (TypeMap TyVar, Type)
+coreFlattenTyFamApp subst type_map fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env, tv)
+      Just tv -> (type_map, mkTyVarTy tv)
               -- we need fresh variables here, but this is called far from
               -- any good source of uniques. So, we just use the fam_tc's unique
               -- and trust uniqAway to avoid clashes. Recall that the in_scope set
@@ -1689,12 +1679,54 @@ coreFlattenTyFamApp env fam_tc fam_args
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
                      tv = uniqAway (getTCvInScope subst) $
                           mkTyVar tyvar_name (typeKind fam_ty)
-                     env' = env { fe_type_map = extendTypeMap type_map fam_ty tv
-                                , fe_subst = extendTCvInScope subst tv }
-                 in (env', tv)
-  where fam_ty   = mkTyConApp fam_tc fam_args
-        FlattenEnv { fe_type_map = type_map
-                   , fe_subst = subst } = env
+
+                            -- See Note [Flatten up to type family arity]
+                     ty'       = mkAppTys (mkTyVarTy tv) leftover_args
+                     type_map' = extendTypeMap type_map fam_ty tv
+                 in (type_map', ty')
+  where arity = tyConArity fam_tc
+        (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
+                                        splitAt arity fam_args
+        -- `fam_tc` may be over-applied to `fam_args` (see
+        -- Note [Flatten up to type family arity]), so we split it into the
+        -- arguments needed to saturate it (sat_fam_args)
+        -- and the rest (leftover_args)
+        fam_ty = mkTyConApp fam_tc sat_fam_args
+
+{-
+Note [Flatten up to type family arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider `F ty_1 ... ty_n`, where F is a type family with arity k:
+
+  type family F ty_1 ... ty_k :: res_k
+
+It's tempting to just flatten `F ty_1 ... ty_n` to `alpha`, where alpha is a
+flattening skolem. But we can do better by instead flattening it to
+`alpha ty_(k+1) ... ty_n`—that is, by only flattening up to the arity of the
+type family.
+
+Why is this better? Consider the following concrete example from #16995:
+
+  type family Param :: Type -> Type
+
+  type family LookupParam (a :: Type) :: Type where
+    LookupParam (f Char) = Bool
+    LookupParam x        = Int
+
+  foo :: LookupParam (Param ())
+  foo = 42
+
+In order for `foo` to typecheck, `LookupParam (Param ())` must reduce to `Int`.
+But if we flatten `Param ()` to `alpha`, then GHC can't be sure if `alpha` is
+apart from `f Char`, so it won't fall through to the second equation. But since
+the `Param` type family has arity 0, we can instead flatten `Param ()` to
+`alpha ()`, about which GHC knows with confidence is apart from `f Char`,
+permitting the second equation to be reached.
+
+Not only does this allow more programs to be accepted, it's also important for
+correctness. Not doing this was the root cause of the Core Lint error
+in #16995.
+-}
 
 -- | Get the set of all type/coercion variables mentioned anywhere in the list
 -- of types. These variables are not necessarily free.
