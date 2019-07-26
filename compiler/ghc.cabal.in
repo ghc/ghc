@@ -337,7 +337,7 @@ Library
         IncompleteMatches
         PmExpr
         PmPpr
-        TmOracle
+        PmOracle
         Check
         Coverage
         Desugar

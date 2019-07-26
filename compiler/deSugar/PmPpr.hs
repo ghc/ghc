@@ -39,15 +39,15 @@ import PmOracle
 --
 -- When the set of refutable shapes contains more than 3 elements, the
 -- additional elements are indicated by "...".
-pprUncovered :: ([PmExpr], TmState) -> SDoc
-pprUncovered (expr_vec, tm_cs)
+pprUncovered :: ([PmExpr], Delta) -> SDoc
+pprUncovered (expr_vec, delta)
   | isNullUDFM refuts = fsep vec -- there are no refutations
   | otherwise         = hang (fsep vec) 4 $
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
     fvs      = unionNameSets (map pmExprFVs expr_vec)
-    refuts   = prettifyRefuts fvs tm_cs
+    refuts   = prettifyRefuts fvs delta
     vec      = runPmPpr sdoc_vec refuts
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
@@ -91,7 +91,7 @@ Check.hs) to be more precise.
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: UniqSet Name -> TmState -> DNameEnv (SDoc, [PmAltCon])
+prettifyRefuts :: UniqSet Name -> Delta -> DNameEnv (SDoc, [PmAltCon])
 prettifyRefuts fvs
   = listToUDFM . zipWith rename nameList
   . filter ((`elemUniqSet_Directly` fvs) . fst) . udfmToList
