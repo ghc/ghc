@@ -138,6 +138,7 @@ library
                       rts/LibdwPool.h
                       rts/Linker.h
                       rts/Main.h
+                      rts/SimpleMain.h
                       rts/Messages.h
                       rts/OSThreads.h
                       rts/Parallel.h

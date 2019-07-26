@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #include "HsFFI.h"
+#include "rts/SimpleMain.h" // For RtsOptsEnabledEnum
 #include "rts/Time.h"
 #include "rts/EventLogWriter.h"
 
@@ -50,14 +51,6 @@ typedef struct CapabilityPublic_ {
 /* ----------------------------------------------------------------------------
    RTS configuration settings, for passing to hs_init_ghc()
    ------------------------------------------------------------------------- */
-
-typedef enum {
-    RtsOptsNone,         // +RTS causes an error
-    RtsOptsIgnore,       // Ignore command line arguments
-    RtsOptsIgnoreAll,    // Ignore command line and Environment arguments
-    RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
-    RtsOptsAll           // all RTS options allowed
-  } RtsOptsEnabledEnum;
 
 struct GCDetails_;
 
