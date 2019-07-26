@@ -70,16 +70,16 @@ typedef struct {
     RtsOptsEnabledEnum rts_opts_enabled;
 
     // Whether to give RTS flag suggestions
-    HsBool rts_opts_suggestions;
+    bool rts_opts_suggestions;
 
     // additional RTS options
     const char *rts_opts;
 
     // True if GHC was not passed -no-hs-main
-    HsBool rts_hs_main;
+    bool rts_hs_main;
 
     // Whether to retain CAFs (default: false)
-    HsBool keep_cafs;
+    bool keep_cafs;
 
     // Writer a for eventlog.
     const EventLogWriter *eventlog_writer;
