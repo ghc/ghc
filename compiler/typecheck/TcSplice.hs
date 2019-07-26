@@ -74,7 +74,6 @@ import TcMType
 import TcHsType
 import TcIface
 import TyCoRep
-import TyCoFVs ( tyConAppNeedsKindSig )
 import FamInst
 import FamInstEnv
 import InstEnv
