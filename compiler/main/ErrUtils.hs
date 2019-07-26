@@ -640,6 +640,8 @@ showPass dflags what
 --
 -- To avoid adversely affecting compiler performance when timings are not
 -- requested, the result is only forced when timings are enabled.
+--
+-- See Note [withTiming] for more.
 withTiming :: MonadIO m
            => m DynFlags  -- ^ A means of getting a 'DynFlags' (often
                           -- 'getDynFlags' will work here)
@@ -749,3 +751,96 @@ traceCmd dflags phase_name cmd_line action
                                  <+> text cmd_line
                                  <+> text (show exn))
                               ; throwGhcExceptionIO (ProgramError (show exn))}
+
+{- Note [withTiming]
+~~~~~~~~~~~~~~~~~~~~
+
+For reference:
+
+  withTiming
+    :: MonadIO
+    => m DynFlags -- how to get the DynFlags
+    -> SDoc       -- label for the computation we're timing
+    -> (a -> ())  -- how to evaluate the result
+    -> m a        -- computation we're timing
+    -> m a
+
+withTiming lets you run an action while:
+
+(1) measuring the CPU time it took and reporting that on stderr,
+(2) emitting start/stop events to GHC's event log, with the label
+    given as an argument.
+
+Evaluation of the result
+------------------------
+
+'withTiming' takes as an argument a function of type 'a -> ()', whose purpose is
+to evaluate the result "sufficiently". A given pass might return an 'm a' for
+some monad 'm' and result type 'a', but where the 'a' is complex enough
+that evaluating it to WHNF barely scratches its surface and leaves many
+complex and time-consuming computations unevaluated. Those would only be
+forced by the next pass, and the time needed to evaluate them would be
+mis-attributed to that next pass. A more appropriate function would be
+one that deeply evaluates the result, so as to assign the time spent doing it
+to the pass we're timing.
+
+Note: as hinted at above, the time spent evaluating the application of the
+forcing function to the result is included in the timings reported by
+'withTiming'.
+
+How we use it
+-------------
+
+We measure the time and allocations of various passes in GHC's pipeline by just
+wrapping the whole pass with 'withTiming'. This also materializes by having
+a label for each pass in the eventlog, where each pass is executed in one go,
+during a continuous time window.
+
+However, from STG onwards, the pipeline uses streams to emit groups of
+STG/Cmm/etc declarations one at a time, and process them until we get to
+assembly code generation. This means that the execution of those last few passes
+is interleaved and that we cannot measure how long they take by just wrapping
+the whole thing with 'withTiming'. Instead we wrap the processing of each
+individual stream element, all along the codegen pipeline, using the appropriate
+label for the pass to which this processing belongs. That generates a lot more
+data but allows us to get fine-grained timings about all the passes and we can
+easily compute totals withh tools like ghc-events-analyze (see below).
+
+
+Producing an eventlog for GHC
+-----------------------------
+
+To actually produce the eventlog, you need an eventlog-capable GHC build:
+
+  With Hadrian:
+  $ hadrian/build.sh -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
+
+  With Make:
+  $ make -j GhcStage2HcOpts+=-eventlog
+
+You can then produce an eventlog when compiling say hello.hs by simply
+doing:
+
+  If GHC was built by Hadrian:
+  $ _build/stage1/bin/ghc -ddump-timings hello.hs -o hello +RTS -l
+
+  If GHC was built with Make:
+  $ inplace/bin/ghc-stage2 -ddump-timing hello.hs -o hello +RTS -l
+
+You could alternatively use -v<N> (with N >= 2) instead of -ddump-timings,
+to ask GHC to report timings (on stderr and the eventlog).
+
+This will write the eventlog to ./ghc.eventlog in both cases. You can then
+visualize it or look at the totals for each label by using ghc-events-analyze,
+threadscope or any other eventlog consumer. Illustrating with
+ghc-events-analyze:
+
+  $ ghc-events-analyze --timed --timed-txt --totals \
+                       --start "GHC:started:" --stop "GHC:finished:" \
+                       ghc.eventlog
+
+This produces ghc.timed.txt (all event timestamps), ghc.timed.svg (visualisation
+of the execution through the various labels) and ghc.totals.txt (total time
+spent in each label).
+
+-}
