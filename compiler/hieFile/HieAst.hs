@@ -55,8 +55,8 @@ import Control.Monad.Trans.Class  ( lift )
 
 {- Note [Updating HieAst for changes in the GHC AST]
 
-When adding new syntax or changing a bit of syntax in HIE files, you need
-to pay attention to the following things:
+When updating the code in this file for changes in the GHC AST, you
+need to pay attention to the following things:
 
 1) Symbols (Names/Vars/Modules) in the following categories:
 
@@ -68,7 +68,8 @@ to pay attention to the following things:
    all the names introduced by a (..) in HIE files), and will include implicit
    parameters and evidence variables after one of my pending MRs lands.
 
-2) Subtrees that may contain such symbols
+2) Subtrees that may contain such symbols, or correspond to a SrcSpan in
+   the file. This includes all `Located` things
 
 For 1), you need to call `toHie` for one of the following instances
 
@@ -99,6 +100,11 @@ the context in which they occur and should be fairly self explanatory. You need
 to select one that looks appropriate for the symbol usage. In very rare cases,
 you might need to extend this sum type if none of the cases seem appropriate.
 
+So, given a `Located Name` that is just being "used", and not defined at a
+particular location, you would do the following:
+
+   toHie $ C Use located_name
+
 If you select one that corresponds to a binding site, you will need to
 provide a `Scope` and a `Span` for your binding. Both of these are basically
 `SrcSpans`.
@@ -116,10 +122,10 @@ For a function definition `foo`:
 foo x = x + y
   where y = x^2
 
-This is the span of the entire function definition from `foo x` to `x^2`.
-For a class definition, this is the span of the entire class, and so on.
-If this isn't well defined for your bit of syntax (like a variable bound by
-a lambda), then you can just supply a `Nothing`
+The binding `Span` is the span of the entire function definition from `foo x`
+to `x^2`.  For a class definition, this is the span of the entire class, and
+so on.  If this isn't well defined for your bit of syntax (like a variable
+bound by a lambda), then you can just supply a `Nothing`
 
 There is a test that checks that all symbols in the resulting HIE file
 occur inside their stated `Scope`. This can be turned on by passing the
@@ -150,13 +156,25 @@ Here are is an extract from the `ToHie` instance for (LHsExpr (GhcPass p)):
         , toHie b
         ]
 
-
 If your subtree is `Located` or has a `SrcSpan` available, the output list
 should contain a HieAst `Node` corresponding to the subtree. You can use
 either `makeNode` or `getTypeNode` for this purpose, depending on whether it
 makes sense to assign a `Type` to the subtree. After this, you just need
 to concatenate the result of calling `toHie` on all subexpressions and
 appropriately annotated symbols contained in the subtree.
+
+The code above from the ToHie instance of `LhsExpr (GhcPass p)` is supposed
+to work for both the renamed and typechecked source. `getTypeNode` is from
+the `HasType` class defined in this file, and it has different instances
+for `GhcTc` and `GhcRn` that allow it to access the type of the expression
+when given a typechecked AST:
+
+class Data a => HasType a where
+  getTypeNode :: a -> HieM [HieAST Type]
+instance HasType (LHsExpr GhcTc) where
+  getTypeNode e@(L spn e') = ... -- Actually get the type for this expression
+instance HasType (LHsExpr GhcRn) where
+  getTypeNode (L spn e) = makeNode e spn -- Fallback to a regular `makeNode` without recording the type
 
 If your subtree doesn't have a span available, you can omit the `makeNode`
 call and just recurse directly in to the subexpressions.
