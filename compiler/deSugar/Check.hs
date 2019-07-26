@@ -109,22 +109,16 @@ instance Outputable PmPat where
 --     MkT :: forall p q. (Eq p, Ord q) => p -> q -> T [p]
 -- or  MkT :: forall p q r. (Eq p, Ord q, [p] ~ r) => p -> q -> T r
 
-type ValAbs  = Id -- ^ Value Abstractions
-
 -- | Pattern Vectors. The *arity* of a PatVec [p1,..,pn] is
 -- the number of p1..pn that are not Guards. See 'patternArity'.
 type PatVec = [PmPat]
-data ValVec = ValVec [ValAbs] Delta -- ^ Value Vector Abstractions
+type ValVec = [Id] -- ^ Value Vector Abstractions
 
-type ValSetAbs = [ValVec]  -- ^ Value Set Abstractions
-type Uncovered = ValSetAbs
-
--- | Not user-facing. See 'pprValVecSubstituted' for a function intended to
--- produce user-facing output.
-instance Outputable ValVec where
-  ppr (ValVec vva delta) = ppr_vec vva <+> text "|>" <+> ppr delta
-    where
-      ppr_vec = brackets . fsep . punctuate comma . map ppr
+-- | Each 'Delta' is proof (i.e., a model of the fact) that some values are not
+-- covered by a pattern match. E.g. @f Nothing = <rhs>@ might be given an
+-- uncovered set @[x :-> Just y]@ or @[x /= Nothing]@, where @x@ is the variable
+-- matching against @f@'s first argument.
+type Uncovered = [Delta]
 
 -- Instead of keeping the whole sets in memory, we keep a boolean for both the
 -- covered and the divergent set (we store the uncovered set though, since we
@@ -229,11 +223,11 @@ instance Outputable PmResult where
 -- but we don't want to issue just a wildcard as missing. Instead, we print a
 -- type annotated wildcard, so that the user knows what kind of patterns is
 -- expected (e.g. (_ :: Int), or (_ :: F Int), where F Int does not reduce).
-data UncoveredCandidates = UncoveredPatterns Uncovered
+data UncoveredCandidates = UncoveredPatterns ValVec Uncovered
                          | TypeOfUncovered Type
 
 instance Outputable UncoveredCandidates where
-  ppr (UncoveredPatterns uc) = text "UnPat" <+> ppr uc
+  ppr (UncoveredPatterns vva uc) = text "UnPat" <+> ppr vva <+> ppr uc
   ppr (TypeOfUncovered ty)   = text "UnTy" <+> ppr ty
 
 {-
@@ -259,11 +253,10 @@ checkSingle' locn var p = do
   resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
   clause    <- translatePat fam_insts p
-  missing   <- mkInitialUncovered [var]
-  tracePm "checkSingle': missing" (vcat (map ppr missing))
-                                  -- no guards
-  PartialResult cs us ds <- runMany (pmcheckI clause []) missing
-  let us' = UncoveredPatterns us
+  missing   <- pmInitialTmTyCs
+  tracePm "checkSingle': missing" (ppr missing)
+  PartialResult cs us ds <- pmcheckI clause [] [var] missing
+  let us' = UncoveredPatterns [var] us
   return $ case (cs,ds) of
     (Covered,  _    )         -> PmResult [] us' [] -- useful
     (NotCovered, NotDiverged) -> PmResult m  us' [] -- redundant
@@ -312,12 +305,12 @@ checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
       resetPmIterDs -- set the iter-no to zero
-      missing    <- mkInitialUncovered vars
-      tracePm "checkMatches': missing" (vcat (map ppr missing))
-      (rs,us,ds) <- go matches missing
+      missing    <- pmInitialTmTyCs
+      tracePm "checkMatches': missing" (ppr missing)
+      (rs,us,ds) <- go matches [missing]
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = UncoveredPatterns us
+                 , pmresultUncovered    = UncoveredPatterns vars us
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
@@ -330,7 +323,7 @@ checkMatches' vars matches
       fam_insts          <- dsGetFamInstEnvs
       (clause, guards)   <- translateMatch fam_insts m
       r@(PartialResult cs missing' ds)
-        <- runMany (pmcheckI clause guards) missing
+        <- runMany (pmcheckI clause guards vars) missing
       tracePm "checkMatches': go: res" (ppr r)
       (rs, final_u, is)  <- go ms missing'
       return $ case (cs, ds) of
@@ -356,7 +349,7 @@ checkEmptyCase' x = do
     Left ty            -> pure (TypeOfUncovered ty)
     -- A list of oracle states for the different satisfiable constructors is
     -- available. Turn this into a value set abstraction.
-    Right (va, deltas) -> pure (UncoveredPatterns (map (ValVec [va]) deltas))
+    Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
   pure (PmResult [] us [])
 
 {-
@@ -1057,13 +1050,7 @@ patternArity _other_pat = 1
 
 Main functions are:
 
-* mkInitialUncovered :: [Id] -> PmM Uncovered
-
-  Generates the initial uncovered set. Term and type constraints in scope
-  are checked, if they are inconsistent, the set is empty, otherwise, the
-  set contains only a vector of variables with the constraints in scope.
-
-* pmcheck :: PatVec -> [PatVec] -> ValVec -> PmM PartialResult
+* pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
 
   Checks redundancy, coverage and inaccessibility, using auxilary functions
   `pmcheckGuards` and `pmcheckHd`. Mainly handles the guard case which is
@@ -1088,127 +1075,115 @@ Main functions are:
 -- | Lift a pattern matching action from a single value vector abstration to a
 -- value set abstraction, but calling it on every vector and the combining the
 -- results.
-runMany :: (ValVec -> PmM PartialResult) -> (Uncovered -> PmM PartialResult)
+runMany :: (Delta -> PmM PartialResult) -> (Uncovered -> PmM PartialResult)
 runMany _ [] = return mempty
 runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
 
--- | Generate the initial uncovered set. It initializes the
--- delta with all term and type constraints in scope.
-mkInitialUncovered :: [Id] -> PmM Uncovered
-mkInitialUncovered vars = do
-  delta <- pmInitialTmTyCs
-  return [ValVec vars delta]
-
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
-pmcheckI :: PatVec -> [PatVec] -> ValVec -> PmM PartialResult
-pmcheckI ps guards vva = do
+pmcheckI :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
+pmcheckI ps guards vva delta = do
   n <- incrCheckPmIterDs
   tracePm "pmCheck" (ppr n <> colon
                         $$ hang (text "patterns:") 2 (ppr ps)
                         $$ hang (text "guards:") 2 (ppr guards)
-                        $$ ppr vva)
-  res <- pmcheck ps guards vva
+                        $$ ppr vva
+                        $$ ppr delta)
+  res <- pmcheck ps guards vva delta
   tracePm "pmCheckResult:" (ppr res)
   return res
 {-# INLINE pmcheckI #-}
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> ValVec -> PmM PartialResult
-pmcheckGuardsI gvs vva = incrCheckPmIterDs >> pmcheckGuards gvs vva
+pmcheckGuardsI :: [PatVec] -> Delta -> PmM PartialResult
+pmcheckGuardsI gvs delta = incrCheckPmIterDs >> pmcheckGuards gvs delta
 {-# INLINE pmcheckGuardsI #-}
+
+-- | Check the list of guards
+pmcheckGuards :: [PatVec] -> Delta -> PmM PartialResult
+pmcheckGuards []       delta = return (usimple delta)
+pmcheckGuards (gv:gvs) delta = do
+  (PartialResult cs unc ds) <- pmcheckI gv [] [] delta
+  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs) unc
+  return $ PartialResult (cs `mappend` css)
+                         uncs
+                         (ds `mappend` dss)
+
+-- | Matching function: Check simultaneously a clause (takes separately the
+-- patterns and the list of guards) for exhaustiveness, redundancy and
+-- inaccessibility.
+pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
+pmcheck [] guards [] delta
+  | null guards = return $ mempty { presultCovered = Covered }
+  | otherwise   = pmcheckGuardsI guards delta
+
+-- Guard
+pmcheck (PmFake : ps) guards vva delta =
+  -- short-circuit if the guard pattern is useless.
+  -- we just have two possible outcomes: fail here or match and recurse
+  -- none of the two contains any useful information about the failure
+  -- though. So just have these two cases but do not do all the boilerplate
+  forces . mkCons delta <$> pmcheckI ps guards vva delta
+pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
+  tracePm "PmGrd: pmPatType" (hcat [ppr p, ppr (pmPatType p)])
+  y <- mkPmId (pmPatType p)
+  let delta' = expectJust "y was fresh" $ solveVar delta y e
+  pmcheckI (pv ++ ps) guards (y : vva) delta'
+
+pmcheck [] _ (_:_) _ = panic "pmcheck: nil-cons"
+pmcheck (_:_) _ [] _ = panic "pmcheck: cons-nil"
+
+pmcheck (p:ps) guards (va:vva) delta = pmcheckHdI p ps guards va vva delta
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckHd`
-pmcheckHdI :: PmPat -> PatVec -> [PatVec] -> ValAbs -> ValVec
+pmcheckHdI :: PmPat -> PatVec -> [PatVec] -> Id -> ValVec -> Delta
            -> PmM PartialResult
-pmcheckHdI p ps guards va vva = do
+pmcheckHdI p ps guards va vva delta = do
   n <- incrCheckPmIterDs
   tracePm "pmCheckHdI" (ppr n <> colon <+> ppr p
                         $$ hang (text "patterns:") 2 (ppr ps)
                         $$ hang (text "guards:") 2 (ppr guards)
                         $$ ppr va
-                        $$ ppr vva)
+                        $$ ppr vva
+                        $$ ppr delta)
 
-  res <- pmcheckHd p ps guards va vva
+  res <- pmcheckHd p ps guards va vva delta
   tracePm "pmCheckHdI: res" (ppr res)
   return res
 {-# INLINE pmcheckHdI #-}
 
--- | Matching function: Check simultaneously a clause (takes separately the
--- patterns and the list of guards) for exhaustiveness, redundancy and
--- inaccessibility.
-pmcheck :: PatVec -> [PatVec] -> ValVec -> PmM PartialResult
-pmcheck [] guards vva@(ValVec [] _)
-  | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuardsI guards vva
-
--- Guard
-pmcheck (PmFake : ps) guards vva =
-  -- short-circuit if the guard pattern is useless.
-  -- we just have two possible outcomes: fail here or match and recurse
-  -- none of the two contains any useful information about the failure
-  -- though. So just have these two cases but do not do all the boilerplate
-  forces . mkCons vva <$> pmcheckI ps guards vva
-pmcheck (p : ps) guards (ValVec vas delta)
-  | PmGrd { pm_grd_pv = pv, pm_grd_expr = e } <- p
-  = do
-      tracePm "PmGrd: pmPatType" (hcat [ppr p, ppr (pmPatType p)])
-      y <- mkPmId (pmPatType p)
-      let delta' = expectJust "y was fresh" $ solveVar delta y e
-      utail <$> pmcheckI (pv ++ ps) guards (ValVec (y : vas) delta')
-
-pmcheck [] _ (ValVec (_:_) _) = panic "pmcheck: nil-cons"
-pmcheck (_:_) _ (ValVec [] _) = panic "pmcheck: cons-nil"
-
-pmcheck (p:ps) guards (ValVec (va:vva) delta)
-  = pmcheckHdI p ps guards va (ValVec vva delta)
-
--- | Check the list of guards
-pmcheckGuards :: [PatVec] -> ValVec -> PmM PartialResult
-pmcheckGuards []       vva = return (usimple [vva])
-pmcheckGuards (gv:gvs) vva = do
-  (PartialResult cs vsa ds) <- pmcheckI gv [] vva
-  (PartialResult css vsas dss) <- runMany (pmcheckGuardsI gvs) vsa
-  return $ PartialResult (cs `mappend` css)
-                         vsas
-                         (ds `mappend` dss)
-
 -- | Worker function: Implements all cases described in the paper for all three
 -- functions (`covered`, `uncovered` and `divergent`) apart from the `Guard`
 -- cases which are handled by `pmcheck`
-pmcheckHd :: PmPat -> PatVec -> [PatVec] -> ValAbs -> ValVec
+pmcheckHd :: PmPat -> PatVec -> [PatVec] -> Id -> ValVec -> Delta
           -> PmM PartialResult
 
 -- Var
-pmcheckHd (PmVar x) ps guards y (ValVec vva delta) =
-  case solveVar delta x (idToPmExpr y) of
-    Nothing     -> return mempty
-    Just delta' -> ucon y <$> pmcheckI ps guards (ValVec vva delta')
+pmcheckHd (PmVar x) ps guards y vva delta = pmcheckI ps guards vva delta'
+  where
+    delta' = expectJust "x is fresh" $ solveVar delta x (idToPmExpr y)
 
 -- ConVar
-pmcheckHd p@PmCon{} ps guards x (ValVec vas delta) = do
+pmcheckHd p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs }
+          ps guards x vva delta = do
   -- Split the value vector into two value vectors: One representing the current
   -- constructor, the other representing everything but the current constructor
   -- (and the already known impossible constructors).
-  let con = pm_con_con p
-  let args = pm_con_args p
-  let ex_tvs = pm_con_tvs p
 
-  -- For the value vector of the current constructor, we directly recurse into
-  -- checking the the current case, so we get back a PartialResult
   pr_pos <- refineToAltCon delta x con ex_tvs >>= \case
     Nothing -> pure mempty
-    Just (delta', arg_vas) -> do
-      let vva' = ValVec (arg_vas ++ vas) delta'
-      kcon x con <$> pmcheckI (args ++ ps) guards vva'
+    Just (delta', arg_vas) ->
+      -- Check <rhs>
+      pmcheckI (args ++ ps) guards (arg_vas ++ vva) delta'
 
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
+  -- Check <next equations>
   pr_neg <- addRefutableAltCon delta x con >>= \case
     Nothing     -> pure mempty
-    Just delta' -> pure (usimple [ValVec (x:vas) delta'])
+    Just delta' -> pure (usimple delta')
 
   tracePm "ConVar" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
 
@@ -1216,46 +1191,21 @@ pmcheckHd p@PmCon{} ps guards x (ValVec vas delta) = do
   pure (mkUnion pr_pos' pr_neg)
 
 -- Impossible: handled by pmcheck
-pmcheckHd PmFake     _ _ _ _ = panic "pmcheckHd: Fake"
-pmcheckHd (PmGrd {}) _ _ _ _ = panic "pmcheckHd: Guard"
+pmcheckHd PmFake     _ _ _ _ _ = panic "pmcheckHd: Fake"
+pmcheckHd (PmGrd {}) _ _ _ _ _ = panic "pmcheckHd: Guard"
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
 
-updateVsa :: (ValSetAbs -> ValSetAbs) -> (PartialResult -> PartialResult)
-updateVsa f p@(PartialResult { presultUncovered = old })
+updateUncovered :: (Uncovered -> Uncovered) -> (PartialResult -> PartialResult)
+updateUncovered f p@(PartialResult { presultUncovered = old })
   = p { presultUncovered = f old }
 
 
--- | Initialise with default values for covering and divergent information.
-usimple :: ValSetAbs -> PartialResult
-usimple vsa = mempty { presultUncovered = vsa }
-
--- | Take the tail of all value vector abstractions in the uncovered set
-utail :: PartialResult -> PartialResult
-utail = updateVsa upd
-  where upd vsa = [ ValVec vva delta | ValVec (_:vva) delta <- vsa ]
-
--- | Prepend a value abstraction to all value vector abstractions in the
--- uncovered set
-ucon :: ValAbs -> PartialResult -> PartialResult
-ucon va = updateVsa upd
-  where
-    upd vsa = [ ValVec (va:vva) delta | ValVec vva delta <- vsa ]
-
--- | Given a 'PmAltCon' of arity `a` which is the solution of a value
--- abstraction `x` and an uncovered set containing value vector abstractions of
--- length `(a+n)`, pass the first `n` value abstractions to the constructor
--- (Hence, the resulting value vector abstractions will have length `n+1`)
-kcon :: Id -> PmAltCon -> PartialResult -> PartialResult
-kcon x con =
-  let n = pmAltConArity con
-      upd vsa =
-        [ ValVec (x:vva) delta
-        | ValVec vva' delta <- vsa
-        , let (_args, vva) = splitAt n vva'
-        ]
-  in updateVsa upd
+-- | Initialise with default values for covering and divergent information and
+-- a singleton uncovered set.
+usimple :: Delta -> PartialResult
+usimple delta = mempty { presultUncovered = [delta] }
 
 -- | Get the union of two covered, uncovered and divergent value set
 -- abstractions. Since the covered and divergent sets are represented by a
@@ -1265,9 +1215,9 @@ kcon x con =
 mkUnion :: PartialResult -> PartialResult -> PartialResult
 mkUnion = mappend
 
--- | Add a value vector abstraction to a value set abstraction (uncovered).
-mkCons :: ValVec -> PartialResult -> PartialResult
-mkCons vva = updateVsa (vva:)
+-- | Add a model to the uncovered set.
+mkCons :: Delta -> PartialResult -> PartialResult
+mkCons model = updateUncovered (model:)
 
 -- | Set the divergent set to not empty
 forces :: PartialResult -> PartialResult
@@ -1394,15 +1344,15 @@ isAnyPmCheckEnabled :: DynFlags -> DsMatchContext -> Bool
 isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
   = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
 
-pprValVecSubstituted :: ValVec -> SDoc
-pprValVecSubstituted (ValVec vva delta) = pprUncovered (vector, delta)
+pprValVecSubstituted :: ValVec -> Delta -> SDoc
+pprValVecSubstituted vva delta = pprUncovered (vector, delta)
   where
-    vector = substInValAbs delta vva
+    vector = substInValVec delta vva
 
 -- | Deeply lookup a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
-substInValAbs :: Delta -> [ValAbs] -> [PmExpr]
-substInValAbs delta = map (exprDeepLookup delta . idToPmExpr)
+substInValVec :: Delta -> ValVec -> [PmExpr]
+substInValVec delta = map (exprDeepLookup delta . idToPmExpr)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
@@ -1411,8 +1361,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible && not is_rec_upd
           exists_u = flag_u && (case uncovered of
-                                  TypeOfUncovered   _ -> True
-                                  UncoveredPatterns u -> notNull u)
+                                  TypeOfUncovered   _     -> True
+                                  UncoveredPatterns _ unc -> notNull unc)
 
       when exists_r $ forM_ redundant $ \(dL->L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
@@ -1422,8 +1372,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
                                (pprEqn q "has inaccessible right hand side"))
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
         case uncovered of
-          TypeOfUncovered ty           -> warnEmptyCase ty
-          UncoveredPatterns candidates -> pprEqns candidates
+          TypeOfUncovered ty            -> warnEmptyCase ty
+          UncoveredPatterns vars unc -> pprEqns vars unc
   where
     PmResult
       { pmresultRedundant = redundant
@@ -1444,14 +1394,12 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
       f (pprPats kind (map unLoc q))
 
     -- Print several clauses (for uncovered clauses)
-    pprEqns qs = pprContext False ctx (text "are non-exhaustive") $ \_ ->
-      case qs of -- See #11245
-           [ValVec [] _]
-                    -> text "Guards do not cover entire pattern space"
-           _missing -> let us = map pprValVecSubstituted qs
-                       in  hang (text "Patterns not matched:") 4
-                                (vcat (take maxPatterns us)
-                                 $$ dots maxPatterns us)
+    pprEqns vars unc = pprContext False ctx (text "are non-exhaustive") $ \_ ->
+      case vars of -- See #11245
+           [] -> text "Guards do not cover entire pattern space"
+           _  -> let us = map (pprValVecSubstituted vars) unc
+                 in  hang (text "Patterns not matched:") 4
+                       (vcat (take maxPatterns us) $$ dots maxPatterns us)
 
     -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
     -- which we only know the type and have no inhabitants at hand)
