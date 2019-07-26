@@ -10,9 +10,9 @@ module PmPpr (
 
 import GhcPrelude
 
-import Name
-import NameEnv
-import NameSet
+import Id
+import VarEnv
+import VarSet
 import UniqDFM
 import UniqSet
 import ConLike
@@ -46,7 +46,7 @@ pprUncovered (expr_vec, delta)
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
     sdoc_vec = mapM pprPmExprWithParens expr_vec
-    fvs      = unionNameSets (map pmExprFVs expr_vec)
+    fvs      = unionVarSets (map pmExprFVs expr_vec)
     refuts   = prettifyRefuts fvs delta
     vec      = runPmPpr sdoc_vec refuts
 
@@ -91,7 +91,7 @@ Check.hs) to be more precise.
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: UniqSet Name -> Delta -> DNameEnv (SDoc, [PmAltCon])
+prettifyRefuts :: UniqSet Id -> Delta -> DIdEnv (SDoc, [PmAltCon])
 prettifyRefuts fvs
   = listToUDFM . zipWith rename nameList
   . filter ((`elemUniqSet_Directly` fvs) . fst) . udfmToList
@@ -103,15 +103,15 @@ prettifyRefuts fvs
     nameList = map text ["p","q","r","s","t"] ++
                  [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
-type PmPprM a = Reader (DNameEnv (SDoc, [PmAltCon])) a
+type PmPprM a = Reader (DIdEnv (SDoc, [PmAltCon])) a
 
-runPmPpr :: PmPprM a -> DNameEnv (SDoc, [PmAltCon]) -> a
+runPmPpr :: PmPprM a -> DIdEnv (SDoc, [PmAltCon]) -> a
 runPmPpr = runReader
 
-checkNegation :: Name -> PmPprM (Maybe SDoc) -- the clean name if it is negated
+checkNegation :: Id -> PmPprM (Maybe SDoc) -- the clean name if it is negated
 checkNegation x = do
   negated <- ask
-  return $ case lookupDNameEnv negated x of
+  return $ case lookupDVarEnv negated x of
     Just (new, _) -> Just new
     Nothing       -> Nothing
 
