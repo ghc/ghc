@@ -162,7 +162,7 @@ whenIsInteresting var (FV f) = FV g
 
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
-  unitFV var = whenIsInteresting var $ add_fv var <> typeFVs (varType var)
+  unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
     where
       add_fv :: Var -> FV
       add_fv var = FV $ \_fv_cand _in_scope (have, have_set) ->
