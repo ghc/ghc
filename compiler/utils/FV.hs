@@ -7,7 +7,7 @@ module FV
   ( -- | An abstraction over free variable computations
     FVM(..)
     -- * Are there any free variables at all?
-  , AnyFVs, noFVs
+  , NoFVs, noFVs
     -- * Deterministic free variable computation
   , FV(..)
   , fvVarListVarSet
@@ -46,30 +46,27 @@ import Data.Semigroup (Semigroup((<>)))
 --------------------------------------------------------------------------------
 
 -- | A free variables traversal that checks whether the free variable set is empty.
-newtype AnyFVs = AnyFVs (VarSet -> Bool)
+newtype NoFVs = NoFVs (VarSet -> Bool)
 
-instance Monoid AnyFVs where
-  mempty = AnyFVs $ const False
+instance Monoid NoFVs where
+  mempty = NoFVs $ const True
   {-# INLINE mempty #-}
 
-instance Semigroup AnyFVs where
-  AnyFVs f <> AnyFVs g = AnyFVs $ oneShot $ \in_scope -> f in_scope || g in_scope
+instance Semigroup NoFVs where
+  NoFVs f <> NoFVs g = NoFVs $ oneShot $ \in_scope -> f in_scope && g in_scope
   {-# INLINE (<>) #-}
 
-instance FVM AnyFVs where
+instance FVM NoFVs where
   coholeFV _hole = mempty
-  unitFV v = AnyFVs $ \in_scope -> not (v `elemVarSet` in_scope)
-  bindVar tv (AnyFVs f) = AnyFVs $ \in_scope -> f $! extendVarSet in_scope tv
+  unitFV v = NoFVs $ \in_scope -> v `elemVarSet` in_scope
+  bindVar tv (NoFVs f) = NoFVs $ \in_scope -> f $! extendVarSet in_scope tv
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
   {-# INLINE bindVar #-}
 
-runAnyFVs :: AnyFVs -> Bool
-runAnyFVs (AnyFVs f) = f emptyVarSet
-
-noFVs :: AnyFVs -> Bool
-noFVs = not . runAnyFVs
+noFVs :: NoFVs -> Bool
+noFVs (NoFVs f) = f emptyVarSet
 
 
 --------------------------------------------------------------------------------
