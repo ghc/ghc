@@ -565,13 +565,15 @@ done.
 tyConToDataCon :: SrcSpan -> RdrName -> Either (SrcSpan, SDoc) (Located RdrName)
 tyConToDataCon loc tc
   | isTcOcc occ || isDataOcc occ
-  , isLexCon (occNameFS occ)
+  , isLexCon cs
+  , cs /= fsLit "->"  -- Fixes #16999
   = return (cL loc (setRdrNameSpace tc srcDataName))
 
   | otherwise
   = Left (loc, msg)
   where
     occ = rdrNameOcc tc
+    cs = occNameFS occ
     msg = text "Not a data constructor:" <+> quotes (ppr tc)
 
 mkPatSynMatchGroup :: Located RdrName
