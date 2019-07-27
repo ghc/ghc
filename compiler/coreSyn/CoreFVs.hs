@@ -6,6 +6,7 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
 
 -- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
