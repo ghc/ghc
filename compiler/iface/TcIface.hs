@@ -371,7 +371,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     names_w_things <- loadDecls ignore_prags (map (\x -> (fingerprint0, x))
                                                   (occEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
-    writeMutVar tc_env_var global_type_env
+    writeMutVar' tc_env_var global_type_env
 
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
