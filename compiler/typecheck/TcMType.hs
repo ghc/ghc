@@ -1812,7 +1812,7 @@ tcGetGlobalTyCoVars
   = do { (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
        ; gbl_tvs  <- readMutVar gtv_var
        ; gbl_tvs' <- zonkTyCoVarsAndFV gbl_tvs
-       ; writeMutVar gtv_var gbl_tvs'
+       ; writeMutVar' gtv_var gbl_tvs'
        ; return gbl_tvs' }
 
 zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
