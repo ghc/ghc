@@ -82,7 +82,7 @@ instance Monoid NonDetFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetFV where
-  NonDetFV f <> NonDetFV g = NonDetFV $ \is acc -> g is (f is acc)
+  NonDetFV f <> NonDetFV g = NonDetFV $ \is acc -> g is $! f is $! acc
   {-# INLINE (<>) #-}
 
 instance FVM NonDetFV where
@@ -90,8 +90,8 @@ instance FVM NonDetFV where
   unitFV v = NonDetFV $ \is acc ->
     if | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
-       | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet (extendVarSet acc v)
-  bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) acc
+       | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
+  bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) $! acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -114,7 +114,7 @@ instance Monoid NonDetCoFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetCoFV where
-  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> f is (g is acc)
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> f is $! g is $! acc
   {-# INLINE (<>) #-}
 
 instance FVM NonDetCoFV where
@@ -123,8 +123,8 @@ instance FVM NonDetCoFV where
     if | not (isCoVar v)    -> acc
        | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
-       | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet (extendVarSet acc v)
-  bindVar v (NonDetCoFV f) = NonDetCoFV $ \is acc -> f (extendVarSet is v) acc
+       | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
+  bindVar v (NonDetCoFV f) = NonDetCoFV $ \is acc -> f (extendVarSet is v) $! acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
