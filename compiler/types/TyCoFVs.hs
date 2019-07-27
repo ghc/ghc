@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
+
 module TyCoFVs
   (
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
