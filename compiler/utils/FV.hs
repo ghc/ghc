@@ -53,13 +53,13 @@ instance Monoid AnyFVs where
   {-# INLINE mempty #-}
 
 instance Semigroup AnyFVs where
-  AnyFVs f <> AnyFVs g = AnyFVs $ \in_scope -> f in_scope || g in_scope
+  AnyFVs f <> AnyFVs g = AnyFVs $ oneShot $ \in_scope -> f in_scope || g in_scope
   {-# INLINE (<>) #-}
 
 instance FVM AnyFVs where
   coholeFV _hole = mempty
   unitFV v = AnyFVs $ \in_scope -> not (v `elemVarSet` in_scope)
-  bindVar tv (AnyFVs f) = AnyFVs $ \in_scope -> f (extendVarSet in_scope tv)
+  bindVar tv (AnyFVs f) = AnyFVs $ \in_scope -> f $! extendVarSet in_scope tv
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -84,7 +84,7 @@ instance Monoid NonDetFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetFV where
-  NonDetFV f <> NonDetFV g = NonDetFV $ \is acc -> g is $! f is $! acc
+  NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> g is $! f is $! acc
   {-# INLINE (<>) #-}
 
 instance FVM NonDetFV where
@@ -116,7 +116,7 @@ instance Monoid NonDetCoFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetCoFV where
-  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> f is $! g is $! acc
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! g is $! acc
   {-# INLINE (<>) #-}
 
 instance FVM NonDetCoFV where
@@ -126,7 +126,7 @@ instance FVM NonDetCoFV where
        | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
-  bindVar v (NonDetCoFV f) = NonDetCoFV $ \is acc -> f (extendVarSet is v) $! acc
+  bindVar v (NonDetCoFV f) = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -146,7 +146,7 @@ type InterestingVarFun = Var -> Bool
 newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> (# [Var], VarSet #) -> (# [Var], VarSet #) }
 
 instance Monoid FV where
-  mempty = FV $ oneShot $ \_ _ acc -> acc
+  mempty = FV $ \_ _ acc -> acc
   {-# INLINE mempty #-}
 
 instance Semigroup FV where
@@ -169,9 +169,11 @@ instance FVM FV where
     where
       add_fv :: Var -> FV
       add_fv var = FV $ oneShot $ \_fv_cand -> oneShot $ \_in_scope -> oneShot $ \(#have, have_set#) ->
-        (# var : have, extendVarSet have_set var #)
+        let !in_scope' = extendVarSet have_set var
+         in (# var : have, in_scope' #)
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
-    f fv_cand (extendVarSet in_scope tv) acc
+    let !in_scope' = extendVarSet in_scope tv
+     in f fv_cand in_scope' acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
