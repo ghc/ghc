@@ -114,7 +114,7 @@ instance Monoid NonDetCoFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetCoFV where
-  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> g is (f is acc)
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ \is acc -> f is (g is acc)
   {-# INLINE (<>) #-}
 
 instance FVM NonDetCoFV where
@@ -155,10 +155,10 @@ whenIsInteresting :: Var -> FV -> FV
 whenIsInteresting var (FV f) = FV g
   where
     g fv_cand in_scope acc@(_have, have_set)
+      | not (fv_cand var)          = acc
       | var `elemVarSet` in_scope  = acc
       | var `elemVarSet` have_set  = acc
-      | fv_cand var                = f fv_cand in_scope acc
-      | otherwise                  = acc
+      | otherwise                  = f fv_cand in_scope acc
 
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
