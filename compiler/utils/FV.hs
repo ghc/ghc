@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module FV
   ( -- | An abstraction over free variable computations
@@ -28,6 +29,7 @@ module FV
   ) where
 
 import GhcPrelude
+import GHC.Exts (oneShot)
 
 import FVM
 
@@ -141,32 +143,33 @@ nonDetCoFVSet (NonDetCoFV f) = f emptyVarSet emptyVarSet
 type InterestingVarFun = Var -> Bool
 
 -- | A free variables traversal that produces a deterministic 'DVarSet
-newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> ([Var], VarSet) -> ([Var], VarSet) }
+newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> (# [Var], VarSet #) -> (# [Var], VarSet #) }
 
 instance Monoid FV where
-  mempty = FV $ \_ _ acc -> acc
+  mempty = FV $ oneShot $ \_ _ acc -> acc
   {-# INLINE mempty #-}
 
 instance Semigroup FV where
-  FV f <> FV g = FV $ \fv_cand in_scope acc -> f fv_cand in_scope $! g fv_cand in_scope $! acc
+  f <> g = FV $ oneShot $ \fv_cand -> oneShot $ \in_scope -> oneShot $ \acc ->
+    runFV f fv_cand in_scope (runFV g fv_cand in_scope acc)
   {-# INLINE (<>) #-}
 
 whenIsInteresting :: Var -> FV -> FV
-whenIsInteresting var (FV f) = FV g
+whenIsInteresting var f = FV $ oneShot g
   where
-    g fv_cand in_scope acc@(_have, have_set)
+    g fv_cand in_scope acc@(# _have, have_set #)
       | not (fv_cand var)          = acc
       | var `elemVarSet` in_scope  = acc
       | var `elemVarSet` have_set  = acc
-      | otherwise                  = f fv_cand in_scope acc
+      | otherwise                  = runFV f fv_cand in_scope acc
 
 instance FVM FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
   unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
     where
       add_fv :: Var -> FV
-      add_fv var = FV $ \_fv_cand _in_scope (have, have_set) ->
-        (var : have, extendVarSet have_set var)
+      add_fv var = FV $ oneShot $ \_fv_cand -> oneShot $ \_in_scope -> oneShot $ \(#have, have_set#) ->
+        (# var : have, extendVarSet have_set var #)
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
     f fv_cand (extendVarSet in_scope tv) acc
 
@@ -174,8 +177,10 @@ instance FVM FV where
   {-# INLINE unitFV #-}
   {-# INLINE bindVar #-}
 
-fvVarListVarSet :: FV ->  ([Var], VarSet)
-fvVarListVarSet (FV fv) = fv (const True) emptyVarSet ([], emptyVarSet)
+fvVarListVarSet :: FV -> ([Var], VarSet)
+fvVarListVarSet (FV fv) =
+  case fv (const True) emptyVarSet (# [], emptyVarSet #) of
+    (# have, have_set #) -> (have, have_set)
 
 fvVarList :: FV -> [Var]
 fvVarList = fst . fvVarListVarSet
