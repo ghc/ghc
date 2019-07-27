@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -ddump-to-file -ddump-simpl #-}
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
 
