@@ -240,10 +240,9 @@ exprsSomeFreeVarsDSet fv_cand e =
 
 addBndr :: CoreBndr -> FV -> FV
 addBndr bndr fv
-  = varTypeTyCoFVs bndr `unionFV`
+  = varTypeTyCoFVs bndr `unionFV` bindVar bndr fv
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
-     FV.delFV bndr fv
 
 addBndrs :: [CoreBndr] -> FV -> FV
 addBndrs bndrs fv = foldr addBndr fv bndrs
