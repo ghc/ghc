@@ -430,20 +430,20 @@ instance Outputable EnterInfo where
 
 
 
-data SumInfo
-    = SumInfo !DataCon [EnterLattice]
-    -- ^ A sum type constructor application
-    deriving (Generic)
+-- data SumInfo
+--     = SumInfo !DataCon [EnterLattice]
+--     -- ^ A sum type constructor application
+--     deriving (Generic)
 
-instance Eq SumInfo where
-    (==) (SumInfo c1 fs1) (SumInfo c2 fs2) =
-        c1 == c2 && fs1 == fs2
+-- instance Eq SumInfo where
+--     (==) (SumInfo c1 fs1) (SumInfo c2 fs2) =
+--         c1 == c2 && fs1 == fs2
 
-instance NFData SumInfo where
-    rnf (SumInfo _ fields) = rnf fields
+-- instance NFData SumInfo where
+--     rnf (SumInfo _ fields) = rnf fields
 
-instance Outputable SumInfo where
-    ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
+-- instance Outputable SumInfo where
+--     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
 
 data ProdInfo
     = ProdInfo [EnterLattice]
@@ -498,8 +498,11 @@ data FieldInfo
 
     -- TODO: Fold these into FieldInfo directly.
     | LatProd {-# UNPACK #-} !ProdInfo
-    | LatSum  {-# UNPACK #-} !SumInfo
-    deriving (Eq,Generic,NFData)
+    | LatSum  !DataCon [EnterLattice]
+    deriving (Eq,Generic)
+
+instance NFData FieldInfo where
+    rnf x = seq x ()
 
 
 -- TODO: Is it worth using maybeEq in the instance?
@@ -526,7 +529,7 @@ instance Outputable FieldInfo where
     ppr LatRec            = text "rec"
     ppr LatUndet          = text "undet"
     ppr (LatProd prodInfo)= ppr prodInfo
-    ppr (LatSum sumInfo)  = ppr sumInfo
+    ppr (LatSum con fields)  = char '<' <> ppr con <> char '>' <> ppr fields
 
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterInfo MaybeEnter _           = MaybeEnter
@@ -544,11 +547,11 @@ combineProdInfo :: ProdInfo -> ProdInfo -> ProdInfo
 combineProdInfo (ProdInfo fs1) (ProdInfo fs2)
     = ProdInfo $ zipWithEqual "ProdInfo:combine" combineLattices fs1 fs2
 
-combineSumInfo :: SumInfo -> SumInfo -> FieldInfo
-combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
-    | c1 /= c2  = LatUnknown
-    | otherwise = LatSum $! SumInfo c1 $
-                  zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
+-- combineSumInfo :: SumInfo -> SumInfo -> FieldInfo
+-- combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
+--     | c1 /= c2  = LatUnknown
+--     | otherwise = LatSum $! SumInfo c1 $
+--                   zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
 
 combineLattices :: EnterLattice -> EnterLattice -> EnterLattice
 combineLattices x1 x2 | maybeEq x1 x2 || x1 == x2 = x1
@@ -565,11 +568,13 @@ combineFieldInfos LatUndet _ = LatUndet
 combineFieldInfos _ LatUndet = LatUndet
 -- Top stays top
 -- We currently do NOT combine results of different types
-combineFieldInfos (LatProd _) (LatSum _) = LatUnknown
-combineFieldInfos (LatSum _) (LatProd _) = LatUnknown
+combineFieldInfos (LatProd _) (LatSum _ _) = LatUnknown
+combineFieldInfos (LatSum _ _) (LatProd _) = LatUnknown
 
-combineFieldInfos (LatSum s1)  (LatSum s2)   =
-    (combineSumInfo s1 s2)
+combineFieldInfos (LatSum c1 fs1)  (LatSum c2 fs2)
+    | c1 /= c2  = LatUnknown
+    | otherwise = LatSum c1 $
+                  zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
 combineFieldInfos (LatProd p1) (LatProd p2) =
     LatProd (combineProdInfo p1 p2)
 
@@ -597,7 +602,7 @@ indexField lat n =
         LatUndet -> bot
         LatUnknown -> top
         LatRec -> bot
-        LatSum  (SumInfo _ fields) -> getField fields
+        LatSum  _ fields -> getField fields
         LatProd (ProdInfo fields)  -> getField fields
   where
     getField fields =
@@ -619,7 +624,7 @@ areTopFields (LatUnknown ) = True
 areTopFields (LatRec  )    = False
 areTopFields (LatUndet)    = False
 areTopFields (LatProd (ProdInfo fields))  = all isTopValue fields
-areTopFields (LatSum  (SumInfo _ fields)) = all isTopValue fields
+areTopFields (LatSum  _ fields) = all isTopValue fields
 
 isTopValue :: EnterLattice -> Bool
 isTopValue lat = enterInfo lat == MaybeEnter && hasTopFields lat
@@ -628,7 +633,7 @@ nestingLevelOver :: EnterLattice -> Int -> Bool
 nestingLevelOver _ 0 = True
 nestingLevelOver (EnterLattice _ (LatProd (ProdInfo fields))) n
     = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver (EnterLattice _  (LatSum (SumInfo _ fields))) n
+nestingLevelOver (EnterLattice _  (LatSum  _ fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
@@ -639,8 +644,8 @@ capAtLevel _ l@(EnterLattice _ LatUndet   ) = l
 capAtLevel 0 _ = top
 capAtLevel n (EnterLattice e (LatProd (ProdInfo fields))) =
     EnterLattice e (LatProd (ProdInfo $ map (capAtLevel (n-1)) fields))
-capAtLevel n (EnterLattice e (LatSum (SumInfo c fields))) =
-    EnterLattice e (LatSum (SumInfo c $ map (capAtLevel (n-1)) fields))
+capAtLevel n (EnterLattice e (LatSum c fields)) =
+    EnterLattice e (LatSum c $ map (capAtLevel (n-1)) fields)
 
 
 {-
@@ -970,7 +975,7 @@ mkJoinNode inputs = do
 mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
 mkOutConLattice con outer fields
     | conCount == 1 = EnterLattice outer $ LatProd (ProdInfo out_fields)
-    | conCount > 1  = EnterLattice outer $ LatSum (SumInfo con out_fields)
+    | conCount > 1  = EnterLattice outer $ LatSum con out_fields
     | otherwise = panic "mkOutConLattice"
   where
     out_fields = mapStrictConArgs con (`setEnterInfo` NeverEnter) fields
