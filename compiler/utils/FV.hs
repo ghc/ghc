@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE UnboxedTuples #-}
 
 module FV
   ( -- | An abstraction over free variable computations
@@ -9,7 +8,7 @@ module FV
     -- * Are there any free variables at all?
   , NoFVs, noFVs
     -- * Deterministic free variable computation
-  , FV(..)
+  , FV
   , fvVarListVarSet
   , fvVarList
   , fvDVarSet
@@ -20,6 +19,8 @@ module FV
   , delFV
   , delFVs
   , unionFV, mapUnionFV, mkFVs
+    -- ** Internal
+  , runFV, FVAccum(..)
     -- * Non-deterministic free variable computation
   , NonDetFV
   , nonDetFVSet
@@ -139,8 +140,10 @@ nonDetCoFVSet (NonDetCoFV f) = f emptyVarSet emptyVarSet
 
 type InterestingVarFun = Var -> Bool
 
+data FVAccum = FVAccum ![Var] !VarSet
+
 -- | A free variables traversal that produces a deterministic 'DVarSet
-newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> (# [Var], VarSet #) -> (# [Var], VarSet #) }
+newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> FVAccum -> FVAccum }
 
 instance Monoid FV where
   mempty = FV $ \_ _ acc -> acc
@@ -154,7 +157,7 @@ instance Semigroup FV where
 whenIsInteresting :: Var -> FV -> FV
 whenIsInteresting var f = FV $ oneShot g
   where
-    g fv_cand in_scope acc@(# _have, have_set #)
+    g fv_cand in_scope acc@(FVAccum _have have_set)
       | not (fv_cand var)          = acc
       | var `elemVarSet` in_scope  = acc
       | var `elemVarSet` have_set  = acc
@@ -165,9 +168,9 @@ instance FVM FV where
   unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
     where
       add_fv :: Var -> FV
-      add_fv var = FV $ oneShot $ \_fv_cand -> oneShot $ \_in_scope -> oneShot $ \(#have, have_set#) ->
+      add_fv var = FV $ oneShot $ \_fv_cand -> oneShot $ \_in_scope -> oneShot $ \(FVAccum have have_set) ->
         let !in_scope' = extendVarSet have_set var
-         in (# var : have, in_scope' #)
+         in FVAccum (var : have) in_scope'
   bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
     let !in_scope' = extendVarSet in_scope tv
      in f fv_cand in_scope' acc
@@ -178,8 +181,8 @@ instance FVM FV where
 
 fvVarListVarSet :: FV -> ([Var], VarSet)
 fvVarListVarSet (FV fv) =
-  case fv (const True) emptyVarSet (# [], emptyVarSet #) of
-    (# have, have_set #) -> (have, have_set)
+  case fv (const True) emptyVarSet (FVAccum [] emptyVarSet) of
+    FVAccum have have_set -> (have, have_set)
 
 fvVarList :: FV -> [Var]
 fvVarList = fst . fvVarListVarSet
