@@ -616,7 +616,6 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
   | appEnterInfo == NoEnter -- Infered to be already evaluated by Tag Inference
   , n_args == 0             -- See Note [Tag Inferrence - The basic idea]
-                  
   = InferedReturnIt
 
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)

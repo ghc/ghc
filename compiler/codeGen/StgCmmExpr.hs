@@ -855,9 +855,9 @@ cgIdApp strict fun_id args = do
               -- For debugging purposes
               trace = do
                 tickyTagged
+                pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
                 when (gopt Opt_DoTagInferenceChecks dflags) $ do
-                  emitTagTrap (showSDoc dflags (ppr fun_id <> char '-' <> ppr fun)) fun
-                  pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
+                  emitTagTrap (showSDoc dflags (ppr fun_id <+> ppr fun)) fun
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun

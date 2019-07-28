@@ -150,9 +150,12 @@ maybeEq x1 x2 = isTrue# (reallyUnsafePtrEquality# x1 x2)
 
 -- Grow them trees:
 
+-- Once all is said and done, will this still be a RhsCon?
+data IsRhsCon = RhsCon | MaybeClosure deriving Eq
+
 type instance BinderP       'InferTags = Id
 type instance XRhsClosure   'InferTags = NoExtFieldSilent
-type instance XRhsCon       'InferTags = NodeId
+type instance XRhsCon       'InferTags = (NodeId,IsRhsCon)
 type instance XLet          'InferTags = NoExtFieldSilent
 type instance XLetNoEscape  'InferTags = NoExtFieldSilent
 type instance XStgApp       'InferTags = NodeId
@@ -190,8 +193,8 @@ like this:
               MaybeEnter
              /    |    \
       AlwaysEnter |  NeverEnter
-             \    |    /
-              RecEnter
+              \   |   /
+               NoValue
                   |
             UndetEnterInfo
 
@@ -208,19 +211,22 @@ coincides with a value being tagged.
 The consequence of this is that it does not matter what enter info
 we use for things like functions.
 
-RecEnter is a special value assigned to tail recursive branches.
+NoValue is a special value assigned to expressions assigned to
+expressions which can't be scrutinised at runtime.
+A common example is the tail recursive branch in a recursive function.
 See Note [Recursive Functions] for why we need this.
-If we end up assigning RecEnter to a *bindings* enterInfo then
+If we end up assigning NoValue to a *bindings* enterInfo then
 this binding represents a computation which won't return as it
 will tail call itself forever.
 This happens for example for `f x = f x`.
 
-RecEnter is also a fixpoint in the lattice. Once a data flow node
-has been assigned enterInfo RecEnter it's enterInfo won't change
+NoValue is also a fixpoint in the lattice. Once a data flow node
+has been assigned enterInfo NoValue it's enterInfo won't change
 anymore.
 
 NeverEnter means the thing referenced by the binding won't ever be
-entered as a *value*. It might be calles as a function though.
+entered as a *value*. It might be called as a function though as it
+can still represent a function causing side effects.
 
 AlwaysEnter implies something is a thunk of some form. However since GC
 can also evaluate certain forms of thunks we currently treat this for the
@@ -247,11 +253,12 @@ This lattice has this shape:
             /  |  \
       LatProd  |  LatSum
             \  |  /
-             LatRec
+          LatNoValues
                |
             LatUndet
 
-Again with a special value for recursive tail calls.
+Again with a placeholder for impossible values.
+Used especially for recursive tail calls.
 See Note [Recursive Functions] for details about that.
 
     Note [The lattice element combinators]
@@ -264,9 +271,9 @@ functions which behaves as follows.
 In general when comparing against top/bot/rec:
 
 combine x y | x == y = x
-combine Rec x = x
 combine Top x = x
 combine Bot x = x
+combine Rec x = x
 
 For enter information we additionally have:
 
@@ -408,7 +415,7 @@ top = EnterLattice MaybeEnter LatUnknown
 -- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
     = UndetEnterInfo    -- ^ Not yet determined.
-    | RecEnter          -- ^ Direct tail recursion
+    | NoValue           -- ^ E.g. direct tail recursion, impossible fields.
     | AlwaysEnter       -- ^ WILL need to be entered
     | MaybeEnter        -- ^ Could be either
     | NeverEnter        -- ^ Does NOT need to be entered.
@@ -416,7 +423,7 @@ data EnterInfo
 
 instance Outputable EnterInfo where
     ppr UndetEnterInfo  = char '?'
-    ppr RecEnter        = text "rec"
+    ppr NoValue        = text "noInfo"
     ppr AlwaysEnter     = text "ent"
     ppr MaybeEnter      = char 'm'
     ppr NeverEnter      = char 't'
@@ -522,12 +529,12 @@ instance Outputable FieldInfo where
     ppr (LatSum sumInfo)  = ppr sumInfo
 
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
-combineEnterInfo RecEnter _             = MaybeEnter
-combineEnterInfo _ RecEnter             = MaybeEnter
 combineEnterInfo MaybeEnter _           = MaybeEnter
 combineEnterInfo _ MaybeEnter           = MaybeEnter
 combineEnterInfo UndetEnterInfo _       = UndetEnterInfo
 combineEnterInfo _ UndetEnterInfo       = UndetEnterInfo
+combineEnterInfo NoValue x              = x
+combineEnterInfo x NoValue              = x
 combineEnterInfo NeverEnter AlwaysEnter = MaybeEnter
 combineEnterInfo AlwaysEnter NeverEnter = MaybeEnter
 combineEnterInfo AlwaysEnter AlwaysEnter= AlwaysEnter
@@ -549,14 +556,14 @@ combineLattices (EnterLattice ei1 fi1) (EnterLattice ei2 fi2)
     = EnterLattice (combineEnterInfo ei1 ei2) (combineFieldInfos fi1 fi2)
 
 combineFieldInfos :: FieldInfo -> FieldInfo -> FieldInfo
-combineFieldInfos LatRec x = x
-combineFieldInfos x LatRec = x
--- Top stays top
 combineFieldInfos (LatUnknown) _ = LatUnknown
 combineFieldInfos _ (LatUnknown) = LatUnknown
+combineFieldInfos LatRec x = x
+combineFieldInfos x LatRec = x
 -- Bot stays bot (unless compared against top)
-combineFieldInfos (LatUndet) _ = LatUndet
-combineFieldInfos _ (LatUndet) = LatUndet
+combineFieldInfos LatUndet _ = LatUndet
+combineFieldInfos _ LatUndet = LatUndet
+-- Top stays top
 -- We currently do NOT combine results of different types
 combineFieldInfos (LatProd _) (LatSum _) = LatUnknown
 combineFieldInfos (LatSum _) (LatProd _) = LatUnknown
@@ -971,6 +978,7 @@ mkOutConLattice con outer fields
 
 {-# NOINLINE findTags #-}
 findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding])
+-- findTags this_mod us binds = passTopBinds binds
 findTags this_mod us binds =
     -- pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
@@ -990,37 +998,37 @@ findTags this_mod us binds =
                 binds'
 
 
--- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
--- passTopBinds binds = map (passTop) binds
+passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
+passTopBinds binds = map (passTop) binds
 
--- passTop :: StgTopBinding -> TgStgTopBinding
--- passTop (StgTopStringLit v s)   = StgTopStringLit v s
--- passTop (StgTopLifted bind)     = StgTopLifted (passBinds bind)
+passTop :: StgTopBinding -> TgStgTopBinding
+passTop (StgTopStringLit v s)   = StgTopStringLit v s
+passTop (StgTopLifted bind)     = StgTopLifted (passBinds bind)
 
--- passBinds :: StgBinding -> TgStgBinding
--- passBinds (StgNonRec v rhs) = StgNonRec v (passRhs rhs)
--- passBinds (StgRec pairs)    = StgRec $ map (second passRhs) pairs
+passBinds :: StgBinding -> TgStgBinding
+passBinds (StgNonRec v rhs) = StgNonRec v (passRhs rhs)
+passBinds (StgRec pairs)    = StgRec $ map (\(v,rhs) -> (v, passRhs rhs)) pairs
 
--- -- For top level lets we have to turn lets into closures.
--- passRhs :: StgRhs -> TgStgRhs
--- passRhs (StgRhsCon node_id ccs con args) = (StgRhsCon noExtFieldSilent ccs con args)
--- passRhs (StgRhsClosure ext ccs flag args body) =
---     StgRhsClosure ext ccs flag args $ passExpr body
+-- For top level lets we have to turn lets into closures.
+passRhs :: StgRhs -> TgStgRhs
+passRhs (StgRhsCon node_id ccs con args) = (StgRhsCon noExtFieldSilent ccs con args)
+passRhs (StgRhsClosure ext ccs flag args body) =
+    StgRhsClosure ext ccs flag args $ passExpr body
 
--- passExpr :: StgExpr -> TgStgExpr
--- passExpr (StgCase scrut bndr ty alts) = StgCase (passExpr scrut) bndr ty (map passAlt alts)
--- passExpr (StgLet _ binds body)          = StgLet noExtFieldSilent (passBinds binds) (passExpr body)
--- passExpr (StgLetNoEscape _ binds body)  = StgLetNoEscape noExtFieldSilent (passBinds binds) (passExpr body)
--- passExpr (StgTick t e)     = StgTick t $ passExpr e
--- passExpr (StgConApp _ con args tys)     = StgConApp noExtFieldSilent con args tys
+passExpr :: StgExpr -> TgStgExpr
+passExpr (StgCase scrut bndr ty alts) = StgCase (passExpr scrut) bndr ty (map passAlt alts)
+passExpr (StgLet _ binds body)          = StgLet noExtFieldSilent (passBinds binds) (passExpr body)
+passExpr (StgLetNoEscape _ binds body)  = StgLetNoEscape noExtFieldSilent (passBinds binds) (passExpr body)
+passExpr (StgTick t e)     = StgTick t $ passExpr e
+passExpr (StgConApp _ con args tys)     = StgConApp noExtFieldSilent con args tys
 
--- passExpr (StgApp _ f args)              =  StgApp MayEnter f args
--- passExpr (StgLit lit)                   = (StgLit lit)
--- passExpr (StgOpApp op args res_ty)      = (StgOpApp op args res_ty)
--- passExpr (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
+passExpr (StgApp _ f args)              =  StgApp MayEnter f args
+passExpr (StgLit lit)                   = (StgLit lit)
+passExpr (StgOpApp op args res_ty)      = (StgOpApp op args res_ty)
+passExpr (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
 
--- passAlt :: StgAlt -> TgStgAlt
--- passAlt (altCon, bndrs, rhs) = (altCon, bndrs, passExpr rhs)
+passAlt :: StgAlt -> TgStgAlt
+passAlt (altCon, bndrs, rhs) = (altCon, bndrs, passExpr rhs)
 
 -- Constant mappings
 addConstantNodes :: AM ()
@@ -1294,9 +1302,16 @@ The main drivers are:
 The enterInfo of the result is determined by checking these conditions
 in order:
 
-a) If the binding is not defined at the top level
+a.1) If the binding is not defined at the top level
    and is a non recursive binding:
 ->  NeverEnter, we can just wrap the expression in a Case.
+
+a.2) If the binding is not defined at the top level
+   and is in a recursive binding, but all strict args
+   are defined outside of the recursive group:
+->  NeverEnter, we can just wrap the expression in a Case.
+
+
 
 b) If there are no strict fields
 ->  NeverEnter, see 1)
@@ -1312,16 +1327,16 @@ d) If any strict field arguments are undetermined
 e) Otherwise
 -> MaybeEnter
 
-For us to reach e the strict fields must contain one of AlwaysEnter/MaybeEnter/RecEnter.
+For us to reach e) the strict fields must contain one of AlwaysEnter/MaybeEnter/NoValue.
 
 If there is a value of MaybeEnter/NeverEnter for one of the strict arguments
 we need to evaluate this argument before allocation.
 In order to do this we will turn this RhsCon into a RhsClosure.
 Removing the ability to tag the binding as it will turn into a thunk.
 
-If there is a RecEnter this represents storing the result of a computation
+If there is a NoValue this represents storing the result of a computation
 in a strict field which will not return.
-We treat this the same as the AlwaysEnter/MaybeEnter/RecEnter case.
+We treat this the same as the AlwaysEnter/MaybeEnter/NoValue case.
 Mostly since it means the constructr will never be allocated and as such
 wrappting it in a seq is of little consequence.
 
@@ -1329,13 +1344,15 @@ wrappting it in a seq is of little consequence.
 
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
-nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag -> Id -> StgRhs -> AM InferStgRhs
+nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag
+        -> Id -> StgRhs 
+        -> AM (InferStgRhs)
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
         let node = mkConstNode node_id (flatLattice NeverEnter)
         markDone $ node `set_desc` (ppr binding <-> text "rhsConNullary")
-        return $! (StgRhsCon node_id ccs con args)
+        return $! (StgRhsCon (node_id,RhsCon) ccs con args)
   | otherwise = do
 
         mapM_ (addImportedNode this_mod ) [v | StgVarArg v <- args]
@@ -1352,43 +1369,50 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
 #endif
                         }
         addNode notDone node
-        return $! (StgRhsCon node_id ccs con args)
+            
+        return $! (StgRhsCon (node_id,remainsConRhs) ccs con args)
   where
     node_id = mkLocalIdNodeId ctxt binding
+    !remainsConRhs
+        | isTopLevel topFlag            = MaybeClosure
+        -- a.1)
+        | (CLet _ _ : _) <- ctxt        = RhsCon
+        -- a.2)
+        | (CLetRec binds _ : _) <- ctxt
+        , not (binding `elemUFM` binds) = RhsCon
+        -- strict argument defined in recursive group
+        | otherwise                     = MaybeClosure
+
     node_update this_id node_inputs = do
         fieldResults <- mapM (lookupNodeResult) node_inputs
         let strictResults = getStrictConArgs con fieldResults
         let strictOuter = map enterInfo strictResults :: [EnterInfo]
         -- pprTraceM "RhsCon" (ppr con <+> ppr this_id <+> ppr fieldResults)
-        -- Rule 2
+        -- See Note [RhsCon data flow]
         let outerTag
-                -- Non-toplevel bindings are wrapped with a case expr.
-                -- This means we can always tag the resulting let,
-                -- although it might no longer be static.
-                -- However we do not do this for recursive binds for now.
-                -- TODO: Could be done also for recursive binds in the common case.
-                | not (isTopLevel topFlag)
-                , (CLet vmap _ : _) <- ctxt
-                , elemVarEnv binding vmap
-                =   -- pprTrace "Avoided tag by wrapping" (ppr binding)
+                -- a) If it's never turned into a closure it's always tagged.
+                | remainsConRhs == RhsCon =
                     NeverEnter
-                -- All lazy fields
+
+                -- b) nothing to force
                 | not $ any isMarkedStrict $ dataConRepStrictness con
                 =   NeverEnter
 
-                -- If all of the strict inputs are tagged so is the output.
+                -- c) If all of the strict inputs are tagged so is the output.
                 | all (==NeverEnter) strictOuter
                 = NeverEnter
 
+                -- d) Taggedness depends on the taggedness of the arguments.
                 | any (== UndetEnterInfo) strictOuter
                 = UndetEnterInfo
 
-
+                -- e) 
                 | otherwise
                 = MaybeEnter
 
-        -- Strict fields need to marked as neverEnter here, even if they are not analysed as such
-        -- This is because when we READ the result of this rhs they will have been tagged.
+
+        -- Strict fields need to marked as neverEnter here, even if their inputs are not.
+        -- This is because once we scrutinise the result of this rhs they will have been tagged.
         let result = mkOutConLattice con outerTag fieldResults
         let cappedResult = capAtLevel 10 result
         updateNodeResult this_id cappedResult
@@ -1801,7 +1825,7 @@ or   is a unsaturated function call:
 ->  We throw up our hands and determine we know nothing.
 
 If f is a simple recursive tail call:
-->  We mark the result as such: RecEnter x RecFields
+->  We mark the result as such: NoValue x RecFields
     See [Recursive Functions] for details.
 
 If f is a saturated function:
@@ -1861,7 +1885,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
                 return $! (StgApp node_id f args, node_id)
   where
     -- Determine if f in this position is a recursive tail call
-    -- and as such safe to set to RecEnter
+    -- and as such safe to set to NoValue
     -- See Note [Recursive Functions]
     isRecTail :: [SynContext] -> Bool
     isRecTail (CTopLevel _ : _) = False
@@ -1917,7 +1941,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
         | isFun && (not isSat) = return $! top
 
         -- App in a direct self-recursive tail call context, returns nothing
-        | recTail = return $! EnterLattice RecEnter LatRec
+        | recTail = return $! EnterLattice NoValue LatRec
 
         | NoMutRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
@@ -2043,51 +2067,23 @@ rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
     (StgTopLifted . fst) <$!> (rewriteBinds TopLevel bind)
 
+-- For top level binds, the wrapper is guaranteed to be `id`
 rewriteBinds :: TopLevelFlag -> InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
-rewriteBinds topFlag (StgNonRec v rhs)
-    | TopLevel    <- topFlag = do
-        !bind <- (StgNonRec v <$> rewriteRhsInplace v rhs)
-        return $! (bind, id)
-    | NotTopLevel <- topFlag = do
+rewriteBinds topFlag (StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
         return $! (StgNonRec v rhs, wrapper)
-rewriteBinds topFlag (StgRec binds)
-    | TopLevel    <- topFlag = do
-        !bind <- mkRec <$!> mapM (uncurry rewriteRhsInplace) binds
-        return $! (bind, id)
-    | NotTopLevel <- topFlag = do
-        rhss <- mapM (uncurry rewriteRhsInplace) binds :: AM ([TgStgRhs])
-        return $! (mkRec rhss, id)
+rewriteBinds topFlag (StgRec binds) =do
+        (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
+        let wrapper = foldl1 (.) wrappers
+        return $! (mkRec rhss, wrapper)
   where
     mkRec :: [TgStgRhs] -> TgStgBinding
     mkRec rhss = StgRec (zip (map fst binds) rhss)
 
--- For top level lets we have to turn lets into closures.
-rewriteRhsInplace :: HasDebugCallStack => Id -> InferStgRhs -> AM TgStgRhs
-rewriteRhsInplace _binding (StgRhsCon node_id ccs con args) = do
-    node <- getNode node_id
-    fieldInfos <- mapM lookupNodeResult (node_inputs node)
-    let strictIndices = getStrictConArgs con (zip [0..] fieldInfos) :: [(Int,EnterLattice)]
-    let needsEval = map fst . filter (not . hasOuterTag . snd) $ strictIndices :: [Int]
-    -- TODO: selectIndices is not a performant solution, fix that.
-    let evalArgs = [v | StgVarArg v <- selectIndices needsEval args] :: [Id]
-
-    if (null evalArgs)
-        then return $! (StgRhsCon noExtFieldSilent ccs con args)
-        else do
-            -- tagInfo <- lookupNodeResult node_id
-            -- pprTraceM "Creating closure for " $ ppr _binding <+> ppr node_id
-            conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
-            return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr)
-
-rewriteRhsInplace _binding (StgRhsClosure ext ccs flag args body) = do
-    -- pprTraceM "rewriteRhsClosure" $ ppr binding <+> ppr tagInfo
-    StgRhsClosure ext ccs flag args <$!> rewriteExpr False body
-
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 rewriteRhs :: Id -> InferStgRhs -> AM (TgStgRhs, TgStgExpr -> TgStgExpr)
-rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
+rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = do
     node <- getNode node_id
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
     -- tagInfo <- lookupNodeResult node_id
@@ -2121,7 +2117,15 @@ rewriteRhs _binding (StgRhsCon node_id ccs con args) = do
                     = StgVarArg v'
                     | otherwise = StgVarArg v
             let evaldConArgs = map updateArg args
-            return $! ((StgRhsCon noExtFieldSilent ccs con evaldConArgs), \expr -> foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap)
+            -- At this point iff, we have possibly untagged arguments
+            -- and MaybeClosure as flag, we turn the result into a closure.
+            if rewriteFlag == MaybeClosure
+                then do
+                    conExpr <- mkSeqs evalArgs con args (panic "mkSeqs should not need to provide types")
+                    return $! (StgRhsClosure noExtFieldSilent ccs ReEntrant [] $! conExpr, id)
+                else do
+                    let evalExpr expr = foldr (\(v, vEvald) e -> mkSeq v vEvald e) expr varMap
+                    return $! ((StgRhsCon noExtFieldSilent ccs con evaldConArgs), evalExpr)
 rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
     pure (,) <*>
         (StgRhsClosure ext ccs flag args <$> rewriteExpr False body) <*>
@@ -2200,7 +2204,7 @@ rewriteApp True (StgApp nodeId f args)
                                   StgSyn.MayEnter
     extInfo NeverEnter        = StgSyn.NoEnter
     extInfo MaybeEnter        = StgSyn.MayEnter
-    extInfo RecEnter          = StgSyn.MayEnter
+    extInfo NoValue          = StgSyn.MayEnter
     extInfo UndetEnterInfo    = StgSyn.MayEnter
 
 rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args -- TODO? Also apply here?
@@ -2208,7 +2212,7 @@ rewriteApp _ _ = panic "Impossible"
 
 
 ----------------------------------------------
--- Utilities for rewriting ConRhs to ConClosure
+-- Utilities for rewriting RhsCon to ConClosure
 
 -- We should really replace ALL references to the evaluatee with the evaluted binding.
 -- Not just in the constructor args.
@@ -2224,7 +2228,7 @@ mkSeq id bndr !expr =
 mkSeqs :: [Id] -> DataCon -> [StgArg] -> [Type] -> AM TgStgExpr
 mkSeqs untaggedIds con args tys = do
     argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: AM [(InId, OutId)]
-    -- mapM_ (pprTraceM "Forcing strict args:" . ppr) argMap
+    mapM_ (pprTraceM "Forcing strict args before allocation:" . ppr) argMap
     let taggedArgs
             = map   (\v -> case v of
                         StgVarArg v' -> StgVarArg $ fromMaybe v' $ lookup v' argMap
