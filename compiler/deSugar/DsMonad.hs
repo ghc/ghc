@@ -418,7 +418,7 @@ incrCheckPmIterDs = do
 
 -- | Reset the counter for pattern match check iterations to zero
 resetPmIterDs :: DsM ()
-resetPmIterDs = do { env <- getLclEnv; writeTcRef (dsl_pm_iter env) 0 }
+resetPmIterDs = do { env <- getLclEnv; writeTcRef' (dsl_pm_iter env) 0 }
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
@@ -568,7 +568,7 @@ discardWarningsDs thing_inside
         ; result <- thing_inside
 
         -- Revert messages to old_msgs
-        ; writeTcRef (ds_msgs env) old_msgs
+        ; writeTcRef' (ds_msgs env) old_msgs
 
         ; return result }
 

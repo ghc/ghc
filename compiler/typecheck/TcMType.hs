@@ -312,7 +312,7 @@ fillCoercionHole (CoercionHole { ch_ref = ref, ch_co_var = cv }) co
          pprPanic "Filling a filled coercion hole" (ppr cv $$ ppr co $$ ppr old_co)
 #endif
        ; traceTc "Filling coercion hole" (ppr cv <+> text ":=" <+> ppr co)
-       ; writeTcRef ref (Just co) }
+       ; writeTcRef' ref (Just co) }
 
 -- | Is a coercion hole filled in?
 isFilledCoercionHole :: CoercionHole -> TcM Bool
@@ -853,7 +853,7 @@ writeMetaTyVarRef tyvar ref ty
   | not debugIsOn
   = do { traceTc "writeMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
                                    <+> text ":=" <+> ppr ty)
-       ; writeTcRef ref (Indirect ty) }
+       ; writeTcRef' ref (Indirect ty) }
 
   -- Everything from here on only happens if DEBUG is on
   | otherwise
@@ -2058,7 +2058,7 @@ zonkTcTyVar tv
                ; case cts of
                     Flexi       -> zonk_kind_and_return
                     Indirect ty -> do { zty <- zonkTcType ty
-                                      ; writeTcRef ref (Indirect zty)
+                                      ; writeTcRef' ref (Indirect zty)
                                         -- See Note [Sharing in zonking]
                                       ; return zty } }
 

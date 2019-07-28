@@ -1813,7 +1813,7 @@ zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
 
     finish_meta mtv_env ty
       = do { let mtv_env' = extendVarEnv mtv_env tv ty
-           ; writeTcRef mtv_env_ref mtv_env'
+           ; writeTcRef' mtv_env_ref mtv_env'
            ; return ty }
 
 lookupTyVarOcc :: ZonkEnv -> TcTyVar -> Maybe TyVar

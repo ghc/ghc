@@ -500,7 +500,7 @@ run_th_modfinalizers = do
   if null th_modfinalizers
   then getEnvs
   else do
-    writeTcRef th_modfinalizers_var []
+    writeTcRef' th_modfinalizers_var []
     let run_finalizer (lcl_env, f) =
             setLclEnv lcl_env (runRemoteModFinalizers f)
 
@@ -540,7 +540,7 @@ tc_rn_src_decls ds
         -- The plumbing here is a bit odd: see #10853
       ; th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
       ; th_ds <- readTcRef th_topdecls_var
-      ; writeTcRef th_topdecls_var []
+      ; writeTcRef' th_topdecls_var []
 
       ; (tcg_env, rn_decls) <-
             if null th_ds
