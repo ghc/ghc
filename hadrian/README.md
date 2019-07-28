@@ -93,7 +93,7 @@ currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
 and `devel2`. As an example, the `quickest` flavour adds `-O0` flag to all GHC
 invocations and builds libraries only in the `vanilla` way, which speeds up
 builds by 3-4x. Build flavours are documented
-[here](https://github.com/snowleopard/hadrian/blob/master/doc/flavours.md).
+[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md).
 
 * `--freeze1`: freeze Stage1 GHC, i.e. do not rebuild it even if some of its
 source files are out-of-date. This allows to significantly reduce the rebuild
