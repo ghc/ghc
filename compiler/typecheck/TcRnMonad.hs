@@ -39,7 +39,7 @@ module TcRnMonad(
   newSysName, newSysLocalId, newSysLocalIds,
 
   -- * Accessing input/output
-  newTcRef, readTcRef, writeTcRef, updTcRef,
+  newTcRef, readTcRef, writeTcRef, writeTcRef', updTcRef,
 
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, traceTcRn, traceTcRnForUser,
@@ -670,6 +670,9 @@ readTcRef = readMutVar
 
 writeTcRef :: TcRef a -> a -> TcRnIf gbl lcl ()
 writeTcRef = writeMutVar
+
+writeTcRef' :: TcRef a -> a -> TcRnIf gbl lcl ()
+writeTcRef' = writeMutVar'
 
 updTcRef :: TcRef a -> (a -> a) -> TcRnIf gbl lcl ()
 -- Returns ()

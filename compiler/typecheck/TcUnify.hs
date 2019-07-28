@@ -904,7 +904,7 @@ fill_infer_result orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
 
        ; when debugIsOn (check_hole ty_to_fill_with)
 
-       ; writeTcRef ref (Just ty_to_fill_with)
+       ; writeTcRef' ref (Just ty_to_fill_with)
 
        ; return ty_co }
   where

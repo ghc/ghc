@@ -962,7 +962,7 @@ instance TH.Quasi TcM where
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
     dep_files <- readTcRef ref
-    writeTcRef ref (fp:dep_files)
+    writeTcRef' ref (fp:dep_files)
 
   qAddTempFile suffix = do
     dflags <- getDynFlags
@@ -1063,7 +1063,7 @@ finishTH = do
   dflags <- getDynFlags
   when (gopt Opt_ExternalInterpreter dflags) $ do
     tcg <- getGblEnv
-    writeTcRef (tcg_th_remote_state tcg) Nothing
+    writeTcRef' (tcg_th_remote_state tcg) Nothing
 
 runTHExp :: ForeignHValue -> TcM TH.Exp
 runTHExp = runTH THExp
@@ -1116,7 +1116,7 @@ runRemoteTH iserv recovers = do
     StartRecover -> do -- Note [TH recover with -fexternal-interpreter]
       v <- getErrsVar
       msgs <- readTcRef v
-      writeTcRef v emptyMessages
+      writeTcRef' v emptyMessages
       runRemoteTH iserv (msgs : recovers)
     EndRecover caught_error -> do
       let (prev_msgs@(prev_warns,prev_errs), rest) = case recovers of
@@ -1125,7 +1125,7 @@ runRemoteTH iserv recovers = do
       v <- getErrsVar
       (warn_msgs,_) <- readTcRef v
       -- keep the warnings only if there were no errors
-      writeTcRef v $ if caught_error
+      writeTcRef' v $ if caught_error
         then prev_msgs
         else (prev_warns `unionBags` warn_msgs, prev_errs)
       runRemoteTH iserv rest
@@ -1193,7 +1193,7 @@ getTHState i = do
     Nothing -> do
       hsc_env <- env_top <$> getEnv
       fhv <- liftIO $ mkFinalizedHValue hsc_env =<< iservCall i StartTH
-      writeTcRef (tcg_th_remote_state tcg) (Just fhv)
+      writeTcRef' (tcg_th_remote_state tcg) (Just fhv)
       return fhv
 
 wrapTHResult :: TcM a -> TcM (THResult a)

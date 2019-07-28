@@ -143,13 +143,13 @@ simplifyTop wanteds
            -- messages.
            ; errs_var  <- getErrsVar
            ; saved_msg <- TcM.readTcRef errs_var
-           ; TcM.writeTcRef errs_var emptyMessages
+           ; TcM.writeTcRef' errs_var emptyMessages
 
            ; warnAllUnsolved $ WC { wc_simple = unsafe_ol
                                   , wc_impl = emptyBag }
 
            ; whyUnsafe <- fst <$> TcM.readTcRef errs_var
-           ; TcM.writeTcRef errs_var saved_msg
+           ; TcM.writeTcRef' errs_var saved_msg
            ; recordUnsafeInfer whyUnsafe
            }
        ; traceTc "reportUnsolved (unsafe overlapping) }" empty
