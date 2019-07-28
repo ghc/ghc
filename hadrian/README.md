@@ -294,7 +294,6 @@ If nothing helps, don't hesitate to create a GHC issue.
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* Validation is not implemented: [#187][validation-issue].
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
 
 How to contribute
@@ -332,7 +331,6 @@ projects), as well as Well-Typed.
 [ghc-windows-quick-build]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows#AQuickBuild
 [windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
-[validation-issue]: https://github.com/snowleopard/hadrian/issues/187
 [dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
 [bin-dist-issue]: https://github.com/snowleopard/hadrian/issues/219
 [contributors]: https://github.com/snowleopard/hadrian/graphs/contributors
