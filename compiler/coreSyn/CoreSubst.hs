@@ -700,7 +700,7 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 ------------------
 substDVarSet :: Subst -> DVarSet -> DVarSet
 substDVarSet subst fvs
-  = let FVAccum vars _ = foldr (subst_fv subst) ([], emptyVarSet) $ dVarSetElems fvs
+  = let FVAccum vars _ = foldr (subst_fv subst) emptyFVAccum $ dVarSetElems fvs
     in mkDVarSet vars
   where
   subst_fv :: Subst -> Var -> FVAccum -> FVAccum
