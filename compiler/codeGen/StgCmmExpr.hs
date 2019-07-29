@@ -812,16 +812,13 @@ cgConApp con stg_args
         ; tickyReturnNewCon (length stg_args)
         ; emitReturn [idInfoToAmode idinfo] }
 
--- | Cause memory fault on tag missprediction
---   expectTag informs if we expect a tag or not.
--- TODO: Call barf instead        -> Maybe Int            -- size prefix
-emitTagTrap :: String -> CmmExpr -> FCode ()
-emitTagTrap onWhat fun = do
+-- | Call barf if we failed to predict a tag correctly.
+emitTagAssertion :: String -> CmmExpr -> FCode ()
+emitTagAssertion onWhat fun = do
   { dflags <- getDynFlags
   ; lret <- newBlockId
   ; lfault <- newBlockId
-  -- ; tscope <- getTickScope
-  ; pprTraceM "emitTagTrap" (text onWhat)
+  ; pprTraceM "emitTagAssertion" (text onWhat)
   ; emit $ mkCbranch (cmmIsTagged dflags fun)
                      lret lfault Nothing
   ; emitLabel lfault
@@ -848,16 +845,18 @@ cgIdApp strict fun_id args = do
           | isVoidTy (idType fun_id) -> emitReturn []
           | otherwise                -> emitReturn [fun]
 
+        -- A value infered to be in WHNF, so we can just return it.
         InferedReturnIt
           | isVoidTy (idType fun_id) -> trace >> emitReturn []
-          | otherwise                -> trace >> emitReturn [fun]
+          | otherwise                -> trace >> assertTag >>
+                                        emitReturn [fun]
             where
-              -- For debugging purposes
               trace = do
                 tickyTagged
                 pprTraceM "WHNF:" (ppr fun_id <+> ppr args )
-                when (gopt Opt_DoTagInferenceChecks dflags) $ do
-                  emitTagTrap (showSDoc dflags (ppr fun_id <+> ppr fun)) fun
+              assertTag =
+                when (debugIsOn || gopt Opt_DoTagInferenceChecks dflags) $
+                  emitTagAssertion (showSDoc dflags (ppr fun_id <+> ppr fun)) fun
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
