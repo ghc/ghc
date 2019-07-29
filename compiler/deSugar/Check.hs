@@ -255,7 +255,7 @@ checkSingle' locn var p = do
   clause    <- translatePat fam_insts p
   missing   <- pmInitialTmTyCs
   tracePm "checkSingle': missing" (ppr missing)
-  PartialResult cs us ds <- pmcheckI clause [] [var] missing
+  PartialResult cs us ds <- pmcheckI clause [var] missing
   let us' = UncoveredPatterns [var] us
   return $ case (cs,ds) of
     (Covered,  _    )         -> PmResult [] us' [] -- useful
@@ -321,9 +321,9 @@ checkMatches' vars matches
     go (m:ms) missing = do
       tracePm "checkMatches': go" (ppr m $$ ppr missing)
       fam_insts          <- dsGetFamInstEnvs
-      (clause, guards)   <- translateMatch fam_insts m
+      clause   <- translateMatch fam_insts m
       r@(PartialResult cs missing' ds)
-        <- runMany (pmcheckI clause guards vars) missing
+        <- runMany (pmcheckI clause vars) missing
       tracePm "checkMatches': go: res" (ppr r)
       (rs, final_u, is)  <- go ms missing'
       return $ case (cs, ds) of
@@ -625,13 +625,13 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
-               -> PmM (PatVec,[PatVec])
+               -> PmM PatVec
 translateMatch fam_insts (dL->L _ (Match { m_pats = lpats, m_grhss = grhss })) =
   do
   pats'   <- concat <$> translatePatVec fam_insts pats
   guards' <- mapM (translateGuards fam_insts) guards
   -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
-  return (pats', guards')
+  return (pats' ++ concat guards')
   where
     extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
     extractGuards (dL->L _ (GRHS _ gs _)) = map unLoc gs
@@ -1081,64 +1081,45 @@ runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
-pmcheckI :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
-pmcheckI ps guards vva delta = do
+pmcheckI :: PatVec -> ValVec -> Delta -> PmM PartialResult
+pmcheckI ps vva delta = do
   n <- incrCheckPmIterDs
   tracePm "pmCheck" (ppr n <> colon
                         $$ hang (text "patterns:") 2 (ppr ps)
-                        $$ hang (text "guards:") 2 (ppr guards)
                         $$ ppr vva
                         $$ ppr delta)
-  res <- pmcheck ps guards vva delta
+  res <- pmcheck ps vva delta
   tracePm "pmCheckResult:" (ppr res)
   return res
 {-# INLINE pmcheckI #-}
 
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> Delta -> PmM PartialResult
-pmcheckGuardsI gvs delta = incrCheckPmIterDs >> pmcheckGuards gvs delta
-{-# INLINE pmcheckGuardsI #-}
-
--- | Check the list of guards
-pmcheckGuards :: [PatVec] -> Delta -> PmM PartialResult
-pmcheckGuards []       delta = return (usimple delta)
-pmcheckGuards (gv:gvs) delta = do
-  (PartialResult cs unc ds) <- pmcheckI gv [] [] delta
-  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs) unc
-  return $ PartialResult (cs `mappend` css)
-                         uncs
-                         (ds `mappend` dss)
-
 -- | Matching function: Check simultaneously a clause (takes separately the
 -- patterns and the list of guards) for exhaustiveness, redundancy and
 -- inaccessibility.
-pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
-pmcheck [] guards [] delta
-  | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuardsI guards delta
+pmcheck :: PatVec -> ValVec -> Delta -> PmM PartialResult
+pmcheck [] [] _ = return $ mempty { presultCovered = Covered }
 
 -- Guard
-pmcheck (PmFake : ps) guards vva delta =
+pmcheck (PmFake : ps) vva delta =
   -- short-circuit if the guard pattern is useless.
   -- we just have two possible outcomes: fail here or match and recurse
   -- none of the two contains any useful information about the failure
   -- though. So just have these two cases but do not do all the boilerplate
-  forces . mkCons delta <$> pmcheckI ps guards vva delta
-pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
+  forces . mkCons delta <$> pmcheckI ps vva delta
+pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) vva delta = do
   tracePm "PmGrd: pmPatType" (hcat [ppr p, ppr (pmPatType p)])
   y <- mkPmId (pmPatType p)
   let delta' = expectJust "y was fresh" $ solveVar delta y e
-  pmcheckI (pv ++ ps) guards (y : vva) delta'
+  pmcheckI (pv ++ ps) (y : vva) delta'
 
 -- Var
-pmcheck (PmVar x : ps) guards (y : vva) delta = pmcheckI ps guards vva delta'
+pmcheck (PmVar x : ps) (y : vva) delta = pmcheckI ps vva delta'
   where
     delta' = expectJust "x is fresh" $ solveVar delta x (idToPmExpr y)
 
 -- ConVar
 pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
-        guards (x : vva) delta = do
+        (x : vva) delta = do
   -- Split the value vector into two value vectors: One representing the current
   -- constructor, the other representing everything but the current constructor
   -- (and the already known impossible constructors).
@@ -1147,7 +1128,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
     Nothing -> pure mempty
     Just (delta', arg_vas) ->
       -- Check <rhs>
-      pmcheckI (args ++ ps) guards (arg_vas ++ vva) delta'
+      pmcheckI (args ++ ps) (arg_vas ++ vva) delta'
 
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
@@ -1161,8 +1142,8 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   -- Combine both into a single PartialResult
   pure (mkUnion pr_pos' pr_neg)
 
-pmcheck [] _ (_:_) _ = panic "pmcheck: nil-cons"
-pmcheck (_:_) _ [] _ = panic "pmcheck: cons-nil"
+pmcheck [] (_:_) _ = panic "pmcheck: nil-cons"
+pmcheck (_:_) [] _ = panic "pmcheck: cons-nil"
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
