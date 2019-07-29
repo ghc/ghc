@@ -736,8 +736,6 @@ data TmState = TmS
   -- along a chain of var-to-var mappings until we find the solution but has the
   -- advantage that when we update the solution for @y@ above, we automatically
   -- update the solution for @x@ in a union-find-like fashion.
-  -- Invariant: Only maps to other variables ('PmExprVar') or to WHNFs
-  -- ('PmExprCon'). Ergo, never maps to a 'PmExprOther'.
   , tm_neg :: !PmRefutEnv
   -- ^ Maps each variable @x@ to a list of 'PmAltCon's that @x@ definitely
   -- cannot match. Example, assuming
@@ -1112,10 +1110,6 @@ isFlexible ts = isNothing . isRigid ts
 -- integrated the knowledge from the equality constraint.
 unify :: TmState -> (PmExpr, PmExpr) -> Maybe TmState
 unify ts eq@(e1, e2) = case eq of
-  -- We cannot do a thing about these cases
-  (PmExprOther _,_)            -> boring
-  (_,PmExprOther _)            -> boring
-
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
     -- See Note [Undecidable Equality for PmAltCons]
     Just True -> foldlM unify ts (zip ts1 ts2)
@@ -1189,11 +1183,7 @@ trySolve x alt args ts@(TS env)
 -- @extendSubst@ simply extends the substitution, unlike what
 -- 'extendSubstAndSolve' does.
 extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e ts@(TS env)
-  | isNotPmExprOther e
-  = TS (extendDVarEnv env y (VI (Rigid e) []))
-  | otherwise
-  = ts
+extendSubst y e ts@(TS env) = TS (extendDVarEnv env y (VI (Rigid e) []))
 
 -- | Apply an (un-flattened) substitution to an expression.
 exprDeepLookup :: Delta -> PmExpr -> PmExpr
