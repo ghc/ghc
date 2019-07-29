@@ -20,7 +20,7 @@ module FV
   , delFVs
   , unionFV, mapUnionFV, mkFVs
     -- ** Internal
-  , runFV, FVAccum(..)
+  , runFV, FVAccum(..), emptyFVAccum
     -- * Non-deterministic free variable computation
   , NonDetFV
   , nonDetFVSet
@@ -141,6 +141,9 @@ nonDetCoFVSet (NonDetCoFV f) = f emptyVarSet emptyVarSet
 type InterestingVarFun = Var -> Bool
 
 data FVAccum = FVAccum ![Var] !VarSet
+
+emptyFVAccum :: FVAccum
+emptyFVAccum = FVAccum [] emptyVarSet
 
 -- | A free variables traversal that produces a deterministic 'DVarSet
 newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> FVAccum -> FVAccum }
