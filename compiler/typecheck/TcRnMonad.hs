@@ -842,7 +842,7 @@ addDependentFiles :: [FilePath] -> TcRn ()
 addDependentFiles fs = do
   ref <- fmap tcg_dependent_files getGblEnv
   dep_files <- readTcRef ref
-  writeTcRef ref (fs ++ dep_files)
+  writeTcRef' ref (fs ++ dep_files)
 
 {-
 ************************************************************************
@@ -940,7 +940,7 @@ discardWarnings thing_inside
 
         -- Revert warnings to old_warns
         ; (_new_warns, new_errs) <- readTcRef errs_var
-        ; writeTcRef errs_var (old_warns, new_errs)
+        ; writeTcRef' errs_var (old_warns, new_errs)
 
         ; return result }
 
@@ -975,7 +975,7 @@ reportError err
   = do { traceTc "Adding error:" (pprLocErrMsg err) ;
          errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
-         writeTcRef errs_var (warns, errs `snocBag` err) }
+         writeTcRef' errs_var (warns, errs `snocBag` err) }
 
 reportWarning :: WarnReason -> ErrMsg -> TcRn ()
 reportWarning reason err
@@ -1532,7 +1532,7 @@ getTcEvBindsMap (CoEvBindsVar {})
 
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
 setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
-  = writeTcRef ev_ref binds
+  = writeTcRef' ev_ref binds
 setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
   | isEmptyEvBindMap ev_binds
   = return ()
@@ -1768,10 +1768,10 @@ solution: make TcUnify.uType spot manifestly-insoluble constraints.
 -}
 
 recordThUse :: TcM ()
-recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
+recordThUse = do { env <- getGblEnv; writeTcRef' (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
-recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
+recordThSpliceUse = do { env <- getGblEnv; writeTcRef' (tcg_th_splice_used env) True }
 
 -- | When generating an out-of-scope error message for a variable matching a
 -- binding in a later inter-splice group, the typechecker uses the splice
@@ -1781,7 +1781,7 @@ recordTopLevelSpliceLoc (RealSrcSpan real_loc)
   = do { env <- getGblEnv
        ; let locs_var = tcg_th_top_level_locs env
        ; locs0 <- readTcRef locs_var
-       ; writeTcRef locs_var (Set.insert real_loc locs0) }
+       ; writeTcRef' locs_var (Set.insert real_loc locs0) }
 recordTopLevelSpliceLoc (UnhelpfulSpan _) = return ()
 
 getTopLevelSpliceLocs :: TcM (Set RealSrcSpan)
@@ -1830,7 +1830,7 @@ addModFinalizersWithLclEnv mod_finalizers
 -- although this is used for more than just that failure case.
 recordUnsafeInfer :: WarningMessages -> TcM ()
 recordUnsafeInfer warns =
-    getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) (False, warns)
+    getGblEnv >>= \env -> writeTcRef' (tcg_safeInfer env) (False, warns)
 
 -- | Figure out the final correct safe haskell mode
 finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
@@ -2047,5 +2047,5 @@ getCCIndexM nm = do
   let cc_st_ref = extractCostCentreState env
   cc_st <- readTcRef cc_st_ref
   let (idx, cc_st') = getCCIndex nm cc_st
-  writeTcRef cc_st_ref cc_st'
+  writeTcRef' cc_st_ref cc_st'
   return idx
