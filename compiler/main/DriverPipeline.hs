@@ -901,7 +901,7 @@ llvmOptions dflags =
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
 
   where target = platformMisc_llvmTarget $ platformMisc dflags
-        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets dflags)
+        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
 
         -- Relocation models
         rmodel | gopt Opt_PIC dflags        = "pic"
@@ -1450,7 +1450,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
         optIdx = max 0 $ min 2 $ optLevel dflags  -- ensure we're in [0,2]
-        llvmOpts = case lookup optIdx $ llvmPasses dflags of
+        llvmOpts = case lookup optIdx $ llvmPasses $ llvmConfig dflags of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
                                       ++ "is missing passes for level "

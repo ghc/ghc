@@ -15,6 +15,9 @@
 #
 # Add missing targets to the list below to have them included in
 # llvm-targets file.
+#
+# See Note [LLVM Configuration] in SysTools for the whole story regarding LLVM
+# configuration data.
 
 # Target sets for which to generate the llvm-targets file
 TARGETS=(

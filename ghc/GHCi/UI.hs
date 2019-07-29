@@ -2775,9 +2775,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
-        default_dflags = defaultDynFlags (settings dflags) llvmConfig
+        default_dflags = defaultDynFlags (settings dflags) (llvmConfig dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -3229,10 +3227,8 @@ showLanguages' show_all dflags =
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-   llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
    default_dflags =
-       defaultDynFlags (settings dflags) llvmConfig `lang_set`
+       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set`
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other
