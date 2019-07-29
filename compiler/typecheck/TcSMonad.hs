@@ -2986,7 +2986,7 @@ readTcRef :: TcRef a -> TcS a
 readTcRef ref = wrapTcS (TcM.readTcRef ref)
 
 writeTcRef :: TcRef a -> a -> TcS ()
-writeTcRef ref val = wrapTcS (TcM.writeTcRef ref val)
+writeTcRef ref val = wrapTcS (TcM.writeTcRef' ref val)
 
 updTcRef :: TcRef a -> (a->a) -> TcS ()
 updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
