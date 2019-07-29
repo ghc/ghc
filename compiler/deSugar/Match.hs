@@ -733,9 +733,10 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
         -- pattern match check warnings
         ; unless (isGenerated origin) $
           when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
-          addTmCsDs (genCaseTmCs1 mb_scr new_vars) $
-              -- See Note [Type and Term Equality Propagation]
-          checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
+          do  { tm_cs <- genCaseTmCs1 mb_scr new_vars
+              ; addTmCsDs tm_cs $
+                -- See Note [Type and Term Equality Propagation]
+                checkMatches dflags (DsMatchContext ctxt locn) new_vars matches }
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
