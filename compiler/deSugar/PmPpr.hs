@@ -121,11 +121,9 @@ checkNegation x = do
 pprPmExpr :: PmExpr -> PmPprM SDoc
 pprPmExpr (PmExprVar x)        = fromMaybe underscore <$> checkNegation x
 pprPmExpr (PmExprCon con args) = pprPmExprCon con args
-pprPmExpr (PmExprOther _)      = return underscore -- don't show
 
 needsParens :: PmExpr -> Bool
 needsParens (PmExprVar   {})            = False
-needsParens (PmExprOther {})            = False -- will become a wildcard
 needsParens (PmExprCon (PmAltLit l) _)  = isNegatedPmLit l
 needsParens (PmExprCon (PmAltConLike (RealDataCon c)) _)
   | isTupleDataCon c || isConsDataCon c = False
