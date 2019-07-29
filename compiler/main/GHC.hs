@@ -505,7 +505,7 @@ initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { top_dir <- findTopDir mb_top_dir
                    ; mySettings <- initSysTools top_dir
-                   ; myLlvmConfig <- initLlvmConfig top_dir
+                   ; myLlvmConfig <- lazyInitLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
