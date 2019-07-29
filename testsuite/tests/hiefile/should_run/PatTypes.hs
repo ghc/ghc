@@ -40,7 +40,7 @@ makeNc = do
 dynFlagsForPrinting :: String -> IO DynFlags
 dynFlagsForPrinting libdir = do
   systemSettings <- initSysTools libdir
-  return $ defaultDynFlags systemSettings ([], [])
+  return $ defaultDynFlags systemSettings (LlvmConfig [] [])
 
 selectPoint :: HieFile -> (Int,Int) -> HieAST Int
 selectPoint hf (sl,sc) = case M.toList (getAsts $ hie_asts hf) of
