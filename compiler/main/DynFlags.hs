@@ -84,7 +84,7 @@ module DynFlags (
         unsafeFlags, unsafeFlagsForInfer,
 
         -- ** LLVM Targets
-        LlvmTarget(..), LlvmTargets, LlvmPasses, LlvmConfig,
+        LlvmTarget(..), LlvmConfig(..),
 
         -- ** System tool settings and locations
         Settings(..),
@@ -966,8 +966,9 @@ data DynFlags = DynFlags {
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
     --   by GHC-API users. See Note [The integer library] in PrelNames
-  llvmTargets           :: LlvmTargets,
-  llvmPasses            :: LlvmPasses,
+  llvmConfig            :: LlvmConfig,
+    -- ^ N.B. It's important that this field is lazy since we load the LLVM
+    -- configuration lazily. See Note [LLVM Configuration] in SysTools.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -1384,9 +1385,10 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
-type LlvmTargets = [(String, LlvmTarget)]
-type LlvmPasses = [(Int, String)]
-type LlvmConfig = (LlvmTargets, LlvmPasses)
+-- | See Note [LLVM Configuration] in SysTools.
+data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
+                             , llvmPasses  :: [(Int, String)]
+                             }
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
@@ -1919,7 +1921,7 @@ initDynFlags dflags = do
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
 defaultDynFlags :: Settings -> LlvmConfig -> DynFlags
-defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
+defaultDynFlags mySettings llvmConfig =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
@@ -2030,8 +2032,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
-        llvmTargets             = myLlvmTargets,
-        llvmPasses              = myLlvmPasses,
+        -- See Note [LLVM configuration].
+        llvmConfig              = llvmConfig,
 
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -5715,11 +5717,10 @@ makeDynFlagsConsistent dflags
 -- initialized.
 defaultGlobalDynFlags :: DynFlags
 defaultGlobalDynFlags =
-    (defaultDynFlags settings (llvmTargets, llvmPasses)) { verbosity = 2 }
+    (defaultDynFlags settings llvmConfig) { verbosity = 2 }
   where
     settings = panic "v_unsafeGlobalDynFlags: settings not initialised"
-    llvmTargets = panic "v_unsafeGlobalDynFlags: llvmTargets not initialised"
-    llvmPasses = panic "v_unsafeGlobalDynFlags: llvmPasses not initialised"
+    llvmConfig = panic "v_unsafeGlobalDynFlags: llvmConfig not initialised"
 
 #if STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
