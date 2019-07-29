@@ -18,10 +18,10 @@ module TcUnify (
   buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind, uTryFillPoly,
+  unifyType, unifyKind, uQuickLookTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
-  tcGuardedSubsumption,
+  tcQuickLookSubtype,
 
   --------------------------------
   -- Holes
@@ -774,24 +774,17 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
     go ty_a ty_e
+      | is_bottom_forall_type ty_a
+      = do { (in_wrap, TyVarTy tv) <- topInstantiate inst_orig ty_a
+           ; dflags <- getDynFlags
+           ; if xopt LangExt.ImpredicativeTypes dflags
+                then do { uQuickLookTryFillPoly inst_orig tv ty_e
+                        ; return in_wrap }
+                else poly_actual ty_a ty_e }
+
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
-      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-              -- quick look
-           ; dflags <- getDynFlags
-           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
-                           then do { ql_subst <- tcGuardedSubsumption in_rho ty_e
-                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
-                                       uTryFillPoly inst_orig v
-                                                    (substTyAddInScope ql_subst (mkTyVarTy v))
-                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
-                                   ; zonkTcType in_rho }
-                           else return in_rho
-           ; body_wrap <- tc_sub_type_ds
-                            (eq_orig { uo_actual = in_rho'
-                                     , uo_expected = ty_expected })
-                            inst_orig ctxt in_rho' ty_e
-           ; return (body_wrap <.> in_wrap) }
+      = poly_actual ty_a ty_e
 
       | otherwise   -- Revert to unification
       = inst_and_unify
@@ -823,12 +816,39 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tcGuardedSubsumption :: TcType -> TcType -> TcM TCvSubst
-tcGuardedSubsumption ty1 ty2
+    -- ty is of the form forall a. Q => a
+    is_bottom_forall_type ty
+      | let (tvs, _theta, rho) = tcSplitSigmaTy ty
+      , TyVarTy tv_a <- rho
+      = tv_a `elem` tvs
+      | otherwise
+      = False
+
+    poly_actual ty_a ty_e
+      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
+              -- quick look
+           ; dflags <- getDynFlags
+           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
+                           then do { lvl <- getTcLevel
+                                   ; ql_subst <- tcQuickLookSubtype lvl in_rho ty_e
+                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
+                                       uQuickLookTryFillPoly inst_orig v
+                                          (substTyAddInScope ql_subst (mkTyVarTy v))
+                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
+                                   ; zonkTcType in_rho }
+                           else return in_rho
+           ; body_wrap <- tc_sub_type_ds
+                            (eq_orig { uo_actual = in_rho'
+                                     , uo_expected = ty_expected })
+                            inst_orig ctxt in_rho' ty_e
+           ; return (body_wrap <.> in_wrap) }
+
+tcQuickLookSubtype :: TcLevel -> TcType -> TcType -> TcM TCvSubst
+tcQuickLookSubtype lvl ty1 ty2
   | Just ty1' <- tcView ty1
-  = tcGuardedSubsumption ty1' ty2
+  = tcQuickLookSubtype lvl ty1' ty2
   | Just ty2' <- tcView ty2
-  = tcGuardedSubsumption ty1 ty2'
+  = tcQuickLookSubtype lvl ty1 ty2'
   | tcIsGuardedType ty1
   = case tcUnifyTyKis bind_flag [ty1] [ty2] of
       Just subst -> return subst
@@ -836,25 +856,27 @@ tcGuardedSubsumption ty1 ty2
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
   = case tcUnifyTyKis bind_flag [arg1] [arg2] of
-      Nothing -> tcGuardedSubsumption res1 res2
+      Nothing -> tcQuickLookSubtype lvl res1 res2
       Just subst1
         -> let res1' = substTyAddInScope subst1 res1
                res2' = substTyAddInScope subst1 res2
-           in flip composeTCvSubst subst1 <$> tcGuardedSubsumption res1' res2'
+           in flip composeTCvSubst subst1 <$> tcQuickLookSubtype lvl res1' res2'
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
-  , TyVarTy tv2 <- ty2, isMetaTyVar tv2
+  , TyVarTy tv2 <- ty2, isTouchableMetaTyVar lvl tv2
   = do { beta <- newFlexiTyVarTy (tcTypeKind res1)
-       ; let new_fun_ty = mkVisFunTy arg1 beta
-       ; subst' <- tcGuardedSubsumption ty1 new_fun_ty
-       ; return (composeTCvSubst subst' (zipTvSubst [tv2] [new_fun_ty])) }
+       ; let new_fun_ty  = mkVisFunTy arg1 beta
+             small_subst = zipTvSubst [tv2] [new_fun_ty]
+             ty1' = substTyAddInScope small_subst ty1'
+       ; subst' <- tcQuickLookSubtype lvl ty1' new_fun_ty
+       ; return (composeTCvSubst subst' small_subst) }
   | otherwise
   = return emptyTCvSubst
   where  
     bind_flag tv
-      | isImmutableTyVar tv
-      = Skolem
-      | otherwise
+      | isTouchableMetaTyVar lvl tv
       = BindMe
+      | otherwise
+      = Skolem
 
 {- Note [Settting the argument context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1667,13 +1689,22 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 -}
 
-uTryFillPoly :: CtOrigin -> TcTyVar -> TcSigmaType -> TcM ()
-uTryFillPoly origin tv1 ty2
-  = do { lookup_res <- lookupTcTyVar tv1
-       ; case lookup_res of
-           Filled _ -> return ()
-           Unfilled _ -> do { _ <- uUnfilledVar origin TypeLevel NotSwapped True tv1 ty2
-                            ; return () } }
+-- fills a variable only if it points to a type with foralls
+uQuickLookTryFillPoly :: CtOrigin -> TcTyVar -> TcSigmaType -> TcM ()
+uQuickLookTryFillPoly origin tv1 ty2
+  = go =<< getTcLevel
+  where
+    go lvl
+      | isTouchableMetaTyVar lvl tv1
+      , not (isTauTy ty2)  -- do not fill if not a polytype
+      = do { lookup_res <- lookupTcTyVar tv1
+           ; case lookup_res of
+               Filled _ -> return ()
+               Unfilled _ -> do { _ <- uUnfilledVar origin TypeLevel NotSwapped
+                                                    True tv1 ty2
+                                ; return () } }
+      | otherwise
+      = return ()
 
 ----------
 uUnfilledVar :: CtOrigin
