@@ -371,7 +371,7 @@ selectNextWorkItem
            Just (ct, new_wl) ->
     do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
          -- This is done by TcInteract.chooseInstance
-       ; writeTcRef wl_var new_wl
+       ; writeTcRef' wl_var new_wl
        ; return (Just ct) } } }
 
 -- Pretty printing
@@ -1877,7 +1877,7 @@ updInertTcS :: (InertSet -> InertSet) -> TcS ()
 updInertTcS upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { curr_inert <- TcM.readTcRef is_var
-                     ; TcM.writeTcRef is_var (upd_fn curr_inert) }) }
+                     ; TcM.writeTcRef' is_var (upd_fn curr_inert) }) }
 
 getInertCans :: TcS InertCans
 getInertCans = do { inerts <- getTcSInerts; return (inert_cans inerts) }
@@ -1891,7 +1891,7 @@ updRetInertCans upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
                      ; let (res, cans') = upd_fn (inert_cans inerts)
-                     ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
+                     ; TcM.writeTcRef' is_var (inerts { inert_cans = cans' })
                      ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
@@ -2666,7 +2666,7 @@ getGlobalRdrEnvTcS = wrapTcS TcM.getGlobalRdrEnv
 bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
                                     ; n <- TcM.readTcRef ref
-                                    ; TcM.writeTcRef ref (n+1) }
+                                    ; TcM.writeTcRef' ref (n+1) }
 
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
@@ -2844,7 +2844,7 @@ nestTcS (TcS thing_inside)
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
 
-       ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
+       ; TcM.writeTcRef' inerts_var  -- See Note [Propagate the solved dictionaries]
                         (inerts { inert_solved_dicts = inert_solved_dicts new_inerts
                                 , inert_cans = nxt_ic })
 
@@ -2954,7 +2954,7 @@ getTcSInerts :: TcS InertSet
 getTcSInerts = getTcSInertsRef >>= readTcRef
 
 setTcSInerts :: InertSet -> TcS ()
-setTcSInerts ics = do { r <- getTcSInertsRef; writeTcRef r ics }
+setTcSInerts ics = do { r <- getTcSInertsRef; writeTcRef' r ics }
 
 getWorkListImplics :: TcS (Bag Implication)
 getWorkListImplics
@@ -2985,8 +2985,8 @@ newTcRef x = wrapTcS (TcM.newTcRef x)
 readTcRef :: TcRef a -> TcS a
 readTcRef ref = wrapTcS (TcM.readTcRef ref)
 
-writeTcRef :: TcRef a -> a -> TcS ()
-writeTcRef ref val = wrapTcS (TcM.writeTcRef ref val)
+writeTcRef' :: TcRef a -> a -> TcS ()
+writeTcRef' ref val = wrapTcS (TcM.writeTcRef' ref val)
 
 updTcRef :: TcRef a -> (a->a) -> TcS ()
 updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
@@ -3337,7 +3337,7 @@ useVars co_vars
        ; wrapTcS $
          do { tcvs <- TcM.readTcRef ref
             ; let tcvs' = tcvs `unionVarSet` co_vars
-            ; TcM.writeTcRef ref tcvs' } }
+            ; TcM.writeTcRef' ref tcvs' } }
 
 -- | Equalities only
 setWantedEq :: TcEvDest -> Coercion -> TcS ()
