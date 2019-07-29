@@ -249,17 +249,25 @@ some information about the constructor it came out of.
 
 This lattice has this shape:
 
-           LatUnknown
+         FieldsUnknown
+               |
+         FieldsUntyped
             /  |  \
-      LatProd  |  LatSum
+   FieldsProd  |  FieldsSum
             \  |  /
           LatNoValues
                |
-            LatUndet
+           FieldsUndet
 
 Again with a placeholder for impossible values.
 Used especially for recursive tail calls.
 See Note [Recursive Functions] for details about that.
+
+FieldsUntyped is used when we want to represent two values with
+potentially matching subtags but different constructors or types.
+
+This can happen for example when combining e.g. Left (Nothing) and Right (Just v)
+
 
     Note [The lattice element combinators]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -279,15 +287,48 @@ For enter information we additionally have:
 
 combine Enter NoEnter = MaybeEnter
 
-For field infos we combine field information pointwise
-if the branches are compatible. Currently this means
-that both branches agree in their type AND constructor.
+For field infos we combine field information pointwise.
 
-We could relax this towards structural compatibilty or even
-compare branches whos resulting field count disagrees.
+When combining results from different branches we allow
+combinations of different field counts.
 
-But currently we do not do so to rule out a source of errors
-in the implementation.
+    Combining branches with different constructors/types.
+    -----------------------------------------------------
+
+Eg we combine `Just False` and Nothing into the result
+tagged<tagged>.
+
+This might seem odd at a glance but is safe.
+
+Consider for example two constructors C1 and C2 as rhs
+in two branches alt1 and alt2.
+C1 having n1 fields, C2 having n2 fields, and
+n1 < n2.
+
+For the first n1 fields we combine the lattices of the
+results, which is safe. If they contradict each other
+we simply assume a safe value on the lattice (MayEnter).
+
+So this can not result in an error, and is in fact the same
+behaviour as when comparing two branches consisting of the same
+outermost constructor.
+
+Now for the fields n1+1 .. n2 we assign them the value from
+C2's branch. This is safe.
+
+* A branch not matching on any constructor can't bind any fields.
+  So this is trivially safe.
+* Any branch matching on C1 will only bind up to n1 arguments.
+  This means there is no chance of any of the values n1+1 ... n2
+  to be scrutinzed in this branch.
+* Any branch matching on C2 might bind the fields n+1 ... n2.
+  But this is also safe. 
+  + If there are other branches with as many defined fields we would
+    already have combined them to a safe element of the lattice.
+  + If alt2 is the only such branch then we will always scrutinize the
+    value created in this branch, so using the field results of alt for
+    n1+1 .. n2 is also safe.
+* Any other constellation can be again reduced to this case.
 
     Note [Recursive Functions]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -408,9 +449,11 @@ It is a tail call if it's none of the above and in a tail call position in
 
 
 bot :: EnterLattice
-bot = EnterLattice UndetEnterInfo LatUndet
+bot = EnterLattice UndetEnterInfo FieldsUndet
 top :: EnterLattice
-top = EnterLattice MaybeEnter LatUnknown
+top = EnterLattice MaybeEnter FieldsUnknown
+noValue :: EnterLattice
+noValue = EnterLattice NoValue FieldsNone
 
 -- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
@@ -423,35 +466,10 @@ data EnterInfo
 
 instance Outputable EnterInfo where
     ppr UndetEnterInfo  = char '?'
-    ppr NoValue        = text "noInfo"
+    ppr NoValue         = text "noInfo"
     ppr AlwaysEnter     = text "ent"
     ppr MaybeEnter      = char 'm'
     ppr NeverEnter      = char 't'
-
-
-
--- data SumInfo
---     = SumInfo !DataCon [EnterLattice]
---     -- ^ A sum type constructor application
---     deriving (Generic)
-
--- instance Eq SumInfo where
---     (==) (SumInfo c1 fs1) (SumInfo c2 fs2) =
---         c1 == c2 && fs1 == fs2
-
--- instance NFData SumInfo where
---     rnf (SumInfo _ fields) = rnf fields
-
--- instance Outputable SumInfo where
---     ppr (SumInfo con fields) = char '<' <> ppr con <> char '>' <> ppr fields
-
-data ProdInfo
-    = ProdInfo [EnterLattice]
-    deriving (Eq,Generic,NFData)
-
-instance Outputable ProdInfo where
-    ppr (ProdInfo fields) = text "p" <+> ppr fields
-
 
 {-  Note [Comparing Sums and Products]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -463,8 +481,8 @@ instance Outputable ProdInfo where
         True -> case x of prod -> Left prod
         False -> case y of sum -> Right sum
 
-    Then we will infer taggedness of ![!], being a tagged
-    result with the first field being tagged.
+    Then we will infer taggedness of ![!], which is a tagged
+    result with the first field also being tagged.
 
     However the first field will be a prod type in one and
     a sum type in the other case. But this does not concern
@@ -472,11 +490,10 @@ instance Outputable ProdInfo where
     don't have to match.
 
     We could go even further still and compare the fields of
-    `prod` and `sum` against each other. But while correct the
-    payoff is small and it's easy to get wrong so for now we
-    widen the fields of any product and sum type comparison
-    to the top of the latice.
+    `prod` and `sum` against each other. And we do!
 
+    See Note [The lattice element combinators] for details.
+    
 -}
 
 data EnterLattice = EnterLattice
@@ -485,51 +502,44 @@ data EnterLattice = EnterLattice
     }
     deriving (Eq, Generic, NFData)
 
+-- Side note: Nullary constructors are assigned FieldsNone.
+
 data FieldInfo
     -- | At most we can say something about the tag of the value itself.
     --   The fields are impossible to known.
-    = LatUnknown
+    = FieldsUnknown
 
-    -- | Direct tail recursion
-    | LatRec
+    -- | The associated value has up to (length fields) fields,
+    --   but can have less!
+    | FieldsUntyped [EnterLattice]
+
+    | FieldsProd [EnterLattice]
+    -- Constructor the fields came out of
+    | FieldsSum  !DataCon [EnterLattice]
+    
+    -- | Direct tail recursion, fields without arguments, the works.
+    | FieldsNone
 
     -- | We might find out more about the fields
-    | LatUndet
-
-    -- TODO: Fold these into FieldInfo directly.
-    | LatProd {-# UNPACK #-} !ProdInfo
-    | LatSum  !DataCon [EnterLattice]
+    | FieldsUndet
     deriving (Eq,Generic)
 
 instance NFData FieldInfo where
     rnf x = seq x ()
-
-
--- TODO: Is it worth using maybeEq in the instance?
--- instance Eq FieldInfo where
---     (==) lat1 lat2
---         | maybeEq lat1 lat2             = True
---     (==) (LatUndet o1)   (LatUndet o2)  = o1 == o2
---     (==) (LatUndet _ )   (_)            = False
---     (==) (LatRec o1)     (LatRec o2)    = o1 == o2
---     (==) (LatRec _ )     (_)            = False
---     (==) (LatProd o1 p1) (LatProd o2 p2)= o1 == o2 && p1 == p2
---     (==) (LatProd _  _ ) (_) = False
---     (==) (LatSum o1 s1)  (LatSum o2 s2) = o1 == o2 && s1 == s2
---     (==) (LatSum _  _ )  (_) = False
---     (==) (LatUnknown o1) (LatUnknown o2) = o1 == o2
---     (==) (LatUnknown _ ) (_) = False
 
 instance Outputable EnterLattice where
     ppr (EnterLattice enterInfo fieldInfo)
         = ppr enterInfo <> text " x " <> ppr fieldInfo
 
 instance Outputable FieldInfo where
-    ppr LatUnknown        = text "top"
-    ppr LatRec            = text "rec"
-    ppr LatUndet          = text "undet"
-    ppr (LatProd prodInfo)= ppr prodInfo
-    ppr (LatSum con fields)  = char '<' <> ppr con <> char '>' <> ppr fields
+    ppr FieldsUnknown           = text "top"
+    ppr (FieldsUntyped fields)  = text "any" <> ppr fields
+    ppr (FieldsProd fields)     = text "prod" <> ppr fields
+    ppr (FieldsSum con fields)  = text "sum" <> char '<' <> ppr con <> char '>' <> ppr fields
+    ppr FieldsNone              = text "none"
+    ppr FieldsUndet             = text "undet"
+
+
 
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterInfo MaybeEnter _           = MaybeEnter
@@ -543,15 +553,14 @@ combineEnterInfo AlwaysEnter NeverEnter = MaybeEnter
 combineEnterInfo AlwaysEnter AlwaysEnter= AlwaysEnter
 combineEnterInfo NeverEnter NeverEnter  = NeverEnter
 
-combineProdInfo :: ProdInfo -> ProdInfo -> ProdInfo
-combineProdInfo (ProdInfo fs1) (ProdInfo fs2)
-    = ProdInfo $ zipWithEqual "ProdInfo:combine" combineLattices fs1 fs2
+combineFieldsUntyped :: [EnterLattice] -> [EnterLattice] -> [EnterLattice]
+combineFieldsUntyped fields1 fields2 =
+    go fields1 fields2
+  where
+    go (x:xs) (y:ys) = combineLattices x y : go xs ys
+    go []     ys     = ys
+    go xs     []      = xs
 
--- combineSumInfo :: SumInfo -> SumInfo -> FieldInfo
--- combineSumInfo (SumInfo c1 fs1) (SumInfo c2 fs2)
---     | c1 /= c2  = LatUnknown
---     | otherwise = LatSum $! SumInfo c1 $
---                   zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
 
 combineLattices :: EnterLattice -> EnterLattice -> EnterLattice
 combineLattices x1 x2 | maybeEq x1 x2 || x1 == x2 = x1
@@ -559,24 +568,40 @@ combineLattices (EnterLattice ei1 fi1) (EnterLattice ei2 fi2)
     = EnterLattice (combineEnterInfo ei1 ei2) (combineFieldInfos fi1 fi2)
 
 combineFieldInfos :: FieldInfo -> FieldInfo -> FieldInfo
-combineFieldInfos (LatUnknown) _ = LatUnknown
-combineFieldInfos _ (LatUnknown) = LatUnknown
-combineFieldInfos LatRec x = x
-combineFieldInfos x LatRec = x
+combineFieldInfos (FieldsUnknown) _ = FieldsUnknown
+combineFieldInfos _ (FieldsUnknown) = FieldsUnknown
+combineFieldInfos FieldsNone x = x
+combineFieldInfos x FieldsNone = x
 -- Bot stays bot (unless compared against top)
-combineFieldInfos LatUndet _ = LatUndet
-combineFieldInfos _ LatUndet = LatUndet
+combineFieldInfos FieldsUndet _ = FieldsUndet
+combineFieldInfos _ FieldsUndet = FieldsUndet
 -- Top stays top
--- We currently do NOT combine results of different types
-combineFieldInfos (LatProd _) (LatSum _ _) = LatUnknown
-combineFieldInfos (LatSum _ _) (LatProd _) = LatUnknown
+-- We currently do combine results of different types
+combineFieldInfos (FieldsProd fs1) (FieldsSum _ fs2) = 
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+combineFieldInfos (FieldsSum _ fs1) (FieldsProd fs2) = 
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
 
-combineFieldInfos (LatSum c1 fs1)  (LatSum c2 fs2)
-    | c1 /= c2  = LatUnknown
-    | otherwise = LatSum c1 $
+combineFieldInfos (FieldsSum c1 fs1)  (FieldsSum c2 fs2)
+    | c1 /= c2  = FieldsUntyped $ combineFieldsUntyped fs1 fs2
+    | otherwise = FieldsSum c1 $
                   zipWithEqual "SumInfo:combine" combineLattices fs1 fs2
-combineFieldInfos (LatProd p1) (LatProd p2) =
-    LatProd (combineProdInfo p1 p2)
+combineFieldInfos (FieldsProd fs1) (FieldsProd fs2) =
+    FieldsProd $ zipWithEqual "ProdInfo:combine" combineLattices fs1 fs2
+
+-- untyped v untyped
+combineFieldInfos (FieldsUntyped fs1) (FieldsUntyped fs2) =
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+-- untyped v sum
+combineFieldInfos (FieldsSum _ fs1) (FieldsUntyped fs2) =
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+combineFieldInfos (FieldsUntyped fs1) (FieldsSum _ fs2) =
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+-- untyped v prod
+combineFieldInfos (FieldsProd fs1) (FieldsUntyped fs2) =
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
+combineFieldInfos (FieldsUntyped fs1) (FieldsProd fs2) =
+    FieldsUntyped $ combineFieldsUntyped fs1 fs2
 
 ------------------------------------------------------------
 --      Utility functions to deal with lattices           --
@@ -585,7 +610,7 @@ combineFieldInfos (LatProd p1) (LatProd p2) =
 
 -- Lattice when we know, and can only know, the outer layer.
 flatLattice :: EnterInfo -> EnterLattice
-flatLattice x = EnterLattice x LatUnknown
+flatLattice x = EnterLattice x FieldsUnknown
 
 setEnterInfo :: HasDebugCallStack => EnterLattice -> EnterInfo -> EnterLattice
 setEnterInfo lat@(EnterLattice enter fields) newEnter
@@ -599,11 +624,12 @@ setEnterInfo lat@(EnterLattice enter fields) newEnter
 indexField :: EnterLattice -> Int -> EnterLattice
 indexField lat n =
     case fieldInfo lat of
-        LatUndet -> bot
-        LatUnknown -> top
-        LatRec -> bot
-        LatSum  _ fields -> getField fields
-        LatProd (ProdInfo fields)  -> getField fields
+        FieldsUndet -> bot
+        FieldsUnknown -> top
+        FieldsNone -> noValue
+        FieldsSum  _ fields -> getField fields
+        FieldsProd fields   -> getField fields
+        FieldsUntyped fields -> getField fields
   where
     getField fields =
         case drop n fields of
@@ -620,32 +646,37 @@ hasTopFields :: EnterLattice -> Bool
 hasTopFields lat = areTopFields $ fieldInfo lat
 
 areTopFields :: FieldInfo -> Bool
-areTopFields (LatUnknown ) = True
-areTopFields (LatRec  )    = False
-areTopFields (LatUndet)    = False
-areTopFields (LatProd (ProdInfo fields))  = all isTopValue fields
-areTopFields (LatSum  _ fields) = all isTopValue fields
+areTopFields (FieldsUnknown ) = True
+areTopFields (FieldsNone  )    = False
+areTopFields (FieldsUndet)    = False
+areTopFields (FieldsProd fields)  = all isTopValue fields
+areTopFields (FieldsSum  _ fields) = all isTopValue fields
+areTopFields (FieldsUntyped fields) = all isTopValue fields
 
 isTopValue :: EnterLattice -> Bool
 isTopValue lat = enterInfo lat == MaybeEnter && hasTopFields lat
 
 nestingLevelOver :: EnterLattice -> Int -> Bool
 nestingLevelOver _ 0 = True
-nestingLevelOver (EnterLattice _ (LatProd (ProdInfo fields))) n
+nestingLevelOver (EnterLattice _ (FieldsProd fields)) n
     = any (`nestingLevelOver` (n-1)) fields
-nestingLevelOver (EnterLattice _  (LatSum  _ fields)) n
+nestingLevelOver (EnterLattice _  (FieldsSum  _ fields)) n
+    = any (`nestingLevelOver` (n-1)) fields
+nestingLevelOver (EnterLattice _  (FieldsUntyped fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
 capAtLevel :: Int -> EnterLattice -> EnterLattice
-capAtLevel _ l@(EnterLattice _ LatUnknown ) = l
-capAtLevel _ l@(EnterLattice _ LatRec     ) = l
-capAtLevel _ l@(EnterLattice _ LatUndet   ) = l
+capAtLevel _ l@(EnterLattice _ FieldsUnknown ) = l
+capAtLevel _ l@(EnterLattice _ FieldsNone     ) = l
+capAtLevel _ l@(EnterLattice _ FieldsUndet   ) = l
 capAtLevel 0 _ = top
-capAtLevel n (EnterLattice e (LatProd (ProdInfo fields))) =
-    EnterLattice e (LatProd (ProdInfo $ map (capAtLevel (n-1)) fields))
-capAtLevel n (EnterLattice e (LatSum c fields)) =
-    EnterLattice e (LatSum c $ map (capAtLevel (n-1)) fields)
+capAtLevel n (EnterLattice e (FieldsProd fields)) =
+    EnterLattice e (FieldsProd (map (capAtLevel (n-1)) fields))
+capAtLevel n (EnterLattice e (FieldsSum c fields)) =
+    EnterLattice e (FieldsSum c $ map (capAtLevel (n-1)) fields)
+capAtLevel n (EnterLattice e (FieldsUntyped fields)) =
+    EnterLattice e (FieldsUntyped $ map (capAtLevel (n-1)) fields)
 
 
 {-
@@ -974,8 +1005,9 @@ mkJoinNode inputs = do
 -- | Take a lattice argument per constructor argument to simplify things.
 mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
 mkOutConLattice con outer fields
-    | conCount == 1 = EnterLattice outer $ LatProd (ProdInfo out_fields)
-    | conCount > 1  = EnterLattice outer $ LatSum con out_fields
+    | null fields   = EnterLattice outer $ FieldsNone
+    | conCount == 1 = EnterLattice outer $ FieldsProd out_fields
+    | conCount > 1  = EnterLattice outer $ FieldsSum con out_fields
     | otherwise = panic "mkOutConLattice"
   where
     out_fields = mapStrictConArgs con (`setEnterInfo` NeverEnter) fields
@@ -1175,7 +1207,7 @@ addImportedNode this_mod id
                     -- Known Nullarry constructors are also never entered
                     | Just con <- (isDataConWorkId_maybe id)
                     , isNullaryRepDataCon con
-                    = (mkConstNode node_id (flatLattice NeverEnter))
+                    = (mkConstNode node_id (EnterLattice NeverEnter FieldsNone))
                                 `set_desc` (text "ext_nullCon" <-> ppr id)
 
                     -- General case, a potentially unevaluated imported id.
@@ -1355,7 +1387,7 @@ nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
-        let node = mkConstNode node_id (flatLattice NeverEnter)
+        let node = mkConstNode node_id (EnterLattice NeverEnter FieldsNone)
         markDone $ node `set_desc` (ppr binding <-> text "rhsConNullary")
         return $! (StgRhsCon (node_id,RhsCon) ccs con args)
   | otherwise = do
@@ -1477,7 +1509,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
                         , node_inputs = [body_id]
                         -- ^ We might infer things about nested fields once evaluated.
                         -- , node_done   = False
-                        , node_result = EnterLattice enterInfo LatUndet
+                        , node_result = EnterLattice enterInfo FieldsUndet
                         , node_update = node_update node_id body_id
 #if defined(WITH_NODE_DESC)
                         , _node_desc = node_desc
@@ -1946,7 +1978,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
         | isFun && (not isSat) = return $! top
 
         -- App in a direct self-recursive tail call context, returns nothing
-        | recTail = return $! EnterLattice NoValue LatRec
+        | recTail = return $! EnterLattice NoValue FieldsNone
 
         | NoMutRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
