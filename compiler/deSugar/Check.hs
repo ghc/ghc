@@ -28,6 +28,7 @@ import GhcPrelude
 import PmExpr
 import PmOracle
 import PmPpr
+import CoreUtils (exprType)
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -41,12 +42,13 @@ import TyCon
 import SrcLoc
 import Util
 import Outputable
-import FastString
+import FastString (FastString, unpackFS)
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
-import BasicTypes (Boxity(..))
+import BasicTypes (Boxity(..), SourceText)
 
+import {-# SOURCE #-} DsExpr (dsExpr)
 import DsMonad
 import Bag
 import TyCoRep
@@ -655,10 +657,8 @@ translateGuards fam_insts guards = do
       | PmCon {} <- p = (&&)
                           <$> singleMatchConstructor (pm_con_con p) (pm_con_arg_tys p)
                           <*> allM shouldKeep (pm_con_args p)
-    shouldKeep (PmGrd pv e)
-      | isNotPmExprOther e = pure True  -- expensive but we want it
-      | otherwise          = allM shouldKeep pv
-    shouldKeep _other_pat  = pure False -- let the rest..
+    shouldKeep (PmGrd pv _) = allM shouldKeep pv
+    shouldKeep _other_pat   = pure False -- let the rest..
 
   all_handled <- allM shouldKeep all_guards
   -- It should have been @pure all_guards@ but it is too expressive.
@@ -713,6 +713,92 @@ translateBoolGuard e
     -- but it is trivial to solve so instead we give back an empty
     -- PatVec for efficiency
   | otherwise = (:[]) <$> mkGuard [truePattern] (unLoc e)
+
+lhsExprToPmExpr :: LHsExpr GhcTc -> PmM PmExpr
+lhsExprToPmExpr (dL->L _ e) = hsExprToPmExpr e
+
+hsExprToPmExpr :: HsExpr GhcTc -> PmM PmExpr
+
+-- Translating HsConLikeOut to a flexible meta variable is misleading.
+-- For an example why, consider `consAreRigid` in
+-- `testsuite/tests/pmcheck/should_compile/PmExprVars.hs`.
+-- hsExprToPmExpr (HsConLikeOut _ c) = PmExprVar (conLikeName c)
+
+-- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
+hsExprToPmExpr (HsOverLit _ olit)
+  | Just lit <- hsOverLitAsHsLit olit False (overLitType olit)
+  = hsExprToPmExpr (HsLit noExtField lit)
+  | otherwise
+  = pure $ PmExprCon (PmAltLit (PmOLit False olit)) []
+hsExprToPmExpr (HsLit     _ lit)
+  | HsString src s <- lit
+  = pure $ stringExprToList src s
+  | otherwise = pure $ PmExprCon (PmAltLit (PmSLit lit)) []
+
+hsExprToPmExpr e@(NegApp _ (dL->L _ neg_expr) _) =
+  hsExprToPmExpr neg_expr >>= \case
+    PmExprCon (PmAltLit (PmOLit False olit)) _ ->
+      -- NB: DON'T simply @(NegApp (NegApp olit))@ as @x@. when extension
+      -- @RebindableSyntax@ enabled, (-(-x)) may not equals to x.
+      pure $ PmExprCon (PmAltLit (PmOLit True olit)) []
+    _ -> mkFreshPmExprVarRepresenting e
+
+hsExprToPmExpr (HsPar _ (dL->L _ e)) = hsExprToPmExpr e
+
+hsExprToPmExpr e@(ExplicitTuple _ ps boxity)
+  | all tupArgPresent ps = mkPmExprData tuple_con <$> mapMaybeM tuple_arg ps
+  | otherwise            = mkFreshPmExprVarRepresenting e
+  where
+    tuple_con = tupleDataCon boxity (length ps)
+    tuple_arg (dL->L _ (Present _ e)) = Just <$> lhsExprToPmExpr e
+    tuple_arg _                       = pure Nothing
+
+hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
+  | Nothing <- mb_ol = foldr cons nil <$> traverse lhsExprToPmExpr elems
+  | otherwise        = mkFreshPmExprVarRepresenting e {- overloaded list: No PmExprApp -}
+  where
+    cons x xs = mkPmExprData consDataCon [x,xs]
+    nil       = mkPmExprData nilDataCon  []
+
+hsExprToPmExpr (RecordCon   _ c binds) = do
+  con  <- dsLookupDataCon (idName (unLoc c))
+  args <- mapM lhsExprToPmExpr (hsRecFieldsArgs binds)
+  return (mkPmExprData con args)
+
+hsExprToPmExpr (HsTick           _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsBinTick      _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsTickPragma _ _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsSCC          _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (HsCoreAnn      _ _ _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (ExprWithTySig    _ e _) = lhsExprToPmExpr e
+hsExprToPmExpr (HsWrap           _ w e)
+  -- A dictionary application spoils e and we have no choice but to return an
+  -- PmExprOther. Same thing for other stuff that can't erased in the
+  -- compilation process. Otherwise this bites in
+  -- teststuite/tests/pmcheck/should_compile/PmExprVars.hs.
+  | isErasableHsWrapper w = hsExprToPmExpr e
+hsExprToPmExpr e = mkFreshPmExprVarRepresenting e -- the rest are not handled by the oracle
+
+stringExprToList :: SourceText -> FastString -> PmExpr
+stringExprToList src s = foldr cons nil (map charToPmExpr (unpackFS s))
+  where
+    cons x xs      = mkPmExprData consDataCon [x,xs]
+    nil            = mkPmExprData nilDataCon  []
+    charToPmExpr c = PmExprCon (PmAltLit (PmSLit (HsChar src c))) []
+
+mkFreshPmExprVarRepresenting :: HsExpr GhcTc -> PmM PmExpr
+mkFreshPmExprVarRepresenting hs_expr = do
+  -- We currently have now mechanism of proving equivalence of two HsExprs, so
+  -- generate a fresh representative each time. This is morally wrong, but
+  -- is the conservative thing to do.
+  -- We have to go through Core because we need the type. Might be useful later
+  -- on, since we have infrastructure for deciding alpha equivalence of Core
+  -- terms.
+  core_expr <- dsExpr hs_expr
+  PmExprVar <$> mkPmId (exprType core_expr)
+
+mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
+mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 
 {- Note [Guards and Approximation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -865,11 +951,9 @@ the paper. This Note serves as a reference for these new features.
 mkGuard :: PatVec -> HsExpr GhcTc -> PmM PmPat
 mkGuard pv e = do
   res <- allM cantFailPattern pv
-  let expr = hsExprToPmExpr e
+  expr <- hsExprToPmExpr e
   tracePm "mkGuard" (vcat [ppr pv, ppr e, ppr res, ppr expr])
-  if | res                    -> pure (PmGrd pv expr)
-     | PmExprOther {} <- expr -> pure PmFake
-     | otherwise              -> pure (PmGrd pv expr)
+  pure (PmGrd pv expr)
 
 -- | Generate a variable pattern of a given type
 mkPmVar :: Type -> PmM PmPat
@@ -1084,10 +1168,7 @@ runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
 pmcheckI :: PatVec -> ValVec -> Delta -> PmM PartialResult
 pmcheckI ps vva delta = do
   n <- incrCheckPmIterDs
-  tracePm "pmCheck" (ppr n <> colon
-                        $$ hang (text "patterns:") 2 (ppr ps)
-                        $$ ppr vva
-                        $$ ppr delta)
+  tracePm "pmCheck" (hang (ppr n <> colon) 2 $ vcat [ppr ps, ppr vva, ppr delta])
   res <- pmcheck ps vva delta
   tracePm "pmCheckResult:" (ppr res)
   return res
@@ -1226,7 +1307,7 @@ genCaseTmCs2 Nothing _ _ = return emptyBag
 genCaseTmCs2 (Just scr) [p] [var] = do
   fam_insts <- dsGetFamInstEnvs
   [e] <- patVecToPmExprs <$> translatePat fam_insts p
-  let scr_e = lhsExprToPmExpr scr
+  scr_e <- lhsExprToPmExpr scr
   return $ listToBag [(TVC var e), (TVC var scr_e)]
 genCaseTmCs2 _ _ _ = panic "genCaseTmCs2: HsCase"
 
@@ -1234,9 +1315,11 @@ genCaseTmCs2 _ _ _ = panic "genCaseTmCs2: HsCase"
 --     case x of { matches }
 -- When checking matches we record that (x ~ y) where y is the initial
 -- uncovered. All matches will have to satisfy this equality.
-genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> Bag TmVarCt
-genCaseTmCs1 Nothing     _    = emptyBag
-genCaseTmCs1 (Just scr) [var] = unitBag (TVC var (lhsExprToPmExpr scr))
+genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM (Bag TmVarCt)
+genCaseTmCs1 Nothing     _    = return emptyBag
+genCaseTmCs1 (Just scr) [var] = do
+  scr_e <- lhsExprToPmExpr scr
+  return $ unitBag (TVC var scr_e)
 genCaseTmCs1 _ _              = panic "genCaseTmCs1: HsCase"
 
 {- Note [Literals in PmPat]

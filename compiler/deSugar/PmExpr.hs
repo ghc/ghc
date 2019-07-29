@@ -6,13 +6,11 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmExprFVs, pmLitType,
-        pmAltConType, pmAltConArity, isNotPmExprOther, hsOverLitAsHsLit,
-        lhsExprToPmExpr, hsExprToPmExpr, mkPmExprLit, decEqPmAltCon,
-        PmExprList(..), pmExprAsList
+        pmAltConType, pmAltConArity, hsOverLitAsHsLit, mkPmExprLit,
+        decEqPmAltCon, PmExprList(..), pmExprAsList
     ) where
 
 #include "HsVersions.h"
@@ -20,19 +18,16 @@ module PmExpr (
 import GhcPrelude
 
 import Util
-import BasicTypes (SourceText, IntegralLit(..), negateIntegralLit)
-import FastString (FastString, unpackFS)
+import BasicTypes (IntegralLit(..), negateIntegralLit)
 import HsSyn
 import Id
 import VarSet
 import DataCon
 import ConLike
-import TcEvidence (isErasableHsWrapper)
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
 import TcHsSyn (hsLitType)
 import TysWiredIn
 import Outputable
-import SrcLoc
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 {-
@@ -43,23 +38,12 @@ import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 %************************************************************************
 -}
 
-{- Note [PmExprOther in PmExpr]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Since there is no plan to extend the (currently pretty naive) term oracle in
-the near future, instead of playing with the verbose (HsExpr Id), we lift it to
-PmExpr. All expressions the term oracle does not handle are wrapped by the
-constructor PmExprOther. Note that we do not perform substitution in
-PmExprOther. Because of this, we do not even print PmExprOther, since they may
-refer to variables that are otherwise substituted away.
--}
-
 -- ----------------------------------------------------------------------------
 -- ** Types
 
 -- | Lifted expressions for pattern match checking.
 data PmExpr = PmExprVar   Id
             | PmExprCon   PmAltCon [PmExpr]
-            | PmExprOther (HsExpr GhcTc)  -- Note [PmExprOther in PmExpr]
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -87,7 +71,6 @@ instance Eq PmLit where
 pmExprFVs :: PmExpr -> IdSet
 pmExprFVs (PmExprVar x)      = unitVarSet x
 pmExprFVs (PmExprCon _ args) = unionVarSets (map pmExprFVs args)
-pmExprFVs (PmExprOther _)    = emptyVarSet
 
 -- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
@@ -143,9 +126,6 @@ instance Eq PmAltCon where
 pmAltConArity :: PmAltCon -> Int
 pmAltConArity (PmAltConLike con) = conLikeArity con
 pmAltConArity (PmAltLit _)       = 0
-
-mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
-mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 
 mkPmExprLit :: PmLit -> PmExpr
 mkPmExprLit l = PmExprCon (PmAltLit l) []
@@ -216,11 +196,6 @@ instance Outputable TmVarCt where
 
 -- ----------------------------------------------------------------------------
 -- ** Predicates on PmExpr
-
--- | Check if an expression is lifted or not
-isNotPmExprOther :: PmExpr -> Bool
-isNotPmExprOther (PmExprOther _) = False
-isNotPmExprOther _expr           = True
 
 -- -----------------------------------------------------------------------
 -- ** Lift source expressions (HsExpr Id) to PmExpr
@@ -315,90 +290,6 @@ consistently and try to turn them into plain literals as often as possible:
             "baz" -> putStrLn "C"
 -}
 
-lhsExprToPmExpr :: LHsExpr GhcTc -> PmExpr
-lhsExprToPmExpr (dL->L _ e) = hsExprToPmExpr e
-
-hsExprToPmExpr :: HsExpr GhcTc -> PmExpr
-
--- Translating HsVar to flexible meta variables in the unification problem is
--- morally wrong, but it does the right thing for now.
--- In contrast to the situation in pattern matches, HsVars in expression syntax
--- are object language variables, most similar to rigid variables with an
--- unknown solution. The correct way would be to handle them through PmExprOther
--- and identify syntactically equal occurrences by the same rigid meta variable,
--- but we can't compare the wrapped HsExpr for equality. Hence we are stuck with
--- this hack.
-hsExprToPmExpr (HsVar        _ x) = PmExprVar (unLoc x)
-
--- Translating HsConLikeOut to a flexible meta variable is misleading.
--- For an example why, consider `consAreRigid` in
--- `testsuite/tests/pmcheck/should_compile/PmExprVars.hs`.
--- hsExprToPmExpr (HsConLikeOut _ c) = PmExprVar (conLikeName c)
-
--- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-hsExprToPmExpr (HsOverLit _ olit)
-  | Just lit <- hsOverLitAsHsLit olit False (overLitType olit)
-  = hsExprToPmExpr (HsLit noExtField lit)
-  | otherwise
-  = PmExprCon (PmAltLit (PmOLit False olit)) []
-hsExprToPmExpr (HsLit     _ lit)
-  | HsString src s <- lit
-  = stringExprToList src s
-  | otherwise = PmExprCon (PmAltLit (PmSLit lit)) []
-
-hsExprToPmExpr e@(NegApp _ (dL->L _ neg_expr) _)
-  | PmExprCon (PmAltLit (PmOLit False olit)) _ <- hsExprToPmExpr neg_expr
-    -- NB: DON'T simply @(NegApp (NegApp olit))@ as @x@. when extension
-    -- @RebindableSyntax@ enabled, (-(-x)) may not equals to x.
-  = PmExprCon (PmAltLit (PmOLit True olit)) []
-  | otherwise = PmExprOther e
-
-hsExprToPmExpr (HsPar _ (dL->L _ e)) = hsExprToPmExpr e
-
-hsExprToPmExpr e@(ExplicitTuple _ ps boxity)
-  | all tupArgPresent ps = mkPmExprData tuple_con tuple_args
-  | otherwise            = PmExprOther e
-  where
-    tuple_con  = tupleDataCon boxity (length ps)
-    tuple_args = [ lhsExprToPmExpr e | (dL->L _ (Present _ e)) <- ps ]
-
-hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
-  | Nothing <- mb_ol = foldr cons nil (map lhsExprToPmExpr elems)
-  | otherwise        = PmExprOther e {- overloaded list: No PmExprApp -}
-  where
-    cons x xs = mkPmExprData consDataCon [x,xs]
-    nil       = mkPmExprData nilDataCon  []
-
--- we want this but we would have to make everything monadic :/
--- ./compiler/deSugar/DsMonad.hs:397:dsLookupDataCon :: Name -> DsM DataCon
---
--- hsExprToPmExpr (RecordCon   c _ binds) = do
---   con  <- dsLookupDataCon (unLoc c)
---   args <- mapM lhsExprToPmExpr (hsRecFieldsArgs binds)
---   return (PmExprCon con args)
-hsExprToPmExpr e@(RecordCon {}) = PmExprOther e
-
-hsExprToPmExpr (HsTick           _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsBinTick      _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsTickPragma _ _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsSCC          _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (HsCoreAnn      _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (ExprWithTySig    _ e _) = lhsExprToPmExpr e
-hsExprToPmExpr (HsWrap           _ w e)
-  -- A dictionary application spoils e and we have no choice but to return an
-  -- PmExprOther. Same thing for other stuff that can't erased in the
-  -- compilation process. Otherwise this bites in
-  -- teststuite/tests/pmcheck/should_compile/PmExprVars.hs.
-  | isErasableHsWrapper w = hsExprToPmExpr e
-hsExprToPmExpr e = PmExprOther e -- the rest are not handled by the oracle
-
-stringExprToList :: SourceText -> FastString -> PmExpr
-stringExprToList src s = foldr cons nil (map charToPmExpr (unpackFS s))
-  where
-    cons x xs      = mkPmExprData consDataCon [x,xs]
-    nil            = mkPmExprData nilDataCon  []
-    charToPmExpr c = PmExprCon (PmAltLit (PmSLit (HsChar src c))) []
-
 -- | Return @Just@ a 'DataCon' application or @Nothing@, otherwise.
 pmExprToDataConApp :: PmExpr -> Maybe (DataCon, [PmExpr])
 pmExprToDataConApp (PmExprCon (PmAltConLike (RealDataCon c)) es) = Just (c, es)
@@ -452,7 +343,6 @@ instance Outputable PmExpr where
   ppr = go (0 :: Int)
     where
       go _    (PmExprVar v) = ppr v
-      go _    (PmExprOther e) = angleBrackets (ppr e)
       go _    (pmExprAsList -> Just pm_expr_list) = case pm_expr_list of
         NilTerminated list
           | Just lits <- as_string list
@@ -465,7 +355,10 @@ instance Outputable PmExpr where
           | otherwise
           -> parens $ fcat $ punctuate colon $ map ppr (toList pref) ++ [ppr x]
       go _    (pmExprToDataConApp -> Just (dc, args))
-        | isTupleDataCon dc = parens $ fsep $ punctuate comma $ map ppr args
+        | isUnboxedTupleCon dc
+        = text "(#" <+> (fsep $ punctuate comma $ map ppr args) <+> text "#)"
+        | isTupleDataCon dc
+        = parens $ fsep $ punctuate comma $ map ppr args
       go prec (PmExprCon cl args)
         = cparen (notNull args && prec > 0) (hsep (ppr cl:map (go 1) args))
 
