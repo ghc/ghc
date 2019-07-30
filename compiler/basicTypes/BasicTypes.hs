@@ -248,7 +248,7 @@ instance Outputable Alignment where
 data OneShotInfo
   = NoOneShotInfo -- ^ No information
   | OneShotLam    -- ^ The lambda is applied at most once.
-  deriving (Eq)
+  deriving (Eq,Enum,Bounded)
 
 -- | It is always safe to assume that an 'Id' has no lambda-bound variable information
 noOneShotInfo :: OneShotInfo
@@ -508,7 +508,7 @@ instance Outputable LexicalFixity where
 
 data TopLevelFlag
   = TopLevel
-  | NotTopLevel
+  | NotTopLevel deriving (Eq,Enum,Bounded)
 
 isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
 
