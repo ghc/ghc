@@ -72,6 +72,7 @@ module FastString
         consFS,
         nilFS,
         isUnderscoreFS,
+        isPrefixOfFS,
 
         -- ** Outputing
         hPutFS,
@@ -584,6 +585,9 @@ tailFS (FastString _ _ bs _) =
     inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
     do let (_, n) = utf8DecodeChar (castPtr ptr)
        return $! mkFastStringByteString (BS.drop n bs)
+
+isPrefixOfFS :: FastString -> FastString -> Bool
+isPrefixOfFS pre fs = BS.isPrefixOf (fs_bs pre) (fs_bs fs)
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
