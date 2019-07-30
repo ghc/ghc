@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
@@ -109,7 +110,8 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 ************************************************************************
 -}
 
-outputC :: DynFlags
+outputC :: forall a.
+           DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
         -> [InstalledUnitId]

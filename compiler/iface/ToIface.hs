@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
--- | Functions for converting Core things to interface file things.
+-- | Functions for converting (mostly core) things to interface file things.
 module ToIface
     ( -- * Binders
       toIfaceTvBndr
@@ -40,6 +42,8 @@ module ToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Information from and for the code generator.
+    , toIfLFInfo
     ) where
 
 #include "HsVersions.h"
@@ -51,6 +55,7 @@ import DataCon
 import Id
 import IdInfo
 import CoreSyn
+import CgTypes
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
@@ -72,6 +77,10 @@ import TyCoTidy ( tidyCo )
 import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
+
+import Data.Bits
+import Data.Word
+-- import PackedFlags
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
@@ -655,3 +664,46 @@ is that these NOINLINE'd functions now can't be profitably inlined
 outside of the hs-boot loop.
 
 -}
+
+{-
+************************************************************************
+*                                                                      *
+                        Code generation info.
+*                                                                      *
+************************************************************************
+-}
+
+toIfStandardFormInfo :: StandardFormInfo -> IfStandardFormInfo
+toIfStandardFormInfo (NonStandardThunk) = IfStandardFormInfo 1
+toIfStandardFormInfo sf =
+    IfStandardFormInfo $!
+      (tag sf) .|. (encodeField (field sf))
+  where tag (SelectorThunk {})  = 0
+        tag (ApThunk {})        = 2 -- == setBit 0 1
+        tag _ = panic "Impossible"
+        field (SelectorThunk n) = n
+        field (ApThunk n)       = n
+        field _ = panic "Impossible"
+        encodeField n =
+          let !wn = fromIntegral n :: Word
+              !shifted = wn `unsafeShiftL` 2
+          in ASSERT(shifted > 0 && shifted < fromIntegral (maxBound :: Word16))
+             (fromIntegral shifted :: Word16)
+
+
+toIfLFInfo :: LambdaFormInfo -> IfLFInfo
+toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
+    -- ASSERT(rep <= (2 ^ (14 :: Int) - 1) && fromEnum oneshot <= 1 && fromEnum fvs <= 1)
+    -- let rep' = fromIntegral rep :: SizedInt 14
+    -- in
+     ILFReEntrant oneshot rep fvs_flag
+
+toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
+    ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
+    ILFThunk (hasfv, updateable, m_function) (toIfStandardFormInfo sfi)
+
+toIfLFInfo (LFUnlifted) = ILFUnlifted
+toIfLFInfo (LFCon con) = ILFCon (dataConName con)
+-- All other cases are not possible at the top level.
+toIfLFInfo lf = pprPanic "Invalid IfLFInfo conversion:"
+                (ppr lf <+> text "should not be exported")
