@@ -2787,17 +2787,6 @@ tcPatSig in_pat_bind sig res_ty
                 -- than in the renamer
         { when in_pat_bind (addErr (patBindSigErr sig_tvs))
 
-                -- Check that all newly-in-scope tyvars are in fact
-                -- constrained by the pattern.  This catches tiresome
-                -- cases like
-                --      type T a = Int
-                --      f :: Int -> Int
-                --      f (x :: T a) = ...
-                -- Here 'a' doesn't get a binding.  Sigh
-        ; let bad_tvs = filterOut (`elemVarSet` exactTyCoVarsOfType sig_ty)
-                                  (tyCoVarsOfTypeList sig_ty)
-        ; checkTc (null bad_tvs) (badPatTyVarTvs sig_ty bad_tvs)
-
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
                   tcSubTypeET PatSigOrigin PatSigCtxt res_ty sig_ty
@@ -2999,23 +2988,6 @@ promotionErr name err
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
                _ -> text "it is defined and used in the same recursive group"
-
-{-
-************************************************************************
-*                                                                      *
-                Scoped type variables
-*                                                                      *
-************************************************************************
--}
-
-badPatTyVarTvs :: TcType -> [TyVar] -> SDoc
-badPatTyVarTvs sig_ty bad_tvs
-  = vcat [ fsep [text "The type variable" <> plural bad_tvs,
-                 quotes (pprWithCommas ppr bad_tvs),
-                 text "should be bound by the pattern signature" <+> quotes (ppr sig_ty),
-                 text "but are actually discarded by a type synonym" ]
-         , text "To fix this, expand the type synonym"
-         , text "[Note: I hope to lift this restriction in due course]" ]
 
 {-
 ************************************************************************
