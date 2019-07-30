@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -9,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToCmm ( codeGen ) where
+module GHC.StgToCmm ( codeGen, CgIfaceInfo ) where
 
 #include "HsVersions.h"
 
@@ -25,6 +26,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.CgTypes ( exportLF )
 
 import Cmm
 import CmmUtils
@@ -37,6 +39,7 @@ import ErrUtils
 import HscTypes
 import CostCentre
 import Id
+import Name
 import IdInfo
 import RepType
 import DataCon
@@ -46,11 +49,13 @@ import Outputable
 import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
+import UniqFM
 
 import OrdList
 import MkGraph
 
 import Data.IORef
+import Data.Maybe
 import Control.Monad (when,void)
 import Util
 
@@ -60,20 +65,22 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> CgIfaceInfo
+        -> Stream IO CmmGroup [(Name,LambdaFormInfo)]
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
-        cost_centre_info stg_binds hpc_info
+        cost_centre_info stg_binds hpc_info m_lf_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
-        ; cgref <- liftIO $ newIORef =<< initC
+        ; cgref <- liftIO $ newIORef =<< initC :: Stream IO b (IORef CgState)
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
                 cmm <- liftIO . withTimingSilent (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
-                         let (a,st') = runC dflags this_mod st (getCmm fcode)
+                         let (a,st') = runC dflags this_mod st m_lf_info (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
@@ -90,6 +97,7 @@ codeGen dflags this_mod data_tycons
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
 
+        ; !st <- liftIO $ readIORef cgref
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -102,7 +110,50 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+        -- See Note [CodeGenerator EPS <<loop>>] for info about why we are so
+        -- strict here.
+
+        -- Only external names are actually visible to codeGen.
+        -- So they are the only ones we care about. `exportLF` filters
+        -- a few more we can recompute easily via their types.
+        ; let extractInfo info
+                | not (isExternalName name)
+                = Nothing
+                | not (exportLF lf)
+                = Nothing
+                | isTypeableBindOcc (occName name)
+                = Nothing
+                | otherwise
+                = lf `seq` Just (name,lf)
+                where
+                  id = cg_id info
+                  !name = idName id
+                  lf = cg_lf info
+        ; let generatedInfo = mapMaybe extractInfo $ eltsUFM $ cgs_binds st
+
+        ; return $! seqList generatedInfo generatedInfo
         }
+
+{-  Note [CodeGenerator EPS <<loop>>]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The code generator will produce a [LambdaFormInfo] containing
+information about top level bindings.
+This information will eventually end up in the EPS and interface
+files. However we have to be careful.
+It's possible for a LambdaFormInfo to contain thunks which depend on
+the EPS in non-obvious ways. The EPS in turn will depend on
+the LambdaForm tying the knot. However in practice this sometimes caused
+<<loop>> in very non-obvious way involving different parts of the compiler
+all doing knot tying.
+
+Instead of dealing with this we use a simpler approach. All LambdaFormInfos
+have all their fields evaluated to WHNF when returned from the code generator.
+
+This does not cause additional work. Eventually this information will be
+serialized into interface files and there at the latest it will be forced.
+
+-}
 
 ---------------------------------------------------------------
 --      Top-level bindings
@@ -141,7 +192,7 @@ cgTopBinding dflags (StgTopStringLit id str)
         ; addBindC (litIdInfo dflags id mkLFStringLit lit)
         }
 
-cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
+cgTopRhs :: HasDebugCallStack => DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
 cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
