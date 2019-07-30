@@ -38,7 +38,8 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
                                  tcIfaceFamInst,
-                                 tcIfaceAnnotations, tcIfaceCompleteSigs )
+                                 tcIfaceAnnotations, tcIfaceCompleteSigs,
+                                 tcCodeGenInfos )
 
 import DynFlags
 import IfaceSyn
@@ -465,6 +466,7 @@ loadInterface doc_str mod from
         --     If we do loadExport first the wrong info gets into the cache (unless we
         --      explicitly tag each export which seems a bit of a bore)
 
+
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
@@ -472,13 +474,20 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; new_eps_cg_info_env <- tcCodeGenInfos (fromMaybe [] $ mi_lf_info $ mi_final_exts iface)
 
+
+        ; let { final_ext = (mi_final_exts iface) {
+                                mi_lf_info   = panic "No mi_lf_info in PIT"
+                            } :: ModIfaceBackend
+               }
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",
                                 mi_insts     = panic "No mi_insts in PIT",
                                 mi_fam_insts = panic "No mi_fam_insts in PIT",
                                 mi_rules     = panic "No mi_rules in PIT",
-                                mi_anns      = panic "No mi_anns in PIT"
+                                mi_anns      = panic "No mi_anns in PIT",
+                                mi_final_exts = final_ext
                               }
                }
 
@@ -520,6 +529,10 @@ loadInterface doc_str mod from
                                      extendModuleEnv (eps_mod_fam_inst_env eps)
                                                      mod
                                                      fam_inst_env,
+                  eps_cg_info_env  = extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env,
+
+
+                  -- TODO: Stats
                   eps_stats        = addEpsInStats (eps_stats eps)
                                                    (length new_eps_decls)
                                                    (length new_eps_insts)
@@ -1025,6 +1038,7 @@ initExternalPackageState
                            = emptyModuleEnv,
       eps_complete_matches = emptyUFM,
       eps_ann_env          = emptyAnnEnv,
+      eps_cg_info_env      = mempty,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
                            , n_rules_in = length builtinRules, n_rules_out = 0 }
@@ -1156,6 +1170,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
+        , text "lf infos:" $$ nest 2 (ppr (mi_lf_info $ mi_final_exts iface))
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"

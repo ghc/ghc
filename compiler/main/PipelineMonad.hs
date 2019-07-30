@@ -40,6 +40,8 @@ instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
 data PhasePlus = RealPhase Phase
+               -- | We finished all core related compilation.
+               -- But we might still need to run codeGen or write .o/.hi files.
                | HscOut HscSource ModuleName HscStatus
 
 instance Outputable PhasePlus where
