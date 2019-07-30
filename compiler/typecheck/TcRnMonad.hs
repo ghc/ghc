@@ -927,7 +927,7 @@ addMessages :: Messages -> TcRn ()
 addMessages msgs1
   = do { errs_var <- getErrsVar ;
          msgs0 <- readTcRef errs_var ;
-         writeTcRef errs_var (unionMessages msgs0 msgs1) }
+         writeTcRef' errs_var (unionMessages msgs0 msgs1) }
 
 discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
@@ -987,7 +987,7 @@ reportWarning reason err
        ; traceTc "Adding warning:" (pprLocErrMsg warn)
        ; errs_var <- getErrsVar
        ; (warns, errs) <- readTcRef errs_var
-       ; writeTcRef errs_var (warns `snocBag` warn, errs) }
+       ; writeTcRef' errs_var (warns `snocBag` warn, errs) }
 
 
 -----------------------
@@ -1545,7 +1545,7 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
   = do { traceTc "addTcEvBind" $ ppr u $$
                                  ppr ev_bind
        ; bnds <- readTcRef ev_ref
-       ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
+       ; writeTcRef' ev_ref (extendEvBinds bnds ev_bind) }
 addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
   = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
 
