@@ -775,10 +775,10 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
     go ty_a ty_e
       | is_bottom_forall_type ty_a
-      = do { (in_wrap, TyVarTy tv) <- topInstantiate inst_orig ty_a
-           ; dflags <- getDynFlags
+      = do { dflags <- getDynFlags
            ; if xopt LangExt.ImpredicativeTypes dflags
-                then do { uQuickLookTryFillPoly inst_orig tv ty_e
+                then do { (in_wrap, TyVarTy tv) <- topInstantiate inst_orig ty_a
+                        ; uQuickLookTryFillPoly inst_orig tv ty_e
                         ; return in_wrap }
                 else poly_actual ty_a ty_e }
 
@@ -2271,8 +2271,8 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 -- Check whether
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
-occCheckForErrors _dflags tv ty
-  = case preCheck True True tv ty of
+occCheckForErrors dflags tv ty
+  = case preCheck True (xopt LangExt.ImpredicativeTypes dflags) tv ty of
       MTVU_OK _   -> MTVU_OK ()
       MTVU_Bad    -> MTVU_Bad
       MTVU_Occurs -> case occCheckExpand [tv] ty of
