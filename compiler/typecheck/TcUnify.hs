@@ -853,23 +853,26 @@ tcQuickLookSubtype lvl ty1 ty2
   | Just ty2' <- tcView ty2
   = tcQuickLookSubtype lvl ty1 ty2'
   | tcIsGuardedType ty1
-  = case tcPartialUnifyTyKis bind_flag [ty1] [ty2] of
-      Just subst -> return subst
-      Nothing    -> return emptyTCvSubst
+  = do { traceTc "tcQuickLookSubtype/mono" (vcat [ppr ty1, ppr ty2])
+       ; case tcPartialUnifyTyKis bind_flag [ty1] [ty2] of
+           Just subst -> return subst
+           Nothing    -> return emptyTCvSubst }
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
-  = case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
-      Nothing -> tcQuickLookSubtype lvl res1 res2
-      Just subst1
-        -> let res1' = substTyAddInScope subst1 res1
-               res2' = substTyAddInScope subst1 res2
-           in flip composeTCvSubst subst1 <$> tcQuickLookSubtype lvl res1' res2'
+  = do { traceTc "tcQuickLookSubtype/arrow-arrow" (vcat [ppr ty1, ppr ty2])
+       ; case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
+           Nothing -> tcQuickLookSubtype lvl res1 res2
+           Just subst1
+             -> let res1' = substTyAddInScope subst1 res1
+                    res2' = substTyAddInScope subst1 res2
+                in flip composeTCvSubst subst1 <$> tcQuickLookSubtype lvl res1' res2' }
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , TyVarTy tv2 <- ty2, isTouchableMetaTyVar lvl tv2
-  = do { beta <- newFlexiTyVarTy (tcTypeKind res1)
+  = do { traceTc "tcQuickLookSubtype/arrow-var" (vcat [ppr ty1, ppr ty2])
+       ; beta <- newFlexiTyVarTy (tcTypeKind res1)
        ; let new_fun_ty  = mkVisFunTy arg1 beta
              small_subst = zipTvSubst [tv2] [new_fun_ty]
-             ty1' = substTyAddInScope small_subst ty1'
+             ty1' = substTyAddInScope small_subst ty1
        ; subst' <- tcQuickLookSubtype lvl ty1' new_fun_ty
        ; return (composeTCvSubst subst' small_subst) }
   | otherwise
