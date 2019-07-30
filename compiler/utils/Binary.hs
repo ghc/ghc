@@ -6,6 +6,12 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
 
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -77,6 +83,7 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
+-- import Util (log2Word)
 
 import Foreign
 import Data.Array
@@ -141,6 +148,28 @@ newtype Bin a = BinPtr Int
 
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
+
+---------------------------------------------------------------
+-- Helper instances/classes
+---------------------------------------------------------------
+
+-- newtype BoundedEnumBinary a = BoundedEnumBinary a
+
+-- instance forall a. (Bounded a, Enum a) => Binary (BoundedEnumBinary a) where
+--     put_ bh (BoundedEnumBinary x)
+--       | maxSize <= 127
+--       = putByte bh $ fromIntegral (fromEnum x)
+--       | otherwise
+--       = put_ bh (fromEnum x)
+--       where
+--         maxSize = fromEnum (maxBound :: a) :: Int
+--     get  bh
+--       | maxSize <= 127
+--       = BoundedEnumBinary . toEnum . fromIntegral <$> getByte bh
+--       | otherwise
+--       = BoundedEnumBinary . toEnum <$> get bh
+--       where
+--         maxSize = fromEnum (maxBound :: a) :: Int
 
 ---------------------------------------------------------------
 -- class Binary
@@ -1420,3 +1449,13 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
+
+instance Binary OneShotInfo where
+  put_ bh NoOneShotInfo = putByte bh 0
+  put_ bh OneShotLam = putByte bh 1
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> return NoOneShotInfo
+      1 -> return OneShotLam
+      _ -> panic "Binary:Invalid byte"
