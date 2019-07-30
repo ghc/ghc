@@ -126,6 +126,7 @@ import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
+import GHC.StgToCmm.CgTypes
 
 {-
 ************************************************************************
@@ -160,11 +161,12 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe [(Name,LambdaFormInfo)] -> IO ModIface
+mkFullIface hsc_env partial_iface lf_infos = do
+    let if_lf_infos = mapSnd toIfLFInfo <$> lf_infos
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface (mi_decls partial_iface)
+      addFingerprints hsc_env partial_iface (mi_decls partial_iface) if_lf_infos
 
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
@@ -221,7 +223,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
-          mkFullIface hsc_env partial_iface
+          mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
@@ -411,8 +413,9 @@ addFingerprints
         :: HscEnv
         -> PartialModIface   -- The new interface (lacking decls)
         -> [IfaceDecl]       -- The new decls
+        -> Maybe [(Name,IfLFInfo)]
         -> IO ModIface       -- Updated interface
-addFingerprints hsc_env iface0 new_decls
+addFingerprints hsc_env iface0 new_decls lf_infos
  = do
    eps <- hscEPS hsc_env
    let
@@ -701,6 +704,7 @@ addFingerprints hsc_env iface0 new_decls
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
+      , mi_lf_info     = lf_infos
       }
     final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --

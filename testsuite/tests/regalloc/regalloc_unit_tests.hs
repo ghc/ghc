@@ -42,7 +42,7 @@ import ErrUtils
 import Outputable
 import BasicTypes
 
-import Stream (collect, yield)
+import Stream (collect_, yield)
 
 import Data.Typeable
 import Data.Maybe
@@ -117,7 +117,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
 
     rawCmms <- cmmToRawCmm dflags (Stream.yield cmmGroup)
 
-    collectedCmms <- mconcat <$> Stream.collect rawCmms
+    collectedCmms <- mconcat <$> Stream.collect_ rawCmms
 
     -- compile and discard the generated code, returning regalloc stats
     mapM (\ (count, thisCmm) ->
