@@ -126,6 +126,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
+import CgTypes          ( LambdaFormInfo, CgIfaceInfo, CgIfaceInfoList )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -791,7 +792,8 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
+finish :: HasDebugCallStack
+       => ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
@@ -835,8 +837,8 @@ finish summary tc_result mb_old_hash = do
           (cg_guts, details) <- {-# SCC "CoreTidy" #-}
               liftIO $ tidyProgram hsc_env desugared_guts
 
-          let iface_gen :: IO (ModIface, Bool)
-              iface_gen = do
+          let iface_gen :: Maybe CgIfaceInfoList -> IO (ModIface, Bool)
+              iface_gen cg_info = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
                   -- core if necessary.
                   -- This has to happen *after* code gen so that the back-end
@@ -846,7 +848,7 @@ finish summary tc_result mb_old_hash = do
                   -- less of the environment alive here but don't do so
                   -- currently.
                   res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts
+                          mkIface hsc_env mb_old_hash details desugared_guts cg_info
                   dumpIfaceStats hsc_env
                   return res
 
@@ -1368,10 +1370,20 @@ hscSimpleIface' tc_result mb_old_iface = do
 -- BackEnd combinators
 --------------------------------------------------------------
 
+{- Note [Interface file extensions]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
---------------------------------------------------------------
--- BackEnd combinators
---------------------------------------------------------------
+ModLocation only contains the base names, however when generating
+dynamic files the actual extension might differ from the default.
+
+If we generate a interface file right after running the core pipeline
+we will have set -dynamic-too and potentially generate both interface
+files at the same time.
+
+If we generate a interface file after running the backend then dynamic-too
+won't be set, however then the extension will be contained in the dynflags
+instead so things still work out fine.
+-}
 
 {-
 Note [Interface file extensions]
@@ -1421,9 +1433,11 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)],
+                      [(Name,LambdaFormInfo)])
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
+
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.
                     cg_module   = this_mod,
@@ -1462,7 +1476,8 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- top-level function, so showPass isn't very useful here.
         -- Hence we have one showPass for the whole backend, the
         -- next showPass after this will be "Assembler".
-        withTiming (pure dflags)
+        (output_filename, stub_c_exists, foreign_fps, stream_result') <-
+          withTiming (pure dflags)
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
             cmms <- {-# SCC "StgToCmm" #-}
@@ -1479,11 +1494,25 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, ())
+            (output_filename, (_stub_h_exists, stub_c_exists),
+             foreign_fps, stream_result)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+            return (output_filename, stub_c_exists, foreign_fps, stream_result)
+
+        -- We update the EPS here to populate the exported lf_infos.
+        -- We have to make sure the generated info does not depend lazily
+        -- on the eps or <<loop>> happens. Hence the bangs.
+        -- See Note [CodeGenerator EPS <<loop>>]
+        !eps <- hscEPS hsc_env
+        let !eps_imported = eps_cg_info_env eps
+            !combined = extendNameEnvList eps_imported stream_result'
+
+        let eps' = eps { eps_cg_info_env = combined }
+        writeIORef (hsc_EPS hsc_env) $! eps'
+
+        return (output_filename, stub_c_exists, foreign_fps, stream_result')
 
 
 hscInteractive :: HscEnv
@@ -1534,7 +1563,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" (ppr cmmgroup)
         rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
-             rawCmms
+                        rawCmms
         return ()
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
@@ -1548,21 +1577,23 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroup [(Name,LambdaFormInfo)])
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
+    import_lf_info <- eps_cg_info_env <$> hscEPS hsc_env :: IO CgIfaceInfo
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
-    let cmm_stream :: Stream IO CmmGroup ()
-        cmm_stream = {-# SCC "StgToCmm" #-}
-            StgToCmm.codeGen dflags this_mod data_tycons
+    let cmm_stream :: Stream IO CmmGroup [(Name,LambdaFormInfo)]
+        cmm_stream = {-# SCC "StgCmm" #-}
+            StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+                           import_lf_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one
@@ -1575,15 +1606,17 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
+        pipeline_stream :: Stream IO CmmGroup [(Name, LambdaFormInfo)]
         pipeline_stream
            = {-# SCC "cmmPipeline" #-}
              let run_pipeline = cmmPipeline hsc_env
-             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+             in snd <$> Stream.mapAccumL_ run_pipeline (emptySRT this_mod) ppr_stream1
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
 
+        ppr_stream2 :: Stream IO CmmGroup [(Name, LambdaFormInfo)]
         ppr_stream2 = Stream.mapM dump2 pipeline_stream
 
     return ppr_stream2

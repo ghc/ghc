@@ -208,6 +208,8 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
+import CgTypes          ( LambdaFormInfo, CgIfaceInfoList )
+
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
 import Data.IORef
@@ -232,7 +234,7 @@ data HscStatus
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
                             -- ^ Module info
-        , hscs_iface_gen  :: IO (ModIface, Bool)
+        , hscs_iface_gen  :: Maybe CgIfaceInfoList -> IO (ModIface, Bool)
                             -- ^ Function to generate iface after codegen.
         }
 -- Should HscStatus contain the HomeModInfo?
@@ -995,8 +997,16 @@ data ModIface
         mi_decl_docs :: DeclDocMap,
                 -- ^ Docs on declarations.
 
-        mi_arg_docs :: ArgDocMap
+        mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
+
+        -- TODO: Generalize as CgInfo
+        mi_lf_info  :: Maybe [(Name,IfLFInfo)]
+                -- ^ Lambda form information, deterministically derived
+                -- from core level information. Hence not fingerprinted.
+                -- Nothing for typecheck-only interface files.
+                -- Maybe allows differentiating empty modules from lack
+                -- of information
      }
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
@@ -1077,7 +1087,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
-                 mi_arg_docs  = arg_docs }) = do
+                 mi_arg_docs  = arg_docs,
+                 mi_lf_info   = lf_info }) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1109,6 +1120,8 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        put_ bh ( lf_info :: Maybe [(Name,IfLFInfo)])
+
 
    get bh = do
         mod         <- get bh
@@ -1142,6 +1155,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        lf_info     <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1178,7 +1192,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
-                 mi_arg_docs    = arg_docs })
+                 mi_arg_docs    = arg_docs,
+                 mi_lf_info     = lf_info })
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1220,7 +1235,8 @@ emptyModIface mod
                mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
-               mi_arg_docs    = emptyArgDocMap }
+               mi_arg_docs    = emptyArgDocMap,
+               mi_lf_info     = Nothing }
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
@@ -2555,6 +2571,7 @@ type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatchMap = CompleteMatchMap
+type PackageCgInfoEnv        = NameEnv LambdaFormInfo
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -2622,6 +2639,8 @@ data ExternalPackageState
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
+
+        eps_cg_info_env :: !PackageCgInfoEnv,  -- ^ A map from names to the code generators view of them.
 
         eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
   }

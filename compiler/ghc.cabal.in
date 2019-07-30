@@ -298,6 +298,8 @@ Library
         GHC.Platform.SPARC
         GHC.Platform.X86
         GHC.Platform.X86_64
+        CgTypes
+        CgUtils
         GHC.StgToCmm.CgUtils
         GHC.StgToCmm
         GHC.StgToCmm.Bind
