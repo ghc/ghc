@@ -20,15 +20,15 @@ import Utilities
 libraryRules :: Rules ()
 libraryRules = do
     root <- buildRootRules
-    root -/- "//libHS*-*.dylib"       %> buildDynamicLibUnix root "dylib"
-    root -/- "//libHS*-*.so"          %> buildDynamicLibUnix root "so"
-    root -/- "//*.a"                  %> buildStaticLib      root
+    root -/- "**/libHS*-*.dylib"       %> buildDynamicLibUnix root "dylib"
+    root -/- "**/libHS*-*.so"          %> buildDynamicLibUnix root "so"
+    root -/- "**/*.a"                  %> buildStaticLib      root
     priority 2 $ do
-        root -/- "stage*/lib//libHS*-*.dylib" %> registerDynamicLibUnix root "dylib"
-        root -/- "stage*/lib//libHS*-*.so"    %> registerDynamicLibUnix root "so"
-        root -/- "stage*/lib//*.a"            %> registerStaticLib  root
-        root -/- "//HS*-*.o"   %> buildGhciLibO root
-        root -/- "//HS*-*.p_o" %> buildGhciLibO root
+        root -/- "stage*/lib/**/libHS*-*.dylib" %> registerDynamicLibUnix root "dylib"
+        root -/- "stage*/lib/**/libHS*-*.so"    %> registerDynamicLibUnix root "so"
+        root -/- "stage*/lib/**/*.a"            %> registerStaticLib  root
+        root -/- "**/HS*-*.o"   %> buildGhciLibO root
+        root -/- "**/HS*-*.p_o" %> buildGhciLibO root
 
 -- * 'Action's for building libraries
 
