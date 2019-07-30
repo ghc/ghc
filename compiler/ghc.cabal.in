@@ -298,10 +298,12 @@ Library
         GHC.Platform.SPARC
         GHC.Platform.X86
         GHC.Platform.X86_64
+        CgUtils
         GHC.StgToCmm.CgUtils
         GHC.StgToCmm
         GHC.StgToCmm.Bind
         GHC.StgToCmm.Closure
+        GHC.StgToCmm.CgTypes
         GHC.StgToCmm.DataCon
         GHC.StgToCmm.Env
         GHC.StgToCmm.Expr

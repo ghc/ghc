@@ -23,7 +23,10 @@ module MkIface (
         mkIfaceExports,
 
         coAxiomToIfaceDecl,
-        tyThingToIfaceDecl -- Converting things to their Iface equivalents
+        -- * Converting things to their Iface equivalents
+        tyThingToIfaceDecl, -- TyThings
+        cgInfoToIfaceCgInfo
+
  ) where
 
 {-
@@ -110,6 +113,7 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
+import GHC.StgToCmm.CgTypes -- (LambdaFormInfo, CgIfaceInfo )
 
 import Control.Monad
 import Data.Function
@@ -139,6 +143,7 @@ mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
+        -> Maybe CgIfaceInfoList
         -> IO (ModIface, -- The new one
                Bool)     -- True <=> there was an old Iface, and the
                          --          new one is identical, so no need
@@ -160,12 +165,13 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_decl_docs    = decl_docs,
                       mg_arg_docs     = arg_docs
                     }
+         cg_details
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src used_th deps rdr_env fix_env
                    warns hpc_info self_trust
                    safe_mode usages
                    doc_hdr decl_docs arg_docs
-                   mod_details
+                   mod_details cg_details
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -216,7 +222,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
-                   mod_details
+                   mod_details Nothing
 
 
 
@@ -230,6 +236,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
+         -> Maybe CgIfaceInfoList
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
@@ -242,6 +249,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
+         cg_details
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -276,6 +284,10 @@ mkIface_ hsc_env maybe_old_fingerprint
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+        lf_info :: Maybe [(Name, IfLFInfo)]
+        lf_info = fmap (mapSnd toIfLFInfo) .
+                  fmap (sortBy (\x y -> stableNameCmp (fst x) (fst y))) $
+                  cg_details
 
         intermediate_iface = ModIface {
               mi_module      = this_mod,
@@ -325,7 +337,9 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_complete_sigs = icomplete_sigs,
               mi_doc_hdr     = doc_hdr,
               mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
+              mi_arg_docs    = arg_docs,
+              mi_lf_info     = lf_info
+              }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
@@ -647,8 +661,24 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        dep_finsts (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/commentary/compiler/recompilation-avoidance
-                       mi_trust iface0)
-                        -- Make sure change of Safe Haskell mode causes recomp.
+                       mi_trust iface0,
+                       -- Make sure change of Safe Haskell mode causes recomp.
+                       mi_lf_info iface0)
+                       -- Include cg info so that dependent modules are recompiled
+                       -- with the new info on change.
+                       -- See Note [Export hash depends on codegen info]
+
+   -- Note [Export hash depends on codegen info]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  --  If module X imports a definition from A
+  --  we must ensure X is recompiled if A changes
+  --  the codegen info of it's exported bindings.
+  --
+  --  Otherwise a definition might change and e.g. no
+  --  longer require a slowcall, and as such we won't
+  --  have a _slow entry label. But X might still assume
+  --  otherwise and try to jump to that one leading to a
+  --  linker error (or worse!).
 
    -- Note [Export hash depends on non-orphan family instances]
    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2112,3 +2142,7 @@ bogusIfaceRule id_name
         ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
         ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
         ifRuleAuto = True }
+
+--------------------------
+cgInfoToIfaceCgInfo :: LambdaFormInfo -> IfLFInfo
+cgInfoToIfaceCgInfo = toIfLFInfo

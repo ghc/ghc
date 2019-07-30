@@ -1432,7 +1432,7 @@ parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brack
     POk pst code -> do
         st <- initC
         let fcode = getCmm $ unEC code "global" (initEnv dflags) [] >> return ()
-            (cmm,_) = runC dflags no_module st fcode
+            (cmm,_) = runC dflags no_module st mempty fcode
         let ms = getMessages pst dflags
         if (errorsFound dflags ms)
          then return (ms, Nothing)

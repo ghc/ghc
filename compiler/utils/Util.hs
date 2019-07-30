@@ -87,6 +87,7 @@ module Util (
 
         -- * Integers
         exactLog2,
+        log2Word,
 
         -- * Floating point
         readRational,
@@ -1131,6 +1132,13 @@ exactLog2 x
       where
          x' = fromIntegral x :: Int32
          c = countTrailingZeros x'
+
+-- | log2 on words.
+-- log2Word 0 == -1
+-- Result is rounded down: `log2Word 3 = 1`
+log2Word :: Word -> Int
+log2Word w = (wordSize - 1) - (countLeadingZeros w)
+  where wordSize = finiteBitSize w
 
 {-
 -- -----------------------------------------------------------------------------
