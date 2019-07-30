@@ -48,13 +48,13 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
-            , input "//Parser.hs" ?
+            [ inputs ["**/GHC.hs", "**/GhcMake.hs"] ? arg "-fprof-auto"
+            , input "**/Parser.hs" ?
               pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
             -- These files take a very long time to compile with -O1,
             -- so we use -O0 for them just in Stage0 to speed up the
             -- build but not affect Stage1+ executables
-            , inputs ["//HsInstances.hs", "//DynFlags.hs"] ? stage0 ?
+            , inputs ["**/HsInstances.hs", "**/DynFlags.hs"] ? stage0 ?
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
@@ -110,7 +110,7 @@ packageArgs = do
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
           , builder (Cc CompileC) ? (not <$> flag GccIsClang) ?
-            input "//cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
+            input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
         -- TODO: This should not be @not <$> flag CrossCompiling@. Instead we
@@ -163,7 +163,7 @@ packageArgs = do
 
         -------------------------------- runGhc --------------------------------
         , package runGhc ?
-          builder Ghc ? input "//Main.hs" ?
+          builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
 
         --------------------------------- text ---------------------------------
@@ -231,10 +231,10 @@ rtsPackageArgs = package rts ? do
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
 
-          , inputs ["//RtsMessages.c", "//Trace.c"] ?
+          , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
 
-          , input "//RtsUtils.c" ? pure
+          , input "**/RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
             , "-DHostPlatform="              ++ show hostPlatform
             , "-DHostArch="                  ++ show hostArch
@@ -253,46 +253,46 @@ rtsPackageArgs = package rts ? do
 
           -- We're after pur performance here. So make sure fast math and
           -- vectorization is enabled.
-          , input "//xxhash.c" ? pure
+          , input "**/xxhash.c" ? pure
             [ "-O3"
             , "-ffast-math"
             , "-ftree-vectorize" ]
 
-            , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
+            , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
             , speedHack ?
-              inputs [ "//Evac.c", "//Evac_thr.c"
-                     , "//Scav.c", "//Scav_thr.c"
-                     , "//Compact.c", "//GC.c" ] ? arg "-fno-PIC"
+              inputs [ "**/Evac.c", "**/Evac_thr.c"
+                     , "**/Scav.c", "**/Scav_thr.c"
+                     , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
             -- @-static@ is necessary for these bits, as otherwise the NCG
             -- generates dynamic references.
             , speedHack ?
-              inputs [ "//Updates.c", "//StgMiscClosures.c"
-                     , "//PrimOps.c", "//Apply.c"
-                     , "//AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+              inputs [ "**/Updates.c", "**/StgMiscClosures.c"
+                     , "**/PrimOps.c", "**/Apply.c"
+                     , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
 
             -- inlining warnings happen in Compact
-            , inputs ["//Compact.c"] ? arg "-Wno-inline"
+            , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
             -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "//RetainerProfile.c", "//StgCRun.c"
-                     , "//win32/ConsoleHandler.c", "//win32/ThrIOManager.c"] ? arg "-w"
+            , inputs [ "**/RetainerProfile.c", "**/StgCRun.c"
+                     , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
             -- any warnings in the module. See:
             -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
             , (not <$> flag GccIsClang) ?
-              inputs ["//Compact.c"] ? arg "-finline-limit=2500"
+              inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "//RetainerProfile.c" ? flag GccIsClang ?
+            , input "**/RetainerProfile.c" ? flag GccIsClang ?
               arg "-Wno-incompatible-pointer-types"
             , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
             -- libffi's ffi.h triggers various warnings
-            , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
+            , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
               arg "-Wno-strict-prototypes"
-            , inputs ["//Interpreter.c", "//Adjustor.c", "//sm/Storage.c"] ?
+            , inputs ["**/Interpreter.c", "**/Adjustor.c", "**/sm/Storage.c"] ?
               anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
