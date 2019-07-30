@@ -1555,7 +1555,7 @@ chooseUniqueOccTc fn =
      ; let dfun_n_var = tcg_dfun_n env
      ; set <- readTcRef dfun_n_var
      ; let occ = fn set
-     ; writeTcRef dfun_n_var (extendOccSet set occ)
+     ; writeTcRef' dfun_n_var (extendOccSet set occ)
      ; return occ }
 
 getConstraintVar :: TcM (TcRef WantedConstraints)
