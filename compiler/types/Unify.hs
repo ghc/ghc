@@ -16,7 +16,7 @@ module Unify (
 
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
-        tcUnifyTysFG, tcUnifyTyWithTFs,
+        tcUnifyTysFG, tcUnifyTyWithTFs, tcPartialUnifyTyKis,
         BindFlag(..),
         UnifyResult, UnifyResultM(..),
 
@@ -420,6 +420,16 @@ tcUnifyTyKis bind_fn tys1 tys2
   = case tcUnifyTyKisFG bind_fn tys1 tys2 of
       Unifiable result -> Just result
       _                -> Nothing
+
+-- | Like 'tcUnifyTyKis', but also returning partial results
+tcPartialUnifyTyKis :: (TyCoVar -> BindFlag)
+                    -> [Type] -> [Type]
+                    -> Maybe TCvSubst
+tcPartialUnifyTyKis bind_fn tys1 tys2
+  = case tcUnifyTyKisFG bind_fn tys1 tys2 of
+      Unifiable result  -> Just result
+      MaybeApart result -> Just result
+      _                 -> Nothing
 
 -- This type does double-duty. It is used in the UM (unifier monad) and to
 -- return the final result. See Note [Fine-grained unification]
