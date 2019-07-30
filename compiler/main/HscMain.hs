@@ -125,6 +125,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
+import StgCmmClosure ( LambdaFormInfo )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -1409,7 +1410,8 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- top-level function, so showPass isn't very useful here.
         -- Hence we have one showPass for the whole backend, the
         -- next showPass after this will be "Assembler".
-        withTiming (pure dflags)
+        (output_filename, stub_c_exists, foreign_fps, stream_result) <-
+          withTiming (pure dflags)
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
             cmms <- {-# SCC "StgCmm" #-}
@@ -1426,11 +1428,14 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps)
+            (output_filename, (_stub_h_exists, stub_c_exists),
+             foreign_fps, stream_result)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+            return (output_filename, stub_c_exists, foreign_fps, stream_result)
+        pprTraceM "CgInfo" $ ppr stream_result
+        return ((output_filename, stub_c_exists, foreign_fps))
 
 
 hscInteractive :: HscEnv
@@ -1481,7 +1486,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" (ppr cmmgroup)
         rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
-             rawCmms
+                        rawCmms
         return ()
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,
@@ -1495,7 +1500,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroup [(Id,LambdaFormInfo)])
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1506,7 +1511,7 @@ doCodeGen hsc_env this_mod data_tycons
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
-    let cmm_stream :: Stream IO CmmGroup ()
+    let cmm_stream :: Stream IO CmmGroup [(Id,LambdaFormInfo)]
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
@@ -1538,13 +1543,13 @@ doCodeGen hsc_env this_mod data_tycons
                   cmmPipeline hsc_env (emptySRT this_mod) cmmgroup
                 return (us, cmmgroup)
 
-          in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
-                return ()
+          in do (_,bindCgInfo) <- Stream.mapAccumL run_pipeline us ppr_stream1
+                return (bindCgInfo)
 
       | otherwise
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline = cmmPipeline hsc_env
-          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+          in snd <$> Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
 
     let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
