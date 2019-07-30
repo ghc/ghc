@@ -5422,6 +5422,13 @@ as in the following example: ::
 
 Here we make use of the ``Monoid ((->) a)`` instance.
 
+When used in combination with StandaloneDeriving we swap the order
+for the instance we base our derivation on and the instance we define: ::
+
+    deriving via BoundedEnumBinary TopLevelFlag instance Binary TopLevelFlag
+
+This defines a ``Binary`` instance for ``TopLevelFlag``.
+
 .. _pattern-synonyms:
 
 Pattern synonyms
