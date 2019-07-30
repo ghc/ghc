@@ -5422,6 +5422,12 @@ as in the following example: ::
 
 Here we make use of the ``Monoid ((->) a)`` instance.
 
+When used in combination with :extension:`StandaloneDeriving` we swap the order
+for the instance we base our derivation on and the instance we define e.g.: ::
+
+  deriving via (a -> App m b) instance Monoid (Kleisli m a b)
+
+
 .. _pattern-synonyms:
 
 Pattern synonyms
