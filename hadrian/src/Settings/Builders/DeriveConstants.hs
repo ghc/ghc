@@ -12,11 +12,11 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
             [a, b] -> (a, b)
             _      -> error $ "DeriveConstants: expected two outputs, got " ++ show outs
     mconcat
-        [ output "//DerivedConstants.h"             ? arg "--gen-header"
-        , output "//GHCConstantsHaskellType.hs"     ? arg "--gen-haskell-type"
-        , output "//platformConstants"              ? arg "--gen-haskell-value"
-        , output "//GHCConstantsHaskellWrappers.hs" ? arg "--gen-haskell-wrappers"
-        , output "//GHCConstantsHaskellExports.hs"  ? arg "--gen-haskell-exports"
+        [ output "**/DerivedConstants.h"             ? arg "--gen-header"
+        , output "**/GHCConstantsHaskellType.hs"     ? arg "--gen-haskell-type"
+        , output "**/platformConstants"              ? arg "--gen-haskell-value"
+        , output "**/GHCConstantsHaskellWrappers.hs" ? arg "--gen-haskell-wrappers"
+        , output "**/GHCConstantsHaskellExports.hs"  ? arg "--gen-haskell-exports"
         , arg "-o", arg outputFile
         , arg "--tmpdir", arg tempDir
         , arg "--gcc-program", arg =<< getBuilderPath (Cc CompileC Stage1)

@@ -50,12 +50,12 @@ toolArgsTarget = do
 
     root <- buildRoot
     let dir = buildDir (vanillaContext Stage0 compiler)
-    need [ root <//> dir -/- "Config.hs" ]
-    need [ root <//> dir -/- "Fingerprint.hs" ]
-    need [ root <//> dir -/- "Parser.hs" ]
-    need [ root <//> dir -/- "Lexer.hs" ]
-    need [ root <//> dir -/- "CmmParse.hs" ]
-    need [ root <//> dir -/- "CmmLex.hs" ]
+    need [ root -/- dir -/- "Config.hs" ]
+    need [ root -/- dir -/- "Fingerprint.hs" ]
+    need [ root -/- dir -/- "Parser.hs" ]
+    need [ root -/- dir -/- "Lexer.hs" ]
+    need [ root -/- dir -/- "CmmParse.hs" ]
+    need [ root -/- dir -/- "CmmLex.hs" ]
 
     -- Find out the arguments that are needed to load a module into the
     -- session

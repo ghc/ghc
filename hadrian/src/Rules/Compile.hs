@@ -182,8 +182,8 @@ compileHsObjectAndHi rs objpath = do
   -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
   -- Note that this may allow too many *.hi and *.hi-boot files, but
   -- calculating the exact set of direct inputs is not feasible.
-  trackAllow [ "//*." ++ hisuf     way
-             , "//*." ++ hibootsuf way
+  trackAllow [ "**/*." ++ hisuf     way
+             , "**/*." ++ hibootsuf way
              ]
 
   buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
