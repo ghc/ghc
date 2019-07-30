@@ -17,6 +17,7 @@ is not deterministic.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqDFM (
@@ -137,6 +138,16 @@ data UniqDFM ele =
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
+
+-- | Deterministic, in O(n log n).
+instance Foldable UniqDFM where
+  foldr = foldUDFM
+
+-- | Deterministic, in O(n log n).
+instance Traversable UniqDFM where
+  traverse f = fmap listToUDFM_Directly
+             . traverse (\(u,a) -> (u,) <$> f a)
+             . udfmToList
 
 emptyUDFM :: UniqDFM elt
 emptyUDFM = UDFM M.empty 0
