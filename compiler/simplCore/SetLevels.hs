@@ -88,7 +88,8 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType, closeOverKindsDSet )
+import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
+                        , isUnliftedType, closeOverKindsDSet )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -1098,12 +1099,20 @@ lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || not (profitableFloat env dest_lvl)
-  = do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
+  || (isTopLvl dest_lvl && any (isUnliftedType . idType) bndrs)
+       -- This isUnliftedType stuff is the same test as in the non-rec case
+       -- You might wonder whether we can have a recursive binding for
+       -- an unlifted value -- but we can if it's a /join binding/ (#16978)
+       -- (Ultimately I think we should not use SetLevels to
+       -- float join bindings at all, but that's another story.)
+  =    -- No float
+    do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
              lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (isJoinId_maybe b) r
        ; rhss' <- mapM lvl_rhs pairs
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
+  -- Otherwise we are going to float
   | null abs_vars
   = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl bndrs
        ; new_rhss <- mapM (do_rhs new_env) pairs
