@@ -29,7 +29,7 @@ main = do
 
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
-        rebuild = [ (RebuildLater, buildRoot -/- "stage0//*")
+        rebuild = [ (RebuildLater, buildRoot -/- "stage0/**")
                   | CommandLine.lookupFreeze1 argsMap ]
 
     cwd <- getCurrentDirectory
@@ -60,11 +60,11 @@ main = do
             , shakeLintIgnore =
                 -- Ignore access to the package database caches.
                 -- They are managed externally by the ghc-pkg tool.
-                [ buildRoot -/- "//package.conf.d/package.cache"
+                [ buildRoot -/- "**/package.conf.d/package.cache"
 
                 -- Ignore access to autom4te.cache directories.
                 -- They are managed externally by auto tools.
-                , "//autom4te.cache//*"
+                , "**/autom4te.cache/**"
                 ]
             }
 

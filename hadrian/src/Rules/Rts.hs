@@ -13,10 +13,10 @@ rtsRules = priority 3 $ do
     -- This is for backwards compatibility (the old make build system omitted the
     -- dummy version number).
     root <- buildRootRules
-    [ root -/- "//libHSrts_*-ghc*.so",
-      root -/- "//libHSrts_*-ghc*.dylib",
-      root -/- "//libHSrts-ghc*.so",
-      root -/- "//libHSrts-ghc*.dylib"]
+    [ root -/- "**/libHSrts_*-ghc*.so",
+      root -/- "**/libHSrts_*-ghc*.dylib",
+      root -/- "**/libHSrts-ghc*.so",
+      root -/- "**/libHSrts-ghc*.dylib"]
       |%> \ rtsLibFilePath' -> createFileLink
             (addRtsDummyVersion $ takeFileName rtsLibFilePath')
             rtsLibFilePath'

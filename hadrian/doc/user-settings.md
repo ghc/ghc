@@ -99,13 +99,13 @@ You can combine several custom command line settings using `mconcat`:
 userArgs :: Args
 userArgs = mconcat
     [ builder Ghc ? package cabal ? arg "-O0"
-    , package rts ? input "//PrimOps.c" ? pure ["-fno-PIC", "-static"] ]
+    , package rts ? input "**/PrimOps.c" ? pure ["-fno-PIC", "-static"] ]
 ```
 You can match any combination of the `builder`, `stage`, `package`, `way`, `input`
 and `output` predicates when specifying custom command line arguments. File
-patterns such as `"//Prelude.*"` can be used when matching input and output files,
-where `//` matches an arbitrary number of path components and `*` matches an entire
-path component, excluding any separators.
+patterns such as `"**/Prelude.*"` can be used when matching input and output files,
+where `**` matches an arbitrary number of path components, but not absolute path 
+prefixes, and `*` matches an entire path component, excluding any separators.
 
 #### Enabling -Werror
 
@@ -245,7 +245,7 @@ verboseCommand = builder (Ghc Link)
 verboseCommand = builder (Gcc Compile) &&^ package compiler
 
 -- Use patterns when matching files:
-verboseCommand = output "//rts/sm/*" &&^ way threaded
+verboseCommand = output "**/rts/sm/*" &&^ way threaded
 
 -- Print all commands:
 verboseCommand = return True

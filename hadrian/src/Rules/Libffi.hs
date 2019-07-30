@@ -140,7 +140,7 @@ needLibfffiArchive buildPath = do
                 . fromSingleton "Exactly one LibFFI tarball is expected"
                 <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
     need [top -/- tarball]
-    trackAllow [buildPath -/- "//*"]
+    trackAllow [buildPath -/- "**"]
     return tarball
 
 libffiRules :: Rules ()
@@ -195,12 +195,12 @@ libffiRules = do
             build $ target context (Tar Extract) [tarball] [path]
             moveDirectory (path -/- libname) libffiPath) $
             -- And finally:
-            removeFiles (path) [libname <//> "*"]
+            removeFiles (path) [libname -/- "**"]
 
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
+        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- "**"]
         produces files
 
     fmap (libffiPath -/-) ["Makefile", "config.guess", "config.sub"] &%> \[mk, _, _] -> do
@@ -218,5 +218,5 @@ libffiRules = do
             target context (Configure libffiPath) [mk <.> "in"] [mk]
 
         dir   <- setting BuildPlatform
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir <//> "*"]
+        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir -/- "**"]
         produces files
