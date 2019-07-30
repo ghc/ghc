@@ -208,7 +208,7 @@ compileOne' m_tc_result mHscMessage
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
-                                            mod_name HscUpdateSig))
+                                            mod_name HscUpdateSig ))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -219,7 +219,7 @@ compileOne' m_tc_result mHscMessage
         (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run
             -- so we generate a interface without codeGen info.
-            (iface, no_change) <- iface_gen
+            (iface, no_change) <- iface_gen Nothing
             -- If we interpret the code, then we can write the interface file here.
             liftIO $ hscMaybeWriteIface dflags iface no_change
                                 (ms_location summary)
@@ -254,8 +254,8 @@ compileOne' m_tc_result mHscMessage
             -- opaque pipeline once it's created. Otherwise we would have
             -- to thread it through runPipeline.
             if_ref <- newIORef Nothing :: IO (IORef (Maybe ModIface))
-            let iface_gen' = do
-                    res@(iface, _no_change) <- iface_gen
+            let iface_gen' cg_info = do
+                    res@(iface, _no_change) <- iface_gen cg_info
                     writeIORef if_ref $ Just iface
                     return res
 
@@ -271,6 +271,7 @@ compileOne' m_tc_result mHscMessage
             iface <- (expectJust "Iface callback") <$> readIORef if_ref
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
+
             let !linkable = LM o_time this_mod [DotO object_filename]
             return $! HomeModInfo iface hmi_details (Just linkable)
 
@@ -338,6 +339,7 @@ compileOne' m_tc_result mHscMessage
        always_do_basic_recompilation_check = case hsc_lang of
                                              HscInterpreted -> True
                                              _ -> False
+
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
@@ -762,6 +764,7 @@ pipeLoop phase input_fn = do
    _
      -> do liftIO $ debugTraceMsg dflags 4
                                   (text "Running phase" <+> ppr phase)
+
            (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
            case phase of
                HscOut {} -> do
@@ -1057,7 +1060,6 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
 -- the direction of the compilation manager).
 runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
  = do   -- normal Hsc mode, not mkdependHS
-
         PipeEnv{ stop_phase=stop,
                  src_basename=basename,
                  src_suffix=suff } <- getPipeEnv
@@ -1151,7 +1153,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name result) _ dflags = do
+runPhase (HscOut src_flavour mod_name result ) _ dflags = do
         location <- getLocation src_flavour mod_name
         setModLocation location
 
@@ -1187,11 +1189,10 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, cgInfoExported) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
 
-
-                    (iface, no_change) <- liftIO iface_gen
+                    (iface, no_change) <- liftIO $ iface_gen (Just cgInfoExported)
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo

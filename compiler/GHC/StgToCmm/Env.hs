@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -33,9 +34,11 @@ import GHC.StgToCmm.Closure
 
 import CLabel
 
+import BasicTypes
 import BlockId
 import CmmExpr
 import CmmUtils
+import DataCon (isNullaryRepDataCon)
 import DynFlags
 import Id
 import MkGraph
@@ -47,6 +50,10 @@ import TysPrim
 import UniqFM
 import Util
 import VarEnv
+
+import GHC.StgToCmm.CgTypes ( whnfLF )
+
+import Data.Maybe
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -120,28 +127,59 @@ addBindsC new_bindings = do
         setBinds new_binds
 
 getCgIdInfo :: Id -> FCode CgIdInfo
-getCgIdInfo id
+getCgIdInfo v_id
   = do  { dflags <- getDynFlags
         ; local_binds <- getBinds -- Try local bindings first
-        ; case lookupVarEnv local_binds id of {
+        ; case lookupVarEnv local_binds v_id of {
             Just info -> return info ;
             Nothing   -> do {
 
                 -- Should be imported; make up a CgIdInfo for it
-          let name = idName id
+          let name = idName v_id
         ; if isExternalName name then
-              let ext_lbl
-                      | isUnliftedType (idType id) =
-                          -- An unlifted external Id must refer to a top-level
-                          -- string literal. See Note [Bytes label] in CLabel.
-                          ASSERT( idType id `eqType` addrPrimTy )
-                          mkBytesLabel name
-                      | otherwise = mkClosureLabel name $ idCafInfo id
-              in return $
-                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
+            let unlifted = isUnliftedType (idType v_id)
+            in  if unlifted then
+                  -- An unlifted external Id must refer to a top-level
+                  -- string literal. See Note [Bytes label] in CLabel.
+                  let ext_lbl = ASSERT( idType v_id `eqType` addrPrimTy )
+                                mkBytesLabel name
+                  in return $ litIdInfo dflags v_id mkLFStringLit (CmmLabel ext_lbl)
+                else do
+                { let !ext_lbl = mkClosureLabel name $ idCafInfo v_id
+                -- ; let !lf_static =
+                ; lf_info <- case mkStaticLF unlifted of
+                    Just static -> return $! static
+                    Nothing -> do !lf_cached <- lookupImportedLF name
+                                  return $! fromMaybe approximateLF lf_cached
+                -- ; !lf_cached <- maybe (return lf_static fromMaybe () (return $ Just lf_static)
+                -- ; !lf_info <- fromMaybe approximateLF lf_cached
+                ; let !cg_info = litIdInfo dflags v_id (whnfLF lf_info) (CmmLabel ext_lbl);
+                -- See Note [CodeGenerator EPS <<loop>>]
+                ; return cg_info
+                }
           else
-              cgLookupPanic id -- Bug
+              cgLookupPanic v_id -- Bug
         }}}
+  where
+    mkStaticLF :: Bool -> Maybe LambdaFormInfo
+    mkStaticLF unlifted
+      | unlifted = return $! mkLFStringLit
+
+      | Just con <- isDataConWorkId_maybe v_id
+      , isNullaryRepDataCon con
+      = Just $! mkConLFInfo con
+
+      | otherwise = Nothing
+                    -- An imported nullary constructor
+                    -- We assume that the constructor is evaluated so that
+                    -- the v_id really does point directly to the constructor
+    approximateLF
+      | arity > 0
+      = mkUnknownLFReEntrant TopLevel arity
+      | otherwise = mkLFArgument v_id
+      where
+        arity = idFunRepArity v_id
+
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

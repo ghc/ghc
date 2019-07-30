@@ -217,7 +217,10 @@ data ArgDescr
 
   | ArgGen              -- General case
         Liveness        -- Details about the arguments
-
+  | ArgUnknown          -- ^ For e.g. imported binds.
+                        -- Invariant: Never Unknown for binds of the module
+                        -- we are compiling.
+  deriving Eq
 
 -----------------------------------------------------------------------------
 -- Construction
@@ -543,6 +546,7 @@ instance Outputable SMRep where
 instance Outputable ArgDescr where
   ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
   ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
+  ppr (ArgUnknown) = text "ArgUnknown"
 
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)

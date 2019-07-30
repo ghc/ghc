@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -23,6 +24,9 @@ module IfaceSyn (
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
 
+        -- * CodeGen Information
+        IfLFInfo(..), IfStandardFormInfo(..),
+
         -- * Binding names
         IfaceTopBndr,
         putIfaceTopBndr, getIfaceTopBndr,
@@ -37,7 +41,11 @@ module IfaceSyn (
         -- Pretty printing
         pprIfaceExpr,
         pprIfaceDecl,
-        AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
+        AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader,
+
+        -- Here to make it useable for the Outputable instance.
+        tcStandardFormInfo
+
     ) where
 
 #include "HsVersions.h"
@@ -73,8 +81,12 @@ import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
 import Util (seqList)
 
+import GHC.StgToCmm.CgTypes
+
 import Control.Monad
 import System.IO.Unsafe
+import Data.Bits
+import Data.Word
 import Control.DeepSeq
 
 infixl 3 &&&
@@ -524,6 +536,79 @@ data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
 
 data IfaceJoinInfo = IfaceNotJoinPoint
                    | IfaceJoinPoint JoinArity
+
+{-
+************************************************************************
+*                                                                      *
+                CodeGen Information
+*                                                                      *
+************************************************************************
+-}
+
+{- Note [Exported lambda form info]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We only export a subset of the full information, in particular:
+* LNE/Unknown is never exported, the former is not exported and the
+  later not possible as we know the form of all internal binds.
+* Not top level flag, all exported bindings are naturally top level binds.
+
+We do export:
+* RepArity: Allows us to directly jump into exactly saturated functions and
+  tag references to functions.
+* no_fvs: Used by nodeMustPointToIt. Might allow us to avoid assigning R1,
+* same for StandardFormInfo,
+* maybeFunction might allow us to avoid a slowcall in favour of jumping to
+  entry code.
+* The constructor (by name). Used to tag references.
+
+TODO:
+* It's not clear if it's better to rederive LFUnlifted from the type or
+  to simply cache it in the interface file.
+* Similar but slightly more complex for unary data cons, as we also have
+  to ensure there is an unfolding.
+-}
+
+newtype IfStandardFormInfo = IfStandardFormInfo Word16
+
+tcStandardFormInfo :: IfStandardFormInfo -> StandardFormInfo
+tcStandardFormInfo (IfStandardFormInfo w)
+  | testBit w 0 = NonStandardThunk
+  | otherwise = con field
+  where
+    field = fromIntegral (w `unsafeShiftR` 2)
+    con
+      | testBit w 1 = ApThunk
+      | otherwise = SelectorThunk
+
+instance Binary IfStandardFormInfo where
+    put_ bh (IfStandardFormInfo w) = put_ bh (w :: Word16)
+    get bh = IfStandardFormInfo <$> (get bh :: IO Word16)
+
+data IfLFInfo =
+    -- | We encode the fields bitwise:
+    --    bit 0: OneShotInfo
+    --    bit 1: no fvs
+    --    bit 2-15 arity
+    ILFReEntrant
+        OneShotInfo
+        RepArity
+        Bool -- True <=> no free fvs
+
+  -- | We encode some fields bitwise:
+    --    bit 0: no fvs
+    --    bit 1: updateable
+    --    bit 2: might be function
+  | ILFThunk             -- Thunk (zero arity)
+        (Bool,Bool,Bool) -- fvs, updtable, maybe a function
+        !IfStandardFormInfo
+
+
+  | ILFCon               -- A saturated constructor application
+        !Name            -- The constructor Name
+
+  | ILFUnlifted          -- A value of unboxed type;
+                        -- always a value, needs evaluation
 
 {-
 Note [Empty case alternatives]
@@ -1413,6 +1498,17 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
+
+
+instance Outputable IfLFInfo where
+    ppr (ILFReEntrant oneshot rep fvs_flag) =
+        text "LFReEntrant" <+> ppr (oneshot, rep, fvs_flag)
+    ppr (ILFThunk fields sfi) =
+        text "LFThunk" <+> ppr fields <+> ppr (tcStandardFormInfo sfi)
+    ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
+    ppr (ILFUnlifted) = text "LFUnlifted"
+
+
 
 {-
 ************************************************************************
@@ -2418,6 +2514,31 @@ instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
 
+instance Binary IfLFInfo where
+    -- TODO: We could pack the bytes somewhat
+
+    put_ bh (ILFReEntrant oneshot rep fvs_flag) =
+        putByte bh 0 >>
+        put_ bh oneshot >>
+        put_ bh rep >>
+        put_ bh fvs_flag
+    put_ bh (ILFThunk encoded_flds sfi) = do
+        putByte bh 1
+        put_ bh (encoded_flds :: (Bool, Bool, Bool))
+        put_ bh sfi
+    put_ bh (ILFCon conName) =
+        putByte bh 2 >>
+        put_ bh conName
+    put_ bh (ILFUnlifted) =
+        putByte bh 3
+    get bh = do
+        tag <- getByte bh
+        case tag of
+            0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh
+            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh :: IO IfStandardFormInfo)
+            2 -> pure ILFCon <*> get bh
+            3 -> pure ILFUnlifted
+            _ -> panic "Invalid byte"
 
 {-
 ************************************************************************
@@ -2591,3 +2712,4 @@ instance NFData IfaceClsInst where
 
 instance NFData IfaceAnnotation where
   rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()
+
