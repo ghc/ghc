@@ -67,6 +67,9 @@ import Data.List        ( sortBy )
 import Data.IORef       ( atomicModifyIORef' )
 
 {-
+  Note [simpleTidyPgm - mkBootModDetailsTc]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Constructing the TypeEnv, Instances, Rules from which the
 ModIface is constructed, and which goes on to subsequent modules in
 --make mode.
