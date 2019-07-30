@@ -67,7 +67,7 @@ import Bag
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
-import Unify( tcUnifyTyKis, BindFlag(..) )
+import Unify( tcPartialUnifyTyKis, BindFlag(..) )
 
 import Data.Maybe( isNothing )
 import Control.Monad
@@ -853,12 +853,12 @@ tcQuickLookSubtype lvl ty1 ty2
   | Just ty2' <- tcView ty2
   = tcQuickLookSubtype lvl ty1 ty2'
   | tcIsGuardedType ty1
-  = case tcUnifyTyKis bind_flag [ty1] [ty2] of
+  = case tcPartialUnifyTyKis bind_flag [ty1] [ty2] of
       Just subst -> return subst
       Nothing    -> return emptyTCvSubst
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
-  = case tcUnifyTyKis bind_flag [arg1] [arg2] of
+  = case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
       Nothing -> tcQuickLookSubtype lvl res1 res2
       Just subst1
         -> let res1' = substTyAddInScope subst1 res1
