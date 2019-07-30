@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -52,17 +53,20 @@ module GHC.StgToCmm.Monad (
         getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags, getThisPackage,
 
         -- more localised access to monad state
-        CgIdInfo(..),
-        getBinds, setBinds,
+        CgIdInfo(..), CgIfaceInfo,
+        getBinds, setBinds, lookupImportedLF,
 
         -- out of general friendliness, we also export ...
-        CgInfoDownwards(..), CgState(..)        -- non-abstract
+        CgInfoDownwards(..), CgState(..)        -- non-abstract,
+
     ) where
 
 import GhcPrelude hiding( sequence, succ )
 
 import Cmm
 import GHC.StgToCmm.Closure
+import GHC.StgToCmm.CgTypes ( CgIfaceInfo )
+
 import DynFlags
 import Hoopl.Collections
 import MkGraph
@@ -72,6 +76,8 @@ import SMRep
 import Module
 import Id
 import VarEnv
+import Name
+import NameEnv
 import OrdList
 import BasicTypes( ConTagZ )
 import Unique
@@ -82,8 +88,6 @@ import Util
 
 import Control.Monad
 import Data.List
-
-
 
 --------------------------------------------------------
 -- The FCode monad and its types
@@ -102,35 +106,41 @@ import Data.List
 --    - a UniqSupply
 --
 --  - A reader monad, for CgInfoDownwards, containing
---    - DynFlags,
---    - the current Module
 --    - the update-frame offset
 --    - the ticky counter label
 --    - the Sequel (the continuation to return to)
 --    - the self-recursive tail call information
 
+--  - "Constant" state in CgInfoGlobal, containing:
+--    - DynFlags,
+--    - the current Module
+--    - Lookuptable for imported LFInfos.
+
 --------------------------------------------------------
 
-newtype FCode a = FCode { doFCode :: CgInfoDownwards -> CgState -> (a, CgState) }
+newtype FCode a = FCode { doFCode :: CgInfoGlobal
+                                  -> CgInfoDownwards
+                                  -> CgState
+                                  -> (a, CgState) }
     deriving (Functor)
 
 instance Applicative FCode where
-    pure val = FCode (\_info_down state -> (val, state))
+    pure val = FCode (\_g _info_down state -> (val, state))
     {-# INLINE pure #-}
     (<*>) = ap
 
 instance Monad FCode where
     FCode m >>= k = FCode $
-        \info_down state ->
-            case m info_down state of
+        \globals info_down state ->
+            case m globals info_down state of
               (m_result, new_state) ->
                  case k m_result of
-                   FCode kcode -> kcode info_down new_state
+                   FCode kcode -> kcode globals info_down new_state
     {-# INLINE (>>=) #-}
 
 instance MonadUnique FCode where
   getUniqueSupplyM = cgs_uniqs <$> getState
-  getUniqueM = FCode $ \_ st ->
+  getUniqueM = FCode $ \_ _ st ->
     let (u, us') = takeUniqFromSupply (cgs_uniqs st)
     in (u, st { cgs_uniqs = us' })
 
@@ -138,13 +148,18 @@ initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
-runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
-runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
+runC :: DynFlags -> Module -> CgState -> CgIfaceInfo -> FCode a -> (a,CgState)
+runC dflags mod st imported fcode
+  = doFCode fcode
+            (initCgInfoGlobal dflags mod imported)
+            (initCgInfoDown dflags)
+            st
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode $
-    \info_down state -> let (v, s) = doFCode (fcode v) info_down state
-                        in (v, s)
+    \globals info_down state ->
+          let (v, s) = doFCode (fcode v) globals info_down state
+          in (v, s)
 
 --------------------------------------------------------
 --        The code generator environment
@@ -154,18 +169,25 @@ fixC fcode = FCode $
 -- *downwards*, as well as some ``state'' which is modified
 -- as we go along.
 
+-- | Constant throughout the Monad.
+data CgInfoGlobal
+  = MkCgInfoGlobal {
+        cgg_dflags        :: !DynFlags,    -- ^ Used for word size and the like
+        cgg_mod           :: Module,      -- ^ Module being compiled
+        cgg_lf_info       :: !CgIfaceInfo  -- ^ Imported LFInfos
+  }
+
 data CgInfoDownwards        -- information only passed *downwards* by the monad
   = MkCgInfoDown {
-        cgd_dflags    :: DynFlags,
-        cgd_mod       :: Module,            -- Module being compiled
-        cgd_updfr_off :: UpdFrameOffset,    -- Size of current update frame
-        cgd_ticky     :: CLabel,            -- Current destination for ticky counts
-        cgd_sequel    :: Sequel,            -- What to do at end of basic block
-        cgd_self_loop :: Maybe SelfLoopInfo,-- Which tail calls can be compiled
+        cgd_updfr_off :: UpdFrameOffset,    -- ^ Size of current update frame
+        cgd_ticky     :: CLabel,            -- ^ Current destination for ticky counts
+        cgd_sequel    :: Sequel,            -- ^ What to do at end of basic block
+        cgd_self_loop :: Maybe SelfLoopInfo,-- ^ Which tail calls can be compiled
                                             -- as local jumps? See Note
                                             -- [Self-recursive tail calls] in
+
                                             -- GHC.StgToCmm.Expr
-        cgd_tick_scope:: CmmTickScope       -- Tick scope for new blocks & ticks
+        cgd_tick_scope:: CmmTickScope       -- ^ Tick scope for new blocks & ticks
   }
 
 type CgBindings = IdEnv CgIdInfo
@@ -271,16 +293,22 @@ data ReturnKind
 -- fall back to AssignedDirectly.
 --
 
+initCgInfoGlobal :: DynFlags -> Module -> CgIfaceInfo -> CgInfoGlobal
+initCgInfoGlobal dflags mod info_imported
+  = MkCgInfoGlobal  { cgg_dflags    = dflags
+                    , cgg_mod       = mod
+                    , cgg_lf_info   = info_imported
+                    }
 
-initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
-initCgInfoDown dflags mod
-  = MkCgInfoDown { cgd_dflags    = dflags
-                 , cgd_mod       = mod
-                 , cgd_updfr_off = initUpdFrameOff dflags
+initCgInfoDown :: DynFlags -> CgInfoDownwards
+initCgInfoDown dflags
+  = MkCgInfoDown { cgd_updfr_off = initFrame
                  , cgd_ticky     = mkTopTickyCtrLabel
                  , cgd_sequel    = initSequel
                  , cgd_self_loop = Nothing
                  , cgd_tick_scope= GlobalScope }
+  where
+    initFrame = initUpdFrameOff dflags
 
 initSequel :: Sequel
 initSequel = Return
@@ -362,13 +390,14 @@ stateIncUsage :: CgState -> CgState -> CgState
 -- stateIncUsage@ e1 e2 incorporates in e1
 -- the heap high water mark found in e2.
 stateIncUsage s1 s2@(MkCgState { cgs_hp_usg = hp_usg })
-     = s1 { cgs_hp_usg  = cgs_hp_usg  s1 `maxHpHw`  virtHp hp_usg }
-       `addCodeBlocksFrom` s2
+     = s1 { cgs_hp_usg  = hp_usg' } `addCodeBlocksFrom` s2
+    where
+      hp_usg' = cgs_hp_usg  s1 `maxHpHw`  virtHp hp_usg
 
 addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- Add code blocks from the latter to the former
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
-s1 `addCodeBlocksFrom` s2
+addCodeBlocksFrom s1 s2
   = s1 { cgs_stmts = cgs_stmts s1 MkGraph.<*> cgs_stmts s2,
          cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
 
@@ -387,17 +416,19 @@ initHpUsage :: HeapUsage
 initHpUsage = HeapUsage { virtHp = 0, realHp = 0 }
 
 maxHpHw :: HeapUsage -> VirtualHpOffset -> HeapUsage
-hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
+hp_usg `maxHpHw` hw = hp_usg { virtHp = max_usg }
+  where
+    max_usg = virtHp hp_usg `max` hw
 
 --------------------------------------------------------
 -- Operators for getting and setting the state and "info_down".
 --------------------------------------------------------
 
 getState :: FCode CgState
-getState = FCode $ \_info_down state -> (state, state)
+getState = FCode $ \_globals _info_down state -> (state, state)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_info_down _ -> ((), state)
+setState state = FCode $ \_globals _info_down _ -> ((), state)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -434,9 +465,15 @@ setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
 
+lookupImportedLF :: Name -> FCode (Maybe LambdaFormInfo)
+lookupImportedLF name = do
+        cg_imports <- cgg_lf_info <$> getInfoGlobal :: FCode CgIfaceInfo
+        return $! lookupNameEnv cg_imports name
+
+
 withState :: FCode a -> CgState -> FCode (a,CgState)
-withState (FCode fcode) newstate = FCode $ \info_down state ->
-  case fcode info_down newstate of
+withState (FCode fcode) newstate = FCode $ \globals info_down state ->
+  case fcode globals info_down newstate of
     (retval, state2) -> ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
@@ -454,8 +491,12 @@ newUnique = do
         return u
 
 ------------------
+getInfoGlobal :: FCode CgInfoGlobal
+getInfoGlobal = FCode $ \globals _info_down state -> (globals,state)
+
+
 getInfoDown :: FCode CgInfoDownwards
-getInfoDown = FCode $ \info_down state -> (info_down,state)
+getInfoDown = FCode $ \_globals info_down state -> (info_down,state)
 
 getSelfLoop :: FCode (Maybe SelfLoopInfo)
 getSelfLoop = do
@@ -468,19 +509,19 @@ withSelfLoop self_loop code = do
         withInfoDown code (info_down {cgd_self_loop = Just self_loop})
 
 instance HasDynFlags FCode where
-    getDynFlags = liftM cgd_dflags getInfoDown
+    getDynFlags = liftM cgg_dflags getInfoGlobal
 
 getThisPackage :: FCode UnitId
 getThisPackage = liftM thisPackage getDynFlags
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
-withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
+withInfoDown (FCode fcode) info_down = FCode $ \g _ state -> fcode g info_down state
 
 -- ----------------------------------------------------------------------------
 -- Get the current module name
 
 getModuleName :: FCode Module
-getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
+getModuleName = do { info <- getInfoGlobal; return (cgg_mod info) }
 
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
@@ -542,8 +583,9 @@ getTickScope = do
 -- way around.
 tickScope :: FCode a -> FCode a
 tickScope code = do
+        globals <- getInfoGlobal
         info <- getInfoDown
-        if debugLevel (cgd_dflags info) == 0 then code else do
+        if debugLevel (cgg_dflags globals) == 0 then code else do
           u <- newUnique
           let scope' = SubScope u (cgd_tick_scope info)
           withInfoDown code info{ cgd_tick_scope = scope' }
@@ -564,13 +606,14 @@ forkClosureBody :: FCode () -> FCode ()
 forkClosureBody body_code
   = do  { dflags <- getDynFlags
         ; info   <- getInfoDown
+        ; global <- getInfoGlobal
         ; us     <- newUniqSupply
         ; state  <- getState
         ; let body_info_down = info { cgd_sequel    = initSequel
                                     , cgd_updfr_off = initUpdFrameOff dflags
                                     , cgd_self_loop = Nothing }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              ((),fork_state_out) = doFCode body_code body_info_down fork_state_in
+              ((),fork_state_out) = doFCode body_code global body_info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkLneBody :: FCode a -> FCode a
@@ -584,8 +627,9 @@ forkLneBody body_code
   = do  { info_down <- getInfoDown
         ; us        <- newUniqSupply
         ; state     <- getState
+        ; global <- getInfoGlobal
         ; let fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
-              (result, fork_state_out) = doFCode body_code info_down fork_state_in
+              (result, fork_state_out) = doFCode body_code global info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
@@ -597,9 +641,10 @@ codeOnly body_code
   = do  { info_down <- getInfoDown
         ; us        <- newUniqSupply
         ; state     <- getState
+        ; global    <- getInfoGlobal
         ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state
                                                  , cgs_hp_usg  = cgs_hp_usg state }
-                ((), fork_state_out) = doFCode body_code info_down fork_state_in
+                ((), fork_state_out) = doFCode body_code global info_down fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
 forkAlts :: [FCode a] -> FCode [a]
@@ -612,8 +657,9 @@ forkAlts branch_fcodes
   = do  { info_down <- getInfoDown
         ; us <- newUniqSupply
         ; state <- getState
+        ; global <- getInfoGlobal
         ; let compile us branch
-                = (us2, doFCode branch info_down branch_state)
+                = (us2, doFCode branch global info_down branch_state)
                 where
                   (us1,us2) = splitUniqSupply us
                   branch_state = (initCgState us1) {
@@ -672,8 +718,9 @@ getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
 getHeapUsage fcode
   = do  { info_down <- getInfoDown
         ; state <- getState
+        ; global <- getInfoGlobal
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
-                (r, fstate_out) = doFCode (fcode hp_hw) info_down fstate_in
+                (r, fstate_out) = doFCode (fcode hp_hw) global info_down fstate_in
                 hp_hw = heapHWM (cgs_hp_usg fstate_out)        -- Loop here!
 
         ; setState $ fstate_out { cgs_hp_usg = cgs_hp_usg state }
