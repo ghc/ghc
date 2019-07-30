@@ -45,6 +45,7 @@ import Outputable
 import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
+import UniqFM
 
 import OrdList
 import MkGraph
@@ -59,7 +60,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup [(Id,LambdaFormInfo)]
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -67,7 +69,7 @@ codeGen dflags this_mod data_tycons
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
-        ; cgref <- liftIO $ newIORef =<< initC
+        ; cgref <- liftIO $ newIORef =<< initC :: Stream IO b (IORef CgState)
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
                 cmm <- liftIO $ do
@@ -101,6 +103,9 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+        ; st <- liftIO $ readIORef cgref
+        ; pprTraceM "Binds:" . ppr $ cgs_binds st
+        ; return $ Prelude.map (\info -> (cg_id info, cg_lf info)) $ eltsUFM $ cgs_binds st
         }
 
 ---------------------------------------------------------------

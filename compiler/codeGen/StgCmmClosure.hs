@@ -226,6 +226,21 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
+instance Outputable LambdaFormInfo where
+    ppr (LFReEntrant top oneshot rep fvs argdesc) =
+        text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
+                                        ppr rep <+> ppr fvs <+> ppr argdesc)
+    ppr (LFThunk top hasfv updateable _sfi m_function) =
+        text "LFThunk" <> brackets (ppr top <+> ppr hasfv <+> ppr updateable <+>
+                                    text "TODO:StdFormInfo" <+> ppr m_function)
+    ppr (LFCon con) = text "LFCon" <> brackets (ppr con)
+    ppr (LFUnknown m_func) =
+        text "LFUnknown" <>
+            if m_func
+                then brackets (text "mf")
+                else empty
+    ppr (LFUnlifted) = text "LFUnlifted"
+    ppr (LFLetNoEscape) = text "LF-LNE"
 
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
