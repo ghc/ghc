@@ -5,6 +5,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -45,6 +51,12 @@ module Binary
    putByte,
    getByte,
 
+   -- * Use for deriving instances
+  --  BoundedEnumPackable, PackedBinary,
+  --  Packable(..),
+
+
+
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
@@ -70,6 +82,7 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
+-- import Util (log2Word)
 
 import Foreign
 import Data.Array
@@ -133,6 +146,28 @@ newtype Bin a = BinPtr Int
 
 castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
+
+---------------------------------------------------------------
+-- Helper instances/classes
+---------------------------------------------------------------
+
+newtype BoundedEnumBinary a = BoundedEnumBinary a
+
+instance forall a. (Bounded a, Enum a) => Binary (BoundedEnumBinary a) where
+    put_ bh (BoundedEnumBinary x)
+      | maxSize <= 127
+      = putByte bh $ fromIntegral (fromEnum x)
+      | otherwise
+      = put_ bh (fromEnum x)
+      where
+        maxSize = fromEnum (maxBound :: a) :: Int
+    get  bh
+      | maxSize <= 127
+      = BoundedEnumBinary . toEnum . fromIntegral <$> getByte bh
+      | otherwise
+      = BoundedEnumBinary . toEnum <$> get bh
+      where
+        maxSize = fromEnum (maxBound :: a) :: Int
 
 ---------------------------------------------------------------
 -- class Binary

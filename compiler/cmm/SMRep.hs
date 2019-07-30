@@ -51,6 +51,7 @@ import DynFlags
 import Outputable
 import GHC.Platform
 import FastString
+import Binary
 
 import Data.Word
 import Data.Bits
@@ -217,7 +218,22 @@ data ArgDescr
 
   | ArgGen              -- General case
         Liveness        -- Details about the arguments
+  | ArgUnknown          -- ^ For e.g. imported binds.
+                        -- Invariant: Never Unknown for binds of the module
+                        -- we are compiling.
+  deriving Eq
 
+instance Binary ArgDescr where
+  put_ bh (ArgSpec spec)    = putByte bh 0 >> put_ bh spec
+  put_ bh (ArgGen liveness) = putByte bh 1 >> put_ bh liveness
+  put_ bh (ArgUnknown)      = putByte bh 2
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> ArgSpec  <$> get bh
+      1 -> ArgGen   <$> get bh
+      2 -> pure ArgUnknown
+      _ -> panic "Invalid byte"
 
 -----------------------------------------------------------------------------
 -- Construction
@@ -543,6 +559,7 @@ instance Outputable SMRep where
 instance Outputable ArgDescr where
   ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
   ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
+  ppr (ArgUnknown) = text "ArgUnknown"
 
 pprTypeInfo :: ClosureTypeInfo -> SDoc
 pprTypeInfo (Constr tag descr)

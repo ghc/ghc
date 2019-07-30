@@ -15,7 +15,7 @@ module HscTypes (
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
-        HscStatus(..),
+        HscStatus(..), needsIfaceUpdate,
         IServ(..),
 
         -- * ModuleGraph
@@ -85,6 +85,8 @@ module HscTypes (
         mi_semantic_module,
         mi_free_holes,
         renameFreeHoles,
+
+        IfaceChanged(..), hasChanged,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -208,6 +210,8 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
+import CgTypes          ( LambdaFormInfo, CgIfaceInfoList )
+
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
 import Data.IORef
@@ -223,11 +227,26 @@ import System.Process   ( ProcessHandle )
 
 -- | Status of a compilation to hard-code
 data HscStatus
-    = HscNotGeneratingCode
-    | HscUpToDate
-    | HscUpdateBoot
-    | HscUpdateSig
-    | HscRecomp CgGuts ModSummary
+    = HscNotGeneratingCode  -- ^ Nothing to do.
+    | HscUpToDate           -- ^ Nothing to do because code already exists.
+    | HscUpdateBoot         -- ^ Update boot file result.
+    | HscUpdateSig          -- ^ Generate signature file (backpack)
+    | HscRecomp             -- ^ Recompile this module.
+        { hscs_guts       :: CgGuts -- ^ Information for the code generator.
+        , hscs_summary    :: ModSummary -- ^ Module info
+        -- TODO: Should we drop the change flag and just always write it?
+        , hscs_iface_gen :: Maybe CgIfaceInfoList -> IO (ModIface, Bool)
+                            -- ^ Function to generate iface after codegen.
+        -- , hscs_mod_details :: ModDetails
+
+        }
+
+-- | The backend (STG Onwards) might produce information
+-- we want to include in the interface filed. So we write
+-- the file later under HscRecomp (which triggers codeGen).
+needsIfaceUpdate :: HscStatus -> Bool
+needsIfaceUpdate HscRecomp {} = True
+needsIfaceUpdate _            = False
 
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
@@ -856,6 +875,30 @@ data FindResult
 ************************************************************************
 -}
 
+{- Note [Interface information from CodeGen]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We want to store some information about generated code which
+is only derived during CodeGen, however is deterministic in
+regards to the core input.
+
+This means we can get away with:
+* Adding the information after codegen has run
+* Not fingerprinting that information (it's indirectly included
+  in the core fingerprint)
+
+This seems error prone, why do we do this? The answer is rather simple:
+In order to be able to fingerprint this information we would have to recompute
+it.
+However this is expensive (rerunning the Stg -> Cmm pipeline).
+
+So instead we rely on Stg -> Cmm being deterministic instead.
+
+However if that turns out to be too hard we can always just push back
+fingerprinting.
+
+-}
+
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
 -- and can be written out to an interface file. The 'ModDetails is after
@@ -986,9 +1029,23 @@ data ModIface
         mi_decl_docs :: DeclDocMap,
                 -- ^ Docs on declarations.
 
-        mi_arg_docs :: ArgDocMap
+        mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
+
+        -- TODO: Generalize as CgInfo
+        mi_lf_info  :: Maybe [(Name,IfLFInfo)]
+                -- ^ Lambda form information, deterministically derived
+                -- from core level information. Hence not fingerprinted.
+                -- Nothing for typecheck-only interface files.
+                -- Maybe allows differentiating empty modules from lack
+                -- of information
      }
+
+data IfaceChanged = HasChanged | Unchanged deriving Eq
+
+hasChanged :: IfaceChanged -> Bool
+hasChanged HasChanged = True
+hasChanged Unchanged = False
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
@@ -1068,7 +1125,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
-                 mi_arg_docs  = arg_docs }) = do
+                 mi_arg_docs  = arg_docs,
+                 mi_lf_info   = lf_info }) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1100,6 +1158,9 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        -- put_ bh ( Nothing :: Maybe [(Name,IfLFInfo)])
+        put_ bh ( lf_info :: Maybe [(Name,IfLFInfo)])
+
 
    get bh = do
         mod         <- get bh
@@ -1133,6 +1194,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        lf_info     <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1169,7 +1231,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
-                 mi_arg_docs    = arg_docs })
+                 mi_arg_docs    = arg_docs,
+                 mi_lf_info     = lf_info })
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1211,7 +1274,8 @@ emptyModIface mod
                mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
-               mi_arg_docs    = emptyArgDocMap }
+               mi_arg_docs    = emptyArgDocMap,
+               mi_lf_info     = Nothing }
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
@@ -2546,6 +2610,7 @@ type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatchMap = CompleteMatchMap
+type PackageCgInfoEnv        = NameEnv LambdaFormInfo
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -2613,6 +2678,8 @@ data ExternalPackageState
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
+
+        eps_cg_info_env :: !PackageCgInfoEnv, -- TODO describe
 
         eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
   }

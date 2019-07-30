@@ -77,8 +77,10 @@ import Data.List        ( isInfixOf, intercalate )
 import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
+import Data.IORef
 
 import Data.Time        ( UTCTime )
+
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -173,23 +175,23 @@ compileOne' m_tc_result mHscMessage
         (HscUpToDate, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust maybe_old_linkable || isNoLink (ghcLink dflags) )
-            return hmi0 { hm_linkable = maybe_old_linkable }
+            return (expectHm hmi0) { hm_linkable = maybe_old_linkable }
         (HscNotGeneratingCode, HscNothing) ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
-            in return hmi0 { hm_linkable = mb_linkable }
+            in return (expectHm hmi0) { hm_linkable = mb_linkable }
         (HscNotGeneratingCode, _) -> panic "compileOne HscNotGeneratingCode"
         (_, HscNothing) -> panic "compileOne HscNothing"
         (HscUpdateBoot, HscInterpreted) -> do
-            return hmi0
+            return (expectHm hmi0)
         (HscUpdateBoot, _) -> do
             touchObjectFile dflags object_filename
-            return hmi0
+            return (expectHm hmi0)
         (HscUpdateSig, HscInterpreted) ->
             let linkable = LM (ms_hs_date summary) this_mod []
-            in return hmi0 { hm_linkable = Just linkable }
+            in return (expectHm hmi0) { hm_linkable = Just linkable }
         (HscUpdateSig, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule) basename dflags
@@ -202,15 +204,22 @@ compileOne' m_tc_result mHscMessage
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
-                                            mod_name HscUpdateSig))
+                                            mod_name HscUpdateSig ))
                               (Just basename)
                               Persistent
                               (Just location)
                               []
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
-            return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, HscInterpreted) -> do
+            return (expectHm hmi0) { hm_linkable = Just linkable }
+        (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
+            -- In interpreted mode the codeGen backend is not run so we generate
+            -- a interface with a codeGen info of Nothing.
+            (iface, no_change) <- iface_gen Nothing
+            -- If we interpret the code, then we can write the interface file here.
+            liftIO $ hscMaybeWriteIface dflags iface no_change
+                                (ms_location summary)
+
             (hasStub, comp_bc, spt_entries) <-
                 hscInteractive hsc_env cgguts summary
 
@@ -230,25 +239,32 @@ compileOne' m_tc_result mHscMessage
               -- be out of date.
             let linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, _) -> do
+            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
+        (HscRecomp cgguts summary iface_gen, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
+            if_ref <- newIORef Nothing :: IO (IORef (Maybe ModIface))
+            let iface_gen' cg_info = do
+                    res@(iface, _no_change) <- iface_gen cg_info
+                    writeIORef if_ref $ Just iface
+                    return res
+
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
+                               Just (HscOut src_flavour mod_name
+                                        (HscRecomp cgguts summary iface_gen')))
                               (Just basename)
                               Persistent
                               (Just location)
                               []
+            iface <- (expectJust "Iface callback") <$> readIORef if_ref
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
-            return hmi0 { hm_linkable = Just linkable }
-
+            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface}
  where dflags0     = ms_hspp_opts summary
 
        this_mod    = ms_mod summary
@@ -310,6 +326,13 @@ compileOne' m_tc_result mHscMessage
        always_do_basic_recompilation_check = case hsc_lang of
                                              HscInterpreted -> True
                                              _ -> False
+
+       expectHm (Left x)= x
+       expectHm (Right _) = error "Failedsagfafsdg"
+
+       expectHmBuilder iface (Right f) = f iface
+       expectHmBuilder _ (Left _) = error "Not builder"
+
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support), and cc files.
@@ -734,18 +757,39 @@ pipeLoop phase input_fn = do
    _
      -> do liftIO $ debugTraceMsg dflags 4
                                   (text "Running phase" <+> ppr phase)
+
+          --  (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
+          --  case phase of
+          --      HscOut {} -> do
+          --          r <- pipeLoop next_phase output_fn
+          --          whenGeneratingDynamicToo dflags $ do
+          --              setDynFlags $ dynamicTooMkDynamicDynFlags dflags
+          --              -- TODO shouldn't ignore result:
+          --              _ <- pipeLoop phase input_fn
+          --              return ()
+          --          return r
+          --      _ -> do
+          --          r <- pipeLoop next_phase output_fn
+          --          return r
+
+
+
            (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
-           r <- pipeLoop next_phase output_fn
            case phase of
-               HscOut {} ->
-                   whenGeneratingDynamicToo dflags $ do
-                       setDynFlags $ dynamicTooMkDynamicDynFlags dflags
-                       -- TODO shouldn't ignore result:
-                       _ <- pipeLoop phase input_fn
-                       return ()
-               _ ->
-                   return ()
-           return r
+               HscOut {} -> do
+                   -- We unset Opt_BuildDynamicToo for the backend,
+                   -- it makes no use of it and is instead run twice.
+                   let noDynToo = pipeLoop next_phase output_fn
+                   let dynToo = do
+                          setDynFlags $ gopt_unset dflags Opt_BuildDynamicToo
+                          r <- pipeLoop next_phase output_fn
+                          setDynFlags $ dynamicTooMkDynamicDynFlags dflags
+                          -- TODO shouldn't ignore result:
+                          _ <- pipeLoop phase input_fn
+                          return r
+                   ifGeneratingDynamicToo dflags dynToo noDynToo
+               _ -> pipeLoop next_phase output_fn
+
 
 runHookedPhase :: PhasePlus -> FilePath -> DynFlags
                -> CompPipeline (PhasePlus, FilePath)
@@ -1024,7 +1068,6 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
 -- the direction of the compilation manager).
 runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
  = do   -- normal Hsc mode, not mkdependHS
-
         PipeEnv{ stop_phase=stop,
                  src_basename=basename,
                  src_suffix=suff } <- getPipeEnv
@@ -1112,13 +1155,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+        (result, _ ) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name result) _ dflags = do
+runPhase (HscOut src_flavour mod_name result ) _ dflags = do
         location <- getLocation src_flavour mod_name
         setModLocation location
 
@@ -1149,19 +1192,30 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
-            HscRecomp cgguts mod_summary
+            HscRecomp cgguts mod_summary iface_gen
               -> do output_fn <- phaseOutputFilename next_phase
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, cgInfoExported) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
+
+                    (iface, no_change) <- liftIO $ iface_gen (Just cgInfoExported)
+
+                    -- let iface' = addIfaceCgIfaceInfo iface cgInfoExported
+
+                    -- See Note [Writing interface files]
+                    let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
+                    liftIO $ hscMaybeWriteIface if_dflags iface no_change
+                                                    (ms_location mod_summary)
+
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     return (RealPhase next_phase, outputFilename)
+
 
 -----------------------------------------------------------------------------
 -- Cmm phase

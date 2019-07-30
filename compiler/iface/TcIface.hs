@@ -8,6 +8,12 @@ Type checking of type signatures in interface files
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 module TcIface (
         tcLookupImported_maybe,
@@ -17,7 +23,10 @@ module TcIface (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+
+        --tcLFInfo,
+        tcCodeGenInfos
  ) where
 
 #include "HsVersions.h"
@@ -44,6 +53,7 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import CoreLint
+import CgTypes
 import MkCore
 import Id
 import MkId
@@ -78,6 +88,11 @@ import qualified BooleanFormula as BF
 
 import Control.Monad
 import qualified Data.Map as Map
+
+-- import PackedFlags
+-- import Data.Bits
+-- import Data.Word
+import SMRep
 
 {-
 This module takes
@@ -1602,7 +1617,7 @@ tcIfaceGlobal name
           ; _ -> via_external }}
   where
     via_external =  do
-        { hsc_env <- getTopEnv
+        { hsc_env <- getTopEnv :: TcRnIf gbl lcl HscEnv
         ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;
@@ -1820,3 +1835,39 @@ bindIfaceTyConBinderX :: (IfaceBndr -> (TyCoVar -> IfL a) -> IfL a)
 bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
   = bind_tv tv $ \tv' ->
     thing_inside (Bndr tv' vis)
+
+{-
+************************************************************************
+*                                                                      *
+                        Code generation info.
+*                                                                      *
+************************************************************************
+-}
+
+-- In order to load the LFCon the constructor has been loaded and processed
+-- first. However, they are only loaded when required by the typechecker.
+-- We solve this by delaying the loading via forkM.
+
+-- This way we only force them once we actually generate code. And at that
+-- point the typechecker will have touched every constructor reference appearing
+-- in the code.
+
+-- Forcing the LambdaForms:
+
+-- If we don't force the
+-- We also force the LambaForms to WHNF.Otherwise they end up keeping
+-- the ILFInfos alive.
+
+tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
+tcCodeGenInfos = mapSndM tcLFInfo
+
+tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
+-- tcLFInfo _ = return $ LFUnknown True
+tcLFInfo (ILFReEntrant (oneshot,rep,fvs_flag)) = do
+    return $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgUnknown)
+tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
+    pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
+tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
+tcLFInfo (ILFCon conName) =
+    forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do
+        LFCon <$!> tcIfaceDataCon conName

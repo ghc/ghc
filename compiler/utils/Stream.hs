@@ -7,8 +7,9 @@
 -- -----------------------------------------------------------------------------
 module Stream (
     Stream(..), yield, liftIO,
-    collect, fromList,
-    Stream.map, Stream.mapM, Stream.mapAccumL
+    collect, collect_, fromList,
+    Stream.map, Stream.mapM, Stream.mapAccumL_,
+    Stream.mapAccumL,
   ) where
 
 import GhcPrelude
@@ -62,13 +63,23 @@ liftIO :: IO a -> Stream IO b a
 liftIO io = Stream $ io >>= return . Left
 
 -- | Turn a Stream into an ordinary list, by demanding all the elements.
-collect :: Monad m => Stream m a () -> m [a]
+collect :: Monad m => Stream m a d -> m ([a],d)
 collect str = go str []
  where
   go str acc = do
     r <- runStream str
     case r of
-      Left () -> return (reverse acc)
+      Left result -> return (reverse acc, result)
+      Right (a, str') -> go str' (a:acc)
+
+-- | Like collect, but ignores the final result.
+collect_ :: Monad m => Stream m a d -> m [a]
+collect_ str = go str []
+ where
+  go str acc = do
+    r <- runStream str
+    case r of
+      Left _ -> return (reverse acc)
       Right (a, str') -> go str' (a:acc)
 
 -- | Turn a list into a 'Stream', by yielding each element in turn.
@@ -95,12 +106,25 @@ mapM f str = Stream $ do
 
 -- | analog of the list-based 'mapAccumL' on Streams.  This is a simple
 -- way to map over a Stream while carrying some state around.
-mapAccumL :: Monad m => (c -> a -> m (c,b)) -> c -> Stream m a ()
-          -> Stream m b c
+mapAccumL :: Monad m => (c -> a -> m (c,b)) -> c -> Stream m a d
+          -> Stream m b (c,d)
 mapAccumL f c str = Stream $ do
+  r <- runStream str
+  case r of
+    Left  d -> return (Left (c,d))
+    Right (a, str') -> do
+      (c',b) <- f c a
+      return (Right (b, mapAccumL f c' str'))
+
+-- | analog of the list-based 'mapAccumL' on Streams.  This is a simple
+-- way to map over a Stream while carrying some state around.
+-- Throws away the result of the initial stream
+mapAccumL_ :: Monad m => (c -> a -> m (c,b)) -> c -> Stream m a ()
+          -> Stream m b c
+mapAccumL_ f c str = Stream $ do
   r <- runStream str
   case r of
     Left  () -> return (Left c)
     Right (a, str') -> do
       (c',b) <- f c a
-      return (Right (b, mapAccumL f c' str'))
+      return (Right (b, mapAccumL_ f c' str'))

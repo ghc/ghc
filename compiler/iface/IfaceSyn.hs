@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -22,6 +23,9 @@ module IfaceSyn (
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
 
+        -- * CodeGen Information
+        IfLFInfo(..),
+
         -- * Binding names
         IfaceTopBndr,
         putIfaceTopBndr, getIfaceTopBndr,
@@ -37,6 +41,8 @@ module IfaceSyn (
         pprIfaceExpr,
         pprIfaceDecl,
         AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
+
+
     ) where
 
 #include "HsVersions.h"
@@ -69,9 +75,12 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import CgTypes (StandardFormInfo)
 
 import Control.Monad
 import System.IO.Unsafe
+-- import Data.Bits
+import Data.Word
 
 infixl 3 &&&
 
@@ -520,6 +529,75 @@ data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
 
 data IfaceJoinInfo = IfaceNotJoinPoint
                    | IfaceJoinPoint JoinArity
+
+{-
+************************************************************************
+*                                                                      *
+                CodeGen Information
+*                                                                      *
+************************************************************************
+-}
+
+{- Note [Exported lambda form info]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We only export a subset of the full information, in particular:
+* LNE/Unknown is never exported, the former is not exported and the
+  later not possible as we know the form of all internal binds.
+* Not top level flag, all exported bindings are naturally top level binds.
+
+We do export:
+* RepArity: Allows us to directly jump into exactly saturated functions and
+  tag references to functions.
+* no_fvs: Used by nodeMustPointToIt. Might allow us to avoid assigning R1,
+* same for StandardFormInfo,
+* maybeFunction might allow us to avoid a slowcall in favour of jumping to
+  entry code.
+* The constructor (by name). Used to tag references.
+
+TODO:
+* It's not clear if it's better to rederive LFUnlifted from the type or
+  to simply cache it in the interface file.
+* Similar but slightly more complex for unary data cons, as we also have
+  to ensure there is an unfolding.
+-}
+
+data IfLFInfo =
+    -- | We encode the fields bitwise:
+    --    bit 0: OneShotInfo
+    --    bit 1: no fvs
+    --    bit 2-15 arity
+    ILFReEntrant
+        (Word8,RepArity,Bool)
+        -- !Word32
+
+        -- TopLevelFlag => Implied true
+        -- !OneShotInfo    -- => Not currently used by codegen, but we store it just in case
+        -- !RepArity       -- Arity. Very useful!  Invariant: always > 0
+        -- !Bool           -- no fvs <=> Used to determine nodePointsTo, True
+        -- ArgDescr        -- Argument descriptor - not encoded
+
+  -- | We encode some fields bitwise:
+    --    bit 0: no fvs
+    --    bit 1: updateable
+    --    bit 2: might be function
+  | ILFThunk             -- Thunk (zero arity)
+        (Bool,Bool,Bool)
+        -- TopLevelFlag => Implied True
+        -- !Bool           -- True <=> no free vars
+        -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        !StandardFormInfo
+        -- !Bool           -- True <=> *might* be a function type
+
+  | ILFCon               -- A saturated constructor application
+        !Name            -- The constructor Name
+
+  | ILFUnlifted          -- A value of unboxed type;
+                        -- always a value, needs evaluation
+
+
+
+
 
 {-
 Note [Empty case alternatives]
@@ -1324,6 +1402,28 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
+
+instance Outputable IfLFInfo where
+    ppr (ILFReEntrant fields) =
+        text "LFReEntrant" <+> ppr fields
+        -- text "LFReEntrant" <> brackets (ppr oneshot <+>
+        --                                 ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
+      where
+          -- oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
+          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          -- rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
+    ppr (ILFThunk fields sfi) =
+        text "LFThunk" <+> ppr fields <+> ppr sfi
+                                -- brackets (ppr fvs_flag <+> ppr upd_flag <+>
+                                    -- ppr sfi <+> ppr fun_flag)
+      where
+          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
+          -- upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          -- fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
+    ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
+    ppr (ILFUnlifted) = text "LFUnlifted"
+
+
 
 {-
 ************************************************************************
@@ -2328,3 +2428,30 @@ instance Binary IfaceTyConParent where
 instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
+
+
+instance Binary IfLFInfo where
+    -- TODO: We could pack the bytes somewhat
+
+    put_ bh (ILFReEntrant fields) =
+        putByte bh 0 >>
+        put_ bh (fields :: (Word8, RepArity, Bool))
+    put_ bh (ILFThunk encoded_flds sfi) =
+        putByte bh 1 >>
+        put_ bh (encoded_flds :: (Bool, Bool, Bool)) >>
+        put_ bh sfi
+    put_ bh (ILFCon conName) =
+        putByte bh 2 >>
+        put_ bh conName
+    put_ bh (ILFUnlifted) =
+        putByte bh 3
+    get bh = do
+        tag <- getByte bh
+        case tag of
+            0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, Bool))
+            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
+            2 -> pure ILFCon <*> get bh
+            3 -> pure ILFUnlifted
+            _ -> panic "Invalid byte"
+
+

@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation: bindings
@@ -90,8 +92,8 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   gen_code dflags _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
     = do
-         cg_info <- getCgIdInfo f
-         let closure_rep   = mkStaticClosureFields dflags
+         !cg_info <- getCgIdInfo f
+         let !closure_rep   = mkStaticClosureFields dflags
                                     indStaticInfoTable ccs MayHaveCafRefs
                                     [unLit (idInfoToAmode cg_info)]
          emitDataLits closure_label closure_rep
