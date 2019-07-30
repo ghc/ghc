@@ -148,9 +148,9 @@ configurePackage context@Context {..} = do
             (argList ++ ["--flags=" ++ unwords flagList, v])
 
     dir <- Context.buildPath context
-    files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" <//> "*"
+    files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" -/- "**"
                                               , dir -/- "*.buildinfo"
-                                              , dir -/- "lib" <//> "*"
+                                              , dir -/- "lib" -/- "**"
                                               , dir -/- "config.*" ]
     produces files
 
