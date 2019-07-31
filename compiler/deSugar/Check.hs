@@ -603,7 +603,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
       let zipped = zip orig_lbls [ x | PmVar x <- arg_var_pats ]
           guards = map (\(name,pvec) -> case lookup name zipped of
-                            Just x  -> PmGrd pvec (idToPmExpr x)
+                            Just x  -> PmGrd pvec (PmExprVar x)
                             Nothing -> panic "translateConPatVec: lookup")
                        translated_pats
 
@@ -797,9 +797,6 @@ mkFreshPmExprVarRepresenting hs_expr = do
   core_expr <- dsExpr hs_expr
   PmExprVar <$> mkPmId (exprType core_expr)
 
-mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
-mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
-
 {- Note [Guards and Approximation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Even if the algorithm is really expressive, the term oracle we use is not.
@@ -983,7 +980,7 @@ patVecToPmExprs = mapMaybe pmPatToPmExpr
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards (See Note [Translating As Patterns])
 pmPatToPmExpr :: PmPat -> Maybe PmExpr
-pmPatToPmExpr (PmVar { pm_var_id  = x }) = Just (idToPmExpr x)
+pmPatToPmExpr (PmVar { pm_var_id  = x }) = Just (PmExprVar x)
 pmPatToPmExpr (PmCon { pm_con_con = con, pm_con_args = args })
   = Just (PmExprCon con (patVecToPmExprs args))
 pmPatToPmExpr _ = Nothing -- drop the guards
@@ -1184,7 +1181,7 @@ pmcheckGuardsI :: [PatVec] -> Delta -> PmM PartialResult
 pmcheckGuardsI gvs delta = incrCheckPmIterDs >> pmcheckGuards gvs delta
 {-# INLINE pmcheckGuardsI #-}
 
--- | Check the list of guards
+-- | Check the list of mutually exclusive guards
 pmcheckGuards :: [PatVec] -> Delta -> PmM PartialResult
 pmcheckGuards []       delta = return (usimple delta)
 pmcheckGuards (gv:gvs) delta = do
@@ -1218,7 +1215,7 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
 -- Var
 pmcheck (PmVar x : ps) guards (y : vva) delta = pmcheckI ps guards vva delta'
   where
-    delta' = expectJust "x is fresh" $ solveVar delta x (idToPmExpr y)
+    delta' = expectJust "x is fresh" $ solveVar delta x (PmExprVar y)
 
 -- ConVar
 pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
@@ -1236,7 +1233,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
   -- Check <next equations>
-  pr_neg <- addRefutableAltCon delta x con >>= \case
+  pr_neg <- tryAddRefutableAltCon delta x con >>= \case
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
 
@@ -1408,7 +1405,7 @@ pprValVecSubstituted vva delta = pprUncovered (vector, delta)
 -- | Deeply lookup a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
 substInValVec :: Delta -> ValVec -> [PmExpr]
-substInValVec delta = map (exprDeepLookup delta . idToPmExpr)
+substInValVec delta = map (exprDeepLookup delta . PmExprVar)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
