@@ -121,13 +121,28 @@ initIM ty = case splitTyConApp_maybe ty of
 markMatched :: ConLike -> IncompleteMatches -> IncompleteMatches
 markMatched con (IM ms) = IM (fmap (`delOneFromUniqSet` con) ms)
 
-ensureInhabited :: Monad m => (ConLike -> m Bool) -> IncompleteMatches -> m (Maybe IncompleteMatches)
+ensureInhabited :: Monad m
+                => (ConLike -> m Bool)   -- Oracle: True <=> this ConLike is inhabited
+                -> IncompleteMatches
+                -> m (Maybe IncompleteMatches)
+   -- Returns (Just im) guarantees that at least one member
+   -- of each ConLikeSet satisfies the oracle
+   --
+   -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
+   --     remain that do not statisfy it.  This lazy approach just
+   --     avoids doing unnecessary work.
 ensureInhabited inh_test (IM ms) = runMaybeT (IM <$> traverse one_set ms)
   where
     one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
+
+    find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT m ConLikeSet
+    -- (find_one_inh cs cls) iterates over cls, deleting from cs
+    -- any uninhabited elements of cls.  Stop (returning Just cs)
+    -- when you see an inhabited element; return Nothing if all
+    -- are uninhabited
     find_one_inh _  [] = mzero
     find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
-      True -> pure cs
+      True  -> pure cs
       False -> find_one_inh (delOneFromUniqSet cs con) cons
 
 -- -----------------------------------------------------------------------
@@ -594,9 +609,16 @@ mkOneConFull x con = do
 -- 'InhabitationCandidate' @ic@ with arguments @arg_vars@ is inhabited by
 -- consulting 'pmIsSatisfiable'. Return @Just (new_delta, ic, ex_tvs, arg_vars)@
 -- if it is.
+--
+-- Suppose K :: forall a b x y. (x,b) -> y -> T a b
+--   where the x,y are the existentials
+-- (mkOneSatifiableConFull delta x K) extends delta with the
+--   positive information x :-> K x' y' p q, for some fresh x', y', p, q.
+--   Return the fresh [x',y'] existentials and [p,q] args
+-- Return Nothing if such a match is contradictory with delta.
 mkOneSatisfiableConFull
   :: Delta -> Id -> ConLike
-  -> PmM (Maybe (Delta, InhabitationCandidate, [TyVar], [Id]))
+  -> PmM (Maybe (Delta, [TyVar], [Id]))
 mkOneSatisfiableConFull delta x con = do
   -- mkOneConFull doesn't cope with type families, so we have to normalise
   -- x's result type first and introduce an auxiliary binding.
@@ -605,10 +627,10 @@ mkOneSatisfiableConFull delta x con = do
   let res_ty = maybe (idType x) fstOf3 mb_res_ty
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
-  (ic, ex_tvs, arg_vars) <- mkOneConFull y con
+  (_ic, ex_tvs, arg_vars) <- mkOneConFull y con
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
-  pure ((,ic,ex_tvs,arg_vars) <$> mb_delta)
+  pure ((,ex_tvs,arg_vars) <$> mb_delta)
 
 -- | Generate all 'InhabitationCandidate's for a given type. The result is
 -- either @'Left' ty@, if the type cannot be reduced to a closed algebraic type
@@ -794,7 +816,7 @@ data PossibleShape
       --   In <rhs> we have x ~ Just y
       -- The PmExpr is: a data con application, literal, or variable
 
-  | CompleteSets !IncompleteMatches
+  | CompleteSets TyCon !IncompleteMatches
 
   | NoInfoYet    -- The type of the variable is not (yet) a data type
 
@@ -901,8 +923,8 @@ refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
   pure ((, []) <$> solveVar delta x (PmExprCon l []))
 refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
   mkOneSatisfiableConFull delta x con >>= \case
-    Nothing                             -> pure Nothing
-    Just (delta1, _ic, ex_tvs2, arg_vas) -> do
+    Nothing                         -> pure Nothing
+    Just (delta1, ex_tvs2, arg_vas) -> do
       -- If we have identical constructors but different existential
       -- tyvars, then generate extra equality constraints to ensure the
       -- existential tyvars. Since ex_tvs2 are fresh, this will never refute.
@@ -1065,6 +1087,7 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
           -- The old delta is sufficient here: We have already gotten rid of cl
           let test_inhabited con = isJust <$> mkOneSatisfiableConFull delta x con
           ensureInhabited test_inhabited im1 >>= \case
+          ensureInhabited (testInhabited delta con ty) >>= \case
             Nothing -> pure Nothing
             Just im2 -> pure (Just (VI ty (CompleteSets im2) neg'))
         _ -> pure (Just (VI ty pos neg'))
@@ -1077,6 +1100,14 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
         Nothing    -> Just (VI ty pos neg') -- ... which is incomparable, so
                                             --     might refute later
     go pos = pure (Just (VI ty pos neg'))
+
+testInhabited :: Delta -> ConLike -> Type -> DsM Bool
+-- (testInhabited delta K ty) Returns False if
+-- a non-bottom value (v::ty) cannot possibly be of form (K _ _ _)
+-- Returning True is always sound
+--
+-- It's like DataCon.dataConCannotMatch, but more clever because it
+-- takes the facts in Delta into account
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
