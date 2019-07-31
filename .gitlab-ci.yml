@@ -127,7 +127,7 @@ lint-submods-marge:
     refs:
       - merge_requests
     variables:
-      - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
+      - "$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/"
 
 lint-submods-mr:
   extends: .lint-submods
@@ -139,7 +139,7 @@ lint-submods-mr:
       - merge_requests
   except:
     variables:
-      - $CI_MERGE_REQUEST_LABELS =~ /.*wip/marge_bot_batch_merge_job.*/
+      - "$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/"
 
 lint-submods-branch:
   extends: .lint-submods
