@@ -1,6 +1,7 @@
 module TyCoFVs
   (
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
+        exactTyCoVarsOfType, exactTyCoVarsOfTypes,
         tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
         tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
@@ -12,7 +13,7 @@ module TyCoFVs
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
         almostDevoidCoVarOfCo,
-        injectiveVarsOfType,
+        injectiveVarsOfType, injectiveVarsOfTypes,
 
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
@@ -25,7 +26,7 @@ module TyCoFVs
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type (coreView)
+import {-# SOURCE #-} Type (coreView, tcView)
 
 import TyCoRep
 import TyCon
@@ -299,6 +300,75 @@ tyCoVarsOfTypesList :: [Type] -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 
+{-
+************************************************************************
+*                                                                      *
+          The "exact" free variables of a type
+*                                                                      *
+************************************************************************
+
+Note [Silly type synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  type T a = Int
+What are the free tyvars of (T x)?  Empty, of course!
+
+exactTyCoVarsOfType is used by the type checker to figure out exactly
+which type variables are mentioned in a type.  It only matters
+occasionally -- see the calls to exactTyCoVarsOfType.
+-}
+
+exactTyCoVarsOfType :: Type -> TyCoVarSet
+-- Find the free type variables (of any kind)
+-- but *expand* type synonyms.  See Note [Silly type synonym] above.
+exactTyCoVarsOfType ty
+  = go ty
+  where
+    go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
+    go (TyVarTy tv)         = goVar tv
+    go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
+    go (LitTy {})           = emptyVarSet
+    go (AppTy fun arg)      = go fun `unionVarSet` go arg
+    go (FunTy _ arg res)    = go arg `unionVarSet` go res
+    go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
+    go (CastTy ty co)       = go ty `unionVarSet` goCo co
+    go (CoercionTy co)      = goCo co
+
+    goMCo MRefl    = emptyVarSet
+    goMCo (MCo co) = goCo co
+
+    goCo (Refl ty)            = go ty
+    goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
+    goCo (TyConAppCo _ _ args)= goCos args
+    goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
+    goCo (ForAllCo tv k_co co)
+      = goCo co `delVarSet` tv `unionVarSet` goCo k_co
+    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
+    goCo (CoVarCo v)         = goVar v
+    goCo (HoleCo h)          = goVar (coHoleCoVar h)
+    goCo (AxiomInstCo _ _ args) = goCos args
+    goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
+    goCo (SymCo co)          = goCo co
+    goCo (TransCo co1 co2)   = goCo co1 `unionVarSet` goCo co2
+    goCo (NthCo _ _ co)      = goCo co
+    goCo (LRCo _ co)         = goCo co
+    goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
+    goCo (KindCo co)         = goCo co
+    goCo (SubCo co)          = goCo co
+    goCo (AxiomRuleCo _ c)   = goCos c
+
+    goCos cos = foldr (unionVarSet . goCo) emptyVarSet cos
+
+    goProv UnsafeCoerceProv     = emptyVarSet
+    goProv (PhantomProv kco)    = goCo kco
+    goProv (ProofIrrelProv kco) = goCo kco
+    goProv (PluginProv _)       = emptyVarSet
+
+    goVar v = unitVarSet v `unionVarSet` go (varType v)
+
+exactTyCoVarsOfTypes :: [Type] -> TyVarSet
+exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
+
 -- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
 -- make the function quadratic.
@@ -536,6 +606,15 @@ almost_devoid_co_var_of_types (ty:tys) cv
 ------------- Injective free vars -----------------
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
+-- Specifically, it finds the free variables while:
+--
+-- * Expanding type synonyms
+--
+-- * Ignoring the coercion in @(ty |> co)@
+--
+-- * Ignoring the non-injective fields of a 'TyConApp'
+--
+--
 -- For example, if @F@ is a non-injective type family, then:
 --
 -- @
@@ -569,6 +648,19 @@ injectiveVarsOfType = go
     go LitTy{}           = emptyFV
     go (CastTy ty _)     = go ty
     go CoercionTy{}      = emptyFV
+
+-- | Returns the free variables of a 'Type' that are in injective positions.
+-- Specifically, it finds the free variables while:
+--
+-- * Expanding type synonyms
+--
+-- * Ignoring the coercion in @(ty |> co)@
+--
+-- * Ignoring the non-injective fields of a 'TyConApp'
+--
+-- See @Note [When does a tycon application need an explicit kind signature?]@.
+injectiveVarsOfTypes :: [Type] -> FV
+injectiveVarsOfTypes tys = mapUnionFV injectiveVarsOfType tys
 
 ------------- No free vars -----------------
 
