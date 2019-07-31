@@ -1891,7 +1891,7 @@ updRetInertCans upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
                      ; let (res, cans') = upd_fn (inert_cans inerts)
-                     ; TcM.writeTcRef' is_var (inerts { inert_cans = cans' })
+                     ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
                      ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
