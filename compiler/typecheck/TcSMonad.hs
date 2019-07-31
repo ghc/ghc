@@ -2844,7 +2844,7 @@ nestTcS (TcS thing_inside)
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
 
-       ; TcM.writeTcRef' inerts_var  -- See Note [Propagate the solved dictionaries]
+       ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
                         (inerts { inert_solved_dicts = inert_solved_dicts new_inerts
                                 , inert_cans = nxt_ic })
 
