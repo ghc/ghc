@@ -106,9 +106,7 @@ module BasicTypes(
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
-        SpliceExplicitFlag(..),
-
-        Satisfiability (..)
+        SpliceExplicitFlag(..)
    ) where
 
 import GhcPrelude
@@ -1646,12 +1644,3 @@ data SpliceExplicitFlag
           = ExplicitSplice | -- ^ <=> $(f x y)
             ImplicitSplice   -- ^ <=> f x y,  i.e. a naked top level expression
     deriving Data
-
--- | Satisfiability decisions as a data type. The @state@ is useful for
--- recording any new facts deduced, while the @proof@ can carry a witness for
--- satisfiability and might even be instantiated to 'Data.Void.Void' to
--- degenerate into a semi-decision predicate.
-data Satisfiability state proof
-  = Unsatisfiable
-  | PossiblySatisfiable state
-  | Satisfiable state !proof
