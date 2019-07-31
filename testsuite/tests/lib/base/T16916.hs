@@ -2,6 +2,7 @@ module Main where
 
 import Control.Concurrent
 import Foreign.C
+import GHC.Clock
 import GHC.Event
 import System.CPUTime
 import System.Posix.Types
@@ -21,12 +22,15 @@ makeTestSocketFd = do
 callback :: FdKey -> Event -> IO ()
 callback _ _ = return ()
 
-idleCpuUsage :: IO Integer
+-- Idle CPU usage with 0 for 0% and 10^12 for 100%
+idleCpuUsage :: IO Double
 idleCpuUsage = do
+  startTime <- getMonotonicTime
   startCPUTime <- getCPUTime
-  threadDelay 500000
+  threadDelay 1000000
   endCPUTime <- getCPUTime
-  return $ endCPUTime - startCPUTime
+  endTime <- getMonotonicTime
+  return $ fromIntegral (endCPUTime - startCPUTime) / (endTime - startTime)
 
 main :: IO ()
 main = do
@@ -42,4 +46,4 @@ main = do
 
   -- CPU consumption should roughly be the same when just idling vs
   -- when idling after the event been triggered
-  print $ (fromIntegral eventTriggeredUsage / fromIntegral noEventUsage) < 2.0
+  print $ eventTriggeredUsage / noEventUsage < 2.0
