@@ -29,7 +29,7 @@ main = do
 
         BuildRoot buildRoot = CommandLine.lookupBuildRoot argsMap
 
-        rebuild = [ (RebuildLater, buildRoot -/- "stage0/**/*")
+        rebuild = [ (RebuildLater, buildRoot -/- "stage0/**")
                   | CommandLine.lookupFreeze1 argsMap ]
 
     cwd <- getCurrentDirectory
