@@ -96,7 +96,7 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) = do
     root <- buildRootRules
     let dir         = buildDir context
-        generated f = (root -/- dir ++ "/**/*.hs") ?== f && not ("**/autogen/*" ?== f)
+        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("**/autogen/*" ?== f)
         go gen file = generate file context gen
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
@@ -184,7 +184,7 @@ generateRules = do
         priority 2.0 $ (prefix -/- "settings") %> go generateSettings
 
     -- TODO: simplify, get rid of fake rts context
-    root -/- generatedDir ++ "/**/*" %> \file -> do
+    root -/- generatedDir -/- "**/*" %> \file -> do
         withTempDir $ \dir -> build $
             target (rtsContext Stage1) DeriveConstants [] [file, dir]
   where
