@@ -15,7 +15,10 @@ module PmOracle (
 
         Delta, pmInitialTmTyCs, canDiverge,
 
-        inhabitants, tryAddRefutableAltCon, refineToAltCon, solveVar,
+        inhabitants,
+        tryAddRefutableAltCon, -- Add a negative equality
+        refineToAltCon,        -- Add a positive equality x ~ K _ _
+        solveVar,              -- Add a positive equality x ~ e
 
         -- misc.
         wrapUpRefutableShapes, exprDeepLookup
@@ -139,6 +142,13 @@ nameType name ty = do
   let occname = mkVarOccFS (fsLit (name++"_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
   return (newEvVar idname ty)
+
+{- *********************************************************************
+*                                                                      *
+*         The Delta data type: what the oracle knows                   *
+*                                                                      *
+********************************************************************* -}
+
 
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
@@ -775,7 +785,6 @@ data VarInfo
   , vi_pos :: !PossibleShape  -- Positive info: things it could be
   , vi_neg :: ![PmAltCon]     -- Negative info: it is not headed by these AltCons
       -- Invariant: vi_pos and vi_neg never contradict each other
-
   }
 
 data PossibleShape

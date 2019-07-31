@@ -165,6 +165,7 @@ instance Monoid Diverged where
   mempty = NotDiverged
   mappend = (Semi.<>)
 
+-- | A triple <C,U,D> of covered, uncovered, and divergent sets.
 data PartialResult = PartialResult {
                         presultCovered :: Covered
                       , presultUncovered :: Uncovered
@@ -1133,24 +1134,17 @@ Main functions are:
 
 * pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
 
-  Checks redundancy, coverage and inaccessibility, using auxilary functions
-  `pmcheckGuards` and `pmcheckHd`. Mainly handles the guard case which is
-  common in all three checks (see paper) and calls `pmcheckGuards` when the
-  whole clause is checked, or `pmcheckHd` when the pattern vector does not
-  start with a guard.
+  This function implements functions `covered`, `uncovered` and
+  `divergent` from the paper at once. Calls out to the auxilary function
+  `pmcheckGuards` for handling (possibly multiple) guarded RHSs when the whole
+  clause is checked. Slightly different from the paper because it does not even
+  produce the covered and uncovered sets. Since we only care about whether a
+  clause covers SOMETHING or if it may forces ANY argument, we only store a
+  boolean in both cases, for efficiency.
 
-* pmcheckGuards :: [PatVec] -> ValVec -> PmM PartialResult
+* pmcheckGuards :: [PatVec] -> ValVec -> Delta -> PmM PartialResult
 
   Processes the guards.
-
-* pmcheckHd :: Pattern -> PatVec -> [PatVec]
-          -> ValAbs -> ValVec -> PmM PartialResult
-
-  Worker: This function implements functions `covered`, `uncovered` and
-  `divergent` from the paper at once. Slightly different from the paper because
-  it does not even produce the covered and uncovered sets. Since we only care
-  about whether a clause covers SOMETHING or if it may forces ANY argument, we
-  only store a boolean in both cases, for efficiency.
 -}
 
 -- | Lift a pattern matching action from a single value vector abstration to a
@@ -1194,7 +1188,12 @@ pmcheckGuards (gv:gvs) delta = do
 -- | Matching function: Check simultaneously a clause (takes separately the
 -- patterns and the list of guards) for exhaustiveness, redundancy and
 -- inaccessibility.
-pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
+pmcheck
+  :: PatVec   -- ^ Patterns of the clause
+  -> [PatVec] -- ^ (Possibly multiple) guards of the clause
+  -> ValVec   -- ^ The value vector abstraction to match against
+  -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
+  -> PmM PartialResult
 pmcheck [] guards [] delta
   | null guards = return $ mempty { presultCovered = Covered }
   | otherwise   = pmcheckGuardsI guards delta
@@ -1212,7 +1211,7 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
   let delta' = expectJust "y was fresh" $ solveVar delta y e
   pmcheckI (pv ++ ps) guards (y : vva) delta'
 
--- Var
+-- Var: Add x :-> y to the oracle and recurse
 pmcheck (PmVar x : ps) guards (y : vva) delta = pmcheckI ps guards vva delta'
   where
     delta' = expectJust "x is fresh" $ solveVar delta x (PmExprVar y)
@@ -1220,19 +1219,21 @@ pmcheck (PmVar x : ps) guards (y : vva) delta = pmcheckI ps guards vva delta'
 -- ConVar
 pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
         guards (x : vva) delta = do
-  -- Split the value vector into two value vectors: One representing the current
-  -- constructor, the other representing everything but the current constructor
-  -- (and the already known impossible constructors).
+  -- E.g   f (K p q) = <rhs>
+  --       <next equation>
+  -- Split the value vector into two value vectors:
+  --    * one for <rhs>, binding x to (K p q)
+  --    * one for <next equation>, recording that x is /not/ (K _ _)
 
+  -- Stuff for <rhs>
   pr_pos <- refineToAltCon delta x con ex_tvs >>= \case
     Nothing -> pure mempty
     Just (delta', arg_vas) ->
-      -- Check <rhs>
       pmcheckI (args ++ ps) guards (arg_vas ++ vva) delta'
 
+  -- Stuff for <next equation>
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
-  -- Check <next equations>
   pr_neg <- tryAddRefutableAltCon delta x con >>= \case
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
