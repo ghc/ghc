@@ -1891,7 +1891,7 @@ updRetInertCans upd_fn
   = do { is_var <- getTcSInertsRef
        ; wrapTcS (do { inerts <- TcM.readTcRef is_var
                      ; let (res, cans') = upd_fn (inert_cans inerts)
-                     ; TcM.writeTcRef is_var (inerts { inert_cans = cans' })
+                     ; TcM.writeTcRef' is_var (inerts { inert_cans = cans' })
                      ; return res }) }
 
 updInertCans :: (InertCans -> InertCans) -> TcS ()
@@ -2666,7 +2666,7 @@ getGlobalRdrEnvTcS = wrapTcS TcM.getGlobalRdrEnv
 bumpStepCountTcS :: TcS ()
 bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
                                     ; n <- TcM.readTcRef ref
-                                    ; TcM.writeTcRef ref (n+1) }
+                                    ; TcM.writeTcRef' ref (n+1) }
 
 csTraceTcS :: SDoc -> TcS ()
 csTraceTcS doc
@@ -2844,7 +2844,7 @@ nestTcS (TcS thing_inside)
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
 
-       ; TcM.writeTcRef inerts_var  -- See Note [Propagate the solved dictionaries]
+       ; TcM.writeTcRef' inerts_var  -- See Note [Propagate the solved dictionaries]
                         (inerts { inert_solved_dicts = inert_solved_dicts new_inerts
                                 , inert_cans = nxt_ic })
 
@@ -3337,7 +3337,7 @@ useVars co_vars
        ; wrapTcS $
          do { tcvs <- TcM.readTcRef ref
             ; let tcvs' = tcvs `unionVarSet` co_vars
-            ; TcM.writeTcRef ref tcvs' } }
+            ; TcM.writeTcRef' ref tcvs' } }
 
 -- | Equalities only
 setWantedEq :: TcEvDest -> Coercion -> TcS ()
