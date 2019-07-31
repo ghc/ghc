@@ -334,7 +334,6 @@ Library
         CoreStats
         MkCore
         PprCore
-        IncompleteMatches
         PmExpr
         PmPpr
         PmOracle
