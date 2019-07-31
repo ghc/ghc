@@ -33,12 +33,12 @@ import PmExpr
 import DynFlags
 import Outputable
 import ErrUtils
-import BasicTypes
 import Util
 import Bag
 import UniqSet
 import Id
 import VarEnv
+import UniqDFM
 import Var           (EvVar)
 import Name
 import UniqSupply
@@ -65,6 +65,7 @@ import Data.Foldable (foldlM)
 import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Semigroup as Semigroup
 import FamInstEnv
 
 type PmM = DsM
@@ -97,29 +98,28 @@ mkIdCoercion x ty delta
 
 type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
 
-newtype IncompleteMatches = IM (NonEmpty ConLikeSet)
+data IncompleteMatches = IM TyCon (NonEmpty ConLikeSet)
   -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
   --
   -- NonEmpty because the empty case would mean that there
   --   are no matching constructors at all
 
 instance Outputable IncompleteMatches where
-  ppr (IM cs) = ppr (NonEmpty.toList cs)
+  ppr (IM _tc cs) = ppr (NonEmpty.toList cs)
 
 initIM :: Type -> DsM (Maybe IncompleteMatches)
 initIM ty = case splitTyConApp_maybe ty of
   Nothing -> pure Nothing
   Just (tc, _) -> do
     let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc
-    let maybe_to_list = maybe [] (:[])
-    let rdcs = maybe_to_list mb_rdcs
+    let rdcs = maybeToList mb_rdcs
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
-    pure (IM . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
+    pure (IM tc . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
 
 markMatched :: ConLike -> IncompleteMatches -> IncompleteMatches
-markMatched con (IM ms) = IM (fmap (`delOneFromUniqSet` con) ms)
+markMatched con (IM tc ms) = IM tc (fmap (`delOneFromUniqSet` con) ms)
 
 ensureInhabited :: Monad m
                 => (ConLike -> m Bool)   -- Oracle: True <=> this ConLike is inhabited
@@ -131,11 +131,11 @@ ensureInhabited :: Monad m
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
-ensureInhabited inh_test (IM ms) = runMaybeT (IM <$> traverse one_set ms)
+ensureInhabited inh_test (IM tc ms) = runMaybeT (IM tc <$> traverse one_set ms)
   where
     one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
 
-    find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT m ConLikeSet
+    -- find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT m ConLikeSet
     -- (find_one_inh cs cls) iterates over cls, deleting from cs
     -- any uninhabited elements of cls.  Stop (returning Just cs)
     -- when you see an inhabited element; return Nothing if all
@@ -215,41 +215,80 @@ instance Outputable InhabitationCandidate where
            , text "ic_ty_cs          =" <+> ppr ty_cs
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
--- | Like 'pmIsSatisfiable', but only checks if term and type constraints are
--- satisfiable, and doesn't bother checking anything related to strict argument
--- types.
-tmTyCsAreSatisfiable
-  :: Delta       -- ^ The ambient term and type constraints
-                 --   (known to be satisfiable).
-  -> Bag TmVarCt -- ^ The new term constraint.
-  -> Bag EvVar   -- ^ The new type constraints.
-  -> PmM (Maybe Delta)
-       -- ^ @'Just' delta@ if the constraints (@delta@) are
-       -- satisfiable. 'Nothing' otherwise.
-tmTyCsAreSatisfiable
-    (MkDelta{ delta_tm_cs = amb_tm_cs, delta_ty_cs = amb_ty_cs })
-    new_tm_cs new_ty_cs = do
-  let ty_cs = new_ty_cs `unionBags` amb_ty_cs
-  sat_ty <- if isEmptyBag new_ty_cs
-               then pure True
-               else tyOracle ty_cs
-  pure $ case (sat_ty, pmOracle amb_tm_cs new_tm_cs) of
-           (True, Just term_cs) -> ensureAllPossibleSetsInhabited (MkDelta ty_cs term_cs)
-           _unsat               -> Nothing
-
-ensureAllPossibleSetsInhabited :: Delta -> Maybe Delta
-ensureAllPossibleSetsInhabited delta@MkDelta{ delta_tm_cs = TS env } = delta{ delta_tm_cs = ts' }
+ensureAllPossibleSetsInhabited :: Delta -> PmM (Maybe Delta)
+ensureAllPossibleSetsInhabited delta@MkDelta{ delta_tm_cs = TS env }
+  = runMaybeT (set_tm_cs_env delta <$> traverseDVarEnv go env)
   where
-    ts' = TS <$> traverseDVarEnv go env
+    set_tm_cs_env delta env = delta{ delta_tm_cs = TS env }
     traverseDVarEnv f
-      = fmap listToUDFM_Directly
+      = fmap listToUDFM
       . traverse (\(u,a) -> (u,) <$> f a)
       . udfmToList
-    go (VI ty (CompleteSets im)) = undefined
-      -- | any new constraints influence ty = do stuff
-      -- But how to call mkOneConFull anyway?! Needs the Id... so another
-      -- refactor incoming. Proabably should attach the Id to CompleteSets
-      -- instead anyway.
+    go (VI ty (CompleteSets im) neg) = do
+      im' <- MaybeT (ensureInhabited (testInhabited delta ty) im)
+      pure (VI ty (CompleteSets im') neg)
+    go vi = pure vi
+
+-- | Given a 'Delta', check if it is compatible with new facts encoded in this
+-- this check. If so, return 'Just' a potentially extended 'Delta'. Return
+-- 'Nothing' if unsatisfiable.
+newtype SatisfiabilityCheck = SC (Delta -> PmM (Maybe Delta))
+
+-- | Check the given 'Delta' for satisfiability by the the given
+-- 'SatisfiabilityCheck'. Return 'Just' a new, potentially extended, 'Delta' if
+-- successful, and 'Nothing' otherwise.
+runSatisfiabilityCheck :: Delta -> SatisfiabilityCheck -> PmM (Maybe Delta)
+runSatisfiabilityCheck delta (SC chk) = chk delta
+
+instance Semigroup SatisfiabilityCheck where
+  -- This is @a >=> b@ from MaybeT PmM
+  SC a <> SC b = SC c
+    where
+      c delta = a delta >>= \case
+        Nothing     -> pure Nothing
+        Just delta' -> b delta'
+
+instance Monoid SatisfiabilityCheck where
+  -- We only need this because of mconcat (which we use in place of sconcat,
+  -- which requires NonEmpty lists as argument, making all call sites ugly)
+  mempty = SC (pure . Just)
+
+-- | A 'SatisfiabilityCheck' based on new term-level constraints.
+-- Returns a new 'Delta' if the new constraints are compatible with existing
+-- ones.
+tmIsSatisfiable :: Bag TmVarCt -> SatisfiabilityCheck
+tmIsSatisfiable new_tm_cs = SC $ \delta ->
+  case pmOracle (delta_tm_cs delta) new_tm_cs of
+    Nothing  -> pure Nothing
+    Just ts' -> pure (Just delta{ delta_tm_cs = ts'})
+
+-- | A 'SatisfiabilityCheck' based on new type-level constraints.
+-- Returns a new 'Delta' if the new constraints are compatible with existing
+-- ones. Will only recheck 'IncompleteMatches' in the term oracle for emptiness
+-- if the first argument is 'True'.
+tyIsSatisfiable :: Bool -> Bag EvVar -> SatisfiabilityCheck
+tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
+  tracePm "tyIsSatisfiable" (ppr (fmap pprEvVarWithType new_ty_cs))
+  let ty_cs = new_ty_cs `unionBags` delta_ty_cs delta
+  let delta' = delta{ delta_ty_cs = ty_cs }
+  if isEmptyBag new_ty_cs
+    then pure (Just delta)
+    else tyOracle ty_cs >>= \case
+      False                     -> pure Nothing
+      True
+        | recheck_complete_sets -> ensureAllPossibleSetsInhabited delta'
+        | otherwise             -> pure (Just delta')
+
+-- | A 'SatisfiabilityCheck' based on "NonVoid ty" constraints, e.g. Will
+-- check if the @strict_arg_tys@ are actually all inhabited.
+-- Returns the old 'Delta' if all the types are non-void according to 'Delta'.
+tysAreNonVoid :: RecTcChecker -> [Type] -> SatisfiabilityCheck
+tysAreNonVoid rec_env strict_arg_tys = SC $ \delta -> do
+  all_non_void <- checkAllNonVoid rec_env delta strict_arg_tys
+  -- Check if each strict argument type is inhabitable
+  pure $ if all_non_void
+            then Just delta
+            else Nothing
 
 -- | Given a conlike's term constraints, type constraints, and strict argument
 -- types, check if they are satisfiable.
@@ -280,18 +319,14 @@ pmIsSatisfiable
                  -- ^ @'Just' delta@ if the constraints (@delta@) are
                  -- satisfiable, and each strict argument type is inhabitable.
                  -- 'Nothing' otherwise.
-pmIsSatisfiable amb_cs new_tm_c new_ty_cs strict_arg_tys = do
-  mb_sat <- tmTyCsAreSatisfiable amb_cs new_tm_c new_ty_cs
-  case mb_sat of
-    Nothing -> pure Nothing
-    Just delta -> do
-      -- We know that the term and type constraints are inhabitable, so now
-      -- check if each strict argument type is inhabitable.
-      all_non_void <- checkAllNonVoid initRecTc delta strict_arg_tys
-      pure $ if all_non_void -- Check if each strict argument type
-                             -- is inhabitable
-                then Just delta
-                else Nothing
+pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
+  -- The order is important here! Check the new type constraints before we check
+  -- whether strict argument types are inhabited given those constraints.
+  runSatisfiabilityCheck amb_cs $ mconcat
+    [ tyIsSatisfiable True new_ty_cs
+    , tmIsSatisfiable new_tm_cs
+    , tysAreNonVoid initRecTc strict_arg_tys
+    ]
 
 -- | Implements two performance optimizations, as described in the
 -- \"Strict argument type constraints\" section of
@@ -346,12 +381,12 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
     cand_is_inhabitable rec_ts amb_cs
       (InhabitationCandidate{ ic_tm_cs          = new_tm_cs
                             , ic_ty_cs          = new_ty_cs
-                            , ic_strict_arg_tys = new_strict_arg_tys }) = do
-        mb_sat <- tmTyCsAreSatisfiable amb_cs new_tm_cs new_ty_cs
-        case mb_sat of
-          Nothing -> pure False
-          Just new_delta ->
-            checkAllNonVoid rec_ts new_delta new_strict_arg_tys
+                            , ic_strict_arg_tys = new_strict_arg_tys }) =
+        fmap isJust $ runSatisfiabilityCheck amb_cs $ mconcat
+          [ tyIsSatisfiable False new_ty_cs
+          , tmIsSatisfiable new_tm_cs
+          , tysAreNonVoid rec_ts new_strict_arg_tys
+          ]
 
 -- | @'definitelyInhabitedType' ty@ returns 'True' if @ty@ has at least one
 -- constructor @C@ such that:
@@ -627,7 +662,7 @@ mkOneSatisfiableConFull delta x con = do
   let res_ty = maybe (idType x) fstOf3 mb_res_ty
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
-  (_ic, ex_tvs, arg_vars) <- mkOneConFull y con
+  (ic, ex_tvs, arg_vars) <- mkOneConFull y con
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
   pure ((,ex_tvs,arg_vars) <$> mb_delta)
@@ -803,7 +838,7 @@ newtype TmState = TS (DIdEnv VarInfo)
 
 data VarInfo
   = VI
-  { vi_ty  :: !Type           -- the type of what 'vi_pos' and 'vi_neg' refer to
+  { _vi_ty :: !Type           -- the type of what 'vi_pos' and 'vi_neg' refer to
   , vi_pos :: !PossibleShape  -- Positive info: things it could be
   , vi_neg :: ![PmAltCon]     -- Negative info: it is not headed by these AltCons
       -- Invariant: vi_pos and vi_neg never contradict each other
@@ -816,7 +851,7 @@ data PossibleShape
       --   In <rhs> we have x ~ Just y
       -- The PmExpr is: a data con application, literal, or variable
 
-  | CompleteSets TyCon !IncompleteMatches
+  | CompleteSets !IncompleteMatches
 
   | NoInfoYet    -- The type of the variable is not (yet) a data type
 
@@ -1082,14 +1117,10 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
     go NoInfoYet = pure (Just (VI ty NoInfoYet neg'))
     go pos@(CompleteSets im) =
       case nalt of
-        PmAltConLike cl -> do
-          let im1 = markMatched cl im
-          -- The old delta is sufficient here: We have already gotten rid of cl
-          let test_inhabited con = isJust <$> mkOneSatisfiableConFull delta x con
-          ensureInhabited test_inhabited im1 >>= \case
-          ensureInhabited (testInhabited delta con ty) >>= \case
+        PmAltConLike cl ->
+          ensureInhabited (testInhabited delta ty) (markMatched cl im) >>= \case
             Nothing -> pure Nothing
-            Just im2 -> pure (Just (VI ty (CompleteSets im2) neg'))
+            Just im' -> pure (Just (VI ty (CompleteSets im') neg'))
         _ -> pure (Just (VI ty pos neg'))
     go pos@(Rigid (exprToAlt -> Just alt)) =
       -- We have to take care to preserve Note [The Pos/Neg invariant]
@@ -1101,13 +1132,44 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
                                             --     might refute later
     go pos = pure (Just (VI ty pos neg'))
 
-testInhabited :: Delta -> ConLike -> Type -> DsM Bool
--- (testInhabited delta K ty) Returns False if
--- a non-bottom value (v::ty) cannot possibly be of form (K _ _ _)
+testInhabited :: Delta -> Type -> ConLike -> DsM Bool
+-- @testInhabited delta ty K@ Returns False if
+-- a non-bottom value @v::ty@ cannot possibly be of form @K _ _ _@
 -- Returning True is always sound
 --
--- It's like DataCon.dataConCannotMatch, but more clever because it
+-- It's like 'DataCon.dataConCannotMatch', but more clever because it
 -- takes the facts in Delta into account
+testInhabited delta ty con = do
+  tracePm "testInhabited" (ppr ty <+> ppr con)
+  let res_ty  = ty
+      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
+        = conLikeFullSig con
+      arg_is_banged = map isBanged $ conLikeImplBangs con
+      -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
+      -- be fine after type-checking.
+      (_, tc_args) = splitAppTys res_ty
+  let subst1 = case con of
+                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  -- The expectJust is always satisfied as long as we filter
+                  -- with 'isValidCompleteMatch' in 'allCompleteMatches'
+                  PatSynCon {}   -> expectJust "testInhabited" (tcMatchTy con_res_ty res_ty)
+                                    -- See Note [Pattern synonym result type] in PatSyn
+
+  (subst, _ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
+
+  let arg_tys' = substTys subst arg_tys
+  -- All constraints bound by the constructor (alpha-renamed)
+  let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
+  evvars <- mapM (nameType "pm") theta_cs
+  let strict_arg_tys = filterByList arg_is_banged arg_tys'
+  -- No need to run the term oracle compared to pmIsSatisfiable
+  fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
+    -- Important to pass False to tyIsSatisfiable here, so that we won't
+    -- recursively call ensureAllPossibleSetsInhabited, leading to an endless
+    -- recursion.
+    [ tyIsSatisfiable False (listToBag evvars)
+    , tysAreNonVoid initRecTc strict_arg_tys
+    ]
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
@@ -1209,7 +1271,7 @@ trySolve x alt args ts@(TS env)
 -- @extendSubst@ simply extends the substitution, unlike what
 -- 'extendSubstAndSolve' does.
 extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e (TS env) = TS (extendDVarEnv env y (VI (Rigid e) []))
+extendSubst y e (TS env) = TS (extendDVarEnv env y (VI (idType y) (Rigid e) []))
 
 -- | Apply an (un-flattened) substitution to an expression.
 exprDeepLookup :: Delta -> PmExpr -> PmExpr

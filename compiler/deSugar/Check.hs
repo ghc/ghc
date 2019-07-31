@@ -29,6 +29,7 @@ import PmExpr
 import PmOracle
 import PmPpr
 import CoreUtils (exprType)
+import CoreSyn (Expr(Var))
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -649,30 +650,8 @@ translateMatch _ _ = panic "translateMatch"
 
 -- | Translate a list of guard statements to a pattern vector
 translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> PmM PatVec
-translateGuards fam_insts guards = do
-  all_guards <- concat <$> mapM (translateGuard fam_insts) guards
-  let
-    shouldKeep :: PmPat -> PmM Bool
-    shouldKeep p
-      | PmVar {} <- p = pure True
-      | PmCon {} <- p = (&&)
-                          <$> singleMatchConstructor (pm_con_con p) (pm_con_arg_tys p)
-                          <*> allM shouldKeep (pm_con_args p)
-    shouldKeep (PmGrd pv _) = allM shouldKeep pv
-    shouldKeep _other_pat   = pure False -- let the rest..
-
-  all_handled <- allM shouldKeep all_guards
-  -- It should have been @pure all_guards@ but it is too expressive.
-  -- Since the term oracle does not handle all constraints we generate,
-  -- we (hackily) replace all constraints the oracle cannot handle with a
-  -- single one (we need to know if there is a possibility of failure).
-  -- See Note [Guards and Approximation] for all guard-related approximations
-  -- we implement.
-  if all_handled
-    then pure all_guards
-    else do
-      kept <- filterM shouldKeep all_guards
-      pure (PmFake : kept)
+translateGuards fam_insts guards =
+  concat <$> mapM (translateGuard fam_insts) guards
 
 -- | Check whether a pattern can fail to match
 cantFailPattern :: PmPat -> PmM Bool
@@ -796,7 +775,10 @@ mkFreshPmExprVarRepresenting hs_expr = do
   -- on, since we have infrastructure for deciding alpha equivalence of Core
   -- terms.
   core_expr <- dsExpr hs_expr
-  PmExprVar <$> mkPmId (exprType core_expr)
+  case core_expr of
+    Var x -> pure (PmExprVar x)
+    _     -> PmExprVar <$> mkPmId (exprType core_expr)
+
 
 {- Note [Guards and Approximation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
