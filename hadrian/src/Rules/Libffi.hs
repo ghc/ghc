@@ -140,7 +140,7 @@ needLibfffiArchive buildPath = do
                 . fromSingleton "Exactly one LibFFI tarball is expected"
                 <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
     need [top -/- tarball]
-    trackAllow [buildPath -/- "**/*"]
+    trackAllow [buildPath -/- "**"]
     return tarball
 
 libffiRules :: Rules ()
