@@ -1171,6 +1171,26 @@ static void report_machine_readable (const RTSSummaryStats * sum)
         MR_STAT_GEN(g, "sync_yield", FMT_Word64, gc_sum->sync_yield);
 #endif
     }
+    // non-moving collector statistics
+    if (RtsFlags.GcFlags.useNonmoving) {
+        const int n_major_colls = sum->gc_summary_stats[RtsFlags.GcFlags.generations-1].collections;
+        MR_STAT("nonmoving_sync_wall_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_sync_elapsed_ns));
+        MR_STAT("nonmoving_sync_max_pause_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_sync_max_elapsed_ns));
+        MR_STAT("nonmoving_sync_avg_pause_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_sync_elapsed_ns) / n_major_colls);
+
+        MR_STAT("nonmoving_concurrent_cpu_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_cpu_ns));
+        MR_STAT("nonmoving_concurrent_wall_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_elapsed_ns));
+        MR_STAT("nonmoving_concurrent_max_pause_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_max_elapsed_ns));
+        MR_STAT("nonmoving_concurrent_avg_pause_seconds", "f",
+                TimeToSecondsDbl(stats.nonmoving_gc_elapsed_ns) / n_major_colls);
+    }
+
 
     statsPrintf(" ]\n");
 }
