@@ -571,10 +571,6 @@ setKeepCAFs (void)
     keepCAFs = 1;
 }
 
-// A list of CAFs linked together via STATIC_LINK where new CAFs are placed
-// until the next GC.
-StgClosure *nonmoving_todo_caf_list;
-
 // An alternate version of newCAF which is used for dynamically loaded
 // object code in GHCi.  In this case we want to retain *all* CAFs in
 // the object code, because they might be demanded at any time from an
