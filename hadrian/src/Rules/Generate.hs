@@ -111,13 +111,13 @@ generatePackageCode context@(Context stage pkg _) = do
 
     priority 2.0 $ do
         when (pkg == compiler) $ do
-            root <//> dir -/- "Config.hs" %> go generateConfigHs
-            root <//> dir -/- "*.hs-incl" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "Config.hs" %> go generateConfigHs
+            root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
-            root <//> dir -/- "GHC/Prim.hs" %> genPrimopCode context
-            root <//> dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
         when (pkg == ghcBoot) $
-            root <//> dir -/- "GHC/Version.hs" %> go generateVersionHs
+            root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -125,17 +125,17 @@ generatePackageCode context@(Context stage pkg _) = do
             need $ [primopsSource] ++ includes
             build $ target context HsCpp [primopsSource] [file]
 
-        root -/- stageString stage <//> "ghc_boot_platform.h" %>
+        root -/- stageString stage -/- "**" -/- "ghc_boot_platform.h" %>
             go generateGhcBootPlatformH
 
     when (pkg == rts) $ do
-        root <//> dir -/- "cmm/AutoApply.cmm" %> \file ->
+        root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
         -- TODO: This should be fixed properly, e.g. generated here on demand.
-        (root <//> dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
  where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir
