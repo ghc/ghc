@@ -12,12 +12,12 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module PmOracle (
 
         PmM, tracePm, mkPmId,
-        idToPmExpr,
 
         Delta, pmInitialTmTyCs, canDiverge,
 
-        inhabitants, addRefutableAltCon, refineToAltCon, solveVar,
+        inhabitants, tryAddRefutableAltCon, refineToAltCon, solveVar,
 
+        -- misc.
         wrapUpRefutableShapes, exprDeepLookup
     ) where
 
@@ -33,6 +33,7 @@ import ErrUtils
 import BasicTypes
 import Util
 import Bag
+import UniqSet
 import Id
 import VarEnv
 import Var           (EvVar)
@@ -43,7 +44,6 @@ import SrcLoc
 import ListSetOps (unionLists)
 import Maybes
 import ConLike
-import IncompleteMatches
 import DataCon
 import TyCon
 import TysWiredIn
@@ -52,15 +52,16 @@ import TyCoRep
 import Type
 import TcSimplify    (tcNormalise, tcCheckSatisfiability)
 import Unify         (tcMatchTy)
-import TcRnTypes     (pprEvVarWithType)
+import TcRnTypes     (pprEvVarWithType, completeMatchConLikes)
 import Coercion
 import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
-import Control.Monad (zipWithM)
+import Control.Monad (zipWithM, mzero)
+import Control.Monad.Trans.Class (lift)
 import Data.Foldable (foldlM)
-import Data.Void
 import Data.List     (find)
-import Data.List.NonEmpty (NonEmpty (..), toList)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NonEmpty
 import FamInstEnv
 
 type PmM = DsM
@@ -81,10 +82,6 @@ mkPmId ty = getUniqueM >>= \unique ->
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 
--- | Convert an 'Id' (or 'ValAbs') into an expression
-idToPmExpr :: Id -> PmExpr
-idToPmExpr = PmExprVar
-
 -- | Introduce a new 'Id' that has the given type and is in the same equivalence
 -- class as the argument.
 mkIdCoercion :: Id -> Type -> Delta -> PmM (Id, Delta)
@@ -92,8 +89,43 @@ mkIdCoercion x ty delta
   | eqType (idType x) ty = pure (x, delta) -- no need to introduce anything new
   | otherwise = do
       y <- mkPmId ty
-      let e = idToPmExpr x
+      let e = PmExprVar x
       pure (y, delta { delta_tm_cs = extendSubst y e (delta_tm_cs delta) })
+
+type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
+
+newtype IncompleteMatches = IM (NonEmpty ConLikeSet)
+  -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
+  --
+  -- NonEmpty because the empty case would mean that there
+  --   are no matching constructors at all
+
+instance Outputable IncompleteMatches where
+  ppr (IM cs) = ppr (NonEmpty.toList cs)
+
+initIM :: Type -> DsM (Maybe IncompleteMatches)
+initIM ty = case splitTyConApp_maybe ty of
+  Nothing -> pure Nothing
+  Just (tc, _) -> do
+    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc
+    let maybe_to_list = maybe [] (:[])
+    let rdcs = maybe_to_list mb_rdcs
+    pragmas <- dsGetCompleteMatches tc
+    let fams = mapM dsLookupConLike . completeMatchConLikes
+    pscs <- mapM fams pragmas
+    pure (IM . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
+
+markMatched :: ConLike -> IncompleteMatches -> IncompleteMatches
+markMatched con (IM ms) = IM (fmap (`delOneFromUniqSet` con) ms)
+
+ensureInhabited :: Monad m => (ConLike -> m Bool) -> IncompleteMatches -> m (Maybe IncompleteMatches)
+ensureInhabited inh_test (IM ms) = runMaybeT (IM <$> traverse one_set ms)
+  where
+    one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
+    find_one_inh _  [] = mzero
+    find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
+      True -> pure cs
+      False -> find_one_inh (delOneFromUniqSet cs con) cons
 
 -- -----------------------------------------------------------------------
 -- * Types and constraints
@@ -177,8 +209,22 @@ tmTyCsAreSatisfiable
                then pure True
                else tyOracle ty_cs
   pure $ case (sat_ty, pmOracle amb_tm_cs new_tm_cs) of
-           (True, Just term_cs) -> Just $ MkDelta ty_cs term_cs
+           (True, Just term_cs) -> ensureAllPossibleSetsInhabited (MkDelta ty_cs term_cs)
            _unsat               -> Nothing
+
+ensureAllPossibleSetsInhabited :: Delta -> Maybe Delta
+ensureAllPossibleSetsInhabited delta@MkDelta{ delta_tm_cs = TS env } = delta{ delta_tm_cs = ts' }
+  where
+    ts' = TS <$> traverseDVarEnv go env
+    traverseDVarEnv f
+      = fmap listToUDFM_Directly
+      . traverse (\(u,a) -> (u,) <$> f a)
+      . udfmToList
+    go (VI ty (CompleteSets im)) = undefined
+      -- | any new constraints influence ty = do stuff
+      -- But how to call mkOneConFull anyway?! Needs the Id... so another
+      -- refactor incoming. Proabably should attach the Id to CompleteSets
+      -- instead anyway.
 
 -- | Given a conlike's term constraints, type constraints, and strict argument
 -- types, check if they are satisfiable.
@@ -521,7 +567,7 @@ mkOneConFull x con = do
   let arg_tys' = substTys subst arg_tys
   -- Fresh term variables (VAs) as arguments to the constructor
   vars <- mapM mkPmId arg_tys'
-  let args = map idToPmExpr vars
+  let args = map PmExprVar vars
   -- All constraints bound by the constructor (alpha-renamed)
   let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   evvars <- mapM (nameType "pm") theta_cs
@@ -554,33 +600,6 @@ mkOneSatisfiableConFull delta x con = do
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
   pure ((,ic,ex_tvs,arg_vars) <$> mb_delta)
 
-ensureInhabited :: Delta -> Id -> PmM (Satisfiability Delta Void)
--- Given (x :: ty) and Delta (what we know about x),
---   figure out if anything can match 'x'.
--- We return a new Delta, logically equivalent to the old Delta,
---   but perhaps with some work done on it
--- Monadic because we may need to look up the possible
---   COMPLETE sets of a data type, and so we can run the
---   type oracle
-ensureInhabited delta x = find_one_in_each_set delta
-  where
-    find_one_in_each_set delta = do
-      suggestPossibleConLikes (delta_tm_cs delta) x >>= \case
-        Unsatisfiable              -> pure Unsatisfiable -- -XEmptyDataDecls
-        PossiblySatisfiable tm_cs' -> pure (PossiblySatisfiable delta{ delta_tm_cs = tm_cs' })
-        Satisfiable tm_cs' cons ->
-          -- Run these candidates through the type oracle
-          go delta{ delta_tm_cs = tm_cs' } (toList cons)
-          where
-            go delta []         = pure (PossiblySatisfiable delta)
-            go delta (con:cons) = mkOneSatisfiableConFull delta x con >>= \case
-              Just _  -> go delta cons -- success
-              Nothing -> do
-                -- Nope, try again, term oracle!
-                tryAddRefutableAltCon (delta_tm_cs delta) x (PmAltConLike con) >>= \case
-                  Nothing -> pure Unsatisfiable -- term oracle says we are out of options
-                  Just ts -> find_one_in_each_set (delta{ delta_tm_cs = ts })
-
 -- | Generate all 'InhabitationCandidate's for a given type. The result is
 -- either @'Left' ty@, if the type cannot be reduced to a closed algebraic type
 -- (or if it's one trivially inhabited, like 'Int'), or @'Right' candidates@,
@@ -591,8 +610,7 @@ inhabitationCandidates :: Delta -> Type
                        -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
 inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
   fam_insts   <- dsGetFamInstEnvs
-  mb_norm_res <- pmTopNormaliseType_maybe fam_insts ty_cs ty
-  case mb_norm_res of
+  pmTopNormaliseType_maybe fam_insts ty_cs ty >>= \case
     Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
     Nothing                     -> alts_to_check ty     ty      []
   where
@@ -600,11 +618,8 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
                           , intTyCon, wordTyCon, word8TyCon ]
 
-    -- Note: At the moment we leave all the typing and constraint fields of
-    -- PmCon empty, since we know that they are not gonna be used. Is the
-    -- right-thing-to-do to actually create them, even if they are never used?
     build_tm :: PmExpr -> [DataCon] -> PmExpr
-    build_tm = foldr (\dc e -> PmExprCon (PmAltConLike (RealDataCon dc)) [e])
+    build_tm = foldr (\dc e -> mkPmExprData dc [e])
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
     alts_to_check :: Type -> Type -> [DataCon]
@@ -615,7 +630,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
         -> case dcs of
              []    -> return (Left src_ty)
              (_:_) -> do inner <- mkPmId core_ty
-                         let expr = build_tm (idToPmExpr inner) dcs
+                         let expr = build_tm (PmExprVar inner) dcs
                          outer <- mkPmId src_ty
                          return $ Right (tc, outer, [InhabitationCandidate
                            { ic_tm_cs = unitBag (TVC outer expr)
@@ -629,7 +644,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
              inner <- mkPmId core_ty -- it would be wrong to unify inner
              alts <- mapM (fmap fstOf3 . mkOneConFull inner . RealDataCon) (tyConDataCons tc)
              outer <- mkPmId src_ty
-             let new_tm_ct = TVC outer (build_tm (idToPmExpr inner) dcs)
+             let new_tm_ct = TVC outer (build_tm (PmExprVar inner) dcs)
              let wrap_dcs alt = alt{ ic_tm_cs = new_tm_ct `consBag` ic_tm_cs alt}
              return $ Right (tc, outer, map wrap_dcs alts)
       -- For other types conservatively assume that they are inhabited.
@@ -756,7 +771,8 @@ newtype TmState = TS (DIdEnv VarInfo)
 
 data VarInfo
   = VI
-  { vi_pos :: !PossibleShape  -- Positive info: things it could be
+  { vi_ty  :: !Type           -- the type of what 'vi_pos' and 'vi_neg' refer to
+  , vi_pos :: !PossibleShape  -- Positive info: things it could be
   , vi_neg :: ![PmAltCon]     -- Negative info: it is not headed by these AltCons
       -- Invariant: vi_pos and vi_neg never contradict each other
 
@@ -767,7 +783,7 @@ data PossibleShape
       -- Get this in the "taken" branch of a pattern match;
       --   e.g. f x@(Just y) = <rhs>
       --   In <rhs> we have x ~ Just y
-      -- Usually the PmExpr is: a data con application, literal, or variable
+      -- The PmExpr is: a data con application, literal, or variable
 
   | CompleteSets !IncompleteMatches
 
@@ -807,7 +823,7 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI pos neg) = if null neg then pos_pp else braces (neg_pp <> char ',' <+> pos_pp)
+  ppr (VI _ty pos neg) = if null neg then pos_pp else braces (neg_pp <> char ',' <+> pos_pp)
     where
       neg_pp = char '¬' <> ppr neg
       pos_pp = ppr pos
@@ -818,8 +834,8 @@ instance Outputable PossibleShape where
   ppr (Rigid sol) = ppr sol
   ppr (CompleteSets sets) = ppr sets
 
-emptyVarInfo :: VarInfo
-emptyVarInfo = VI NoInfoYet []
+emptyVarInfo :: Id -> VarInfo
+emptyVarInfo x = VI (idType x) NoInfoYet []
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -827,8 +843,8 @@ initialTmState = TS emptyDVarEnv
 
 lookupVarInfo :: TmState -> Id -> (Id, VarInfo)
 lookupVarInfo ts@(TS env) x = case lookupDVarEnv env x of
-  Just (VI (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
-  mb_vi                             -> (x, fromMaybe emptyVarInfo mb_vi)
+  Just (VI _ (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
+  mb_vi                               -> (x, fromMaybe (emptyVarInfo x) mb_vi)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
@@ -839,7 +855,7 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI pos [] <- snd (lookupVarInfo ts x), not_solved_yet pos
+  | VI _ pos [] <- snd (lookupVarInfo ts x), not_solved_yet pos
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
@@ -853,7 +869,7 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
 isRefutable :: Id -> PmExpr -> TmState -> Bool
 isRefutable x e ts = fromMaybe False $ do
   alt <- exprToAlt e
-  let VI _ ncons = snd (lookupVarInfo ts x)
+  let ncons = vi_neg (snd (lookupVarInfo ts x))
   pure (notNull (filter ((== Just True) . decEqPmAltCon alt) ncons))
 
 -- | Solve an equality (top-level).
@@ -871,30 +887,9 @@ initIncompleteMatches ty NoInfoYet = initIM ty >>= \case
   Just im -> pure (CompleteSets im)
 initIncompleteMatches _  pos       = pure pos
 
-addRefutableAltCon :: Delta -> Id -> PmAltCon -> PmM (Maybe Delta)
-addRefutableAltCon delta x nalt =
-  -- See Note [Refutable shapes] in PmOracle
-  tryAddRefutableAltCon (delta_tm_cs delta) x nalt >>= \case
-    Nothing -> pure Nothing
-    Just tms ->
-      -- We need to normalise here to catch uninhabitable vars that would
-      -- otherwise
-      --  * hide redundant pattern match warnings
-      --  * turn redundant pattern match warnings into inaccessible RHS
-      ensureInhabited (delta {delta_tm_cs = tms}) x >>= \case
-        Unsatisfiable -> pure Nothing
-        PossiblySatisfiable delta' -> pure (Just delta')
-#if __GLASGOW_HASKELL__ < 808
-        -- GHC before 8.8 will say that this match is needed, while GHC 8.8
-        -- will correctly flag it as redundant.
-        Satisfiable _ _            -> panic "addRefutableAltCon"
-#endif
-
 refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
-refineToAltCon delta x (PmAltLit l)       _ex_tvs1 =
-  case solveOneEq (delta_tm_cs delta) (TVC x (mkPmExprLit l)) of
-    Nothing -> pure Nothing
-    Just ts -> pure (Just (delta{ delta_tm_cs = ts }, []))
+refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
+  pure ((, []) <$> solveVar delta x (PmExprCon l []))
 refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
   mkOneSatisfiableConFull delta x con >>= \case
     Nothing                             -> pure Nothing
@@ -1043,45 +1038,36 @@ solveVar delta x e =
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
-tryAddRefutableAltCon :: TmState -> Id -> PmAltCon -> DsM (Maybe TmState)
-tryAddRefutableAltCon ts@(TS env) x nalt = do
-  pos' <- initIncompleteMatches (idType x) pos
-  pure (TS . extendDVarEnv env y <$> go pos')
+-- See Note [Refutable shapes].
+tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
+tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
+  mb_pos' <- initIncompleteMatches (idType x) pos >>= go
+  let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
+  pure (new_delta <$> mb_pos')
   where
-    (y, VI pos neg) = lookupVarInfo ts x
+    (y, VI ty pos neg) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
 
-    go NoInfoYet = Just (VI NoInfoYet neg')
+    go NoInfoYet = pure (Just (VI ty NoInfoYet neg'))
     go pos@(CompleteSets im) =
       case nalt of
-        PmAltConLike cl
-          | let im' = markMatchedIM cl im, isJust (unmatchedConLikesIM im')
-          -> Just (VI (CompleteSets im') neg')
-          | otherwise
-          -> Nothing
-        _ -> Just (VI pos neg')
+        PmAltConLike cl -> do
+          let im1 = markMatched cl im
+          -- The old delta is sufficient here: We have already gotten rid of cl
+          let test_inhabited con = isJust <$> mkOneSatisfiableConFull delta x con
+          ensureInhabited test_inhabited im1 >>= \case
+            Nothing -> pure Nothing
+            Just im2 -> pure (Just (VI ty (CompleteSets im2) neg'))
+        _ -> pure (Just (VI ty pos neg'))
     go pos@(Rigid (exprToAlt -> Just alt)) =
       -- We have to take care to preserve Note [The Pos/Neg invariant]
-      case decEqPmAltCon alt nalt of      -- We have a solution
-        Just True  -> Nothing             -- ... that is contradictory
-        Just False -> Just (VI pos neg)   -- ... that is compatible, rendering
-                                          --     the refutation redundant
-        Nothing    -> Just (VI pos neg')  -- ... which is incomparable, so might
-                                          --     refute later
-    go pos = pure (VI pos neg')
-
-suggestPossibleConLikes :: TmState -> Id -> DsM (Satisfiability TmState (NonEmpty ConLike))
-suggestPossibleConLikes ts@(TS env) x = do
-  let (y, VI pos neg) = lookupVarInfo ts x
-  pos' <- initIncompleteMatches (idType x) pos
-  let ts' = TS (extendDVarEnv env y (VI pos' neg))
-  case pos' of
-    CompleteSets im -> case unmatchedConLikesIM im of
-      Nothing  -> pure Unsatisfiable
-      Just cls -> pure (Satisfiable ts' cls)
-    Rigid (exprToAlt -> Just (PmAltConLike cl))
-      -> pure (Satisfiable ts' (cl :| []))
-    _ -> pure (PossiblySatisfiable ts')
+      pure $ case decEqPmAltCon alt nalt of -- We have a solution
+        Just True  -> Nothing               -- ... that is contradictory
+        Just False -> Just (VI ty pos neg)  -- ... that is compatible, rendering
+                                            --     the refutation redundant
+        Nothing    -> Just (VI ty pos neg') -- ... which is incomparable, so
+                                            --     might refute later
+    go pos = pure (Just (VI ty pos neg'))
 
 -- | Combines two entries in a 'PmRefutEnv' by merging the set of refutable
 -- 'PmAltCon's.
@@ -1093,7 +1079,7 @@ combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
 -- semantically helpful alias for 'lookupVarEnv'.
 isRigid :: TmState -> Id -> Maybe PmExpr
 isRigid (TS env) x = do
-  VI pos _ <- lookupDVarEnv env x
+  VI _ pos _ <- lookupDVarEnv env x
   case pos of
     Rigid e -> Just e
     _       -> Nothing
@@ -1148,16 +1134,16 @@ equate x y ts@(TS env)
     ASSERT( isFlexible ts y )
     ts'
   where
-    VI _     neg_x = snd (lookupVarInfo ts x)
-    VI pos_y neg_y = snd (lookupVarInfo ts y)
-    vi_x'          = VI (Rigid (PmExprVar y)) []
+    VI ty_x _     neg_x = snd (lookupVarInfo ts x)
+    VI ty_y pos_y neg_y = snd (lookupVarInfo ts y)
+    vi_x'               = VI ty_x (Rigid (PmExprVar y)) []
     -- Be careful to uphold Note [The Pos/Neg invariant] by merging the refuts
     -- of x into those of y
     -- We could compute the intersection of CompleteSets for pos_x and pos_y
     -- here. Should we? We merge the negs, after all. It's also not so clear
     -- how to merge different COMPLETE sets.
-    vi_y'          = VI pos_y (combineRefutEntries neg_x neg_y)
-    ts'           = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
+    vi_y' = VI ty_y pos_y (combineRefutEntries neg_x neg_y)
+    ts'   = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
 
 -- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
@@ -1173,9 +1159,9 @@ trySolve x alt args ts@(TS env)
   = Just ts'
   where
     e = PmExprCon alt args
-    VI _ neg = snd (lookupVarInfo ts x)
+    VI ty _ neg = snd (lookupVarInfo ts x)
     -- Uphold Note [The Pos/Neg invariant]
-    vi' = VI (Rigid e) (filter ((== Nothing) . decEqPmAltCon alt) neg)
+    vi' = VI ty (Rigid e) (filter ((== Nothing) . decEqPmAltCon alt) neg)
     ts' = TS (extendDVarEnv env x vi')
 
 -- | When we know that a variable is fresh, we do not actually have to
@@ -1183,7 +1169,7 @@ trySolve x alt args ts@(TS env)
 -- @extendSubst@ simply extends the substitution, unlike what
 -- 'extendSubstAndSolve' does.
 extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e ts@(TS env) = TS (extendDVarEnv env y (VI (Rigid e) []))
+extendSubst y e (TS env) = TS (extendDVarEnv env y (VI (Rigid e) []))
 
 -- | Apply an (un-flattened) substitution to an expression.
 exprDeepLookup :: Delta -> PmExpr -> PmExpr
@@ -1199,8 +1185,8 @@ wrapUpRefutableShapes MkDelta{ delta_tm_cs = ts@(TS env) }
   where
     -- Unfortunate overlap with lookupVarInfo here, because we don't have the
     -- Id
-    f (VI (Rigid (PmExprVar y)) _) = vi_neg (snd (lookupVarInfo ts y))
-    f (VI _ neg)                   = neg
+    f (VI _ (Rigid (PmExprVar y)) _) = vi_neg (snd (lookupVarInfo ts y))
+    f (VI _ _ neg)                   = neg
 
 -- | External interface to the term oracle.
 pmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
