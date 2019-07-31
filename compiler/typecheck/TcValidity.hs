@@ -27,6 +27,7 @@ import Maybes
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
+import TyCoFVs
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
@@ -2141,7 +2142,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
               , text "qtvs:" <+> ppr qtvs
               , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
               , text "pat_tvs:" <+> ppr pat_tvs
-              , text "exact_pat_tvs:" <+> ppr exact_pat_tvs ]
+              , text "inj_pat_tvs:" <+> ppr inj_pat_tvs ]
 
          -- Check for implicitly-bound tyvars, mentioned on the
          -- RHS but not bound on the LHS
@@ -2161,15 +2162,21 @@ checkFamPatBinders fam_tc qtvs pats rhs
                             (text "used in")
        }
   where
-    pat_tvs       = tyCoVarsOfTypes pats
-    exact_pat_tvs = exactTyCoVarsOfTypes pats
-    rhs_fvs       = tyCoFVsOfType rhs
-    used_tvs      = pat_tvs `unionVarSet` fvVarSet rhs_fvs
-    bad_qtvs      = filterOut (`elemVarSet` used_tvs) qtvs
-                    -- Bound but not used at all
-    bad_rhs_tvs   = filterOut (`elemVarSet` exact_pat_tvs) (fvVarList rhs_fvs)
-                    -- Used on RHS but not bound on LHS
-    dodgy_tvs     = pat_tvs `minusVarSet` exact_pat_tvs
+    pat_tvs     = tyCoVarsOfTypes pats
+    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes pats
+      -- The type variables that are in injective positions.
+      -- See Note [Dodgy binding sites in type family instances]
+      --
+      -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
+      -- since the order of `inj_pat_tvs` is never revealed in an error
+      -- message.
+    rhs_fvs     = tyCoFVsOfType rhs
+    used_tvs    = pat_tvs `unionVarSet` fvVarSet rhs_fvs
+    bad_qtvs    = filterOut (`elemVarSet` used_tvs) qtvs
+                  -- Bound but not used at all
+    bad_rhs_tvs = filterOut (`elemVarSet` inj_pat_tvs) (fvVarList rhs_fvs)
+                  -- Used on RHS but not bound on LHS
+    dodgy_tvs   = pat_tvs `minusVarSet` inj_pat_tvs
 
     check_tvs tvs what what2
       = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
@@ -2328,10 +2335,10 @@ checkFamPatBinders.  Here is an interesting example:
     type family   T :: k
     type instance T = (Nothing :: Maybe a)
 
-Upon a cursory glance, it may appear that the kind variable `a` is
-free-floating above, since there are no (visible) LHS patterns in
-`T`. However, there is an *invisible* pattern due to the return kind,
-so inside of GHC, the instance looks closer to this:
+Upon a cursory glance, it may appear that the kind variable `a` is unbound
+since there are no (visible) LHS patterns in `T`. However, there is an
+*invisible* pattern due to the return kind, so inside of GHC, the instance
+looks closer to this:
 
     type family T @k :: k
     type instance T @(Maybe a) = (Nothing :: Maybe a)
@@ -2346,7 +2353,7 @@ This would looks like this inside of GHC:
     type instance T @(*) = Proxy (Nothing :: Maybe a)
 
 So this time, `a` is neither bound by a visible nor invisible type pattern on
-the LHS, so it would be reported as free-floating.
+the LHS, so `a` would be reported as not in scope.
 
 Finally, here's one more brain-teaser (from #9574). In the example below:
 
@@ -2355,13 +2362,51 @@ Finally, here's one more brain-teaser (from #9574). In the example below:
     instance Funct ('KProxy :: KProxy o) where
       type Codomain 'KProxy = NatTr (Proxy :: o -> *)
 
-As it turns out, `o` is not free-floating in this example. That is because `o`
+As it turns out, `o` is in scope in this example. That is because `o` is
 bound by the kind signature of the LHS type pattern 'KProxy. To make this more
 obvious, one can also write the instance like so:
 
     instance Funct ('KProxy :: KProxy o) where
       type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> *)
 
+Note [Dodgy binding sites in type family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example (from #7536):
+
+  type T a = Int
+  type instance F (T a) = a
+
+This `F` instance is extremely fishy, since the RHS, `a`, purports to be
+"bound" by the LHS pattern `T a`. "Bound" has scare quotes around it because
+`T a` expands to `Int`, which doesn't mention at all, so it's as if one had
+actually written:
+
+  type instance F Int = a
+
+That is clearly bogus, so to reject this, we check that every type variable
+that is mentioned on the RHS is /actually/ bound on the LHS. In other words,
+we need to do something slightly more sophisticated that just compute the free
+variables of the LHS patterns.
+
+It's tempting to just expand all type synonyms on the LHS and then compute
+their free variables, but even that isn't sophisticated enough. After all,
+an impish user could write the following (#17008):
+
+  type family ConstType (a :: Type) :: Type where
+    ConstType _ = Type
+
+  type family F (x :: ConstType a) :: Type where
+    F (x :: ConstType a) = a
+
+Just like in the previous example, the `a` on the RHS isn't actually bound
+on the LHS, but this time a type family is responsible for the deception, not
+a type synonym.
+
+We avoid both issues by requiring that all RHS type variables are mentioned
+in injective positions on the left-hand side (by way of
+`injectiveVarsOfTypes`). For instance, the `a` in `T a` is not in an injective
+position, as `T` is not an injective type constructor, so we do not count that.
+Similarly for the `a` in `ConstType a`.
 
 Note [Matching in the consistent-instantation check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
