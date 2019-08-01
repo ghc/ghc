@@ -127,6 +127,8 @@ clear_segment_free_blocks(struct NonmovingSegment* seg)
 
 GNUC_ATTR_HOT void nonmovingSweep(void)
 {
+    struct NonmovingSegment *new_sweep_list = NULL;
+
     while (nonmovingHeap.sweep_list) {
         struct NonmovingSegment *seg = nonmovingHeap.sweep_list;
 
@@ -146,12 +148,19 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
             nonmovingPushActiveSegment(seg);
             break;
         case SEGMENT_FILLED:
-            nonmovingPushFilledSegment(seg);
+            // Clear bitmap
+            nonmovingClearBitmap(seg);
+            // Set snapshot
+            nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+            seg->link = new_sweep_list;
+            new_sweep_list = seg;
             break;
         default:
             barf("nonmovingSweep: weird sweep return: %d\n", ret);
         }
     }
+
+    nonmovingHeap.sweep_list = new_sweep_list;
 }
 
 /* Must a closure remain on the mutable list?
