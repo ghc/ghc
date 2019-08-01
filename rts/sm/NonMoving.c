@@ -619,6 +619,9 @@ void nonmovingExit(void)
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
     }
+    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+        stgFree(nonmovingHeap.allocators[i]);
+    }
     closeMutex(&concurrent_coll_finished_lock);
     closeCondition(&concurrent_coll_finished);
     closeMutex(&nonmoving_collection_mutex);
