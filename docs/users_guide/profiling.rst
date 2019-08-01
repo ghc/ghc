@@ -694,7 +694,7 @@ following RTS options select which break-down to use:
 .. rts-flag:: -hc
               -h
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by the cost-centre stack
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by the cost-centre stack
     which produced the data.
 
     .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
@@ -704,34 +704,33 @@ following RTS options select which break-down to use:
 
 .. rts-flag:: -hm
 
-    *Requires :ghc-flag:`-prof`.* Break down the live heap by the module
+    *Requires* :ghc-flag:`-prof`. Break down the live heap by the module
     containing the code which produced the data.
 
 .. rts-flag:: -hd
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by closure description.
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by closure description.
     For actual data, the description is just the constructor name, for other
     closures it is a compiler-generated string identifying the closure.
 
 .. rts-flag:: -hy
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by type. For closures
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by type. For closures
     which have function type or unknown/polymorphic type, the string will
     represent an approximation to the actual type.
 
 .. rts-flag:: -hr
 
-    *Requires :ghc-flag:`-prof`.* Break down the graph by retainer set. Retainer
+    *Requires* :ghc-flag:`-prof`. Break down the graph by retainer set. Retainer
     profiling is described in more detail below (:ref:`retainer-prof`).
 
 .. rts-flag:: -hb
 
-    *Requires :ghc-flag:`-prof`.* Break down the graph by biography.
+    *Requires* :ghc-flag:`-prof`. Break down the graph by biography.
     Biographical profiling is described in more detail below
     (:ref:`biography-prof`).
 
 .. rts-flag:: -l
-
     :noindex:
 
     .. index::
