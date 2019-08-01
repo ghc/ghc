@@ -147,6 +147,9 @@ pprConLike cl args
       WcVarTerminated pref x ->
         parens   . fcat . punctuate colon <$> mapM pprPmExpr (toList pref ++ [PmExprVar x])
 pprConLike (RealDataCon con) args
+  | isUnboxedTupleCon con
+  , let hash_parens doc = text "(#" <+> doc <+> text "#)"
+  = hash_parens . fsep . punctuate comma <$> mapM pprPmExpr args
   | isTupleDataCon con
   = parens . fsep . punctuate comma <$> mapM pprPmExpr args
 pprConLike cl args
