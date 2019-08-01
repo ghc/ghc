@@ -1255,13 +1255,15 @@ instance Binary InlineSpec where
     put_ bh Inline          = putByte bh 1
     put_ bh Inlinable       = putByte bh 2
     put_ bh NoInline        = putByte bh 3
+    put_ bh Expose          = putByte bh 4
 
     get bh = do h <- getByte bh
                 case h of
                   0 -> return NoUserInline
                   1 -> return Inline
                   2 -> return Inlinable
-                  _ -> return NoInline
+                  3 -> return NoInline
+                  _ -> return Expose
 
 instance Binary RecFlag where
     put_ bh Recursive = do

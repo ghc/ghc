@@ -90,6 +90,7 @@ module BasicTypes(
         neverInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
         isInlinePragma, isInlinablePragma, isAnyInlinePragma,
+        isExposePragma,
         inlinePragmaSpec, inlinePragmaSat,
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
@@ -1242,6 +1243,7 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   = Inline       -- User wrote INLINE
   | Inlinable    -- User wrote INLINABLE
   | NoInline     -- User wrote NOINLINE
+  | Expose       -- User wrote EXPOSE
   | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
@@ -1368,11 +1370,17 @@ isInlinablePragma prag = case inl_inline prag of
                            _         -> False
 
 isAnyInlinePragma :: InlinePragma -> Bool
--- INLINE or INLINABLE
+-- INLINE or INLINABLE or EXPOSE
 isAnyInlinePragma prag = case inl_inline prag of
                         Inline    -> True
                         Inlinable -> True
+                        Expose    -> True
                         _         -> False
+
+isExposePragma :: InlinePragma -> Bool
+isExposePragma prag = case inl_inline prag of
+                        Expose -> True
+                        _      -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -1403,6 +1411,7 @@ instance Outputable InlineSpec where
    ppr Inline       = text "INLINE"
    ppr NoInline     = text "NOINLINE"
    ppr Inlinable    = text "INLINABLE"
+   ppr Expose       = text "EXPOSE"
    ppr NoUserInline = text "NOUSERINLINE" -- what is better?
 
 instance Outputable InlinePragma where

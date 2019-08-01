@@ -587,6 +587,7 @@ noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
 noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
 inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
 inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
+exposeDataConName    = thCon (fsLit "Expose")    exposeDataConKey
 
 -- data RuleMatch = ...
 conLikeDataConName, funLikeDataConName :: Name
@@ -690,6 +691,7 @@ noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
 noInlineDataConKey  = mkPreludeDataConUnique 200
 inlineDataConKey    = mkPreludeDataConUnique 201
 inlinableDataConKey = mkPreludeDataConUnique 202
+exposeDataConKey    = mkPreludeDataConUnique 213
 
 -- data RuleMatch = ...
 conLikeDataConKey, funLikeDataConKey :: Unique

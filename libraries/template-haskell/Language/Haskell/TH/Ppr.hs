@@ -586,6 +586,7 @@ instance Ppr Inline where
     ppr NoInline  = text "NOINLINE"
     ppr Inline    = text "INLINE"
     ppr Inlinable = text "INLINABLE"
+    ppr Expose    = text "EXPOSE"
 
 ------------------------------
 instance Ppr RuleMatch where
