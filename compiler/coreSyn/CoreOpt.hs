@@ -1051,7 +1051,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- CPR'd workers getting inlined back into their wrappers,
         | idArity fun == 0
         , Just rhs <- expandUnfolding_maybe unfolding
-        , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
+        , let in_scope' = in_scope `unionInScope` mkExprInScopeSet rhs
         = go (Left in_scope') floats rhs cont
 
         -- See Note [exprIsConApp_maybe on literal strings]
