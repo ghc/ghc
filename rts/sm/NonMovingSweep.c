@@ -128,6 +128,7 @@ clear_segment_free_blocks(struct NonmovingSegment* seg)
 GNUC_ATTR_HOT void nonmovingSweep(void)
 {
     struct NonmovingSegment *new_sweep_list = NULL;
+    uint32_t n_free=0, n_partial=0, n_filled=0;
 
     while (nonmovingHeap.sweep_list) {
         struct NonmovingSegment *seg = nonmovingHeap.sweep_list;
@@ -142,10 +143,12 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
         case SEGMENT_FREE:
             IF_DEBUG(sanity, clear_segment(seg));
             nonmovingPushFreeSegment(seg);
+            n_free++;
             break;
         case SEGMENT_PARTIAL:
             IF_DEBUG(sanity, clear_segment_free_blocks(seg));
             nonmovingPushActiveSegment(seg);
+            n_partial++;
             break;
         case SEGMENT_FILLED:
             // Clear bitmap
@@ -154,6 +157,7 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
             seg->link = new_sweep_list;
             new_sweep_list = seg;
+            n_filled++;
             break;
         default:
             barf("nonmovingSweep: weird sweep return: %d\n", ret);
@@ -161,6 +165,7 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
     }
 
     nonmovingHeap.sweep_list = new_sweep_list;
+    trace(TRACE_nonmoving_gc, "Finished sweep: free=%d, partial=%d, filled=%d", n_free, n_partial, n_filled);
 }
 
 /* N.B. This happens during the pause so we own all capabilities. */
