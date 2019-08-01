@@ -14,7 +14,7 @@ import GhcPrelude
 
 import CoreSubst
 import Var              ( Var )
-import VarEnv           ( elemInScopeSet, mkInScopeSet )
+import VarEnv           ( elemInScopeSet )
 import Id               ( Id, idType, isDeadBinder
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
@@ -22,7 +22,7 @@ import Id               ( Id, idType, isDeadBinder
 import CoreUtils        ( mkAltExpr, eqExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
-import CoreFVs          ( exprFreeVars )
+import CoreFVs          ( mkExprInScopeSet )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
@@ -535,7 +535,7 @@ try_for_cse env expr
 -- as a convenient entry point for users of the GHC API.
 cseOneExpr :: InExpr -> OutExpr
 cseOneExpr e = cseExpr env e
-  where env = emptyCSEnv {cs_subst = mkEmptySubst (mkInScopeSet (exprFreeVars e)) }
+  where env = emptyCSEnv {cs_subst = mkEmptySubst (mkExprInScopeSet e) }
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
