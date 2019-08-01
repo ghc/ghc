@@ -820,6 +820,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     }
 #endif
 
+    trace(TRACE_nonmoving_gc, "Starting nonmoving GC preparation");
     resizeGenerations();
 
     nonmovingPrepareMark();
@@ -835,6 +836,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     current_mark_queue = mark_queue;
 
     // Mark roots
+    trace(TRACE_nonmoving_gc, "Marking roots for nonmoving GC");
     markCAFs((evac_fn)markQueueAddRoot, mark_queue);
     for (unsigned int n = 0; n < n_capabilities; ++n) {
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
@@ -848,6 +850,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     for (StgTSO *tso = *resurrected_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
         markQueuePushClosure_(mark_queue, (StgClosure*)tso);
     }
+    trace(TRACE_nonmoving_gc, "Finished marking roots for nonmoving GC");
 
     // Roots marked, mark threads and weak pointers
 
@@ -870,6 +873,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     ASSERT(nonmoving_old_weak_ptr_list == NULL);
     nonmoving_old_weak_ptr_list = oldest_gen->weak_ptr_list;
     oldest_gen->weak_ptr_list = NULL;
+    trace(TRACE_nonmoving_gc, "Finished nonmoving GC preparation");
 
     // We are now safe to start concurrent marking
 
