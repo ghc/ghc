@@ -90,14 +90,12 @@ registerPackageRules rs stage = do
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
         historyDisable
-        let libpath = takeDirectory (takeDirectory conf)
-            settings = libpath -/- "settings"
-            platformConstants = libpath -/- "platformConstants"
-
-        need [settings, platformConstants]
 
         pkgName <- getPackageNameFromConfFile conf
         let pkg = unsafeFindPackageByName pkgName
+
+        when (pkg == compiler) $ need =<< ghcLibDeps stage
+
         isBoot <- (pkg `notElem`) <$> stagePackages Stage0
 
         let ctx = Context stage pkg vanilla

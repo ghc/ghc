@@ -24,8 +24,8 @@ module Base (
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
-    ghcDeps, includesDependencies, haddockDeps, relativePackageDbPath,
-    packageDbPath, packageDbStamp, mingwStamp,
+    ghcBinDeps, ghcLibDeps, includesDependencies, haddockDeps,
+    relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
     ) where
 
 import Control.Applicative
@@ -106,15 +106,21 @@ stageBinPath stage = buildRoot <&> (-/- stageString stage -/- "bin")
 stageLibPath :: Stage -> Action FilePath
 stageLibPath stage = buildRoot <&> (-/- stageString stage -/- "lib")
 
--- | Files the GHC binary depends on.
-ghcDeps :: Stage -> Action [FilePath]
-ghcDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
-    [ "ghc-usage.txt"
-    , "ghci-usage.txt"
-    , "llvm-targets"
+-- | Files the GHC library depends on
+ghcLibDeps :: Stage -> Action [FilePath]
+ghcLibDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
+    [ "llvm-targets"
     , "llvm-passes"
     , "platformConstants"
-    , "settings" ]
+    , "settings"
+    ]
+
+-- | Files the GHC binary depends on.
+ghcBinDeps :: Stage -> Action [FilePath]
+ghcBinDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
+    [ "ghc-usage.txt"
+    , "ghci-usage.txt"
+    ]
 
 includesDependencies :: Action [FilePath]
 includesDependencies = do

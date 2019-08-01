@@ -83,10 +83,7 @@ buildProgram bin ctx@(Context{..}) rs = do
     template <- templateHscPath stage
     need [template]
   when (package == ghc) $ do
-    -- GHC depends on @settings@, @platformConstants@,
-    -- @llvm-targets@, @ghc-usage.txt@, @ghci-usage.txt@,
-    -- @llvm-passes@.
-    need =<< ghcDeps stage
+    need =<< ghcBinDeps stage
   when (package == haddock) $ do
     -- Haddock has a resource folder
     need =<< haddockDeps stage
