@@ -738,11 +738,18 @@ static void nonmovingPrepareMark(void)
         // since.
     }
 
-    ASSERT(oldest_gen->scavenged_large_objects == NULL);
+    // Clear large object bits of existing large objects
+    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+    }
+
+    // Add newly promoted large objects and clear mark bits
     bdescr *next;
+    ASSERT(oldest_gen->scavenged_large_objects == NULL);
     for (bdescr *bd = oldest_gen->large_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
+        bd->flags &= ~BF_MARKED;
         dbl_link_onto(bd, &nonmoving_large_objects);
     }
     n_nonmoving_large_blocks += oldest_gen->n_large_blocks;
@@ -751,10 +758,16 @@ static void nonmovingPrepareMark(void)
     oldest_gen->n_large_blocks = 0;
     nonmoving_live_words = 0;
 
+    // Clear compact object mark bits
+    for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+    }
+
     // Move new compact objects from younger generations to nonmoving_compact_objects
     for (bdescr *bd = oldest_gen->compact_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
+        bd->flags &= ~BF_MARKED;
         dbl_link_onto(bd, &nonmoving_compact_objects);
     }
     n_nonmoving_compact_blocks += oldest_gen->n_compact_blocks;
@@ -762,15 +775,6 @@ static void nonmovingPrepareMark(void)
     oldest_gen->compact_objects = NULL;
     // TODO (osa): what about "in import" stuff??
 
-    // Clear compact object mark bits
-    for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-    }
-
-    // Clear large object bits
-    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-    }
 
 
 #if defined(DEBUG)
