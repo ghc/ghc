@@ -21,6 +21,7 @@ module CoreFVs (
         exprsFreeVars,
         exprsFreeVarsList,
         bindFreeVars,
+        mkExprInScopeSet,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -69,6 +70,7 @@ import UniqSet
 import Unique (Uniquable (..))
 import Name
 import VarSet
+import VarEnv (InScopeSet, mkInScopeSet)
 import Var
 import Type
 import TyCoRep
@@ -104,11 +106,20 @@ but not those that are free in the type of variable occurrence.
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = fvVarSet . exprFVs
 
+-- | Generates an in-scope set from the free variables in a list of 'CoreExpr's.
+-- Note that this *does* include type variables free in the types of free term
+-- variables (see #15211).
+mkExprInScopeSet :: CoreExpr -> InScopeSet
+mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ closeOverTypes (exprFreeVarsList e)
+
+closeOverTypes :: [Var] -> FV
+closeOverTypes vars = mapUnionFV (tyCoFVsOfType . varType) vars `unionFV` FV.mkFVs vars
+
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
 -- for why export it.
 exprFVs :: CoreExpr -> FV
-exprFVs = filterFV isLocalVar . expr_fvs
+exprFVs e = filterFV isLocalVar (expr_fvs e)
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
