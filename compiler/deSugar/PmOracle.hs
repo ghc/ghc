@@ -1084,7 +1084,6 @@ same. But this is fine, since this is the only scenario where this situation
 arises in the first place!
 -}
 
-
 equateTyVars :: [TyVar] -> [TyVar] -> PmM [EvVar]
 equateTyVars ex_tvs1 ex_tvs2
   = ASSERT(ex_tvs1 `equalLength` ex_tvs2)

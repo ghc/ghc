@@ -776,8 +776,10 @@ mkFreshPmExprVarRepresenting hs_expr = do
   -- terms.
   core_expr <- dsExpr hs_expr
   case core_expr of
-    Var x -> pure (PmExprVar x)
-    _     -> PmExprVar <$> mkPmId (exprType core_expr)
+    Var x
+      -- See the HsConLikeOut case above
+      | not (isDataConWorkId x) -> pure (PmExprVar x)
+    _                           -> PmExprVar <$> mkPmId (exprType core_expr)
 
 
 {- Note [Guards and Approximation]
