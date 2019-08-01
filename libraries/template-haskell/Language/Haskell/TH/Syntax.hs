@@ -2212,6 +2212,7 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
 data Inline = NoInline
             | Inline
             | Inlinable
+            | Expose
             deriving (Show, Eq, Ord, Data, Generic)
 
 data RuleMatch = ConLike

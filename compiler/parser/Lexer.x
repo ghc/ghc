@@ -2996,6 +2996,8 @@ oneWordPrags = Map.fromList [
      ("inlineable",
          strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
                                     -- Spelling variant
+     ("expose",
+         strtoken (\s -> (ITinline_prag (SourceText s) Expose FunLike))),
      ("notinline",
          strtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
      ("specialize", strtoken (\s -> ITspec_prag (SourceText s))),

@@ -699,6 +699,10 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
        =  expose_all         -- 'expose_all' says to expose all
                              -- unfoldings willy-nilly
 
+       || isExposePragma (inlinePragInfo idinfo)
+                             -- EXPOSE pragma says to expose *this*
+                             -- unfolding
+
        || isStableSource src     -- Always expose things whose
                                  -- source is an inline rule
 
