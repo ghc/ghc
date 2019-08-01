@@ -184,7 +184,7 @@ instance H.Builder Builder where
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
-            ghcdeps <- ghcDeps (pred stage)
+            ghcdeps <- ghcBinDeps (pred stage)
 
             return $ [ unlitPath ]
                   ++ ghcdeps
