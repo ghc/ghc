@@ -342,6 +342,9 @@ stat_endNonmovingGcSync ()
     stats.nonmoving_gc_sync_max_elapsed_ns =
       stg_max(stats.gc.nonmoving_gc_sync_elapsed_ns,
               stats.nonmoving_gc_sync_max_elapsed_ns);
+    if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
+      statsPrintf("# sync %6.3f\n", TimeToSecondsDbl(stats.gc.nonmoving_gc_sync_elapsed_ns));
+    }
     traceConcSyncEnd();
 }
 
