@@ -22,6 +22,9 @@ module IfaceSyn (
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
 
+        -- * CodeGen Information
+        IfLFInfo(..),
+
         -- * Binding names
         IfaceTopBndr,
         putIfaceTopBndr, getIfaceTopBndr,
@@ -37,6 +40,8 @@ module IfaceSyn (
         pprIfaceExpr,
         pprIfaceDecl,
         AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
+
+
     ) where
 
 #include "HsVersions.h"
@@ -69,6 +74,7 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import CgTypes (StandardFormInfo)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -520,6 +526,39 @@ data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
 
 data IfaceJoinInfo = IfaceNotJoinPoint
                    | IfaceJoinPoint JoinArity
+
+{-
+************************************************************************
+*                                                                      *
+                CodeGen Information
+*                                                                      *
+************************************************************************
+-}
+
+data IfLFInfo =
+  -- Since LNE and Unknown can't happen for exported ids.
+  -- LNE are never top level, Unknown is only used for imported things.
+    ILFReEntrant
+        TopLevelFlag    -- True if top level
+        OneShotInfo
+        !RepArity       -- Arity. Invariant: always > 0
+        !Bool           -- True <=> no fvs
+        -- ArgDescr        -- Argument descriptor (should really be in ClosureInfo)
+
+  | ILFThunk             -- Thunk (zero arity)
+        TopLevelFlag
+        !Bool           -- True <=> no free vars
+        !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        StandardFormInfo
+        !Bool           -- True <=> *might* be a function type
+
+  | ILFCon               -- A saturated constructor application
+        Name            -- The constructor Name
+
+  | ILFUnlifted          -- A value of unboxed type;
+                        -- always a value, needs evaluation
+
+
 
 {-
 Note [Empty case alternatives]
@@ -1324,6 +1363,16 @@ instance Outputable IfaceUnfolding where
                                         pprParendIfaceExpr e]
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
+
+instance Outputable IfLFInfo where
+    ppr (ILFReEntrant top oneshot rep fvs) =
+        text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
+                                        ppr rep <+> ppr fvs) -- <+> ppr argdesc)
+    ppr (ILFThunk top hasfv updateable sfi m_function) =
+        text "LFThunk" <> brackets (ppr top <+> ppr hasfv <+> ppr updateable <+>
+                                    ppr sfi <+> ppr m_function)
+    ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
+    ppr (ILFUnlifted) = text "LFUnlifted"
 
 {-
 ************************************************************************
@@ -2328,3 +2377,32 @@ instance Binary IfaceTyConParent where
 instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
+
+
+instance Binary IfLFInfo where
+    put_ bh (ILFReEntrant top oneshot rep fvs) =
+        putByte bh 0 >>
+        put_ bh top >>
+        put_ bh oneshot >>
+        put_ bh rep >>
+        put_ bh fvs -- >>
+        -- put_ bh argdesc
+    put_ bh (ILFThunk top hasfv updateable sfi m_function) =
+        putByte bh 1 >>
+        put_ bh top >>
+        put_ bh hasfv >>
+        put_ bh updateable >>
+        put_ bh sfi >>
+        put_ bh m_function
+    put_ bh (ILFCon conName) = putByte bh 2 >> put_ bh conName
+    put_ bh (ILFUnlifted) = putByte bh 3
+    get bh = do
+        con <- getByte bh
+        case con of
+            0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh <*> get bh -- <*> get bh
+            1 -> pure ILFThunk <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+            2 -> pure ILFCon <*> get bh
+            3 -> pure ILFUnlifted
+            _ -> panic "Invalid byte"
+
+

@@ -52,8 +52,8 @@ module StgCmmMonad (
         getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags, getThisPackage,
 
         -- more localised access to monad state
-        CgIdInfo(..),
-        getBinds, setBinds,
+        CgIdInfo(..), CgInfoImported,
+        getBinds, setBinds, lookupImportedLF,
 
         -- out of general friendliness, we also export ...
         CgInfoDownwards(..), CgState(..)        -- non-abstract
@@ -63,6 +63,7 @@ import GhcPrelude hiding( sequence, succ )
 
 import Cmm
 import StgCmmClosure
+import CgTypes ( CgInfoImported )
 import DynFlags
 import Hoopl.Collections
 import MkGraph
@@ -72,6 +73,8 @@ import SMRep
 import Module
 import Id
 import VarEnv
+import Name
+import NameEnv
 import OrdList
 import BasicTypes( ConTagZ )
 import Unique
@@ -138,8 +141,8 @@ initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
-runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
-runC dflags mod st fcode = doFCode fcode (initCgInfoDown dflags mod) st
+runC :: DynFlags -> Module -> CgState -> CgInfoImported -> FCode a -> (a,CgState)
+runC dflags mod st imported fcode = doFCode fcode (initCgInfoDown dflags mod imported) st
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode $
@@ -157,15 +160,18 @@ fixC fcode = FCode $
 data CgInfoDownwards        -- information only passed *downwards* by the monad
   = MkCgInfoDown {
         cgd_dflags    :: DynFlags,
-        cgd_mod       :: Module,            -- Module being compiled
-        cgd_updfr_off :: UpdFrameOffset,    -- Size of current update frame
-        cgd_ticky     :: CLabel,            -- Current destination for ticky counts
-        cgd_sequel    :: Sequel,            -- What to do at end of basic block
-        cgd_self_loop :: Maybe SelfLoopInfo,-- Which tail calls can be compiled
+        cgd_mod       :: Module,            -- ^ Module being compiled
+        cgd_info_imported :: CgInfoImported,-- ^ Backend info about imported things if we have any,
+                                            -- can be empty.
+        cgd_updfr_off :: UpdFrameOffset,    -- ^ Size of current update frame
+        cgd_ticky     :: CLabel,            -- ^ Current destination for ticky counts
+        cgd_sequel    :: Sequel,            -- ^ What to do at end of basic block
+        cgd_self_loop :: Maybe SelfLoopInfo,-- ^ Which tail calls can be compiled
                                             -- as local jumps? See Note
                                             -- [Self-recursive tail calls] in
                                             -- StgCmmExpr
-        cgd_tick_scope:: CmmTickScope       -- Tick scope for new blocks & ticks
+        cgd_tick_scope:: CmmTickScope       -- ^ Tick scope for new blocks & ticks
+
   }
 
 type CgBindings = IdEnv CgIdInfo
@@ -272,10 +278,11 @@ data ReturnKind
 --
 
 
-initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
-initCgInfoDown dflags mod
+initCgInfoDown :: DynFlags -> Module -> CgInfoImported -> CgInfoDownwards
+initCgInfoDown dflags mod info_imported
   = MkCgInfoDown { cgd_dflags    = dflags
                  , cgd_mod       = mod
+                 , cgd_info_imported = info_imported
                  , cgd_updfr_off = initUpdFrameOff dflags
                  , cgd_ticky     = mkTopTickyCtrLabel
                  , cgd_sequel    = initSequel
@@ -433,6 +440,12 @@ setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
+
+lookupImportedLF :: Name -> FCode (Maybe LambdaFormInfo)
+lookupImportedLF name = do
+        cg_imports <- cgd_info_imported <$> getInfoDown
+        pprTraceM "Lookup up lfinfo" $ ppr (name, lookupNameEnv cg_imports name)
+        return $ lookupNameEnv cg_imports name
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->

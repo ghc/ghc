@@ -51,6 +51,7 @@ import DynFlags
 import Outputable
 import GHC.Platform
 import FastString
+import Binary
 
 import Data.Word
 import Data.Bits
@@ -218,6 +219,15 @@ data ArgDescr
   | ArgGen              -- General case
         Liveness        -- Details about the arguments
 
+instance Binary ArgDescr where
+  put_ bh (ArgSpec spec)    = putByte bh 0 >> put_ bh spec
+  put_ bh (ArgGen liveness) = putByte bh 1 >> put_ bh liveness
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> ArgSpec  <$> get bh
+      1 -> ArgGen   <$> get bh
+      _ -> panic "Invalid byte"
 
 -----------------------------------------------------------------------------
 -- Construction
