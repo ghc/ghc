@@ -734,16 +734,9 @@ static void nonmovingPrepareMark(void)
         // since.
     }
 
-    // Clear large object bits of existing large objects
-    uint32_t n_large = 0;
-    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-        n_large++;
-    }
-    trace(TRACE_nonmoving_gc, "Cleared mark bit of %d large objects", n_large);
     // Add newly promoted large objects and clear mark bits
     bdescr *next;
-    n_large = 0;
+    uint32_t n_large = 0;
     ASSERT(oldest_gen->scavenged_large_objects == NULL);
     for (bdescr *bd = oldest_gen->large_objects; bd; bd = next) {
         next = bd->link;
