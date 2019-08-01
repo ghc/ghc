@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
--- | Functions for converting Core things to interface file things.
+-- | Functions for converting (mostly core) things to interface file things.
 module ToIface
     ( -- * Binders
       toIfaceTvBndr
@@ -40,6 +40,8 @@ module ToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+      -- * Information from and for the code generator.
+    , toIfLFInfo
     ) where
 
 #include "HsVersions.h"
@@ -51,6 +53,7 @@ import DataCon
 import Id
 import IdInfo
 import CoreSyn
+import CgTypes
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
@@ -654,3 +657,22 @@ is that these NOINLINE'd functions now can't be profitably inlined
 outside of the hs-boot loop.
 
 -}
+
+{-
+************************************************************************
+*                                                                      *
+                        Code generation info.
+*                                                                      *
+************************************************************************
+-}
+
+toIfLFInfo :: LambdaFormInfo -> IfLFInfo
+toIfLFInfo (LFReEntrant top oneshot rep fvs _argdesc) =
+    ILFReEntrant top oneshot rep fvs
+toIfLFInfo (LFThunk top hasfv updateable sfi m_function) =
+    ILFThunk top hasfv updateable sfi m_function
+toIfLFInfo (LFUnlifted) = ILFUnlifted
+toIfLFInfo (LFCon con) = ILFCon (dataConName con)
+-- All other cases are not possible at the top level.
+toIfLFInfo lf = pprPanic "Invalid IfLFInfo conversion:"
+                (ppr lf <+> text "should not be exported")

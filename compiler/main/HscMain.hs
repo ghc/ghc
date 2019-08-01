@@ -39,6 +39,7 @@ module HscMain
     , Messager, batchMsg
     , HscStatus (..)
     , hscIncrementalCompile
+    , hscMaybeWriteIface, addIfaceCgInfoImported
     , hscCompileCmmFile
 
     , hscGenHardCode
@@ -85,6 +86,7 @@ module HscMain
 
 import GhcPrelude
 
+import Data.Bifunctor
 import Data.Data hiding (Fixity, TyCon)
 import Data.Maybe       ( fromJust )
 import Id
@@ -125,7 +127,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
-import StgCmmClosure ( LambdaFormInfo )
+import CgTypes          ( LambdaFormInfo, CgInfoImported )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -715,6 +717,7 @@ genericHscFrontend' mod_summary
 --------------------------------------------------------------
 
 -- Compile Haskell/boot in OneShot mode.
+-- Does NOT create an interface file.
 hscIncrementalCompile :: Bool
                       -> Maybe TcGblEnv
                       -> Maybe Messager
@@ -778,10 +781,11 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
             finish mod_summary tc_result mb_old_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify),
--- and then generates and writes out the final interface. We want
--- to write the interface AFTER simplification so we can get
+-- and then generates and returns the interface. We want
+-- to generate most of the interface AFTER simplification so we can get
 -- as up-to-date and good unfoldings and other info as possible
 -- in the interface file.
+-- However we might extend the interface further during actual code gen.
 finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
@@ -820,23 +824,30 @@ finish summary tc_result mb_old_hash = do
             desugared_guts <- hscSimplify' plugins desugared_guts0
             (iface, no_change, details, cgguts) <-
               liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
-            return (iface, no_change, details, HscRecomp cgguts summary)
+            let has_changed = if no_change then Unchanged else HasChanged
+            return (iface, no_change, details, HscRecomp cgguts summary (iface, has_changed))
       else mk_simple_iface
-  liftIO $ hscMaybeWriteIface dflags iface no_change summary
+  unless (needsIfaceUpdate hsc_status) $ do
+    liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
   return
     ( hsc_status
     , HomeModInfo
       {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
-hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscMaybeWriteIface dflags iface no_change summary =
+hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
+hscMaybeWriteIface dflags iface no_change location =
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case hscTarget dflags of
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
     in when (write_interface || force_write_interface) $
-            hscWriteIface dflags iface no_change summary
+            hscWriteIface dflags iface no_change location
+
+-- | Add information produced by codeGen to the iface.
+addIfaceCgInfoImported :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
+addIfaceCgInfoImported core_iface lf_info =
+  core_iface { mi_lf_info = Just $ mapSnd cgInfoToIfaceCgInfo lf_info }
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1296,6 +1307,9 @@ hscSimplify' plugins ds_result = do
 -- Interface generators
 --------------------------------------------------------------
 
+-- | Generate a striped down interface file,
+-- e.g. for boot files or when ghci generates interface files.
+-- See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
                -> TcGblEnv
                -> Maybe Fingerprint
@@ -1352,9 +1366,9 @@ hscNormalIface' simpl_result mb_old_iface = do
 -- BackEnd combinators
 --------------------------------------------------------------
 
-hscWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscWriteIface dflags iface no_change mod_summary = do
-    let ifaceFile = ml_hi_file (ms_location mod_summary)
+hscWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
+hscWriteIface dflags iface no_change mod_location = do
+    let ifaceFile = ml_hi_file mod_location
     unless no_change $
         {-# SCC "writeIface" #-}
         writeIfaceFile dflags ifaceFile iface
@@ -1369,9 +1383,11 @@ hscWriteIface dflags iface no_change mod_summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)],
+                      [(Name,LambdaFormInfo)])
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
+
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.
                     cg_module   = this_mod,
@@ -1434,8 +1450,12 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, stream_result)
-        pprTraceM "CgInfo" $ ppr stream_result
-        return ((output_filename, stub_c_exists, foreign_fps))
+        pprTraceM "ResultCgInfo" $ ppr $ take 50 stream_result
+
+        -- Only external names are actually visible to codeGen
+        let infoExported = filter (isExternalName . fst) . map (first idName) $ stream_result
+
+        return (output_filename, stub_c_exists, foreign_fps, infoExported)
 
 
 hscInteractive :: HscEnv
@@ -1507,6 +1527,9 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
+    import_lf_info <- eps_cg_info_env <$> hscEPS hsc_env :: IO CgInfoImported
+
+    pprTraceM "ImportedLFs1" $ ppr $ import_lf_info
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
@@ -1515,6 +1538,7 @@ doCodeGen hsc_env this_mod data_tycons
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+                           import_lf_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

@@ -202,7 +202,7 @@ compileOne' m_tc_result mHscMessage
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
-                                            mod_name HscUpdateSig))
+                                            mod_name HscUpdateSig ))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -210,7 +210,11 @@ compileOne' m_tc_result mHscMessage
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
             return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, HscInterpreted) -> do
+        (HscRecomp cgguts summary (iface, iface_changed), HscInterpreted) -> do
+            -- If we interpret the code, then we can write the interface file here.
+            liftIO $ hscMaybeWriteIface dflags iface (not $ hasChanged iface_changed)
+                                (ms_location summary)
+
             (hasStub, comp_bc, spt_entries) <-
                 hscInteractive hsc_env cgguts summary
 
@@ -231,7 +235,7 @@ compileOne' m_tc_result mHscMessage
             let linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
             return hmi0 { hm_linkable = Just linkable }
-        (HscRecomp cgguts summary, _) -> do
+        (HscRecomp cgguts summary (iface, iface_changed), _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
@@ -239,7 +243,7 @@ compileOne' m_tc_result mHscMessage
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
                                Nothing,
-                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary)))
+                               Just (HscOut src_flavour mod_name (HscRecomp cgguts summary (iface, iface_changed))))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -248,7 +252,6 @@ compileOne' m_tc_result mHscMessage
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
             return hmi0 { hm_linkable = Just linkable }
-
  where dflags0     = ms_hspp_opts summary
 
        this_mod    = ms_mod summary
@@ -1024,7 +1027,6 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
 -- the direction of the compilation manager).
 runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
  = do   -- normal Hsc mode, not mkdependHS
-
         PipeEnv{ stop_phase=stop,
                  src_basename=basename,
                  src_suffix=suff } <- getPipeEnv
@@ -1112,13 +1114,13 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+        (result, _ ) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")
 
-runPhase (HscOut src_flavour mod_name result) _ dflags = do
+runPhase (HscOut src_flavour mod_name result ) _ dflags = do
         location <- getLocation src_flavour mod_name
         setModLocation location
 
@@ -1149,19 +1151,31 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
-            HscRecomp cgguts mod_summary
+            HscRecomp cgguts mod_summary (iface, iface_changed)
               -> do output_fn <- phaseOutputFilename next_phase
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, cgInfoExported) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
+
+                    let iface' = addIfaceCgInfoImported iface cgInfoExported
+
+                    liftIO $ hscMaybeWriteIface dflags iface' (not $ hasChanged iface_changed)
+                                                    (ms_location mod_summary)
+
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     return (RealPhase next_phase, outputFilename)
+                  where
+                    -- -- | Add information produced by codeGen to the iface.
+                    -- -- mkIfaceCgInfoImported :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
+                    -- mkIfaceCgInfoImported core_iface lf_info =
+                    --   core_iface { mi_lf_info = Just lf_info }
+
 
 -----------------------------------------------------------------------------
 -- Cmm phase

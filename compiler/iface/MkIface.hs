@@ -23,7 +23,10 @@ module MkIface (
         mkIfaceExports,
 
         coAxiomToIfaceDecl,
-        tyThingToIfaceDecl -- Converting things to their Iface equivalents
+        -- * Converting things to their Iface equivalents
+        tyThingToIfaceDecl, -- TyThings
+        cgInfoToIfaceCgInfo
+
  ) where
 
 {-
@@ -110,6 +113,7 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
+import CgTypes (LambdaFormInfo )
 
 import Control.Monad
 import Data.Function
@@ -165,6 +169,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                    warns hpc_info self_trust
                    safe_mode usages
                    doc_hdr decl_docs arg_docs
+                   --TODO: Currently we just stub it out here.
                    mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
@@ -325,7 +330,8 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_complete_sigs = icomplete_sigs,
               mi_doc_hdr     = doc_hdr,
               mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
+              mi_arg_docs    = arg_docs,
+              mi_lf_info     = Nothing }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
@@ -2114,3 +2120,7 @@ bogusIfaceRule id_name
         ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [],
         ifRuleRhs = IfaceExt id_name, ifRuleOrph = IsOrphan,
         ifRuleAuto = True }
+
+--------------------------
+cgInfoToIfaceCgInfo :: LambdaFormInfo -> IfLFInfo
+cgInfoToIfaceCgInfo = toIfLFInfo

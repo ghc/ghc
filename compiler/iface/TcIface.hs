@@ -17,7 +17,9 @@ module TcIface (
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
-        tcIfaceGlobal
+        tcIfaceGlobal,
+
+        tcLFInfo
  ) where
 
 #include "HsVersions.h"
@@ -43,6 +45,7 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import CoreLint
+import CgTypes
 import MkCore
 import Id
 import MkId
@@ -77,6 +80,8 @@ import qualified BooleanFormula as BF
 
 import Control.Monad
 import qualified Data.Map as Map
+
+import SMRep
 
 {-
 This module takes
@@ -1601,7 +1606,7 @@ tcIfaceGlobal name
           ; _ -> via_external }}
   where
     via_external =  do
-        { hsc_env <- getTopEnv
+        { hsc_env <- getTopEnv :: TcRnIf gbl lcl HscEnv
         ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
         ; case mb_thing of {
             Just thing -> return thing ;
@@ -1819,3 +1824,29 @@ bindIfaceTyConBinderX :: (IfaceBndr -> (TyCoVar -> IfL a) -> IfL a)
 bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
   = bind_tv tv $ \tv' ->
     thing_inside (Bndr tv' vis)
+
+{-
+************************************************************************
+*                                                                      *
+                        Code generation info.
+*                                                                      *
+************************************************************************
+-}
+
+-- In order to load the LFCon the constructor has been loaded and processed
+-- first. However, they are only loaded when required by the typechecker.
+-- We solve this by delaying the loading via forkM.
+
+-- This way we only force them once we actually generate code. And at that
+-- point the typechecker will have touched every constructor reference appearing
+-- in the code.
+
+tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
+tcLFInfo (ILFReEntrant top oneshot rep fvs) =
+    pure $ LFReEntrant top oneshot rep fvs (ArgSpec 0) --(panic "Not used for references")
+tcLFInfo (ILFThunk top hasfv updateable sfi m_function) =
+    pure $ LFThunk top hasfv updateable sfi m_function
+tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
+tcLFInfo (ILFCon conName) =
+    LFCon <$> forkM (text "Loading LFCon constructor")
+                    (tcIfaceDataCon conName)

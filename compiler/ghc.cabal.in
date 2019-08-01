@@ -302,6 +302,7 @@ Library
         CodeGen.Platform.SPARC
         CodeGen.Platform.X86
         CodeGen.Platform.X86_64
+        CgTypes
         CgUtils
         StgCmm
         StgCmmBind

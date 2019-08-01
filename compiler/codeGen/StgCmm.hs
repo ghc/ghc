@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmm ( codeGen ) where
+module StgCmm ( codeGen, CgInfoImported ) where
 
 #include "HsVersions.h"
 
@@ -25,6 +25,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
+import CgTypes ( CgInfoImported )
 
 import Cmm
 import CmmUtils
@@ -46,6 +47,7 @@ import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
 import UniqFM
+import NameEnv
 
 import OrdList
 import MkGraph
@@ -60,12 +62,13 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
+        -> CgInfoImported
         -> Stream IO CmmGroup [(Id,LambdaFormInfo)]
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
-        cost_centre_info stg_binds hpc_info
+        cost_centre_info stg_binds hpc_info m_lf_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
@@ -74,7 +77,7 @@ codeGen dflags this_mod data_tycons
               cg fcode = do
                 cmm <- liftIO $ do
                          st <- readIORef cgref
-                         let (a,st') = runC dflags this_mod st (getCmm fcode)
+                         let (a,st') = runC dflags this_mod st m_lf_info (getCmm fcode)
 
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
@@ -104,7 +107,6 @@ codeGen dflags this_mod data_tycons
 
         ; mapM_ do_tycon data_tycons
         ; st <- liftIO $ readIORef cgref
-        ; pprTraceM "Binds:" . ppr $ cgs_binds st
         ; return $ Prelude.map (\info -> (cg_id info, cg_lf info)) $ eltsUFM $ cgs_binds st
         }
 

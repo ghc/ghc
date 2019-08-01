@@ -48,6 +48,8 @@ import UniqFM
 import Util
 import VarEnv
 
+import Data.Maybe
+
 -------------------------------------
 --        Manipulating CgIdInfo
 -------------------------------------
@@ -129,16 +131,19 @@ getCgIdInfo id
 
                 -- Should be imported; make up a CgIdInfo for it
           let name = idName id
-        ; if isExternalName name then
-              let ext_lbl
+        ; if isExternalName name then do
+            { let ext_lbl
                       | isUnliftedType (idType id) =
                           -- An unlifted external Id must refer to a top-level
                           -- string literal. See Note [Bytes label] in CLabel.
                           ASSERT( idType id `eqType` addrPrimTy )
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
-              in return $
-                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
+              ; lf_cached <- lookupImportedLF name
+              ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
+              ; let lf_info = fromMaybe (mkLFImported id) lf_cached
+              ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
+            }
           else
               cgLookupPanic id -- Bug
         }}}
