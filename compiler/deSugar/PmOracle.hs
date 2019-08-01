@@ -66,6 +66,7 @@ import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
+import FamInst
 import FamInstEnv
 
 type PmM = DsM
@@ -110,9 +111,14 @@ instance Outputable IncompleteMatches where
 initIM :: Type -> DsM (Maybe IncompleteMatches)
 initIM ty = case splitTyConApp_maybe ty of
   Nothing -> pure Nothing
-  Just (tc, _) -> do
-    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc
+  Just (tc, tc_args) -> do
+    -- Look into the representation type of a data family instance, too.
+    env <- dsGetFamInstEnvs
+    let (tc', _tc_args', _co) = tcLookupDataFamInst env tc tc_args
+    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc'
     let rdcs = maybeToList mb_rdcs
+    -- NB: tc, because COMPLETE sets are associated with the parent data family
+    -- TyCon
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
@@ -333,9 +339,7 @@ pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
 -- @Note [Extensions to GADTs Meet Their Match]@.
 checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> PmM Bool
 checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
-  fam_insts <- dsGetFamInstEnvs
-  let definitely_inhabited =
-        definitelyInhabitedType fam_insts (delta_ty_cs amb_cs)
+  let definitely_inhabited = definitelyInhabitedType (delta_ty_cs amb_cs)
   tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
   let rec_max_bound | tys_to_check `lengthExceeds` 1
                     = 1
@@ -396,9 +400,9 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
 --
 -- See the \"Strict argument type constraints\" section of
 -- @Note [Extensions to GADTs Meet Their Match]@.
-definitelyInhabitedType :: FamInstEnvs -> Bag EvVar -> Type -> PmM Bool
-definitelyInhabitedType env ty_cs ty = do
-  mb_res <- pmTopNormaliseType_maybe env ty_cs ty
+definitelyInhabitedType :: Bag EvVar -> Type -> PmM Bool
+definitelyInhabitedType ty_cs ty = do
+  mb_res <- pmTopNormaliseType_maybe ty_cs ty
   pure $ case mb_res of
            Just (_, cons, _) -> any meets_criteria cons
            Nothing           -> False
@@ -481,7 +485,7 @@ pmTopNormaliseType_maybe, using the constraint solver to solve for any local
 equalities (such as i ~ Int) that may be in scope.
 -}
 
-pmTopNormaliseType_maybe :: FamInstEnvs -> Bag EvVar -> Type
+pmTopNormaliseType_maybe :: Bag EvVar -> Type
                          -> PmM (Maybe (Type, [DataCon], Type))
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
@@ -495,14 +499,15 @@ pmTopNormaliseType_maybe :: FamInstEnvs -> Bag EvVar -> Type
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
-pmTopNormaliseType_maybe env ty_cs typ
-  = do (_, mb_typ') <- initTcDsForSolver $ tcNormalise ty_cs typ
+pmTopNormaliseType_maybe ty_cs typ
+  = do env <- dsGetFamInstEnvs
+       (_, mb_typ') <- initTcDsForSolver $ tcNormalise ty_cs typ
          -- Before proceeding, we chuck typ into the constraint solver, in case
          -- solving for given equalities may reduce typ some. See
          -- "Wrinkle: local equalities" in
          -- Note [Type normalisation for EmptyCase].
        pure $ do typ' <- mb_typ'
-                 ((ty_f,tm_f), ty) <- topNormaliseTypeX stepper comb typ'
+                 ((ty_f,tm_f), ty) <- topNormaliseTypeX (stepper env) comb typ'
                  -- We need to do topNormaliseTypeX in addition to tcNormalise,
                  -- since topNormaliseX looks through newtypes, which
                  -- tcNormalise does not do.
@@ -523,7 +528,7 @@ pmTopNormaliseType_maybe env ty_cs typ
     -- comb performs the concatenation, for both lists.
     comb (tyf1, tmf1) (tyf2, tmf2) = (tyf1 . tyf2, tmf1 . tmf2)
 
-    stepper = newTypeStepper `composeSteppers` tyFamStepper
+    stepper env = newTypeStepper `composeSteppers` tyFamStepper env
 
     -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
     -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
@@ -538,8 +543,8 @@ pmTopNormaliseType_maybe env ty_cs typ
       | otherwise
       = NS_Done
 
-    tyFamStepper :: NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
-    tyFamStepper rec_nts tc tys  -- Try to step a type/data family
+    tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
+    tyFamStepper env rec_nts tc tys  -- Try to step a type/data family
       = let (_args_co, ntys, _res_co) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
           -- normalise_tc_args (which takes the LiftingContext described
@@ -614,9 +619,13 @@ mkOneConFull x con = do
       arg_is_banged = map isBanged $ conLikeImplBangs con
       -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
       -- be fine after type-checking.
-      (_, tc_args) = splitAppTys res_ty
+      (tc, tc_args) = splitTyConApp res_ty
+  -- tc might be a data family, but univ_tvs above is relative to the
+  -- representation data type. We need to "translate" tc_args accordingly.
+  env <- dsGetFamInstEnvs
+  let (_tc', tc_args', _co) = tcLookupDataFamInst env tc tc_args
   let subst1 = case con of
-                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  RealDataCon {} -> zipTvSubst univ_tvs tc_args'
                   -- The expectJust is always satisfied as long as we filter
                   -- with 'isValidCompleteMatch' in 'allCompleteMatches'
                   PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
@@ -657,11 +666,13 @@ mkOneSatisfiableConFull
 mkOneSatisfiableConFull delta x con = do
   -- mkOneConFull doesn't cope with type families, so we have to normalise
   -- x's result type first and introduce an auxiliary binding.
-  fam_insts <- dsGetFamInstEnvs
-  mb_res_ty <- pmTopNormaliseType_maybe fam_insts (delta_ty_cs delta) (idType x)
+  mb_res_ty <- pmTopNormaliseType_maybe (delta_ty_cs delta) (idType x)
   let res_ty = maybe (idType x) fstOf3 mb_res_ty
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
+  let (_,_,_,_,_,_,con_res_ty) = conLikeFullSig con
+  con_res_ty' <- maybe con_res_ty fstOf3 <$> pmTopNormaliseType_maybe (delta_ty_cs delta) con_res_ty
+  tracePm "sldfksjd" (ppr con_res_ty $$ ppr con_res_ty')
   (ic, ex_tvs, arg_vars) <- mkOneConFull y con
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
@@ -676,8 +687,7 @@ mkOneSatisfiableConFull delta x con = do
 inhabitationCandidates :: Delta -> Type
                        -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
 inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
-  fam_insts   <- dsGetFamInstEnvs
-  pmTopNormaliseType_maybe fam_insts ty_cs ty >>= \case
+  pmTopNormaliseType_maybe ty_cs ty >>= \case
     Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
     Nothing                     -> alts_to_check ty     ty      []
   where
@@ -1138,17 +1148,21 @@ testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 --
 -- It's like 'DataCon.dataConCannotMatch', but more clever because it
 -- takes the facts in Delta into account
-testInhabited delta ty con = do
-  tracePm "testInhabited" (ppr ty <+> ppr con)
-  let res_ty  = ty
-      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
+--
+-- NB: Assumes that res_ty is the *representation* type in case of data family
+testInhabited delta res_ty con = do
+  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
       -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
       -- be fine after type-checking.
-      (_, tc_args) = splitAppTys res_ty
+      (tc, tc_args) = splitTyConApp res_ty
+  -- tc might be a data family, but univ_tvs above is relative to the
+  -- representation data type. We need to "translate" tc_args accordingly.
+  env <- dsGetFamInstEnvs
+  let (_tc', tc_args', _co) = tcLookupDataFamInst env tc tc_args
   let subst1 = case con of
-                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  RealDataCon {} -> zipTvSubst univ_tvs tc_args'
                   -- The expectJust is always satisfied as long as we filter
                   -- with 'isValidCompleteMatch' in 'allCompleteMatches'
                   PatSynCon {}   -> expectJust "testInhabited" (tcMatchTy con_res_ty res_ty)
