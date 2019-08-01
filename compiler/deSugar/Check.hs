@@ -37,6 +37,7 @@ import TcHsSyn
 import Id
 import ConLike
 import Name
+import FamInst
 import FamInstEnv
 import TysWiredIn
 import TyCon
@@ -1005,6 +1006,12 @@ translation step. See #15753 for why this yields surprising results.
 
 -- | For a given type, finds all the COMPLETE sets of conlikes that inhabit it.
 --
+-- Note that for a data family instance, this must be the *representation* type.
+-- e.g. data instance T (a,b) = T1 a b
+--   leads to
+--      data TPair a b = T1 a b  -- The "representation" type
+--   It is TPair a b, not T (a, b), that is given to allCompleteMatches
+--
 -- These come from two places.
 --  1. From data constructors defined with the result type constructor.
 --  2. From `COMPLETE` pragmas which have the same type as the result
@@ -1013,10 +1020,15 @@ translation step. See #15753 for why this yields surprising results.
 allCompleteMatches :: Type -> DsM [[ConLike]]
 allCompleteMatches ty = case splitTyConApp_maybe ty of
   Nothing -> pure [] -- NB: We don't know any COMPLETE set, as opposed to [[]]
-  Just (tc, _) -> do
-    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc
+  Just (tc, tc_args) -> do
+    -- Look into the representation type of a data family instance, too.
+    env <- dsGetFamInstEnvs
+    let (tc', _tc_args', _co) = tcLookupDataFamInst env tc tc_args
+    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc'
     let maybe_to_list = maybe [] (:[])
     let rdcs = maybe_to_list mb_rdcs
+    -- NB: tc, because COMPLETE sets are associated with the parent data family
+    -- TyCon
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
@@ -1190,7 +1202,7 @@ pmcheck (PmFake : ps) guards vva delta =
   -- though. So just have these two cases but do not do all the boilerplate
   forces . mkCons delta <$> pmcheckI ps guards vva delta
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
-  tracePm "PmGrd: pmPatType" (hcat [ppr p, ppr (pmPatType p)])
+  tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
   y <- mkPmId (pmPatType p)
   let delta' = expectJust "y was fresh" $ solveVar delta y e
   pmcheckI (pv ++ ps) guards (y : vva) delta'
