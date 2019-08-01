@@ -599,6 +599,7 @@ static struct NonmovingAllocator *alloc_nonmoving_allocator(uint32_t n_caps)
 
 void nonmovingInit(void)
 {
+    if (! RtsFlags.GcFlags.useNonmoving) return;
 #if defined(THREADED_RTS)
     initMutex(&nonmoving_collection_mutex);
     initCondition(&concurrent_coll_finished);
@@ -612,6 +613,7 @@ void nonmovingInit(void)
 
 void nonmovingExit(void)
 {
+    if (! RtsFlags.GcFlags.useNonmoving) return;
 #if defined(THREADED_RTS)
     if (mark_thread) {
         debugTrace(DEBUG_nonmoving_gc,
