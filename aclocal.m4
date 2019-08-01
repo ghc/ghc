@@ -2112,7 +2112,8 @@ AC_DEFUN([XCODE_VERSION],[
 # FIND_LLVM_PROG()
 # --------------------------------
 # Find where the llvm tools are. We have a special function to handle when they
-# are installed with a version suffix (e.g., llc-3.1).
+# are installed with a version suffix (e.g., llc-7, llc-7.0) and without (e.g.
+# llc).
 #
 # $1 = the variable to set
 # $2 = the command to look for
@@ -2120,7 +2121,7 @@ AC_DEFUN([XCODE_VERSION],[
 #
 AC_DEFUN([FIND_LLVM_PROG],[
     # Test for program with and without version name.
-    AC_CHECK_TOOLS([$1], [$2-$3 $2], [:])
+    AC_CHECK_TOOLS([$1], [$2-$3 $2-$3.0 $2], [:])
     if test "$$1" != ":"; then
         AC_MSG_CHECKING([$$1 is version $3])
         if test `$$1 --version | grep -c "version $3"` -gt 0 ; then
