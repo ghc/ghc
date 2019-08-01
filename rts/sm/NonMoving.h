@@ -61,7 +61,11 @@ struct NonmovingSegment {
 
 // A non-moving allocator for a particular block size
 struct NonmovingAllocator {
+    Mutex mutex;
+    // filled and filled_tail protected by mutex
     struct NonmovingSegment *filled;
+    struct NonmovingSegment *filled_tail;
+    struct NonmovingSegment *new_filled;
     struct NonmovingSegment *active;
     // indexed by capability number
     struct NonmovingSegment *current[];
@@ -160,14 +164,15 @@ INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
-    while (true) {
-        struct NonmovingSegment *current_filled = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->filled);
-        seg->link = current_filled;
-        if (cas((StgVolatilePtr) &alloc->filled, (StgWord) current_filled, (StgWord) seg) == (StgWord) current_filled) {
-            break;
-        }
-    }
+
+    ACQUIRE_LOCK(&alloc->mutex);
+    seg->link = alloc->new_filled;
+    alloc->new_filled = seg;
+    RELEASE_LOCK(&alloc->mutex);
 }
+
+void nonmovingFinishedFilling(void);
+
 // Assert that the pointer can be traced by the non-moving collector (e.g. in
 // mark phase). This means one of the following:
 //
