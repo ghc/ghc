@@ -712,12 +712,21 @@ static void nonmovingPrepareMark(void)
         // since.
     }
 
-    ASSERT(oldest_gen->scavenged_large_objects == NULL);
-    bdescr *next;
+    // Clear large object bits of existing large objects
     uint32_t n_large = 0;
+    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+        n_large++;
+    }
+    trace(TRACE_nonmoving_gc, "Cleared mark bit of %d large objects", n_large);
+    // Add newly promoted large objects and clear mark bits
+    bdescr *next;
+    n_large = 0;
+    ASSERT(oldest_gen->scavenged_large_objects == NULL);
     for (bdescr *bd = oldest_gen->large_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
+        bd->flags &= ~BF_MARKED;
         dbl_link_onto(bd, &nonmoving_large_objects);
         n_large++;
     }
@@ -728,11 +737,19 @@ static void nonmovingPrepareMark(void)
     oldest_gen->n_large_blocks = 0;
     nonmoving_live_words = 0;
 
-    // Move new compact objects from younger generations to nonmoving_compact_objects
+    // Clear compact object mark bits
     uint32_t n_compact = 0;
+    for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
+        bd->flags &= ~BF_MARKED;
+        n_compact++;
+    }
+    trace(TRACE_nonmoving_gc, "Cleared mark bit of %d compact objects", n_compact);
+    // Move new compact objects from younger generations to nonmoving_compact_objects
+    n_compact = 0;
     for (bdescr *bd = oldest_gen->compact_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
+        bd->flags &= ~BF_MARKED;
         dbl_link_onto(bd, &nonmoving_compact_objects);
         n_compact++;
     }
@@ -742,18 +759,6 @@ static void nonmovingPrepareMark(void)
     oldest_gen->compact_objects = NULL;
     // TODO (osa): what about "in import" stuff??
 
-    // Clear compact object mark bits
-    for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-    }
-
-    // Clear large object bits
-    n_large = 0;
-    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-        n_large++;
-    }
-    trace(TRACE_nonmoving_gc, "Cleared mark bit of %d large objects", n_large);
 
 
 #if defined(DEBUG)
