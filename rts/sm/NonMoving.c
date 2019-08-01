@@ -375,7 +375,6 @@ memcount nonmoving_live_words = 0;
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
 #endif
-static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
 
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block_size)
@@ -682,7 +681,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
     nonmovingHeap.n_caps = new_n_caps;
 }
 
-static inline void nonmovingClearBitmap(struct NonmovingSegment *seg)
+void nonmovingClearBitmap(struct NonmovingSegment *seg)
 {
     unsigned int n = nonmovingSegmentBlockCount(seg);
     memset(seg->bitmap, 0, n);
@@ -695,9 +694,6 @@ static void nonmovingPrepareMark(void)
     prev_static_flag = static_flag;
     static_flag =
         static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
-
-    // Should have been cleared by the last sweep
-    ASSERT(nonmovingHeap.sweep_list == NULL);
 
     nonmovingBumpEpoch();
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
@@ -1087,7 +1083,6 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingSweepStableNameTable();
 
     nonmovingSweep();
-    ASSERT(nonmovingHeap.sweep_list == NULL);
     debugTrace(DEBUG_nonmoving_gc, "Finished sweeping.");
     traceConcSweepEnd();
 #if defined(DEBUG)
