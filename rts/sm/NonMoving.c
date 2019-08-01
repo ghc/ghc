@@ -733,11 +733,6 @@ static void nonmovingPrepareMark(void)
         // since.
     }
 
-    // Clear large object bits of existing large objects
-    for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
-        bd->flags &= ~BF_MARKED;
-    }
-
     // Add newly promoted large objects and clear mark bits
     bdescr *next;
     ASSERT(oldest_gen->scavenged_large_objects == NULL);

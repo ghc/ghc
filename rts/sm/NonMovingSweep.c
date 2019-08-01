@@ -330,6 +330,15 @@ void nonmovingSweepLargeObjects()
 {
     freeChain_lock_max(nonmoving_large_objects, 10000);
     nonmoving_large_objects = nonmoving_marked_large_objects;
+
+    // Clear MARKED bits of all large objects so we don't need to do it in the
+    // preparatory pause>
+    bdescr *next;
+    for (bdescr *bd = nonmoving_large_objects; bd; bd = next) {
+        next = bd->link;
+        ASSERT(bd->flags & BF_NONMOVING_SWEEPING);
+        bd->flags &= ~BF_MARKED;
+    }
     n_nonmoving_large_blocks = n_nonmoving_marked_large_blocks;
     nonmoving_marked_large_objects = NULL;
     n_nonmoving_marked_large_blocks = 0;
