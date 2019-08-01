@@ -267,7 +267,7 @@ picture = DocPic . makeLabeled Picture
 -- >>> parseString "\\(\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\)"
 -- DocMathInline "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathInline :: Parser (DocH mod a)
-mathInline = DocMathInline . T.unpack 
+mathInline = DocMathInline . T.unpack
              <$> disallowNewline  ("\\(" *> takeUntil "\\)")
 
 -- | Display math parser, surrounded by \\[ and \\].
@@ -492,7 +492,7 @@ tableStepFour rs hdrIndex cells =  case hdrIndex of
     -- extract cell contents given boundaries
     extract :: Int -> Int -> Int -> Int -> Text
     extract x y x2 y2 = T.intercalate "\n"
-        [ T.take (x2 - x + 1) $ T.drop x $ rs !! y'
+        [ T.stripEnd $ T.stripStart $ T.take (x2 - x + 1) $ T.drop x $ rs !! y'
         | y' <- [y .. y2]
         ]
 
@@ -579,7 +579,7 @@ definitionList indent = DocDefList <$> p
         Right i -> (label, contents) : i
 
 -- | Drops all trailing newlines.
-dropNLs :: Text -> Text 
+dropNLs :: Text -> Text
 dropNLs = T.dropWhileEnd (== '\n')
 
 -- | Main worker for 'innerList' and 'definitionList'.
@@ -653,7 +653,7 @@ takeNonEmptyLine = do
 --
 -- More precisely: skips all whitespace-only lines and returns indentation
 -- (horizontal space, might be empty) of that non-empty line.
-takeIndent :: Parser Text 
+takeIndent :: Parser Text
 takeIndent = do
   indent <- takeHorizontalSpace
   choice' [ "\n" *> takeIndent
@@ -711,14 +711,14 @@ examples = DocExamples <$> (many (try (skipHorizontalSpace *> "\n")) *> go)
         substituteBlankLine "<BLANKLINE>" = ""
         substituteBlankLine xs = xs
 
-nonEmptyLine :: Parser Text 
+nonEmptyLine :: Parser Text
 nonEmptyLine = try (mfilter (T.any (not . isSpace)) takeLine)
 
 takeLine :: Parser Text
 takeLine = try (takeWhile (/= '\n') <* endOfLine)
 
 endOfLine :: Parser ()
-endOfLine = void "\n" <|> Parsec.eof 
+endOfLine = void "\n" <|> Parsec.eof
 
 -- | Property parser.
 --
@@ -800,7 +800,7 @@ autoUrl :: Parser (DocH mod a)
 autoUrl = mkLink <$> url
   where
     url = mappend <$> choice' [ "http://", "https://", "ftp://"] <*> takeWhile1 (not . isSpace)
-    
+
     mkLink :: Text -> DocH mod a
     mkLink s = case T.unsnoc s of
       Just (xs,x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
