@@ -172,8 +172,7 @@ initStorage (void)
   oldest_gen->to = oldest_gen;
 
   // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
-  if (RtsFlags.GcFlags.useNonmoving)
-      nonmovingInit();
+  nonmovingInit();
 
 #if defined(THREADED_RTS)
   // nonmovingAddCapabilities allocates segments, which requires taking the gc
