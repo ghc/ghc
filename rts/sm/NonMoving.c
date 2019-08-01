@@ -705,6 +705,7 @@ static void nonmovingPrepareMark(void)
             seg->link = nonmovingHeap.sweep_list;
             nonmovingHeap.sweep_list = filled;
         }
+        trace(TRACE_nonmoving_gc, "Allocator %d: Prepared %d filled segments", alloca_idx, n_filled);
 
         // N.B. It's not necessary to update snapshot pointers of active segments;
         // they were set after they were swept and haven't seen any allocation
@@ -713,11 +714,14 @@ static void nonmovingPrepareMark(void)
 
     ASSERT(oldest_gen->scavenged_large_objects == NULL);
     bdescr *next;
+    uint32_t n_large = 0;
     for (bdescr *bd = oldest_gen->large_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
         dbl_link_onto(bd, &nonmoving_large_objects);
+        n_large++;
     }
+    trace(TRACE_nonmoving_gc, "Prepared %d large objects", n_large);
     n_nonmoving_large_blocks += oldest_gen->n_large_blocks;
     oldest_gen->large_objects = NULL;
     oldest_gen->n_large_words = 0;
@@ -725,11 +729,14 @@ static void nonmovingPrepareMark(void)
     nonmoving_live_words = 0;
 
     // Move new compact objects from younger generations to nonmoving_compact_objects
+    uint32_t n_compact = 0;
     for (bdescr *bd = oldest_gen->compact_objects; bd; bd = next) {
         next = bd->link;
         bd->flags |= BF_NONMOVING_SWEEPING;
         dbl_link_onto(bd, &nonmoving_compact_objects);
+        n_compact++;
     }
+    trace(TRACE_nonmoving_gc, "Prepared %d compact objects", n_compact);
     n_nonmoving_compact_blocks += oldest_gen->n_compact_blocks;
     oldest_gen->n_compact_blocks = 0;
     oldest_gen->compact_objects = NULL;
@@ -741,9 +748,12 @@ static void nonmovingPrepareMark(void)
     }
 
     // Clear large object bits
+    n_large = 0;
     for (bdescr *bd = nonmoving_large_objects; bd; bd = bd->link) {
         bd->flags &= ~BF_MARKED;
+        n_large++;
     }
+    trace(TRACE_nonmoving_gc, "Cleared mark bit of %d large objects", n_large);
 
 
 #if defined(DEBUG)
