@@ -687,12 +687,15 @@ All the different profile types yield a graph of live heap against time,
 but they differ in how the live heap is broken down into bands. The
 following RTS options select which break-down to use:
 
+.. rts-flag:: -h
+
+    With :ghc-flag:`-prof` this is the :rts-flag:`-hc`, otherwise it is the same as :rts-flag:`-hT`.
+
 .. rts-flag:: -hT
 
     Breaks down the graph by heap closure type.
 
 .. rts-flag:: -hc
-              -h
 
     *Requires :ghc-flag:`-prof`.* Breaks down the graph by the cost-centre stack
     which produced the data.
