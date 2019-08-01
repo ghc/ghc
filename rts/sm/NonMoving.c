@@ -430,6 +430,31 @@ static struct NonmovingSegment *nonmovingPopFreeSegment(void)
     }
 }
 
+void nonmovingFinishedFilling(void)
+{
+    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+        struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
+        struct NonmovingSegment *seg = alloca->new_filled;
+        if (seg == NULL) continue;
+        while (true) {
+            // Prepare segment for next GC
+            nonmovingClearBitmap(seg);
+            nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+            ASSERT(seg->next_free == nonmovingSegmentBlockCount(seg));
+            if (seg->link) {
+                seg = seg->link;
+            } else {
+                break;
+            }
+        }
+        if (alloca->filled_tail == NULL) {
+            alloca->filled_tail = seg;
+        }
+        alloca->filled = alloca->new_filled;
+        alloca->new_filled = NULL;
+    }
+}
+
 unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
 {
   // We compute the overwhelmingly common size cases directly to avoid a very
@@ -607,6 +632,7 @@ void nonmovingInit(void)
 #endif
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
         nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(n_capabilities);
+        initMutex(&nonmovingHeap.allocators[i]->mutex);
     }
     nonmovingMarkInitUpdRemSet();
 }
@@ -622,6 +648,7 @@ void nonmovingExit(void)
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
     }
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+        closeMutex(&nonmovingHeap.allocators[i]->mutex);
         stgFree(nonmovingHeap.allocators[i]);
     }
     closeMutex(&concurrent_coll_finished_lock);
@@ -647,6 +674,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
 
         // Copy the old state
         allocs[i]->filled = old->filled;
+        allocs[i]->filled_tail = old->filled_tail;
         allocs[i]->active = old->active;
         for (unsigned int j = 0; j < old_n_caps; j++) {
             allocs[i]->current[j] = old->current[j];
@@ -687,30 +715,15 @@ static void nonmovingPrepareMark(void)
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
 
-        // Update filled segments' snapshot pointers and move to sweep_list
-        uint32_t n_filled = 0;
-        struct NonmovingSegment *const filled = alloca->filled;
-        alloca->filled = NULL;
-        if (filled) {
-            struct NonmovingSegment *seg = filled;
-            while (true) {
-                n_filled++;
-                prefetchForRead(seg->link);
-                // Clear bitmap
-                prefetchForWrite(seg->link->bitmap);
-                nonmovingClearBitmap(seg);
-                // Set snapshot
-                nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
-                if (seg->link)
-                    seg = seg->link;
-                else
-                    break;
-            }
-            // add filled segments to sweep_list
-            seg->link = nonmovingHeap.sweep_list;
-            nonmovingHeap.sweep_list = filled;
+        // Add filled segments to sweep_list.
+        // N.B. all capabilities stopped here so no need to take alloca->mutex.
+        if (alloca->filled != NULL) {
+            alloca->filled_tail->link = nonmovingHeap.sweep_list;
+            nonmovingHeap.sweep_list = alloca->filled;
+
+            alloca->filled = NULL;
+            alloca->filled_tail = NULL;
         }
-        trace(TRACE_nonmoving_gc, "Allocator %d: Prepared %d filled segments", alloca_idx, n_filled);
 
         // N.B. It's not necessary to update snapshot pointers of active segments;
         // they were set after they were swept and haven't seen any allocation
