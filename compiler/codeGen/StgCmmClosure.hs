@@ -251,7 +251,7 @@ mkApLFInfo id upd_flag arity
         (might_be_a_function (idType id))
 
 -------------
--- This only has one call site in another module,
+-- mkLFImported only has one call site in another module,
 -- so we want to make sure it get's inlined.
 {-# INLINE mkLFImported #-}
 -- | Guess the LFInfo based on id/type.
@@ -259,7 +259,8 @@ mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id
   | Just con <- isDataConWorkId_maybe id
   , isNullaryRepDataCon con
-  = LFCon con   -- An imported nullary constructor
+  = LFCon con
+                -- An imported nullary constructor
                 -- We assume that the constructor is evaluated so that
                 -- the id really does point directly to the constructor
 

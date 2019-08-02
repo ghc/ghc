@@ -1842,10 +1842,10 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 -- in the code.
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
-tcLFInfo (ILFReEntrant top oneshot rep fvs) =
-    pure $ LFReEntrant top oneshot rep fvs (ArgSpec 0) --(panic "Not used for references")
-tcLFInfo (ILFThunk top hasfv updateable sfi m_function) =
-    pure $ LFThunk top hasfv updateable sfi m_function
+tcLFInfo (ILFReEntrant oneshot rep fvs) =
+    pure $ LFReEntrant TopLevel oneshot rep fvs (ArgSpec 0) --(panic "Not used for references")
+tcLFInfo (ILFThunk hasfv updateable sfi m_function) =
+    pure $ LFThunk TopLevel hasfv updateable sfi m_function
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     LFCon <$> forkM (text "Loading LFCon constructor")

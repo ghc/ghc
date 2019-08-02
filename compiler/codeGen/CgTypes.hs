@@ -9,6 +9,7 @@
 
 module CgTypes
   ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
+  , exportLF
   ) where
 
 #include "HsVersions.h"
@@ -56,9 +57,9 @@ type CgIfaceInfo = NameEnv LambdaFormInfo
 
 data LambdaFormInfo
   = LFReEntrant         -- ^ Reentrant closure (a function)
-        { lf_top        :: TopLevelFlag  -- ^ True if top level
-        , lf_os_info    :: OneShotInfo
-        , lf_repArity   :: RepArity      -- ^ Arity. Invariant: always > 0
+        { lf_top        :: !TopLevelFlag  -- ^ True if top level
+        , lf_os_info    :: !OneShotInfo
+        , lf_repArity   :: !RepArity      -- ^ Arity. Invariant: always > 0
         , lf_no_fvs     :: !Bool         -- ^ True <=> no fvs
         , lf_arg_desc   :: ArgDescr      -- ^ Argument descriptor
                                          -- (should really be in ClosureInfo)
@@ -68,7 +69,7 @@ data LambdaFormInfo
         TopLevelFlag
         !Bool           -- True <=> no free vars
         !Bool           -- True <=> updatable (i.e., *not* single-entry)
-        StandardFormInfo
+        !StandardFormInfo
         !Bool           -- True <=> *might* be a function type
 
   | LFCon               -- A saturated constructor application
@@ -91,6 +92,10 @@ data LambdaFormInfo
   | LFLetNoEscape       -- See LetNoEscape module for precise description
   deriving (Eq)
 
+exportLF :: LambdaFormInfo -> Bool
+exportLF LFUnlifted     = False
+exportLF _              = True
+
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
@@ -107,38 +112,6 @@ instance Outputable LambdaFormInfo where
     ppr (LFUnlifted) = text "LFUnlifted"
     ppr (LFLetNoEscape) = text "LF-LNE"
 
--- instance Binary LambdaFormInfo where
---     put_ bh (LFReEntrant top oneshot rep fvs argdesc) =
---         putByte bh 0 >>
---         put_ bh top >>
---         put_ bh oneshot >>
---         put_ bh rep >>
---         put_ bh fvs >>
---         put_ bh argdesc
---     put_ bh (LFThunk top hasfv updateable sfi m_function) =
---         putByte bh 1 >>
---         put_ bh top >>
---         put_ bh hasfv >>
---         put_ bh updateable >>
---         put_ bh sfi >>
---         put_ bh m_function
---     put_ bh (LFCon con) = putByte bh 2 -- >> put_ bh (dataConName con)
---     put_ _h (LFUnknown _m_func) =
---       panic "We should never export Unknown info"
---     put_ bh (LFUnlifted) = putByte bh 4
---     put_ bh (LFLetNoEscape) = putByte bh 5
---     get bh = do
---         con <- getByte bh
---         case con of
---             0 -> pure LFReEntrant <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
---             1 -> pure LFThunk <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
---             2 -> pure $ LFCon nilDataCon
---             3 -> pure LFUnknown <*> get bh
---             4 -> pure LFUnlifted
---             5 -> pure LFLetNoEscape
---             _ -> panic "Invalid byte"
-
-
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
 -- a small number of standard forms
@@ -152,7 +125,7 @@ data StandardFormInfo
         --      case x of
         --           con a1,..,an -> ak
         -- and the constructor is from a single-constr type.
-       WordOff          -- 0-origin offset of ak within the "goods" of
+       !WordOff          -- 0-origin offset of ak within the "goods" of
                         -- constructor (Recall that the a1,...,an may be laid
                         -- out in the heap in a non-obvious order.)
 
@@ -162,9 +135,14 @@ data StandardFormInfo
         -- The code for the thunk just pushes x2..xn on the stack and enters x1.
         -- There are a few of these (for 1 <= n <= MAX_SPEC_AP_SIZE) pre-compiled
         -- in the RTS to save space.
-        RepArity                -- Arity, n
+        !RepArity                -- Arity, n
    deriving (Eq)
 
+-- TODO: We can save a byte by using the 3 high
+-- bits to encode the tag.
+-- Unless we have a function/constructor with tens
+-- of millions of arguments (which is broken for all kinds of
+-- other reasons) this is perfectly safe.
 instance Binary StandardFormInfo where
   put_ bh NonStandardThunk  = putByte bh 0
   put_ bh (SelectorThunk w) = putByte bh 1 >> put_ bh w

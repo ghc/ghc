@@ -240,8 +240,9 @@ data HscStatus
 
         }
 
--- | Only when we run the stg+ parts of the compiler
--- we have to update the iface after codegen.
+-- | The backend (STG Onwards) might produce information
+-- we want to include in the interface filed. So we write
+-- the file later under HscRecomp (which triggers codeGen).
 needsIfaceUpdate :: HscStatus -> Bool
 needsIfaceUpdate HscRecomp {} = True
 needsIfaceUpdate _            = False
