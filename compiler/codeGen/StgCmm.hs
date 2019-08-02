@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmm ( codeGen, CgInfoImported ) where
+module StgCmm ( codeGen, CgIfaceInfo ) where
 
 #include "HsVersions.h"
 
@@ -25,7 +25,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
-import CgTypes ( CgInfoImported )
+import CgTypes ( CgIfaceInfo )
 
 import Cmm
 import CmmUtils
@@ -47,7 +47,6 @@ import Stream
 import BasicTypes
 import VarSet ( isEmptyDVarSet )
 import UniqFM
-import NameEnv
 
 import OrdList
 import MkGraph
@@ -62,7 +61,7 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> CgInfoImported
+        -> CgIfaceInfo
         -> Stream IO CmmGroup [(Id,LambdaFormInfo)]
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output

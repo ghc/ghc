@@ -39,7 +39,7 @@ module HscMain
     , Messager, batchMsg
     , HscStatus (..)
     , hscIncrementalCompile
-    , hscMaybeWriteIface, addIfaceCgInfoImported
+    , hscMaybeWriteIface, addIfaceCgIfaceInfo
     , hscCompileCmmFile
 
     , hscGenHardCode
@@ -127,7 +127,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
-import CgTypes          ( LambdaFormInfo, CgInfoImported )
+import CgTypes          ( LambdaFormInfo, CgIfaceInfo )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -845,8 +845,8 @@ hscMaybeWriteIface dflags iface no_change location =
             hscWriteIface dflags iface no_change location
 
 -- | Add information produced by codeGen to the iface.
-addIfaceCgInfoImported :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
-addIfaceCgInfoImported core_iface lf_info =
+addIfaceCgIfaceInfo :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
+addIfaceCgIfaceInfo core_iface lf_info =
   core_iface { mi_lf_info = Just $ mapSnd cgInfoToIfaceCgInfo lf_info }
 
 --------------------------------------------------------------
@@ -1455,6 +1455,11 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- Only external names are actually visible to codeGen
         let infoExported = filter (isExternalName . fst) . map (first idName) $ stream_result
 
+        -- We update the
+        eps <- hscEPS hsc_env
+        let eps' = eps { eps_cg_info_env = extendNameEnvList (eps_cg_info_env eps) infoExported }
+        writeIORef (hsc_EPS hsc_env) eps'
+
         return (output_filename, stub_c_exists, foreign_fps, infoExported)
 
 
@@ -1527,9 +1532,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
-    import_lf_info <- eps_cg_info_env <$> hscEPS hsc_env :: IO CgInfoImported
-
-    pprTraceM "ImportedLFs1" $ ppr $ import_lf_info
+    import_lf_info <- eps_cg_info_env <$> hscEPS hsc_env :: IO CgIfaceInfo
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final

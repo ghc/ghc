@@ -411,8 +411,7 @@ loadInterface doc_str mod from
         ; dflags <- getDynFlags
         ; case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of {
             Just iface
-                -> pprTraceM "Already loaded:" (ppr mod) >>
-                   return (Succeeded iface) ;   -- Already loaded
+                -> return (Succeeded iface) ;   -- Already loaded
                         -- The (src_imp == mi_boot iface) test checks that the already-loaded
                         -- interface isn't a boot iface.  This can conceivably happen,
                         -- if an earlier import had a before we got to real imports.   I think.
@@ -476,9 +475,6 @@ loadInterface doc_str mod from
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
         ; new_eps_cg_info_env <- mapSndM tcLFInfo (fromMaybe [] $ mi_lf_info iface)
-
-        ; pprTraceM "ifInfo1123" (ppr $ mi_lf_info iface)
-        -- ; pprTraceM "newEpsCgInfo" (ppr new_eps_cg_info_env)
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",
