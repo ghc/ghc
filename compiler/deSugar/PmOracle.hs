@@ -102,6 +102,7 @@ mkIdCoercion x ty delta
 type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
 
 data IncompleteMatches = IM TyCon (NonEmpty ConLikeSet)
+                       | NoIM   -- Overloaded literals
   -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
   --
   -- NonEmpty because the empty case would mean that there
@@ -852,7 +853,7 @@ data TmState = TmS
   }
 -}
 
-newtype TmState = TS (DIdEnv VarInfo)
+newtype TmState = TS (DIdEnv (Either Id VarInfo))
   -- Deterministic so that we generate deterministic error messages
 
 data VarInfo
@@ -863,12 +864,24 @@ data VarInfo
       -- Invariant: vi_pos and vi_neg never contradict each other
   }
 
+{- Note [Maintaining invariantes in TmState]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Suppoose we add the fact (x~y) to TmState
+    x /~ True
+    y /~ False
+  Then we want to get x /~ [True,False], hence vacuous
+
+
+-}
+
 data PossibleShape
   = Rigid !PmExpr
       -- Get this in the "taken" branch of a pattern match;
       --   e.g. f x@(Just y) = <rhs>
       --   In <rhs> we have x ~ Just y
-      -- The PmExpr is: a data con application, literal, or variable
+      --
+      -- The PmExpr is: a data con application, literal
+      --  ToDo:  Rigid PmAltCon [Id], perhaps
 
   | CompleteSets !IncompleteMatches
 
@@ -927,6 +940,9 @@ initialTmState :: TmState
 initialTmState = TS emptyDVarEnv
 
 lookupVarInfo :: TmState -> Id -> (Id, VarInfo)
+-- (lookupVarInfo tms x) tells what we know about 'x'
+-- The returned Id is the representative of the
+--   equivalence class
 lookupVarInfo ts@(TS env) x = case lookupDVarEnv env x of
   Just (VI _ (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
   mb_vi                               -> (x, fromMaybe (emptyVarInfo x) mb_vi)
@@ -965,7 +981,6 @@ exprToAlt :: PmExpr -> Maybe PmAltCon
 exprToAlt (PmExprCon c _) = Just c
 exprToAlt _               = Nothing
 
--- This is the only actual 'DsM' side-effect in the entire module
 initIncompleteMatches :: VarInfo -> DsM PossibleShape
 initIncompleteMatches (VI ty NoInfoYet neg) = initIM ty >>= \case
   Nothing -> pure NoInfoYet
@@ -996,6 +1011,9 @@ refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
       pure (Just (delta2, arg_vas))
 
 provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [[PmExpr]]
+-- (provideEvidenceForEquation vs n delta) returns a list of
+-- at most n (but perhaps empty) of expression-lists that can
+-- match 'vs' without contradicting delta
 provideEvidenceForEquation _      0 _     = pure []
 provideEvidenceForEquation []     _ _     = pure [[]]
 provideEvidenceForEquation (x:xs) n delta = do
@@ -1008,6 +1026,7 @@ provideEvidenceForEquation (x:xs) n delta = do
       -- We have a solution for x, and delta already knows about it.
       -- So nothing to do here
       map (e:) <$> provideEvidenceForEquation xs n delta
+        - ToDo!  recursively invoke on arguments
     CompleteSets im -> -- We have to pick one of the available constructors
       case getUnmatchedConstructor im of
         Nothing -> pure []
@@ -1166,9 +1185,11 @@ solveVar delta x e =
 -- See Note [Refutable shapes].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
-  mb_pos' <- initIncompleteMatches vi >>= go
-  let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
-  pure (new_delta <$> mb_pos')
+    possible_shape <- initIncompleteMatches vi
+    mb_pos'        <- go possible_shape
+
+    let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
+    pure (new_delta <$> mb_pos')
   where
     (y, vi@(VI ty _ neg)) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
