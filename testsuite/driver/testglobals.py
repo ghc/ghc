@@ -236,7 +236,8 @@ class TestRun:
        self.unexpected_stat_failures = [] # type: List[TestResult]
 
        # Results from tests that have been marked as fragile
-       self.fragile_results = [] # type: List[TestResult]
+       self.fragile_passes = [] # type: List[TestResult]
+       self.fragile_failures = [] # type: List[TestResult]
 
        # List of all metrics measured in this test run.
        # [(change, PerfStat)] where change is one of the  MetricChange
