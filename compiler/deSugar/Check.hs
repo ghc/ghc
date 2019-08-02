@@ -172,6 +172,17 @@ data PartialResult = PartialResult {
                       , presultUncovered :: Uncovered
                       , presultDivergent :: Diverged }
 
+emptyPartialResult :: PartialResult
+emptyPartialResult = PartialResult { presultUncovered = mempty
+                                   , presultCovered   = mempty
+                                   , presultDivergent = mempty }
+
+combinePartialResults :: PartialResult -> PartialResult -> PartialResult
+combinePartialResults (PartialResult cs1 vsa1 ds1) (PartialResult cs2 vsa2 ds2)
+  = PartialResult (cs1 Semi.<> cs2)
+                  (vsa1 Semi.<> vsa2)
+                  (ds1 Semi.<> ds2)
+
 instance Outputable PartialResult where
   ppr (PartialResult c vsa d)
     = hang (text "PartialResult" <+> ppr c <+> ppr d) 2  (ppr_vsa vsa)
@@ -179,18 +190,11 @@ instance Outputable PartialResult where
       ppr_vsa = braces . fsep . punctuate comma . map ppr
 
 instance Semi.Semigroup PartialResult where
-  (PartialResult cs1 vsa1 ds1)
-    <> (PartialResult cs2 vsa2 ds2)
-      = PartialResult (cs1 Semi.<> cs2)
-                      (vsa1 Semi.<> vsa2)
-                      (ds1 Semi.<> ds2)
-
+  (<>) = combinePartialResults
 
 instance Monoid PartialResult where
-  mempty = PartialResult mempty [] mempty
-  mappend = (Semi.<>)
-
--- newtype ChoiceOf a = ChoiceOf [a]
+  mempty = emptyPartialResult
+  mappend = combinePartialResults
 
 -- | Pattern check result
 --
@@ -1154,11 +1158,11 @@ Main functions are:
 -}
 
 -- | Lift a pattern matching action from a single value vector abstration to a
--- value set abstraction, but calling it on every vector and the combining the
+-- value set abstraction, but calling it on every vector and combining the
 -- results.
 runMany :: (Delta -> PmM PartialResult) -> (Uncovered -> PmM PartialResult)
-runMany _ [] = return mempty
-runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
+runMany _  []     = return emptyPartialResult
+runMany pm (m:ms) = combinePartialResults <$> pm m <*> runMany pm ms
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
