@@ -18,7 +18,7 @@ module TcUnify (
   buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind, uQuickLookTryFillPoly,
+  unifyType, unifyTypeImpredicatively, unifyKind, uQuickLookTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
   tcQuickLookUnify,
@@ -662,7 +662,7 @@ tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; mkWpCastN <$>
-         uType TypeLevel eq_orig ty_actual ty_expected }
+         uType TypeLevel eq_orig False ty_actual ty_expected }
 
   | otherwise   -- This is the general case
   = do { traceTc "tc_sub_tc_type (general case)" $
@@ -764,7 +764,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
        (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = 
-        do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig exp_arg act_arg
+        do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False exp_arg act_arg
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
            -- ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
@@ -820,12 +820,12 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                                   -> eq_orig { uo_actual = rho_a }
                                 _ -> eq_orig
 
-                        ; cow <- uType TypeLevel eq_orig' rho_a ty_expected
+                        ; cow <- uType TypeLevel eq_orig' False rho_a ty_expected
                         ; return (mkWpCastN cow <.> wrap) }
 
 
      -- use versions without synonyms expanded
-    unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+    unify = mkWpCastN <$> uType TypeLevel eq_orig False ty_actual ty_expected
 
 tcQuickLookUnify :: TcLevel -> TcType -> TcType -> TcM TCvSubst
 tcQuickLookUnify lvl ty1 ty2
@@ -1094,7 +1094,7 @@ promoteTcType dest_lvl ty
                                           , uo_expected = res_kind
                                           , uo_thing    = Nothing
                                           , uo_visible  = False }
-           ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
+           ; ki_co <- uType KindLevel kind_orig False (tcTypeKind ty) res_kind
            ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
@@ -1405,12 +1405,21 @@ The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
 
-unifyType :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
+unifyType, unifyTypeImpredicatively
+          :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
           -> TcTauType -> TcTauType -> TcM TcCoercionN
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
 unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType TypeLevel origin ty1 ty2
+                          uType TypeLevel origin False ty1 ty2
+  where
+    origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
+                          , uo_thing  = ppr <$> thing
+                          , uo_visible = True } -- always called from a visible context
+
+unifyTypeImpredicatively thing ty1 ty2
+                        = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
+                          uType TypeLevel origin True ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                           , uo_thing  = ppr <$> thing
@@ -1418,7 +1427,7 @@ unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
 
 unifyKind :: Maybe (HsType GhcRn) -> TcKind -> TcKind -> TcM CoercionN
 unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType KindLevel origin ty1 ty2
+                          uType KindLevel origin False ty1 ty2
   where origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                               , uo_thing  = ppr <$> thing
                               , uo_visible = True } -- also always from a visible context
@@ -1435,7 +1444,15 @@ unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
 uType is the heart of the unifier.
 -}
 
-uType, uType_defer
+uType
+  :: TypeOrKind
+  -> CtOrigin
+  -> Bool      -- can unify with polytypes?
+  -> TcType    -- ty1 is the *actual* type
+  -> TcType    -- ty2 is the *expected* type
+  -> TcM CoercionN
+
+uType_defer
   :: TypeOrKind
   -> CtOrigin
   -> TcType    -- ty1 is the *actual* type
@@ -1463,7 +1480,7 @@ uType_defer t_or_k origin ty1 ty2
        ; return co }
 
 --------------
-uType t_or_k origin orig_ty1 orig_ty2
+uType t_or_k origin can_unify_poly_tv orig_ty1 orig_ty2
   = do { tclvl <- getTcLevel
        ; traceTc "u_tys" $ vcat
               [ text "tclvl" <+> ppr tclvl
@@ -1483,11 +1500,11 @@ uType t_or_k origin orig_ty1 orig_ty2
      -- recognize (t |> co) ~ (t |> co), which is nice. Previously, we
      -- didn't do it this way, and then the unification above was deferred.
     go (CastTy t1 co1) t2
-      = do { co_tys <- uType t_or_k origin t1 t2
+      = do { co_tys <- uType t_or_k origin can_unify_poly_tv t1 t2
            ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
 
     go t1 (CastTy t2 co2)
-      = do { co_tys <- uType t_or_k origin t1 t2
+      = do { co_tys <- uType t_or_k origin can_unify_poly_tv t1 t2
            ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
         -- Variables; go for uUnfilledVar
@@ -1499,13 +1516,13 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; case lookup_res of
                Filled ty1   -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped False tv1 ty2 }
+               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped can_unify_poly_tv tv1 ty2 }
     go ty1 (TyVarTy tv2)
       = do { lookup_res <- lookupTcTyVar tv2
            ; case lookup_res of
                Filled ty2   -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped False tv2 ty1 }
+               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped can_unify_poly_tv tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
@@ -1526,8 +1543,8 @@ uType t_or_k origin orig_ty1 orig_ty2
 
         -- Functions (or predicate functions) just check the two parts
     go (FunTy _ fun1 arg1) (FunTy _ fun2 arg2)
-      = do { co_l <- uType t_or_k origin fun1 fun2
-           ; co_r <- uType t_or_k origin arg1 arg2
+      = do { co_l <- uType t_or_k origin can_unify_poly_tv fun1 fun2
+           ; co_r <- uType t_or_k origin can_unify_poly_tv arg1 arg2
            ; return $ mkFunCo Nominal co_l co_r }
 
         -- Always defer if a type synonym family (type function)
@@ -1541,7 +1558,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, equalLength tys1 tys2
       = ASSERT2( isGenerativeTyCon tc1 Nominal, ppr tc1 )
-        do { cos <- zipWith3M (uType t_or_k) origins' tys1 tys2
+        do { cos <- zipWith3M (\o -> uType t_or_k o can_unify_poly_tv) origins' tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
       where
         origins' = map (\is_vis -> if is_vis then origin else toInvisibleOrigin origin)
@@ -1573,6 +1590,7 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; kco <- uType KindLevel
                           (KindEqOrigin orig_ty1 (Just orig_ty2) origin
                                         (Just t_or_k))
+                          can_unify_poly_tv
                           ty1 ty2
            ; return $ mkProofIrrelCo Nominal kco co1 co2 }
 
@@ -1587,11 +1605,11 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     ------------------
     go_app vis s1 t1 s2 t2
-      = do { co_s <- uType t_or_k origin s1 s2
+      = do { co_s <- uType t_or_k origin can_unify_poly_tv s1 s2
            ; let arg_origin
                    | vis       = origin
                    | otherwise = toInvisibleOrigin origin
-           ; co_t <- uType t_or_k arg_origin t1 t2
+           ; co_t <- uType t_or_k arg_origin can_unify_poly_tv t1 t2
            ; return $ mkAppCo co_s co_t }
 
 {- Note [Check for equality before deferring]
@@ -1777,7 +1795,7 @@ uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
     go cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
       , Just ty2' <- metaTyVarUpdateOK can_unify_poly_tv tv1 ty2
-      = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
+      = do { co_k <- uType KindLevel kind_origin can_unify_poly_tv (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
                   , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
@@ -2195,7 +2213,7 @@ matchExpectedFunKind hs_ty n k = go n k
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
                                         }
-           ; uType KindLevel origin k new_fun }
+           ; uType KindLevel origin False k new_fun }
 
 {- *********************************************************************
 *                                                                      *
