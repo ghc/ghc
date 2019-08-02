@@ -19,6 +19,7 @@ module PmOracle (
         tryAddRefutableAltCon, -- Add a negative equality
         refineToAltCon,        -- Add a positive equality x ~ K _ _
         solveVar,              -- Add a positive equality x ~ e
+        provideEvidenceForEquation,
 
         -- misc.
         wrapUpRefutableShapes, exprDeepLookup
@@ -151,6 +152,16 @@ ensureInhabited inh_test (IM tc ms) = runMaybeT (IM tc <$> traverse one_set ms)
     find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
       True  -> pure cs
       False -> find_one_inh (delOneFromUniqSet cs con) cons
+
+-- | Tries to return one of the possible 'ConLike's from one of the COMPLETE
+-- sets. If the 'IncompleteMatches' was inhabited before (cf. 'ensureInhabited')
+-- this 'ConLike' is evidence for that assurance.
+getUnmatchedConstructor :: IncompleteMatches -> Maybe ConLike
+getUnmatchedConstructor (IM _tc ms) = NonEmpty.head <$> traverse pick_one_conlike ms
+  where
+    pick_one_conlike cs = case nonDetEltsUniqSet cs of
+      [] -> Nothing
+      (cl:_) -> Just cl
 
 -- -----------------------------------------------------------------------
 -- * Types and constraints
@@ -984,6 +995,40 @@ refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
       tracePm "matched at all" (ppr (delta_tm_cs delta2))
       pure (Just (delta2, arg_vas))
 
+provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [[PmExpr]]
+provideEvidenceForEquation _      0 _     = pure []
+provideEvidenceForEquation []     _ _     = pure [[]]
+provideEvidenceForEquation (x:xs) n delta = do
+  let (_, vi) = lookupVarInfo (delta_tm_cs delta) x
+  pos <- initIncompleteMatches vi
+  case pos of
+    NoInfoYet -> -- No COMPLETE sets available, so we can assume it's inhabited
+      map (PmExprVar x:) <$> provideEvidenceForEquation xs n delta
+    Rigid e ->
+      -- We have a solution for x, and delta already knows about it.
+      -- So nothing to do here
+      map (e:) <$> provideEvidenceForEquation xs n delta
+    CompleteSets im -> -- We have to pick one of the available constructors
+      case getUnmatchedConstructor im of
+        Nothing -> pure []
+        Just cl -> do
+          -- This will be really similar to the ConVar case
+          ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
+            Nothing                          -> pure []
+            Just (delta', _ex_tvs2, arg_vas) -> do
+              let replace_args_by_con exprs = case splitAt (length arg_vas) exprs of
+                    (args, rest) -> PmExprCon (PmAltConLike cl) args : rest
+              map replace_args_by_con <$>
+                provideEvidenceForEquation (arg_vas ++ xs) n delta'
+
+          -- Only n' more equations to go...
+          let n' = n - length ev_pos
+          ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
+            Nothing                          -> pure []
+            Just delta'                      -> provideEvidenceForEquation (x:xs) n' delta'
+
+          pure (ev_pos ++ ev_neg)
+
 {-
 Note [Coverage checking and existential tyvars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1125,7 +1170,7 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
   let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
   pure (new_delta <$> mb_pos')
   where
-    (y, vi@(VI ty pos neg)) = lookupVarInfo ts x
+    (y, vi@(VI ty _ neg)) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
 
     go NoInfoYet = pure (Just (VI ty NoInfoYet neg'))
