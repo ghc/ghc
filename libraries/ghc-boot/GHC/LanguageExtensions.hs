@@ -14,4 +14,6 @@ module GHC.LanguageExtensions ( module GHC.LanguageExtensions.Type ) where
 import Data.Binary
 import GHC.LanguageExtensions.Type
 
-instance Binary Extension
+instance Binary Extension where
+  get = toEnum <$> get
+  put = put . fromEnum
