@@ -2382,14 +2382,14 @@ instance Binary IfaceCompleteMatch where
 instance Binary IfLFInfo where
     put_ bh (ILFReEntrant top oneshot rep fvs) =
         putByte bh 0 >>
-        put_ bh top >>
+        -- put_ bh top >>
         put_ bh oneshot >>
         put_ bh rep >>
         put_ bh fvs -- >>
         -- put_ bh argdesc
     put_ bh (ILFThunk top hasfv updateable sfi m_function) =
         putByte bh 1 >>
-        put_ bh top >>
+        -- put_ bh top >>
         put_ bh hasfv >>
         put_ bh updateable >>
         put_ bh sfi >>
@@ -2399,8 +2399,8 @@ instance Binary IfLFInfo where
     get bh = do
         con <- getByte bh
         case con of
-            0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh <*> get bh -- <*> get bh
-            1 -> pure ILFThunk <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+            0 -> pure ILFReEntrant <*> pure TopLevel <*> get bh <*> get bh <*> get bh
+            1 -> pure ILFThunk <*> pure TopLevel <*> get bh <*> get bh <*> get bh <*> get bh
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"

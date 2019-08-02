@@ -6,12 +6,9 @@
 
 -- In particular we define here any information which might be written to or
 -- read from interface files.
--- Inside the codegenerator this module should in general not be imported.
--- Instead the types are reexported by StgCmmClosure
-
 
 module CgTypes
-  ( LambdaFormInfo(..), StandardFormInfo(..), CgInfoImported
+  ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
   ) where
 
 #include "HsVersions.h"
@@ -26,12 +23,27 @@ import SMRep
 import DataCon
 import NameEnv
 
+{- Note [Backend information in interface files]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is desireable to store certain information in interface files
+which only becomes obvious during code generation.
+
+One of these cases is the information required to tag or enter
+a reference via the fast path. This info is contained in LambdaFormInfo.
+
+This allows us to generate
+
+
+
+-}
+
 -----------------------------------------------------------------------------
 --                General types
 -----------------------------------------------------------------------------
 
 -- | Information about imported things coming from interface files.
-type CgInfoImported = NameEnv LambdaFormInfo
+type CgIfaceInfo = NameEnv LambdaFormInfo
 
 -----------------------------------------------------------------------------
 --                LambdaFormInfo
@@ -43,12 +55,14 @@ type CgInfoImported = NameEnv LambdaFormInfo
 -- tail call or return that identifier.
 
 data LambdaFormInfo
-  = LFReEntrant         -- Reentrant closure (a function)
-        TopLevelFlag    -- True if top level
-        OneShotInfo
-        !RepArity       -- Arity. Invariant: always > 0
-        !Bool           -- True <=> no fvs
-        ArgDescr        -- Argument descriptor (should really be in ClosureInfo)
+  = LFReEntrant         -- ^ Reentrant closure (a function)
+        { lf_top        :: TopLevelFlag  -- ^ True if top level
+        , lf_os_info    :: OneShotInfo
+        , lf_repArity   :: RepArity      -- ^ Arity. Invariant: always > 0
+        , lf_no_fvs     :: !Bool         -- ^ True <=> no fvs
+        , lf_arg_desc   :: ArgDescr      -- ^ Argument descriptor
+                                         -- (should really be in ClosureInfo)
+        }
 
   | LFThunk             -- Thunk (zero arity)
         TopLevelFlag
@@ -75,6 +89,7 @@ data LambdaFormInfo
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
+  deriving (Eq)
 
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
@@ -148,6 +163,7 @@ data StandardFormInfo
         -- There are a few of these (for 1 <= n <= MAX_SPEC_AP_SIZE) pre-compiled
         -- in the RTS to save space.
         RepArity                -- Arity, n
+   deriving (Eq)
 
 instance Binary StandardFormInfo where
   put_ bh NonStandardThunk  = putByte bh 0

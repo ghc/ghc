@@ -218,6 +218,7 @@ data ArgDescr
 
   | ArgGen              -- General case
         Liveness        -- Details about the arguments
+  deriving Eq
 
 instance Binary ArgDescr where
   put_ bh (ArgSpec spec)    = putByte bh 0 >> put_ bh spec

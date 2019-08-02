@@ -1159,7 +1159,7 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
                     (outputFilename, mStub, foreign_files, cgInfoExported) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
 
-                    let iface' = addIfaceCgInfoImported iface cgInfoExported
+                    let iface' = addIfaceCgIfaceInfo iface cgInfoExported
 
                     liftIO $ hscMaybeWriteIface dflags iface' (not $ hasChanged iface_changed)
                                                     (ms_location mod_summary)
@@ -1172,8 +1172,8 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
                     return (RealPhase next_phase, outputFilename)
                   where
                     -- -- | Add information produced by codeGen to the iface.
-                    -- -- mkIfaceCgInfoImported :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
-                    -- mkIfaceCgInfoImported core_iface lf_info =
+                    -- -- mkIfaceCgIfaceInfo :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
+                    -- mkIfaceCgIfaceInfo core_iface lf_info =
                     --   core_iface { mi_lf_info = Just lf_info }
 
 

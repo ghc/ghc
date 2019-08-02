@@ -52,7 +52,7 @@ module StgCmmMonad (
         getState, setState, getSelfLoop, withSelfLoop, getInfoDown, getDynFlags, getThisPackage,
 
         -- more localised access to monad state
-        CgIdInfo(..), CgInfoImported,
+        CgIdInfo(..), CgIfaceInfo,
         getBinds, setBinds, lookupImportedLF,
 
         -- out of general friendliness, we also export ...
@@ -63,7 +63,7 @@ import GhcPrelude hiding( sequence, succ )
 
 import Cmm
 import StgCmmClosure
-import CgTypes ( CgInfoImported )
+import CgTypes ( CgIfaceInfo )
 import DynFlags
 import Hoopl.Collections
 import MkGraph
@@ -141,7 +141,7 @@ initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
-runC :: DynFlags -> Module -> CgState -> CgInfoImported -> FCode a -> (a,CgState)
+runC :: DynFlags -> Module -> CgState -> CgIfaceInfo -> FCode a -> (a,CgState)
 runC dflags mod st imported fcode = doFCode fcode (initCgInfoDown dflags mod imported) st
 
 fixC :: (a -> FCode a) -> FCode a
@@ -161,7 +161,7 @@ data CgInfoDownwards        -- information only passed *downwards* by the monad
   = MkCgInfoDown {
         cgd_dflags    :: DynFlags,
         cgd_mod       :: Module,            -- ^ Module being compiled
-        cgd_info_imported :: CgInfoImported,-- ^ Backend info about imported things if we have any,
+        cgd_info_imported :: CgIfaceInfo,-- ^ Backend info about imported things if we have any,
                                             -- can be empty.
         cgd_updfr_off :: UpdFrameOffset,    -- ^ Size of current update frame
         cgd_ticky     :: CLabel,            -- ^ Current destination for ticky counts
@@ -278,7 +278,7 @@ data ReturnKind
 --
 
 
-initCgInfoDown :: DynFlags -> Module -> CgInfoImported -> CgInfoDownwards
+initCgInfoDown :: DynFlags -> Module -> CgIfaceInfo -> CgInfoDownwards
 initCgInfoDown dflags mod info_imported
   = MkCgInfoDown { cgd_dflags    = dflags
                  , cgd_mod       = mod
