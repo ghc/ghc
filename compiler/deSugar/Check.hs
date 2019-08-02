@@ -38,7 +38,6 @@ import Id
 import ConLike
 import Name
 import FamInst
-import FamInstEnv
 import TysWiredIn
 import TyCon
 import SrcLoc
@@ -60,7 +59,7 @@ import Maybes        (mapMaybe, isJust, expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
-import Control.Monad (forM, when, forM_, filterM)
+import Control.Monad (forM, when, forM_)
 import Coercion
 import TcEvidence
 import IOEnv
@@ -228,11 +227,11 @@ instance Outputable PmResult where
 -- but we don't want to issue just a wildcard as missing. Instead, we print a
 -- type annotated wildcard, so that the user knows what kind of patterns is
 -- expected (e.g. (_ :: Int), or (_ :: F Int), where F Int does not reduce).
-data UncoveredCandidates = UncoveredPatterns ValVec Uncovered
+data UncoveredCandidates = UncoveredPatterns [([PmExpr], Delta)]
                          | TypeOfUncovered Type
 
 instance Outputable UncoveredCandidates where
-  ppr (UncoveredPatterns vva uc) = text "UnPat" <+> ppr vva <+> ppr uc
+  ppr (UncoveredPatterns vva) = text "UnPat" <+> ppr vva
   ppr (TypeOfUncovered ty)   = text "UnTy" <+> ppr ty
 
 {-
@@ -261,7 +260,8 @@ checkSingle' locn var p = do
   missing   <- pmInitialTmTyCs
   tracePm "checkSingle': missing" (ppr missing)
   PartialResult cs us ds <- pmcheckI clause [] [var] missing
-  let us' = UncoveredPatterns [var] us
+  dflags <- getDynFlags
+  us' <- getUncoveredPatterns [var] (maxUncoveredPatterns dflags) us
   return $ case (cs,ds) of
     (Covered,  _    )         -> PmResult [] us' [] -- useful
     (NotCovered, NotDiverged) -> PmResult m  us' [] -- redundant
@@ -313,9 +313,11 @@ checkMatches' vars matches
       missing    <- pmInitialTmTyCs
       tracePm "checkMatches': missing" (ppr missing)
       (rs,us,ds) <- go matches [missing]
+      dflags <- getDynFlags
+      us' <- getUncoveredPatterns vars (maxUncoveredPatterns dflags) us
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = UncoveredPatterns vars us
+                 , pmresultUncovered    = us'
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
@@ -354,8 +356,16 @@ checkEmptyCase' x = do
     Left ty            -> pure (TypeOfUncovered ty)
     -- A list of oracle states for the different satisfiable constructors is
     -- available. Turn this into a value set abstraction.
-    Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
+    Right (va, deltas) -> pure (UncoveredPatterns (map ([PmExprVar va],) deltas))
   pure (PmResult [] us [])
+
+getUncoveredPatterns :: [Id] -> Int -> [Delta] -> PmM UncoveredCandidates
+getUncoveredPatterns _    0 _              = pure (UncoveredPatterns [])
+getUncoveredPatterns _    _ []             = pure (UncoveredPatterns [])
+getUncoveredPatterns vars n (delta:deltas) = do
+  front <- provideEvidenceForEquation vars n delta
+  UncoveredPatterns back <- getUncoveredPatterns vars (n - length front) deltas
+  pure (UncoveredPatterns (map (, delta) front ++ back))
 
 {-
 Note [Recovering from unsatisfiable pattern-matching constraints]
@@ -1394,10 +1404,8 @@ isAnyPmCheckEnabled :: DynFlags -> DsMatchContext -> Bool
 isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
   = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
 
-pprValVecSubstituted :: ValVec -> Delta -> SDoc
-pprValVecSubstituted vva delta = pprUncovered (vector, delta)
-  where
-    vector = substInValVec delta vva
+pprValVecSubstituted :: [PmExpr] -> Delta -> SDoc
+pprValVecSubstituted vector delta = pprUncovered (vector, delta)
 
 -- | Deeply lookup a value vector abstraction. All VAs are
 -- transformed to PmExpr (used only before pretty printing).
@@ -1411,8 +1419,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible && not is_rec_upd
           exists_u = flag_u && (case uncovered of
-                                  TypeOfUncovered   _     -> True
-                                  UncoveredPatterns _ unc -> notNull unc)
+                                  TypeOfUncovered   _   -> True
+                                  UncoveredPatterns unc -> notNull unc)
 
       when exists_r $ forM_ redundant $ \(dL->L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
@@ -1422,8 +1430,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
                                (pprEqn q "has inaccessible right hand side"))
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
         case uncovered of
-          TypeOfUncovered ty            -> warnEmptyCase ty
-          UncoveredPatterns vars unc -> pprEqns vars unc
+          TypeOfUncovered ty    -> warnEmptyCase ty
+          UncoveredPatterns unc -> pprEqns unc
   where
     PmResult
       { pmresultRedundant = redundant
@@ -1444,12 +1452,12 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
       f (pprPats kind (map unLoc q))
 
     -- Print several clauses (for uncovered clauses)
-    pprEqns vars unc = pprContext False ctx (text "are non-exhaustive") $ \_ ->
-      case vars of -- See #11245
-           [] -> text "Guards do not cover entire pattern space"
-           _  -> let us = map (pprValVecSubstituted vars) unc
-                 in  hang (text "Patterns not matched:") 4
-                       (vcat (take maxPatterns us) $$ dots maxPatterns us)
+    pprEqns unc = pprContext False ctx (text "are non-exhaustive") $ \_ ->
+      case unc of -- See #11245
+           ([],_):_ -> text "Guards do not cover entire pattern space"
+           _        -> let us = map (uncurry pprValVecSubstituted) unc
+                       in  hang (text "Patterns not matched:") 4
+                             (vcat (take maxPatterns us) $$ dots maxPatterns us)
 
     -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
     -- which we only know the type and have no inhabitants at hand)
