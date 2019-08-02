@@ -114,6 +114,22 @@ data PmAltCon = PmAltConLike ConLike
 -- * @Just True@ ==> Surely equal
 -- * @Just False@ ==> Surely different (non-overlapping, even!)
 -- * @Nothing@ ==> Equality relation undecidable
+--
+-- Examples (omitting some constructor wrapping):
+--
+-- * @decEqPmAltCon (SLit 42) (SLit 1) == Just False@: Lit equality is decidable
+-- * @decEqPmAltCon (DataCon A) (DataCon B) == Just False@: DataCon equality is
+--   decidable
+-- * @decEqPmAltCon (OLit 42) (OLit 1) == Nothing@: OverLit equality is
+--   undecidable
+-- * @decEqPmAltCon (PatSyn PA) (PatSyn PB) == Nothing@: PatSyn equality is
+--   undecidable
+-- * @decEqPmAltCon (DataCon I#) (SLit 1) == Nothing@: DataCon to Lit
+--   comparisons are undecidable without reasoning about the wrapped @Int#@
+-- * @decEqPmAltCon (OLit 1) (OLit 1) == Just True@: We assume reflexivity for
+--   overloaded literals
+-- * @decEqPmAltCon (PatSyn PA) (PatSyn PA) == Just True@: We assume reflexivity
+--   for Pattern Synonyms
 decEqPmAltCon :: PmAltCon -> PmAltCon -> Maybe Bool
 decEqPmAltCon (PmAltConLike cl1) (PmAltConLike cl2) = decEqConLike cl1 cl2
 decEqPmAltCon (PmAltLit     l1)  (PmAltLit     l2)  = decEqPmLit l1 l2
