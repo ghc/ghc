@@ -67,6 +67,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
+import UniqSupply
 
 import Exception
 import System.Directory
@@ -737,18 +738,39 @@ pipeLoop phase input_fn = do
    _
      -> do liftIO $ debugTraceMsg dflags 4
                                   (text "Running phase" <+> ppr phase)
+
+          --  (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
+          --  case phase of
+          --      HscOut {} -> do
+          --          r <- pipeLoop next_phase output_fn
+          --          whenGeneratingDynamicToo dflags $ do
+          --              setDynFlags $ dynamicTooMkDynamicDynFlags dflags
+          --              -- TODO shouldn't ignore result:
+          --              _ <- pipeLoop phase input_fn
+          --              return ()
+          --          return r
+          --      _ -> do
+          --          r <- pipeLoop next_phase output_fn
+          --          return r
+
+
+
            (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
-           r <- pipeLoop next_phase output_fn
            case phase of
-               HscOut {} ->
-                   whenGeneratingDynamicToo dflags $ do
-                       setDynFlags $ dynamicTooMkDynamicDynFlags dflags
-                       -- TODO shouldn't ignore result:
-                       _ <- pipeLoop phase input_fn
-                       return ()
-               _ ->
-                   return ()
-           return r
+               HscOut {} -> do
+                   -- We unset Opt_BuildDynamicToo for the backend,
+                   -- it makes no use of it and is instead run twice.
+                   let noDynToo = pipeLoop next_phase output_fn
+                   let dynToo = do
+                          setDynFlags $ gopt_unset dflags Opt_BuildDynamicToo
+                          r <- pipeLoop next_phase output_fn
+                          setDynFlags $ dynamicTooMkDynamicDynFlags dflags
+                          -- TODO shouldn't ignore result:
+                          _ <- pipeLoop phase input_fn
+                          return r
+                   ifGeneratingDynamicToo dflags dynToo noDynToo
+               _ -> pipeLoop next_phase output_fn
+
 
 runHookedPhase :: PhasePlus -> FilePath -> DynFlags
                -> CompPipeline (PhasePlus, FilePath)
@@ -1161,7 +1183,9 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
 
                     let iface' = addIfaceCgIfaceInfo iface cgInfoExported
 
-                    liftIO $ hscMaybeWriteIface dflags iface' (not $ hasChanged iface_changed)
+                    -- See Note [Writing interface files]
+                    let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
+                    liftIO $ hscMaybeWriteIface if_dflags iface' (not $ hasChanged iface_changed)
                                                     (ms_location mod_summary)
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)

@@ -140,16 +140,14 @@ getCgIdInfo id
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
               ; lf_cached <- lookupImportedLF name
-              -- ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
               ; let lf_computed = mkLFImported id
+              -- ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
               ; let lf_info = fromMaybe (mkLFImported id) lf_cached
               ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
             }
           else
               cgLookupPanic id -- Bug
         }}}
-  where
-
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

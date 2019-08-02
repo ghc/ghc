@@ -127,7 +127,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
-import CgTypes          ( LambdaFormInfo, CgIfaceInfo )
+import CgTypes          ( LambdaFormInfo, CgIfaceInfo, exportLF )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -716,7 +716,8 @@ genericHscFrontend' mod_summary
 -- Compilers
 --------------------------------------------------------------
 
--- Compile Haskell/boot in OneShot mode.
+-- Compile Haskell/boot in OneShot mode, but used by
+-- both OneShot and batch mode.
 -- Does NOT create an interface file.
 hscIncrementalCompile :: Bool
                       -> Maybe TcGblEnv
@@ -834,6 +835,23 @@ finish summary tc_result mb_old_hash = do
     , HomeModInfo
       {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
+{- Note [Writing interface files]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We write interface files in HscMain.hs and DriverPipeline.hs
+using hscMaybeWriteIface but try to only write them once per compilation.
+In practice this means:
+
+* If a compilation does NOT require recompilation of the hard code
+  we write it in HscMain:finish.
+* If we run in One Shot mode and target bytecode we write it in compileOne'
+* Otherwise we must be compiling to regular hard code and require recompilation.
+  In this case we write interface files inside RunPhase.
+
+For dynamic-too to work properly we have to do: What exactly?
+
+
+-}
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
 hscMaybeWriteIface dflags iface no_change location =
     let force_write_interface = gopt Opt_WriteInterface dflags
@@ -1366,17 +1384,38 @@ hscNormalIface' simpl_result mb_old_iface = do
 -- BackEnd combinators
 --------------------------------------------------------------
 
+{- Note [Interface file extensions]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ModLocation only contains the base names, however when generating
+dynamic files the actual extension might differ from the default.
+
+So we only load the base name from ModLocation and replace the
+actual extension according to the information in DynFlags.
+
+If we generate a interface file right after running the core pipeline
+we will have set -dynamic-too and generate both interface files at the
+same time.
+
+If we generate a interface file after running the backend then dynamic-too
+won't be set, however the
+-}
+
 hscWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
 hscWriteIface dflags iface no_change mod_location = do
-    let ifaceFile = ml_hi_file mod_location
+    -- mod_location only contains the base name, so we rebuild the
+    -- correct file extension from the dynflags.
+    let ifaceBaseFile = ml_hi_file mod_location
     unless no_change $
-        {-# SCC "writeIface" #-}
-        writeIfaceFile dflags ifaceFile iface
+        let ifaceFile = replaceExtension ifaceBaseFile (hiSuf dflags)
+            ifaceFile' = addBootSuffix_maybe (mi_boot iface) ifaceFile
+        in  {-# SCC "writeIface" #-}
+            writeIfaceFile dflags ifaceFile' iface
     whenGeneratingDynamicToo dflags $ do
         -- TODO: We should do a no_change check for the dynamic
         --       interface file too
-        -- TODO: Should handle the dynamic hi filename properly
-        let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
+        -- When we generate iface files after core
+        let dynIfaceFile = replaceExtension ifaceBaseFile (dynHiSuf dflags)
             dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
             dynDflags = dynamicTooMkDynamicDynFlags dflags
         writeIfaceFile dynDflags dynIfaceFile' iface
@@ -1450,12 +1489,15 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, stream_result)
-        pprTraceM "ResultCgInfo" $ ppr $ take 50 stream_result
 
         -- Only external names are actually visible to codeGen
-        let infoExported = filter (isExternalName . fst) . map (first idName) $ stream_result
+        -- which we can't recompute easily
 
-        -- We update the
+        let infoExported = filter (exportLF . snd) .
+                           filter (isExternalName . fst) .
+                           map (first idName) $ stream_result
+
+        -- We update the EPS here to populate the exported lf_infos.
         eps <- hscEPS hsc_env
         let eps' = eps { eps_cg_info_env = extendNameEnvList (eps_cg_info_env eps) infoExported }
         writeIORef (hsc_EPS hsc_env) eps'

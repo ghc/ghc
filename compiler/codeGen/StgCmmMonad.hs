@@ -444,7 +444,7 @@ setBinds new_binds = do
 lookupImportedLF :: Name -> FCode (Maybe LambdaFormInfo)
 lookupImportedLF name = do
         cg_imports <- cgd_info_imported <$> getInfoDown
-        pprTraceM "Lookup up lfinfo" $ ppr (name, lookupNameEnv cg_imports name)
+        -- pprTraceM "Lookup up lfinfo" $ ppr (name, lookupNameEnv cg_imports name)
         return $ lookupNameEnv cg_imports name
 
 withState :: FCode a -> CgState -> FCode (a,CgState)

@@ -668,10 +668,10 @@ outside of the hs-boot loop.
 -}
 
 toIfLFInfo :: LambdaFormInfo -> IfLFInfo
-toIfLFInfo (LFReEntrant top oneshot rep fvs _argdesc) =
-    ILFReEntrant top oneshot rep fvs
-toIfLFInfo (LFThunk top hasfv updateable sfi m_function) =
-    ILFThunk top hasfv updateable sfi m_function
+toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs _argdesc) =
+    ILFReEntrant oneshot rep fvs
+toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
+    ILFThunk hasfv updateable sfi m_function
 toIfLFInfo (LFUnlifted) = ILFUnlifted
 toIfLFInfo (LFCon con) = ILFCon (dataConName con)
 -- All other cases are not possible at the top level.
