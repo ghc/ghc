@@ -1008,7 +1008,12 @@ def do_test(name: TestName,
 
     if way in opts.fragile_ways:
         if_verbose(1, '*** fragile test %s resulted in %s' % (full_name, passFail))
-        t.fragile_results.append(TestResult(directory, name, 'fragile %s' % passFail, way))
+        if passFail == 'pass':
+            t.fragile_passes.append(TestResult(directory, name, 'fragile', way))
+        else:
+            t.fragile_failures.append(TestResult(directory, name, 'fragile', way,
+                                                 stdout=result.stdout,
+                                                 stderr=result.stderr))
     elif passFail == 'pass':
         if _expect_pass(way):
             t.expected_passes.append(TestResult(directory, name, "", way))
@@ -2363,7 +2368,7 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
                + ' unexpected failures\n'
                + repr(len(t.unexpected_stat_failures)).rjust(8)
                + ' unexpected stat failures\n'
-               + repr(len(t.fragile_results)).rjust(8)
+               + repr(len(t.fragile_failures) + len(t.fragile_passes)).rjust(8)
                + ' fragile tests\n'
                + '\n')
 
@@ -2387,9 +2392,13 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
         file.write('Framework warnings:\n')
         printTestInfosSummary(file, t.framework_warnings)
 
-    if t.fragile_results:
-        file.write('Fragile tests:\n')
-        printTestInfosSummary(file, t.fragile_results)
+    if t.fragile_passes:
+        file.write('Fragile test passes:\n')
+        printTestInfosSummary(file, t.fragile_passes)
+
+    if t.fragile_failures:
+        file.write('Fragile test failures:\n')
+        printTestInfosSummary(file, t.fragile_failures)
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
