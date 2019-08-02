@@ -22,7 +22,7 @@ makeTestSocketFd = do
 callback :: FdKey -> Event -> IO ()
 callback _ _ = return ()
 
--- Idle CPU usage per time
+-- Idle CPU usage with 0 for 0% and 10^12 for 100%
 idleCpuUsage :: IO Double
 idleCpuUsage = do
   startTime <- getMonotonicTime
