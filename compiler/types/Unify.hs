@@ -431,8 +431,8 @@ tcPartialUnifyTyKis :: (TyCoVar -> BindFlag)
                     -> [Type] -> [Type]
                     -> Maybe TCvSubst
 tcPartialUnifyTyKis bind_fn tys1 tys2
-  = case tcUnifyTyKisFG bind_fn tys1 tys2 of
-      Unifiable result  -> Just result
+  = case tc_partial_unify_tys_fg True bind_fn tys1 tys2 of
+      Unifiable  result -> Just result
       MaybeApart result -> Just result
       _                 -> Nothing
 
@@ -499,9 +499,23 @@ tc_unify_tys_fg match_kis bind_fn tys1 tys2
     vars = tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2
     env  = mkRnEnv2 $ mkInScopeSet vars
 
+tc_partial_unify_tys_fg :: Bool
+                        -> (TyVar -> BindFlag)
+                        -> [Type] -> [Type]
+                        -> UnifyResult
+tc_partial_unify_tys_fg match_kis bind_fn tys1 tys2
+  = do { (env, _) <- tc_partial_unify_tys bind_fn True False match_kis env
+                                          emptyTvSubstEnv emptyCvSubstEnv
+                                          tys1 tys2
+       ; return $ niFixTCvSubst env }
+  where
+    vars = tyCoVarsOfTypes tys1 `unionVarSet` tyCoVarsOfTypes tys2
+    env  = mkRnEnv2 $ mkInScopeSet vars
+
 -- | This function is actually the one to call the unifier -- a little
 -- too general for outside clients, though.
-tc_unify_tys :: (TyVar -> BindFlag)
+tc_unify_tys, tc_partial_unify_tys
+             :: (TyVar -> BindFlag)
              -> AmIUnifying -- ^ True <=> unify; False <=> match
              -> Bool        -- ^ True <=> doing an injectivity check
              -> Bool        -- ^ True <=> treat the kinds as well
@@ -526,6 +540,22 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
     do { when match_kis $
          unify_tys env kis1 kis2
        ; unify_tys env tys1 tys2
+       ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
+  where
+    env = UMEnv { um_bind_fun = bind_fn
+                , um_skols    = emptyVarSet
+                , um_unif     = unif
+                , um_inj_tf   = inj_check
+                , um_rn_env   = rn_env }
+
+    kis1 = map typeKind tys1
+    kis2 = map typeKind tys2
+
+tc_partial_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
+  = initUM tv_env cv_env $
+    do { when match_kis $
+         don'tBeSoSure (unify_tys env kis1 kis2)
+       ; don'tBeSoSure (unify_tys env tys1 tys2)
        ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
   where
     env = UMEnv { um_bind_fun = bind_fn

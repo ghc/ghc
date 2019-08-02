@@ -21,7 +21,7 @@ module TcUnify (
   unifyType, unifyKind, uQuickLookTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
-  tcQuickLookSubtype,
+  tcQuickLookUnify,
 
   --------------------------------
   -- Holes
@@ -777,17 +777,25 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
     go ty_a ty_e
-      | is_bottom_forall_type ty_a
-      = do { dflags <- getDynFlags
-           ; if xopt LangExt.ImpredicativeTypes dflags
-                then do { (in_wrap, TyVarTy tv) <- topInstantiate inst_orig ty_a
-                        ; uQuickLookTryFillPoly inst_orig tv ty_e
-                        ; return in_wrap }
-                else poly_actual ty_a ty_e }
-
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
-      = poly_actual ty_a ty_e
+      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
+              -- quick look
+           ; dflags <- getDynFlags
+           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
+                           then do { lvl <- getTcLevel
+                                   ; ql_subst <- tcQuickLookUnify lvl in_rho ty_e
+                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
+                                       uQuickLookTryFillPoly inst_orig v
+                                          (substTyAddInScope ql_subst (mkTyVarTy v))
+                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
+                                   ; zonkTcType in_rho }
+                           else return in_rho
+           ; body_wrap <- tc_sub_type_ds
+                            (eq_orig { uo_actual = in_rho'
+                                     , uo_expected = ty_expected })
+                            inst_orig ctxt in_rho' ty_e
+           ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
       = inst_and_unify
@@ -819,61 +827,46 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-    -- ty is of the form forall a. Q => a
-    is_bottom_forall_type ty
-      | let (tvs, _theta, rho) = tcSplitSigmaTy ty
-      , TyVarTy tv_a <- rho
-      = tv_a `elem` tvs
-      | otherwise
-      = False
-
-    poly_actual ty_a ty_e
-      = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-              -- quick look
-           ; dflags <- getDynFlags
-           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
-                           then do { lvl <- getTcLevel
-                                   ; ql_subst <- tcQuickLookSubtype lvl in_rho ty_e
-                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
-                                       uQuickLookTryFillPoly inst_orig v
-                                          (substTyAddInScope ql_subst (mkTyVarTy v))
-                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
-                                   ; zonkTcType in_rho }
-                           else return in_rho
-           ; body_wrap <- tc_sub_type_ds
-                            (eq_orig { uo_actual = in_rho'
-                                     , uo_expected = ty_expected })
-                            inst_orig ctxt in_rho' ty_e
-           ; return (body_wrap <.> in_wrap) }
-
-tcQuickLookSubtype :: TcLevel -> TcType -> TcType -> TcM TCvSubst
-tcQuickLookSubtype lvl ty1 ty2
+tcQuickLookUnify :: TcLevel -> TcType -> TcType -> TcM TCvSubst
+tcQuickLookUnify lvl ty1 ty2
   | Just ty1' <- tcView ty1
-  = tcQuickLookSubtype lvl ty1' ty2
+  = tcQuickLookUnify lvl ty1' ty2
   | Just ty2' <- tcView ty2
-  = tcQuickLookSubtype lvl ty1 ty2'
-  | tcIsGuardedType ty1
-  = do { traceTc "tcQuickLookSubtype/mono" (vcat [ppr ty1, ppr ty2])
+  = tcQuickLookUnify lvl ty1 ty2'
+  -- case of one being a monotype => unify
+  | tcIsGuardedType ty1 || tcIsGuardedType ty2
+  = do { traceTc "tcQuickLookUnify/mono" (vcat [ppr ty1, ppr ty2])
        ; case tcPartialUnifyTyKis bind_flag [ty1] [ty2] of
            Just subst -> return subst
            Nothing    -> return emptyTCvSubst }
+  -- case of both being functions
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
-  = do { traceTc "tcQuickLookSubtype/arrow-arrow" (vcat [ppr ty1, ppr ty2])
+  = do { traceTc "tcQuickLookUnify/arrow-arrow" (vcat [ppr ty1, ppr ty2])
        ; case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
-           Nothing -> tcQuickLookSubtype lvl res1 res2
+           Nothing -> tcQuickLookUnify lvl res1 res2
            Just subst1
              -> let res1' = substTyAddInScope subst1 res1
                     res2' = substTyAddInScope subst1 res2
-                in flip composeTCvSubst subst1 <$> tcQuickLookSubtype lvl res1' res2' }
+                in flip composeTCvSubst subst1 <$> tcQuickLookUnify lvl res1' res2' }
+  -- case of variable and function type
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , TyVarTy tv2 <- ty2, isTouchableMetaTyVar lvl tv2
-  = do { traceTc "tcQuickLookSubtype/arrow-var" (vcat [ppr ty1, ppr ty2])
+  = do { traceTc "tcQuickLookUnify/arrow-var" (vcat [ppr ty1, ppr ty2])
        ; beta <- newFlexiTyVarTy (tcTypeKind res1)
        ; let new_fun_ty  = mkVisFunTy arg1 beta
              small_subst = zipTvSubst [tv2] [new_fun_ty]
              ty1' = substTyAddInScope small_subst ty1
-       ; subst' <- tcQuickLookSubtype lvl ty1' new_fun_ty
+       ; subst' <- tcQuickLookUnify lvl ty1' new_fun_ty
+       ; return (composeTCvSubst subst' small_subst) }
+  | Just (arg2, res2) <- tcSplitFunTy_maybe ty2
+  , TyVarTy tv1 <- ty1, isTouchableMetaTyVar lvl tv1
+  = do { traceTc "tcQuickLookUnify/var-arrow" (vcat [ppr ty1, ppr ty2])
+       ; beta <- newFlexiTyVarTy (tcTypeKind res2)
+       ; let new_fun_ty  = mkVisFunTy arg2 beta
+             small_subst = zipTvSubst [tv1] [new_fun_ty]
+             ty2' = substTyAddInScope small_subst ty2
+       ; subst' <- tcQuickLookUnify lvl new_fun_ty ty2'
        ; return (composeTCvSubst subst' small_subst) }
   | otherwise
   = return emptyTCvSubst

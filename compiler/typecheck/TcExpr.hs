@@ -1440,7 +1440,7 @@ tcQuickLooks res_tys args arg_tys = go res_tys
            ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty:exp_res_ty:arg_tys))
              -- We look *twice* in the result type
            ; res_subst1 <- composeTCvSubst (mkEmptyTCvSubst in_scope)
-                              <$> tcQuickLookSubtype lvl act_res_ty exp_res_ty
+                              <$> tcQuickLookUnify lvl act_res_ty exp_res_ty
              -- Apply first quick look on the result to arguments
            ; args_subst <- go_args res_subst1 args arg_tys
            ; let args_res1_subst = composeTCvSubst args_subst res_subst1
@@ -1448,7 +1448,7 @@ tcQuickLooks res_tys args arg_tys = go res_tys
                  exp_res_ty' = substTyAddInScope args_res1_subst exp_res_ty
              -- Now look again at the result type
            ; res_subst2 <- composeTCvSubst (mkEmptyTCvSubst in_scope)
-                              <$> tcQuickLookSubtype lvl act_res_ty' exp_res_ty'
+                              <$> tcQuickLookUnify lvl act_res_ty' exp_res_ty'
            ; return ( composeTCvSubst res_subst2 args_res1_subst
                     , tyCoVarsOfTypesList (act_res_ty:exp_res_ty:arg_tys) ) }
     go (act_res_ty, _)
