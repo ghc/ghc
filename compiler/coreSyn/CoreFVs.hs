@@ -110,10 +110,7 @@ exprFreeVars = fvVarSet . exprFVs
 -- Note that this *does* include type variables free in the types of free term
 -- variables (see #15211).
 mkExprInScopeSet :: CoreExpr -> InScopeSet
-mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ closeOverTypes (exprFreeVarsList e)
-
-closeOverTypes :: [Var] -> FV
-closeOverTypes vars = mapUnionFV (tyCoFVsOfType . varType) vars `unionFV` FV.mkFVs vars
+mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ exprFreeVarsList e
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
@@ -264,7 +261,10 @@ expr_fvs (Type ty) fv_cand in_scope acc =
   tyCoFVsOfType ty fv_cand in_scope acc
 expr_fvs (Coercion co) fv_cand in_scope acc =
   tyCoFVsOfCo co fv_cand in_scope acc
-expr_fvs (Var var) fv_cand in_scope acc = FV.unitFV var fv_cand in_scope acc
+expr_fvs (Var var) fv_cand in_scope acc
+  | v `elemVarSet` in_scope = acc
+  | v `elemVarSet` acc      = acc
+  | otherwise               = ty_co_vars_of_type (idType v) emptyVarSet (extendVarSet acc v)
 expr_fvs (Lit _) fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 expr_fvs (Tick t expr) fv_cand in_scope acc =
   (tickish_fvs t `unionFV` expr_fvs expr) fv_cand in_scope acc
