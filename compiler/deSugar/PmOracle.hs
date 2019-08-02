@@ -61,6 +61,7 @@ import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
 import Control.Monad (zipWithM, mzero)
 import Control.Monad.Trans.Class (lift)
+import Data.Functor.Identity
 import Data.Foldable (foldlM)
 import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -670,9 +671,6 @@ mkOneSatisfiableConFull delta x con = do
   let res_ty = maybe (idType x) fstOf3 mb_res_ty
   (y, delta') <- mkIdCoercion x res_ty delta
   tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
-  let (_,_,_,_,_,_,con_res_ty) = conLikeFullSig con
-  con_res_ty' <- maybe con_res_ty fstOf3 <$> pmTopNormaliseType_maybe (delta_ty_cs delta) con_res_ty
-  tracePm "sldfksjd" (ppr con_res_ty $$ ppr con_res_ty')
   (ic, ex_tvs, arg_vars) <- mkOneConFull y con
   mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
   tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
@@ -957,11 +955,18 @@ exprToAlt (PmExprCon c _) = Just c
 exprToAlt _               = Nothing
 
 -- This is the only actual 'DsM' side-effect in the entire module
-initIncompleteMatches :: Type -> PossibleShape -> DsM PossibleShape
-initIncompleteMatches ty NoInfoYet = initIM ty >>= \case
+initIncompleteMatches :: VarInfo -> DsM PossibleShape
+initIncompleteMatches (VI ty NoInfoYet neg) = initIM ty >>= \case
   Nothing -> pure NoInfoYet
-  Just im -> pure (CompleteSets im)
-initIncompleteMatches _  pos       = pure pos
+  Just im -> pure (CompleteSets (markRefutsMatched neg im))
+initIncompleteMatches vi                    = pure (vi_pos vi)
+
+markRefutsMatched :: [PmAltCon] -> IncompleteMatches -> IncompleteMatches
+markRefutsMatched refuts im = foldr markMatched im (mapMaybe asPmAltConLike refuts)
+
+asPmAltConLike :: PmAltCon -> Maybe ConLike
+asPmAltConLike (PmAltConLike cl) = Just cl
+asPmAltConLike _                 = Nothing
 
 refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
@@ -1116,11 +1121,11 @@ solveVar delta x e =
 -- See Note [Refutable shapes].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
-  mb_pos' <- initIncompleteMatches (idType x) pos >>= go
+  mb_pos' <- initIncompleteMatches vi >>= go
   let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
   pure (new_delta <$> mb_pos')
   where
-    (y, VI ty pos neg) = lookupVarInfo ts x
+    (y, vi@(VI ty pos neg)) = lookupVarInfo ts x
     neg' = combineRefutEntries neg [nalt]
 
     go NoInfoYet = pure (Just (VI ty NoInfoYet neg'))
@@ -1231,7 +1236,7 @@ unify ts eq@(e1, e2) = case eq of
     | Just e1' <- isRigid ts x     -> unify ts (e1', e2)
   (_, PmExprVar y)
     | Just e2' <- isRigid ts y     -> unify ts (e1, e2')
-  (PmExprVar x, PmExprVar y)       -> Just (equate x y ts)
+  (PmExprVar x, PmExprVar y)       -> equate x y ts
   (PmExprVar x, PmExprCon c args)  -> trySolve x c args ts
   (PmExprCon c args, PmExprVar y)  -> trySolve y c args ts
   where
@@ -1242,23 +1247,34 @@ unify ts eq@(e1, e2) = case eq of
 -- with @x :-> y@.
 -- Preconditions: @x /= y@ and both @x@ and @y@ are flexible (cf.
 -- 'isFlexible'/'isRigid').
-equate :: Id -> Id -> TmState -> TmState
+equate :: Id -> Id -> TmState -> Maybe TmState
 equate x y ts@(TS env)
   = ASSERT( x /= y )
     ASSERT( isFlexible ts x )
     ASSERT( isFlexible ts y )
-    ts'
+    ts' <$> mb_pos_y'
   where
     VI ty_x _     neg_x = snd (lookupVarInfo ts x)
     VI ty_y pos_y neg_y = snd (lookupVarInfo ts y)
     vi_x'               = VI ty_x (Rigid (PmExprVar y)) []
     -- Be careful to uphold Note [The Pos/Neg invariant] by merging the refuts
-    -- of x into those of y
-    -- We could compute the intersection of CompleteSets for pos_x and pos_y
-    -- here. Should we? We merge the negs, after all. It's also not so clear
-    -- how to merge different COMPLETE sets.
-    vi_y' = VI ty_y pos_y (combineRefutEntries neg_x neg_y)
-    ts'   = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
+    -- of x into those of y. We also have to weed out the COMPLETE sets of pos_y
+    -- refuted by neg_x here.
+    mb_pos_y' = weed_out_cs neg_x pos_y
+    ts' pos_y' = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
+      where
+        vi_y' = VI ty_y pos_y' (combineRefutEntries neg_x neg_y)
+
+    weed_out_cs negs (CompleteSets im) = CompleteSets <$> mb_im2
+      where
+        im1                  = foldr markMatched im (mapMaybe cl negs)
+        cl (PmAltConLike cl) = Just cl
+        cl _                 = Nothing
+        mb_im2               = runIdentity (ensureInhabited inh_test im1)
+        -- Since we don't want to run the type-checker here, just use a conservative
+        -- inhabitation test
+        inh_test _           = Identity True
+    weed_out_cs _   pos                = Just pos
 
 -- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
