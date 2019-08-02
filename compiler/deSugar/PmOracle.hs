@@ -905,6 +905,9 @@ We want to know that @x@ is certainly not the literal 4 when we know it is a
 general, we consider every binding in 'tm_neg' informative when the equality
 relation to the solution is undecidable ('decEqPmAltCons').
 
+  ToDo: add an example with pattern synonyms, to show it's
+        not just about literals
+
 Now, suppose we are adding the (positive) fact @x :-> e@ to 'tm_pos'. Then we
 must delete any comparable negative facts (after considering them for
 refutation) for @x@ from 'tm_neg', to uphold the invariant.
