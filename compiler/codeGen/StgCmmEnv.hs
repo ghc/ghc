@@ -131,20 +131,23 @@ getCgIdInfo id
 
                 -- Should be imported; make up a CgIdInfo for it
           let name = idName id
-        ; if isExternalName name then do
-            { let ext_lbl
-                      | isUnliftedType (idType id) =
-                          -- An unlifted external Id must refer to a top-level
-                          -- string literal. See Note [Bytes label] in CLabel.
-                          ASSERT( idType id `eqType` addrPrimTy )
-                          mkBytesLabel name
-                      | otherwise = mkClosureLabel name $ idCafInfo id
-              ; lf_cached <- lookupImportedLF name
-              ; let lf_computed = mkLFImported id
-              -- ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
-              ; let lf_info = fromMaybe (mkLFImported id) lf_cached
-              ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
-            }
+        ; if isExternalName name then
+            let unlifted = isUnliftedType (idType id)
+            in  if unlifted then
+                  -- An unlifted external Id must refer to a top-level
+                  -- string literal. See Note [Bytes label] in CLabel.
+                  let ext_lbl = ASSERT( idType id `eqType` addrPrimTy )
+                                mkBytesLabel name
+                  in return $ litIdInfo dflags id mkLFStringLit (CmmLabel ext_lbl)
+                else do
+                {
+                  let ext_lbl = mkClosureLabel name $ idCafInfo id
+                  ; lf_cached <- lookupImportedLF name
+                  ; let lf_computed = mkLFImported id
+                  -- ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
+                  ; let lf_info = fromMaybe lf_computed lf_cached
+                  ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
+                }
           else
               cgLookupPanic id -- Bug
         }}}
