@@ -1304,7 +1304,11 @@ simplCast env body co0 cont0
 
         addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
-          , Pair hole_ty _ <- coercionKind co
+            -- N.B. As mentioned in Note [The hole type in ApplyToTy] this is
+            -- only needed by `sc_hole_ty` which is often not forced.
+            -- Consequently it is worthwhile using a lazy pattern match here to
+            -- avoid unnecessary coercionKind evaluations.
+          , ~(Pair hole_ty _) <- coercionKind co
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' tail
                ; return (cont { sc_arg_ty  = arg_ty'
