@@ -152,6 +152,7 @@ initStats0(void)
         .allocated_bytes = 0,
         .max_live_bytes = 0,
         .max_large_objects_bytes = 0,
+        .max_pinned_objects_bytes = 0,
         .max_compact_bytes = 0,
         .max_slop_bytes = 0,
         .max_mem_in_use_bytes = 0,
@@ -181,6 +182,7 @@ initStats0(void)
             .allocated_bytes = 0,
             .live_bytes = 0,
             .large_objects_bytes = 0,
+            .pinned_objects_bytes = 0,
             .compact_bytes = 0,
             .slop_bytes = 0,
             .mem_in_use_bytes = 0,
@@ -341,6 +343,7 @@ stat_endGC (Capability *cap, gc_thread *gct, W_ live, W_ copied, W_ slop,
 
     stats.gc.live_bytes = live * sizeof(W_);
     stats.gc.large_objects_bytes = calcTotalLargeObjectsW() * sizeof(W_);
+    stats.gc.pinned_objects_bytes = calcTotalPinnedObjectsW() * sizeof(W_);
     stats.gc.compact_bytes = calcTotalCompactW() * sizeof(W_);
     stats.gc.slop_bytes = slop * sizeof(W_);
     stats.gc.mem_in_use_bytes = mblocks_allocated * MBLOCK_SIZE;
@@ -406,6 +409,9 @@ stat_endGC (Capability *cap, gc_thread *gct, W_ live, W_ copied, W_ slop,
         }
         if (stats.gc.large_objects_bytes > stats.max_large_objects_bytes) {
             stats.max_large_objects_bytes = stats.gc.large_objects_bytes;
+        }
+        if (stats.gc.pinned_objects_bytes > stats.max_pinned_objects_bytes) {
+            stats.max_pinned_objects_bytes = stats.gc.pinned_objects_bytes;
         }
         if (stats.gc.compact_bytes > stats.max_compact_bytes) {
             stats.max_compact_bytes = stats.gc.compact_bytes;
@@ -927,6 +933,8 @@ static void report_machine_readable (const RTSSummaryStats * sum)
     MR_STAT("max_live_bytes", FMT_Word64, stats.max_live_bytes);
     MR_STAT("max_large_objects_bytes", FMT_Word64,
             stats.max_large_objects_bytes);
+    MR_STAT("max_pinned_objects_bytes", FMT_Word64,
+            stats.max_pinned_objects_bytes);
     MR_STAT("max_compact_bytes", FMT_Word64, stats.max_compact_bytes);
     MR_STAT("max_slop_bytes", FMT_Word64, stats.max_slop_bytes);
     // This duplicates, except for unit, peak_megabytes_allocated above

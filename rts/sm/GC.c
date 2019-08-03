@@ -646,6 +646,7 @@ GarbageCollect (uint32_t collect_gen,
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
+        gen->n_pinned_blocks = gen->n_scavenged_pinned_blocks;
         gen->n_large_words  = countOccupied(gen->large_objects);
         gen->n_new_large_words = 0;
 
@@ -686,6 +687,7 @@ GarbageCollect (uint32_t collect_gen,
 
         // add the new blocks we promoted during this GC
         gen->n_large_blocks += gen->n_scavenged_large_blocks;
+        gen->n_pinned_blocks += gen->n_scavenged_pinned_blocks;
         gen->n_compact_blocks += gen->n_live_compact_blocks;
     }
 
@@ -697,6 +699,7 @@ GarbageCollect (uint32_t collect_gen,
 
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
+    gen->n_scavenged_pinned_blocks = 0;
     gen->live_compact_objects = NULL;
     gen->n_live_compact_blocks = 0;
 
@@ -1366,6 +1369,7 @@ prepare_collected_gen (generation *gen)
     // initialise the large object queues.
     ASSERT(gen->scavenged_large_objects == NULL);
     ASSERT(gen->n_scavenged_large_blocks == 0);
+    ASSERT(gen->n_scavenged_pinned_blocks == 0);
     ASSERT(gen->live_compact_objects == NULL);
     ASSERT(gen->n_live_compact_blocks == 0);
 
@@ -1488,6 +1492,7 @@ prepare_uncollected_gen (generation *gen)
 
     ASSERT(gen->scavenged_large_objects == NULL);
     ASSERT(gen->n_scavenged_large_blocks == 0);
+    ASSERT(gen->n_scavenged_pinned_blocks == 0);
 }
 
 /* -----------------------------------------------------------------------------
