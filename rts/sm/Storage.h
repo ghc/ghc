@@ -109,6 +109,7 @@ StgWord genLiveWords  (generation *gen);
 StgWord genLiveBlocks (generation *gen);
 
 StgWord calcTotalLargeObjectsW (void);
+StgWord calcTotalPinnedObjectsW (void);
 StgWord calcTotalCompactW (void);
 
 /* ----------------------------------------------------------------------------

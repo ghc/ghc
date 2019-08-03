@@ -61,6 +61,8 @@ data RTSStats = RTSStats {
   , max_live_bytes :: Word64
     -- | Maximum live data in large objects
   , max_large_objects_bytes :: Word64
+    -- | Maximum live data in pinned objects
+  , max_pinned_objects_bytes :: Word64
     -- | Maximum live data in compact regions
   , max_compact_bytes :: Word64
     -- | Maximum slop
@@ -127,6 +129,8 @@ data GCDetails = GCDetails {
   , gcdetails_live_bytes :: Word64
     -- | Total amount of live data in large objects
   , gcdetails_large_objects_bytes :: Word64
+    -- | Total amount of live data in pinned objects
+  , gcdetails_pinned_objects_bytes :: Word64
     -- | Total amount of live data in compact regions
   , gcdetails_compact_bytes :: Word64
     -- | Total amount of slop (wasted memory)
@@ -174,6 +178,7 @@ getRTSStats = do
     allocated_bytes <- (# peek RTSStats, allocated_bytes) p
     max_live_bytes <- (# peek RTSStats, max_live_bytes) p
     max_large_objects_bytes <- (# peek RTSStats, max_large_objects_bytes) p
+    max_pinned_objects_bytes <- (# peek RTSStats, max_pinned_objects_bytes) p
     max_compact_bytes <- (# peek RTSStats, max_compact_bytes) p
     max_slop_bytes <- (# peek RTSStats, max_slop_bytes) p
     max_mem_in_use_bytes <- (# peek RTSStats, max_mem_in_use_bytes) p
@@ -200,6 +205,8 @@ getRTSStats = do
       gcdetails_live_bytes <- (# peek GCDetails, live_bytes) pgc
       gcdetails_large_objects_bytes <-
         (# peek GCDetails, large_objects_bytes) pgc
+      gcdetails_pinned_objects_bytes <-
+        (# peek GCDetails, pinned_objects_bytes) pgc
       gcdetails_compact_bytes <- (# peek GCDetails, compact_bytes) pgc
       gcdetails_slop_bytes <- (# peek GCDetails, slop_bytes) pgc
       gcdetails_mem_in_use_bytes <- (# peek GCDetails, mem_in_use_bytes) pgc

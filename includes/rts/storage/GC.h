@@ -92,6 +92,7 @@ typedef struct generation_ {
     memcount       n_large_words;       // no. of words used by large objs
     memcount       n_new_large_words;   // words of new large objects
                                         // (for doYouWantToGC())
+    memcount       n_pinned_blocks;     // no. of blocks used by pinned objs
 
     bdescr *       compact_objects;     // compact objects chain
                                         // the second block in each compact is
@@ -149,6 +150,7 @@ typedef struct generation_ {
 
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
     memcount     n_scavenged_large_blocks; // size (not count) of above
+    memcount     n_scavenged_pinned_blocks; // size (not count) of pinned objects
 
     bdescr *     live_compact_objects;  // live compact objs after GC (d-link)
     memcount     n_live_compact_blocks; // size (not count) of above
