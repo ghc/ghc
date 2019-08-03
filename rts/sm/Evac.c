@@ -308,6 +308,7 @@ evacuate_large(StgPtr p)
       if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
       dbl_link_onto(bd, &new_gen->scavenged_large_objects);
       new_gen->n_scavenged_large_blocks += bd->blocks;
+      new_gen->n_scavenged_pinned_blocks += bd->blocks;
       if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync); }
   } else {
       bd->link = ws->todo_large_objects;
