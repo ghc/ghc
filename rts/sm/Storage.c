@@ -100,12 +100,14 @@ initGeneration (generation *gen, int g)
     gen->n_large_blocks = 0;
     gen->n_large_words = 0;
     gen->n_new_large_words = 0;
+    gen->n_pinned_blocks = 0;
     gen->compact_objects = NULL;
     gen->n_compact_blocks = 0;
     gen->compact_blocks_in_import = NULL;
     gen->n_compact_blocks_in_import = 0;
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
+    gen->n_scavenged_pinned_blocks = 0;
     gen->live_compact_objects = NULL;
     gen->n_live_compact_blocks = 0;
     gen->compact_blocks_in_import = NULL;
@@ -1333,6 +1335,18 @@ StgWord calcTotalLargeObjectsW (void)
     }
     return totalW;
 }
+
+StgWord calcTotalPinnedObjectsW (void)
+{
+    uint32_t g;
+    StgWord totalW = 0;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        totalW += generations[g].n_pinned_blocks * BLOCK_SIZE_W;
+    }
+    return totalW;
+}
+    
 
 StgWord calcTotalCompactW (void)
 {
