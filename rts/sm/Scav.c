@@ -1987,6 +1987,9 @@ scavenge_large (gen_workspace *ws)
         } else {
             dbl_link_onto(bd, &ws->gen->scavenged_large_objects);
             ws->gen->n_scavenged_large_blocks += bd->blocks;
+            if (bd->flags & BF_PINNED) {
+              ws->gen->n_scavenged_pinned_blocks += bd->blocks;
+            }
             p = bd->start;
         }
         RELEASE_SPIN_LOCK(&ws->gen->sync);

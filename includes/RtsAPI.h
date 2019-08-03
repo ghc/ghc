@@ -133,6 +133,8 @@ typedef struct GCDetails_ {
   uint64_t live_bytes;
     // Total amount of live data in large objects
   uint64_t large_objects_bytes;
+    // Total amount of data in pinned objects
+  uint64_t pinned_objects_bytes;
     // Total amount of live data in compact regions
   uint64_t compact_bytes;
     // Total amount of slop (wasted memory)
@@ -172,6 +174,8 @@ typedef struct _RTSStats {
   uint64_t max_live_bytes;
     // Maximum live data in large objects
   uint64_t max_large_objects_bytes;
+    // Maximum live data in pinned objects
+  uint64_t max_pinned_objects_bytes;
     // Maximum live data in compact regions
   uint64_t max_compact_bytes;
     // Maximum slop
