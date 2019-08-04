@@ -419,8 +419,8 @@ else # CLEANING
 # Packages that are built by stage0. These packages are dependencies of
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
-
-PACKAGES_STAGE0 = binary text transformers mtl parsec Cabal/Cabal hpc ghc-boot-th ghc-boot template-haskell ghc-heap ghci
+# Note that these must be given in topological order.
+PACKAGES_STAGE0 = binary transformers mtl parsec hpc ghc-boot-th ghc-boot template-haskell text Cabal/Cabal ghc-heap ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
