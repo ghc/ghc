@@ -619,7 +619,14 @@ static struct NonmovingAllocator *alloc_nonmoving_allocator(uint32_t n_caps)
     struct NonmovingAllocator *alloc =
         stgMallocBytes(allocator_sz, "nonmovingInit");
     memset(alloc, 0, allocator_sz);
+    initMutex(&alloc->mutex);
     return alloc;
+}
+
+static free_nonmoving_allocator(struct NonmovingAllocator *alloc)
+{
+    closeMutex(&alloc->mutex);
+    stgFree(alloc);
 }
 
 void nonmovingInit(void)
@@ -632,7 +639,6 @@ void nonmovingInit(void)
 #endif
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
         nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(n_capabilities);
-        initMutex(&nonmovingHeap.allocators[i]->mutex);
     }
     nonmovingMarkInitUpdRemSet();
 }
@@ -647,14 +653,13 @@ void nonmovingExit(void)
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
     }
-    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        closeMutex(&nonmovingHeap.allocators[i]->mutex);
-        stgFree(nonmovingHeap.allocators[i]);
-    }
     closeMutex(&concurrent_coll_finished_lock);
     closeCondition(&concurrent_coll_finished);
     closeMutex(&nonmoving_collection_mutex);
 #endif
+    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+        free_nonmoving_allocator(nonmovingHeap.allocators[i])
+    }
 }
 
 /*
