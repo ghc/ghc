@@ -10,7 +10,7 @@ data MBA = MBA (MutableByteArray# RealWorld)
 
 main :: IO ()
 main = do
-  MBA mba <- IO $ \s0 -> case newPinnedByteArray# 4096# s0 of
+  MBA mba <- IO $ \s0 -> case newPinnedByteArray# 1# s0 of
     (# s1, mba #) -> (# s1, MBA mba #)
 
   IO $ \s0 -> case writeIntArray# mba 0# 1# s0 of

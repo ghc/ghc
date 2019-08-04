@@ -1554,6 +1554,10 @@ collect_pinned_object_blocks (void)
     bdescr *bd, *prev;
 
     for (n = 0; n < n_capabilities; n++) {
+        bd = capabilities[n]->pinned_object_block;
+        if (bd != NULL) {
+            g0->n_scavenged_pinned_blocks += bd->blocks;
+        }
         prev = NULL;
         for (bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
             prev = bd;
