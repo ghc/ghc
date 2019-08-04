@@ -643,7 +643,8 @@ void nonmovingInit(void)
     nonmovingMarkInitUpdRemSet();
 }
 
-void nonmovingExit(void)
+// Stop any nonmoving collection in preparation for RTS shutdown.
+void nonmovingStop(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;
 #if defined(THREADED_RTS)
@@ -653,6 +654,17 @@ void nonmovingExit(void)
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
     }
+#endif
+}
+
+void nonmovingExit(void)
+{
+    if (! RtsFlags.GcFlags.useNonmoving) return;
+
+    // First make sure collector is stopped before we tear things down.
+    nonmovingStop();
+
+#if defined(THREADED_RTS)
     closeMutex(&concurrent_coll_finished_lock);
     closeCondition(&concurrent_coll_finished);
     closeMutex(&nonmoving_collection_mutex);
