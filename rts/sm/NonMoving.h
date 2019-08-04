@@ -105,6 +105,7 @@ extern bool concurrent_coll_running;
 #endif
 
 void nonmovingInit(void);
+void nonmovingStop(void);
 void nonmovingExit(void);
 
 

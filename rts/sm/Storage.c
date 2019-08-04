@@ -300,6 +300,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
 void
 exitStorage (void)
 {
+    nonmovingExit();
     updateNurseriesStats();
     stat_exit();
 }
