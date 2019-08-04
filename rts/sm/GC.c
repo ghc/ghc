@@ -1369,7 +1369,6 @@ prepare_collected_gen (generation *gen)
     // initialise the large object queues.
     ASSERT(gen->scavenged_large_objects == NULL);
     ASSERT(gen->n_scavenged_large_blocks == 0);
-    ASSERT(gen->n_scavenged_pinned_blocks == 0);
     ASSERT(gen->live_compact_objects == NULL);
     ASSERT(gen->n_live_compact_blocks == 0);
 
