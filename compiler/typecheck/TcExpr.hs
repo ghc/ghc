@@ -1432,25 +1432,23 @@ tcQuickLookApp :: (TcRhoType, ExpRhoType)        -- ^ Result types
                -> [LHsExprArgIn]                 -- ^ arguments
                -> [TcSigmaType]                  -- ^ and their types
                -> TcM (TCvSubst, [TcTyVar])
-tcQuickLookApp res_tys args arg_tys = go res_tys
-  where
-    -- look in the result type only if available
-    go (act_res_ty, Check exp_res_ty)
-      = do { args_subst <- tcQuickLookArgs args arg_tys
-           ; let act_res_ty' = substTyAddInScope args_subst act_res_ty
-                 exp_res_ty' = substTyAddInScope args_subst exp_res_ty
-           ; lvl <- getTcLevel
-           ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty:exp_res_ty:arg_tys)) 
-           ; res_subst <- composeTCvSubst (mkEmptyTCvSubst in_scope)
-                              <$> tcQuickLookUnify lvl act_res_ty' exp_res_ty'
-           ; return ( composeTCvSubst res_subst args_subst
-                    , tyCoVarsOfTypesList (act_res_ty:exp_res_ty:arg_tys) ) }
-    go (act_res_ty, _)
-      = do { args_subst <- tcQuickLookArgs args arg_tys
-           ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty:arg_tys))
-                 res_subst = mkEmptyTCvSubst in_scope
-           ; return ( composeTCvSubst res_subst args_subst
-                    , tyCoVarsOfTypesList (act_res_ty:arg_tys) ) }
+tcQuickLookApp (act_res_ty, exp_res_ty) args arg_tys
+  = do { -- first look into the arguments
+         arg_tys' <- mapM zonkTcType arg_tys
+       ; args_subst <- tcQuickLookArgs args arg_tys'
+         -- now into the result types
+       ; case exp_res_ty of
+           Infer _
+             -> return ( args_subst, tyCoVarsOfTypesList arg_tys' )
+           Check exp_res_ty
+             -> do { act_res_ty' <- substTyAddInScope args_subst <$> zonkTcType act_res_ty
+                   ; exp_res_ty' <- substTyAddInScope args_subst <$> zonkTcType exp_res_ty
+                   ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty':exp_res_ty':arg_tys'))
+                   ; lvl <- getTcLevel
+                   ; res_subst <- composeTCvSubst (mkEmptyTCvSubst in_scope)
+                                      <$> tcQuickLookUnify lvl act_res_ty' exp_res_ty'
+                   ; return ( composeTCvSubst res_subst args_subst
+                            , tyCoVarsOfTypesList (act_res_ty':exp_res_ty':arg_tys') ) } } 
 
 tcQuickLookArgs :: [LHsExprArgIn]                 -- ^ arguments
                 -> [TcSigmaType]                  -- ^ and their types
