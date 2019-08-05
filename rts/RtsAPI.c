@@ -654,9 +654,7 @@ static bool rts_paused = false;
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
-    paused.pausing_task = NULL;
     paused.pausing_task = newBoundTask();
-    paused.capabilities = NULL;
     stopAllCapabilities(&paused.capabilities, paused.pausing_task);
     rts_paused = true;
     return paused;
