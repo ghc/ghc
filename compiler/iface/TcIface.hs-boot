@@ -19,4 +19,4 @@ tcIfaceFamInst      :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations  :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 
-tcLFInfo            :: IfLFInfo -> IfL LambdaFormInfo
+tcCodeGenInfos  :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]

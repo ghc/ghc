@@ -38,7 +38,7 @@ import GhcPrelude
 import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
                                  tcIfaceFamInst,
                                  tcIfaceAnnotations, tcIfaceCompleteSigs,
-                                 tcLFInfo )
+                                 tcCodeGenInfos )
 
 import DynFlags
 import IfaceSyn
@@ -474,7 +474,7 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
-        ; new_eps_cg_info_env <- mapSndM tcLFInfo (fromMaybe [] $ mi_lf_info iface)
+        ; new_eps_cg_info_env <- tcCodeGenInfos (fromMaybe [] $ mi_lf_info iface)
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",

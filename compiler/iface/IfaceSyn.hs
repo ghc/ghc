@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -78,6 +79,8 @@ import CgTypes (StandardFormInfo)
 
 import Control.Monad
 import System.IO.Unsafe
+import Data.Bits
+import Data.Word
 
 infixl 3 &&&
 
@@ -560,25 +563,37 @@ TODO:
 -}
 
 data IfLFInfo =
+    -- | We encode the fields bitwise:
+    --    bit 0: OneShotInfo
+    --    bit 1: no fvs
+    --    bit 2-15 arity
     ILFReEntrant
+        !Word16
         -- TopLevelFlag => Implied true
-        !OneShotInfo    -- => Not currently used by codegen
-        !RepArity       -- Very useful! Arity. Invariant: always > 0
-        !Bool           -- Used to determine nodePointsTo, True <=> no fvs
-        -- ArgDescr        -- Argument descriptor (should really be in ClosureInfo)
+        -- !OneShotInfo    -- => Not currently used by codegen, but we store it just in case
+        -- !RepArity       -- Arity. Very useful!  Invariant: always > 0
+        -- !Bool           -- no fvs <=> Used to determine nodePointsTo, True
+        -- ArgDescr        -- Argument descriptor - not encoded
 
+  -- | We encode some fields bitwise:
+    --    bit 0: no fvs
+    --    bit 1: updateable
+    --    bit 2: might be function
   | ILFThunk             -- Thunk (zero arity)
+        !Word8
         -- TopLevelFlag => Implied True
-        !Bool           -- True <=> no free vars
-        !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        -- !Bool           -- True <=> no free vars
+        -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
         !StandardFormInfo
-        !Bool           -- True <=> *might* be a function type
+        -- !Bool           -- True <=> *might* be a function type
 
   | ILFCon               -- A saturated constructor application
         !Name            -- The constructor Name
 
   | ILFUnlifted          -- A value of unboxed type;
                         -- always a value, needs evaluation
+
+
 
 
 
@@ -1387,14 +1402,24 @@ instance Outputable IfaceUnfolding where
                                 2 (sep (map pprParendIfaceExpr es))
 
 instance Outputable IfLFInfo where
-    ppr (ILFReEntrant oneshot rep fvs) =
+    ppr (ILFReEntrant fields) =
         text "LFReEntrant" <> brackets (ppr oneshot <+>
-                                        ppr rep <+> ppr fvs) -- <+> ppr argdesc)
-    ppr (ILFThunk hasfv updateable sfi m_function) =
-        text "LFThunk" <> brackets (ppr hasfv <+> ppr updateable <+>
-                                    ppr sfi <+> ppr m_function)
+                                        ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
+      where
+          oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
+          fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
+    ppr (ILFThunk fields sfi) =
+        text "LFThunk" <> brackets (ppr fvs_flag <+> ppr upd_flag <+>
+                                    ppr sfi <+> ppr fun_flag)
+      where
+          fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
+          upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
     ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (ILFUnlifted) = text "LFUnlifted"
+
+
 
 {-
 ************************************************************************
@@ -2403,24 +2428,20 @@ instance Binary IfaceCompleteMatch where
 
 instance Binary IfLFInfo where
     -- TODO: We could pack the bytes somewhat
-    put_ bh (ILFReEntrant oneshot rep fvs) =
+    put_ bh (ILFReEntrant fields) =
         putByte bh 0 >>
-        put_ bh oneshot >>
-        put_ bh rep >>
-        put_ bh fvs
-    put_ bh (ILFThunk hasfv updateable sfi m_function) =
+        put_ bh fields
+    put_ bh (ILFThunk encoded_flds sfi) =
         putByte bh 1 >>
-        put_ bh hasfv >>
-        put_ bh updateable >>
-        put_ bh sfi >>
-        put_ bh m_function
+        put_ bh encoded_flds >>
+        put_ bh sfi
     put_ bh (ILFCon conName) = putByte bh 2 >> put_ bh conName
     put_ bh (ILFUnlifted) = putByte bh 3
     get bh = do
         con <- getByte bh
         case con of
-            0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh
-            1 -> pure ILFThunk <*> get bh <*> get bh <*> get bh <*> get bh
+            0 -> pure ILFReEntrant <*> get bh
+            1 -> pure ILFThunk <*> get bh <*> get bh
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"

@@ -7,6 +7,9 @@
 
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -48,6 +51,12 @@ module Binary
    putByte,
    getByte,
 
+   -- * Use for deriving instances
+  --  BoundedEnumPackable, PackedBinary,
+  --  Packable(..),
+
+
+
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
@@ -73,6 +82,7 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
+import Util (log2Word)
 
 import Foreign
 import Data.Array
@@ -138,7 +148,7 @@ castBin :: Bin a -> Bin b
 castBin (BinPtr i) = BinPtr i
 
 ---------------------------------------------------------------
--- Helper instances
+-- Helper instances/classes
 ---------------------------------------------------------------
 
 newtype BoundedEnumBinary a = BoundedEnumBinary a
@@ -158,7 +168,6 @@ instance forall a. (Bounded a, Enum a) => Binary (BoundedEnumBinary a) where
       = BoundedEnumBinary . toEnum <$> get bh
       where
         maxSize = fromEnum (maxBound :: a) :: Int
-
 
 ---------------------------------------------------------------
 -- class Binary
@@ -1244,6 +1253,6 @@ instance Binary SourceText where
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
 
-deriving via BoundedEnumBinary TopLevelFlag instance Binary TopLevelFlag
+-- deriving via BoundedEnumBinary TopLevelFlag instance Binary TopLevelFlag
 
-deriving via BoundedEnumBinary OneShotInfo instance Binary OneShotInfo
+-- deriving via BoundedEnumBinary OneShotInfo instance Binary OneShotInfo

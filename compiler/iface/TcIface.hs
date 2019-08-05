@@ -8,6 +8,7 @@ Type checking of type signatures in interface files
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE BangPatterns #-}
 
 module TcIface (
         tcLookupImported_maybe,
@@ -19,7 +20,8 @@ module TcIface (
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
 
-        tcLFInfo
+        --tcLFInfo,
+        tcCodeGenInfos
  ) where
 
 #include "HsVersions.h"
@@ -82,6 +84,7 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
+import Data.Bits
 import SMRep
 
 {-
@@ -1842,12 +1845,30 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 -- point the typechecker will have touched every constructor reference appearing
 -- in the code.
 
+-- Forcing the LambdaForms:
+
+-- If we don't force the
+-- We also force the LambaForms to WHNF.Otherwise they end up keeping
+-- the ILFInfos alive.
+
+tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
+tcCodeGenInfos = mapSndM tcLFInfo
+
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
-tcLFInfo (ILFReEntrant oneshot rep fvs) =
-    pure $ LFReEntrant TopLevel oneshot rep fvs (ArgSpec 0) --(panic "Not used for references")
-tcLFInfo (ILFThunk hasfv updateable sfi m_function) =
-    pure $ LFThunk TopLevel hasfv updateable sfi m_function
-tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
-tcLFInfo (ILFCon conName) =
-    LFCon <$> forkM (text "Loading LFCon constructor")
-                    (tcIfaceDataCon conName)
+tcLFInfo (ILFReEntrant fields) = undefined -- do
+--     let (oneshot, rep, fvs_flag) = fromBits
+--     pure $! LFReEntrant TopLevel oneshot rep fvs_flag (ArgSpec 0) --(panic "Not used for references")
+--   where
+--     oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
+--     fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+--     rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
+-- tcLFInfo (ILFThunk fields sfi) =
+--     pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
+--   where
+--     fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
+--     upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+--     fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
+-- tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
+-- tcLFInfo (ILFCon conName) =
+--     LFCon <$> forkM (text "Loading LFCon constructor")
+--                     (tcIfaceDataCon conName)
