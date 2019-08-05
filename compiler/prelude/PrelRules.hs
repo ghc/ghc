@@ -433,10 +433,10 @@ shiftRightLogical :: DynFlags -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
 -- Do this by converting to Word and back.  Obviously this won't work for big
 -- values, but its ok as we use it here
-shiftRightLogical dflags x n
-  | wordSizeInBits dflags == 32 = fromIntegral (fromInteger x `shiftR` n :: Word32)
-  | wordSizeInBits dflags == 64 = fromIntegral (fromInteger x `shiftR` n :: Word64)
-  | otherwise = panic "shiftRightLogical: unsupported word size"
+shiftRightLogical dflags x n =
+    case platformWordSize (targetPlatform dflags) of
+      PW4 -> fromIntegral (fromInteger x `shiftR` n :: Word32)
+      PW8 -> fromIntegral (fromInteger x `shiftR` n :: Word64)
 
 --------------------------
 retLit :: (DynFlags -> Literal) -> RuleM CoreExpr
@@ -489,7 +489,7 @@ shiftRule shift_op
            _ -> mzero }
 
 wordSizeInBits :: DynFlags -> Integer
-wordSizeInBits dflags = toInteger (platformWordSize (targetPlatform dflags) `shiftL` 3)
+wordSizeInBits dflags = toInteger (platformWordSizeInBits (targetPlatform dflags))
 
 --------------------------
 floatOp2 :: (Rational -> Rational -> Rational)
@@ -802,11 +802,12 @@ liftLitDynFlags f = do
 removeOp32 :: RuleM CoreExpr
 removeOp32 = do
   dflags <- getDynFlags
-  if wordSizeInBits dflags == 32
-  then do
-    [e] <- getArgs
-    return e
-  else mzero
+  case platformWordSize (targetPlatform dflags) of
+    PW4 -> do
+      [e] <- getArgs
+      return e
+    PW8 ->
+      mzero
 
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ args -> Just args
