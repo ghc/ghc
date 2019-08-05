@@ -116,7 +116,7 @@ compileUnitHeader unitU = sdocWithPlatform $ \plat ->
           , pprHalf 3                          -- DWARF version
           , sectionOffset (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
                                                -- abbrevs offset
-          , text "\t.byte " <> ppr (platformWordSize plat) -- word size
+          , text "\t.byte " <> ppr (platformWordSizeInBits plat) -- word size
           ]
 
 -- | Compilation unit footer, mainly establishing size of debug sections
