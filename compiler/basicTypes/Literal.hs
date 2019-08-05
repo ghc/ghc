@@ -309,13 +309,11 @@ Int/Word range.
 wrapLitNumber :: DynFlags -> Literal -> Literal
 wrapLitNumber dflags v@(LitNumber nt i t) = case nt of
   LitNumInt -> case platformWordSize (targetPlatform dflags) of
-    4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
-    8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
-    w -> panic ("wrapLitNumber: Unknown platformWordSize: " ++ show w)
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
   LitNumWord -> case platformWordSize (targetPlatform dflags) of
-    4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
-    8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
-    w -> panic ("wrapLitNumber: Unknown platformWordSize: " ++ show w)
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
   LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
   LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
   LitNumInteger -> v
