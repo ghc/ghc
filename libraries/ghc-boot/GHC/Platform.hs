@@ -1,9 +1,10 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, ScopedTypeVariables #-}
 
 -- | A description of the platform we're compiling for.
 --
 module GHC.Platform (
         Platform(..),
+        PlatformWordSize(..),
         Arch(..),
         OS(..),
         ArmISA(..),
@@ -17,6 +18,8 @@ module GHC.Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
+        platformWordSizeInBytes,
+        platformWordSizeInBits,
 
         PlatformMisc(..),
         IntegerLibrary(..),
@@ -28,6 +31,7 @@ module GHC.Platform (
 where
 
 import Prelude -- See Note [Why do we import Prelude here?]
+import GHC.Read
 
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
@@ -37,7 +41,7 @@ data Platform
               platformOS                       :: OS,
               -- Word size in bytes (i.e. normally 4 or 8,
               -- for 32bit and 64bit platforms respectively)
-              platformWordSize                 :: {-# UNPACK #-} !Int,
+              platformWordSize                 :: PlatformWordSize,
               platformUnregisterised           :: Bool,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
@@ -46,6 +50,31 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
+data PlatformWordSize
+  = PW4 -- ^ A 32-bit platform
+  | PW8 -- ^ A 64-bit platform
+  deriving (Eq)
+
+instance Show PlatformWordSize where
+  show PW4 = "4"
+  show PW8 = "8"
+
+instance Read PlatformWordSize where
+  readPrec = do
+    i :: Int <- readPrec
+    case i of
+      4 -> return PW4
+      8 -> return PW8
+      other -> fail ("Invalid PlatformWordSize: " ++ show other)
+
+platformWordSizeInBytes :: Platform -> Int
+platformWordSizeInBytes p =
+    case platformWordSize p of
+      PW4 -> 4
+      PW8 -> 8
+
+platformWordSizeInBits :: Platform -> Int
+platformWordSizeInBits p = platformWordSizeInBytes p * 8
 
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information
@@ -185,7 +214,10 @@ data PPC_64ABI
 
 -- | This predicate tells us whether the platform is 32-bit.
 target32Bit :: Platform -> Bool
-target32Bit p = platformWordSize p == 4
+target32Bit p =
+    case platformWordSize p of
+      PW4 -> True
+      PW8 -> False
 
 -- | This predicate tells us whether the OS supports ELF-like shared libraries.
 osElfTarget :: OS -> Bool

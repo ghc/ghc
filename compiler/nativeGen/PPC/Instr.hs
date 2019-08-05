@@ -98,7 +98,7 @@ ppc_mkStackAllocInstr' platform amount
     , STU fmt r0 (AddrRegReg sp tmp)
     ]
   where
-    fmt = intFormat $ widthFromBytes (platformWordSize platform)
+    fmt = intFormat $ widthFromBytes (platformWordSizeInBytes platform)
     zero = ImmInt 0
     tmp = tmpReg platform
     immAmount = ImmInt amount

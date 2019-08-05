@@ -13,7 +13,7 @@ module SMRep (
 
         StgWord, fromStgWord, toStgWord,
         StgHalfWord, fromStgHalfWord, toStgHalfWord,
-        hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
+        halfWordSize, halfWordSizeInBits,
 
         -- * Closure repesentation
         SMRep(..), -- CmmInfo sees the rep; no one else does
@@ -107,9 +107,8 @@ toStgWord dflags i
     = case platformWordSize (targetPlatform dflags) of
       -- These conversions mean that things like toStgWord (-1)
       -- do the right thing
-      4 -> StgWord (fromIntegral (fromInteger i :: Word32))
-      8 -> StgWord (fromInteger i :: Word64)
-      w -> panic ("toStgWord: Unknown platformWordSize: " ++ show w)
+      PW4 -> StgWord (fromIntegral (fromInteger i :: Word32))
+      PW8 -> StgWord (fromInteger i)
 
 instance Outputable StgWord where
     ppr (StgWord i) = integer (toInteger i)
@@ -129,17 +128,18 @@ toStgHalfWord dflags i
     = case platformWordSize (targetPlatform dflags) of
       -- These conversions mean that things like toStgHalfWord (-1)
       -- do the right thing
-      4 -> StgHalfWord (fromIntegral (fromInteger i :: Word16))
-      8 -> StgHalfWord (fromInteger i :: Word32)
-      w -> panic ("toStgHalfWord: Unknown platformWordSize: " ++ show w)
+      PW4 -> StgHalfWord (fromIntegral (fromInteger i :: Word16))
+      PW8 -> StgHalfWord (fromInteger i :: Word32)
 
 instance Outputable StgHalfWord where
     ppr (StgHalfWord w) = integer (toInteger w)
 
-hALF_WORD_SIZE :: DynFlags -> ByteOff
-hALF_WORD_SIZE dflags = platformWordSize (targetPlatform dflags) `shiftR` 1
-hALF_WORD_SIZE_IN_BITS :: DynFlags -> Int
-hALF_WORD_SIZE_IN_BITS dflags = platformWordSize (targetPlatform dflags) `shiftL` 2
+-- | Half word size in bytes
+halfWordSize :: DynFlags -> ByteOff
+halfWordSize dflags = platformWordSizeInBytes (targetPlatform dflags) `div` 2
+
+halfWordSizeInBits :: DynFlags -> Int
+halfWordSizeInBits dflags = platformWordSizeInBits (targetPlatform dflags) `div` 2
 
 {-
 ************************************************************************
