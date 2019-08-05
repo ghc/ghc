@@ -142,11 +142,13 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
         switch (ret) {
         case SEGMENT_FREE:
             IF_DEBUG(sanity, clear_segment(seg));
+            seg->filled_epoch = 0;
             nonmovingPushFreeSegment(seg);
             n_free++;
             break;
         case SEGMENT_PARTIAL:
             IF_DEBUG(sanity, clear_segment_free_blocks(seg));
+            seg->filled_epoch = 0;
             nonmovingPushActiveSegment(seg);
             n_partial++;
             break;
@@ -155,6 +157,7 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
             nonmovingClearBitmap(seg);
             // Set snapshot
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+            seg->filled_epoch = nonmovingMarkEpoch;
             seg->link = new_sweep_list;
             new_sweep_list = seg;
             n_filled++;

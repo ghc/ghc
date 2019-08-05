@@ -38,6 +38,7 @@ struct NonmovingSegment {
     struct NonmovingSegment *link;     // for linking together segments into lists
     struct NonmovingSegment *todo_link; // NULL when not in todo list
     nonmoving_block_idx next_free;      // index of the next unallocated block
+    uint8_t filled_epoch;
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
     // ensure that the size of this struct (including the bitmap) is a multiple
@@ -109,6 +110,8 @@ extern memcount nonmoving_live_words;
 extern bool concurrent_coll_running;
 #endif
 
+extern uint8_t nonmovingMarkEpoch;
+
 void nonmovingInit(void);
 void nonmovingStop(void);
 void nonmovingExit(void);
@@ -166,6 +169,7 @@ INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
 
     ACQUIRE_LOCK(&alloc->mutex);
+    seg->filled_epoch = nonmovingMarkEpoch;
     seg->link = alloc->new_filled;
     alloc->new_filled = seg;
     RELEASE_LOCK(&alloc->mutex);
@@ -252,9 +256,6 @@ INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
     return (nonmoving_block_idx) (offset >> nonmovingSegmentLogBlockSize(seg));
 }
-
-// TODO: Eliminate this
-extern uint8_t nonmovingMarkEpoch;
 
 INLINE_HEADER void nonmovingSetMark(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
