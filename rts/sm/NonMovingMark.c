@@ -1768,6 +1768,21 @@ bool nonmovingIsAlive (StgClosure *p)
             //   all objects alive in the snapshot would be marked.
             //
             return mark == nonmovingMarkEpoch || mark == 0;
+        } else if (seg->next_free == nonmovingSegmentBlockCount(seg)) {
+            // If the segment is filled then we check whether it was filled
+            // during the current GC cycle.
+            //
+            //  * If so, then we must consider the object to be alive since we
+            //    cleared the bitmap when the segment was filled but haven't
+            //    yet marked it.
+            //  * If it was filled in the previous cycle then the object's
+            //    liveness is reflected by its bitmap bit.
+            // 
+            if (seg->filled_epoch == nonmovingMarkEpoch) {
+                return true;
+            } else {
+                return mark == nonmovingMarkEpoch;
+            }
         } else {
             // If the object is below next_free_snap then the snapshot
             // invariant guarantees that it is marked if reachable.
