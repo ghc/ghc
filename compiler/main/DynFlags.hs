@@ -5596,19 +5596,16 @@ mAX_PTR_TAG = tAG_MASK
 tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
 tARGET_MIN_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (minBound :: Int32)
-      8 -> toInteger (minBound :: Int64)
-      w -> panic ("tARGET_MIN_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (minBound :: Int32)
+      PW8 -> toInteger (minBound :: Int64)
 tARGET_MAX_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Int32)
-      8 -> toInteger (maxBound :: Int64)
-      w -> panic ("tARGET_MAX_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Int32)
+      PW8 -> toInteger (maxBound :: Int64)
 tARGET_MAX_WORD dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Word32)
-      8 -> toInteger (maxBound :: Word64)
-      w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Word32)
+      PW8 -> toInteger (maxBound :: Word64)
 
 
 {- -----------------------------------------------------------------------------
