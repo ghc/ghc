@@ -277,6 +277,15 @@ getClosureX get_closure_raw x = do
 
         --  pure $ OtherClosure itbl pts wds
         --
+        WEAK ->
+            pure $ WeakClosure
+                { info = itbl
+                , cfinalizers = pts !! 0
+                , key = pts !! 1
+                , value = pts !! 2
+                , finalizer = pts !! 3
+                , link = pts !! 4
+                }
         TSO -> do
             unless (length pts >= 1) $
                 fail $ "Expected at least 1 ptr argument to TSO, found "
