@@ -1907,6 +1907,47 @@ kcLHsQTyVars_NonCusk name flav
 
 kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
+-- Take a type and skolemise any quantified variables at the front.
+-- Does *not* deeply skolemise or bring anything into scope.
+-- The fresh skolems are substed into the type passed to the continuation
+-- Emits an implication constraint with a correct SkolemInfo, wrapping
+-- any constrainted emitted by the continuation.
+-- Is a no-op for types without any outermost quantification.
+-- Very much like TcUnify.tcSkolemise, but for types instead of terms.
+tcSkolemiseType :: UserTypeCtxt -> TcSigmaType
+                -> (TcType -> TcM r)
+                -> TcM r
+tcSkolemiseType ctxt expected_ty thing_inside
+  | null tvs
+  = thing_inside expected_ty
+
+  | otherwise
+  = do {
+         -- using tcInstSkolTyVars means that we have to inefficiently apply
+         -- the subst to the rest of the type instead of building up a
+         -- TCvSubst. This is quadratic in the number of user- written
+         -- foralls. I (Richard E) think this is an acceptable cost for code
+         -- simplicity.
+         (subst, skols) <- tcInstSkolTyVars tvs
+
+       ; traceTc "tcSkolemiseType" (vcat [ text "expected_ty:" <+> ppr expected_ty
+                                         , text "skols:" <+> ppr skols ])
+
+       ; let tv_prs = [ (getName tv, skol)
+                      | (tv, skol) <- zipEqual "tcSkolemiseType" tvs skols ]
+             skol_info = SigSkol ctxt expected_ty tv_prs
+
+             inner_ty' = substTy subst inner_ty
+
+       ; (tclvl, wanted, result)
+           <- pushLevelAndCaptureConstraints (thing_inside inner_ty')
+       ; emitResidualTvConstraint skol_info Nothing skols tclvl wanted
+
+       ; return result }
+  where
+    -- really, we want all *invisible* arguments, but
+    -- that's covered by tcSplitForAllTys for now
+    (tvs, inner_ty) = tcSplitForAllTys expected_ty
 
 {- Note [No polymorphic recursion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

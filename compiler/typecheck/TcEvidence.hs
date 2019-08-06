@@ -432,11 +432,10 @@ instance Data.Data TcEvBinds where
 Class constraints etc give rise to /term/ bindings for evidence, and
 we have nowhere to put term bindings in /types/.  So in some places we
 use CoEvBindsVar (see newCoTcEvBinds) to signal that no term-level
-evidence bindings are allowed.  Notebly ():
+evidence bindings are allowed.  Notably:
 
   - Places in types where we are solving kind constraints (all of which
-    are equalities); see solveEqualities, solveLocalEqualities,
-    checkTvConstraints
+    are equalities); see solveEqualities and solveLocalEqualities
 
   - When unifying forall-types
 -}
