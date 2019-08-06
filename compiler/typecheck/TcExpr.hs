@@ -375,9 +375,11 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
-           -- have a quick look at the result type
-       ; op_res_ty' <- tcPerformQuickLookApp orig1 (op_res_ty, res_ty) [] []
-       ; arg2_sigma' <- zonkTcType arg2_sigma
+           -- have a quick look
+       ; (op_res_ty', [arg2_sigma'])
+            <- tcPerformQuickLook tcQuickLookExprs
+                                  orig1 (op_res_ty, res_ty)
+                                  [arg2] [arg2_sigma]
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
@@ -436,9 +438,13 @@ tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkVisFunTy arg1_ty op_res_ty) res_ty
-       ; arg2' <- tcArg op arg2 arg2_ty 2
+       ; let fun_ty = mkVisFunTy arg1_ty op_res_ty
+       ; (fun_ty', [arg2_ty'])
+            <- tcPerformQuickLook tcQuickLookExprs fn_orig
+                                  (fun_ty, res_ty)
+                                  [arg2] [arg2_ty]
+       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr) fun_ty' res_ty
+       ; arg2' <- tcArg op arg2 arg2_ty' 2
        ; return ( mkHsWrap wrap_res $
                   SectionR x (mkLHsWrap wrap_fun op') arg2' ) }
   where
@@ -456,9 +462,13 @@ tcExpr expr@(SectionL x arg1 op) res_ty
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
            <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
                                 n_reqd_args op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkVisFunTys arg_tys op_res_ty) res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
+       ; let fun_ty = mkVisFunTys arg_tys op_res_ty
+       ; (fun_ty', [arg1_ty'])
+            <- tcPerformQuickLook tcQuickLookExprs fn_orig
+                                  (fun_ty, res_ty)
+                                  [arg1] [arg1_ty]
+       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr) fun_ty' res_ty
+       ; arg1' <- tcArg op arg1 arg1_ty' 1
        ; return ( mkHsWrap wrap_res $
                   SectionL x arg1' (mkLHsWrap wrap_fn op') ) }
   where
@@ -480,7 +490,14 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                            -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
-       ; tup_args1 <- tcTupArgs tup_args arg_tys'
+           -- quick look on arguments
+       ; let orig = Shouldn'tHappenOrigin "ExpTuple"
+       ; (_, arg_tys1)
+           <- tcPerformQuickLook tcQuickLookTupArgs orig
+                                 (res_ty, Check res_ty)
+                                 tup_args arg_tys'
+           -- type check arguments
+       ; tup_args1 <- tcTupArgs tup_args arg_tys1
        ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) }
 
   | otherwise
@@ -492,15 +509,21 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
        ; let actual_res_ty
                  = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
-                            (mkTupleTy1 boxity arg_tys)
+                               (mkTupleTy1 boxity arg_tys)
                    -- See Note [Don't flatten tuples from HsSyn] in MkCore
 
-       ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
-                             (Just expr)
-                             actual_res_ty res_ty
+          -- quick look on arguments
+       ; let orig = Shouldn'tHappenOrigin "ExpTuple"
+       ; (actual_res_ty', arg_tys')
+            <- tcPerformQuickLook tcQuickLookTupArgs orig
+                                  (actual_res_ty, res_ty)
+                                  tup_args arg_tys
+
+       ; wrap <- tcSubTypeHR orig (Just expr)
+                             actual_res_ty' res_ty
 
        -- Handle tuple sections where
-       ; tup_args1 <- tcTupArgs tup_args arg_tys
+       ; tup_args1 <- tcTupArgs tup_args arg_tys'
 
        ; return $ mkHsWrap wrap (ExplicitTuple x tup_args1 boxity) }
 
@@ -519,17 +542,27 @@ tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { res_ty <- expTypeToType res_ty
                        ; (coi, elt_ty) <- matchExpectedListTy res_ty
-                       ; exprs' <- mapM (tc_elt elt_ty) exprs
+                       ; (elt_ty', _)
+                            <- tcPerformQuickLook tcQuickLookExprs
+                                                  (Shouldn'tHappenOrigin "ExpList")
+                                                  (elt_ty, Check elt_ty)
+                                                  exprs (replicate (length exprs) elt_ty)
+                       ; exprs' <- mapM (tc_elt elt_ty') exprs
                        ; return $
-                         mkHsWrapCo coi $ ExplicitList elt_ty Nothing exprs' }
+                         mkHsWrapCo coi $ ExplicitList elt_ty' Nothing exprs' }
 
       Just fln -> do { ((exprs', elt_ty), fln')
                          <- tcSyntaxOp ListOrigin fln
                                        [synKnownType intTy, SynList] res_ty $
                             \ [elt_ty] ->
-                            do { exprs' <-
-                                    mapM (tc_elt elt_ty) exprs
-                               ; return (exprs', elt_ty) }
+                            do { (elt_ty', _)
+                                    <- tcPerformQuickLook tcQuickLookExprs
+                                                  (Shouldn'tHappenOrigin "ExpList")
+                                                  (elt_ty, Check elt_ty)
+                                                  exprs (replicate (length exprs) elt_ty)
+                               ; exprs' <-
+                                    mapM (tc_elt elt_ty') exprs
+                               ; return (exprs', elt_ty') }
 
                      ; return $ ExplicitList elt_ty (Just fln') exprs' }
      where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
@@ -1282,12 +1315,12 @@ tcArgs fun orig_fun_ty fun_orig orig_args exp_res_ty herald
            IFR_BadVTA ty arg
              -> ty_app_err ty arg
            IFR_OK arg_tys act_res_ty wrapper
-             -> do { act_res_ty' <- tcPerformQuickLookApp fun_orig
-                                                          (act_res_ty, exp_res_ty)
-                                                          orig_args arg_tys
-                   ; out_args <- tc_args 1 orig_args arg_tys
-                   ; return (wrapper, out_args, act_res_ty')
-                   }
+             -> do { (act_res_ty', arg_tys')
+                        <- tcPerformQuickLook tcQuickLookArgs fun_orig
+                                              (act_res_ty, exp_res_ty)
+                                              orig_args arg_tys
+                   ; out_args <- tc_args 1 orig_args arg_tys'
+                   ; return (wrapper, out_args, act_res_ty') }
        }
   where    
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
@@ -1408,33 +1441,35 @@ tcInstantiateFun defer_arrow fun fun_ty fun_orig orig_args herald
         doc = text "When checking the" <+> speakNth n <+>
               text "argument to" <+> quotes (ppr fun)
 
-tcPerformQuickLookApp :: CtOrigin
-                      -> (TcRhoType, ExpRhoType)  -- ^ Result types
-                      -> [LHsExprArgIn]           -- ^ arguments
-                      -> [TcSigmaType]            -- ^ and their types
-                      -> TcM TcRhoType
-tcPerformQuickLookApp orig (act_res_ty, exp_res_ty) args arg_tys
+tcPerformQuickLook :: ([a] -> [TcSigmaType] -> TcM TCvSubst) -- ^ what to do on arguments
+                   -> CtOrigin
+                   -> (TcRhoType, ExpRhoType)  -- ^ result types
+                   -> [a]                      -- ^ arguments
+                   -> [TcSigmaType]            -- ^ and their types
+                   -> TcM (TcRhoType, [TcSigmaType])
+tcPerformQuickLook ql_args orig (act_res_ty, exp_res_ty) args arg_tys
   = do { dflags <- getDynFlags
          -- only perform quick look if ImpredicativeTypes is on
        ; if xopt LangExt.ImpredicativeTypes dflags
             then do { (ql_subst, ql_vars)
                         <- discardConstraints $
-                             tcQuickLookApp (act_res_ty, exp_res_ty) args arg_tys
+                             tcQuickLookApp ql_args (act_res_ty, exp_res_ty) args arg_tys
                     ; forM_ ql_vars $ \v ->
                         uQuickLookTryFillPoly orig v
                           (substTyAddInScope ql_subst (mkTyVarTy v))
-                    ; traceTc "tcPerformQuickLookApp" (ppr ql_subst)
-                    ; zonkTcType act_res_ty }
-            else return act_res_ty }
+                    ; traceTc "tcPerformQuickLook" (ppr ql_subst)
+                    ; (,) <$> zonkTcType act_res_ty <*> mapM zonkTcType arg_tys }
+            else return (act_res_ty, arg_tys) }
 
-tcQuickLookApp :: (TcRhoType, ExpRhoType)        -- ^ Result types
-               -> [LHsExprArgIn]                 -- ^ arguments
+tcQuickLookApp :: ([a] -> [TcSigmaType] -> TcM TCvSubst)
+               -> (TcRhoType, ExpRhoType)        -- ^ result types
+               -> [a]                            -- ^ arguments
                -> [TcSigmaType]                  -- ^ and their types
                -> TcM (TCvSubst, [TcTyVar])
-tcQuickLookApp (act_res_ty, exp_res_ty) args arg_tys
+tcQuickLookApp ql_args (act_res_ty, exp_res_ty) args arg_tys
   = do { -- first look into the arguments
          arg_tys' <- mapM zonkTcType arg_tys
-       ; args_subst <- tcQuickLookArgs args arg_tys'
+       ; args_subst <- ql_args args arg_tys'
          -- now into the result types
        ; case exp_res_ty of
            Infer _
@@ -1449,14 +1484,13 @@ tcQuickLookApp (act_res_ty, exp_res_ty) args arg_tys
                    ; return ( composeTCvSubst res_subst args_subst
                             , tyCoVarsOfTypesList (act_res_ty':exp_res_ty':arg_tys') ) } } 
 
-tcQuickLookArgs :: [LHsExprArgIn]                 -- ^ arguments
-                -> [TcSigmaType]                  -- ^ and their types
+tcQuickLookArgs :: [LHsExprArgIn]
+                -> [TcSigmaType]
                 -> TcM TCvSubst
 tcQuickLookArgs args arg_tys
   = do { let in_scope = mkInScopeSet (tyCoVarsOfTypes arg_tys)
        ; go_args (mkEmptyTCvSubst in_scope) args arg_tys }
-  where 
-    -- quick look around the arguments
+  where
     go_args current_subst [] []
       = return current_subst
     go_args current_subst (HsArgPar _ : rest) tys
@@ -1468,6 +1502,40 @@ tcQuickLookArgs args arg_tys
            ; new_subst <- tcQuickLook e [] ty'
            ; go_args (composeTCvSubst new_subst current_subst) rest tys }
     go_args _ es tys = pprPanic "tcQuickLookArgs" (vcat [ppr es, ppr tys])
+
+tcQuickLookTupArgs :: [LHsTupArg GhcRn]
+                   -> [TcSigmaType]
+                   -> TcM TCvSubst
+tcQuickLookTupArgs args arg_tys
+  = do { let in_scope = mkInScopeSet (tyCoVarsOfTypes arg_tys)
+       ; go_args (mkEmptyTCvSubst in_scope) args arg_tys }
+  where
+    go_args current_subst [] []
+      = return current_subst
+    go_args current_subst (L _ (Missing {}) : rest) (_ : tys)
+      = go_args current_subst rest tys
+    go_args current_subst (L _ (XTupArg _) : rest) (_ : tys)
+      = go_args current_subst rest tys
+    go_args current_subst (L _ (Present _ e) : rest) (ty : tys)
+      = do { let ty' = substTyAddInScope current_subst ty
+           ; new_subst <- tcQuickLook e [] ty'
+           ; go_args (composeTCvSubst new_subst current_subst) rest tys }
+    go_args _ _ tys = pprPanic "tcQuickLookTupArgs" (vcat [ppr tys])
+
+tcQuickLookExprs :: [LHsExpr GhcRn]
+                 -> [TcSigmaType]
+                 -> TcM TCvSubst
+tcQuickLookExprs args arg_tys
+  = do { let in_scope = mkInScopeSet (tyCoVarsOfTypes arg_tys)
+       ; go_args (mkEmptyTCvSubst in_scope) args arg_tys }
+  where
+    go_args current_subst [] []
+      = return current_subst
+    go_args current_subst (e : rest) (ty : tys)
+      = do { let ty' = substTyAddInScope current_subst ty
+           ; new_subst <- tcQuickLook e [] ty'
+           ; go_args (composeTCvSubst new_subst current_subst) rest tys }
+    go_args _ es tys = pprPanic "tcQuickLookExprs" (vcat [ppr es, ppr tys])
 
 tcQuickLook :: LHsExpr GhcRn   -- head of the application
             -> [LHsExprArgIn]  -- given arguments
