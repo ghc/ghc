@@ -167,8 +167,9 @@ type Assignments = [Assignment]
   --     x = e1
 
 cmmSink :: DynFlags -> CmmGraph -> CmmGraph
-cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
+cmmSink dflags graph' = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
   where
+  graph = preConstantFoldGraph graph'
   liveness = cmmLocalLiveness dflags graph
   getLive l = mapFindWithDefault Set.empty l liveness
 

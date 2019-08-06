@@ -2,6 +2,8 @@
 -- in this module.
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 
+{-# LANGUAGE GADTs #-}
+
 -----------------------------------------------------------------------------
 --
 -- Cmm optimisation
@@ -14,7 +16,8 @@ module CmmOpt (
         constantFoldNode,
         constantFoldExpr,
         cmmMachOpFold,
-        cmmMachOpFoldM
+        cmmMachOpFoldM,
+        preConstantFoldGraph
  ) where
 
 import GhcPrelude
@@ -30,6 +33,30 @@ import GHC.Platform
 import Data.Bits
 import Data.Maybe
 
+import Hoopl.Block
+import Hoopl.Graph
+
+-- | We perform constant folding on some nodes and they become two different
+-- nodes. Hence we need to do this at the CmmGraph level and not into
+-- constantFoldNode.
+preConstantFoldGraph :: CmmGraph -> CmmGraph
+preConstantFoldGraph = modifyGraph (mapGraphBlocksCC mBlock)
+   where
+      mBlock = uncurry3 blockJoin . (\(h,ns,t) -> (h,mNode ns,t)) . blockSplit
+      mNode = blockFromList . concatMap f . blockToList
+
+      f node = case node of
+         CmmUnsafeForeignCall (PrimTarget (MO_U_QuotRem width)) [q,r] [x,l@(CmmLit (CmmInt n _))]
+            | Just _ <- exactLog2 n ->
+               [ CmmAssign (CmmLocal q) (CmmMachOp (MO_U_Quot width) [x, l])
+               , CmmAssign (CmmLocal r) (CmmMachOp (MO_U_Rem  width) [x, l])
+               ]
+         CmmUnsafeForeignCall (PrimTarget (MO_S_QuotRem width)) [q,r] [x,l@(CmmLit (CmmInt n _))]
+            | Just _ <- exactLog2 n ->
+               [ CmmAssign (CmmLocal q) (CmmMachOp (MO_S_Quot width) [x, l])
+               , CmmAssign (CmmLocal r) (CmmMachOp (MO_S_Rem  width) [x, l])
+               ]
+         _ -> [node]
 
 constantFoldNode :: DynFlags -> CmmNode e x -> CmmNode e x
 constantFoldNode dflags = mapExp (constantFoldExpr dflags)
