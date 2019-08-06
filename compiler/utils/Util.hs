@@ -1123,22 +1123,16 @@ toArgs str
 -----------------------------------------------------------------------------
 -- Integers
 
--- This algorithm for determining the $\log_2$ of exact powers of 2 comes
--- from GCC.  It requires bit manipulation primitives, and we use GHC
--- extensions.  Tough.
-
+-- | Determine the $\log_2$ of exact powers of 2
 exactLog2 :: Integer -> Maybe Integer
 exactLog2 x
-  = if (x <= 0 || x >= 2147483648) then
-       Nothing
-    else
-       if (x .&. (-x)) /= x then
-          Nothing
-       else
-          Just (pow2 x)
-  where
-    pow2 x | x == 1 = 0
-           | otherwise = 1 + pow2 (x `shiftR` 1)
+   | x <= 0                               = Nothing
+   | x > fromIntegral (maxBound :: Int32) = Nothing
+   | x' .&. (-x') /= x'                   = Nothing
+   | otherwise                            = Just (fromIntegral c)
+      where
+         x' = fromIntegral x :: Int32
+         c = countTrailingZeros x'
 
 {-
 -- -----------------------------------------------------------------------------
