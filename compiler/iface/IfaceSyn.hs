@@ -2432,6 +2432,7 @@ instance Binary IfaceCompleteMatch where
 
 instance Binary IfLFInfo where
     -- TODO: We could pack the bytes somewhat
+
     put_ bh (ILFReEntrant fields) =
         putByte bh 0 >>
         put_ bh (fields :: (Word8, RepArity, Bool))

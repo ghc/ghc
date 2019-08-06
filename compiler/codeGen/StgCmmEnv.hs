@@ -144,7 +144,7 @@ getCgIdInfo id
                   let ext_lbl = mkClosureLabel name $ idCafInfo id
                   ; lf_cached <- lookupImportedLF name
                   ; let lf_computed = mkLFImported id
-                  -- ; pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
+                  ; if (not $ isJust lf_cached) then return () else pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
                   ; let lf_info = fromMaybe lf_computed lf_cached
                   ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
                 }

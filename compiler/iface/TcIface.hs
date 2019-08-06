@@ -1858,15 +1858,17 @@ tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
 tcCodeGenInfos = mapSndM tcLFInfo
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
-tcLFInfo _ = return $ LFUnknown True
+-- tcLFInfo _ = return $ LFUnknown True
 tcLFInfo (ILFReEntrant (oneshot,rep,fvs_flag)) = do
+    return $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgSpec 0)
+
     -- let (oneshot,SizedInt rep,fvs_flag) = fromBits fields :: (OneShotInfo, SizedInt 14, Bool)
 
-    pure $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgSpec 0) --(panic "Not used for references")
+    -- pure $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgSpec 0) --(panic "Not used for references")
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
+    return $ LFUnknown True
     -- let (fvs_flag, upd_flag, fun_flag) = fromBits fields :: (Bool,Bool,Bool)
     pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
-  where
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     LFCon <$> forkM (text "Loading LFCon constructor")

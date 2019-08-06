@@ -679,7 +679,7 @@ toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
      ILFReEntrant (fromIntegral $ fromEnum oneshot,rep,fvs_flag)
 
 toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
-    -- ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
+    ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
     ILFThunk (hasfv, updateable, m_function) sfi
 
 toIfLFInfo (LFUnlifted) = ILFUnlifted
