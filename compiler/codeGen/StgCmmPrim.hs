@@ -872,11 +872,32 @@ emitPrimOp dflags r@[res] op args
      emit stmt
 
 emitPrimOp dflags results op args
-   = case callishPrimOpSupported dflags op of
+   = case optPrimOp dflags results op args of
+       Just gen -> gen results args
+       Nothing  -> case callishPrimOpSupported dflags op of
           Left op   -> emit $ mkUnsafeCall (PrimTarget op) results args
           Right gen -> gen results args
 
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
+
+-- | Prim-ops that we can optimize or prepare for optimization
+optPrimOp :: DynFlags -> [LocalReg] -> PrimOp -> [CmmExpr] -> Maybe GenericOp
+optPrimOp dflags _results op args
+  = case args of
+      [_,CmmLit (CmmInt n _)] | Just _ <- exactLog2 n -> case op of
+        -- (q,r) = x `quotRem` CONST ==> q = quot x CONST; r = rem x CONST
+        -- Where CONST = 2^N until #9041 is fixed.
+        -- We do this because quot and rem with constant divisor are implemented
+        -- with fast bit-ops (shift,.&.)
+        IntQuotRemOp    -> Just $ genericIntQuotRemOp (wordWidth dflags)
+        Int8QuotRemOp   -> Just $ genericIntQuotRemOp W8
+        Int16QuotRemOp  -> Just $ genericIntQuotRemOp W16
+        WordQuotRemOp   -> Just $ genericWordQuotRemOp (wordWidth dflags)
+        Word8QuotRemOp  -> Just $ genericWordQuotRemOp W8
+        Word16QuotRemOp -> Just $ genericWordQuotRemOp W16
+        WordQuotRem2Op  -> Just $ genericWordQuotRem2Op dflags
+        _               -> Nothing
+      _ -> Nothing
 
 callishPrimOpSupported :: DynFlags -> PrimOp -> Either CallishMachOp GenericOp
 callishPrimOpSupported dflags op
