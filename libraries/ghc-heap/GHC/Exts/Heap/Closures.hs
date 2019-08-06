@@ -262,6 +262,8 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
+  -- TODO: There are many more fields in a TSO closure which
+  -- are not yet implemented
   | TSOClosure
       { info :: !StgInfoTable
       , tsoStack :: !b
