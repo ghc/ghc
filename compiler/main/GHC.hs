@@ -80,6 +80,7 @@ module GHC (
         modInfoIsExportedName,
         modInfoLookupName,
         modInfoIface,
+        modInfoRdrEnv,
         modInfoSafe,
         lookupGlobalName,
         findGlobalAnns,
@@ -1220,6 +1221,9 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
+
+modInfoRdrEnv :: ModuleInfo -> Maybe GlobalRdrEnv
+modInfoRdrEnv = minf_rdr_env
 
 -- | Retrieve module safe haskell mode
 modInfoSafe :: ModuleInfo -> SafeHaskellMode
