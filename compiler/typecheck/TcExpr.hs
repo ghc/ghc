@@ -1388,7 +1388,8 @@ tcInstantiateFun defer_arrow fun fun_ty fun_orig orig_args herald
     
     go _acc_args _n fun_ty (HsValArg _ : _args)
       | IFA_DoNotDefer <- defer_arrow
-      , Nothing <- tcSplitFunTy_maybe fun_ty
+      , (_tvs, _theta, rho_ty) <- tcSplitSigmaTy fun_ty
+      , Nothing <- tcSplitFunTy_maybe rho_ty
       = return IFR_NotVisibleArrow
 
     go acc_args n fun_ty (HsValArg _ : args) 
