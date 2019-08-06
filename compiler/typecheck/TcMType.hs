@@ -66,7 +66,7 @@ module TcMType (
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
-  zonkTyCoVarsAndFVList,
+  zonkTyCoVarsAndFVList, zonkExpType,
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
   CandidatesQTvs(..), delCandidates, candidateKindVars, partitionCandidates,
@@ -1928,6 +1928,10 @@ zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mapM zonkTcType tys
+
+zonkExpType :: ExpType -> TcM ExpType
+zonkExpType (Infer v) = return (Infer v)
+zonkExpType (Check t) = Check <$> zonkTcType t
 
 {-
 ************************************************************************
