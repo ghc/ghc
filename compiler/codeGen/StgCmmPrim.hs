@@ -871,6 +871,26 @@ emitPrimOp dflags r@[res] op args
    = let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args) in
      emit stmt
 
+-- (q,r) = x `quotRem` CONST ==> q = quot x CONST; r = rem x CONST
+-- Where CONST = 2^N until #9041 is fixed.
+-- We do this because quot and rem with constant divisor are implemented
+-- with fast bit-ops (shift,.&.)
+emitPrimOp dflags results IntQuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericIntQuotRemOp (wordWidth dflags) results args
+emitPrimOp _dflags results Int8QuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericIntQuotRemOp W8 results args
+emitPrimOp _dflags results Int16QuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericIntQuotRemOp W16 results args
+emitPrimOp dflags results WordQuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericWordQuotRemOp (wordWidth dflags) results args
+emitPrimOp _dflags results Word8QuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericWordQuotRemOp W8 results args
+emitPrimOp _dflags results Word16QuotRemOp args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericWordQuotRemOp W16 results args
+emitPrimOp dflags results WordQuotRem2Op args@[_, CmmLit (CmmInt n _)]
+   | Just _ <- exactLog2 n = genericWordQuotRem2Op dflags results args
+
+
 emitPrimOp dflags results op args
    = case callishPrimOpSupported dflags op of
           Left op   -> emit $ mkUnsafeCall (PrimTarget op) results args
