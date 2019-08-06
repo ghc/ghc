@@ -14,7 +14,7 @@ module TcUnify (
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
   tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
   tcSubTypeDS_NC_O, tcSubTypeET,
-  checkConstraints, checkTvConstraints,
+  checkConstraints,
   buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
@@ -1084,6 +1084,7 @@ the thinking.
 -- | Take an "expected type" and strip off quantifiers to expose the
 -- type underneath, binding the new skolems for the @thing_inside@.
 -- The returned 'HsWrapper' has type @specific_ty -> expected_ty@.
+-- If you are processing a type instead of a term, see TcHsType.tcSkolemiseType
 tcSkolemise :: UserTypeCtxt -> TcSigmaType
             -> ([TcTyVar] -> TcType -> TcM result)
          -- ^ These are only ever used for scoped type variables.
@@ -1158,20 +1159,6 @@ checkConstraints skol_info skol_tvs given thing_inside
               -- So this fast path is well-exercised
               do { res <- thing_inside
                  ; return (emptyTcEvBinds, res) } }
-
-checkTvConstraints :: SkolemInfo
-                   -> Maybe SDoc  -- User-written telescope, if present
-                   -> TcM ([TcTyVar], result)
-                   -> TcM ([TcTyVar], result)
-
-checkTvConstraints skol_info m_telescope thing_inside
-  = do { (tclvl, wanted, (skol_tvs, result))
-             <- pushLevelAndCaptureConstraints thing_inside
-
-       ; emitResidualTvConstraint skol_info m_telescope
-                                  skol_tvs tclvl wanted
-
-       ; return (skol_tvs, result) }
 
 emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()

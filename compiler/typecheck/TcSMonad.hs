@@ -2854,8 +2854,7 @@ checkTvConstraintsTcS :: SkolemInfo
                       -> [TcTyVar]        -- Skolems
                       -> TcS (result, Cts)
                       -> TcS result
--- Just like TcUnify.checkTvConstraints, but
---   - In the TcS monnad
+-- Wraps the continuation in an implication binding the given skolems
 --   - The thing-inside should not put things in the work-list
 --     Instead, it returns the Wanted constraints it needs
 --   - No 'givens', and no TcEvBinds; this is type-level constraints only
