@@ -9,6 +9,7 @@ Type checking of type signatures in interface files
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 
 module TcIface (
         tcLookupImported_maybe,
@@ -84,7 +85,9 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
+import PackedFlags
 import Data.Bits
+import Data.Word
 import SMRep
 
 {-
@@ -1855,20 +1858,16 @@ tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
 tcCodeGenInfos = mapSndM tcLFInfo
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
-tcLFInfo (ILFReEntrant fields) = undefined -- do
---     let (oneshot, rep, fvs_flag) = fromBits
---     pure $! LFReEntrant TopLevel oneshot rep fvs_flag (ArgSpec 0) --(panic "Not used for references")
---   where
---     oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
---     fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
---     rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
--- tcLFInfo (ILFThunk fields sfi) =
---     pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
---   where
---     fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
---     upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
---     fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
--- tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
--- tcLFInfo (ILFCon conName) =
---     LFCon <$> forkM (text "Loading LFCon constructor")
---                     (tcIfaceDataCon conName)
+tcLFInfo _ = return $ LFUnknown True
+tcLFInfo (ILFReEntrant (oneshot,rep,fvs_flag)) = do
+    -- let (oneshot,SizedInt rep,fvs_flag) = fromBits fields :: (OneShotInfo, SizedInt 14, Bool)
+
+    pure $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgSpec 0) --(panic "Not used for references")
+tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
+    -- let (fvs_flag, upd_flag, fun_flag) = fromBits fields :: (Bool,Bool,Bool)
+    pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
+  where
+tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
+tcLFInfo (ILFCon conName) =
+    LFCon <$> forkM (text "Loading LFCon constructor")
+                    (tcIfaceDataCon conName)

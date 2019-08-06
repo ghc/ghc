@@ -804,6 +804,9 @@ instance Outputable Int where
 instance Outputable Integer where
     ppr n = integer n
 
+instance Outputable Word8 where
+    ppr n = integer $ fromIntegral n
+
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n
 

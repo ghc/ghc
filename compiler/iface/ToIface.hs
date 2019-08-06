@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 
 -- | Functions for converting (mostly core) things to interface file things.
 module ToIface
@@ -76,6 +77,8 @@ import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
 import Data.Bits
+
+import PackedFlags
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
@@ -669,29 +672,16 @@ outside of the hs-boot loop.
 -}
 
 toIfLFInfo :: LambdaFormInfo -> IfLFInfo
---  We encode the fields bitwise:
---    bit 0: OneShotInfo
---    bit 1: no fvs
---    bit 2-15 arity
-toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs _argdesc) =
-    ASSERT(rep <= (2 ^ (14 :: Int) - 1) && fromEnum oneshot <= 1 && fromEnum fvs <= 1)
-    ILFReEntrant $ fromIntegral (os_flag .|. fvs_flag .|. arity)
-  where
-    os_flag   = fromEnum oneshot  `unsafeShiftL` 0
-    fvs_flag  = fromEnum fvs      `unsafeShiftL` 1
-    arity     = rep               `unsafeShiftL` 2
+toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
+    -- ASSERT(rep <= (2 ^ (14 :: Int) - 1) && fromEnum oneshot <= 1 && fromEnum fvs <= 1)
+    -- let rep' = fromIntegral rep :: SizedInt 14
+    -- in
+     ILFReEntrant (fromIntegral $ fromEnum oneshot,rep,fvs_flag)
 
--- We encode some fields bitwise:
---    bit 0: no fvs
---    bit 1: updateable
---    bit 2: might be function
 toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
-    ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
-    ILFThunk (fromIntegral (fvs_flag .|. upd_flag .|. fun_flag)) sfi
-  where
-    fvs_flag  = fromEnum hasfv      `unsafeShiftL` 0
-    upd_flag  = fromEnum updateable `unsafeShiftL` 1
-    fun_flag  = fromEnum m_function `unsafeShiftL` 2
+    -- ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
+    ILFThunk (hasfv, updateable, m_function) sfi
+
 toIfLFInfo (LFUnlifted) = ILFUnlifted
 toIfLFInfo (LFCon con) = ILFCon (dataConName con)
 -- All other cases are not possible at the top level.
