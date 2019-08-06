@@ -15,6 +15,7 @@ module Hoopl.Graph
     , labelsDefined
     , mapGraph
     , mapGraphBlocks
+    , mapGraphBlocksCC
     , revPostorderFrom
     ) where
 
@@ -104,6 +105,15 @@ mapGraphBlocks f = map
         map GNil = GNil
         map (GUnit b) = GUnit (f b)
         map (GMany e b x) = GMany (fmap f e) (mapMap f b) (fmap f x)
+
+mapGraphBlocksCC :: forall block n e x .
+                  (block n C C -> block n C C)
+               -> (Graph' block n e x -> Graph' block n e x)
+
+mapGraphBlocksCC f = map
+  where map GNil = GNil
+        map (GUnit b) = GUnit b
+        map (GMany e b x) = GMany e (mapMap f b) x
 
 -- -----------------------------------------------------------------------------
 -- Extracting Labels from graphs
