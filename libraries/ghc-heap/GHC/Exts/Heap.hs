@@ -37,6 +37,7 @@ module GHC.Exts.Heap (
 
      -- * Closure inspection
     , getBoxedClosureData
+    , getClosureRaw
     , allClosures
 
     -- * Boxes
