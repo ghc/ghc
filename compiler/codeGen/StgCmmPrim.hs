@@ -46,6 +46,7 @@ import SMRep
 import FastString
 import Outputable
 import Util
+import Data.Maybe
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
@@ -872,43 +873,65 @@ emitPrimOp dflags r@[res] op args
      emit stmt
 
 emitPrimOp dflags results op args
-   = case callishPrimOpSupported dflags op of
+   = case callishPrimOpSupported dflags op args of
           Left op   -> emit $ mkUnsafeCall (PrimTarget op) results args
           Right gen -> gen results args
 
+-- Note [QuotRem optimization]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- `quot` and `rem` with constant divisor can be implemented with fast bit-ops
+-- (shift, .&.).
+--
+-- Currently we only support optimization (performed in CmmOpt) when the
+-- constant is a power of 2. #9041 tracks the implementation of the general
+-- optimization.
+--
+-- `quotRem` can be optimized in the same way. However as it returns two values,
+-- it is implemented as a "callish" primop which is harder to match and
+-- to transform later on. For simplicity, the current implementation detects cases
+-- that can be optimized (see `quotRemCanBeOptimized`) and converts STG quotRem
+-- primop into two CMM quot and rem primops.
+
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 
-callishPrimOpSupported :: DynFlags -> PrimOp -> Either CallishMachOp GenericOp
-callishPrimOpSupported dflags op
+callishPrimOpSupported :: DynFlags -> PrimOp -> [CmmExpr] -> Either CallishMachOp GenericOp
+callishPrimOpSupported dflags op args
   = case op of
-      IntQuotRemOp   | ncg && (x86ish || ppc) ->
-                         Left (MO_S_QuotRem  (wordWidth dflags))
-                     | otherwise              ->
-                         Right (genericIntQuotRemOp (wordWidth dflags))
+      IntQuotRemOp   | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
+                         -> Left (MO_S_QuotRem  (wordWidth dflags))
+                     | otherwise
+                         -> Right (genericIntQuotRemOp (wordWidth dflags))
 
       Int8QuotRemOp  | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_S_QuotRem W8)
                      | otherwise     -> Right (genericIntQuotRemOp W8)
 
       Int16QuotRemOp | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
 
 
-      WordQuotRemOp  | ncg && (x86ish || ppc) ->
-                         Left (MO_U_QuotRem  (wordWidth dflags))
-                     | otherwise      ->
-                         Right (genericWordQuotRemOp (wordWidth dflags))
+      WordQuotRemOp  | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
+                         -> Left (MO_U_QuotRem  (wordWidth dflags))
+                     | otherwise
+                         -> Right (genericWordQuotRemOp (wordWidth dflags))
 
       WordQuotRem2Op | (ncg && (x86ish || ppc))
                           || llvm     -> Left (MO_U_QuotRem2 (wordWidth dflags))
                      | otherwise      -> Right (genericWordQuotRem2Op dflags)
 
       Word8QuotRemOp | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                       -> Left (MO_U_QuotRem W8)
                      | otherwise      -> Right (genericWordQuotRemOp W8)
 
       Word16QuotRemOp| ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_U_QuotRem W16)
                      | otherwise     -> Right (genericWordQuotRemOp W16)
 
@@ -944,6 +967,11 @@ callishPrimOpSupported dflags op
 
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
  where
+  -- See Note [QuotRem optimization]
+  quotRemCanBeOptimized = case args of
+    [_, CmmLit (CmmInt n _) ] -> isJust (exactLog2 n)
+    _                         -> False
+
   ncg = case hscTarget dflags of
            HscAsm -> True
            _      -> False
