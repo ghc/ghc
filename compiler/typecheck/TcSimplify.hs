@@ -201,7 +201,8 @@ solveLocalEqualitiesX callsite thing_inside
 -- | Type-check a thing that emits only equality constraints, then
 -- solve those constraints. Fails outright if there is trouble.
 -- Use this if you're not going to get another crack at solving
--- (because, e.g., you're checking a datatype declaration)
+-- (because, e.g., you're checking a datatype declaration and
+-- are about to call zonkTcTypeToType)
 solveEqualities :: TcM a -> TcM a
 solveEqualities thing_inside
   = checkNoErrs $  -- See Note [Fail fast on kind errors]
