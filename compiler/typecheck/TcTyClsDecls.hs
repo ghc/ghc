@@ -2300,6 +2300,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty)))
                <- pushTcLevelM_                                $
                   solveEqualities                              $
+                    -- See Note [Kind-checking tyvar binders for associated types]
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats

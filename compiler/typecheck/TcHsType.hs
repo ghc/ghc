@@ -1797,6 +1797,7 @@ kcLHsQTyVars_Cusk name flav
     do { (scoped_kvs, (tc_tvs, res_kind))
            <- pushTcLevelM_                               $
               solveEqualities                             $
+                -- See Note [Kind-checking tyvar binders for associated types]
               bindImplicitTKBndrs_Q_Skol kv_ns            $
               bindExplicitTKBndrs_Q_Skol ctxt_kind hs_tvs $
               thing_inside
@@ -1961,16 +1962,15 @@ When kind-checking the type-variable binders for associated
    family decls
 we behave specially for type variables that are already in scope;
 that is, bound by the enclosing class decl.  This is done in
-kcLHsQTyVarBndrs:
-  * The use of tcImplicitQTKBndrs
-  * The tcLookupLocal_maybe code in kc_hs_tv
+kcLHsQTyVars_Cusk and kcLHsQTyVars_NoCusk with
+the use of bindImplicitTKBndrs_Q and bindExplicitTKBndrs_Q.
 
 See Note [Associated type tyvar names] in Class and
     Note [TyVar binders for associated decls] in HsDecls
 
 We must do the same for family instance decls, where the in-scope
 variables may be bound by the enclosing class instance decl.
-Hence the use of tcImplicitQTKBndrs in tcFamTyPatsAndGen.
+Hence the use of bindImplicitTKBndrs_Q_Skol in tcTyFamInstEqnGuts.
 
 Note [Kind variable ordering for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2075,6 +2075,7 @@ bindImplicitTKBndrsX new_tv tv_names thing_inside
 
 newImplicitTyVarQ :: (Name -> TcM TcTyVar) ->  Name -> TcM TcTyVar
 -- Behave like new_tv, except that if the tyvar is in scope, use it
+-- See Note [Kind-checking tyvar binders for associated types]
 newImplicitTyVarQ new_tv name
   = do { mb_tv <- tcLookupLcl_maybe name
        ; case mb_tv of
@@ -3000,7 +3001,7 @@ promotionErr name err
 
 -- | If the inner action emits constraints, report them as errors and fail;
 -- otherwise, propagates the return value. Useful as a wrapper around
--- 'tcImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
+-- 'bindImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
 -- another chance to solve constraints
 failIfEmitsConstraints :: TcM a -> TcM a
 failIfEmitsConstraints thing_inside
