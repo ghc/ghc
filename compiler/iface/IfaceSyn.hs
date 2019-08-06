@@ -568,7 +568,9 @@ data IfLFInfo =
     --    bit 1: no fvs
     --    bit 2-15 arity
     ILFReEntrant
-        !Word16
+        (Word8,RepArity,Bool)
+        -- !Word32
+
         -- TopLevelFlag => Implied true
         -- !OneShotInfo    -- => Not currently used by codegen, but we store it just in case
         -- !RepArity       -- Arity. Very useful!  Invariant: always > 0
@@ -580,7 +582,7 @@ data IfLFInfo =
     --    bit 1: updateable
     --    bit 2: might be function
   | ILFThunk             -- Thunk (zero arity)
-        !Word8
+        (Bool,Bool,Bool)
         -- TopLevelFlag => Implied True
         -- !Bool           -- True <=> no free vars
         -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
@@ -1403,19 +1405,21 @@ instance Outputable IfaceUnfolding where
 
 instance Outputable IfLFInfo where
     ppr (ILFReEntrant fields) =
-        text "LFReEntrant" <> brackets (ppr oneshot <+>
-                                        ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
+        text "LFReEntrant" <> ppr fields
+        -- text "LFReEntrant" <> brackets (ppr oneshot <+>
+        --                                 ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
       where
-          oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
-          fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
-          rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
+          -- oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
+          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          -- rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
     ppr (ILFThunk fields sfi) =
-        text "LFThunk" <> brackets (ppr fvs_flag <+> ppr upd_flag <+>
-                                    ppr sfi <+> ppr fun_flag)
+        text "LFThunk" <> ppr fields <> ppr sfi
+                                -- brackets (ppr fvs_flag <+> ppr upd_flag <+>
+                                    -- ppr sfi <+> ppr fun_flag)
       where
-          fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
-          upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
-          fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
+          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
+          -- upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
+          -- fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
     ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (ILFUnlifted) = text "LFUnlifted"
 
@@ -2428,20 +2432,24 @@ instance Binary IfaceCompleteMatch where
 
 instance Binary IfLFInfo where
     -- TODO: We could pack the bytes somewhat
+
     put_ bh (ILFReEntrant fields) =
         putByte bh 0 >>
-        put_ bh fields
+        put_ bh (fields :: (Word8, RepArity, Bool))
     put_ bh (ILFThunk encoded_flds sfi) =
         putByte bh 1 >>
-        put_ bh encoded_flds >>
+        put_ bh (encoded_flds :: (Bool, Bool, Bool)) >>
         put_ bh sfi
-    put_ bh (ILFCon conName) = putByte bh 2 >> put_ bh conName
-    put_ bh (ILFUnlifted) = putByte bh 3
+    put_ bh (ILFCon conName) =
+        putByte bh 2 >>
+        put_ bh conName
+    put_ bh (ILFUnlifted) =
+        putByte bh 3
     get bh = do
         con <- getByte bh
         case con of
-            0 -> pure ILFReEntrant <*> get bh
-            1 -> pure ILFThunk <*> get bh <*> get bh
+            0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, Bool))
+            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"

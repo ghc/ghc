@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
@@ -111,7 +112,8 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 ************************************************************************
 -}
 
-outputC :: DynFlags
+outputC :: forall a.
+           DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup a
         -> [InstalledUnitId]
@@ -119,33 +121,32 @@ outputC :: DynFlags
 
 outputC dflags filenm cmm_stream packages
   = do
-       -- ToDo: make the C backend consume the C-- incrementally, by
-       -- pushing the cmm_stream inside (c.f. nativeCodeGen)
-       (rawcmms,result) <- Stream.collect cmm_stream
-       withTiming (return dflags) (text "C codegen") id $ do
+      -- ToDo: make the C backend consume the C-- incrementally, by
+      -- pushing the cmm_stream inside (c.f. nativeCodeGen)
+      (rawcmms,result) <- Stream.collect cmm_stream :: IO ([RawCmmGroup], a)
+      withTiming (return dflags) (text "C codegen") (const ()) $ do
+            -- figure out which header files to #include in the generated .hc file:
+            --
+            --   * extra_includes from packages
+            --   * -#include options from the cmdline and OPTIONS pragmas
+            --   * the _stub.h file, if there is one.
+            --
+            let rts = getPackageDetails dflags rtsUnitId
 
-       -- figure out which header files to #include in the generated .hc file:
-       --
-       --   * extra_includes from packages
-       --   * -#include options from the cmdline and OPTIONS pragmas
-       --   * the _stub.h file, if there is one.
-       --
-       let rts = getPackageDetails dflags rtsUnitId
+            let cc_injects = unlines (map mk_include (includes rts))
+                mk_include h_file =
+                     case h_file of
+                        '"':_{-"-} -> "#include "++h_file
+                        '<':_      -> "#include "++h_file
+                        _          -> "#include \""++h_file++"\""
 
-       let cc_injects = unlines (map mk_include (includes rts))
-           mk_include h_file =
-            case h_file of
-               '"':_{-"-} -> "#include "++h_file
-               '<':_      -> "#include "++h_file
-               _          -> "#include \""++h_file++"\""
+            let pkg_names = map installedUnitIdString packages
 
-       let pkg_names = map installedUnitIdString packages
-
-       doOutput filenm $ \ h -> do
-          hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-          hPutStr h cc_injects
-          writeCs dflags h rawcmms
-       return result
+            doOutput filenm $ \ h -> do
+              hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+              hPutStr h cc_injects
+              writeCs dflags h rawcmms
+            return result
 
 {-
 ************************************************************************

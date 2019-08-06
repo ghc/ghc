@@ -1155,8 +1155,9 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
-        put_ bh -- ( Nothing :: Maybe [(Name,IfLFInfo)])
-               lf_info
+        -- put_ bh ( Nothing :: Maybe [(Name,IfLFInfo)])
+        put_ bh ( lf_info :: Maybe [(Name,IfLFInfo)])
+
 
    get bh = do
         mod         <- get bh
@@ -1190,7 +1191,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
-        lf_info     <- get bh
+        lf_info     <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,

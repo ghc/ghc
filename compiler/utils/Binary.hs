@@ -1252,7 +1252,3 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
-
--- deriving via BoundedEnumBinary TopLevelFlag instance Binary TopLevelFlag
-
--- deriving via BoundedEnumBinary OneShotInfo instance Binary OneShotInfo
