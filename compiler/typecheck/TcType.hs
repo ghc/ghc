@@ -79,7 +79,7 @@ module TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  hasIPPred, isTauTy, isTauTyCon, isFullyMonoTauTy, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy, isAlmostFunctionFree,

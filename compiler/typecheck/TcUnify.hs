@@ -1713,8 +1713,7 @@ uQuickLookTryFillPoly origin tv1 ty2
   where
     go lvl
       | isTouchableMetaTyVar lvl tv1
-      , (tvs, theta, _) <- tcSplitSigmaTy ty2
-      , not (null tvs && null theta)  -- do not fill if not a polytype
+      , not (isFullyMonoTauTy ty2) -- do not fill if not a polytype
       = do { lookup_res <- lookupTcTyVar tv1
            ; case lookup_res of
                Filled _ -> return ()
