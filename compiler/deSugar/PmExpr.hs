@@ -25,9 +25,7 @@ import DataCon
 import ConLike
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
 import TcHsSyn (hsLitType)
-import TysWiredIn
 import Outputable
-import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 {-
 %************************************************************************
