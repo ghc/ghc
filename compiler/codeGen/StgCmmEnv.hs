@@ -33,9 +33,11 @@ import StgCmmClosure
 
 import CLabel
 
+import BasicTypes
 import BlockId
 import CmmExpr
 import CmmUtils
+import DataCon (isNullaryRepDataCon)
 import DynFlags
 import Id
 import MkGraph
@@ -49,6 +51,7 @@ import Util
 import VarEnv
 
 import Data.Maybe
+import Control.Applicative
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -143,14 +146,35 @@ getCgIdInfo id
                 {
                   let ext_lbl = mkClosureLabel name $ idCafInfo id
                   ; lf_cached <- lookupImportedLF name
-                  ; let lf_computed = mkLFImported id
                   ; if (not $ isJust lf_cached) then return () else pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
-                  ; let lf_info = fromMaybe lf_computed lf_cached
+                  ; let lf_computed = approximateLF
+                  ; let lf_info = fromJust (mkStaticLF unlifted <|> lf_cached <|> pure lf_computed)
                   ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
                 }
           else
               cgLookupPanic id -- Bug
         }}}
+  where
+    mkStaticLF :: Bool -> Maybe LambdaFormInfo
+    mkStaticLF unlifted
+      | unlifted = return $! mkLFStringLit
+
+      | Just con <- isDataConWorkId_maybe id
+      , isNullaryRepDataCon con
+      = Just $! mkConLFInfo con
+
+      | otherwise = Nothing
+                    -- An imported nullary constructor
+                    -- We assume that the constructor is evaluated so that
+                    -- the id really does point directly to the constructor
+    approximateLF
+      | arity > 0
+      = mkUnknownLFReEntrant TopLevel arity
+      | otherwise = mkLFArgument id
+      where
+        arity = idFunRepArity id
+
+
 
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id

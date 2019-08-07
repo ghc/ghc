@@ -24,7 +24,7 @@ module StgCmmClosure (
         LambdaFormInfo,         -- Abstract
         StandardFormInfo,        -- ...ditto...
         mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
-        mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
+        mkApLFInfo, mkLFArgument, mkLFLetNoEscape, mkUnknownLFReEntrant,
         mkLFStringLit,
         lfDynTag,
         isLFThunk, isLFReEntrant, lfUpdatable,
@@ -214,6 +214,12 @@ mkLFReEntrant top fvs args arg_descr
   = LFReEntrant top os_info (length args) (null fvs) arg_descr
   where os_info = idOneShotInfo (head args)
 
+mkUnknownLFReEntrant :: TopLevelFlag
+                     -> RepArity
+                     -> LambdaFormInfo
+mkUnknownLFReEntrant top arity
+  = LFReEntrant top noOneShotInfo arity True (panic "arg_descr")
+
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
@@ -250,28 +256,6 @@ mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
   = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
         (might_be_a_function (idType id))
-
--------------
--- mkLFImported only has one call site in another module,
--- so we want to make sure it get's inlined.
-{-# INLINE mkLFImported #-}
--- | Guess the LFInfo based on id/type.
-mkLFImported :: Id -> LambdaFormInfo
-mkLFImported id
-  | Just con <- isDataConWorkId_maybe id
-  , isNullaryRepDataCon con
-  = LFCon con
-                -- An imported nullary constructor
-                -- We assume that the constructor is evaluated so that
-                -- the id really does point directly to the constructor
-
-  | arity > 0
-  = LFReEntrant TopLevel noOneShotInfo arity True (panic "arg_descr")
-
-  | otherwise
-  = mkLFArgument id -- Not sure of exact arity
-  where
-    arity = idFunRepArity id
 
 -------------
 mkLFStringLit :: LambdaFormInfo
