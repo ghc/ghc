@@ -56,10 +56,6 @@ testOneFile libdir fileName = do
        = ["HsIntPrim [" ++ src ++ "] " ++ show c]
      doHsLit (HsWordPrim   (SourceText src) c)
        = ["HsWordPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInt64Prim  (SourceText src) c)
-       = ["HsInt64Prim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsWord64Prim (SourceText src) c)
-       = ["HsWord64Prim [" ++ src ++ "] " ++ show c]
      doHsLit (HsInteger  (SourceText src) c _)
        = ["HsInteger [" ++ src ++ "] " ++ show c]
      doHsLit _ = []

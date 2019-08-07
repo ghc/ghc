@@ -59,10 +59,6 @@ data HsLit x
       -- ^ literal @Int#@
   | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer
       -- ^ literal @Word#@
-  | HsInt64Prim (XHsInt64Prim x) {- SourceText -} Integer
-      -- ^ literal @Int64#@
-  | HsWord64Prim (XHsWord64Prim x) {- SourceText -} Integer
-      -- ^ literal @Word64#@
   | HsInteger (XHsInteger x) {- SourceText -} Integer Type
       -- ^ Genuinely an integer; arises only
       -- from TRANSLATION (overloaded
@@ -85,8 +81,6 @@ type instance XHsStringPrim (GhcPass _) = SourceText
 type instance XHsInt        (GhcPass _) = NoExtField
 type instance XHsIntPrim    (GhcPass _) = SourceText
 type instance XHsWordPrim   (GhcPass _) = SourceText
-type instance XHsInt64Prim  (GhcPass _) = SourceText
-type instance XHsWord64Prim (GhcPass _) = SourceText
 type instance XHsInteger    (GhcPass _) = SourceText
 type instance XHsRat        (GhcPass _) = NoExtField
 type instance XHsFloatPrim  (GhcPass _) = NoExtField
@@ -101,8 +95,6 @@ instance Eq (HsLit x) where
   (HsInt _ x1)        == (HsInt _ x2)        = x1==x2
   (HsIntPrim _ x1)    == (HsIntPrim _ x2)    = x1==x2
   (HsWordPrim _ x1)   == (HsWordPrim _ x2)   = x1==x2
-  (HsInt64Prim _ x1)  == (HsInt64Prim _ x2)  = x1==x2
-  (HsWord64Prim _ x1) == (HsWord64Prim _ x2) = x1==x2
   (HsInteger _ x1 _)  == (HsInteger _ x2 _)  = x1==x2
   (HsRat _ x1 _)      == (HsRat _ x2 _)      = x1==x2
   (HsFloatPrim _ x1)  == (HsFloatPrim _ x2)  = x1==x2
@@ -159,8 +151,6 @@ convertLit (HsStringPrim a x) = (HsStringPrim (convert a) x)
 convertLit (HsInt a x)        = (HsInt (convert a) x)
 convertLit (HsIntPrim a x)    = (HsIntPrim (convert a) x)
 convertLit (HsWordPrim a x)   = (HsWordPrim (convert a) x)
-convertLit (HsInt64Prim a x)  = (HsInt64Prim (convert a) x)
-convertLit (HsWord64Prim a x) = (HsWord64Prim (convert a) x)
 convertLit (HsInteger a x b)  = (HsInteger (convert a) x b)
 convertLit (HsRat a x b)      = (HsRat (convert a) x b)
 convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
@@ -240,8 +230,6 @@ instance p ~ GhcPass pass => Outputable (HsLit p) where
     ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
     ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
     ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
-    ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
-    ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
     ppr (XLit x) = ppr x
 
 pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
@@ -274,8 +262,6 @@ pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
 pmPprHsLit (HsInt _ i)        = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i
 pmPprHsLit (HsWordPrim _ w)   = integer w
-pmPprHsLit (HsInt64Prim _ i)  = integer i
-pmPprHsLit (HsWord64Prim _ w) = integer w
 pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
@@ -294,8 +280,6 @@ hsLitNeedsParens p = go
     go (HsInt _ x)        = p > topPrec && il_neg x
     go (HsIntPrim _ x)    = p > topPrec && x < 0
     go (HsWordPrim {})    = False
-    go (HsInt64Prim _ x)  = p > topPrec && x < 0
-    go (HsWord64Prim {})  = False
     go (HsInteger _ x _)  = p > topPrec && x < 0
     go (HsRat _ x _)      = p > topPrec && fl_neg x
     go (HsFloatPrim _ x)  = p > topPrec && fl_neg x

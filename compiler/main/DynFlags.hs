@@ -24,6 +24,7 @@ module DynFlags (
         WarningFlag(..), WarnReason(..),
         Language(..),
         PlatformConstants(..),
+        PlatformWordSize(..),
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
@@ -66,6 +67,7 @@ module DynFlags (
         positionIndependent,
         optimisationFlags,
         setFlagsFromEnvFile,
+        platformWordSize,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,

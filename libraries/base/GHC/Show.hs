@@ -210,7 +210,11 @@ deriving instance Show a => Show (NonEmpty a)
 
 -- | @since 2.01
 instance Show TyCon where
+#if WORD_SIZE_IN_BITS < 64
+  showsPrec p (TyCon _ _ _ _ _ tc_name _ _) = showsPrec p tc_name
+#else
   showsPrec p (TyCon _ _ _ tc_name _ _) = showsPrec p tc_name
+#endif
 
 -- | @since 4.9.0.0
 instance Show TrName where

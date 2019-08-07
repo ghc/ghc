@@ -81,23 +81,17 @@ showAstData b a0 = blankLine $$ showAstData' a0
             -- Eliminate word-size dependence
             lit :: HsLit GhcPs -> SDoc
             lit (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
-            lit (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             lit (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
-            lit (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             lit l                  = generic l
 
             litr :: HsLit GhcRn -> SDoc
             litr (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
-            litr (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             litr (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
-            litr (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             litr l                  = generic l
 
             litt :: HsLit GhcTc -> SDoc
             litt (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
-            litt (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             litt (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
-            litt (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             litt l                  = generic l
 
             numericLit :: String -> Integer -> SourceText -> SDoc
