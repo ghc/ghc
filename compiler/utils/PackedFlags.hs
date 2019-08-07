@@ -10,6 +10,8 @@ them once all is said and done will be zero cost.
 
 Only up to 63 bits of flags are supported, to ensure performance.
 
+TODO: Use this after issues on linux are resolved.
+
 -}
 
 {-# LANGUAGE TypeFamilies #-}
