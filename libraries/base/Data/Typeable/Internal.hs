@@ -569,7 +569,9 @@ eqTypeRep a b
 -- in the usual case that it is scrutinized immediately. We
 -- split eqTypeRep into a worker and wrapper because otherwise
 -- it's much larger than anything we'd want to inline.
-{-# INLINABLE eqTypeRep #-}
+--
+-- However, due to #16893 it is currently unsafe to do so, hence the NOINLINE.
+{-# NOINLINE eqTypeRep #-}
 
 sameTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
                TypeRep a -> TypeRep b -> Bool
