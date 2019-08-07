@@ -128,7 +128,7 @@ initIM ty = case splitTyConApp_maybe ty of
 
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
 markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqSet` con) ms)
-markMatched con NoPM = NoPM
+markMatched _   NoPM = NoPM
 
 ensureInhabited :: Monad m
                 => (ConLike -> m Bool)   -- Oracle: True <=> this ConLike is inhabited
@@ -140,7 +140,7 @@ ensureInhabited :: Monad m
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
-ensureInhabited inh_test NoPM = pure (Just NoPM)
+ensureInhabited _        NoPM = pure (Just NoPM)
 ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
   where
     one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
@@ -903,12 +903,6 @@ setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
 setEntrySDIE sdie@(SDIE env) x a =
   SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
 
-mapEntriesSDIE :: (a -> b) -> SharedDIdEnv a -> SharedDIdEnv b
-mapEntriesSDIE f (SDIE env) = SDIE (mapDVarEnv g env)
-  where
-    g (Indirect x) = Indirect x
-    g (Entry a) = Entry (f a)
-
 traverseSharedIdEnv :: Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
 traverseSharedIdEnv f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unSDIE
   where
@@ -930,7 +924,7 @@ data VarInfo
   { vi_ty  :: Type -- The type of the variable, think Gamma. Important for rejecting possible GADT constructors or incompatible pattern synonyms (think Just42).
   , vi_pos :: [(PmAltCon, [Id])] -- Positive info: things it is, all at the same time (think: intersection). Therefore no more than one RealDataCon, otherwise contradiction. TODO: Of these, the data con solution is special in that it is an actual solution, the others just denote equivalent expressions, similar to guards. We'll probably change this representation later on. BUT: On the other hand, these things will have to be inhabitated individually, so this is more information than just equiavelence to an arbitrary expression
   , vi_neg :: [PmAltCon]         -- Negative info: it is not headed by these AltCons. must be orthogonal to anything from vi_pos
-  , vi_cache :: PossibleMatches -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
+  , _vi_cache :: PossibleMatches -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
   }
 
 {- Note [Maintaining invariantes in TmState]
@@ -1011,7 +1005,7 @@ initialTmState = TS emptySDIE
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo ts@(TS env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
+lookupVarInfo (TS env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
@@ -1050,21 +1044,9 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_cs delta) x) of
     | Just sol <- find isDataConSolution pos -> Just sol
     | otherwise                            -> Just (head pos)
 
--- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
--- @x@ and @e@ are completely substituted before!
-isRefutable :: Id -> PmExpr -> TmState -> Bool
-isRefutable x e ts = fromMaybe False $ do
-  alt <- exprToAlt e
-  let ncons = vi_neg (lookupVarInfo ts x)
-  pure (notNull (filter ((== Just True) . decEqPmAltCon alt) ncons))
-
 -- | Solve a term equality (top-level).
 solveOneEq :: Delta -> TmVarCt -> DsM (Maybe Delta)
 solveOneEq delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
-
-exprToAlt :: PmExpr -> Maybe PmAltCon
-exprToAlt (PmExprCon c _) = Just c
-exprToAlt _               = Nothing
 
 initPossibleMatches :: VarInfo -> DsM VarInfo
 initPossibleMatches vi@(VI ty pos neg NoPM) = initIM ty >>= \case
@@ -1074,13 +1056,6 @@ initPossibleMatches vi                      = pure vi
 
 initLookupVarInfo :: TmState -> Id -> DsM VarInfo
 initLookupVarInfo ts x = initPossibleMatches (lookupVarInfo ts x)
-
-markRefutsMatched :: [PmAltCon] -> PossibleMatches -> PossibleMatches
-markRefutsMatched refuts im = foldr markMatched im (mapMaybe asPmAltConLike refuts)
-
-asPmAltConLike :: PmAltCon -> Maybe ConLike
-asPmAltConLike (PmAltConLike cl) = Just cl
-asPmAltConLike _                 = Nothing
 
 refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
@@ -1272,7 +1247,7 @@ equateTyVars ex_tvs1 ex_tvs2
 -- See Note [Refutable shapes].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMaybeT $ do
-  vi@(VI ty pos neg pm) <- lift (initLookupVarInfo ts x)
+  VI ty pos neg pm <- lift (initLookupVarInfo ts x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = decEqPmAltCon cl nalt == Just True
   guard (not (any (contradicts nalt) pos))
@@ -1343,7 +1318,7 @@ combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
 -- when the constraint was compatible with prior facts, in which case @ts@ has
 -- integrated the knowledge from the equality constraint.
 unify :: Delta -> (PmExpr, PmExpr) -> MaybeT DsM Delta
-unify delta@MkDelta{ delta_tm_cs = TS env } eq@(e1, e2) = case eq of
+unify delta@MkDelta{ delta_tm_cs = TS env } eq = case eq of
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
     -- See Note [Undecidable Equality for PmAltCons]
     Just True -> foldlM unify delta (zip (map PmExprVar ts1) (map PmExprVar ts2))
