@@ -733,10 +733,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
         -- pattern match check warnings
         ; unless (isGenerated origin) $
           when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
-          do  { tm_cs <- genCaseTmCs1 mb_scr new_vars
-              ; addTmCsDs tm_cs $
-                -- See Note [Type and Term Equality Propagation]
-                checkMatches dflags (DsMatchContext ctxt locn) new_vars matches }
+            genCaseTmCs1 mb_scr new_vars $
+            -- See Note [Type and Term Equality Propagation]
+            checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
@@ -746,9 +745,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = collectEvVarsPats upats
-           ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
-                             addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
+                             genCaseTmCs2 mb_scr upats vars $ -- See Note [Type and Term Equality Propagation]
                              dsGRHSs ctxt grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource

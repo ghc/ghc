@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ViewPatterns #-}
 
 -- | Provides factilities for pretty-printing 'PmExpr's in a way approriate for
 -- user facing pattern match warnings.
@@ -12,16 +12,16 @@ import GhcPrelude
 
 import Id
 import VarEnv
-import VarSet
 import UniqDFM
 import UniqSet
 import ConLike
 import DataCon
 import TysWiredIn
 import Outputable
-import Control.Monad.Trans.Reader
+import Control.Monad.Trans.RWS.CPS
+import Util
 import Maybes
-import Data.List.NonEmpty (toList)
+import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 import PmExpr
 import PmOracle
@@ -39,16 +39,15 @@ import PmOracle
 --
 -- When the set of refutable shapes contains more than 3 elements, the
 -- additional elements are indicated by "...".
-pprUncovered :: ([PmExpr], Delta) -> SDoc
-pprUncovered (expr_vec, delta)
+pprUncovered :: Delta -> [Id] -> SDoc
+pprUncovered delta vas
   | isNullUDFM refuts = fsep vec -- there are no refutations
   | otherwise         = hang (fsep vec) 4 $
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
-    sdoc_vec = mapM pprPmExprWithParens expr_vec
-    fvs      = unionVarSets (map pmExprFVs expr_vec)
-    refuts   = prettifyRefuts fvs delta
-    vec      = runPmPpr sdoc_vec refuts
+    ppr_action       = mapM (pprPmExprVar 1) vas
+    (vec, renamings) = runPmPpr delta ppr_action
+    refuts           = prettifyRefuts delta renamings
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
@@ -91,36 +90,55 @@ Check.hs) to be more precise.
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: UniqSet Id -> Delta -> DIdEnv (SDoc, [PmAltCon])
-prettifyRefuts fvs
-  = listToUDFM . zipWith rename nameList
-  . filter ((`elemUniqSet_Directly` fvs) . fst) . udfmToList
-  . wrapUpRefutableShapes
+prettifyRefuts :: Delta -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
+prettifyRefuts delta = listToUDFM . map attach_refuts . udfmToList
   where
-    rename new (old, ncons) = (old, (new, ncons))
-    -- Try nice names p,q,r,s,t before using the (ugly) t_i
-    nameList :: [SDoc]
-    nameList = map text ["p","q","r","s","t"] ++
-                 [ text ('t':show u) | u <- [(0 :: Int)..] ]
+    attach_refuts (u, sdoc) = (u, (sdoc, lookupRefuts delta u))
 
-type PmPprM a = Reader (DIdEnv (SDoc, [PmAltCon])) a
 
-runPmPpr :: PmPprM a -> DIdEnv (SDoc, [PmAltCon]) -> a
-runPmPpr = runReader
+type PmPprM a = RWS Delta () (DIdEnv SDoc, [SDoc]) a
 
-checkNegation :: Id -> PmPprM (Maybe SDoc) -- the clean name if it is negated
-checkNegation x = do
-  negated <- ask
-  return $ case lookupDVarEnv negated x of
-    Just (new, _) -> Just new
-    Nothing       -> Nothing
+-- Try nice names p,q,r,s,t before using the (ugly) t_i
+nameList :: [SDoc]
+nameList = map text ["p","q","r","s","t"] ++
+            [ text ('t':show u) | u <- [(0 :: Int)..] ]
+
+runPmPpr :: Delta -> PmPprM a -> (a, DIdEnv SDoc)
+runPmPpr delta m = case runRWS m delta (emptyDVarEnv, nameList) of
+  (a, (renamings, _), _) -> (a, renamings)
+
+-- | Allocates a new, clean name for the given 'Id' if it doesn't already have
+-- one.
+getCleanName :: Id -> PmPprM SDoc
+getCleanName x = do
+  (renamings, name_supply) <- get
+  let (clean_name:name_supply') = name_supply
+  case lookupDVarEnv renamings x of
+    Just nm -> pure nm
+    Nothing -> do
+      put (extendDVarEnv renamings x clean_name, name_supply')
+      pure clean_name
+
+checkRefuts :: Id -> PmPprM (Maybe SDoc) -- the clean name if it has negative info attached
+checkRefuts x = do
+  delta <- ask
+  case lookupRefuts delta x of
+    [] -> pure Nothing -- Will just be a wildcard later on
+    _  -> Just <$> getCleanName x
 
 -- | Pretty print a pmexpr, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
-pprPmExpr :: PmExpr -> PmPprM SDoc
-pprPmExpr (PmExprVar x)        = fromMaybe underscore <$> checkNegation x
-pprPmExpr (PmExprCon con args) = pprPmExprCon con args
+pprPmExpr :: Int -> PmExpr -> PmPprM SDoc
+pprPmExpr prec (PmExprVar x)        = pprPmExprVar prec x
+pprPmExpr prec (PmExprCon con args) = pprPmExprCon prec con args
+
+pprPmExprVar :: Int -> Id -> PmPprM SDoc
+pprPmExprVar prec x = do
+  delta <- ask
+  case lookupSolution delta x of
+    Just (alt, args) -> pprPmExprCon prec alt args
+    Nothing          -> fromMaybe underscore <$> checkRefuts x
 
 needsParens :: PmExpr -> Bool
 needsParens (PmExprVar   {})            = False
@@ -129,39 +147,36 @@ needsParens (PmExprCon (PmAltConLike (RealDataCon c)) _)
   | isTupleDataCon c || isConsDataCon c = False
 needsParens (PmExprCon _ es)            = not (null es)
 
-pprPmExprWithParens :: PmExpr -> PmPprM SDoc
-pprPmExprWithParens expr
-  | needsParens expr = parens <$> pprPmExpr expr
-  | otherwise        =            pprPmExpr expr
+pprPmExprCon :: Int -> PmAltCon -> [Id] -> PmPprM SDoc
+pprPmExprCon prec (PmAltLit l)      _    = pure (ppr l)
+pprPmExprCon prec (PmAltConLike cl) args = do
+  delta <- ask
+  pprConLike delta prec cl args
 
-pprPmExprCon :: PmAltCon -> [PmExpr] -> PmPprM SDoc
-pprPmExprCon (PmAltConLike cl) args = pprConLike cl args
-pprPmExprCon (PmAltLit l)      _    = pure (ppr l)
-
-pprConLike :: ConLike -> [PmExpr] -> PmPprM SDoc
-pprConLike cl args
-  | Just pm_expr_list <- pmExprAsList (PmExprCon (PmAltConLike cl) args)
+pprConLike :: Delta -> Int -> ConLike -> [Id] -> PmPprM SDoc
+pprConLike delta prec cl args
+  | Just pm_expr_list <- pmExprAsList delta (PmExprCon (PmAltConLike cl) args)
   = case pm_expr_list of
       NilTerminated list ->
-        brackets . fsep . punctuate comma <$> mapM pprPmExpr list
+        brackets . fsep . punctuate comma <$> mapM (pprPmExprVar 0) list
       WcVarTerminated pref x ->
-        parens   . fcat . punctuate colon <$> mapM pprPmExpr (toList pref ++ [PmExprVar x])
-pprConLike (RealDataCon con) args
+        parens   . fcat . punctuate colon <$> mapM (pprPmExprVar 0) (toList pref ++ [x])
+pprConLike delta prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
-  = hash_parens . fsep . punctuate comma <$> mapM pprPmExpr args
+  = hash_parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
   | isTupleDataCon con
-  = parens . fsep . punctuate comma <$> mapM pprPmExpr args
-pprConLike cl args
+  = parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
+pprConLike delta prec cl args
   | conLikeIsInfix cl = case args of
-      [x, y] -> do x' <- pprPmExprWithParens x
-                   y' <- pprPmExprWithParens y
-                   return (x' <+> ppr cl <+> y')
+      [x, y] -> do x' <- pprPmExprVar 1 x
+                   y' <- pprPmExprVar 1 y
+                   return (cparen (prec > 0) (x' <+> ppr cl <+> y'))
       -- can it be infix but have more than two arguments?
       list   -> pprPanic "pprPmExprCon:" (ppr list)
   | null args = return (ppr cl)
-  | otherwise = do args' <- mapM pprPmExprWithParens args
-                   return (fsep (ppr cl : args'))
+  | otherwise = do args' <- mapM (pprPmExprVar 2) args
+                   return (cparen (prec > 1) (fsep (ppr cl : args')))
 
 -- | Check whether a literal is negated
 isNegatedPmLit :: PmLit -> Bool
@@ -171,3 +186,34 @@ isNegatedPmLit _other_lit   = False
 -- | Check if a DataCon is (:).
 isConsDataCon :: DataCon -> Bool
 isConsDataCon con = consDataCon == con
+
+-- | The result of 'pmExprAsList'.
+data PmExprList
+  = NilTerminated [Id]
+  | WcVarTerminated (NonEmpty Id) Id
+
+-- | Extract a list of 'PmExpr's out of a sequence of cons cells, optionally
+-- terminated by a wildcard variable instead of @[]@. Some examples:
+--
+-- * @pmExprAsList (1:2:[]) == Just ('NilTerminated' [1,2])@, a regular,
+--   @[]@-terminated list. Should be pretty-printed as @[1,2]@.
+-- * @pmExprAsList (1:2:x) == Just ('WcVarTerminated' [1,2] x)@, a list prefix
+--   ending in a wildcard variable x (of list type). Should be pretty-printed as
+--   (1:2:_).
+-- * @pmExprAsList [] == Just ('NilTerminated' [])@
+pmExprAsList :: Delta -> PmExpr -> Maybe PmExprList
+pmExprAsList delta = go []
+  where
+    go rev_pref (PmExprVar x)
+      | Just (alt, args) <- lookupSolution delta x
+      = go rev_pref (PmExprCon alt args)
+    go rev_pref (PmExprVar x)
+      | Just pref <- nonEmpty (reverse rev_pref)
+      = Just (WcVarTerminated pref x)
+    go rev_pref (pmExprToDataConApp -> Just (c, es))
+      | c == nilDataCon
+      = ASSERT( null es ) Just (NilTerminated (reverse rev_pref))
+      | c == consDataCon
+      = ASSERT( length es == 2 ) go (es !! 0 : rev_pref) (PmExprVar (es !! 1))
+    go _ _
+      = Nothing
