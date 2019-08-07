@@ -1145,9 +1145,7 @@ Motivating examples for HsLit
   HsInt           001        == 1
   HsIntPrim       002#       == 2#
   HsWordPrim      003##      == 3##
-  HsInt64Prim     004##      == 4##
-  HsWord64Prim    005##      == 5##
-  HsInteger       006        == 6
+  HsInteger       004        == 4
 
 For OverLitVal
 

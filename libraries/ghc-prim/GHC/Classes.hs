@@ -281,15 +281,22 @@ eqInt, neInt :: Int -> Int -> Bool
 
 #if WORD_SIZE_IN_BITS < 64
 instance Eq TyCon where
-  (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-       = isTrue# (hi1 `eqWord64#` hi2) && isTrue# (lo1 `eqWord64#` lo2)
+  (==) (TyCon hi_hi1 hi_lo1 lo_hi1 lo_lo1 _ _ _ _) (TyCon hi_hi2 hi_lo2 lo_hi2 lo_lo2 _ _ _ _)
+       = isTrue# (hi_hi1 `eqWord#` hi_hi2) &&
+         isTrue# (hi_lo1 `eqWord#` hi_lo2) &&
+         isTrue# (lo_hi1 `eqWord#` lo_hi2) &&
+         isTrue# (lo_lo1 `eqWord#` lo_lo2)
 instance Ord TyCon where
-  compare (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
-    | isTrue# (hi1 `gtWord64#` hi2) = GT
-    | isTrue# (hi1 `ltWord64#` hi2) = LT
-    | isTrue# (lo1 `gtWord64#` lo2) = GT
-    | isTrue# (lo1 `ltWord64#` lo2) = LT
-    | True                = EQ
+  compare (TyCon hi_hi1 hi_lo1 lo_hi1 lo_lo1 _ _ _ _) (TyCon hi_hi2 hi_lo2 lo_hi2 lo_lo2 _ _ _ _)
+    | isTrue# (hi_hi1 `gtWord#` hi_hi2) = GT
+    | isTrue# (hi_hi1 `ltWord#` hi_hi2) = LT
+    | isTrue# (hi_lo1 `gtWord#` hi_lo2) = GT
+    | isTrue# (hi_lo1 `ltWord#` hi_lo2) = LT
+    | isTrue# (lo_hi1 `gtWord#` lo_hi2) = GT
+    | isTrue# (lo_hi1 `ltWord#` lo_hi2) = LT
+    | isTrue# (lo_lo1 `gtWord#` lo_lo2) = GT
+    | isTrue# (lo_lo1 `ltWord#` lo_lo2) = LT
+    | True = EQ
 #else
 instance Eq TyCon where
   (==) (TyCon hi1 lo1 _ _ _ _) (TyCon hi2 lo2 _ _ _ _)
@@ -300,7 +307,7 @@ instance Ord TyCon where
     | isTrue# (hi1 `ltWord#` hi2) = LT
     | isTrue# (lo1 `gtWord#` lo2) = GT
     | isTrue# (lo1 `ltWord#` lo2) = LT
-    | True              = EQ
+    | True = EQ
 #endif
 
 

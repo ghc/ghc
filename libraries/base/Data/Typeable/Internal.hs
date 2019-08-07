@@ -91,6 +91,10 @@ import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
 import GHC.TypeNats ( KnownNat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
 
+#if WORD_SIZE_IN_BITS < 64
+import GHC.IntWord64
+#endif
+
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
    -- loop: GHC.Fingerprint -> Foreign.Ptr -> Data.Typeable
@@ -107,6 +111,12 @@ import {-# SOURCE #-} GHC.Fingerprint
 *                                                                      *
 ********************************************************************* -}
 
+#if WORD_SIZE_IN_BITS < 64
+#define TYCON TyCon _ _ _ _
+#else
+#define TYCON TyCon _ _
+#endif
+
 modulePackage :: Module -> String
 modulePackage (Module p _) = trNameString p
 
@@ -114,27 +124,35 @@ moduleName :: Module -> String
 moduleName (Module _ m) = trNameString m
 
 tyConPackage :: TyCon -> String
-tyConPackage (TyCon _ _ m _ _ _) = modulePackage m
+tyConPackage (TYCON m _ _ _) = modulePackage m
 
 tyConModule :: TyCon -> String
-tyConModule (TyCon _ _ m _ _ _) = moduleName m
+tyConModule (TYCON m _ _ _) = moduleName m
 
 tyConName :: TyCon -> String
-tyConName (TyCon _ _ _ n _ _) = trNameString n
+tyConName (TYCON _ n _ _) = trNameString n
 
 trNameString :: TrName -> String
 trNameString (TrNameS s) = unpackCStringUtf8# s
 trNameString (TrNameD s) = s
 
 tyConFingerprint :: TyCon -> Fingerprint
+#if WORD_SIZE_IN_BITS < 64
+tyConFingerprint (TyCon hi_hi hi_lo lo_hi lo_lo _ _ _ _)
+  = Fingerprint (W64# (or64# (uncheckedShiftL64# (wordToWord64# hi_hi) 32#)
+                             (wordToWord64# hi_lo)))
+                (W64# (or64# (uncheckedShiftL64# (wordToWord64# lo_hi) 32#)
+                             (wordToWord64# lo_lo)))
+#else
 tyConFingerprint (TyCon hi lo _ _ _ _)
   = Fingerprint (W64# hi) (W64# lo)
+#endif
 
 tyConKindArgs :: TyCon -> Int
-tyConKindArgs (TyCon _ _ _ _ n _) = I# n
+tyConKindArgs (TYCON _ _ n _) = I# n
 
 tyConKindRep :: TyCon -> KindRep
-tyConKindRep (TyCon _ _ _ _ _ k) = k
+tyConKindRep (TYCON _ _ _ k) = k
 
 -- | Helper to fully evaluate 'TyCon' for use as @NFData(rnf)@ implementation
 --
@@ -167,7 +185,7 @@ rnfString :: [Char] -> ()
 rnfString = rnfList (`seq` ())
 
 rnfTyCon :: TyCon -> ()
-rnfTyCon (TyCon _ _ m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
+rnfTyCon (TYCON m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
 
 
 {- *********************************************************************
@@ -589,7 +607,7 @@ typeRepKind (TrApp {trAppKind = kind}) = kind
 typeRepKind (TrFun {}) = typeRep @Type
 
 tyConKind :: TyCon -> [SomeTypeRep] -> SomeTypeRep
-tyConKind (TyCon _ _ _ _ nKindVars# kindRep) kindVars =
+tyConKind (TYCON _ _ nKindVars# kindRep) kindVars =
     let kindVarsArr :: A.Array KindBndr SomeTypeRep
         kindVarsArr = A.listArray (0, I# (nKindVars# -# 1#)) kindVars
     in instantiateKindRep kindVarsArr kindRep
@@ -923,7 +941,18 @@ mkTyCon# :: Addr#       -- ^ package name
          -> TyCon       -- ^ A unique 'TyCon' object
 mkTyCon# pkg modl name n_kinds kind_rep
   | Fingerprint (W64# hi) (W64# lo) <- fingerprint
-  = TyCon hi lo mod (TrNameS name) n_kinds kind_rep
+#if WORD_SIZE_IN_BITS < 64
+  = let
+      hi_hi = word64ToWord# (uncheckedShiftRL64# hi 32#)
+      hi_lo = word64ToWord# hi
+      lo_hi = word64ToWord# (uncheckedShiftRL64# lo 32#)
+      lo_lo = word64ToWord# lo
+    in
+      TyCon hi_hi hi_lo lo_hi lo_lo
+#else
+  =   TyCon hi lo
+#endif
+        mod (TrNameS name) n_kinds kind_rep
   where
     mod = Module (TrNameS pkg) (TrNameS modl)
     fingerprint :: Fingerprint
@@ -946,7 +975,18 @@ mkTyCon :: String       -- ^ package name
 -- eg from binary deserialisation
 mkTyCon pkg modl name (I# n_kinds) kind_rep
   | Fingerprint (W64# hi) (W64# lo) <- fingerprint
-  = TyCon hi lo mod (TrNameD name) n_kinds kind_rep
+#if WORD_SIZE_IN_BITS < 64
+  = let
+      hi_hi = word64ToWord# (uncheckedShiftRL64# hi 32#)
+      hi_lo = word64ToWord# hi
+      lo_hi = word64ToWord# (uncheckedShiftRL64# lo 32#)
+      lo_lo = word64ToWord# lo
+    in
+      TyCon hi_hi hi_lo lo_hi lo_lo
+#else
+  =   TyCon hi lo
+#endif
+        mod (TrNameD name) n_kinds kind_rep
   where
     mod = Module (TrNameD pkg) (TrNameD modl)
     fingerprint :: Fingerprint

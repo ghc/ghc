@@ -16,8 +16,8 @@ module Literal
         -- ** Creating Literals
         , mkLitInt, mkLitIntWrap, mkLitIntWrapC
         , mkLitWord, mkLitWordWrap, mkLitWordWrapC
-        , mkLitInt64, mkLitInt64Wrap
-        , mkLitWord64, mkLitWord64Wrap
+        , mkLitInt64
+        , mkLitWord64
         , mkLitFloat, mkLitDouble
         , mkLitChar, mkLitString
         , mkLitInteger, mkLitNatural
@@ -61,7 +61,6 @@ import BasicTypes
 import Binary
 import Constants
 import DynFlags
-import GHC.Platform
 import UniqFM
 import Util
 
@@ -392,11 +391,6 @@ mkLitWordWrapC dflags i = (n, i /= i')
 mkLitInt64 :: Integer -> Literal
 mkLitInt64  x = ASSERT2( inInt64Range x, integer x ) (mkLitInt64Unchecked x)
 
--- | Creates a 'Literal' of type @Int64#@.
---   If the argument is out of the range, it is wrapped.
-mkLitInt64Wrap :: DynFlags -> Integer -> Literal
-mkLitInt64Wrap dflags i = wrapLitNumber dflags $ mkLitInt64Unchecked i
-
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
 mkLitInt64Unchecked :: Integer -> Literal
 mkLitInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
@@ -404,11 +398,6 @@ mkLitInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
 -- | Creates a 'Literal' of type @Word64#@
 mkLitWord64 :: Integer -> Literal
 mkLitWord64 x = ASSERT2( inWord64Range x, integer x ) (mkLitWord64Unchecked x)
-
--- | Creates a 'Literal' of type @Word64#@.
---   If the argument is out of the range, it is wrapped.
-mkLitWord64Wrap :: DynFlags -> Integer -> Literal
-mkLitWord64Wrap dflags i = wrapLitNumber dflags $ mkLitWord64Unchecked i
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
 mkLitWord64Unchecked :: Integer -> Literal

@@ -87,8 +87,6 @@ dsLit l = do
     HsCharPrim   _ c -> return (Lit (LitChar c))
     HsIntPrim    _ i -> return (Lit (mkLitIntWrap dflags i))
     HsWordPrim   _ w -> return (Lit (mkLitWordWrap dflags w))
-    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap dflags i))
-    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap dflags w))
     HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
     HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
@@ -308,8 +306,6 @@ getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Name)
 getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTyConName)
 getSimpleIntegralLit (HsIntPrim _ i) = Just (i, intPrimTyConName)
 getSimpleIntegralLit (HsWordPrim _ i) = Just (i, wordPrimTyConName)
-getSimpleIntegralLit (HsInt64Prim _ i) = Just (i, int64PrimTyConName)
-getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTyConName)
 getSimpleIntegralLit (HsInteger _ i ty)
   | Just tc <- tyConAppTyCon_maybe ty
   = Just (i, tyConName tc)
@@ -451,8 +447,6 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- HsLit does not.
 hsLitKey dflags (HsIntPrim    _ i) = mkLitIntWrap  dflags i
 hsLitKey dflags (HsWordPrim   _ w) = mkLitWordWrap dflags w
-hsLitKey dflags (HsInt64Prim  _ i) = mkLitInt64Wrap  dflags i
-hsLitKey dflags (HsWord64Prim _ w) = mkLitWord64Wrap dflags w
 hsLitKey _      (HsCharPrim   _ c) = mkLitChar            c
 hsLitKey _      (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
 hsLitKey _      (HsDoublePrim _ d) = mkLitDouble          (fl_value d)

@@ -854,8 +854,6 @@ type family XHsStringPrim x
 type family XHsInt x
 type family XHsIntPrim x
 type family XHsWordPrim x
-type family XHsInt64Prim x
-type family XHsWord64Prim x
 type family XHsInteger x
 type family XHsRat x
 type family XHsFloatPrim x
@@ -870,13 +868,11 @@ type ForallXHsLit (c :: * -> Constraint) (x :: *) =
   , c (XHsDoublePrim x)
   , c (XHsFloatPrim  x)
   , c (XHsInt        x)
-  , c (XHsInt64Prim  x)
   , c (XHsIntPrim    x)
   , c (XHsInteger    x)
   , c (XHsRat        x)
   , c (XHsString     x)
   , c (XHsStringPrim x)
-  , c (XHsWord64Prim x)
   , c (XHsWordPrim   x)
   , c (XXLit         x)
   )
@@ -1111,8 +1107,6 @@ type ConvertIdX a b =
    XHsFloatPrim a ~ XHsFloatPrim b,
    XHsRat a ~ XHsRat b,
    XHsInteger a ~ XHsInteger b,
-   XHsWord64Prim a ~ XHsWord64Prim b,
-   XHsInt64Prim a ~ XHsInt64Prim b,
    XHsWordPrim a ~ XHsWordPrim b,
    XHsIntPrim a ~ XHsIntPrim b,
    XHsInt a ~ XHsInt b,

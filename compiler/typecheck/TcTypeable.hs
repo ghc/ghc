@@ -43,10 +43,11 @@ import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable
 import FastString ( FastString, mkFastString, fsLit )
+import Util (count)
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class (lift)
-import Data.Word( Word64 )
+import Data.Bits (shiftR)
 
 {- Note [Grand plan for Typeable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -580,20 +581,29 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
       = pprPanic "mkTyConKindRepBinds.go(coercion)" (ppr co)
 
 -- | Produce the right-hand-side of a @TyCon@ representation.
-mkTyConRepTyConRHS :: TypeableStuff -> TypeRepTodo
+mkTyConRepTyConRHS :: TypeableStuff
+                   -> TypeRepTodo
                    -> TyCon      -- ^ the 'TyCon' we are producing a binding for
                    -> LHsExpr GhcTc -- ^ its 'KindRep'
                    -> LHsExpr GhcTc
 mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
-  =           nlHsDataCon trTyConDataCon
-    `nlHsApp` nlHsLit (word64 dflags high)
-    `nlHsApp` nlHsLit (word64 dflags low)
+  =           fp
     `nlHsApp` mod_rep_expr todo
     `nlHsApp` trNameLit (mkFastString tycon_str)
     `nlHsApp` nlHsLit (int n_kind_vars)
     `nlHsApp` kind_rep
   where
-    n_kind_vars = length $ filter isNamedTyConBinder (tyConBinders tycon)
+    ws = platformWordSize (targetPlatform dflags)
+    dc = nlHsDataCon trTyConDataCon
+    fp = case ws of
+           PW4 -> dc `nlHsApp` nlHsLit (word (fromIntegral (high `shiftR` 32)))
+                     `nlHsApp` nlHsLit (word (fromIntegral high))
+                     `nlHsApp` nlHsLit (word (fromIntegral (low `shiftR` 32)))
+                     `nlHsApp` nlHsLit (word (fromIntegral low))
+           PW8 -> dc `nlHsApp` nlHsLit (word (fromIntegral high))
+                     `nlHsApp` nlHsLit (word (fromIntegral low))
+
+    n_kind_vars = count isNamedTyConBinder (tyConBinders tycon)
     tycon_str = add_tick (occNameString (getOccName tycon))
     add_tick s | isPromotedDataCon tycon = '\'' : s
                | otherwise               = s
@@ -608,10 +618,8 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
     int :: Int -> HsLit GhcTc
     int n = HsIntPrim (SourceText $ show n) (toInteger n)
 
-word64 :: DynFlags -> Word64 -> HsLit GhcTc
-word64 dflags n
-  | wORD_SIZE dflags == 4 = HsWord64Prim NoSourceText (toInteger n)
-  | otherwise             = HsWordPrim   NoSourceText (toInteger n)
+    word :: Word -> HsLit GhcTc
+    word = HsWordPrim NoSourceText . toInteger
 
 {-
 Note [Representing TyCon kinds: KindRep]
