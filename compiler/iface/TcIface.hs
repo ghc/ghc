@@ -1867,5 +1867,6 @@ tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
     pure $! LFUnknown True
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
-    LFCon <$> forkM (text "Loading LFCon constructor")
-                    (tcIfaceDataCon conName)
+    LFCon <$> forkM (text "Loading LFCon constructor") $ do
+      pprTraceM "Loading constructor:" (ppr conName)
+      (tcIfaceDataCon conName)
