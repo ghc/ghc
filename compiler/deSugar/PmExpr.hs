@@ -8,9 +8,9 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmExprFVs, pmLitType,
+        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmLitType,
         pmAltConType, pmAltConArity, hsOverLitAsHsLit, mkPmExprLit,
-        mkPmExprData, decEqPmAltCon, PmExprList(..), pmExprAsList
+        mkPmExprData, decEqPmAltCon, pmExprToDataConApp
     ) where
 
 #include "HsVersions.h"
@@ -21,7 +21,6 @@ import Util
 import BasicTypes (IntegralLit(..), negateIntegralLit)
 import HsSyn
 import Id
-import VarSet
 import DataCon
 import ConLike
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
@@ -43,7 +42,7 @@ import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 -- | Lifted expressions for pattern match checking.
 data PmExpr = PmExprVar   Id
-            | PmExprCon   PmAltCon [PmExpr]
+            | PmExprCon   PmAltCon [Id]
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -67,10 +66,6 @@ decEqPmLit _              _              = Nothing
 -- | Syntactic equality.
 instance Eq PmLit where
   a == b = decEqPmLit a b == Just True
-
-pmExprFVs :: PmExpr -> IdSet
-pmExprFVs (PmExprVar x)      = unitVarSet x
-pmExprFVs (PmExprCon _ args) = unionVarSets (map pmExprFVs args)
 
 -- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
@@ -146,7 +141,7 @@ pmAltConArity (PmAltLit _)       = 0
 mkPmExprLit :: PmLit -> PmExpr
 mkPmExprLit l = PmExprCon (PmAltLit l) []
 
-mkPmExprData :: DataCon -> [PmExpr] -> PmExpr
+mkPmExprData :: DataCon -> [Id] -> PmExpr
 mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 
 {- Note [Undecidable Equality for PmAltCons]
@@ -310,37 +305,9 @@ consistently and try to turn them into plain literals as often as possible:
 -}
 
 -- | Return @Just@ a 'DataCon' application or @Nothing@, otherwise.
-pmExprToDataConApp :: PmExpr -> Maybe (DataCon, [PmExpr])
+pmExprToDataConApp :: PmExpr -> Maybe (DataCon, [Id])
 pmExprToDataConApp (PmExprCon (PmAltConLike (RealDataCon c)) es) = Just (c, es)
 pmExprToDataConApp _                                             = Nothing
-
--- | The result of 'pmExprAsList'.
-data PmExprList
-  = NilTerminated [PmExpr]
-  | WcVarTerminated (NonEmpty PmExpr) Id
-
--- | Extract a list of 'PmExpr's out of a sequence of cons cells, optionally
--- terminated by a wildcard variable instead of @[]@. Some examples:
---
--- * @pmExprAsList (1:2:[]) == Just ('NilTerminated' [1,2])@, a regular,
---   @[]@-terminated list. Should be pretty-printed as @[1,2]@.
--- * @pmExprAsList (1:2:x) == Just ('WcVarTerminated' [1,2] x)@, a list prefix
---   ending in a wildcard variable x (of list type). Should be pretty-printed as
---   (1:2:_).
--- * @pmExprAsList [] == Just ('NilTerminated' [])@
-pmExprAsList :: PmExpr -> Maybe PmExprList
-pmExprAsList = go []
-  where
-    go rev_pref (PmExprVar x)
-      | Just pref <- nonEmpty (reverse rev_pref)
-      = Just (WcVarTerminated pref x)
-    go rev_pref (pmExprToDataConApp -> Just (c, es))
-      | c == nilDataCon
-      = ASSERT( null es ) Just (NilTerminated (reverse rev_pref))
-      | c == consDataCon
-      = ASSERT( length es == 2 ) go (es !! 0 : rev_pref) (es !! 1)
-    go _ _
-      = Nothing
 
 {-
 %************************************************************************
@@ -359,29 +326,10 @@ instance Outputable PmAltCon where
   ppr (PmAltLit l)      = ppr l
 
 instance Outputable PmExpr where
-  ppr = go (0 :: Int)
-    where
-      go _    (PmExprVar v) = ppr v
-      go _    (pmExprAsList -> Just pm_expr_list) = case pm_expr_list of
-        NilTerminated list
-          | Just lits <- as_string list
-          -> doubleQuotes $ hcat $ map ppr lits
-          | otherwise
-          -> brackets $ fsep $ punctuate comma $ map ppr list
-        WcVarTerminated pref x
-          | Just lits <- as_string (toList pref)
-          -> hcat [doubleQuotes $ hcat $ map ppr lits, text "++", ppr x]
-          | otherwise
-          -> parens $ fcat $ punctuate colon $ map ppr (toList pref) ++ [ppr x]
-      go _    (pmExprToDataConApp -> Just (dc, args))
-        | isUnboxedTupleCon dc
-        = text "(#" <+> (fsep $ punctuate comma $ map ppr args) <+> text "#)"
-        | isTupleDataCon dc
-        = parens $ fsep $ punctuate comma $ map ppr args
-      go prec (PmExprCon cl args)
-        = cparen (notNull args && prec > 0) (hsep (ppr cl:map (go 1) args))
-
-      as_string = traverse as_char_lit
-      as_char_lit (PmExprCon (PmAltLit lit) [])
-        | isStringTy (pmLitType lit) = Just lit
-      as_char_lit _ = Nothing
+  ppr (PmExprVar v) = ppr v
+  ppr (pmExprToDataConApp -> Just (dc, args))
+    | isUnboxedTupleCon dc
+    = text "(#" <+> (fsep $ punctuate comma $ map ppr args) <+> text "#)"
+    | isTupleDataCon dc
+    = parens $ fsep $ punctuate comma $ map ppr args
+  ppr (PmExprCon cl args) = hsep (ppr cl:map ppr args)
