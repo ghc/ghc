@@ -13,16 +13,13 @@ module PmOracle (
 
         PmM, tracePm, mkPmId,
 
-        Delta, pmInitialTmTyCs, canDiverge,
+        Delta, pmInitialTmTyCs, canDiverge, lookupRefuts, lookupSolution,
 
         inhabitants,
         tryAddRefutableAltCon, -- Add a negative equality
         refineToAltCon,        -- Add a positive equality x ~ K _ _
-        solveVar,              -- Add a positive equality x ~ e
+        solveOneEq,            -- Add a positive equality x ~ e
         provideEvidenceForEquation,
-
-        -- misc.
-        wrapUpRefutableShapes, exprDeepLookup
     ) where
 
 #include "HsVersions.h"
@@ -37,6 +34,7 @@ import ErrUtils
 import Util
 import Bag
 import UniqSet
+import Unique
 import Id
 import VarEnv
 import UniqDFM
@@ -60,9 +58,9 @@ import TcRnTypes     (pprEvVarWithType, completeMatchConLikes)
 import Coercion
 import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
-import Control.Monad (zipWithM, mzero)
+import Control.Monad (zipWithM, guard, mzero)
 import Control.Monad.Trans.Class (lift)
-import Data.Functor.Identity
+import Data.Bifunctor (second)
 import Data.Foldable (foldlM)
 import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
@@ -96,22 +94,23 @@ mkIdCoercion x ty delta
   | eqType (idType x) ty = pure (x, delta) -- no need to introduce anything new
   | otherwise = do
       y <- mkPmId ty
-      let e = PmExprVar x
-      pure (y, delta { delta_tm_cs = extendSubst y e (delta_tm_cs delta) })
+      delta' <- expectJust "y was fresh" <$> runMaybeT (equate delta x y)
+      pure (y, delta')
 
 type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
 
-data IncompleteMatches = IM TyCon (NonEmpty ConLikeSet)
-                       | NoIM   -- Overloaded literals
+data PossibleMatches = PM TyCon (NonEmpty ConLikeSet)
+                     | NoPM   -- Overloaded literals
   -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
   --
   -- NonEmpty because the empty case would mean that there
   --   are no matching constructors at all
 
-instance Outputable IncompleteMatches where
-  ppr (IM _tc cs) = ppr (NonEmpty.toList cs)
+instance Outputable PossibleMatches where
+  ppr (PM _tc cs) = ppr (NonEmpty.toList cs)
+  ppr NoPM = empty
 
-initIM :: Type -> DsM (Maybe IncompleteMatches)
+initIM :: Type -> DsM (Maybe PossibleMatches)
 initIM ty = case splitTyConApp_maybe ty of
   Nothing -> pure Nothing
   Just (tc, tc_args) -> do
@@ -125,22 +124,24 @@ initIM ty = case splitTyConApp_maybe ty of
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
-    pure (IM tc . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
+    pure (PM tc . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
 
-markMatched :: ConLike -> IncompleteMatches -> IncompleteMatches
-markMatched con (IM tc ms) = IM tc (fmap (`delOneFromUniqSet` con) ms)
+markMatched :: ConLike -> PossibleMatches -> PossibleMatches
+markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqSet` con) ms)
+markMatched con NoPM = NoPM
 
 ensureInhabited :: Monad m
                 => (ConLike -> m Bool)   -- Oracle: True <=> this ConLike is inhabited
-                -> IncompleteMatches
-                -> m (Maybe IncompleteMatches)
+                -> PossibleMatches
+                -> m (Maybe PossibleMatches)
    -- Returns (Just im) guarantees that at least one member
    -- of each ConLikeSet satisfies the oracle
    --
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
-ensureInhabited inh_test (IM tc ms) = runMaybeT (IM tc <$> traverse one_set ms)
+ensureInhabited inh_test NoPM = pure (Just NoPM)
+ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
   where
     one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
 
@@ -154,11 +155,25 @@ ensureInhabited inh_test (IM tc ms) = runMaybeT (IM tc <$> traverse one_set ms)
       True  -> pure cs
       False -> find_one_inh (delOneFromUniqSet cs con) cons
 
+-- | Satisfiability decisions as a data type. The @proof@ can carry a witness
+-- for satisfiability and might even be instantiated to 'Data.Void.Void' to
+-- degenerate into a semi-decision predicate.
+data Satisfiability proof
+  = Unsatisfiable
+  | PossiblySatisfiable
+  | Satisfiable !proof
+
+maybeSatisfiable :: Maybe a -> Satisfiability a
+maybeSatisfiable (Just a) = Satisfiable a
+maybeSatisfiable Nothing  = Unsatisfiable
+
 -- | Tries to return one of the possible 'ConLike's from one of the COMPLETE
--- sets. If the 'IncompleteMatches' was inhabited before (cf. 'ensureInhabited')
+-- sets. If the 'PossibleMatches' was inhabited before (cf. 'ensureInhabited')
 -- this 'ConLike' is evidence for that assurance.
-getUnmatchedConstructor :: IncompleteMatches -> Maybe ConLike
-getUnmatchedConstructor (IM _tc ms) = NonEmpty.head <$> traverse pick_one_conlike ms
+getUnmatchedConstructor :: PossibleMatches -> Satisfiability ConLike
+getUnmatchedConstructor NoPM = PossiblySatisfiable
+getUnmatchedConstructor (PM _tc ms)
+  = maybeSatisfiable $ NonEmpty.head <$> traverse pick_one_conlike ms
   where
     pick_one_conlike cs = case nonDetEltsUniqSet cs of
       [] -> Nothing
@@ -211,8 +226,8 @@ pmInitialTmTyCs = do
   tm_cs  <- bagToList <$> getTmCsDs
   sat_ty <- tyOracle ty_cs
   let initTyCs = if sat_ty then ty_cs else emptyBag
-      initTmState = fromMaybe initialTmState (pmOracle initialTmState tm_cs)
-  pure $ MkDelta initTyCs initTmState
+  let initDelta = MkDelta initTyCs initialTmState
+  fromMaybe initDelta <$> pmOracle initDelta tm_cs
 
 -- | Information about a conlike that is relevant to coverage checking.
 -- It is called an \"inhabitation candidate\" since it is a value which may
@@ -236,17 +251,12 @@ instance Outputable InhabitationCandidate where
 
 ensureAllPossibleSetsInhabited :: Delta -> PmM (Maybe Delta)
 ensureAllPossibleSetsInhabited delta@MkDelta{ delta_tm_cs = TS env }
-  = runMaybeT (set_tm_cs_env delta <$> traverseDVarEnv go env)
+  = runMaybeT (set_tm_cs_env delta <$> traverseSharedIdEnv go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_cs = TS env }
-    traverseDVarEnv f
-      = fmap listToUDFM
-      . traverse (\(u,a) -> (u,) <$> f a)
-      . udfmToList
-    go (VI ty (CompleteSets im) neg) = do
-      im' <- MaybeT (ensureInhabited (testInhabited delta ty) im)
-      pure (VI ty (CompleteSets im') neg)
-    go vi = pure vi
+    go (VI ty pos neg pm) = do
+      pm' <- MaybeT (ensureInhabited (testInhabited delta ty) pm)
+      pure (VI ty pos neg pm')
 
 -- | Given a 'Delta', check if it is compatible with new facts encoded in this
 -- this check. If so, return 'Just' a potentially extended 'Delta'. Return
@@ -276,14 +286,11 @@ instance Monoid SatisfiabilityCheck where
 -- Returns a new 'Delta' if the new constraints are compatible with existing
 -- ones.
 tmIsSatisfiable :: Bag TmVarCt -> SatisfiabilityCheck
-tmIsSatisfiable new_tm_cs = SC $ \delta ->
-  case pmOracle (delta_tm_cs delta) new_tm_cs of
-    Nothing  -> pure Nothing
-    Just ts' -> pure (Just delta{ delta_tm_cs = ts'})
+tmIsSatisfiable new_tm_cs = SC $ \delta -> pmOracle delta new_tm_cs
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing
--- ones. Will only recheck 'IncompleteMatches' in the term oracle for emptiness
+-- ones. Will only recheck 'PossibleMatches' in the term oracle for emptiness
 -- if the first argument is 'True'.
 tyIsSatisfiable :: Bool -> Bag EvVar -> SatisfiabilityCheck
 tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
@@ -649,11 +656,10 @@ mkOneConFull x con = do
   let arg_tys' = substTys subst arg_tys
   -- Fresh term variables (VAs) as arguments to the constructor
   vars <- mapM mkPmId arg_tys'
-  let args = map PmExprVar vars
   -- All constraints bound by the constructor (alpha-renamed)
   let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   evvars <- mapM (nameType "pm") theta_cs
-  let expr = PmExprCon (PmAltConLike con) args
+  let expr = PmExprCon (PmAltConLike con) vars
       strict_arg_tys = filterByList arg_is_banged arg_tys'
   let ic = InhabitationCandidate
            { ic_tm_cs          = unitBag (TVC x expr)
@@ -705,8 +711,15 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
                           , intTyCon, wordTyCon, word8TyCon ]
 
-    build_tm :: PmExpr -> [DataCon] -> PmExpr
-    build_tm = foldr (\dc e -> mkPmExprData dc [e])
+    build_newtype :: DataCon -> Id -> DsM (Id, TmVarCt)
+    build_newtype dc x = do
+      y <- mkPmId (mkTyConApp (dataConTyCon dc) [idType x])
+      pure (y, TVC y (mkPmExprData dc [x]))
+
+    build_newtypes :: Id -> [DataCon] -> DsM (Id, [TmVarCt])
+    build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
+      where
+        go dc x cts = second (:cts) <$> build_newtype dc x
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
     alts_to_check :: Type -> Type -> [DataCon]
@@ -717,10 +730,9 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
         -> case dcs of
              []    -> return (Left src_ty)
              (_:_) -> do inner <- mkPmId core_ty
-                         let expr = build_tm (PmExprVar inner) dcs
-                         outer <- mkPmId src_ty
+                         (outer, new_tm_cts) <- build_newtypes inner dcs
                          return $ Right (tc, outer, [InhabitationCandidate
-                           { ic_tm_cs = unitBag (TVC outer expr)
+                           { ic_tm_cs = listToBag new_tm_cts
                            , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }])
 
         |  pmIsClosedType core_ty && not (isAbstractTyCon tc)
@@ -730,9 +742,8 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
         -> do
              inner <- mkPmId core_ty -- it would be wrong to unify inner
              alts <- mapM (fmap fstOf3 . mkOneConFull inner . RealDataCon) (tyConDataCons tc)
-             outer <- mkPmId src_ty
-             let new_tm_ct = TVC outer (build_tm (PmExprVar inner) dcs)
-             let wrap_dcs alt = alt{ ic_tm_cs = new_tm_ct `consBag` ic_tm_cs alt}
+             (outer, new_tm_cts) <- build_newtypes inner dcs
+             let wrap_dcs alt = alt{ ic_tm_cs = listToBag new_tm_cts `unionBags` ic_tm_cs alt}
              return $ Right (tc, outer, map wrap_dcs alts)
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
@@ -853,15 +864,73 @@ data TmState = TmS
   }
 -}
 
-newtype TmState = TS (DIdEnv (Either Id VarInfo))
+data Blarg a
+  = Indirect Id
+  | Entry a
+
+-- |
+newtype SharedDIdEnv a
+  = SDIE { unSDIE :: DIdEnv (Blarg a) }
+
+emptySDIE :: SharedDIdEnv a
+emptySDIE = SDIE emptyDVarEnv
+
+lookupReprAndEntrySDIE :: SharedDIdEnv a -> Id -> (Id, Maybe a)
+lookupReprAndEntrySDIE sdie@(SDIE env) x = case lookupDVarEnv env x of
+  Nothing           -> (x, Nothing)
+  Just (Indirect y) -> lookupReprAndEntrySDIE sdie y
+  Just (Entry a)    -> (x, Just a)
+
+-- | @lookupSDIE env x@ looks up an entry for @x@, looking through all
+-- 'Indirect's until it finds a shared 'Entry'.
+lookupSDIE :: SharedDIdEnv a -> Id -> Maybe a
+lookupSDIE sdie x = snd (lookupReprAndEntrySDIE sdie x)
+
+sameRepresentative :: SharedDIdEnv a -> Id -> Id -> Bool
+sameRepresentative sdie x y =
+  fst (lookupReprAndEntrySDIE sdie x) == fst (lookupReprAndEntrySDIE sdie y)
+
+-- | @setIndirectSDIE env x y@ sets @x@'s 'Entry' to @Indirect y@, thereby
+-- merging @x@'s equivalence class into @y@'s. This will discard all info on
+-- @x@!
+setIndirectSDIE :: SharedDIdEnv a -> Id -> Id -> SharedDIdEnv a
+setIndirectSDIE sdie@(SDIE env) x y =
+  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Indirect y)
+
+-- | @setEntrySDIE env x a@ sets the 'Entry' @x@ is associated with to @a@,
+-- thereby modifying its whole equivalence class.
+setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
+setEntrySDIE sdie@(SDIE env) x a =
+  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
+
+mapEntriesSDIE :: (a -> b) -> SharedDIdEnv a -> SharedDIdEnv b
+mapEntriesSDIE f (SDIE env) = SDIE (mapDVarEnv g env)
+  where
+    g (Indirect x) = Indirect x
+    g (Entry a) = Entry (f a)
+
+traverseSharedIdEnv :: Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
+traverseSharedIdEnv f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unSDIE
+  where
+    g (u, Indirect y) = pure (u,Indirect y)
+    g (u, Entry a)    = (u,) . Entry <$> f a
+
+instance Outputable a => Outputable (Blarg a) where
+  ppr (Indirect x) = ppr x
+  ppr (Entry a)    = ppr a
+
+instance Outputable a => Outputable (SharedDIdEnv a) where
+  ppr (SDIE env) = ppr env
+
+newtype TmState = TS (SharedDIdEnv VarInfo)
   -- Deterministic so that we generate deterministic error messages
 
 data VarInfo
   = VI
-  { _vi_ty :: !Type           -- the type of what 'vi_pos' and 'vi_neg' refer to
-  , vi_pos :: !PossibleShape  -- Positive info: things it could be
-  , vi_neg :: ![PmAltCon]     -- Negative info: it is not headed by these AltCons
-      -- Invariant: vi_pos and vi_neg never contradict each other
+  { vi_ty  :: Type -- The type of the variable, think Gamma. Important for rejecting possible GADT constructors or incompatible pattern synonyms (think Just42).
+  , vi_pos :: [(PmAltCon, [Id])] -- Positive info: things it is, all at the same time (think: intersection). Therefore no more than one RealDataCon, otherwise contradiction. TODO: Of these, the data con solution is special in that it is an actual solution, the others just denote equivalent expressions, similar to guards. We'll probably change this representation later on. BUT: On the other hand, these things will have to be inhabitated individually, so this is more information than just equiavelence to an arbitrary expression
+  , vi_neg :: [PmAltCon]         -- Negative info: it is not headed by these AltCons. must be orthogonal to anything from vi_pos
+  , vi_cache :: PossibleMatches -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
   }
 
 {- Note [Maintaining invariantes in TmState]
@@ -883,7 +952,7 @@ data PossibleShape
       -- The PmExpr is: a data con application, literal
       --  ToDo:  Rigid PmAltCon [Id], perhaps
 
-  | CompleteSets !IncompleteMatches
+  | CompleteSets !PossibleMatches
 
   | NoInfoYet    -- The type of the variable is not (yet) a data type
 
@@ -924,10 +993,8 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI _ty pos neg) = if null neg then pos_pp else braces (neg_pp <> char ',' <+> pos_pp)
-    where
-      neg_pp = char '¬' <> ppr neg
-      pos_pp = ppr pos
+  ppr (VI ty pos neg cache)
+    = braces (fsep (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
 
 -- | Not user-facing.
 instance Outputable PossibleShape where
@@ -936,19 +1003,15 @@ instance Outputable PossibleShape where
   ppr (CompleteSets sets) = ppr sets
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) NoInfoYet []
+emptyVarInfo x = VI (idType x) [] [] NoPM
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
-initialTmState = TS emptyDVarEnv
+initialTmState = TS emptySDIE
 
-lookupVarInfo :: TmState -> Id -> (Id, VarInfo)
+lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
--- The returned Id is the representative of the
---   equivalence class
-lookupVarInfo ts@(TS env) x = case lookupDVarEnv env x of
-  Just (VI _ (Rigid (PmExprVar y)) _) -> lookupVarInfo ts y
-  mb_vi                               -> (x, fromMaybe (emptyVarInfo x) mb_vi)
+lookupVarInfo ts@(TS env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
@@ -959,38 +1022,60 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI _ pos [] <- snd (lookupVarInfo ts x), not_solved_yet pos
+  | VI _ [] [] _ <- lookupVarInfo ts x
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
   | otherwise = False
-  where
-    not_solved_yet (Rigid PmExprCon{}) = False
-    not_solved_yet _                   = True
+
+lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
+-- Unfortunately we need the extra bit of polymorphism and the unfortunate
+-- duplication of lookupVarInfo here.
+lookupRefuts MkDelta{ delta_tm_cs = ts@(TS (SDIE env)) } k =
+  case lookupUDFM env k of
+    Nothing -> []
+    Just (Indirect y) -> vi_neg (lookupVarInfo ts y)
+    Just (Entry vi)   -> vi_neg vi
+
+isDataConSolution :: (PmAltCon, [Id]) -> Bool
+isDataConSolution (PmAltConLike (RealDataCon _), _) = True
+isDataConSolution _                                 = False
+
+-- @lookupSolution delta x@ picks a single solution ('vi_pos') of @x@ from
+-- possibly many, preferring 'RealDataCon' solutions whenever possible.
+lookupSolution :: Delta -> Id -> Maybe (PmAltCon, [Id])
+lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_cs delta) x) of
+  []                                       -> Nothing
+  pos
+    | Just sol <- find isDataConSolution pos -> Just sol
+    | otherwise                            -> Just (head pos)
 
 -- | Check whether the equality @x ~ e@ leads to a refutation. Make sure that
 -- @x@ and @e@ are completely substituted before!
 isRefutable :: Id -> PmExpr -> TmState -> Bool
 isRefutable x e ts = fromMaybe False $ do
   alt <- exprToAlt e
-  let ncons = vi_neg (snd (lookupVarInfo ts x))
+  let ncons = vi_neg (lookupVarInfo ts x)
   pure (notNull (filter ((== Just True) . decEqPmAltCon alt) ncons))
 
--- | Solve an equality (top-level).
-solveOneEq :: TmState -> TmVarCt -> Maybe TmState
-solveOneEq solver_env (TVC x e) = unify solver_env (PmExprVar x, e)
+-- | Solve a term equality (top-level).
+solveOneEq :: Delta -> TmVarCt -> DsM (Maybe Delta)
+solveOneEq delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
 
 exprToAlt :: PmExpr -> Maybe PmAltCon
 exprToAlt (PmExprCon c _) = Just c
 exprToAlt _               = Nothing
 
-initIncompleteMatches :: VarInfo -> DsM PossibleShape
-initIncompleteMatches (VI ty NoInfoYet neg) = initIM ty >>= \case
-  Nothing -> pure NoInfoYet
-  Just im -> pure (CompleteSets (markRefutsMatched neg im))
-initIncompleteMatches vi                    = pure (vi_pos vi)
+initPossibleMatches :: VarInfo -> DsM VarInfo
+initPossibleMatches vi@(VI ty pos neg NoPM) = initIM ty >>= \case
+  Nothing -> pure vi
+  Just pm -> pure (VI ty pos neg pm)
+initPossibleMatches vi                      = pure vi
 
-markRefutsMatched :: [PmAltCon] -> IncompleteMatches -> IncompleteMatches
+initLookupVarInfo :: TmState -> Id -> DsM VarInfo
+initLookupVarInfo ts x = initPossibleMatches (lookupVarInfo ts x)
+
+markRefutsMatched :: [PmAltCon] -> PossibleMatches -> PossibleMatches
 markRefutsMatched refuts im = foldr markMatched im (mapMaybe asPmAltConLike refuts)
 
 asPmAltConLike :: PmAltCon -> Maybe ConLike
@@ -999,7 +1084,7 @@ asPmAltConLike _                 = Nothing
 
 refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
-  pure ((, []) <$> solveVar delta x (PmExprCon l []))
+  fmap (, []) <$> solveOneEq delta (TVC x (PmExprCon l []))
 refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
   mkOneSatisfiableConFull delta x con >>= \case
     Nothing                         -> pure Nothing
@@ -1013,35 +1098,40 @@ refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
       tracePm "matched at all" (ppr (delta_tm_cs delta2))
       pure (Just (delta2, arg_vas))
 
-provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [[PmExpr]]
+provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
 -- (provideEvidenceForEquation vs n delta) returns a list of
 -- at most n (but perhaps empty) of expression-lists that can
 -- match 'vs' without contradicting delta
 provideEvidenceForEquation _      0 _     = pure []
-provideEvidenceForEquation []     _ _     = pure [[]]
+provideEvidenceForEquation []     _ delta = pure [delta]
 provideEvidenceForEquation (x:xs) n delta = do
-  let (_, vi) = lookupVarInfo (delta_tm_cs delta) x
-  pos <- initIncompleteMatches vi
+  VI _ty pos _neg pm <- initLookupVarInfo (delta_tm_cs delta) x
   case pos of
-    NoInfoYet -> -- No COMPLETE sets available, so we can assume it's inhabited
-      map (PmExprVar x:) <$> provideEvidenceForEquation xs n delta
-    Rigid e ->
-      -- We have a solution for x, and delta already knows about it.
-      -- So nothing to do here
-      map (e:) <$> provideEvidenceForEquation xs n delta
-        - ToDo!  recursively invoke on arguments
-    CompleteSets im -> -- We have to pick one of the available constructors
-      case getUnmatchedConstructor im of
-        Nothing -> pure []
-        Just cl -> do
+    _:_ -> do
+      -- All solutions must be valid at once. Try to find candidates for their
+      -- fields. Example:
+      --   f x@(Just _) True = case x of SomePatSyn _ -> ()
+      --   f _          False = ()
+      -- after this clause, @x@ will have two possibly compatible solutions,
+      -- @Just y@ for some @y@ and @SomePatSyn z@ for some @z@. We must find
+      ---evidence for @y@ and @z@ that is valid at the same time.
+      let arg_vas = concatMap (\(_cl, args) -> args) pos
+      provideEvidenceForEquation (arg_vas ++ xs) n delta
+    [] ->
+      -- We have to pick one of the available constructors and try it
+      -- It's important that each of the ConLikeSets in pm is still inhabited,
+      -- so that it doesn't matter from which we pick.
+      -- I think we implicitly uphold that invariant, but not too sure
+      case getUnmatchedConstructor pm of
+        Unsatisfiable -> pure []
+        -- No COMPLETE sets available, so we can assume it's inhabited
+        PossiblySatisfiable -> provideEvidenceForEquation xs n delta
+        Satisfiable cl -> do
           -- This will be really similar to the ConVar case
           ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
             Nothing                          -> pure []
-            Just (delta', _ex_tvs2, arg_vas) -> do
-              let replace_args_by_con exprs = case splitAt (length arg_vas) exprs of
-                    (args, rest) -> PmExprCon (PmAltConLike cl) args : rest
-              map replace_args_by_con <$>
-                provideEvidenceForEquation (arg_vas ++ xs) n delta'
+            Just (delta', _ex_tvs2, arg_vas) ->
+              provideEvidenceForEquation (arg_vas ++ xs) n delta'
 
           -- Only n' more equations to go...
           let n' = n - length ev_pos
@@ -1177,43 +1267,26 @@ equateTyVars ex_tvs1 ex_tvs2
     to_evvar tv1 tv2 = nameType "pmConCon" $
                        mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
 
-solveVar :: Delta -> Id -> PmExpr -> Maybe Delta
-solveVar delta x e =
-  case solveOneEq (delta_tm_cs delta) (TVC x e) of
-    Nothing -> Nothing
-    Just ts -> Just delta{ delta_tm_cs = ts }
-
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'TmState' and return @Nothing@ if that leads to a contradiction.
 -- See Note [Refutable shapes].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = do
-    possible_shape <- initIncompleteMatches vi
-    mb_pos'        <- go possible_shape
-
-    let new_delta pos = delta{ delta_tm_cs = TS (extendDVarEnv env y pos) }
-    pure (new_delta <$> mb_pos')
-  where
-    (y, vi@(VI ty _ neg)) = lookupVarInfo ts x
-    neg' = combineRefutEntries neg [nalt]
-
-    go NoInfoYet = pure (Just (VI ty NoInfoYet neg'))
-    go pos@(CompleteSets im) =
-      case nalt of
-        PmAltConLike cl ->
-          ensureInhabited (testInhabited delta ty) (markMatched cl im) >>= \case
-            Nothing -> pure Nothing
-            Just im' -> pure (Just (VI ty (CompleteSets im') neg'))
-        _ -> pure (Just (VI ty pos neg'))
-    go pos@(Rigid (exprToAlt -> Just alt)) =
-      -- We have to take care to preserve Note [The Pos/Neg invariant]
-      pure $ case decEqPmAltCon alt nalt of -- We have a solution
-        Just True  -> Nothing               -- ... that is contradictory
-        Just False -> Just (VI ty pos neg)  -- ... that is compatible, rendering
-                                            --     the refutation redundant
-        Nothing    -> Just (VI ty pos neg') -- ... which is incomparable, so
-                                            --     might refute later
-    go pos = pure (Just (VI ty pos neg'))
+tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMaybeT $ do
+  vi@(VI ty pos neg pm) <- lift (initLookupVarInfo ts x)
+  -- 1. Bail out quickly when nalt contradicts a solution
+  let contradicts nalt (cl, _args) = decEqPmAltCon cl nalt == Just True
+  guard (not (any (contradicts nalt) pos))
+  -- 2. Only record the new fact when it's not already implied by one of the
+  -- solutions
+  let implies nalt (cl, _args) = decEqPmAltCon cl nalt == Just False
+  let neg'
+        | any (implies nalt) pos = neg
+        | otherwise              = combineRefutEntries neg [nalt]
+  -- 3. Make sure there's at least one other possible constructor
+  pm' <- case nalt of
+    PmAltConLike cl -> MaybeT (ensureInhabited (testInhabited delta ty) (markMatched cl pm))
+    _               -> pure pm
+  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
 
 testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 -- @testInhabited delta ty K@ Returns False if
@@ -1263,134 +1336,89 @@ testInhabited delta res_ty con = do
 combineRefutEntries :: [PmAltCon] -> [PmAltCon] -> [PmAltCon]
 combineRefutEntries old_ncons new_ncons = unionLists old_ncons new_ncons
 
--- | Is the given variable /rigid/ (i.e., we have a solution for it) or
--- /flexible/ (i.e., no solution)? Returns the solution if /rigid/. A
--- semantically helpful alias for 'lookupVarEnv'.
-isRigid :: TmState -> Id -> Maybe PmExpr
-isRigid (TS env) x = do
-  VI _ pos _ <- lookupDVarEnv env x
-  case pos of
-    Rigid e -> Just e
-    _       -> Nothing
-
--- | @isFlexible tms = isNothing . 'isRigid' tms@
-isFlexible :: TmState -> Id -> Bool
-isFlexible ts = isNothing . isRigid ts
-
 -- | Try to unify two 'PmExpr's and record the gained knowledge in the
 -- 'TmState'.
 --
 -- Returns @Nothing@ when there's a contradiction. Returns @Just ts@
 -- when the constraint was compatible with prior facts, in which case @ts@ has
 -- integrated the knowledge from the equality constraint.
-unify :: TmState -> (PmExpr, PmExpr) -> Maybe TmState
-unify ts eq@(e1, e2) = case eq of
+unify :: Delta -> (PmExpr, PmExpr) -> MaybeT DsM Delta
+unify delta@MkDelta{ delta_tm_cs = TS env } eq@(e1, e2) = case eq of
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
     -- See Note [Undecidable Equality for PmAltCons]
-    Just True -> foldlM unify ts (zip ts1 ts2)
+    Just True -> foldlM unify delta (zip (map PmExprVar ts1) (map PmExprVar ts2))
     Just False -> unsat
     Nothing -> boring
 
-  (PmExprVar x, PmExprVar y)
-    | x == y    -> boring
-
-  -- It's important to handle both rigid cases before the flexible ones,
-  -- otherwise we get cyclic substitutions. Cf. 'extendSubstAndSolve' and
+  -- It's important that we never @equate@ two variables of the same equivalence
+  -- class, otherwise we might get cyclic substitutions.
+  -- Cf. 'extendSubstAndSolve' and
   -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
-  (PmExprVar x, _)
-    | isRefutable x e2 ts -> unsat
-  (_, PmExprVar y)
-    | isRefutable y e1 ts -> unsat
-  (PmExprVar x, _)
-    | Just e1' <- isRigid ts x     -> unify ts (e1', e2)
-  (_, PmExprVar y)
-    | Just e2' <- isRigid ts y     -> unify ts (e1, e2')
-  (PmExprVar x, PmExprVar y)       -> equate x y ts
-  (PmExprVar x, PmExprCon c args)  -> trySolve x c args ts
-  (PmExprCon c args, PmExprVar y)  -> trySolve y c args ts
+  (PmExprVar x, PmExprVar y)
+    | sameRepresentative env x y -> boring
+    | otherwise                  -> equate delta x y
+  (PmExprVar x, PmExprCon c args)  -> trySolve delta x c args
+  (PmExprCon c args, PmExprVar y)  -> trySolve delta y c args
   where
-    boring    = Just ts
-    unsat     = Nothing
+    boring = pure delta
+    unsat  = mzero
 
--- | Merges the equivalence classes of @x@ and @y@ by extending the substitution
--- with @x :-> y@.
--- Preconditions: @x /= y@ and both @x@ and @y@ are flexible (cf.
--- 'isFlexible'/'isRigid').
-equate :: Id -> Id -> TmState -> Maybe TmState
-equate x y ts@(TS env)
-  = ASSERT( x /= y )
-    ASSERT( isFlexible ts x )
-    ASSERT( isFlexible ts y )
-    ts' <$> mb_pos_y'
-  where
-    VI ty_x _     neg_x = snd (lookupVarInfo ts x)
-    VI ty_y pos_y neg_y = snd (lookupVarInfo ts y)
-    vi_x'               = VI ty_x (Rigid (PmExprVar y)) []
-    -- Be careful to uphold Note [The Pos/Neg invariant] by merging the refuts
-    -- of x into those of y. We also have to weed out the COMPLETE sets of pos_y
-    -- refuted by neg_x here.
-    mb_pos_y' = weed_out_cs neg_x pos_y
-    ts' pos_y' = TS (extendDVarEnv (extendDVarEnv env x vi_x') y vi_y')
-      where
-        vi_y' = VI ty_y pos_y' (combineRefutEntries neg_x neg_y)
-
-    weed_out_cs negs (CompleteSets im) = CompleteSets <$> mb_im2
-      where
-        im1                  = foldr markMatched im (mapMaybe cl negs)
-        cl (PmAltConLike cl) = Just cl
-        cl _                 = Nothing
-        mb_im2               = runIdentity (ensureInhabited inh_test im1)
-        -- Since we don't want to run the type-checker here, just use a conservative
-        -- inhabitation test
-        inh_test _           = Identity True
-    weed_out_cs _   pos                = Just pos
+-- | @equate ts@(TS env) x y@ merges the equivalence classes of @x@ and @y@ by
+-- adding an indirection to the environment.
+-- Makes sure that the positive and negative facts of @x@ and @y@ are
+-- compatible.
+-- Preconditions: @not (sameRepresentative env x y)@
+equate :: Delta -> Id -> Id -> MaybeT DsM Delta
+equate delta@MkDelta{ delta_tm_cs = TS env } x y
+  = ASSERT( not (sameRepresentative env x y) )
+    case (lookupSDIE env x, lookupSDIE env y) of
+      (Nothing, _) -> pure (delta{ delta_tm_cs = TS (setIndirectSDIE env x y) })
+      (_, Nothing) -> pure (delta{ delta_tm_cs = TS (setIndirectSDIE env y x) })
+      -- Merge the info we have for x into the info for y
+      (Just vi_x, Just vi_y) -> do
+        -- This assert will probably trigger at some point...
+        -- We should decide how to break the tie
+        MASSERT2( vi_ty vi_x `eqType` vi_ty vi_y, text "Not same type" )
+        -- First assume that x and y are in the same equivalence class
+        let delta_ind = delta{ delta_tm_cs = TS (setIndirectSDIE env x y) }
+        -- and then gradually merge every positive fact we have on x into y
+        let add_fact delta (cl, args) = trySolve delta y cl args
+        delta_pos <- foldlM add_fact delta_ind (vi_pos vi_x)
+        -- Do the same for negative info
+        let add_refut delta nalt = MaybeT (tryAddRefutableAltCon delta y nalt)
+        delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
+        -- vi_cache will be updated in tryAddRefutableAltCon, so we are good to
+        -- go!
+        pure delta_neg
 
 -- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
 -- solution, reject (@Nothing@) otherwise.
 --
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
-trySolve:: Id -> PmAltCon -> [PmExpr] -> TmState -> Maybe TmState
-trySolve x alt args ts@(TS env)
-  | ASSERT( isFlexible ts x )
-    isRefutable x e ts
-  = Nothing
-  | otherwise
-  = Just ts'
-  where
-    e = PmExprCon alt args
-    VI ty _ neg = snd (lookupVarInfo ts x)
-    -- Uphold Note [The Pos/Neg invariant]
-    vi' = VI ty (Rigid e) (filter ((== Nothing) . decEqPmAltCon alt) neg)
-    ts' = TS (extendDVarEnv env x vi')
-
--- | When we know that a variable is fresh, we do not actually have to
--- check whether anything changes, we know that nothing does. Hence,
--- @extendSubst@ simply extends the substitution, unlike what
--- 'extendSubstAndSolve' does.
-extendSubst :: Id -> PmExpr -> TmState -> TmState
-extendSubst y e (TS env) = TS (extendDVarEnv env y (VI (idType y) (Rigid e) []))
-
--- | Apply an (un-flattened) substitution to an expression.
-exprDeepLookup :: Delta -> PmExpr -> PmExpr
-exprDeepLookup delta (PmExprCon c es) = PmExprCon c (map (exprDeepLookup delta) es)
-exprDeepLookup delta (PmExprVar x)
-  | Rigid e <- vi_pos (snd (lookupVarInfo (delta_tm_cs delta) x))
-  = exprDeepLookup delta e
-exprDeepLookup _   e               = e
-
-wrapUpRefutableShapes :: Delta -> DVarEnv [PmAltCon]
-wrapUpRefutableShapes MkDelta{ delta_tm_cs = ts@(TS env) }
-  = filterDVarEnv notNull (mapDVarEnv f env)
-  where
-    -- Unfortunate overlap with lookupVarInfo here, because we don't have the
-    -- Id
-    f (VI _ (Rigid (PmExprVar y)) _) = vi_neg (snd (lookupVarInfo ts y))
-    f (VI _ _ neg)                   = neg
+trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
+trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
+  VI ty pos neg cache <- lift (initLookupVarInfo ts x)
+  -- First try to refute with a negative fact
+  guard (all ((/= Just True) . decEqPmAltCon alt) neg)
+  -- Then see if any of the other solutions (remember: each of them is an
+  -- additional refinement of the possible values x could take) indicate a
+  -- contradiction
+  guard (all ((/= Just False) . decEqPmAltCon alt . fst) pos)
+  -- Now we should be good! Add (alt, args) as a possible solution, or refine an
+  -- existing one
+  case find ((== Just True) . decEqPmAltCon alt . fst) pos of
+    Just (_, other_args) -> foldlM (uncurry . equate) delta (zip args other_args)
+    Nothing -> do
+      -- Filter out redundant negative facts (those that compare Just False to
+      -- the new solution)
+      let neg' = filter ((== Nothing) . decEqPmAltCon alt) neg
+      let pos' = (alt,args):pos
+      pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
 
 -- | External interface to the term oracle.
-pmOracle :: Foldable f => TmState -> f TmVarCt -> Maybe TmState
-pmOracle tm_state eqs = foldlM solveOneEq tm_state eqs
+pmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)
+pmOracle = (runMaybeT .) . foldlM ((MaybeT .)  . solveOneEq)
 
 {- Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
