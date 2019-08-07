@@ -1407,9 +1407,13 @@ checkExpectedKind_pp pp_hs_ty ty act_kind exp_kind
 
        ; let res_ty = ty `mkTcAppTys` new_args
 
+       ; dflags <- getDynFlags
+       ; let allow_impred_unif = xopt LangExt.ImpredicativeTypes dflags
+
        ; if act_kind' `tcEqType` exp_kind
          then return res_ty  -- This is very common
-         else do { co_k <- uType KindLevel origin False act_kind' exp_kind
+         else do { co_k <- uType KindLevel origin allow_impred_unif
+                                 act_kind' exp_kind
                  ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                                      , ppr exp_kind
                                                      , ppr co_k ])
