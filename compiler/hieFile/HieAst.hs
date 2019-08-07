@@ -38,6 +38,7 @@ import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import MkIface                    ( mkIfaceExports )
+import Panic
 
 import HieTypes
 import HieUtils
@@ -161,7 +162,7 @@ getRealSpan _ = Nothing
 
 grhss_span :: GRHSs p body -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLoc bs) (map getLoc xs)
-grhss_span (XGRHSs _) = error "XGRHS has no span"
+grhss_span (XGRHSs _) = panic "XGRHS has no span"
 
 bindingsOnly :: [Context Name] -> [HieAST a]
 bindingsOnly [] = []
@@ -245,7 +246,7 @@ patScopes
   -> [LPat (GhcPass p)]
   -> [PScoped (LPat (GhcPass p))]
 patScopes rsp useScope patScope xs =
-  map (\(RS sc a) -> PS rsp useScope sc (unLoc a)) $
+  map (\(RS sc a) -> PS rsp useScope sc (composeSrcSpan a)) $
     listScopes patScope (map dL xs)
 
 -- | 'listScopes' specialised to 'TVScoped' things
@@ -300,7 +301,8 @@ instance ProtectSig GhcTc where
 instance ProtectSig GhcRn where
   protectSig sc (HsWC a (HsIB b sig)) =
     HsWC a (HsIB b (SH sc sig))
-  protectSig _ _ = error "protectSig not given HsWC (HsIB)"
+  protectSig _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+  protectSig _ (XHsWildCardBndrs nec) = noExtCon nec
 
 class HasLoc a where
   -- ^ defined so that HsImplicitBndrs and HsWildCardBndrs can
@@ -350,6 +352,21 @@ instance HasLoc (HsDataDefn GhcRn) where
 
 instance HasLoc (Pat (GhcPass a)) where
   loc (dL -> L l _) = l
+
+{- Note [Real DataCon Name]
+The typechecker subtitutes the conLikeWrapId for the name, but we don't want
+this showing up in the hieFile, so we replace the name in the Id with the
+original datacon name
+See also Note [Data Constructor Naming]
+-}
+class HasRealDataConName p where
+  getRealDataCon :: XRecordCon p -> Located (IdP p) -> Located (IdP p)
+
+instance HasRealDataConName GhcRn where
+  getRealDataCon _ n = n
+instance HasRealDataConName GhcTc where
+  getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
+    L sp (setVarName var (conLikeName con))
 
 -- | The main worker class
 class ToHie a where
@@ -737,6 +754,7 @@ instance ( a ~ GhcPass p
          , Data (HsSplice a)
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
+         , (HasRealDataConName a)
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -817,8 +835,9 @@ instance ( a ~ GhcPass p
       ExplicitList _ _ exprs ->
         [ toHie exprs
         ]
-      RecordCon {rcon_con_name = name, rcon_flds = binds}->
-        [ toHie $ C Use name
+      RecordCon {rcon_ext = mrealcon, rcon_con_name = name, rcon_flds = binds} ->
+        [ toHie $ C Use (getRealDataCon @a mrealcon name)
+            -- See Note [Real DataCon Name]
         , toHie $ RC RecFieldAssign $ binds
         ]
       RecordUpd {rupd_expr = expr, rupd_flds = upds}->
