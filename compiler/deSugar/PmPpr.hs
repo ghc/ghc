@@ -13,7 +13,6 @@ import GhcPrelude
 import Id
 import VarEnv
 import UniqDFM
-import UniqSet
 import ConLike
 import DataCon
 import TysWiredIn
@@ -126,13 +125,9 @@ checkRefuts x = do
     [] -> pure Nothing -- Will just be a wildcard later on
     _  -> Just <$> getCleanName x
 
--- | Pretty print a pmexpr, but remember to prettify the names of the variables
+-- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
-pprPmExpr :: Int -> PmExpr -> PmPprM SDoc
-pprPmExpr prec (PmExprVar x)        = pprPmExprVar prec x
-pprPmExpr prec (PmExprCon con args) = pprPmExprCon prec con args
-
 pprPmExprVar :: Int -> Id -> PmPprM SDoc
 pprPmExprVar prec x = do
   delta <- ask
@@ -140,34 +135,27 @@ pprPmExprVar prec x = do
     Just (alt, args) -> pprPmExprCon prec alt args
     Nothing          -> fromMaybe underscore <$> checkRefuts x
 
-needsParens :: PmExpr -> Bool
-needsParens (PmExprVar   {})            = False
-needsParens (PmExprCon (PmAltLit l) _)  = isNegatedPmLit l
-needsParens (PmExprCon (PmAltConLike (RealDataCon c)) _)
-  | isTupleDataCon c || isConsDataCon c = False
-needsParens (PmExprCon _ es)            = not (null es)
-
 pprPmExprCon :: Int -> PmAltCon -> [Id] -> PmPprM SDoc
-pprPmExprCon prec (PmAltLit l)      _    = pure (ppr l)
-pprPmExprCon prec (PmAltConLike cl) args = do
+pprPmExprCon _prec (PmAltLit l)      _    = pure (cparen (isNegatedPmLit l) (ppr l))
+pprPmExprCon prec  (PmAltConLike cl) args = do
   delta <- ask
   pprConLike delta prec cl args
 
 pprConLike :: Delta -> Int -> ConLike -> [Id] -> PmPprM SDoc
-pprConLike delta prec cl args
+pprConLike delta _prec cl args
   | Just pm_expr_list <- pmExprAsList delta (PmExprCon (PmAltConLike cl) args)
   = case pm_expr_list of
       NilTerminated list ->
         brackets . fsep . punctuate comma <$> mapM (pprPmExprVar 0) list
       WcVarTerminated pref x ->
         parens   . fcat . punctuate colon <$> mapM (pprPmExprVar 0) (toList pref ++ [x])
-pprConLike delta prec (RealDataCon con) args
+pprConLike _delta _prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
   = hash_parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
   | isTupleDataCon con
   = parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
-pprConLike delta prec cl args
+pprConLike _delta prec cl args
   | conLikeIsInfix cl = case args of
       [x, y] -> do x' <- pprPmExprVar 1 x
                    y' <- pprPmExprVar 1 y
@@ -182,10 +170,6 @@ pprConLike delta prec cl args
 isNegatedPmLit :: PmLit -> Bool
 isNegatedPmLit (PmOLit b _) = b
 isNegatedPmLit _other_lit   = False
-
--- | Check if a DataCon is (:).
-isConsDataCon :: DataCon -> Bool
-isConsDataCon con = consDataCon == con
 
 -- | The result of 'pmExprAsList'.
 data PmExprList
