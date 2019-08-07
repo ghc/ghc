@@ -110,7 +110,9 @@ data Literal
 
   | LitNumber !LitNumType !Integer Type
                                 -- ^ Any numeric literal that can be
-                                -- internally represented with an Integer
+                                -- internally represented with an Integer.
+                                -- See Note [Types of LitNumbers] below for the
+                                -- Type field.
 
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
@@ -251,6 +253,7 @@ instance Binary Literal where
               6 -> do
                     nt <- get bh
                     i  <- get bh
+                    -- Note [Types of LitNumbers]
                     let t = case nt of
                             LitNumInt     -> intPrimTy
                             LitNumInt64   -> int64PrimTy
@@ -267,20 +270,15 @@ instance Binary Literal where
                     return (LitRubbish)
 
 instance Outputable Literal where
-    ppr lit = pprLiteral (\d -> d) lit
+    ppr = pprLiteral id
 
 instance Eq Literal where
-    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
+    a == b = compare a b == EQ
 
 -- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
 -- 'TrieMap.CoreMap'.
 instance Ord Literal where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = cmpLit a b
+    compare = cmpLit
 
 {-
         Construction
@@ -642,6 +640,26 @@ litIsLifted _                  = False
 {-
         Types
         ~~~~~
+
+Note [Types of LitNumbers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A LitNumber's type is always known from its LitNumType:
+
+  LitNumInteger -> Integer
+  LitNumNatural -> Natural
+  LitNumInt     -> Int# (intPrimTy)
+  LitNumInt64   -> Int64# (int64PrimTy)
+  LitNumWord    -> Word# (wordPrimTy)
+  LitNumWord64  -> Word64# (word64PrimTy)
+
+The reason why we have a Type field is because Integer and Natural types live
+outside of GHC (in the libraries), so we have to get the actual Type via
+lookupTyCon, tcIfaceTyConByName etc. that's too inconvenient in the call sites
+of literalType, so we do that when creating these literals, and literalType
+simply reads the field.
+
+(But see also Note [Integer literals] and Note [Natural literals])
 -}
 
 -- | Find the Haskell 'Type' the literal occupies
@@ -652,7 +670,7 @@ literalType (LitString  _)    = addrPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t
+literalType (LitNumber _ _ t) = t -- Note [Types of LitNumbers]
 literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
