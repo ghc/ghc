@@ -372,7 +372,7 @@ pmExprToDataConApp _                                             = Nothing
 instance Outputable PmLitValue where
   ppr (PmLitInt i)        = ppr i
   ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
-  ppr (PmLitChar c)       = ppr c
+  ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
   ppr (PmLitOverInt n i)  = minuses (ppr i)
     where

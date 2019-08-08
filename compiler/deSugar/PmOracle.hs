@@ -1431,8 +1431,9 @@ trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
       checkForStringLiterals delta' x alt args
 
 checkForStringLiterals :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-checkForStringLiterals delta x _ _
+checkForStringLiterals delta x _alt _args
   | not (idType x `eqType` stringTy) = pure delta
+  | pprTrace "checkForStringLiterals" (ppr x <+> ppr _alt <+> ppr _args $$ ppr delta) False = undefined
 -- Solved to a string literal, we have info about [] or (:)
 checkForStringLiterals delta x (pmAltConAsStringLit -> Just s) []
   | nullFS s  = trySolve delta x nilPmAltCon []
@@ -1451,15 +1452,12 @@ checkForStringLiterals delta x (PmAltConLike (RealDataCon dc)) args
   | dc == nilDataCon = trySolve delta x emptyStringLit []
   | otherwise        = ASSERT( dc == consDataCon ) do
       let [h, t] = args
-      VI _ pos neg _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
+      VI _ pos _ _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
 
-      let neg_strings = mapMaybe pmAltConAsStringLit neg
-      let add_neg d s
-            | nullFS s  = pure d
-            | otherwise = do
-                d' <- MaybeT $ tryAddRefutableAltCon d h (PmAltLit (charPmLit (headFS s)))
-                MaybeT $ tryAddRefutableAltCon d' t (PmAltLit (stringPmLit (tailFS s)))
-      delta' <- foldlM add_neg delta neg_strings
+      -- We can't just tryAddRefutableAltCon for the negative information,
+      -- because we only refute a literal when *every* position occurs.
+      -- We would need to split Delta (which is like a conjunctive clause of a
+      -- DNF) for every character encountered.
 
       let pos_strings = mapMaybe (pmAltConAsStringLit . fst) pos
       let add_pos d s
@@ -1467,7 +1465,7 @@ checkForStringLiterals delta x (PmAltConLike (RealDataCon dc)) args
             | otherwise = do
                 d' <- trySolve d h (PmAltLit (charPmLit (headFS s))) []
                 trySolve d' t (PmAltLit (stringPmLit (tailFS s))) []
-      foldlM add_pos delta' pos_strings
+      foldlM add_pos delta pos_strings
 checkForStringLiterals delta _ _ _  = pure delta
 
 nilPmAltCon :: PmAltCon
