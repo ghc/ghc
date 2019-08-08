@@ -146,6 +146,9 @@ getCgIdInfo id
                 {
                   let ext_lbl = mkClosureLabel name $ idCafInfo id
                   ; lf_cached <- lookupImportedLF name
+                  ; lf_cached <- case isUnknown <$> lf_cached of
+                      Just True -> return Nothing
+                      x -> return lf_cached
                   -- ; if (not $ isJust lf_cached) then return () else pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
                   ; let lf_computed = approximateLF
                   ; let lf_info = fromJust (mkStaticLF unlifted <|> lf_cached <|> pure lf_computed)
