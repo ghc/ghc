@@ -1,5 +1,4 @@
 
 completesig02.hs:10:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘a’:
-        Patterns not matched: p where p is not one of {Foo}
+    In an equation for ‘a’: Patterns not matched: ()

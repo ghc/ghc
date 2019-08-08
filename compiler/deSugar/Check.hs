@@ -272,7 +272,7 @@ checkSingle' locn var p = do
     tracePm "checkSingle': missing" (ppr missing)
     PartialResult cs us ds <- pmcheckI clause [] [var] missing
     dflags <- getDynFlags
-    us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags) us
+    us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
     let uc = UncoveredPatterns [var] us'
     return $ case (cs,ds) of
       (Covered,  _    )         -> PmResult [] uc [] -- useful
@@ -326,7 +326,7 @@ checkMatches' vars matches
       tracePm "checkMatches': missing" (ppr missing)
       (rs,us,ds) <- go matches [missing]
       dflags <- getDynFlags
-      us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags) us
+      us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
       let up = UncoveredPatterns vars us'
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
@@ -740,6 +740,8 @@ hsExprToPmExpr expr k = do
 -- Turns (vanilla) String literals into list expressions, see
 -- Note [Literals in PmPat].
 coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
+-- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
+coreExprToPmExpr e'@(Cast e _co) = pprTraceWith "coreExprToPmExpr" (\it -> ppr e' $$ ppr it) <$> coreExprToPmExpr e
 coreExprToPmExpr e
   | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
   , exprType e `eqType` stringTy
@@ -753,6 +755,8 @@ coreExprToPmExpr e
   = pure (PmExprCon (PmAltLit lit) [])
   | Just (dc, args) <- splitDataConApp_maybe e
   = pprTraceWith "coreExprToPmExpr" (\it -> ppr e $$ ppr it) . mkPmExprData dc <$> traverse core_expr_to_id args
+  | Var x <- e, not (isDataConWorkId x)
+  = pure (PmExprVar x)
   | otherwise
   -- We currently have no mechanism of proving equivalence of two HsExprs, so
   -- generate a fresh representative each time. This is morally wrong, but
@@ -762,10 +766,11 @@ coreExprToPmExpr e
   -- terms.
   = PmExprVar <$> lift (mkPmId (exprType e))
   where
-    core_expr_to_id (Var x) = pure x
-    core_expr_to_id e       = do
+    core_expr_to_id e = do
       pm_expr <- coreExprToPmExpr e
-      bindPmExprToId (exprType e) pm_expr -- This is the reason for ContT
+      case pm_expr of
+        PmExprVar x -> pure x
+        _           -> bindPmExprToId (exprType e) pm_expr -- This is the reason for ContT
 
 -- | Try to peel off the topmost 'DataCon' application.
 splitDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])

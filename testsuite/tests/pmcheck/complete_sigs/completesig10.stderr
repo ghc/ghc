@@ -9,5 +9,4 @@ completesig10.hs:16:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 
 completesig10.hs:20:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘m2’:
-        Patterns not matched: p where p is not one of {B, D}
+    In an equation for ‘m2’: Patterns not matched: A
