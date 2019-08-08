@@ -32,7 +32,7 @@ module Data.Maybe
    ) where
 
 import GHC.Base
-import GHC.Stack.Types ( HasCallStack )
+import GHC.Stack ( HasCallStack, withFrozenCallStack )
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
@@ -145,7 +145,7 @@ isNothing _       = False
 -- *** Exception: Maybe.fromJust: Nothing
 --
 fromJust          :: HasCallStack => Maybe a -> a
-fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck
+fromJust Nothing  = withFrozenCallStack $ error "Maybe.fromJust: Nothing"
 fromJust (Just x) = x
 
 -- | The 'fromMaybe' function takes a default value and and 'Maybe'

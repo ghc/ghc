@@ -220,6 +220,7 @@ import GHC.Num
 import GHC.Real
 import GHC.List
 import GHC.Base
+import GHC.Stack ( HasCallStack, withFrozenCallStack )
 
 infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#cpp-and-string-gaps
 
@@ -644,8 +645,8 @@ insertBy cmp x ys@(y:ys')
 --
 -- >>> maximumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
-maximumBy               :: (a -> a -> Ordering) -> [a] -> a
-maximumBy _ []          =  errorWithoutStackTrace "List.maximumBy: empty list"
+maximumBy               :: HasCallStack => (a -> a -> Ordering) -> [a] -> a
+maximumBy _ []          =  withFrozenCallStack $ error "List.maximumBy: empty list"
 maximumBy cmp xs        =  foldl1 maxBy xs
                         where
                            maxBy x y = case cmp x y of
@@ -660,8 +661,8 @@ maximumBy cmp xs        =  foldl1 maxBy xs
 --
 -- >>> minimumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
-minimumBy               :: (a -> a -> Ordering) -> [a] -> a
-minimumBy _ []          =  errorWithoutStackTrace "List.minimumBy: empty list"
+minimumBy               :: HasCallStack => (a -> a -> Ordering) -> [a] -> a
+minimumBy _ []          =  withFrozenCallStack $ error "List.minimumBy: empty list"
 minimumBy cmp xs        =  foldl1 minBy xs
                         where
                            minBy x y = case cmp x y of
@@ -718,12 +719,12 @@ genericSplitAt n (x:xs) =  (x:xs',xs'') where
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
-genericIndex :: (Integral i) => [a] -> i -> a
+genericIndex :: HasCallStack => (Integral i) => [a] -> i -> a
 genericIndex (x:_)  0 = x
 genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
- | otherwise = errorWithoutStackTrace "List.genericIndex: negative argument."
-genericIndex _ _      = errorWithoutStackTrace "List.genericIndex: index too large."
+ | otherwise = withFrozenCallStack $ error "List.genericIndex: negative argument."
+genericIndex _ _      = withFrozenCallStack $ error "List.genericIndex: index too large."
 
 -- | The 'genericReplicate' function is an overloaded version of 'replicate',
 -- which accepts any 'Integral' value as the number of repetitions to make.
