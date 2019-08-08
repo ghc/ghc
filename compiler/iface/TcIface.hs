@@ -1860,8 +1860,8 @@ tcCodeGenInfos = mapSndM tcLFInfo
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 -- tcLFInfo _ = return $ LFUnknown True
 tcLFInfo (ILFReEntrant (oneshot,rep,fvs_flag)) = do
-    -- return $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgUnknown)
-    pure $! LFUnknown True
+    return $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgUnknown)
+    -- pure $! LFUnknown True
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
     -- pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
     pure $! LFUnknown True
