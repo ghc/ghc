@@ -194,26 +194,32 @@ One lattice encodes if we have to enter an object when
 we case on it in the form of `case id of ...` and looks
 like this:
 
-              MaybeEnter
-             /    |    \
-      AlwaysEnter |  NeverEnter
-              \   |   /
                NoValue
+                  |
+               /  |  \
+              /   |   \
+      AlwaysEnter |  NeverEnter
+               \  |  /
+                \ | /
+              MaybeEnter
                   |
             UndetEnterInfo
 
 It is also called the "outer" infor about a binding in places.
 
-What these values represent is the requirement of a binding in
-a context like
+What these values represent is the requirement of needing
+to evaluate a binding 'val' in a context like
 
-    `case val of`
+    case val of
+        True -> foo
+        False -> bar
 
-in regards to weither or not it has to be entered. Which for values
-coincides with a value being tagged.
+Which for values coincides with a value being tagged.
 
-The consequence of this is that it does not matter what enter info
-we use for things like functions.
+For functions it doesn't matter (operationally) how we treat them
+as they can not be entered only called. However we try to assign
+functions a value of NeverEnter, as it makes certain things more
+consistent in the code.
 
 NoValue is a special value assigned to expressions assigned to
 expressions which can't be scrutinised at runtime.
@@ -226,76 +232,100 @@ This happens for example for `f x = f x`.
 
 NoValue is also a fixpoint in the lattice. Once a data flow node
 has been assigned enterInfo NoValue it's enterInfo won't change
-anymore.
+anymore, as the only way to arrive at this value in practice is
+through nodes representing tail recursion, or by having a node
+which only depends on such nodes.
 
-NeverEnter means the thing referenced by the binding won't ever be
-entered as a *value*. It might be called as a function though as it
-can still represent a function causing side effects.
+NeverEnter means the object referenced by the binding won't ever be
+entered as a *value*. It might be called as a function when applied
+to arguments.
 
 AlwaysEnter implies something is a thunk of some form. However since GC
-can also evaluate certain forms of thunks we currently treat this for the
-most part just like MaybeEnter.
+can also evaluate certain forms of thunks we do currently not utilize it.
 
 MaybeEnter represents the union of things where:
-* We don't care about the enter behaviour.
-* We know we can't know the enter behaviour.
+* We don't care about the enter behaviour
+* We know we can't know the enter behaviour - function arguments
 * We know it could be either enter or no-enter depending on
   branches taken at runtime.
-
 
 # The FieldInfo Lattice
 
 The second lattice represents information about bindings which are
 bound to the fields of an id.
-For example if we have "foo = Just bar" then this lattice will
+This is a mouthful so here is an example:
+
+    let x = foo
+    in case x of
+        MyCon a b -> case a of
+            <alts>
+
+    We have determined foo has the field info lattice:
+        `FieldsProd [(NeverEnter,fi1), (MaybeEnter,fi2)]
+    So naturally the same is true of x.
+
+    This means if we bind the second field of 'x' (here bound to 'a')
+    then 'a' will have the information (NeverEnter,fi1) associated with it.
+
+    This is independent of weither or not x needs to be entered, or even it's
+    termination. As this information can only be used if x terminates.
+
+So if we have "foo = Just bar" then this lattice will
 encode the information we have about bar, potentially also with
-some information about the constructor it came out of.
+nested information itself. In practice we limit to nesting to a certain depth
+for performance reasons but a few levels deep can be very useful.
 
 This lattice has this shape:
 
-         FieldsUnknown
-               |
-         FieldsUntyped
+          LatNoValues
             /  |  \
    FieldsProd  |  FieldsSum
             \  |  /
-          LatNoValues
+         FieldsUntyped
+               |
+         FieldsUnknown
                |
            FieldsUndet
 
-Again with a placeholder for impossible values.
-Used especially for recursive tail calls.
+It's very much analog to the one for enterInfo.
+
+Again we have a placeholder for lack of a value used
+for recursive tail calls.
 See Note [Recursive Functions] for details about that.
 
-FieldsUntyped is used when we want to represent two values with
-potentially matching subtags but different constructors or types.
+Some of these constructors represent an infinite number of fields
+containing certain information:
+* FieldsUndet represents a infinite number of undetermined values.
+* FieldsUnknown represents a infinite number of values we can't know anything about.
+* LatNoValues represents a infinite number of non-values.
 
-This can happen for example when combining e.g. Left (Nothing) and Right (Just v)
+* FieldsProd/FieldsSum/FieldsUntyped encode known information about fields.
+  They are represented as a determined list of information. Fields not represented
+  in the list have semantically the value noValue.
 
+Again as example we might have
+
+    x = Just Nothing.
+
+The FieldLattice for 'x' would semantically be:
+
+    FieldsSum ((NeverEnter,LatNoValues) : repeat (noValues))
+
+However 'repeat (noValues)' is only implicitly encoded in our branch combinators.
+
+This scheme is incredible useful when combining branches of constructors with a different
+number of fields.
 
     Note [The lattice element combinators]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We do use neither the lub nor glb to combine multiple branches.
-Instead we have a combine operator implemented by the combine*
-functions which behaves as follows.
-
-In general when comparing against top/bot/rec:
-
-combine x y
-     | x == y = x
-combine Top x = x
-combine Bot x = x
-combine Rec x = x
-
-For enter information we additionally have:
-
-combine Enter NoEnter = MaybeEnter
+We do use glb to combine multiple branches and this behaves as expected.
 
 For field infos we combine field information pointwise.
 
 When combining results from different branches we allow
-combinations of different field counts.
+combinations of different field counts. Usually promoting the field
+info constructor to UntypedFields
 
     Combining branches with different constructors/types.
     -----------------------------------------------------
@@ -338,8 +368,6 @@ C2's branch. This is safe.
     Note [Recursive Functions]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Why we do not use lub/glb requires a bit of explaining.
-
 Consider this function:
 
     f x
@@ -349,79 +377,76 @@ Consider this function:
 It's fairly obvious that it will return a value whos first
 field will contain a tagged&evaluated value.
 
-    Why not glb:
-    ------------
-
-If we use glb to combine the two branches the following
-happens:
-* We initialize all nodes to bot.
-* This causes the `otherwise` branch to be evaluated to
-  bot.
-* when using glb as combinator the result will therefore
-  also be bot.
-
-We have reached the unhelpful fixpoint bot and miss the
-oppertunity to proof the field as always tagged.
-
-    Why not lub:
-    ------------
-
-lub seems to solve this problem conveniently as all branches
-will combined will return the result of the branch with the
-result closest to the top of the lattice.
-
-However this is also subtly wrong!
-We have to deal with functions without a fixpoint in our lattice
-like repeat.
-We do so by allowing termination of the analysis before a fixpoint
-is reached. To guarantee that this is correct we guarantee that any
-intermediate result will be valid (but maybe not complete) no matter
-what order we process the data flow nodes in.
-
-However if we have a function of three branches:
-
-f x | c1 = Just $! Nothing
-    | c2 = f x'
-    | c3 = Just <thunkExpr>
-    where
-        ...
-
-And we evaluate the nodes associated with c1, then the node combining
-the branches, and then stob, lub will incorrectly conclude that the first
-field of the result will be tagged!
-
-    Our solution
-    ------------
-
 We deal with this by looking for branches in a functions body
-which are tail calls to the function itself. In our domain we can
-pretend these branches do not return a value. Indeed any value
-eventually produced by a function must come from a branch NOT
-consisting of a recursive tail call.
+which are recursive tail calls to the function itself.
+In our domain we can pretend these branches do not return a value.
+Indeed any value eventually produced by a function must come from a
+branch NOT consisting of a recursive tail call.
 
 For any of these tail calls we mark the result with the special
-Rec element of the lattice. When combining these values they
+noValue element of the lattice. When combining these values they
 always "give way" to the result of the non-recursive branches.
 
-This is correct as after all the recursive branch represents the
-combination of all non-recursive branches.
+This is correct as after all we can approximate the result of the recursive
+branch as a combination of all non-recursive branches.
 
 It even works our for silly things like f x = f x, we infer a value
-of rec for `f x` which means if f is called in a branch somewhere else
+of noValue for `f x` which means if `f` is called in a branch somewhere else
 that branch too will give way to the terminating branches.
 
 Beyond this we are cautios when combining the result of branches.
-bot/top combined with any other value will result in the same so
+bot/top combined with any other value will result in bot or top so
 the result of multiple branches will only be inferred once all the
-branches have been analyzed.
+branches have been analyzed. As otherwise the not yet analyzed branches
+will pull the result down to undetermined as well.
 
 Implementation wise we check for tail calls by looking at the syntactic
 context of function applications. This is implemented in `isRecTail`
 and looks through join points (LNE) as well.
 
 This does not solve the problem of mutual recursion however, in which
-case we just throw our hands up in the air and conclude that we
-can't conclude anything (resulting in the top of the lattice.)
+case we just throw our hands up in the air and simply assign the recursive
+branch as undetermined.
+
+TODO: Can we simply assign noValue here as well?
+
+    We use glb to combine the branches:
+    ------------
+
+If we use glb to combine the two branches the following
+happens:
+* We initialize all nodes to bot.
+* We compute the info tagged<tagged> for the non-recursive branch.
+* We compute the info noValue for the tail recursive branch.
+* Combining that with tagged from the other branch will result
+  in the value tagged<tagged>.
+
+We have reached the fixpoint bot at this point.
+
+If we process the nodes in a different order then it might take
+multiple iterations. But we make an effort to process nodes in
+dependency order.
+
+    Non tail recursive functions.
+    -----------------------------
+
+We have to deal with functions without a fixpoint in our lattice.
+These are primarily functions producing infinite values like (f x = x : f x)
+
+To handle these cases we do three things:
+* We stop processing data flow nodes once
+  their fields go beyond a certain depth.
+* We process each node a limited number of times.
+* We make sure that ANY intermediate result of the
+  analysis is safe.
+
+Intermediate results (before a fixpoint is reached) might
+be less precise than our analysis allows for. But any state
+will result in a correct program transformation as we never
+overestimate enter behaviour.
+That is we never predict we don't have to enter a binding if
+we do.
+
 
     Note [Infering recursive tail calls]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -462,11 +487,11 @@ noValue = EnterLattice NoValue FieldsNone
 
 -- | Encode if a node needs to be entered or is already evaluated.
 data EnterInfo
-    = UndetEnterInfo    -- ^ Not yet determined.
-    | NoValue           -- ^ E.g. direct tail recursion, impossible fields.
+    = NoValue           -- ^ E.g. direct tail recursion, impossible fields.
     | AlwaysEnter       -- ^ WILL need to be entered
-    | MaybeEnter        -- ^ Could be either
     | NeverEnter        -- ^ Does NOT need to be entered.
+    | MaybeEnter        -- ^ Could be either
+    | UndetEnterInfo    -- ^ Not yet determined.
     deriving (Eq,Ord,Show,Enum,Generic,NFData)
 
 instance Binary EnterInfo where
@@ -518,20 +543,23 @@ instance Binary EnterLattice where
 -- Side note: Nullary constructors are assigned FieldsNone.
 
 data FieldInfo
-    -- | At most we can say something about the tag of the value itself.
-    --   The fields are impossible to known.
-    = FieldsUnknown
+    -- | Direct tail recursion, fields without arguments, the works.
+    = FieldsNone
 
-    -- | The associated value has up to (length fields) fields,
-    --   but can have less!
+    -- | The associated value has up to (length fields) fields we know something
+    -- about. But can have less fields! Or more fields!
+    -- See Note [Lattice for tag analysis].
     | FieldsUntyped [EnterLattice]
 
+
     | FieldsProd [EnterLattice]
+
     -- Constructor the fields came out of
     | FieldsSum  !(Maybe DataCon) [EnterLattice]
 
-    -- | Direct tail recursion, fields without arguments, the works.
-    | FieldsNone
+    -- | At most we can say something about the tag of the value itself.
+    --   The fields are impossible to known.
+    | FieldsUnknown
 
     -- | We might find out more about the fields
     | FieldsUndet
@@ -572,10 +600,10 @@ instance Binary FieldInfo where
             _ -> panic "get:FieldInfo - invalid byte"
 
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
-combineEnterInfo MaybeEnter _           = MaybeEnter
-combineEnterInfo _ MaybeEnter           = MaybeEnter
 combineEnterInfo UndetEnterInfo _       = UndetEnterInfo
 combineEnterInfo _ UndetEnterInfo       = UndetEnterInfo
+combineEnterInfo MaybeEnter _           = MaybeEnter
+combineEnterInfo _ MaybeEnter           = MaybeEnter
 combineEnterInfo NoValue x              = x
 combineEnterInfo x NoValue              = x
 combineEnterInfo NeverEnter AlwaysEnter = MaybeEnter
@@ -598,15 +626,13 @@ combineLattices (EnterLattice ei1 fi1) (EnterLattice ei2 fi2)
     = EnterLattice (combineEnterInfo ei1 ei2) (combineFieldInfos fi1 fi2)
 
 combineFieldInfos :: FieldInfo -> FieldInfo -> FieldInfo
+combineFieldInfos FieldsUndet _ = FieldsUndet
+combineFieldInfos _ FieldsUndet = FieldsUndet
 combineFieldInfos (FieldsUnknown) _ = FieldsUnknown
 combineFieldInfos _ (FieldsUnknown) = FieldsUnknown
 combineFieldInfos FieldsNone x = x
 combineFieldInfos x FieldsNone = x
--- Bot stays bot (unless compared against top)
-combineFieldInfos FieldsUndet _ = FieldsUndet
-combineFieldInfos _ FieldsUndet = FieldsUndet
--- Top stays top
--- We currently do combine results of different types
+-- We currently do combine results of different constructors
 combineFieldInfos (FieldsProd fs1) (FieldsSum _ fs2) =
     FieldsUntyped $ combineFieldsUntyped fs1 fs2
 combineFieldInfos (FieldsSum _ fs1) (FieldsProd fs2) =
@@ -1008,7 +1034,7 @@ idMappedInCtxt id ctxt
 -- | Lub like operator between all input node
 -- See Note [The lattice element combinators]
 mkJoinNode :: [NodeId] -> AM NodeId
-mkJoinNode []     = return topNodeId
+mkJoinNode []     = return unknownNodeId
 mkJoinNode [node] = return node
 mkJoinNode inputs = do
     node_id <- mkUniqueId
@@ -1100,8 +1126,8 @@ findTags this_mod us binds =
 addConstantNodes :: AM ()
 addConstantNodes = do
     markDone litNode
-    markDone $ mkConstNode botNodeId bot
-    markDone $ mkConstNode topNodeId top
+    markDone $ mkConstNode undetNodeId bot
+    markDone $ mkConstNode unknownNodeId top
     markDone $ mkConstNode neverNodeId (flatLattice NeverEnter)
     markDone $ mkConstNode maybeNodeId (flatLattice MaybeEnter)
     markDone $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
@@ -1122,10 +1148,10 @@ mkConstNode id !val =
     }
 
 -- Some nodes we can reuse.
-litNodeId, botNodeId, topNodeId, neverNodeId, maybeNodeId, alwaysNodeId :: NodeId
+litNodeId, undetNodeId, unknownNodeId, neverNodeId, maybeNodeId, alwaysNodeId :: NodeId
 litNodeId       = NodeId $ mkUnique 'c' 2
-botNodeId       = NodeId $ mkUnique 'c' 3 -- Always returns bot
-topNodeId       = NodeId $ mkUnique 'c' 4
+undetNodeId     = NodeId $ mkUnique 'c' 3 -- Always returns bot
+unknownNodeId   = NodeId $ mkUnique 'c' 4
 neverNodeId     = NodeId $ mkUnique 'c' 5
 maybeNodeId     = NodeId $ mkUnique 'c' 6
 alwaysNodeId    = NodeId $ mkUnique 'c' 7
@@ -1554,7 +1580,8 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
         | null args = text "rhsThunk:" <> (ppr binding)
         | otherwise = text "rhsFunc:" <> (ppr binding)
 #endif
-    varMap = mkVarEnv (zip args (replicate arity topNodeId))
+    -- We know nothing about the arguments.
+    varMap = mkVarEnv (zip args (replicate arity unknownNodeId))
     ctxt' = (CClosureBody varMap :ctxt)
     arity = length args
     enterInfo
@@ -1584,7 +1611,8 @@ nodeExpr this_mod ctxt e@(StgConApp {})        = nodeConApp this_mod ctxt e
 nodeExpr this_mod ctxt e@(StgApp {})           = nodeApp this_mod ctxt e
 -- Do the boring ones right here
 nodeExpr _ _ctxt  (StgLit lit)              = return $! (StgLit lit, litNodeId)
-nodeExpr _ _ctxt  (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty, topNodeId)
+-- Not currently analysed
+nodeExpr _ _ctxt  (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty, unknownNodeId)
 nodeExpr _ _ctxt  (StgLam {})               = error "Invariant violated: No lambdas in STG representation."
 
 {-  Note [Case Data Flow Nodes]
