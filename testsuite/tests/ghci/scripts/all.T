@@ -308,3 +308,4 @@ test('T16509', normal, ghci_script, ['T16509.script'])
 #   to use hie files
 test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_script, ['T16804.script'])
 test('T15546', normal, ghci_script, ['T15546.script'])
+test('T16876', normal, ghci_script, ['T16876.script'])
