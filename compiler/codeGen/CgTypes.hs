@@ -10,8 +10,18 @@
 -- read from interface files.
 
 module CgTypes
-  ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
+  (
+
+  -- * Function attributes
+    FreeVarFlag(..), noFreeVars, withFreeVars
+  , LfUpdateable(..), updateableFlag, notUpdateableFlag
+  , LfMaybeFunction(..), maybeFunction, notFunction
+
+  -- * Form of functions
+  , LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
   , exportLF
+
+
   ) where
 
 #include "HsVersions.h"
@@ -25,6 +35,8 @@ import Outputable
 import SMRep
 import DataCon
 import NameEnv
+
+import Data.Coerce
 
 {- Note [Backend information in interface files]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,24 +60,52 @@ This allows us to generate
 -- | Information about imported things coming from interface files.
 type CgIfaceInfo = NameEnv LambdaFormInfo
 
--- | Recursivity Flag
-data FreeVarFlag = HasFreeVars
-                 | NoFreeVars
-                 deriving (Eq,Enum,Bounded)
+newtype FreeVarFlag
+      = FreeVarFlag { hasFreeVars :: Bool }
+      deriving newtype (Eq,Enum,Bounded,Binary)
 
 instance Outputable FreeVarFlag where
-  ppr HasFreeVars = text "hasFvs"
-  ppr NoFreeVars  = text "noFvs"
+  ppr flag
+      | hasFreeVars flag = text "hasFvs"
+      | otherwise        =  text "noFvs"
 
-data LfUpdateable = Updateable
-                  | NotUpdateable
-                  deriving stock (Eq,Enum,Bounded)
-                  -- deriving via Binary
-                  --       via (BoundedEnumBinary LfUpdateable)
+withFreeVars :: FreeVarFlag
+withFreeVars = FreeVarFlag True
+noFreeVars :: FreeVarFlag
+noFreeVars = FreeVarFlag False
 
-data LfValueFlag = Value            -- ^ Definitely a value (eg. Nothing)
-                 | MaybeFunction    -- ^ Might be a function.
-                 deriving (Eq,Enum,Bounded)
+
+newtype LfUpdateable
+      = LfUpdateable { lfIsUpdateable :: Bool }
+      deriving newtype (Eq,Enum,Bounded,Binary)
+
+pprUpdateable :: Bool -> SDoc
+pprUpdateable True = text "updateable"
+pprUpdateable False = text "notUpdateable"
+
+instance Outputable LfUpdateable where
+      ppr = coerce pprUpdateable
+
+updateableFlag :: LfUpdateable
+updateableFlag = LfUpdateable True
+notUpdateableFlag :: LfUpdateable
+notUpdateableFlag = LfUpdateable False
+
+newtype LfMaybeFunction
+      = LfMaybeFunction { lfMightBeFunction :: Bool }
+      deriving newtype (Eq,Enum,Bounded,Binary)
+
+pprFuncFlag :: Bool -> SDoc
+pprFuncFlag True = text "mFunc"
+pprFuncFlag False = text "value"
+
+instance Outputable LfMaybeFunction where
+      ppr = coerce pprFuncFlag
+
+maybeFunction :: LfMaybeFunction
+maybeFunction = LfMaybeFunction True
+notFunction :: LfMaybeFunction
+notFunction = LfMaybeFunction False
 
 -----------------------------------------------------------------------------
 --                LambdaFormInfo
@@ -81,17 +121,17 @@ data LambdaFormInfo
         { lf_top        :: !TopLevelFlag  -- ^ True if top level
         , lf_os_info    :: !OneShotInfo
         , lf_repArity   :: !RepArity      -- ^ Arity. Invariant: always > 0
-        , lf_no_fvs     :: !Bool   -- ^ True <=> no fvs
+        , lf_no_fvs     :: !FreeVarFlag   -- ^ True <=> no fvs
         , lf_arg_desc   :: ArgDescr      -- ^ Argument descriptor
                                          -- (should really be in ClosureInfo)
         }
 
   | LFThunk             -- Thunk (zero arity)
         TopLevelFlag
-        !Bool           -- True <=> no free vars
-        !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        !FreeVarFlag    -- True <=> no free vars
+        !LfUpdateable   -- True <=> updatable (i.e., *not* single-entry)
         !StandardFormInfo
-        !Bool           -- True <=> *might* be a function type
+        !LfMaybeFunction-- True <=> *might* be a function type
 
   | LFCon               -- A saturated constructor application
         DataCon         -- The constructor
@@ -102,7 +142,7 @@ data LambdaFormInfo
                         -- Imported things which we *do* know something about use
                         -- one of the other LF constructors (eg LFReEntrant for
                         -- known functions)
-        !Bool           -- True <=> *might* be a function type
+        !LfMaybeFunction-- True <=> *might* be a function type
                         --      The False case is good when we want to enter it,
                         --        because then we know the entry code will do
                         --        For a function, the entry code is the fast entry point
@@ -117,30 +157,20 @@ exportLF :: LambdaFormInfo -> Bool
 exportLF LFUnlifted     = False
 exportLF _              = True
 
-pprFvs :: Bool -> SDoc
-pprFvs True = text "no-fvs"
-pprFvs False = text "fvs"
 
-pprFuncFlag :: Bool -> SDoc
-pprFuncFlag True = text "mFunc"
-pprFuncFlag False = text "value"
-
-pprUpdateable :: Bool -> SDoc
-pprUpdateable True = text "updateable"
-pprUpdateable False = text "oneshot"
 
 
 
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
-                                        ppr rep <+> pprFvs fvs <+> ppr argdesc)
+                                        ppr rep <+> ppr fvs <+> ppr argdesc)
     ppr (LFThunk top hasfv updateable sfi m_function) =
-        text "LFThunk" <> brackets (ppr top <+> pprFvs hasfv <+> pprUpdateable updateable <+>
-                                    ppr sfi <+> pprFuncFlag m_function)
+        text "LFThunk" <> brackets (ppr top <+> ppr hasfv <+> ppr updateable <+>
+                                    ppr sfi <+> ppr m_function)
     ppr (LFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (LFUnknown m_func) =
-        text "LFUnknown" <> brackets (pprFuncFlag m_func)
+        text "LFUnknown" <> brackets (ppr m_func)
     ppr (LFUnlifted) = text "LFUnlifted"
     ppr (LFLetNoEscape) = text "LF-LNE"
 

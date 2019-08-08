@@ -52,10 +52,10 @@ module Binary
    getByte,
 
    -- * Use for deriving instances
-  --  BoundedEnumPackable, PackedBinary,
+  --  BoundedEnumPackable,
+  -- PackedBinary,
   --  Packable(..),
-
-
+  BoundedEnumBinary(..),
 
    -- * Lazy Binary I/O
    lazyGet,

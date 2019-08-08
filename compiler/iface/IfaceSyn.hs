@@ -75,7 +75,7 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
-import CgTypes (StandardFormInfo)
+import CgTypes (StandardFormInfo, FreeVarFlag, LfMaybeFunction, LfUpdateable)
 
 import Control.Monad
 import System.IO.Unsafe
@@ -568,7 +568,7 @@ data IfLFInfo =
     --    bit 1: no fvs
     --    bit 2-15 arity
     ILFReEntrant
-        (Word8,RepArity,Bool)
+        (Word8,RepArity,FreeVarFlag)
         -- !Word32
 
         -- TopLevelFlag => Implied true
@@ -582,7 +582,7 @@ data IfLFInfo =
     --    bit 1: updateable
     --    bit 2: might be function
   | ILFThunk             -- Thunk (zero arity)
-        (Bool,Bool,Bool)
+        (FreeVarFlag,LfUpdateable,LfMaybeFunction)
         -- TopLevelFlag => Implied True
         -- !Bool           -- True <=> no free vars
         -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
@@ -2435,10 +2435,10 @@ instance Binary IfLFInfo where
 
     put_ bh (ILFReEntrant fields) =
         putByte bh 0 >>
-        put_ bh (fields :: (Word8, RepArity, Bool))
+        put_ bh (fields :: (Word8, RepArity, FreeVarFlag))
     put_ bh (ILFThunk encoded_flds sfi) =
         putByte bh 1 >>
-        put_ bh (encoded_flds :: (Bool, Bool, Bool)) >>
+        put_ bh (encoded_flds :: (FreeVarFlag, LfUpdateable, LfMaybeFunction)) >>
         put_ bh sfi
     put_ bh (ILFCon conName) =
         putByte bh 2 >>
@@ -2448,8 +2448,10 @@ instance Binary IfLFInfo where
     get bh = do
         con <- getByte bh
         case con of
-            0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, Bool))
-            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
+            0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, FreeVarFlag))
+            1 -> pure ILFThunk <*>
+                   (get bh :: IO (FreeVarFlag, LfUpdateable, LfMaybeFunction)) <*>
+                   (get bh)
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"

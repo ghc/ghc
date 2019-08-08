@@ -193,9 +193,8 @@ argPrimRep arg = typePrimRep1 (stgArgType arg)
 
 mkLFArgument :: Id -> LambdaFormInfo
 mkLFArgument id
-  | isUnliftedType ty      = LFUnlifted
-  | might_be_a_function ty = LFUnknown True
-  | otherwise              = LFUnknown False
+  | isUnliftedType ty  = LFUnlifted
+  | otherwise          = LFUnknown (might_be_a_function ty)
   where
     ty = idType id
 
@@ -213,35 +212,44 @@ mkLFReEntrant :: TopLevelFlag    -- True of top level
 mkLFReEntrant _ _ [] _
   = pprPanic "mkLFReEntrant" empty
 mkLFReEntrant top fvs args arg_descr
-  = LFReEntrant top os_info (length args) (null fvs) arg_descr
+  = LFReEntrant top os_info (length args) freeVars arg_descr
   where os_info = idOneShotInfo (head args)
+        freeVars
+          | null fvs = noFreeVars
+          | otherwise = withFreeVars
 
 mkUnknownLFReEntrant :: TopLevelFlag
                      -> RepArity
                      -> LambdaFormInfo
 mkUnknownLFReEntrant top arity
-  = LFReEntrant top noOneShotInfo arity True (panic "arg_descr")
+  = LFReEntrant top noOneShotInfo arity withFreeVars (panic "arg_descr")
 
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
 mkLFThunk thunk_ty top fvs upd_flag
   = ASSERT( not (isUpdatable upd_flag) || not (isUnliftedType thunk_ty) )
-    LFThunk top (null fvs)
-            (isUpdatable upd_flag)
+    LFThunk top freeVars
+            updatable
             NonStandardThunk
             (might_be_a_function thunk_ty)
+    where
+      freeVars
+        | null fvs = noFreeVars
+        | otherwise = withFreeVars
+      updatable :: LfUpdateable
+      updatable = LfUpdateable (isUpdatable upd_flag)
 
 --------------
-might_be_a_function :: Type -> Bool
+might_be_a_function :: Type -> LfMaybeFunction
 -- Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as poss
 might_be_a_function ty
   | [LiftedRep] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc
-  = False
+  = notFunction
   | otherwise
-  = True
+  = maybeFunction
 
 -------------
 mkConLFInfo :: DataCon -> LambdaFormInfo
@@ -250,14 +258,24 @@ mkConLFInfo con = LFCon con
 -------------
 mkSelectorLFInfo :: Id -> Int -> Bool -> LambdaFormInfo
 mkSelectorLFInfo id offset updatable
-  = LFThunk NotTopLevel False updatable (SelectorThunk offset)
+  = LFThunk NotTopLevel noFreeVars (LfUpdateable updatable) (SelectorThunk offset)
         (might_be_a_function (idType id))
 
 -------------
+-- | For an ap thunk of the the form "x1 x2 ... xn" 'arity' is (n-1)
 mkApLFInfo :: Id -> UpdateFlag -> Arity -> LambdaFormInfo
 mkApLFInfo id upd_flag arity
-  = LFThunk NotTopLevel (arity == 0) (isUpdatable upd_flag) (ApThunk arity)
+  = LFThunk NotTopLevel freeVars updatable (ApThunk arity)
         (might_be_a_function (idType id))
+    where
+      -- It's not clear to me why we equate zero arguments here to
+      -- no free variables. But it seems that the field is not used
+      -- so I leave the logic as is for now.
+      freeVars
+        | arity == 0 = noFreeVars
+        | otherwise = freeVars
+      updatable :: LfUpdateable
+      updatable = LfUpdateable (isUpdatable upd_flag)
 
 -------------
 mkLFStringLit :: LambdaFormInfo
@@ -349,17 +367,17 @@ nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
 -- this closure has R1 (the "Node" register) pointing to the
 -- closure itself --- the "self" argument
 
-nodeMustPointToIt _ (LFReEntrant top _ _ no_fvs _)
-  =  not no_fvs          -- Certainly if it has fvs we need to point to it
+nodeMustPointToIt _ (LFReEntrant top _ _ fvs _)
+  =  hasFreeVars fvs     -- Certainly if it has fvs we need to point to it
   || isNotTopLevel top   -- See Note [GC recovery]
         -- For lex_profiling we also access the cost centre for a
         -- non-inherited (i.e. non-top-level) function.
         -- The isNotTopLevel test above ensures this is ok.
 
-nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
-  =  not no_fvs            -- Self parameter
+nodeMustPointToIt dflags (LFThunk top fvs updatable NonStandardThunk _)
+  =  hasFreeVars fvs       -- Self parameter
   || isNotTopLevel top     -- Note [GC recovery]
-  || updatable             -- Need to push update frame
+  || lfIsUpdateable updatable -- Need to push update frame
   || gopt Opt_SccProfilingOn dflags
           -- For the non-updatable (single-entry case):
           --
@@ -503,12 +521,14 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
 
 getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
-  | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
+  | lfMightBeFunction is_fun
+                -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || gopt Opt_Ticky dflags -- to catch double entry
+  | lfIsUpdateable updatable ||
+    gopt Opt_Ticky dflags -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
          if we enter the same thunk multiple times, so the optimisation
@@ -533,10 +553,10 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
     DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info
                 updatable) 0
 
-getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
+getCallMethod _ name _ (LFUnknown maybe_func) n_args _v_args _cg_locs _self_loop_info
+  | lfMightBeFunction maybe_func
   = SlowCall -- might be a function
-
-getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
+  | otherwise
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
     EnterIt -- Not a function
 
@@ -649,7 +669,8 @@ blackHoleOnEntry cl_info
   = case closureLFInfo cl_info of
       LFReEntrant {}            -> False
       LFLetNoEscape             -> False
-      LFThunk _ _no_fvs upd _ _ -> upd   -- See Note [Black-holing non-updatable thunks]
+      -- See Note [Black-holing non-updatable thunks]
+      LFThunk _ _no_fvs upd _ _ -> lfIsUpdateable upd
       _other -> panic "blackHoleOnEntry"
 
 {- Note [Black-holing non-updatable thunks]
@@ -726,14 +747,15 @@ closureUpdReqd :: ClosureInfo -> Bool
 closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
 
 lfUpdatable :: LambdaFormInfo -> Bool
-lfUpdatable (LFThunk _ _ upd _ _)  = upd
+lfUpdatable (LFThunk _ _ upd _ _)  = lfIsUpdateable upd
 lfUpdatable _ = False
 
+lfIsUnknown :: LambdaFormInfo -> Bool
 lfIsUnknown (LFUnknown {}) = True
 lfIsUnknown _              = False
 
 closureSingleEntry :: ClosureInfo -> Bool
-closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
+closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not $ lfIsUpdateable upd
 closureSingleEntry (ClosureInfo { closureLFInfo = LFReEntrant _ OneShotLam _ _ _}) = True
 closureSingleEntry _ = False
 
@@ -778,10 +800,10 @@ mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel id lf_info
   = case lf_info of
         LFThunk _ _ upd_flag (SelectorThunk offset) _
-                      -> mkSelectorInfoLabel upd_flag offset
+                      -> mkSelectorInfoLabel (lfIsUpdateable upd_flag) offset
 
         LFThunk _ _ upd_flag (ApThunk arity) _
-                      -> mkApInfoTableLabel upd_flag arity
+                      -> mkApInfoTableLabel (lfIsUpdateable upd_flag) arity
 
         LFThunk{}     -> std_mk_lbl name cafs
         LFReEntrant{} -> std_mk_lbl name cafs
@@ -801,13 +823,13 @@ mkClosureInfoTableLabel id lf_info
        -- invariants in CorePrep anything else gets eta expanded.
 
 
-thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
+thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> LfUpdateable -> CLabel
 -- thunkEntryLabel is a local help function, not exported.  It's used from
 -- getCallMethod.
 thunkEntryLabel dflags _thunk_id _ (ApThunk arity) upd_flag
-  = enterApLabel dflags upd_flag arity
+  = enterApLabel dflags (lfIsUpdateable upd_flag) arity
 thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset) upd_flag
-  = enterSelectorLabel dflags upd_flag offset
+  = enterSelectorLabel dflags (lfIsUpdateable upd_flag) offset
 thunkEntryLabel dflags thunk_id c _ _
   = enterIdLabel dflags thunk_id c
 
