@@ -96,19 +96,26 @@ exportLF :: LambdaFormInfo -> Bool
 exportLF LFUnlifted     = False
 exportLF _              = True
 
+pprFvs :: Bool -> SDoc
+pprFvs True = text "no-fvs"
+pprFvs False = text "fvs"
+
+pprFuncFlag :: Bool -> SDoc
+pprFuncFlag True = text "mFunc"
+pprFuncFlag False = text "value"
+
+
+
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
-                                        ppr rep <+> ppr fvs <+> ppr argdesc)
+                                        ppr rep <+> pprFvs fvs <+> ppr argdesc)
     ppr (LFThunk top hasfv updateable sfi m_function) =
-        text "LFThunk" <> brackets (ppr top <+> ppr hasfv <+> ppr updateable <+>
-                                    ppr sfi <+> ppr m_function)
+        text "LFThunk" <> brackets (ppr top <+> pprFvs hasfv <+> ppr updateable <+>
+                                    ppr sfi <+> pprFuncFlag m_function)
     ppr (LFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (LFUnknown m_func) =
-        text "LFUnknown" <>
-            if m_func
-                then brackets (text "mf")
-                else empty
+        text "LFUnknown" <> brackets (pprFuncFlag m_func)
     ppr (LFUnlifted) = text "LFUnlifted"
     ppr (LFLetNoEscape) = text "LF-LNE"
 

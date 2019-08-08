@@ -60,6 +60,8 @@ module StgCmmClosure (
         cafBlackHoleInfoTable,
         indStaticInfoTable,
         staticClosureNeedsLink,
+
+        might_be_a_function,
     ) where
 
 #include "../includes/MachDeps.h"
