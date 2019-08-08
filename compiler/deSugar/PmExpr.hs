@@ -8,9 +8,11 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..), pmLitType,
-        pmAltConType, pmAltConArity, hsOverLitAsHsLit, mkPmExprLit,
-        mkPmExprData, decEqPmAltCon, pmExprToDataConApp
+        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..),
+        pmAltConType, decEqPmAltCon,
+        pmLitType, literalToPmLit, negatePmLit, overloadPmLit, charPmLit,
+        stringPmLit, pmAltConAsStringLit, hsOverLitAsHsLit,
+        mkPmExprData, pmExprToDataConApp
     ) where
 
 #include "HsVersions.h"
@@ -19,13 +21,20 @@ import GhcPrelude
 
 import Util
 import BasicTypes (IntegralLit(..), negateIntegralLit)
+import FastString
 import HsSyn
 import Id
 import DataCon
 import ConLike
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
-import TcHsSyn (hsLitType)
+import TysPrim
+import TysWiredIn
 import Outputable
+import Literal
+import Maybes
+
+import Numeric (fromRat)
+import Data.Foldable (find)
 
 {-
 %************************************************************************
@@ -45,8 +54,17 @@ data PmExpr = PmExprVar   Id
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
 -- See Note [Undecidable Equality for PmAltCons]
-data PmLit = PmSLit (HsLit GhcTc)                               -- simple
-           | PmOLit Bool {- is it negated? -} (HsOverLit GhcTc) -- overloaded
+data PmLit = PmLit
+           { pm_lit_ty  :: Type
+           , pm_lit_val :: PmLitValue }
+
+data PmLitValue
+  = PmLitInt Integer
+  | PmLitRat Rational
+  | PmLitChar Char
+  | PmLitString FastString
+  | PmLitOverInt Int {- How often Negated? -} Integer
+  | PmLitOverString FastString
 
 -- | Undecidable equality for values represented by 'PmLit's.
 -- See Note [Undecidable Equality for PmAltCons]
@@ -55,11 +73,20 @@ data PmLit = PmSLit (HsLit GhcTc)                               -- simple
 -- * @Just False@ ==> Surely different (non-overlapping, even!)
 -- * @Nothing@ ==> Equality relation undecidable
 decEqPmLit :: PmLit -> PmLit -> Maybe Bool
-decEqPmLit (PmSLit    l1) (PmSLit    l2) = Just (l1 == l2)
-decEqPmLit (PmOLit b1 l1) (PmOLit b2 l2)
-  | b1 == b2, l1 == l2
-  = Just True
-decEqPmLit _              _              = Nothing
+decEqPmLit (PmLit t1 v1) (PmLit t2 v2)
+  | pprTrace "decEqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
+  | not (t1 `eqType` t2) = Just False
+  | otherwise            = go v1 v2
+  where
+    go (PmLitInt i1)        (PmLitInt i2)        = Just (i1 == i2)
+    go (PmLitRat r1)        (PmLitRat r2)        = Just (r1 == r2)
+    go (PmLitChar c1)       (PmLitChar c2)       = Just (c1 == c2)
+    go (PmLitString s1)     (PmLitString s2)     = Just (s1 == s2)
+    go (PmLitOverInt n1 i1) (PmLitOverInt n2 i2)
+      | n1 == n2 && i1 == i2                     = Just True
+    go (PmLitOverString s1) (PmLitOverString s2)
+      | s1 == s2                                 = Just True
+    go _                    _                    = Nothing
 
 -- | Syntactic equality.
 instance Eq PmLit where
@@ -67,8 +94,7 @@ instance Eq PmLit where
 
 -- | Type of a 'PmLit'
 pmLitType :: PmLit -> Type
-pmLitType (PmSLit   lit) = hsLitType   lit
-pmLitType (PmOLit _ lit) = overLitType lit
+pmLitType (PmLit ty _) = ty
 
 -- | Type of a 'PmAltCon'
 pmAltConType :: PmAltCon -> [Type] -> Type
@@ -110,17 +136,18 @@ data PmAltCon = PmAltConLike ConLike
 --
 -- Examples (omitting some constructor wrapping):
 --
--- * @decEqPmAltCon (SLit 42) (SLit 1) == Just False@: Lit equality is decidable
+-- * @decEqPmAltCon (LitInt 42) (LitInt 1) == Just False@: Lit equality is
+--   decidable
 -- * @decEqPmAltCon (DataCon A) (DataCon B) == Just False@: DataCon equality is
 --   decidable
--- * @decEqPmAltCon (OLit 42) (OLit 1) == Nothing@: OverLit equality is
---   undecidable
+-- * @decEqPmAltCon (LitOverInt 42) (LitOverInt 1) == Nothing@: OverLit equality
+--   is undecidable
 -- * @decEqPmAltCon (PatSyn PA) (PatSyn PB) == Nothing@: PatSyn equality is
 --   undecidable
--- * @decEqPmAltCon (DataCon I#) (SLit 1) == Nothing@: DataCon to Lit
+-- * @decEqPmAltCon (DataCon I#) (LitInt 1) == Nothing@: DataCon to Lit
 --   comparisons are undecidable without reasoning about the wrapped @Int#@
--- * @decEqPmAltCon (OLit 1) (OLit 1) == Just True@: We assume reflexivity for
---   overloaded literals
+-- * @decEqPmAltCon (LitOverInt 1) (LitOverInt 1) == Just True@: We assume
+--   reflexivity for overloaded literals
 -- * @decEqPmAltCon (PatSyn PA) (PatSyn PA) == Just True@: We assume reflexivity
 --   for Pattern Synonyms
 decEqPmAltCon :: PmAltCon -> PmAltCon -> Maybe Bool
@@ -131,16 +158,6 @@ decEqPmAltCon _                  _                  = Nothing
 -- | Syntactic equality.
 instance Eq PmAltCon where
   a == b = decEqPmAltCon a b == Just True
-
-pmAltConArity :: PmAltCon -> Int
-pmAltConArity (PmAltConLike con) = conLikeArity con
-pmAltConArity (PmAltLit _)       = 0
-
-mkPmExprLit :: PmLit -> PmExpr
-mkPmExprLit l = PmExprCon (PmAltLit l) []
-
-mkPmExprData :: DataCon -> [Id] -> PmExpr
-mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,6 +216,43 @@ Similar reasoning applies to pattern synonyms: In contrast to data constructors,
 which are generative, constraints like F a ~ G b for two different pattern
 synonyms F and G aren't immediately unsatisfiable. We know F a ~ F a, though.
 -}
+
+mkPmExprData :: DataCon -> [Id] -> PmExpr
+mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
+
+literalToPmLit :: Type -> Literal -> Maybe PmLit
+literalToPmLit ty l = PmLit ty <$> go l
+  where
+    go (LitChar c)       = Just (PmLitChar c)
+    go (LitFloat r)      = Just (PmLitRat r)
+    go (LitDouble r)     = Just (PmLitRat r)
+    go (LitString s)     = Just (PmLitString (mkFastStringByteString s))
+    go (LitNumber _ i _) = Just (PmLitInt i)
+    go _                 = Nothing
+
+negatePmLit :: PmLit -> Maybe PmLit
+negatePmLit (PmLit ty v) = PmLit ty <$> go v
+  where
+    go (PmLitInt i)       = Just (PmLitInt (-i))
+    go (PmLitOverInt n i) = Just (PmLitOverInt (n+1) i)
+    go _                  = Nothing
+
+overloadPmLit :: PmLit -> Maybe PmLit
+overloadPmLit (PmLit ty v) = PmLit ty <$> go v
+  where
+    go (PmLitInt i)    = Just (PmLitOverInt 0 i)
+    go (PmLitString s) = Just (PmLitOverString s)
+    go _               = Nothing
+
+charPmLit :: Char -> PmLit
+charPmLit c = PmLit charTy (PmLitChar c)
+
+stringPmLit :: FastString -> PmLit
+stringPmLit s = PmLit stringTy (PmLitString s)
+
+pmAltConAsStringLit :: PmAltCon -> Maybe FastString
+pmAltConAsStringLit (PmAltLit (PmLit _ (PmLitString s))) = Just s
+pmAltConAsStringLit _                                    = Nothing
 
 -- | A term constraint. @TVC x e@ encodes that @x@ is equal to @e@.
 data TmVarCt = TVC !Id !PmExpr
@@ -315,9 +369,29 @@ pmExprToDataConApp _                                             = Nothing
 %************************************************************************
 -}
 
+instance Outputable PmLitValue where
+  ppr (PmLitInt i)        = ppr i
+  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
+  ppr (PmLitChar c)       = ppr c
+  ppr (PmLitString s)     = pprHsString s
+  ppr (PmLitOverInt n i)  = minuses (ppr i)
+    where
+      -- Take care of negated literals
+      minuses sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
+  ppr (PmLitOverString s) = pprHsString s
+
 instance Outputable PmLit where
-  ppr (PmSLit     l) = pmPprHsLit l
-  ppr (PmOLit neg l) = (if neg then char '-' else empty) <> ppr l
+  ppr (PmLit ty v) = ppr v <> suffix
+    where
+      -- Some ad-hoc hackery for displaying proper lit suffixes based on type
+      tbl = [ (intPrimTy, primIntSuffix)
+            , (int64PrimTy, primInt64Suffix)
+            , (wordPrimTy, primWordSuffix)
+            , (word64PrimTy, primWord64Suffix)
+            , (charPrimTy, primCharSuffix)
+            , (floatPrimTy, primFloatSuffix)
+            , (doublePrimTy, primDoubleSuffix) ]
+      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
 
 instance Outputable PmAltCon where
   ppr (PmAltConLike cl) = ppr cl

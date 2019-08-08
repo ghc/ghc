@@ -29,7 +29,9 @@ import PmExpr
 import PmOracle
 import PmPpr
 import CoreUtils (exprType)
-import CoreSyn (Expr(Var, Type), collectArgs)
+import CoreSyn (CoreExpr, Expr(..), collectArgs)
+import Literal
+import FastString (fsLit)
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -38,18 +40,19 @@ import Id
 import ConLike
 import Name
 import FamInst
+import PrelNames
 import TysWiredIn
 import TyCon
 import SrcLoc
 import Util
 import Outputable
-import FastString (unpackFS)
 import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 
 import {-# SOURCE #-} DsExpr (dsExpr)
+import MatchLit (dsLit, dsOverLit)
 import DsMonad
 import Bag
 import TyCoRep
@@ -442,12 +445,7 @@ mkListPatVec ty xs ys = [PmCon { pm_con_con = PmAltConLike (RealDataCon consData
                                , pm_con_args = xs++ys }]
 {-# INLINE mkListPatVec #-}
 
--- | Create a (non-overloaded) literal pattern
-mkSLitPattern :: HsLit GhcTc -> PmPat
-mkSLitPattern lit = mkPmLitPattern (PmSLit lit)
-{-# INLINE mkSLitPattern #-}
-
--- | Create a (non-overloaded) literal pattern
+-- | Create a literal pattern
 mkPmLitPattern :: PmLit -> PmPat
 mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
                            , pm_con_arg_tys = []
@@ -553,16 +551,19 @@ translatePat fam_insts pat k = case pat of
   NPat ty (dL->L _ olit) mb_neg _
     | Just lit <- hsOverLitAsHsLit olit (isJust mb_neg) ty
     -> translatePat fam_insts (LitPat noExtField lit) k
-    | otherwise
-    -> k [mkPmLitPattern (PmOLit (isJust mb_neg) olit)]
+  NPat _ (dL->L _ olit) mb_neg _ -> do
+    core_expr <- dsOverLit olit
+    let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
+    let lit' = case mb_neg of
+          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
+          Nothing -> lit
+    k [mkPmLitPattern lit']
 
   -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-  LitPat _ lit
-    | HsString src s <- lit ->
-        translatePatVec fam_insts
-          (map (LitPat noExtField . HsChar src) (unpackFS s))
-          (\pv -> k (foldr (mkListPatVec charTy) [nilPattern charTy] pv))
-    | otherwise -> k [mkSLitPattern lit]
+  LitPat _ lit -> do
+    core_expr <- dsLit (convertLit lit)
+    let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+    k [mkPmLitPattern lit]
 
   TuplePat tys ps boxity -> do
     translatePatVec fam_insts (map unLoc ps) $ \tidy_ps -> do
@@ -724,30 +725,66 @@ translateBoolGuard e k
 hsExprToPmExpr :: HsExpr GhcTc -> (PmExpr -> PmM a) -> PmM a
 hsExprToPmExpr expr k = do
   core_expr <- dsExpr expr
-  flip runContT k (go core_expr)
-  -- We currently have now mechanism of proving equivalence of two HsExprs, so
+  flip runContT k (coreExprToPmExpr core_expr)
+
+-- | Tries to peel off as many nested 'PmExprCon's from the given 'CoreExpr' as
+-- possible, falling back to allocating fresh 'PmExprVar's representing
+-- unhandled expressions.
+coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
+coreExprToPmExpr e
+  | Just lit <- coreExprAsPmLit e
+  = pure (PmExprCon (PmAltLit lit) [])
+  | Just (dc, args) <- isDataConApp_maybe e
+  = mkPmExprData dc <$> traverse core_expr_to_id args
+  | otherwise
+  -- We currently have no mechanism of proving equivalence of two HsExprs, so
   -- generate a fresh representative each time. This is morally wrong, but
   -- is the conservative thing to do.
   -- We have to go through Core because we need the type. Might be useful later
   -- on, since we have infrastructure for deciding alpha equivalence of Core
   -- terms.
+  = PmExprVar <$> lift (mkPmId (exprType e))
   where
-    go e = case collectArgs e of
-      (Var x, args)
-        | Just dc <- isDataConWorkId_maybe x
-        , let args' = last_n_term_args (dataConSourceArity dc) args
-        , length args' == dataConSourceArity dc
-        -> mkPmExprData dc <$> traverse core_expr_to_id args'
-      _ -> PmExprVar <$> lift (mkPmId (exprType e))
+    core_expr_to_id (Var x) = pure x
+    core_expr_to_id e       = do
+      pm_expr <- coreExprToPmExpr e
+      bindPmExprToId (exprType e) pm_expr -- This is the reason for ContT
 
+-- | Try to peel off the topmost 'DataCon' application.
+isDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+isDataConApp_maybe (collectArgs -> (Var x, args))
+  | Just dc <- isDataConWorkId_maybe x
+  , let args' = last_n_term_args (dataConSourceArity dc) args
+  , length args' == dataConSourceArity dc
+  = Just (dc, args')
+  where
     is_not_type (Type _) = False
     is_not_type _        = True
     last_n_term_args n = reverse . take n . reverse . filter is_not_type
+isDataConApp_maybe _ = Nothing
 
-    core_expr_to_id (Var x) = pure x
-    core_expr_to_id e       = do
-      pm_expr <- go e
-      bindPmExprToId (exprType e) pm_expr -- This is the reason for CPS
+coreExprAsPmLit :: CoreExpr -> Maybe PmLit
+coreExprAsPmLit e
+  | pprTrace "coreExprAsPmLit" (ppr e) False
+  = undefined
+coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
+coreExprAsPmLit e = case collectArgs e of
+  (Var x, [Type ty])
+    | Just dc <- isDataConWorkId_maybe x
+    , dc == nilDataCon
+    , ty `eqType` charTy
+    -> Just (stringPmLit (fsLit ""))
+  (Var x, [Lit l])
+    | Just dc <- isDataConWorkId_maybe x
+    , dc `elem` [intDataCon, wordDataCon, charDataCon]
+    -> literalToPmLit (exprType e) l
+  (Var x, [_ty, _dict, Lit l])
+    | idName x == fromIntegerName
+    -> pprTrace "matched OverLit" (ppr e) $ literalToPmLit (exprType e) l >>= overloadPmLit
+  (Var x, [Lit l])
+    | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
+    -> pprTrace "matched StringLit" (ppr e) $ literalToPmLit (exprType e) l
+  _ -> pprTrace "Missed lit" (ppr e) Nothing
 
 -- | This fucntion is the reason we need all that ContT machinery!
 -- @bindPmExprToId ty expr@ introduces a fresh 'Id' @x@ of type @ty@ and extends
