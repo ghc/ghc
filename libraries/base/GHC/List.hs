@@ -36,6 +36,7 @@ import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Integer (Integer)
+import GHC.Stack ( HasCallStack, withFrozenCallStack )
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
@@ -45,12 +46,12 @@ infix  4 `elem`, `notElem`
 --------------------------------------------------------------
 
 -- | \(\mathcal{O}(1)\). Extract the first element of a list, which must be non-empty.
-head                    :: [a] -> a
+head                    :: HasCallStack => [a] -> a
 head (x:_)              =  x
-head []                 =  badHead
+head []                 =  withFrozenCallStack badHead
 {-# NOINLINE [1] head #-}
 
-badHead :: a
+badHead :: HasCallStack => a
 badHead = errorEmptyList "head"
 
 -- This rule is useful in cases like
@@ -73,39 +74,39 @@ uncons (x:xs)           = Just (x, xs)
 
 -- | \(\mathcal{O}(1)\). Extract the elements after the head of a list, which
 -- must be non-empty.
-tail                    :: [a] -> [a]
+tail                    :: HasCallStack => [a] -> [a]
 tail (_:xs)             =  xs
-tail []                 =  errorEmptyList "tail"
+tail []                 =  withFrozenCallStack $ errorEmptyList "tail"
 
 -- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
 -- finite and non-empty.
-last                    :: [a] -> a
+last                    :: HasCallStack => [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
 last (_:xs)             =  last xs
-last []                 =  errorEmptyList "last"
+last []                 =  withFrozenCallStack $ errorEmptyList "last"
 #else
 -- Use foldl to make last a good consumer.
 -- This will compile to good code for the actual GHC.List.last.
 -- (At least as long it is eta-expaned, otherwise it does not, #10260.)
-last xs = foldl (\_ x -> x) lastError xs
+last xs = foldl (\_ x -> x) (withFrozenCallStack lastError) xs
 {-# INLINE last #-}
 -- The inline pragma is required to make GHC remember the implementation via
 -- foldl.
-lastError :: a
+lastError :: HasCallStack => a
 lastError = errorEmptyList "last"
 #endif
 
 -- | \(\mathcal{O}(n)\). Return all the elements of a list except the last one.
 -- The list must be non-empty.
-init                    :: [a] -> [a]
+init                    :: HasCallStack => [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
 init (x:xs)             =  x : init xs
-init []                 =  errorEmptyList "init"
+init []                 =  withFrozenCallStack $ errorEmptyList "init"
 #else
 -- eliminate repeated cases
-init []                 =  errorEmptyList "init"
+init []                 =  withFrozenCallStack $ errorEmptyList "init"
 init (x:xs)             =  init' x xs
   where init' _ []     = []
         init' y (z:zs) = y : init' z zs
@@ -240,14 +241,14 @@ foldl' k z0 xs =
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
-foldl1                  :: (a -> a -> a) -> [a] -> a
+foldl1                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
-foldl1 _ []             =  errorEmptyList "foldl1"
+foldl1 _ []             =  withFrozenCallStack $ errorEmptyList "foldl1"
 
 -- | A strict version of 'foldl1'
-foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1'                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
-foldl1' _ []             =  errorEmptyList "foldl1'"
+foldl1' _ []             =  withFrozenCallStack $ errorEmptyList "foldl1'"
 
 -- -----------------------------------------------------------------------------
 -- List sum and product
@@ -374,11 +375,11 @@ match on everything past the :, which is just the tail of scanl.
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty lists.
 
-foldr1                  :: (a -> a -> a) -> [a] -> a
+foldr1                  :: HasCallStack => (a -> a -> a) -> [a] -> a
 foldr1 f = go
   where go [x]            =  x
         go (x:xs)         =  f x (go xs)
-        go []             =  errorEmptyList "foldr1"
+        go []             =  withFrozenCallStack $ errorEmptyList "foldr1"
 {-# INLINE [0] foldr1 #-}
 
 -- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'.
@@ -402,9 +403,9 @@ scanr1 f (x:xs)         =  f x q : qs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
-maximum                 :: (Ord a) => [a] -> a
+maximum                 :: HasCallStack => (Ord a) => [a] -> a
 {-# INLINABLE maximum #-}
-maximum []              =  errorEmptyList "maximum"
+maximum []              =  withFrozenCallStack $ errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
 -- We want this to be specialized so that with a strict max function, GHC
@@ -417,9 +418,9 @@ maximum xs              =  foldl1 max xs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
-minimum                 :: (Ord a) => [a] -> a
+minimum                 :: HasCallStack => (Ord a) => [a] -> a
 {-# INLINABLE minimum #-}
-minimum []              =  errorEmptyList "minimum"
+minimum []              =  withFrozenCallStack $ errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
 {-# SPECIALIZE  minimum :: [Int] -> Int #-}
@@ -872,10 +873,10 @@ concat = foldr (++) []
 -- | List index (subscript) operator, starting from 0.
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
-(!!)                    :: [a] -> Int -> a
+(!!)                    :: HasCallStack => [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
-xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
-[]     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
+xs     !! n | n < 0 =  withFrozenCallStack $ error "Prelude.!!: negative index"
+[]     !! _         =  withFrozenCallStack $ error "Prelude.!!: index too large"
 (x:_)  !! 0         =  x
 (_:xs) !! n         =  xs !! (n-1)
 #else
@@ -884,11 +885,11 @@ xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
 -- We may want to fuss around a bit with NOINLINE, and
 -- if so we should be careful not to trip up known-bottom
 -- optimizations.
-tooLarge :: Int -> a
-tooLarge _ = errorWithoutStackTrace (prel_list_str ++ "!!: index too large")
+tooLarge :: HasCallStack => Int -> a
+tooLarge _ = withFrozenCallStack . error $ prel_list_str ++ "!!: index too large"
 
-negIndex :: a
-negIndex = errorWithoutStackTrace $ prel_list_str ++ "!!: negative index"
+negIndex :: HasCallStack => a
+negIndex = withFrozenCallStack . error $ prel_list_str ++ "!!: negative index"
 
 {-# INLINABLE (!!) #-}
 xs !! n
@@ -1131,9 +1132,9 @@ unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 -- Common up near identical calls to `error' to reduce the number
 -- constant strings created when compiled:
 
-errorEmptyList :: String -> a
+errorEmptyList :: HasCallStack => String -> a
 errorEmptyList fun =
-  errorWithoutStackTrace (prel_list_str ++ fun ++ ": empty list")
+  error (prel_list_str ++ fun ++ ": empty list")
 
 prel_list_str :: String
 prel_list_str = "Prelude."

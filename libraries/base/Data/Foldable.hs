@@ -67,6 +67,7 @@ import GHC.Arr  ( Array(..), elems, numElements,
 import GHC.Base hiding ( foldr )
 import GHC.Generics
 import GHC.Num  ( Num(..) )
+import GHC.Stack ( HasCallStack, withFrozenCallStack )
 
 infix  4 `elem`, `notElem`
 
@@ -216,8 +217,8 @@ class Foldable t where
     -- and thus may only be applied to non-empty structures.
     --
     -- @'foldr1' f = 'List.foldr1' f . 'toList'@
-    foldr1 :: (a -> a -> a) -> t a -> a
-    foldr1 f xs = fromMaybe (errorWithoutStackTrace "foldr1: empty structure")
+    foldr1 :: HasCallStack => (a -> a -> a) -> t a -> a
+    foldr1 f xs = fromMaybe (withFrozenCallStack $ error "foldr1: empty structure")
                     (foldr mf Nothing xs)
       where
         mf x m = Just (case m of
@@ -228,8 +229,8 @@ class Foldable t where
     -- and thus may only be applied to non-empty structures.
     --
     -- @'foldl1' f = 'List.foldl1' f . 'toList'@
-    foldl1 :: (a -> a -> a) -> t a -> a
-    foldl1 f xs = fromMaybe (errorWithoutStackTrace "foldl1: empty structure")
+    foldl1 :: HasCallStack => (a -> a -> a) -> t a -> a
+    foldl1 f xs = fromMaybe (withFrozenCallStack $ error "foldl1: empty structure")
                     (foldl mf Nothing xs)
       where
         mf m y = Just (case m of
@@ -268,15 +269,15 @@ class Foldable t where
     -- | The largest element of a non-empty structure.
     --
     -- @since 4.8.0.0
-    maximum :: forall a . Ord a => t a -> a
-    maximum = fromMaybe (errorWithoutStackTrace "maximum: empty structure") .
+    maximum :: forall a . Ord a => HasCallStack => t a -> a
+    maximum = fromMaybe (withFrozenCallStack $ error "maximum: empty structure") .
        getMax . foldMap (Max #. (Just :: a -> Maybe a))
 
     -- | The least element of a non-empty structure.
     --
     -- @since 4.8.0.0
-    minimum :: forall a . Ord a => t a -> a
-    minimum = fromMaybe (errorWithoutStackTrace "minimum: empty structure") .
+    minimum :: forall a . Ord a => HasCallStack => t a -> a
+    minimum = fromMaybe (withFrozenCallStack $ error "minimum: empty structure") .
        getMin . foldMap (Min #. (Just :: a -> Maybe a))
 
     -- | The 'sum' function computes the sum of the numbers of a structure.
@@ -387,8 +388,8 @@ instance Foldable Proxy where
     {-# INLINE foldr #-}
     foldl _ z _ = z
     {-# INLINE foldl #-}
-    foldl1 _ _ = errorWithoutStackTrace "foldl1: Proxy"
-    foldr1 _ _ = errorWithoutStackTrace "foldr1: Proxy"
+    foldl1 _ _ = withFrozenCallStack $ error "foldl1: Proxy"
+    foldr1 _ _ = withFrozenCallStack $ error "foldr1: Proxy"
     length _   = 0
     null _     = True
     elem _ _   = False
@@ -479,8 +480,8 @@ instance Foldable U1 where
     {-# INLINE foldr #-}
     foldl _ z _ = z
     {-# INLINE foldl #-}
-    foldl1 _ _ = errorWithoutStackTrace "foldl1: U1"
-    foldr1 _ _ = errorWithoutStackTrace "foldr1: U1"
+    foldl1 _ _ = withFrozenCallStack $ error "foldl1: U1"
+    foldr1 _ _ = withFrozenCallStack $ error "foldr1: U1"
     length _   = 0
     null _     = True
     elem _ _   = False
@@ -663,8 +664,8 @@ all p = getAll #. foldMap (All #. p)
 -- given comparison function.
 
 -- See Note [maximumBy/minimumBy space usage]
-maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-maximumBy cmp = foldl1 max'
+maximumBy :: Foldable t => HasCallStack => (a -> a -> Ordering) -> t a -> a
+maximumBy cmp = withFrozenCallStack (foldl1 max')
   where max' x y = case cmp x y of
                         GT -> x
                         _  -> y
@@ -673,8 +674,8 @@ maximumBy cmp = foldl1 max'
 -- given comparison function.
 
 -- See Note [maximumBy/minimumBy space usage]
-minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-minimumBy cmp = foldl1 min'
+minimumBy :: Foldable t => HasCallStack => (a -> a -> Ordering) -> t a -> a
+minimumBy cmp = withFrozenCallStack (foldl1 min')
   where min' x y = case cmp x y of
                         GT -> y
                         _  -> x
