@@ -89,7 +89,7 @@ Language
   around what kinds of types can appear inside of the data constructor
   for a `newtype`. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
-             
+
 Compiler
 ~~~~~~~~
 
@@ -112,7 +112,7 @@ Compiler
   and all modules they depend on. Before this change, attempting to
   load these modules into the interpreter would just fail, and the
   only convenient workaround was to enable `-fobject-code` for all
-  modules.
+  modules. See the :ref:`GHCi FAQ <ghci-faq>` for further details.
 
 GHCi
 ~~~~
