@@ -10,8 +10,8 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..),
         pmAltConType, decEqPmAltCon,
-        pmLitType, literalToPmLit, negatePmLit, overloadPmLit, charPmLit,
-        stringPmLit, pmAltConAsStringLit, hsOverLitAsHsLit,
+        pmLitType, literalToPmLit, negatePmLit, overloadPmLit,
+        pmLitAsStringLit, hsOverLitAsHsLit,
         mkPmExprData, pmExprToDataConApp
     ) where
 
@@ -28,7 +28,6 @@ import DataCon
 import ConLike
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
 import TysPrim
-import TysWiredIn
 import Outputable
 import Literal
 import Maybes
@@ -62,8 +61,11 @@ data PmLitValue
   = PmLitInt Integer
   | PmLitRat Rational
   | PmLitChar Char
+  -- We won't actually see PmLitString in the oracle since we desugar strings to
+  -- lists
   | PmLitString FastString
   | PmLitOverInt Int {- How often Negated? -} Integer
+  | PmLitOverRat Int {- How often Negated? -} Rational
   | PmLitOverString FastString
 
 -- | Undecidable equality for values represented by 'PmLit's.
@@ -74,7 +76,7 @@ data PmLitValue
 -- * @Nothing@ ==> Equality relation undecidable
 decEqPmLit :: PmLit -> PmLit -> Maybe Bool
 decEqPmLit (PmLit t1 v1) (PmLit t2 v2)
-  | pprTrace "decEqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
+  -- | pprTrace "decEqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
   | not (t1 `eqType` t2) = Just False
   | otherwise            = go v1 v2
   where
@@ -84,6 +86,8 @@ decEqPmLit (PmLit t1 v1) (PmLit t2 v2)
     go (PmLitString s1)     (PmLitString s2)     = Just (s1 == s2)
     go (PmLitOverInt n1 i1) (PmLitOverInt n2 i2)
       | n1 == n2 && i1 == i2                     = Just True
+    go (PmLitOverRat n1 r1) (PmLitOverRat n2 r2)
+      | n1 == n2 && r1 == r2                     = Just True
     go (PmLitOverString s1) (PmLitOverString s2)
       | s1 == s2                                 = Just True
     go _                    _                    = Nothing
@@ -237,22 +241,17 @@ negatePmLit (PmLit ty v) = PmLit ty <$> go v
     go (PmLitOverInt n i) = Just (PmLitOverInt (n+1) i)
     go _                  = Nothing
 
-overloadPmLit :: PmLit -> Maybe PmLit
-overloadPmLit (PmLit ty v) = PmLit ty <$> go v
+overloadPmLit :: Type -> PmLit -> Maybe PmLit
+overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
   where
     go (PmLitInt i)    = Just (PmLitOverInt 0 i)
+    go (PmLitRat r)    = Just (PmLitOverRat 0 r)
     go (PmLitString s) = Just (PmLitOverString s)
     go _               = Nothing
 
-charPmLit :: Char -> PmLit
-charPmLit c = PmLit charTy (PmLitChar c)
-
-stringPmLit :: FastString -> PmLit
-stringPmLit s = PmLit stringTy (PmLitString s)
-
-pmAltConAsStringLit :: PmAltCon -> Maybe FastString
-pmAltConAsStringLit (PmAltLit (PmLit _ (PmLitString s))) = Just s
-pmAltConAsStringLit _                                    = Nothing
+pmLitAsStringLit :: PmLit -> Maybe FastString
+pmLitAsStringLit (PmLit _ (PmLitString s)) = Just s
+pmLitAsStringLit _                         = Nothing
 
 -- | A term constraint. @TVC x e@ encodes that @x@ is equal to @e@.
 data TmVarCt = TVC !Id !PmExpr
@@ -374,11 +373,13 @@ instance Outputable PmLitValue where
   ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
   ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
-  ppr (PmLitOverInt n i)  = minuses (ppr i)
-    where
-      -- Take care of negated literals
-      minuses sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
+  ppr (PmLitOverInt n i)  = minuses n (ppr i)
+  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
   ppr (PmLitOverString s) = pprHsString s
+
+-- Take care of negated literals
+minuses :: Int -> SDoc -> SDoc
+minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
 
 instance Outputable PmLit where
   ppr (PmLit ty v) = ppr v <> suffix
