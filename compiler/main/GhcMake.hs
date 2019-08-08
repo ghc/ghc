@@ -2078,7 +2078,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
            (defaultObjectTarget dflags)
            map0
          else if hscTarget dflags == HscInterpreted
-           then enableCodeGenForUnboxedTuples
+           then enableCodeGenForUnboxedTuplesOrSums
              (defaultObjectTarget dflags)
              map0
            else return map0
@@ -2176,16 +2176,19 @@ enableCodeGenForTH =
 -- and .o file locations to be temporary files.
 --
 -- This is used used in order to load code that uses unboxed tuples
--- into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuples :: HscTarget
+-- or sums into GHCi while still allowing some code to be interpreted.
+enableCodeGenForUnboxedTuplesOrSums :: HscTarget
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenForUnboxedTuples =
+enableCodeGenForUnboxedTuplesOrSums =
   enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
   where
     condition ms =
-      xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
+      unboxed_tuples_or_sums (ms_hspp_opts ms) &&
+      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
       not (isBootSummary ms)
+    unboxed_tuples_or_sums d =
+      xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
       hscTarget dflags == HscInterpreted
 

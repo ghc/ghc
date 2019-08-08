@@ -654,6 +654,7 @@ data GeneralFlag
    | Opt_SingleLibFolder
    | Opt_KeepCAFs
    | Opt_KeepGoing
+   | Opt_ByteCode
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -3744,7 +3745,10 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
-  , make_ord_flag defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
+  , make_ord_flag defFlag "fbyte-code"
+      (noArgM $ \dflags -> do
+        setTarget HscInterpreted
+        pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
       setTarget $ defaultObjectTarget dflags
