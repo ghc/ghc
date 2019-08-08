@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DerivingStrategies #-}
 
 -- | Code generation related types used in other parts of the compiler.
 
@@ -46,6 +48,25 @@ This allows us to generate
 -- | Information about imported things coming from interface files.
 type CgIfaceInfo = NameEnv LambdaFormInfo
 
+-- | Recursivity Flag
+data FreeVarFlag = HasFreeVars
+                 | NoFreeVars
+                 deriving (Eq,Enum,Bounded)
+
+instance Outputable FreeVarFlag where
+  ppr HasFreeVars = text "hasFvs"
+  ppr NoFreeVars  = text "noFvs"
+
+data LfUpdateable = Updateable
+                  | NotUpdateable
+                  deriving stock (Eq,Enum,Bounded)
+                  -- deriving via Binary
+                  --       via (BoundedEnumBinary LfUpdateable)
+
+data LfValueFlag = Value            -- ^ Definitely a value (eg. Nothing)
+                 | MaybeFunction    -- ^ Might be a function.
+                 deriving (Eq,Enum,Bounded)
+
 -----------------------------------------------------------------------------
 --                LambdaFormInfo
 -----------------------------------------------------------------------------
@@ -60,7 +81,7 @@ data LambdaFormInfo
         { lf_top        :: !TopLevelFlag  -- ^ True if top level
         , lf_os_info    :: !OneShotInfo
         , lf_repArity   :: !RepArity      -- ^ Arity. Invariant: always > 0
-        , lf_no_fvs     :: !Bool         -- ^ True <=> no fvs
+        , lf_no_fvs     :: !Bool   -- ^ True <=> no fvs
         , lf_arg_desc   :: ArgDescr      -- ^ Argument descriptor
                                          -- (should really be in ClosureInfo)
         }
@@ -104,6 +125,10 @@ pprFuncFlag :: Bool -> SDoc
 pprFuncFlag True = text "mFunc"
 pprFuncFlag False = text "value"
 
+pprUpdateable :: Bool -> SDoc
+pprUpdateable True = text "updateable"
+pprUpdateable False = text "oneshot"
+
 
 
 instance Outputable LambdaFormInfo where
@@ -111,7 +136,7 @@ instance Outputable LambdaFormInfo where
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
                                         ppr rep <+> pprFvs fvs <+> ppr argdesc)
     ppr (LFThunk top hasfv updateable sfi m_function) =
-        text "LFThunk" <> brackets (ppr top <+> pprFvs hasfv <+> ppr updateable <+>
+        text "LFThunk" <> brackets (ppr top <+> pprFvs hasfv <+> pprUpdateable updateable <+>
                                     ppr sfi <+> pprFuncFlag m_function)
     ppr (LFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (LFUnknown m_func) =
