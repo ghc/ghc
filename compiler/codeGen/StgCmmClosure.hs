@@ -226,7 +226,6 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
 
--- Debug only
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>

@@ -28,6 +28,8 @@ module StgInferTags (findTags) where
 import GhcPrelude
 
 import BasicTypes
+import Binary hiding (put, get)
+import qualified Binary as B
 import DataCon
 import Id
 import Outputable
@@ -44,7 +46,6 @@ import StgUtil
 import Name
 import PrelNames
 
-import Control.Monad
 
 import Unique
 import UniqFM
@@ -54,7 +55,10 @@ import Data.Ord (comparing)
 
 import State -- See Note [Useless Bangs]
 import Maybes
+
+-- import Data.Int
 import Control.Applicative hiding (empty)
+import Control.Monad
 
 import GHC.Generics
 import Control.DeepSeq -- hiding (deepseq)
@@ -278,7 +282,8 @@ functions which behaves as follows.
 
 In general when comparing against top/bot/rec:
 
-combine x y | x == y = x
+combine x y
+     | x == y = x
 combine Top x = x
 combine Bot x = x
 combine Rec x = x
@@ -322,7 +327,7 @@ C2's branch. This is safe.
   This means there is no chance of any of the values n1+1 ... n2
   to be scrutinzed in this branch.
 * Any branch matching on C2 might bind the fields n+1 ... n2.
-  But this is also safe. 
+  But this is also safe.
   + If there are other branches with as many defined fields we would
     already have combined them to a safe element of the lattice.
   + If alt2 is the only such branch then we will always scrutinize the
@@ -464,6 +469,10 @@ data EnterInfo
     | NeverEnter        -- ^ Does NOT need to be entered.
     deriving (Eq,Ord,Show,Enum,Generic,NFData)
 
+instance Binary EnterInfo where
+    put_ bh info = putByte bh (fromIntegral $ fromEnum info) -- . (fromIntegral . fromEnum $ info :: Int8)
+    get h = toEnum . fromIntegral <$> getByte h
+
 instance Outputable EnterInfo where
     ppr UndetEnterInfo  = char '?'
     ppr NoValue         = text "noInfo"
@@ -493,7 +502,7 @@ instance Outputable EnterInfo where
     `prod` and `sum` against each other. And we do!
 
     See Note [The lattice element combinators] for details.
-    
+
 -}
 
 data EnterLattice = EnterLattice
@@ -501,6 +510,10 @@ data EnterLattice = EnterLattice
     , fieldInfo :: !FieldInfo
     }
     deriving (Eq, Generic, NFData)
+
+instance Binary EnterLattice where
+    put_ bh (EnterLattice enterInfo fieldInfo) = put_ bh enterInfo >> put_ bh fieldInfo
+    get h = pure EnterLattice <*> B.get h <*> B.get h
 
 -- Side note: Nullary constructors are assigned FieldsNone.
 
@@ -515,8 +528,8 @@ data FieldInfo
 
     | FieldsProd [EnterLattice]
     -- Constructor the fields came out of
-    | FieldsSum  !DataCon [EnterLattice]
-    
+    | FieldsSum  !(Maybe DataCon) [EnterLattice]
+
     -- | Direct tail recursion, fields without arguments, the works.
     | FieldsNone
 
@@ -539,7 +552,24 @@ instance Outputable FieldInfo where
     ppr FieldsNone              = text "none"
     ppr FieldsUndet             = text "undet"
 
+instance Binary FieldInfo where
+    put_ bh FieldsUnknown           = putByte bh 0
+    put_ bh (FieldsUntyped fields)  = putByte bh 1 >> put_ bh fields
+    put_ bh (FieldsProd fields)     = putByte bh 2 >> put_ bh fields
+    put_ bh (FieldsSum _con fields) = putByte bh 3 >> put_ bh fields
+    put_ bh FieldsNone              = putByte bh 4
+    put_ bh FieldsUndet             = putByte bh 5
 
+    get bh = do
+        con <- getByte bh
+        case con of
+            0 -> pure FieldsUnknown
+            1 -> pure FieldsUntyped <*> B.get bh
+            2 -> pure FieldsProd <*> B.get bh
+            3 -> pure FieldsSum <*> pure Nothing <*> B.get bh
+            4 -> pure FieldsNone
+            5 -> pure FieldsUndet
+            _ -> panic "get:FieldInfo - invalid byte"
 
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterInfo MaybeEnter _           = MaybeEnter
@@ -577,9 +607,9 @@ combineFieldInfos FieldsUndet _ = FieldsUndet
 combineFieldInfos _ FieldsUndet = FieldsUndet
 -- Top stays top
 -- We currently do combine results of different types
-combineFieldInfos (FieldsProd fs1) (FieldsSum _ fs2) = 
+combineFieldInfos (FieldsProd fs1) (FieldsSum _ fs2) =
     FieldsUntyped $ combineFieldsUntyped fs1 fs2
-combineFieldInfos (FieldsSum _ fs1) (FieldsProd fs2) = 
+combineFieldInfos (FieldsSum _ fs1) (FieldsProd fs2) =
     FieldsUntyped $ combineFieldsUntyped fs1 fs2
 
 combineFieldInfos (FieldsSum c1 fs1)  (FieldsSum c2 fs2)
@@ -1007,7 +1037,7 @@ mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
 mkOutConLattice con outer fields
     | null fields   = EnterLattice outer $ FieldsNone
     | conCount == 1 = EnterLattice outer $ FieldsProd out_fields
-    | conCount > 1  = EnterLattice outer $ FieldsSum con out_fields
+    | conCount > 1  = EnterLattice outer $ FieldsSum (Just con) out_fields
     | otherwise = panic "mkOutConLattice"
   where
     out_fields = mapStrictConArgs con (`setEnterInfo` NeverEnter) fields
@@ -1031,41 +1061,40 @@ findTags this_mod us binds =
             finalBinds <- rewriteTopBinds binds'
             return $! finalBinds
     in  (seqTopBinds binds') `seq`
-            -- pprTrace "foundBinds" (ppr this_mod) 
+            -- pprTrace "foundBinds" (ppr this_mod)
                 binds'
 
+-- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
+-- passTopBinds binds = map (passTop) binds
 
-passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
-passTopBinds binds = map (passTop) binds
+-- passTop :: StgTopBinding -> TgStgTopBinding
+-- passTop (StgTopStringLit v s)   = StgTopStringLit v s
+-- passTop (StgTopLifted bind)     = StgTopLifted (passBinds bind)
 
-passTop :: StgTopBinding -> TgStgTopBinding
-passTop (StgTopStringLit v s)   = StgTopStringLit v s
-passTop (StgTopLifted bind)     = StgTopLifted (passBinds bind)
+-- passBinds :: StgBinding -> TgStgBinding
+-- passBinds (StgNonRec v rhs) = StgNonRec v (passRhs rhs)
+-- passBinds (StgRec pairs)    = StgRec $ map (\(v,rhs) -> (v, passRhs rhs)) pairs
 
-passBinds :: StgBinding -> TgStgBinding
-passBinds (StgNonRec v rhs) = StgNonRec v (passRhs rhs)
-passBinds (StgRec pairs)    = StgRec $ map (\(v,rhs) -> (v, passRhs rhs)) pairs
+-- -- For top level lets we have to turn lets into closures.
+-- passRhs :: StgRhs -> TgStgRhs
+-- passRhs (StgRhsCon node_id ccs con args) = (StgRhsCon noExtFieldSilent ccs con args)
+-- passRhs (StgRhsClosure ext ccs flag args body) =
+--     StgRhsClosure ext ccs flag args $ passExpr body
 
--- For top level lets we have to turn lets into closures.
-passRhs :: StgRhs -> TgStgRhs
-passRhs (StgRhsCon node_id ccs con args) = (StgRhsCon noExtFieldSilent ccs con args)
-passRhs (StgRhsClosure ext ccs flag args body) =
-    StgRhsClosure ext ccs flag args $ passExpr body
+-- passExpr :: StgExpr -> TgStgExpr
+-- passExpr (StgCase scrut bndr ty alts) = StgCase (passExpr scrut) bndr ty (map passAlt alts)
+-- passExpr (StgLet _ binds body)          = StgLet noExtFieldSilent (passBinds binds) (passExpr body)
+-- passExpr (StgLetNoEscape _ binds body)  = StgLetNoEscape noExtFieldSilent (passBinds binds) (passExpr body)
+-- passExpr (StgTick t e)     = StgTick t $ passExpr e
+-- passExpr (StgConApp _ con args tys)     = StgConApp noExtFieldSilent con args tys
 
-passExpr :: StgExpr -> TgStgExpr
-passExpr (StgCase scrut bndr ty alts) = StgCase (passExpr scrut) bndr ty (map passAlt alts)
-passExpr (StgLet _ binds body)          = StgLet noExtFieldSilent (passBinds binds) (passExpr body)
-passExpr (StgLetNoEscape _ binds body)  = StgLetNoEscape noExtFieldSilent (passBinds binds) (passExpr body)
-passExpr (StgTick t e)     = StgTick t $ passExpr e
-passExpr (StgConApp _ con args tys)     = StgConApp noExtFieldSilent con args tys
+-- passExpr (StgApp _ f args)              =  StgApp MayEnter f args
+-- passExpr (StgLit lit)                   = (StgLit lit)
+-- passExpr (StgOpApp op args res_ty)      = (StgOpApp op args res_ty)
+-- passExpr (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
 
-passExpr (StgApp _ f args)              =  StgApp MayEnter f args
-passExpr (StgLit lit)                   = (StgLit lit)
-passExpr (StgOpApp op args res_ty)      = (StgOpApp op args res_ty)
-passExpr (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
-
-passAlt :: StgAlt -> TgStgAlt
-passAlt (altCon, bndrs, rhs) = (altCon, bndrs, passExpr rhs)
+-- passAlt :: StgAlt -> TgStgAlt
+-- passAlt (altCon, bndrs, rhs) = (altCon, bndrs, passExpr rhs)
 
 -- Constant mappings
 addConstantNodes :: AM ()
@@ -1382,7 +1411,7 @@ wrappting it in a seq is of little consequence.
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
 nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag
-        -> Id -> StgRhs 
+        -> Id -> StgRhs
         -> AM (InferStgRhs)
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
@@ -1406,7 +1435,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
 #endif
                         }
         addNode notDone node
-            
+
         return $! (StgRhsCon (node_id,remainsConRhs) ccs con args)
   where
     node_id = mkLocalIdNodeId ctxt binding
@@ -1443,7 +1472,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
                 | any (== UndetEnterInfo) strictOuter
                 = UndetEnterInfo
 
-                -- e) 
+                -- e)
                 | otherwise
                 = MaybeEnter
 
@@ -1857,13 +1886,13 @@ If f is imported:
 If f is an absent expression:
 ->  We treat it as NeverEnter with Unknown field information.
 
-If f is potentially part of mutual recursive binds
-or   is a unsaturated function call:
-->  We throw up our hands and determine we know nothing.
-
 If f is a simple recursive tail call:
 ->  We mark the result as such: NoValue x RecFields
     See [Recursive Functions] for details.
+
+If f is potentially part of mutual recursive binds
+or   is a unsaturated function call:
+->  We throw up our hands and determine we know nothing.
 
 If f is a saturated function:
 ->  We determine MaybeEnter x fieldInfoOf(f)
@@ -1956,7 +1985,6 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
 
     inputs
         | isAbsentExpr expr = []
-        | OtherRecursion <- recursionKind = []
         | isFun && (not isSat) = []
         | recTail = []
         | isFun && isSat = [f_node_id]
@@ -1965,20 +1993,17 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     -- See Note [App Data Flow]
     mkResult :: AM EnterLattice
     mkResult
-        | isAbsent = 
-            -- pprTrace "Absent:" (ppr f) $ 
+        | isAbsent =
+            -- pprTrace "Absent:" (ppr f) $
             return $! flatLattice NeverEnter
-
-        -- I'm fairly certain we can do better than this on mutual recursion.
-        -- But it also seems to change hardly anything on GHC
-        | OtherRecursion <- recursionKind
-        =   -- pprTrace "mutRec" (ppr f_node_id) $
-            return top
 
         | isFun && (not isSat) = return $! top
 
         -- App in a direct self-recursive tail call context, returns nothing
         | recTail = return $! EnterLattice NoValue FieldsNone
+
+        | OtherRecursion <- recursionKind
+        =   lookupNodeResult f_node_id
 
         | NoMutRecursion <- recursionKind =
             -- pprTrace "simpleRec" (ppr f) $
@@ -2102,14 +2127,14 @@ rewriteTopBinds binds = mapM (rewriteTop) binds
 rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
-    (StgTopLifted . fst) <$!> (rewriteBinds TopLevel bind)
+    (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
 -- For top level binds, the wrapper is guaranteed to be `id`
-rewriteBinds :: TopLevelFlag -> InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
-rewriteBinds topFlag (StgNonRec v rhs) = do
+rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
+rewriteBinds (StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
         return $! (StgNonRec v rhs, wrapper)
-rewriteBinds topFlag (StgRec binds) =do
+rewriteBinds (StgRec binds) =do
         (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
         let wrapper = foldl1 (.) wrappers
         return $! (mkRec rhss, wrapper)
@@ -2199,14 +2224,14 @@ rewriteAlt (altCon, bndrs, rhs) = do
 
 rewriteLet :: InferStgExpr -> AM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
-    (!bind', !wrapper) <- rewriteBinds NotTopLevel bind
+    (!bind', !wrapper) <- rewriteBinds bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
 rewriteLetNoEscape :: InferStgExpr -> AM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
-    (!bind', wrapper) <- rewriteBinds NotTopLevel bind
+    (!bind', wrapper) <- rewriteBinds bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
