@@ -31,7 +31,7 @@ import PmPpr
 import CoreUtils (exprType)
 import CoreSyn (CoreExpr, Expr(..), collectArgs)
 import Literal
-import FastString (fsLit)
+import FastString (unpackFS)
 import Unify( tcMatchTy )
 import DynFlags
 import HsSyn
@@ -560,10 +560,15 @@ translatePat fam_insts pat k = case pat of
     k [mkPmLitPattern lit']
 
   -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-  LitPat _ lit -> do
-    core_expr <- dsLit (convertLit lit)
-    let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
-    k [mkPmLitPattern lit]
+  LitPat _ lit
+    | HsString src s <- lit ->
+        translatePatVec fam_insts
+          (map (LitPat noExtField . HsChar src) (unpackFS s))
+          (\pv -> k (foldr (mkListPatVec charTy) [nilPattern charTy] pv))
+    | otherwise -> do
+        core_expr <- dsLit (convertLit lit)
+        let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+        k [mkPmLitPattern lit]
 
   TuplePat tys ps boxity -> do
     translatePatVec fam_insts (map unLoc ps) $ \tidy_ps -> do
@@ -769,11 +774,6 @@ coreExprAsPmLit e
   = undefined
 coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
 coreExprAsPmLit e = case collectArgs e of
-  (Var x, [Type ty])
-    | Just dc <- isDataConWorkId_maybe x
-    , dc == nilDataCon
-    , ty `eqType` charTy
-    -> Just (stringPmLit (fsLit ""))
   (Var x, [Lit l])
     | Just dc <- isDataConWorkId_maybe x
     , dc `elem` [intDataCon, wordDataCon, charDataCon]

@@ -1291,12 +1291,7 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMay
   pm' <- case nalt of
     PmAltConLike cl -> MaybeT (ensureInhabited (testInhabited delta ty) (markMatched cl pm))
     _               -> pure pm
-  let delta' = delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
-  -- 4. For strings, we want to identify "" with [], so we recognise a complete
-  --    match.
-  if nalt == emptyStringLit
-    then MaybeT (tryAddRefutableAltCon delta' x nilPmAltCon)
-    else pure delta'
+  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
 
 testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 -- @testInhabited delta ty K@ Returns False if
@@ -1426,56 +1421,7 @@ trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
       -- the new solution)
       let neg'   = filter ((== Nothing) . decEqPmAltCon alt) neg
       let pos'   = (alt,args):pos
-      let delta' = delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
-      -- Finally a hack for converting between String literals and list DataCons
-      checkForStringLiterals delta' x alt args
-
-checkForStringLiterals :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-checkForStringLiterals delta x _alt _args
-  | not (idType x `eqType` stringTy) = pure delta
-  | pprTrace "checkForStringLiterals" (ppr x <+> ppr _alt <+> ppr _args $$ ppr delta) False = undefined
--- Solved to a string literal, we have info about [] or (:)
-checkForStringLiterals delta x (pmAltConAsStringLit -> Just s) []
-  | nullFS s  = trySolve delta x nilPmAltCon []
-  | otherwise = do
-      VI _ pos neg _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
-      if null neg && null pos
-        then pure delta -- no need to refine the info yet. Lits are more compact
-        else do
-          h <- lift (mkPmId charTy)
-          t <- lift (mkPmId stringTy)
-          delta1 <- trySolve delta h (PmAltLit (charPmLit (headFS s))) []
-          delta2 <- trySolve delta1 t (PmAltLit (stringPmLit (tailFS s))) []
-          trySolve delta2 x consPmAltCon [h, t]
--- Solved to [] or (:), we have info about string literals
-checkForStringLiterals delta x (PmAltConLike (RealDataCon dc)) args
-  | dc == nilDataCon = trySolve delta x emptyStringLit []
-  | otherwise        = ASSERT( dc == consDataCon ) do
-      let [h, t] = args
-      VI _ pos _ _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
-
-      -- We can't just tryAddRefutableAltCon for the negative information,
-      -- because we only refute a literal when *every* position occurs.
-      -- We would need to split Delta (which is like a conjunctive clause of a
-      -- DNF) for every character encountered.
-
-      let pos_strings = mapMaybe (pmAltConAsStringLit . fst) pos
-      let add_pos d s
-            | nullFS s  = mzero
-            | otherwise = do
-                d' <- trySolve d h (PmAltLit (charPmLit (headFS s))) []
-                trySolve d' t (PmAltLit (stringPmLit (tailFS s))) []
-      foldlM add_pos delta pos_strings
-checkForStringLiterals delta _ _ _  = pure delta
-
-nilPmAltCon :: PmAltCon
-nilPmAltCon = PmAltConLike (RealDataCon nilDataCon)
-
-consPmAltCon :: PmAltCon
-consPmAltCon = PmAltConLike (RealDataCon consDataCon)
-
-emptyStringLit :: PmAltCon
-emptyStringLit = PmAltLit (stringPmLit (fsLit ""))
+      pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
 
 -- | External interface to the term oracle.
 pmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)
