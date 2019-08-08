@@ -160,7 +160,7 @@ getCgIdInfo id
     reliableLF :: Maybe LambdaFormInfo -> Maybe LambdaFormInfo
     reliableLF (Just lf)
       | lfIsUnknown lf = Nothing
-      | otherwise = Just lf
+    reliableLF lf = lf
     mkStaticLF :: Bool -> Maybe LambdaFormInfo
     mkStaticLF unlifted
       | unlifted = return $! mkLFStringLit
