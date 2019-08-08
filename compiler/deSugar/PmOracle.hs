@@ -2,7 +2,7 @@
 Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 -}
 
-{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
 -- | The term equality oracle. The main export of the module are the functions
 -- 'pmOracle', 'solveOneEq' and 'tryAddRefutableAltCon'.
@@ -1077,44 +1077,74 @@ provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
 -- (provideEvidenceForEquation vs n delta) returns a list of
 -- at most n (but perhaps empty) of expression-lists that can
 -- match 'vs' without contradicting delta
-provideEvidenceForEquation _      0 _     = pure []
-provideEvidenceForEquation []     _ delta = pure [delta]
-provideEvidenceForEquation (x:xs) n delta = do
-  VI _ty pos _neg pm <- initLookupVarInfo (delta_tm_cs delta) x
-  case pos of
-    _:_ -> do
-      -- All solutions must be valid at once. Try to find candidates for their
-      -- fields. Example:
-      --   f x@(Just _) True = case x of SomePatSyn _ -> ()
-      --   f _          False = ()
-      -- after this clause, @x@ will have two possibly compatible solutions,
-      -- @Just y@ for some @y@ and @SomePatSyn z@ for some @z@. We must find
-      ---evidence for @y@ and @z@ that is valid at the same time.
-      let arg_vas = concatMap (\(_cl, args) -> args) pos
-      provideEvidenceForEquation (arg_vas ++ xs) n delta
-    [] ->
-      -- We have to pick one of the available constructors and try it
-      -- It's important that each of the ConLikeSets in pm is still inhabited,
-      -- so that it doesn't matter from which we pick.
-      -- I think we implicitly uphold that invariant, but not too sure
-      case getUnmatchedConstructor pm of
-        Unsatisfiable -> pure []
-        -- No COMPLETE sets available, so we can assume it's inhabited
-        PossiblySatisfiable -> provideEvidenceForEquation xs n delta
-        Satisfiable cl -> do
-          -- This will be really similar to the ConVar case
-          ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
-            Nothing                          -> pure []
-            Just (delta', _ex_tvs2, arg_vas) ->
-              provideEvidenceForEquation (arg_vas ++ xs) n delta'
+provideEvidenceForEquation = go initRecTc
+  where
+    go _      _      0 _     = pure []
+    go _      []     _ delta = pure [delta]
+    go rec_ts (x:xs) n delta = do
+      VI ty pos neg pm <- initLookupVarInfo (delta_tm_cs delta) x
+      case pos of
+        _:_ -> do
+          -- All solutions must be valid at once. Try to find candidates for their
+          -- fields. Example:
+          --   f x@(Just _) True = case x of SomePatSyn _ -> ()
+          -- after this clause, we want to report that
+          --   * @f Nothing _@ is uncovered
+          --   * @f x False@ is uncovered
+          -- where @x@ will have two possibly compatible solutions, @Just y@ for
+          -- some @y@ and @SomePatSyn z@ for some @z@. We must find evidence for @y@
+          -- and @z@ that is valid at the same time. These constitute arg_vas below.
+          let arg_vas = concatMap (\(_cl, args) -> args) pos
+          go rec_ts (arg_vas ++ xs) n delta
+        []
+          -- First the simple case where we don't need to query the oracles
+          | isVanillaDataType ty
+              -- So no type info unleashed in pattern match
+          , null neg
+              -- No term-level info either
+          || notNull [ l | PmAltLit l <- neg ]
+              -- ... or there are literals involved, in which case we don't want
+              -- to split on possible constructors
+          -> go rec_ts xs n delta
+        [] -> do
+          -- We have to pick one of the available constructors and try it
+          -- It's important that each of the ConLikeSets in pm is still inhabited,
+          -- so that it doesn't matter from which we pick.
+          -- I think we implicitly uphold that invariant, but not too sure
+          case getUnmatchedConstructor pm of
+            Unsatisfiable -> pure []
+            -- No COMPLETE sets available, so we can assume it's inhabited
+            PossiblySatisfiable -> go rec_ts xs n delta
+            Satisfiable cl
+              | Just rec_ts' <- checkRecTc rec_ts (fst (splitTyConApp ty))
+              -> split_at_con rec_ts' delta n x xs cl
+              | otherwise
+              -- We ran out of fuel; just conservatively assume that this is
+              -- inhabited.
+              -> go rec_ts xs n delta
 
-          -- Only n' more equations to go...
-          let n' = n - length ev_pos
-          ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
-            Nothing                          -> pure []
-            Just delta'                      -> provideEvidenceForEquation (x:xs) n' delta'
+    split_at_con rec_ts delta n x xs cl = do
+      tracePm "split_at_con" (ppr x <+> ppr cl)
+      -- This will be really similar to the ConVar case
+      ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
+        Nothing                          -> pure []
+        Just (delta', _ex_tvs2, arg_vas) ->
+          go rec_ts (arg_vas ++ xs) n delta'
 
-          pure (ev_pos ++ ev_neg)
+      -- Only n' more equations to go...
+      let n' = n - length ev_pos
+      ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
+        Nothing                          -> pure []
+        Just delta'                      -> go rec_ts (x:xs) n' delta'
+
+      pure (ev_pos ++ ev_neg)
+
+-- | Checks if every data con of the type 'isVanillsDataCon'.
+isVanillaDataType :: Type -> Bool
+isVanillaDataType ty = fromMaybe False $ do
+  (tc, _) <- splitTyConApp_maybe ty
+  dcs <- tyConDataCons_maybe tc
+  pure (all isVanillaDataCon dcs)
 
 {-
 Note [Coverage checking and existential tyvars]
@@ -1261,7 +1291,12 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMay
   pm' <- case nalt of
     PmAltConLike cl -> MaybeT (ensureInhabited (testInhabited delta ty) (markMatched cl pm))
     _               -> pure pm
-  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
+  let delta' = delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
+  -- 4. For strings, we want to identify "" with [], so we recognise a complete
+  --    match.
+  if nalt == emptyStringLit
+    then MaybeT (tryAddRefutableAltCon delta' x nilPmAltCon)
+    else pure delta'
 
 testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 -- @testInhabited delta ty K@ Returns False if
@@ -1383,13 +1418,66 @@ trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
   -- Now we should be good! Add (alt, args) as a possible solution, or refine an
   -- existing one
   case find ((== Just True) . decEqPmAltCon alt . fst) pos of
-    Just (_, other_args) -> foldlM (uncurry . equate) delta (zip args other_args)
+    Just (_, other_args) -> do
+      let unify_vars delta (x, y) = unify delta (PmExprVar x, PmExprVar y)
+      foldlM unify_vars delta (zip args other_args)
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
       -- the new solution)
-      let neg' = filter ((== Nothing) . decEqPmAltCon alt) neg
-      let pos' = (alt,args):pos
-      pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
+      let neg'   = filter ((== Nothing) . decEqPmAltCon alt) neg
+      let pos'   = (alt,args):pos
+      let delta' = delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
+      -- Finally a hack for converting between String literals and list DataCons
+      checkForStringLiterals delta' x alt args
+
+checkForStringLiterals :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
+checkForStringLiterals delta x _ _
+  | not (idType x `eqType` stringTy) = pure delta
+-- Solved to a string literal, we have info about [] or (:)
+checkForStringLiterals delta x (pmAltConAsStringLit -> Just s) []
+  | nullFS s  = trySolve delta x nilPmAltCon []
+  | otherwise = do
+      VI _ pos neg _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
+      if null neg && null pos
+        then pure delta -- no need to refine the info yet. Lits are more compact
+        else do
+          h <- lift (mkPmId charTy)
+          t <- lift (mkPmId stringTy)
+          delta1 <- trySolve delta h (PmAltLit (charPmLit (headFS s))) []
+          delta2 <- trySolve delta1 t (PmAltLit (stringPmLit (tailFS s))) []
+          trySolve delta2 x consPmAltCon [h, t]
+-- Solved to [] or (:), we have info about string literals
+checkForStringLiterals delta x (PmAltConLike (RealDataCon dc)) args
+  | dc == nilDataCon = trySolve delta x emptyStringLit []
+  | otherwise        = ASSERT( dc == consDataCon ) do
+      let [h, t] = args
+      VI _ pos neg _ <- lift (initLookupVarInfo (delta_tm_cs delta) x)
+
+      let neg_strings = mapMaybe pmAltConAsStringLit neg
+      let add_neg d s
+            | nullFS s  = pure d
+            | otherwise = do
+                d' <- MaybeT $ tryAddRefutableAltCon d h (PmAltLit (charPmLit (headFS s)))
+                MaybeT $ tryAddRefutableAltCon d' t (PmAltLit (stringPmLit (tailFS s)))
+      delta' <- foldlM add_neg delta neg_strings
+
+      let pos_strings = mapMaybe (pmAltConAsStringLit . fst) pos
+      let add_pos d s
+            | nullFS s  = mzero
+            | otherwise = do
+                d' <- trySolve d h (PmAltLit (charPmLit (headFS s))) []
+                trySolve d' t (PmAltLit (stringPmLit (tailFS s))) []
+      foldlM add_pos delta' pos_strings
+checkForStringLiterals delta _ _ _  = pure delta
+
+nilPmAltCon :: PmAltCon
+nilPmAltCon = PmAltConLike (RealDataCon nilDataCon)
+
+consPmAltCon :: PmAltCon
+consPmAltCon = PmAltConLike (RealDataCon consDataCon)
+
+emptyStringLit :: PmAltCon
+emptyStringLit = PmAltLit (stringPmLit (fsLit ""))
 
 -- | External interface to the term oracle.
 pmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)

@@ -136,7 +136,7 @@ pprPmExprVar prec x = do
     Nothing          -> fromMaybe underscore <$> checkRefuts x
 
 pprPmExprCon :: Int -> PmAltCon -> [Id] -> PmPprM SDoc
-pprPmExprCon _prec (PmAltLit l)      _    = pure (cparen (isNegatedPmLit l) (ppr l))
+pprPmExprCon _prec (PmAltLit l)      _    = pure (ppr l)
 pprPmExprCon prec  (PmAltConLike cl) args = do
   delta <- ask
   pprConLike delta prec cl args
@@ -165,11 +165,6 @@ pprConLike _delta prec cl args
   | null args = return (ppr cl)
   | otherwise = do args' <- mapM (pprPmExprVar 2) args
                    return (cparen (prec > 1) (fsep (ppr cl : args')))
-
--- | Check whether a literal is negated
-isNegatedPmLit :: PmLit -> Bool
-isNegatedPmLit (PmOLit b _) = b
-isNegatedPmLit _other_lit   = False
 
 -- | The result of 'pmExprAsList'.
 data PmExprList
