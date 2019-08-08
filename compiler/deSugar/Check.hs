@@ -30,6 +30,7 @@ import PmOracle
 import PmPpr
 import CoreUtils (exprType)
 import CoreSyn (CoreExpr, Expr(..), collectArgs)
+import MkCore (mkListExpr, mkCharExpr)
 import Literal
 import FastString (unpackFS)
 import Unify( tcMatchTy )
@@ -62,6 +63,7 @@ import Maybes        (isJust, expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
+import Data.Ratio
 import Control.Monad (forM, when, forM_)
 import Control.Monad.Trans.Cont (ContT(..))
 import Control.Monad.Trans.Class (lift)
@@ -735,12 +737,22 @@ hsExprToPmExpr expr k = do
 -- | Tries to peel off as many nested 'PmExprCon's from the given 'CoreExpr' as
 -- possible, falling back to allocating fresh 'PmExprVar's representing
 -- unhandled expressions.
+-- Turns (vanilla) String literals into list expressions, see
+-- Note [Literals in PmPat].
 coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
 coreExprToPmExpr e
+  | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
+  , exprType e `eqType` stringTy
+  -- See Note [Literals in PmPat]
+  = case unpackFS s of
+      -- We need this special case to break a loop with coreExprAsPmLit
+      -- Otherwise we alternate endlessly between [] and ""
+      [] -> pure (mkPmExprData nilDataCon [])
+      s' -> coreExprToPmExpr (mkListExpr charTy (map mkCharExpr s'))
   | Just lit <- coreExprAsPmLit e
   = pure (PmExprCon (PmAltLit lit) [])
-  | Just (dc, args) <- isDataConApp_maybe e
-  = mkPmExprData dc <$> traverse core_expr_to_id args
+  | Just (dc, args) <- splitDataConApp_maybe e
+  = pprTraceWith "coreExprToPmExpr" (\it -> ppr e $$ ppr it) . mkPmExprData dc <$> traverse core_expr_to_id args
   | otherwise
   -- We currently have no mechanism of proving equivalence of two HsExprs, so
   -- generate a fresh representative each time. This is morally wrong, but
@@ -756,8 +768,8 @@ coreExprToPmExpr e
       bindPmExprToId (exprType e) pm_expr -- This is the reason for ContT
 
 -- | Try to peel off the topmost 'DataCon' application.
-isDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-isDataConApp_maybe (collectArgs -> (Var x, args))
+splitDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+splitDataConApp_maybe (collectArgs -> (Var x, args))
   | Just dc <- isDataConWorkId_maybe x
   , let args' = last_n_term_args (dataConSourceArity dc) args
   , length args' == dataConSourceArity dc
@@ -766,25 +778,43 @@ isDataConApp_maybe (collectArgs -> (Var x, args))
     is_not_type (Type _) = False
     is_not_type _        = True
     last_n_term_args n = reverse . take n . reverse . filter is_not_type
-isDataConApp_maybe _ = Nothing
+splitDataConApp_maybe _ = Nothing
 
 coreExprAsPmLit :: CoreExpr -> Maybe PmLit
-coreExprAsPmLit e
-  | pprTrace "coreExprAsPmLit" (ppr e) False
-  = undefined
+coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
 coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
 coreExprAsPmLit e = case collectArgs e of
   (Var x, [Lit l])
     | Just dc <- isDataConWorkId_maybe x
-    , dc `elem` [intDataCon, wordDataCon, charDataCon]
+    , dc `elem` [intDataCon, wordDataCon, charDataCon, floatDataCon, doubleDataCon]
     -> literalToPmLit (exprType e) l
-  (Var x, [_ty, _dict, Lit l])
+  (Var x, [_ty, Lit n, Lit d])
+    | Just dc <- isDataConWorkId_maybe x
+    , dataConName dc == ratioDataConName
+    -- HACK: just assume we have a literal double. This case only occurs for
+    --       overloaded lits anyway, so we immediately override type information
+    -> pprTrace "matched Ratio" (ppr e) $ literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
+  (Var x, [Type ty, _dict, Lit l])
     | idName x == fromIntegerName
-    -> pprTrace "matched OverLit" (ppr e) $ literalToPmLit (exprType e) l >>= overloadPmLit
+    -> literalToPmLit ty l >>= overloadPmLit ty
+  (Var x, [Type ty, _dict, r])
+    | idName x == fromRationalName
+    -> coreExprAsPmLit r >>= overloadPmLit ty
+  (Var x, [Type ty, _dict, s])
+    | idName x == fromStringName
+    -- NB: Calls coreExprAsPmLit, so that we return PmLitOverStrings
+    -> coreExprAsPmLit s >>= overloadPmLit ty
+  -- These last two cases handle String literals, which will be desugared to
+  -- lists by coreExprToPmExpr. See Note [Literals in PmPat]
+  (Var x, [Type ty])
+    | Just dc <- isDataConWorkId_maybe x
+    , dc == nilDataCon
+    , ty `eqType` charTy
+    -> pprTraceIt "blub" $ literalToPmLit stringTy (mkLitString "")
   (Var x, [Lit l])
     | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
-    -> pprTrace "matched StringLit" (ppr e) $ literalToPmLit (exprType e) l
-  _ -> pprTrace "Missed lit" (ppr e) Nothing
+    -> literalToPmLit stringTy l
+  _ -> Nothing
 
 -- | This fucntion is the reason we need all that ContT machinery!
 -- @bindPmExprToId ty expr@ introduces a fresh 'Id' @x@ of type @ty@ and extends
