@@ -10,7 +10,9 @@ completesig07.hs:20:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 completesig07.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘m3’:
-        Patterns not matched: p where p is not one of {C}
+        Patterns not matched:
+            A
+            B
 
 completesig07.hs:24:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant

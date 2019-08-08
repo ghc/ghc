@@ -44,7 +44,7 @@ pprUncovered delta vas
   | otherwise         = hang (fsep vec) 4 $
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
-    ppr_action       = mapM (pprPmExprVar 1) vas
+    ppr_action       = mapM (pprPmExprVar 2) vas
     (vec, renamings) = runPmPpr delta ppr_action
     refuts           = prettifyRefuts delta renamings
 

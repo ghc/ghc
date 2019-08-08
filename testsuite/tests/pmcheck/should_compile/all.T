@@ -107,8 +107,6 @@ test('PmExprVars', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('CyclicSubst', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('SinglePossibleCon', [], compile,
-     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('CaseOfKnownCon', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
