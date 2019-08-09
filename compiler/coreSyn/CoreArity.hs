@@ -1057,10 +1057,17 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
   where
     empty_subst = mkEmptyTCvSubst in_scope
 
+    go :: Arity              -- Number of value args to expand to
+       -> TCvSubst -> Type   -- We are really looking at subst(ty)
+       -> [EtaInfo]          -- Accumulating parameter
+       -> (InScopeSet, [EtaInfo])
     go n subst ty eis       -- See Note [exprArity invariant]
+
+       ----------- Done!  No more expansion needed
        | n == 0
        = (getTCvInScope subst, reverse eis)
 
+       ----------- Forall types  (forall a. ty)
        | Just (tcv,ty') <- splitForAllTy_maybe ty
        , let (subst', tcv') = Type.substVarBndr subst tcv
        = let ((n_subst, n_tcv), n_n)
@@ -1071,10 +1078,11 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
                --   lambda \co:ty. e co. In this case we generate a new variable
                --   of the coercion type, update the scope, and reduce n by 1.
                | isTyVar tcv = ((subst', tcv'), n)
-               | otherwise  = (freshEtaId n subst' (varType tcv'), n-1)
+               | otherwise   = (freshEtaId n subst' (varType tcv'), n-1)
            -- Avoid free vars of the original expression
          in go n_n n_subst ty' (EtaVar n_tcv : eis)
 
+       ----------- Function types  (t1 -> t2)
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
        , not (isTypeLevPoly arg_ty)
           -- See Note [Levity polymorphism invariants] in CoreSyn
@@ -1084,14 +1092,19 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
 
+       ----------- Newtypes
+       -- Given this:
+       --      newtype T = MkT ([T] -> Int)
+       -- Consider eta-expanding this
+       --      eta_expand 1 e T
+       -- We want to get
+       --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
        | Just (co, ty') <- topNormaliseNewType_maybe ty
-       =        -- Given this:
-                --      newtype T = MkT ([T] -> Int)
-                -- Consider eta-expanding this
-                --      eta_expand 1 e T
-                -- We want to get
-                --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-         go n subst ty' (pushCoercion co eis)
+       , let co' = Coercion.substCo subst co
+             -- Remember to apply the substitution to co (#16979)
+             -- (or we could have applied to ty, but then
+             --  we'd have had to zap it for the recursive call)
+       = go n subst ty' (pushCoercion co' eis)
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
