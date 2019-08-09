@@ -633,17 +633,21 @@ mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [TyVar], [Id])
 --          [e1,..,en]
 --          [y1,..,yn]
 mkOneConFull x con = do
+  env <- dsGetFamInstEnvs
   let res_ty  = idType x
       (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
-      -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
-      -- be fine after type-checking.
-      (tc, tc_args) = splitTyConApp res_ty
-  -- tc might be a data family, but univ_tvs above is relative to the
-  -- representation data type. We need to "translate" tc_args accordingly.
-  env <- dsGetFamInstEnvs
-  let (_tc', tc_args', _co) = tcLookupDataFamInst env tc tc_args
+      tc_args'
+        | Just (tc, tc_args) <- splitTyConApp_maybe res_ty
+        -- tc might be a data family, but univ_tvs above is relative to the
+        -- representation data type. We need to "translate" tc_args accordingly.
+        = sndOf3 (tcLookupDataFamInst env tc tc_args)
+        | (_var, tc_args) <- splitAppTys res_ty
+        -- This hits for e.g. T11336(b), where we have an app like @s a@.
+        -- I hope this does the right thing. At least splitAppTys probably won't
+        -- crash after type checking.
+        = tc_args
   let subst1 = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args'
                   -- The expectJust is always satisfied as long as we filter
@@ -1315,16 +1319,20 @@ testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 --
 -- NB: Assumes that res_ty is the *representation* type in case of data family
 testInhabited delta res_ty con = do
+  env <- dsGetFamInstEnvs
   let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
-      -- tyConAppArgs crashes for T11336(b), so use splitAppTy instead. Should
-      -- be fine after type-checking.
-      (tc, tc_args) = splitTyConApp res_ty
-  -- tc might be a data family, but univ_tvs above is relative to the
-  -- representation data type. We need to "translate" tc_args accordingly.
-  env <- dsGetFamInstEnvs
-  let (_tc', tc_args', _co) = tcLookupDataFamInst env tc tc_args
+      tc_args'
+        | Just (tc, tc_args) <- splitTyConApp_maybe res_ty
+        -- tc might be a data family, but univ_tvs above is relative to the
+        -- representation data type. We need to "translate" tc_args accordingly.
+        = sndOf3 (tcLookupDataFamInst env tc tc_args)
+        | (_var, tc_args) <- splitAppTys res_ty
+        -- This hits for e.g. T11336(b), where we have an app like @s a@.
+        -- I hope this does the right thing. At least splitAppTys probably won't
+        -- crash after type checking.
+        = tc_args
   let subst1 = case con of
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args'
                   -- The expectJust is always satisfied as long as we filter

@@ -4,7 +4,7 @@ T11336b.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
     In an equation for ‘fun’:
         Patterns not matched:
             (PProxy p) where p is not one of {Proxy}
-            p where p is not one of {PProxy}
+            Proxy
 
 T11336b.hs:26:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
