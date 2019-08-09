@@ -186,7 +186,7 @@ emptyPartialResult = PartialResult { presultUncovered = mempty
 
 combinePartialResults :: PartialResult -> PartialResult -> PartialResult
 combinePartialResults (PartialResult cs1 vsa1 ds1) (PartialResult cs2 vsa2 ds2)
-  = pprTrace "combine" (ppr (length $ vsa1 Semi.<> vsa2)) $ PartialResult (cs1 Semi.<> cs2)
+  = PartialResult (cs1 Semi.<> cs2)
                   (vsa1 Semi.<> vsa2)
                   (ds1 Semi.<> ds2)
 
