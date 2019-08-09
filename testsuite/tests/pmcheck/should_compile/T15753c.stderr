@@ -1,0 +1,8 @@
+
+T15753c.hs:40:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g1’: g1 Refl su1 su2 = ...
+
+T15753c.hs:47:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g2’: g2 Refl su1 su2 = ...
