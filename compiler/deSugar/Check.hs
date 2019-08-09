@@ -1217,13 +1217,9 @@ pmcheckI ps guards vva n delta = do
                         $$ hang (text "guards:") 2 (ppr guards)
                         $$ ppr vva
                         $$ ppr delta)
-  ds <- getNFirstUncovered vva 1 [delta]
-  if null ds
-    then return mempty
-    else do
-      res <- pmcheck ps guards vva n delta
-      tracePm "pmCheckResult:" (ppr res)
-      return res
+  res <- pmcheck ps guards vva n delta
+  tracePm "pmCheckResult:" (ppr res)
+  return res
 {-# INLINE pmcheckI #-}
 
 -- | Increase the counter for elapsed algorithm iterations, check that the

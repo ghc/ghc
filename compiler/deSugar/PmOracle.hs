@@ -1121,13 +1121,13 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
             PossiblySatisfiable -> go rec_ts xs n delta
             Satisfiable cl
               | Just rec_ts' <- checkRecTc rec_ts (fst (splitTyConApp ty))
-              -> split_at_con rec_ts' delta n x xs cl
+              -> split_at_con rec_ts' delta neg n x xs cl
               | otherwise
               -- We ran out of fuel; just conservatively assume that this is
               -- inhabited.
               -> go rec_ts xs n delta
 
-    split_at_con rec_ts delta n x xs cl = do
+    split_at_con rec_ts delta neg n x xs cl = do
       tracePm "split_at_con" (ppr x <+> ppr cl)
       -- This will be really similar to the ConVar case
       ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
@@ -1141,9 +1141,17 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
         Nothing                          -> pure []
         Just delta'                      -> go init_ts (x:xs) n' delta'
 
-      pure (ev_pos ++ ev_neg)
+      -- Actually there was no need to split if we see that both branches were
+      -- inhabited and we had no negative information on the variable!
+      -- So only refine delta if we find that one branch was indeed
+      -- uninhabited.
+      case (ev_pos, ev_neg) of
+        ([], _)       -> pure ev_neg
+        (_, [])       -> pure ev_pos
+        _ | null neg  -> pure [delta]
+          | otherwise -> pure (ev_pos ++ ev_neg)
 
--- | Checks if every data con of the type 'isVanillsDataCon'.
+-- | Checks if every data con of the type 'isVanillaDataCon'.
 isVanillaDataType :: Type -> Bool
 isVanillaDataType ty = fromMaybe False $ do
   (tc, _) <- splitTyConApp_maybe ty
