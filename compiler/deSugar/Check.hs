@@ -339,12 +339,12 @@ checkMatches' vars matches
               , [LMatch GhcTc (LHsExpr GhcTc)])
     go []     missing = return ([], missing, [])
     go (m:ms) missing = do
-      tracePm "checkMatches': go" (ppr m $$ ppr missing)
+      tracePm "checkMatches': go" (ppr (length missing) $$ ppr m $$ ppr missing)
       fam_insts          <- dsGetFamInstEnvs
       translateMatch fam_insts m $ \(clause, guards) -> do
         r@(PartialResult cs missing' ds)
           <- runMany (pmcheckI clause guards vars) missing
-        tracePm "checkMatches': go: res" (ppr r)
+        tracePm "checkMatches': go: res" (ppr (length missing') $$ ppr r)
         (rs, final_u, is)  <- go ms missing'
         return $ case (cs, ds) of
           -- useful
@@ -741,7 +741,7 @@ hsExprToPmExpr expr k = do
 -- Note [Literals in PmPat].
 coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
 -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
-coreExprToPmExpr e'@(Cast e _co) = pprTraceWith "coreExprToPmExpr" (\it -> ppr e' $$ ppr it) <$> coreExprToPmExpr e
+coreExprToPmExpr e'@(Cast e _co) = coreExprToPmExpr e
 coreExprToPmExpr e
   | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
   , exprType e `eqType` stringTy
@@ -754,7 +754,7 @@ coreExprToPmExpr e
   | Just lit <- coreExprAsPmLit e
   = pure (PmExprCon (PmAltLit lit) [])
   | Just (dc, args) <- splitDataConApp_maybe e
-  = pprTraceWith "coreExprToPmExpr" (\it -> ppr e $$ ppr it) . mkPmExprData dc <$> traverse core_expr_to_id args
+  = mkPmExprData dc <$> traverse core_expr_to_id args
   | Var x <- e, not (isDataConWorkId x)
   = pure (PmExprVar x)
   | otherwise
@@ -786,7 +786,7 @@ splitDataConApp_maybe (collectArgs -> (Var x, args))
 splitDataConApp_maybe _ = Nothing
 
 coreExprAsPmLit :: CoreExpr -> Maybe PmLit
-coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
+-- coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
 coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
 coreExprAsPmLit e = case collectArgs e of
   (Var x, [Lit l])
@@ -798,7 +798,7 @@ coreExprAsPmLit e = case collectArgs e of
     , dataConName dc == ratioDataConName
     -- HACK: just assume we have a literal double. This case only occurs for
     --       overloaded lits anyway, so we immediately override type information
-    -> pprTrace "matched Ratio" (ppr e) $ literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
+    -> literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
   (Var x, [Type ty, _dict, Lit l])
     | idName x == fromIntegerName
     -> literalToPmLit ty l >>= overloadPmLit ty
@@ -815,7 +815,7 @@ coreExprAsPmLit e = case collectArgs e of
     | Just dc <- isDataConWorkId_maybe x
     , dc == nilDataCon
     , ty `eqType` charTy
-    -> pprTraceIt "blub" $ literalToPmLit stringTy (mkLitString "")
+    -> literalToPmLit stringTy (mkLitString "")
   (Var x, [Lit l])
     | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
     -> literalToPmLit stringTy l
@@ -980,7 +980,12 @@ the paper. This Note serves as a reference for these new features.
 
 -- | Create a guard pattern
 mkGuard :: PatVec -> HsExpr GhcTc -> (PmPat -> PmM a) -> PmM a
-mkGuard pv e k = hsExprToPmExpr e (k . PmGrd pv)
+mkGuard pv e = runContT $ do
+  res <- lift (allM cantFailPattern pv)
+  expr <- ContT (hsExprToPmExpr e)
+  lift (tracePm "mkGuard" (vcat [ppr pv, ppr e, ppr res, ppr expr]))
+  if | res                    -> pure (PmGrd pv expr)
+     | otherwise              -> pure (PmGrd pv expr)
 
 -- | Generate a variable pattern of a given type
 mkPmVar :: Type -> PmM PmPat
@@ -1225,6 +1230,7 @@ pmcheckGuards :: [PatVec] -> Delta -> PmM PartialResult
 pmcheckGuards []       delta = return (usimple delta)
 pmcheckGuards (gv:gvs) delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] delta
+  tracePm "pmcheckGuards" (ppr (length unc))
   (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs) unc
   return $ PartialResult (cs `mappend` css)
                          uncs
