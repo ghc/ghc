@@ -1036,6 +1036,8 @@ data ModIface
                 -- ^ Lambda form information, deterministically derived
                 -- from core level information. Hence not fingerprinted.
                 -- Nothing for typecheck-only interface files.
+                -- Maybe allows differentiating empty modules from lack
+                -- of information
      }
 
 data IfaceChanged = HasChanged | Unchanged deriving Eq

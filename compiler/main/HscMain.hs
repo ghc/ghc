@@ -1409,19 +1409,26 @@ hscWriteIface dflags iface no_change mod_location = do
     -- mod_location only contains the base name, so we rebuild the
     -- correct file extension from the dynflags.
     let ifaceBaseFile = ml_hi_file mod_location
+    pprTraceM "HiSuffix:" (text $ hiSuf dflags)
     unless no_change $
-        let ifaceFile = replaceExtension ifaceBaseFile (hiSuf dflags)
-            ifaceFile' = addBootSuffix_maybe (mi_boot iface) ifaceFile
+        let ifaceFile = buildIfName ifaceBaseFile (hiSuf dflags)
         in  {-# SCC "writeIface" #-}
-            writeIfaceFile dflags ifaceFile' iface
+            writeIfaceFile dflags ifaceFile iface
     whenGeneratingDynamicToo dflags $ do
         -- TODO: We should do a no_change check for the dynamic
         --       interface file too
         -- When we generate iface files after core
-        let dynIfaceFile = replaceExtension ifaceBaseFile (dynHiSuf dflags)
-            dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
+        let dynIfaceFile = buildIfName ifaceBaseFile (dynHiSuf dflags)
             dynDflags = dynamicTooMkDynamicDynFlags dflags
-        writeIfaceFile dynDflags dynIfaceFile' iface
+        writeIfaceFile dynDflags dynIfaceFile iface
+  where
+    buildIfName :: String -> String -> String
+    buildIfName baseName suffix
+      | Just name <- outputHi dflags
+      = name
+      | otherwise
+      = let with_hi = replaceExtension baseName (hiSuf dflags)
+        in  addBootSuffix_maybe (mi_boot iface) with_hi
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
