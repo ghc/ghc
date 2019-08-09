@@ -1077,8 +1077,12 @@ provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
 -- (provideEvidenceForEquation vs n delta) returns a list of
 -- at most n (but perhaps empty) of expression-lists that can
 -- match 'vs' without contradicting delta
-provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >> go initRecTc a b c
+provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >> go init_ts a b c
   where
+    -- Choosing 1 here will not be enough for RedBlack, but any other bound
+    -- might potentially lead to combinatorial explosion, so we are extremely
+    -- cautious and pick 2 here.
+    init_ts                  = setRecTcMaxBound 2 initRecTc
     go _      _      0 _     = pure []
     go _      []     _ delta = pure [delta]
     go rec_ts (x:xs) n delta = do
@@ -1135,7 +1139,7 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
       let n' = n - length ev_pos
       ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
         Nothing                          -> pure []
-        Just delta'                      -> go rec_ts (x:xs) n' delta'
+        Just delta'                      -> go init_ts (x:xs) n' delta'
 
       pure (ev_pos ++ ev_neg)
 
