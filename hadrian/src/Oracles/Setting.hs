@@ -1,7 +1,7 @@
 module Oracles.Setting (
     configFile, Setting (..), SettingList (..), setting, settingList, getSetting,
     getSettingList,  anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
-    ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
+    ghcWithInterpreter, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
     libsuf, ghcVersionStage, SettingsFileSetting (..), settingsFileSetting
     ) where
@@ -224,11 +224,6 @@ ghcWithInterpreter = do
     goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc", "sparc"
                               , "sparc64", "arm" ]
     return $ goodOs && goodArch
-
--- | Check whether the target architecture supports placing info tables next to
--- code. See: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code.
-ghcEnableTablesNextToCode :: Action Bool
-ghcEnableTablesNextToCode = notM $ anyTargetArch ["ia64", "powerpc64", "powerpc64le"]
 
 -- | Check to use @libffi@ for adjustors.
 useLibFFIForAdjustors :: Action Bool
