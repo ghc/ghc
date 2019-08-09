@@ -186,7 +186,7 @@ emptyPartialResult = PartialResult { presultUncovered = mempty
 
 combinePartialResults :: PartialResult -> PartialResult -> PartialResult
 combinePartialResults (PartialResult cs1 vsa1 ds1) (PartialResult cs2 vsa2 ds2)
-  = PartialResult (cs1 Semi.<> cs2)
+  = pprTrace "combine" (ppr (length $ vsa1 Semi.<> vsa2)) $ PartialResult (cs1 Semi.<> cs2)
                   (vsa1 Semi.<> vsa2)
                   (ds1 Semi.<> ds2)
 
@@ -270,7 +270,7 @@ checkSingle' locn var p = do
   translatePat fam_insts p $ \clause -> do
     missing   <- pmInitialTmTyCs
     tracePm "checkSingle': missing" (ppr missing)
-    PartialResult cs us ds <- pmcheckI clause [] [var] missing
+    PartialResult cs us ds <- pmcheckI clause [] [var] 1 missing
     dflags <- getDynFlags
     us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
     let uc = UncoveredPatterns [var] us'
@@ -343,7 +343,7 @@ checkMatches' vars matches
       fam_insts          <- dsGetFamInstEnvs
       translateMatch fam_insts m $ \(clause, guards) -> do
         r@(PartialResult cs missing' ds)
-          <- runMany (pmcheckI clause guards vars) missing
+          <- runMany (length missing) (pmcheckI clause guards vars) missing
         tracePm "checkMatches': go: res" (ppr (length missing') $$ ppr r)
         (rs, final_u, is)  <- go ms missing'
         return $ case (cs, ds) of
@@ -741,7 +741,7 @@ hsExprToPmExpr expr k = do
 -- Note [Literals in PmPat].
 coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
 -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
-coreExprToPmExpr e'@(Cast e _co) = coreExprToPmExpr e
+coreExprToPmExpr (Cast e _co) = coreExprToPmExpr e
 coreExprToPmExpr e
   | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
   , exprType e `eqType` stringTy
@@ -1200,38 +1200,50 @@ Main functions are:
 -- | Lift a pattern matching action from a single value vector abstration to a
 -- value set abstraction, but calling it on every vector and combining the
 -- results.
-runMany :: (Delta -> PmM PartialResult) -> (Uncovered -> PmM PartialResult)
-runMany _  []     = return emptyPartialResult
-runMany pm (m:ms) = combinePartialResults <$> pm m <*> runMany pm ms
+runMany :: Int -> (Int -> Delta -> PmM PartialResult) -> Uncovered -> PmM PartialResult
+runMany _ _  []     = return emptyPartialResult
+runMany n pm (m:ms) = do
+  res <- pm n m
+  let n' = length (presultUncovered res) * n
+  combinePartialResults res <$> runMany n' pm ms
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
-pmcheckI :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
-pmcheckI ps guards vva delta = do
-  n <- incrCheckPmIterDs
-  tracePm "pmCheck" (ppr n <> colon
+pmcheckI :: PatVec -> [PatVec] -> ValVec -> Int -> Delta -> PmM PartialResult
+pmcheckI ps guards vva n delta = do
+  m <- incrCheckPmIterDs
+  tracePm "pmCheck" (ppr m <> colon
                         $$ hang (text "patterns:") 2 (ppr ps)
                         $$ hang (text "guards:") 2 (ppr guards)
                         $$ ppr vva
                         $$ ppr delta)
-  res <- pmcheck ps guards vva delta
-  tracePm "pmCheckResult:" (ppr res)
-  return res
+  ds <- getNFirstUncovered vva 1 [delta]
+  if null ds
+    then return mempty
+    else do
+      res <- pmcheck ps guards vva n delta
+      tracePm "pmCheckResult:" (ppr res)
+      return res
 {-# INLINE pmcheckI #-}
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> Delta -> PmM PartialResult
-pmcheckGuardsI gvs delta = incrCheckPmIterDs >> pmcheckGuards gvs delta
+pmcheckGuardsI :: [PatVec] -> Int -> Delta -> PmM PartialResult
+pmcheckGuardsI gvs n delta = incrCheckPmIterDs >> pmcheckGuards gvs n delta
 {-# INLINE pmcheckGuardsI #-}
 
 -- | Check the list of mutually exclusive guards
-pmcheckGuards :: [PatVec] -> Delta -> PmM PartialResult
-pmcheckGuards []       delta = return (usimple delta)
-pmcheckGuards (gv:gvs) delta = do
-  (PartialResult cs unc ds) <- pmcheckI gv [] [] delta
-  tracePm "pmcheckGuards" (ppr (length unc))
-  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs) unc
+pmcheckGuards :: [PatVec] -> Int -> Delta -> PmM PartialResult
+pmcheckGuards []       _ delta = return (usimple delta)
+pmcheckGuards (gv:gvs) n delta = do
+  (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
+  let n' = length unc * n
+  -- The multiplication by length unc below is intentional: We want to
+  -- give up on large guards rather quickly, still leaving room for small
+  -- informative ones. TODO: Factor this expression into its own function
+  let unc' | n' * length unc > 100 = [delta]
+           | otherwise             = unc
+  (PartialResult css uncs dss) <- runMany n' (pmcheckGuardsI gvs) unc'
   return $ PartialResult (cs `mappend` css)
                          uncs
                          (ds `mappend` dss)
@@ -1243,33 +1255,34 @@ pmcheck
   :: PatVec   -- ^ Patterns of the clause
   -> [PatVec] -- ^ (Possibly multiple) guards of the clause
   -> ValVec   -- ^ The value vector abstraction to match against
+  -> Int      -- ^ Estimate on the number of similar 'Delta's to handle
   -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
   -> PmM PartialResult
-pmcheck [] guards [] delta
+pmcheck [] guards [] n delta
   | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuardsI guards delta
+  | otherwise   = pmcheckGuardsI guards n delta
 
 -- Guard
-pmcheck (PmFake : ps) guards vva delta =
+pmcheck (PmFake : ps) guards vva n delta =
   -- short-circuit if the guard pattern is useless.
   -- we just have two possible outcomes: fail here or match and recurse
   -- none of the two contains any useful information about the failure
   -- though. So just have these two cases but do not do all the boilerplate
-  forces . mkCons delta <$> pmcheckI ps guards vva delta
-pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva delta = do
+  forces . mkCons delta <$> pmcheckI ps guards vva n delta
+pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
   tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
   y <- mkPmId (pmPatType p)
   delta' <- expectJust "y was fresh" <$> solveOneEq delta (TVC y e)
-  pmcheckI (pv ++ ps) guards (y : vva) delta'
+  pmcheckI (pv ++ ps) guards (y : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
-pmcheck (PmVar x : ps) guards (y : vva) delta = do
+pmcheck (PmVar x : ps) guards (y : vva) n delta = do
   delta' <- expectJust "x is fresh" <$> solveOneEq delta (TVC x (PmExprVar y))
-  pmcheckI ps guards vva delta'
+  pmcheckI ps guards vva n delta'
 
 -- ConVar
 pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
-        guards (x : vva) delta = do
+        guards (x : vva) n delta = do
   -- E.g   f (K p q) = <rhs>
   --       <next equation>
   -- Split the value vector into two value vectors:
@@ -1280,7 +1293,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   pr_pos <- refineToAltCon delta x con ex_tvs >>= \case
     Nothing -> pure mempty
     Just (delta', arg_vas) ->
-      pmcheckI (args ++ ps) guards (arg_vas ++ vva) delta'
+      pmcheckI (args ++ ps) guards (arg_vas ++ vva) n delta'
 
   -- Stuff for <next equation>
   -- The var is forced regardless of whether @con@ was satisfiable
@@ -1294,8 +1307,8 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   -- Combine both into a single PartialResult
   pure (mkUnion pr_pos' pr_neg)
 
-pmcheck [] _ (_:_) _ = panic "pmcheck: nil-cons"
-pmcheck (_:_) _ [] _ = panic "pmcheck: cons-nil"
+pmcheck [] _ (_:_) _ _ = panic "pmcheck: nil-cons"
+pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
