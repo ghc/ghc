@@ -1077,7 +1077,7 @@ provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
 -- (provideEvidenceForEquation vs n delta) returns a list of
 -- at most n (but perhaps empty) of expression-lists that can
 -- match 'vs' without contradicting delta
-provideEvidenceForEquation = go initRecTc
+provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >> go initRecTc a b c
   where
     go _      _      0 _     = pure []
     go _      []     _ delta = pure [delta]
