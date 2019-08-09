@@ -1,5 +1,4 @@
 
 WerrorFail.hs:6:1: error: [-Wincomplete-patterns (in -Wextra), -Werror=incomplete-patterns]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘foo’:
-        Patterns not matched: p where p is not one of {Nothing}
+    In an equation for ‘foo’: Patterns not matched: (Just _)
