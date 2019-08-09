@@ -1,0 +1,4 @@
+
+RedBlack.hs:144:3: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘==’: == _ _ = ...
