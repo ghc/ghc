@@ -166,20 +166,27 @@ assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
 
 -- Why are these here?
 
+-- | Assumes that there is precisely one 'PrimRep' of the type. This assumption
+-- holds after unarise.
+-- See Note [Post-unarisation invariants]
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep1 (idType id)
-    -- NB: typePrimRep1 fails on unboxed tuples,
-    --     but by StgCmm no Ids have unboxed tuple type
     -- See also Note [VoidRep] in RepType
 
+-- | Assumes that Ids have one PrimRep, which holds after unarisation.
+-- See Note [Post-unarisation invariants]
 addIdReps :: [NonVoid Id] -> [NonVoid (PrimRep, Id)]
 addIdReps = map (\id -> let id' = fromNonVoid id
                          in NonVoid (idPrimRep id', id'))
 
+-- | Assumes that arguments have one PrimRep, which holds after unarisation.
+-- See Note [Post-unarisation invariants]
 addArgReps :: [NonVoid StgArg] -> [NonVoid (PrimRep, StgArg)]
 addArgReps = map (\arg -> let arg' = fromNonVoid arg
                            in NonVoid (argPrimRep arg', arg'))
 
+-- | Assumes that the argument has one PrimRep, which holds after unarisation.
+-- See Note [Post-unarisation invariants]
 argPrimRep :: StgArg -> PrimRep
 argPrimRep arg = typePrimRep1 (stgArgType arg)
 

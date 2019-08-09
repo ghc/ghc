@@ -188,6 +188,8 @@ STG programs after unarisation have these invariants:
     `StgCmmEnv.NonVoid`, for example.
 
   * Alt binders (binders in patterns) are always non-void.
+
+  * Binders always have zero (for void arguments) or one PrimRep.
 -}
 
 {-# LANGUAGE CPP, TupleSections #-}
