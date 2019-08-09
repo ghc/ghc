@@ -862,10 +862,13 @@ hscMaybeWriteIface dflags iface no_change location =
     in when (write_interface || force_write_interface) $
             hscWriteIface dflags iface no_change location
 
--- | Add information produced by codeGen to the iface.
+-- | Update information produced by codeGen in the iface.
 addIfaceCgIfaceInfo :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
 addIfaceCgIfaceInfo core_iface lf_info =
-  core_iface { mi_lf_info = Just $ mapSnd cgInfoToIfaceCgInfo lf_info }
+  let infos = mapSnd cgInfoToIfaceCgInfo lf_info
+      sorted = sortBy (\x y -> stableNameCmp (fst x) (fst y) ) infos
+  in
+  core_iface { mi_lf_info = Just sorted }
 
 --------------------------------------------------------------
 -- NoRecomp handlers

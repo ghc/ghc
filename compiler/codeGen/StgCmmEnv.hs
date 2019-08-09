@@ -149,12 +149,13 @@ getCgIdInfo id
                 ; let lf_computed = approximateLF
                 ; lf_cached <- reliableLF <$> lookupImportedLF name
                 ; let lf_static = mkStaticLF unlifted
-                ; case lf_cached of
-                    Just (lf @ LFThunk {}) -> do
-                      pprTraceM "Imported Thunk - " $
-                        text "imported:" <> (ppr lf) <+>
-                        text "approx:" <> ppr (mkStaticLF unlifted <|> pure lf_computed)
-                    _ -> return ()
+                -- ; case lf_cached of
+                --     Just (lf @ LFThunk {}) -> do
+                --       pprTraceM "Imported Thunk - " $
+                --         ppr name $$
+                --         text "imported:" <> (ppr lf) <+>
+                --         text "approx:" <> ppr (mkStaticLF unlifted <|> pure lf_computed)
+                --     _ -> return ()
                 -- ; if (not $ isJust lf_cached) then return () else pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
                 ; let lf_info = fromJust (lf_static <|> lf_cached <|> pure lf_computed)
                 ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);

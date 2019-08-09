@@ -1869,5 +1869,4 @@ tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do
       -- pure $! LFUnknown True
-      pprTraceM "Loading constructor:" (ppr conName)
       LFCon <$> (tcIfaceDataCon conName)
