@@ -401,7 +401,7 @@ scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
 scanrFB f c = \x ~(r, est) -> (f x r, r `c` est)
 -- This lazy pattern match on the tuple is necessary to prevent
 -- an infinite loop when scanr recieves a fusable infinite list,
--- which was the reason for #T16943.
+-- which was the reason for #16943.
 -- See Note [scanrFB and evaluation] below
 
 {-# RULES
@@ -430,7 +430,7 @@ recursive case of g, parametricity applies again and we will again have a
 possible call to scanrFB. In short, g (scanrFB f c) (q0,n) will end up being
 completely evaluated. This is resource consuming for large lists and if the
 recursion has no exit condition (and this will be the case in functions like
-repeat or cycle), the program will crash (see #T16943).
+repeat or cycle), the program will crash (see #16943).
 The solution: Don't make scanrFB strict in its last argument. Doing so will
 remove the cause for the chain of evaluations, and all is well.
 -}
