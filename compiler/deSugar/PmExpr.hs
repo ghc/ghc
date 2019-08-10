@@ -238,7 +238,9 @@ negatePmLit :: PmLit -> Maybe PmLit
 negatePmLit (PmLit ty v) = PmLit ty <$> go v
   where
     go (PmLitInt i)       = Just (PmLitInt (-i))
+    go (PmLitRat r)       = Just (PmLitRat (-r))
     go (PmLitOverInt n i) = Just (PmLitOverInt (n+1) i)
+    go (PmLitOverRat n r) = Just (PmLitOverRat (n+1) r)
     go _                  = Nothing
 
 overloadPmLit :: Type -> PmLit -> Maybe PmLit
