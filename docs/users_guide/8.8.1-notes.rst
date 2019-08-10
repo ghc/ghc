@@ -197,6 +197,7 @@ Template Haskell
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- Continued refinemnt of Trees That Grow AST representation.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
