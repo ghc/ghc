@@ -52,7 +52,6 @@ import GHC.Real (div, fromIntegral)
 import GHC.Show (Show)
 import GHC.Word (Word32, Word64)
 import GHC.Windows
-import GHC.Prim.Ext
 
 #if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
