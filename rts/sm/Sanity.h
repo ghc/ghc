@@ -21,7 +21,7 @@
 
 /* debugging routines */
 void checkSanity        ( bool after_gc, bool major_gc );
-void checkNurserySanity ( nursery *nursery );
+void checkNurserySanity ( nursery *nursery, bool check_objects );
 void checkHeapChain     ( bdescr *bd );
 void checkHeapChunk     ( StgPtr start, StgPtr end );
 void checkLargeObjects  ( bdescr *bd );

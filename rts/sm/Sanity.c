@@ -464,11 +464,9 @@ checkClosure( const StgClosure* p )
 
 void checkHeapChain (bdescr *bd)
 {
-    StgPtr p;
-
     for (; bd != NULL; bd = bd->link) {
-        if(!(bd->flags & BF_SWEPT)) {
-            p = bd->start;
+        if (!(bd->flags & BF_SWEPT)) {
+            StgPtr p = bd->start;
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
@@ -734,17 +732,19 @@ checkStaticObjects ( StgClosure* static_objects )
 
 /* Nursery sanity check */
 void
-checkNurserySanity (nursery *nursery)
+checkNurserySanity (nursery *nursery, bool check_objects)
 {
-    bdescr *bd, *prev;
+    bdescr *prev = NULL;
     uint32_t blocks = 0;
-
-    prev = NULL;
-    for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
+    for (bdescr *bd = nursery->blocks; bd != NULL; bd = bd->link) {
         ASSERT(bd->gen == g0);
         ASSERT(bd->u.back == prev);
         prev = bd;
         blocks += bd->blocks;
+
+        if (check_objects) {
+            checkHeapChain(bd);
+        }
     }
 
     ASSERT(blocks == nursery->n_blocks);
@@ -780,21 +780,19 @@ static void checkGeneration (generation *gen,
 }
 
 /* Full heap sanity check. */
-static void checkFullHeap (bool after_major_gc)
+static void checkFullHeap (bool after_gc, bool major_gc)
 {
-    uint32_t g, n;
-
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        checkGeneration(&generations[g], after_major_gc);
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        checkGeneration(&generations[g], after_gc && major_gc);
     }
-    for (n = 0; n < n_capabilities; n++) {
-        checkNurserySanity(&nurseries[n]);
+    for (uint32_t n = 0; n < n_capabilities; n++) {
+        checkNurserySanity(&nurseries[n], true);
     }
 }
 
 void checkSanity (bool after_gc, bool major_gc)
 {
-    checkFullHeap(after_gc && major_gc);
+    checkFullHeap(after_gc, major_gc);
 
     checkFreeListSanity();
 
