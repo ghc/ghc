@@ -799,16 +799,22 @@ coreExprAsPmLit e = case collectArgs e of
     -- HACK: just assume we have a literal double. This case only occurs for
     --       overloaded lits anyway, so we immediately override type information
     -> literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
-  (Var x, [Type ty, _dict, Lit l])
-    | idName x == fromIntegerName
-    -> literalToPmLit ty l >>= overloadPmLit ty
-  (Var x, [Type ty, _dict, r])
-    | idName x == fromRationalName
-    -> coreExprAsPmLit r >>= overloadPmLit ty
-  (Var x, [Type ty, _dict, s])
+  (Var x, args)
+    -- Take care of -XRebindableSyntax. The last argument should be the (only)
+    -- integer literal, otherwise we can't really do much about it.
+    | [Lit l] <- dropWhile (not . is_lit) args
+    -- getOccFS because of -XRebindableSyntax
+    , getOccFS (idName x) == getOccFS fromIntegerName
+    -> literalToPmLit (literalType l) l >>= overloadPmLit (exprType e)
+  (Var x, args)
+    -- Similar to fromInteger case
+    | [r] <- dropWhile (not . is_ratio) args
+    , getOccFS (idName x) == getOccFS fromRationalName
+    -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
+  (Var x, [Type _ty, _dict, s])
     | idName x == fromStringName
     -- NB: Calls coreExprAsPmLit, so that we return PmLitOverStrings
-    -> coreExprAsPmLit s >>= overloadPmLit ty
+    -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
   -- These last two cases handle String literals, which will be desugared to
   -- lists by coreExprToPmExpr. See Note [Literals in PmPat]
   (Var x, [Type ty])
@@ -820,6 +826,14 @@ coreExprAsPmLit e = case collectArgs e of
     | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
     -> literalToPmLit stringTy l
   _ -> Nothing
+  where
+    is_lit Lit{} = True
+    is_lit _     = False
+    is_ratio r
+      | Just (tc, _) <- splitTyConApp_maybe (exprType r)
+      = tyConName tc == ratioTyConName
+      | otherwise
+      = False
 
 -- | This fucntion is the reason we need all that ContT machinery!
 -- @bindPmExprToId ty expr@ introduces a fresh 'Id' @x@ of type @ty@ and extends
