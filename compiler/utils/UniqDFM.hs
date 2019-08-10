@@ -63,6 +63,7 @@ module UniqDFM (
 import GhcPrelude
 
 import Unique           ( Uniquable(..), Unique, getKey )
+import Binary
 import Outputable
 
 import qualified Data.IntMap as M
@@ -127,6 +128,10 @@ taggedSnd (TaggedVal _ i) = i
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
 
+instance Binary val => Binary (TaggedVal val) where
+  put_ bh (TaggedVal a b) = put_ bh a >> put_ bh b
+  get bh = TaggedVal <$> get bh <*> get bh
+
 -- | Type of unique deterministic finite maps
 data UniqDFM ele =
   UDFM
@@ -137,6 +142,10 @@ data UniqDFM ele =
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
+
+instance Binary ele => Binary (UniqDFM ele) where
+  put_ bh (UDFM a b) = put_ bh a >> put_ bh b
+  get bh = UDFM <$> get bh <*> get bh
 
 emptyUDFM :: UniqDFM elt
 emptyUDFM = UDFM M.empty 0

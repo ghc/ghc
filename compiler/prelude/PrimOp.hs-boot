@@ -1,5 +1,7 @@
 module PrimOp where
 
-import GhcPrelude ()
+import GhcPrelude (Int)
 
 data PrimOp
+primOpTag :: PrimOp -> Int
+allThePrimOps :: [PrimOp]
