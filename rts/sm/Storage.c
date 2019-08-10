@@ -1050,7 +1050,8 @@ allocateMightFail (Capability *cap, W_ n)
         }
         dbl_link_onto(bd, &cap->r.rNursery->blocks);
         cap->r.rCurrentAlloc = bd;
-        IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
+        IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery,
+                                            false /* don't check objects */));
     }
     p = bd->free;
     bd->free += n;

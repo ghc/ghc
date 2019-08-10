@@ -1180,7 +1180,8 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 
             // This assert can be a killer if the app is doing lots
             // of large block allocations.
-            IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
+            IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery,
+                                                false /* don't check objects */));
 
             // now update the nursery to point to the new block
             finishedNurseryBlock(cap, cap->r.rCurrentNursery);
