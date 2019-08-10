@@ -509,12 +509,15 @@ validate-x86_64-linux-deb9-debug:
     expire_in: 2 week
 
 # Disabled to alleviate CI load
-.validate-x86_64-linux-deb9-llvm:
+validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
+  artifacts:
+    when: always
+    expire_in: 1 week
 
 nightly-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
@@ -691,7 +694,6 @@ validate-x86_64-linux-fedora27:
   variables:
     FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
-    SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
   cache:
     paths:
       - cabal-cache
