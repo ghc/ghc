@@ -385,10 +385,55 @@ foldr1 f = go
 -- Note that
 --
 -- > head (scanr f z xs) == foldr f z xs.
+{-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
 scanr f q0 (x:xs)       =  f x q : qs
                            where qs@(q:_) = scanr f q0 xs
+
+{-# INLINE [0] strictUncurryScanr #-}
+strictUncurryScanr :: (a -> b -> c) -> (a, b) -> c
+strictUncurryScanr f pair = case pair of
+                              (x, y) -> f x y
+
+{-# INLINE [0] scanrFB #-} -- See Note [Inline FB functions]
+scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
+scanrFB f c = \x ~(r, est) -> (f x r, r `c` est)
+-- This lazy pattern match on the tuple is necessary to prevent
+-- an infinite loop when scanr recieves a fusable infinite list,
+-- which was the reason for #16943.
+-- See Note [scanrFB and evaluation] below
+
+{-# RULES
+"scanr" [~1] forall f q0 ls . scanr f q0 ls =
+  build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) ls))
+"scanrList" [1] forall f q0 ls .
+               strictUncurryScanr (:) (foldr (scanrFB f (:)) (q0,[]) ls) =
+                 scanr f q0 ls
+ #-}
+
+{- Note [scanrFB and evaluation]
+In a previous Version, the pattern match on the tuple in scanrFB used to be
+strict. If scanr is called with a build expression, the following would happen:
+The rule "scanr" would fire, and we obtain
+    build (\c n -> strictUncurryScanr c (foldr (scanrFB f c) (q0,n) (build g))))
+The rule "foldr/build" now fires, and the second argument of strictUncurryScanr
+will be the expression
+    g (scanrFB f c) (q0,n)
+which will be evaluated, thanks to strictUncurryScanr.
+The type of (g :: (a -> b -> b) -> b -> b) allows us to apply parametricity:
+Either the tuple is returned (trivial), or scanrFB is called:
+    g (scanrFB f c) (q0,n) = scanrFB ... (g' (scanrFB f c) (q0,n))
+Notice that thanks to the strictness of scanrFB, the expression
+g' (scanrFB f c) (q0,n) gets evaluated aswell. In particular, if g' is a
+recursive case of g, parametricity applies again and we will again have a
+possible call to scanrFB. In short, g (scanrFB f c) (q0,n) will end up being
+completely evaluated. This is resource consuming for large lists and if the
+recursion has no exit condition (and this will be the case in functions like
+repeat or cycle), the program will crash (see #16943).
+The solution: Don't make scanrFB strict in its last argument. Doing so will
+remove the cause for the chain of evaluations, and all is well.
+-}
 
 -- | \(\mathcal{O}(n)\). 'scanr1' is a variant of 'scanr' that has no starting
 -- value argument.
