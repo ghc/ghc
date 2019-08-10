@@ -829,6 +829,7 @@ coreExprAsPmLit e = case collectArgs e of
   where
     is_lit Lit{} = True
     is_lit _     = False
+    is_ratio (Type _) = False
     is_ratio r
       | Just (tc, _) <- splitTyConApp_maybe (exprType r)
       = tyConName tc == ratioTyConName
