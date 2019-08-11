@@ -8,7 +8,7 @@
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = git@github.com:sgraf812/cabal.git
+	url = https://github.com/sgraf812/cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
