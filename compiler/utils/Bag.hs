@@ -194,32 +194,26 @@ foldBag t u e (ListBag xs)    = foldr (t.u) e xs
 foldrBag :: (a -> r -> r) -> r
          -> Bag a
          -> r
-
-foldrBag _ z EmptyBag        = z
-foldrBag k z (UnitBag x)     = k x z
-foldrBag k z (TwoBags b1 b2) = foldrBag k (foldrBag k z b2) b1
-foldrBag k z (ListBag xs)    = foldr k z xs
+-- Maintained for backward compatibility - now just a specialisation of
+-- Foldable.
+foldrBag = Foldable.foldr
 
 foldlBag :: (r -> a -> r) -> r
          -> Bag a
          -> r
-
-foldlBag _ z EmptyBag        = z
-foldlBag k z (UnitBag x)     = k z x
-foldlBag k z (TwoBags b1 b2) = foldlBag k (foldlBag k z b1) b2
-foldlBag k z (ListBag xs)    = foldl k z xs
+-- Maintained for backward compatibility - now just a specialisation of
+-- Foldable.
+foldlBag = Foldable.foldl
 
 foldrBagM :: (Monad m) => (a -> b -> m b) -> b -> Bag a -> m b
-foldrBagM _ z EmptyBag        = return z
-foldrBagM k z (UnitBag x)     = k x z
-foldrBagM k z (TwoBags b1 b2) = do { z' <- foldrBagM k z b2; foldrBagM k z' b1 }
-foldrBagM k z (ListBag xs)    = foldrM k z xs
+-- Maintained for backward compatibility - now just a specialisation of
+-- Foldable.
+foldrBagM = Foldable.foldrM
 
 foldlBagM :: (Monad m) => (b -> a -> m b) -> b -> Bag a -> m b
-foldlBagM _ z EmptyBag        = return z
-foldlBagM k z (UnitBag x)     = k z x
-foldlBagM k z (TwoBags b1 b2) = do { z' <- foldlBagM k z b1; foldlBagM k z' b2 }
-foldlBagM k z (ListBag xs)    = foldlM k z xs
+-- Maintained for backward compatibility - now just a specialisation of
+-- Foldable.
+foldlBagM = Foldable.foldlM
 
 mapBag :: (a -> b) -> Bag a -> Bag b
 mapBag = fmap
@@ -343,4 +337,17 @@ instance Data a => Data (Bag a) where
   dataCast1 x  = gcast1 x
 
 instance Foldable.Foldable Bag where
-    foldr = foldrBag
+  foldr _ z EmptyBag        = z
+  foldr k z (UnitBag x)     = k x z
+  foldr k z (TwoBags b1 b2) = foldr k (foldr k z b2) b1
+  foldr k z (ListBag xs)    = foldr k z xs
+
+  foldl _ z EmptyBag        = z
+  foldl k z (UnitBag x)     = k z x
+  foldl k z (TwoBags b1 b2) = foldl k (foldl k z b1) b2
+  foldl k z (ListBag xs)    = foldl k z xs
+
+  foldl' _ z EmptyBag        = z
+  foldl' k z (UnitBag x)     = k z x
+  foldl' k z (TwoBags b1 b2) = let r1 = foldl' k z b1 in seq r1 $ foldl' k r1 b2
+  foldl' k z (ListBag xs)    = foldl' k z xs
