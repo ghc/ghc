@@ -1143,7 +1143,7 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
       let n' = n - length ev_pos
       ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
         Nothing                          -> pure []
-        Just delta'                      -> go init_ts (x:xs) n' delta'
+        Just delta'                      -> go rec_ts (x:xs) n' delta'
 
       -- Actually there was no need to split if we see that both branches were
       -- inhabited and we had no negative information on the variable!
