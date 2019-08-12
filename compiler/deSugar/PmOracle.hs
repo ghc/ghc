@@ -88,13 +88,16 @@ mkPmId ty = getUniqueM >>= \unique ->
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 
--- | Introduce a new 'Id' that has the given type and is in the same equivalence
--- class as the argument.
-mkIdCoercion :: Id -> Type -> Delta -> PmM (Id, Delta)
-mkIdCoercion x ty delta
-  | eqType (idType x) ty = pure (x, delta) -- no need to introduce anything new
-  | otherwise = do
-      y <- mkPmId ty
+-- | Introduce a new 'Id' that has its type normalised and is in the same
+-- equivalence class as the argument.
+normaliseIdType :: Id -> Delta -> PmM (Id, Delta)
+normaliseIdType x delta = do
+  mb_norm_ty <- pmTopNormaliseType_maybe (delta_ty_cs delta) (idType x)
+  let norm_ty = maybe (idType x) fstOf3 mb_norm_ty
+  if eqType norm_ty (idType x)
+    then pure (x, delta) -- no need to introduce anything new
+    else do
+      y <- mkPmId norm_ty
       delta' <- expectJust "y was fresh" <$> runMaybeT (equate delta x y)
       pure (y, delta')
 
@@ -615,22 +618,21 @@ pmIsClosedType ty
 -- Generate fresh variables of the appropriate type for arguments and return
 -- them alongside.
 mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [TyVar], [Id])
---  *  x :: T tys, where T is an algebraic data type
---     NB: in the case of a data family, T is the *representation* TyCon
---     e.g.   data instance T (a,b) = T1 a b
---       leads to
---            data TPair a b = T1 a b  -- The "representation" type
---       It is TPair, not T, that is given to mkOneConFull
+--  *  x :: T tys, where T is an algebraic data type or
+--                       T tys is a (saturated) data family application
 --
---  * 'con' K is a conlike of data type T
+--  * 'con' K is a conlike of data type U tyvars
+--     NB: In case T is a data family, mkOneConFull will lookup T's
+--         representation type at tys, to get TRep rep_tys.
+--         U must be equal to TRep!
 --
--- After instantiating the universal tyvars of K we get
---          K tys :: forall e1 .. en. Q => s1 .. sn -> T tys
+--         After instantiating the universal tyvars of K we get
+--             K rep_tys :: forall e1 .. en. Q => s1 .. sn -> TRep rep_tys
 --
 -- Suppose y1 is a strict field. Then we get
--- Results: ic_tm_cs:          x ~ K (y1::s1) .. (yn::sn)
---          ic_ty_cs:          Q
---          ic_strict_arg_tys: [s1]
+-- Results: { ic_tm_cs:          x ~ K (y1::s1) .. (yn::sn)
+--          , ic_ty_cs:          Q
+--          , ic_strict_arg_tys: [s1] }
 --          [e1,..,en]
 --          [y1,..,yn]
 mkOneConFull x con = do
@@ -643,7 +645,9 @@ mkOneConFull x con = do
         | Just (tc, tc_args) <- splitTyConApp_maybe res_ty
         -- tc might be a data family, but univ_tvs above is relative to the
         -- representation data type. We need to "translate" tc_args accordingly.
-        = sndOf3 (tcLookupDataFamInst env tc tc_args)
+        , (_rep_tc, tc_args', _) <- tcLookupDataFamInst env tc tc_args
+        -- Just a sanity check that x is actually compatible with con
+        = ASSERT( _rep_tc == fst (splitTyConApp con_res_ty) ) tc_args'
         | (_var, tc_args) <- splitAppTys res_ty
         -- This hits for e.g. T11336(b), where we have an app like @s a@.
         -- I hope this does the right thing. At least splitAppTys probably won't
@@ -653,6 +657,9 @@ mkOneConFull x con = do
                   RealDataCon {} -> zipTvSubst univ_tvs tc_args'
                   -- The expectJust is always satisfied as long as we filter
                   -- with 'isValidCompleteMatch' in 'allCompleteMatches'
+                  -- Note that PatSyn's are always associated to the data family
+                  -- TyCon, not the representation TyCon! Hence match with
+                  -- un-normalised res_ty.
                   PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
                                     -- See Note [Pattern synonym result type] in PatSyn
 
@@ -672,32 +679,6 @@ mkOneConFull x con = do
            , ic_strict_arg_tys = strict_arg_tys
            }
   return (ic, ex_tvs', vars)
-
--- | Invoke 'mkOneConFull' and immediately check whether the resulting
--- 'InhabitationCandidate' @ic@ with arguments @arg_vars@ is inhabited by
--- consulting 'pmIsSatisfiable'. Return @Just (new_delta, ic, ex_tvs, arg_vars)@
--- if it is.
---
--- Suppose K :: forall a b x y. (x,b) -> y -> T a b
---   where the x,y are the existentials
--- (mkOneSatifiableConFull delta x K) extends delta with the
---   positive information x :-> K x' y' p q, for some fresh x', y', p, q.
---   Return the fresh [x',y'] existentials and [p,q] args
--- Return Nothing if such a match is contradictory with delta.
-mkOneSatisfiableConFull
-  :: Delta -> Id -> ConLike
-  -> PmM (Maybe (Delta, [TyVar], [Id]))
-mkOneSatisfiableConFull delta x con = do
-  -- mkOneConFull doesn't cope with type families, so we have to normalise
-  -- x's result type first and introduce an auxiliary binding.
-  mb_res_ty <- pmTopNormaliseType_maybe (delta_ty_cs delta) (idType x)
-  let res_ty = maybe (idType x) fstOf3 mb_res_ty
-  (y, delta') <- mkIdCoercion x res_ty delta
-  tracePm "coercing" (ppr x $$ ppr (idType x) $$ ppr y $$ ppr res_ty)
-  (ic, ex_tvs, arg_vars) <- mkOneConFull y con
-  mb_delta <- pmIsSatisfiable delta' (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
-  tracePm "mkOneSatisfiableConFull" (ppr x <+> ppr y $$ ppr ic $$ ppr delta' $$ ppr mb_delta)
-  pure ((,ex_tvs,arg_vars) <$> mb_delta)
 
 -- | Generate all 'InhabitationCandidate's for a given type. The result is
 -- either @'Left' ty@, if the type cannot be reduced to a closed algebraic type
@@ -1075,18 +1056,36 @@ refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
   solveOneEq delta (TVC x (PmExprCon l [])) >>= \case
     Nothing     -> pure Nothing
     Just delta' -> pure (Just (markRefined delta' x, []))
-refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
-  mkOneSatisfiableConFull delta x con >>= \case
-    Nothing                         -> pure Nothing
-    Just (delta1, ex_tvs2, arg_vas) -> do
-      -- If we have identical constructors but different existential
-      -- tyvars, then generate extra equality constraints to ensure the
-      -- existential tyvars. Since ex_tvs2 are fresh, this will never refute.
-      -- See Note [Coverage checking and existential tyvars].
-      evvars <- listToBag <$> equateTyVars ex_tvs1 ex_tvs2
-      let delta2 = delta1 { delta_ty_cs = evvars `unionBags` delta_ty_cs delta1 }
-      tracePm "matched at all" (ppr (delta_tm_cs delta2))
-      pure (Just (markRefined delta2 x, arg_vas))
+refineToAltCon delta x (PmAltConLike con) ex_tvs1  = do
+  -- The plan for ConLikes:
+  -- Suppose K :: forall a b y z. (y,b) -> z -> T a b
+  --   where the y,z are the existentials
+  -- @refineToAltCon delta x K [ex1, ex2]@ extends delta with the
+  --   positive information x :-> K y' z' p q, for some fresh y', z', p, q.
+  --   This is done by mkOneConFull.
+  --   We return the fresh [p,q] args, and bind the existentials [y',z'] to
+  --   [ex1, ex2].
+  -- Return Nothing if such a match is contradictory with delta.
+
+  -- mkOneConFull doesn't cope with type families, so we have to normalise
+  -- x's result type first and introduce an auxiliary binding.
+  (y, delta1) <- normaliseIdType x delta
+  (ic, ex_tvs2, arg_vars) <- mkOneConFull y con
+
+  -- If we have identical constructors but different existential
+  -- tyvars, then generate extra equality constraints to ensure the
+  -- existential tyvars.
+  -- See Note [Coverage checking and existential tyvars].
+  evvars <- listToBag <$> equateTyVars ex_tvs1 ex_tvs2
+  let delta2 = delta1 { delta_ty_cs = evvars `unionBags` delta_ty_cs delta1 }
+
+  -- Now check satifiability
+  mb_delta <- pmIsSatisfiable delta2 (ic_tm_cs ic) (ic_ty_cs ic) (ic_strict_arg_tys ic)
+  tracePm "refineToAltCon" (ppr y $$ ppr ic $$ ppr delta2 $$ ppr mb_delta)
+  case mb_delta of
+    Nothing     -> pure Nothing
+    Just delta3 -> pure (Just (markRefined delta3 y, arg_vars))
+
 
 -- | This is the only place that actualy increments 'vi_n_refines'.
 markRefined :: Delta -> Id -> Delta
@@ -1151,11 +1150,13 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
               -> go rec_ts xs n delta
 
     split_at_con rec_ts delta neg n x xs cl = do
-      tracePm "split_at_con" (ppr x <+> ppr cl)
       -- This will be really similar to the ConVar case
-      ev_pos <- mkOneSatisfiableConFull delta x cl >>= \case
-        Nothing                          -> pure []
-        Just (delta', _ex_tvs2, arg_vas) ->
+      let (_,ex_tvs,_,_,_,_,_) = conLikeFullSig cl
+          -- we might need to freshen ex_tvs. Not sure
+
+      ev_pos <- refineToAltCon delta x (PmAltConLike cl) ex_tvs >>= \case
+        Nothing                -> pure []
+        Just (delta', arg_vas) ->
           go rec_ts (arg_vas ++ xs) n delta'
 
       -- Only n' more equations to go...

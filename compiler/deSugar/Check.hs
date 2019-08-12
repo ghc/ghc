@@ -383,7 +383,15 @@ getNFirstUncovered vars n (delta:deltas) = do
 -- | The maximum successive number of refinements ('refineToAltCon') we allow
 -- per representative. See Note [TODO]
 mAX_REFINEMENTS :: Int
-mAX_REFINEMENTS = 1
+-- The current number is chosen so that PrelRules is still checked with
+-- reasonable performance. If this is set to below 2, ds022 will start to fail.
+-- Although that is probably due to the fact that we always increase the
+-- refinement counter instead of just increasing it when the contraposition
+-- is satisfiable (when the not taken case 'tryAddRefutableAltCon' is
+-- satisfiable, that is). That would be the first thing I'd try if we have
+-- performance problems on one test while decreasing the threshold leads to
+-- other tests being broken like ds022 above.
+mAX_REFINEMENTS = 3
 
 -- | The threshold for detecting exponential blow-up in the number of 'Delta's
 -- to check introduced by guards.
