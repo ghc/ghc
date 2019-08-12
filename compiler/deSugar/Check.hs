@@ -339,12 +339,12 @@ checkMatches' vars matches
               , [LMatch GhcTc (LHsExpr GhcTc)])
     go []     missing = return ([], missing, [])
     go (m:ms) missing = do
-      tracePm "checkMatches': go" (ppr (length missing) $$ ppr m $$ ppr missing)
+      tracePm "checkMatches': go" (ppr m)
       fam_insts          <- dsGetFamInstEnvs
       translateMatch fam_insts m $ \(clause, guards) -> do
         r@(PartialResult cs missing' ds)
-          <- runMany (length missing) (pmcheckI clause guards vars) missing
-        tracePm "checkMatches': go: res" (ppr (length missing') $$ ppr r)
+          <- runMany (pmcheckI clause guards vars (length missing)) missing
+        tracePm "checkMatches': go: res" (ppr r)
         (rs, final_u, is)  <- go ms missing'
         return $ case (cs, ds) of
           -- useful
@@ -1215,12 +1215,11 @@ Main functions are:
 -- | Lift a pattern matching action from a single value vector abstration to a
 -- value set abstraction, but calling it on every vector and combining the
 -- results.
-runMany :: Int -> (Int -> Delta -> PmM PartialResult) -> Uncovered -> PmM PartialResult
-runMany _ _  []     = return emptyPartialResult
-runMany n pm (m:ms) = do
-  res <- pm n m
-  let n' = length (presultUncovered res) * n
-  combinePartialResults res <$> runMany n' pm ms
+runMany :: (Delta -> PmM PartialResult) -> Uncovered -> PmM PartialResult
+runMany _  []     = return emptyPartialResult
+runMany pm (m:ms) = do
+  res <- pm m
+  combinePartialResults res <$> runMany pm ms
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
@@ -1254,7 +1253,7 @@ pmcheckGuards (gv:gvs) n delta = do
   -- informative ones. TODO: Factor this expression into its own function
   let unc' | n' * length unc > 100 = [delta]
            | otherwise             = unc
-  (PartialResult css uncs dss) <- runMany n' (pmcheckGuardsI gvs) unc'
+  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
   return $ PartialResult (cs `mappend` css)
                          uncs
                          (ds `mappend` dss)
