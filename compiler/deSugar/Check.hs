@@ -380,6 +380,14 @@ getNFirstUncovered vars n (delta:deltas) = do
   back <- getNFirstUncovered vars (n - length front) deltas
   pure (front ++ back)
 
+-- | The maximum successive number of refinements ('refineToAltCon') we allow
+-- per representative. See Note [TODO]
+mAX_REFINEMENTS :: Int
+mAX_REFINEMENTS = 1
+
+mAX_GUARD_DELTAS :: Int
+mAX_GUARD_DELTAS = 100
+
 {-
 Note [Recovering from unsatisfiable pattern-matching constraints]
 ~~~~~~~~~~~~~~~~
@@ -1315,7 +1323,13 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   tracePm "ConVar" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
 
   -- Combine both into a single PartialResult
-  pure (mkUnion pr_pos' pr_neg)
+  let pr = mkUnion pr_pos' pr_neg
+  case (presultUncovered pr_pos', presultUncovered pr_neg) of
+    ([], _)                                   -> pure pr
+    (_, [])                                   -> pure pr
+    _ | lookupNumberOfRefinements delta x < mAX_REFINEMENTS
+      -> pure pr
+      | otherwise                             -> pure pr{ presultUncovered = [delta] }
 
 pmcheck [] _ (_:_) _ _ = panic "pmcheck: nil-cons"
 pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"

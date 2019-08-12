@@ -14,6 +14,7 @@ module PmOracle (
         PmM, tracePm, mkPmId,
 
         Delta, pmInitialTmTyCs, canDiverge, lookupRefuts, lookupSolution,
+        lookupNumberOfRefinements,
 
         inhabitants,
         tryAddRefutableAltCon, -- Add a negative equality
@@ -254,9 +255,9 @@ ensureAllPossibleSetsInhabited delta@MkDelta{ delta_tm_cs = TS env }
   = runMaybeT (set_tm_cs_env delta <$> traverseSharedIdEnv go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_cs = TS env }
-    go (VI ty pos neg pm) = do
+    go vi@VI{ vi_ty = ty, vi_cache = pm } = do
       pm' <- MaybeT (ensureInhabited (testInhabited delta ty) pm)
-      pure (VI ty pos neg pm')
+      pure vi{ vi_cache = pm' }
 
 -- | Given a 'Delta', check if it is compatible with new facts encoded in this
 -- this check. If so, return 'Just' a potentially extended 'Delta'. Return
@@ -928,7 +929,8 @@ data VarInfo
   { vi_ty  :: Type -- The type of the variable, think Gamma. Important for rejecting possible GADT constructors or incompatible pattern synonyms (think Just42).
   , vi_pos :: [(PmAltCon, [Id])] -- Positive info: things it is, all at the same time (think: intersection). Therefore no more than one RealDataCon, otherwise contradiction. TODO: Of these, the data con solution is special in that it is an actual solution, the others just denote equivalent expressions, similar to guards. We'll probably change this representation later on. BUT: On the other hand, these things will have to be inhabitated individually, so this is more information than just equiavelence to an arbitrary expression
   , vi_neg :: [PmAltCon]         -- Negative info: it is not headed by these AltCons. must be orthogonal to anything from vi_pos
-  , _vi_cache :: PossibleMatches -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
+  , vi_cache :: PossibleMatches  -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
+  , vi_n_refines :: !Int         -- Purely for performance reasons. The number of times this representative was refined ('refineToAltCon') in the Check's ConVar split. Sadly, we can't store this info in the Check module, as it's tightly couple to the particular 'Delta' and also is per *representative*, not per syntactic variable. Note that this number does not always correspond to the length of solutions: 'pmInitialTmTyCs' might add a solution without incurring the potential exponential blowup by ConVar.
   }
 
 {- Note [Maintaining invariantes in TmState]
@@ -991,8 +993,8 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache)
-    = braces (fsep (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
+  ppr (VI ty pos neg cache n)
+    = braces (fsep (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
 
 -- | Not user-facing.
 instance Outputable PossibleShape where
@@ -1001,7 +1003,7 @@ instance Outputable PossibleShape where
   ppr (CompleteSets sets) = ppr sets
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) [] [] NoPM
+emptyVarInfo x = VI (idType x) [] [] NoPM 0
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -1020,7 +1022,7 @@ canDiverge MkDelta{ delta_tm_cs = ts } x
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI _ [] [] _ <- lookupVarInfo ts x
+  | VI _ [] [] _ _ <- lookupVarInfo ts x
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
@@ -1048,14 +1050,21 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_cs delta) x) of
     | Just sol <- find isDataConSolution pos -> Just sol
     | otherwise                            -> Just (head pos)
 
+-- | @lookupNumberOfRefinements delta x@ Looks up how many times we have refined
+-- ('refineToAltCon') @x@ for some 'PmAltCon' to arrive at @delta@. This number
+-- is always less or equal to @length (lookupSolution delta x)@!
+lookupNumberOfRefinements :: Delta -> Id -> Int
+lookupNumberOfRefinements delta x
+  = vi_n_refines (lookupVarInfo (delta_tm_cs delta) x)
+
 -- | Solve a term equality (top-level).
 solveOneEq :: Delta -> TmVarCt -> DsM (Maybe Delta)
 solveOneEq delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
 
 initPossibleMatches :: VarInfo -> DsM VarInfo
-initPossibleMatches vi@(VI ty pos neg NoPM) = initIM ty >>= \case
+initPossibleMatches vi@VI{ vi_ty = ty, vi_cache = NoPM } = initIM ty >>= \case
   Nothing -> pure vi
-  Just pm -> pure (VI ty pos neg pm)
+  Just pm -> pure vi{ vi_cache = pm }
 initPossibleMatches vi                      = pure vi
 
 initLookupVarInfo :: TmState -> Id -> DsM VarInfo
@@ -1063,7 +1072,9 @@ initLookupVarInfo ts x = initPossibleMatches (lookupVarInfo ts x)
 
 refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
-  fmap (, []) <$> solveOneEq delta (TVC x (PmExprCon l []))
+  solveOneEq delta (TVC x (PmExprCon l [])) >>= \case
+    Nothing     -> pure Nothing
+    Just delta' -> pure (Just (markRefined delta' x, []))
 refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
   mkOneSatisfiableConFull delta x con >>= \case
     Nothing                         -> pure Nothing
@@ -1075,7 +1086,15 @@ refineToAltCon delta x (PmAltConLike con) ex_tvs1  =
       evvars <- listToBag <$> equateTyVars ex_tvs1 ex_tvs2
       let delta2 = delta1 { delta_ty_cs = evvars `unionBags` delta_ty_cs delta1 }
       tracePm "matched at all" (ppr (delta_tm_cs delta2))
-      pure (Just (delta2, arg_vas))
+      pure (Just (markRefined delta2 x, arg_vas))
+
+-- | This is the only place that actualy increments 'vi_n_refines'.
+markRefined :: Delta -> Id -> Delta
+markRefined delta@MkDelta{ delta_tm_cs = ts@(TS env) } x
+  = delta{ delta_tm_cs = TS env' }
+  where
+    vi = lookupVarInfo ts x
+    env' = setEntrySDIE env x vi{ vi_n_refines = vi_n_refines vi + 1 }
 
 provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
 -- (provideEvidenceForEquation vs n delta) returns a list of
@@ -1090,7 +1109,7 @@ provideEvidenceForEquation a b c = tracePm "provEv" (ppr a $$ ppr b $$ ppr c) >>
     go _      _      0 _     = pure []
     go _      []     _ delta = pure [delta]
     go rec_ts (x:xs) n delta = do
-      VI ty pos neg pm <- initLookupVarInfo (delta_tm_cs delta) x
+      VI ty pos neg pm _ <- initLookupVarInfo (delta_tm_cs delta) x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
@@ -1293,7 +1312,7 @@ equateTyVars ex_tvs1 ex_tvs2
 -- See Note [Refutable shapes].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMaybeT $ do
-  VI ty pos neg pm <- lift (initLookupVarInfo ts x)
+  VI ty pos neg pm n <- lift (initLookupVarInfo ts x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = decEqPmAltCon cl nalt == Just True
   guard (not (any (contradicts nalt) pos))
@@ -1307,7 +1326,7 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMay
   pm' <- case nalt of
     PmAltConLike cl -> MaybeT (ensureInhabited (testInhabited delta ty) (markMatched cl pm))
     _               -> pure pm
-  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm')) }
+  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm' n)) }
 
 testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 -- @testInhabited delta ty K@ Returns False if
@@ -1405,10 +1424,14 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
         -- We should decide how to break the tie
         MASSERT2( vi_ty vi_x `eqType` vi_ty vi_y, text "Not same type" )
         -- First assume that x and y are in the same equivalence class
-        let delta_ind = delta{ delta_tm_cs = TS (setIndirectSDIE env x y) }
+        let env_ind = setIndirectSDIE env x y
+        -- Then sum up the refinement counters
+        let vi_y' = vi_y{ vi_n_refines = vi_n_refines vi_x + vi_n_refines vi_y }
+        let env_refs = setEntrySDIE env_ind y vi_y'
+        let delta_refs = delta{ delta_tm_cs = TS env_refs }
         -- and then gradually merge every positive fact we have on x into y
         let add_fact delta (cl, args) = trySolve delta y cl args
-        delta_pos <- foldlM add_fact delta_ind (vi_pos vi_x)
+        delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
         let add_refut delta nalt = MaybeT (tryAddRefutableAltCon delta y nalt)
         delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
@@ -1423,7 +1446,7 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
 trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
 trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
-  VI ty pos neg cache <- lift (initLookupVarInfo ts x)
+  VI ty pos neg cache n <- lift (initLookupVarInfo ts x)
   -- First try to refute with a negative fact
   guard (all ((/= Just True) . decEqPmAltCon alt) neg)
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1441,7 +1464,7 @@ trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
       -- the new solution)
       let neg'   = filter ((== Nothing) . decEqPmAltCon alt) neg
       let pos'   = (alt,args):pos
-      pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache))}
+      pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache n))}
 
 -- | External interface to the term oracle.
 pmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)
