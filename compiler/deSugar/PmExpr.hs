@@ -76,7 +76,7 @@ data PmLitValue
 -- * @Nothing@ ==> Equality relation undecidable
 decEqPmLit :: PmLit -> PmLit -> Maybe Bool
 decEqPmLit (PmLit t1 v1) (PmLit t2 v2)
-  -- | pprTrace "decEqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
+  -- no haddock | pprTrace "decEqPmLit" (ppr t1 <+> ppr v1 $$ ppr t2 <+> ppr v2) False = undefined
   | not (t1 `eqType` t2) = Just False
   | otherwise            = go v1 v2
   where
