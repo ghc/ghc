@@ -385,8 +385,23 @@ getNFirstUncovered vars n (delta:deltas) = do
 mAX_REFINEMENTS :: Int
 mAX_REFINEMENTS = 1
 
-mAX_GUARD_DELTAS :: Int
-mAX_GUARD_DELTAS = 100
+-- | The threshold for detecting exponential blow-up in the number of 'Delta's
+-- to check introduced by guards.
+tHRESHOLD_GUARD_DELTAS :: Int
+tHRESHOLD_GUARD_DELTAS = 100
+
+-- | Multiply the estimated number of 'Delta's to process by a constant
+-- branching factor induced by a guard and return the new estimate if it
+-- doesn't exceed a constant threshold.
+tryMultiplyDeltas :: Int -> Int -> Maybe Int
+tryMultiplyDeltas multiplier n_delta
+  -- The ^2 below is intentional: We want to give up on guards with a large
+  -- branching factor rather quickly, still leaving room for small informative
+  -- ones later on.
+  | n_delta*multiplier^(2::Int) < tHRESHOLD_GUARD_DELTAS
+  = Just (n_delta*multiplier)
+  | otherwise
+  = Nothing
 
 {-
 Note [Recovering from unsatisfiable pattern-matching constraints]
@@ -1255,12 +1270,9 @@ pmcheckGuards :: [PatVec] -> Int -> Delta -> PmM PartialResult
 pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
-  let n' = length unc * n
-  -- The multiplication by length unc below is intentional: We want to
-  -- give up on large guards rather quickly, still leaving room for small
-  -- informative ones. TODO: Factor this expression into its own function
-  let unc' | n' * length unc > 100 = [delta]
-           | otherwise             = unc
+  let (n', unc')
+        | Just n' <- tryMultiplyDeltas (length unc) n = (n', unc)
+        | otherwise                                   = (n, unc)
   (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
   return $ PartialResult (cs `mappend` css)
                          uncs
