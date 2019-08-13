@@ -3,8 +3,8 @@ module Main where
 import DynFlags
 import RepType
 import SMRep
-import StgCmmLayout
-import StgCmmClosure
+import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Closure
 import GHC
 import GhcMonad
 import System.Environment

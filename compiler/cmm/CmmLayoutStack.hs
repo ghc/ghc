@@ -5,8 +5,8 @@ module CmmLayoutStack (
 
 import GhcPrelude hiding ((<*>))
 
-import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX layering violation
-import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX layering violation
+import GHC.StgToCmm.Utils      ( callerSaveVolatileRegs, newTemp  ) -- XXX layering violation
+import GHC.StgToCmm.Foreign    ( saveThreadState, loadThreadState ) -- XXX layering violation
 
 import BasicTypes
 import Cmm
@@ -25,7 +25,6 @@ import Hoopl.Dataflow
 import Hoopl.Graph
 import Hoopl.Label
 import UniqSupply
-import StgCmmUtils      ( newTemp )
 import Maybes
 import UniqFM
 import Util
@@ -918,7 +917,7 @@ areaToSp dflags sp_old _sp_hwm area_off (CmmStackSlot area n)
 areaToSp dflags _ sp_hwm _ (CmmLit CmmHighStackMark)
   = mkIntExpr dflags sp_hwm
     -- Replace CmmHighStackMark with the number of bytes of stack used,
-    -- the sp_hwm.   See Note [Stack usage] in StgCmmHeap
+    -- the sp_hwm.   See Note [Stack usage] in GHC.StgToCmm.Heap
 
 areaToSp dflags _ _ _ (CmmMachOp (MO_U_Lt _) args)
   | falseStackCheck args

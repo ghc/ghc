@@ -9,22 +9,22 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmm ( codeGen ) where
+module GHC.StgToCmm ( codeGen ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude as Prelude
 
-import StgCmmProf (initCostCentres, ldvEnter)
-import StgCmmMonad
-import StgCmmEnv
-import StgCmmBind
-import StgCmmCon
-import StgCmmLayout
-import StgCmmUtils
-import StgCmmClosure
-import StgCmmHpc
-import StgCmmTicky
+import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Env
+import GHC.StgToCmm.Bind
+import GHC.StgToCmm.Con
+import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Hpc
+import GHC.StgToCmm.Ticky
 
 import Cmm
 import CmmUtils

@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmProf (
+module GHC.StgToCmm.Prof (
         initCostCentres, ccType, ccsType,
         mkCCostCentre, mkCCostCentreStack,
 
@@ -25,9 +25,9 @@ module StgCmmProf (
 
 import GhcPrelude
 
-import StgCmmClosure
-import StgCmmUtils
-import StgCmmMonad
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Monad
 import SMRep
 
 import MkGraph
