@@ -412,24 +412,6 @@ tryMultiplyDeltas multiplier n_delta
   = Nothing
 
 {-
-Note [Recovering from unsatisfiable pattern-matching constraints]
-~~~~~~~~~~~~~~~~
-Consider the following code (see #12957 and #15450):
-
-  f :: Int ~ Bool => ()
-  f = case True of { False -> () }
-
-We want to warn that the pattern-matching in `f` is non-exhaustive. But GHC
-used not to do this; in fact, it would warn that the match was /redundant/!
-This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
-coverage checker deems any matches with unsatifiable constraint sets to be
-unreachable.
-
-We decide to better than this. When beginning coverage checking, we first
-check if the constraints in scope are unsatisfiable, and if so, we start
-afresh with an empty set of constraints. This way, we'll get the warnings
-that we expect.
-
 %************************************************************************
 %*                                                                      *
               Transform source syntax to *our* syntax
@@ -1015,10 +997,9 @@ the paper. This Note serves as a reference for these new features.
   variables. The information about the PmExpr shape of a variable is encoded in
   the oracle state 'Delta' instead.
 * Handling of uninhabited fields like `!Void`.
-  See Note [Strict argument type constraints] in PmOracle
+  See Note [Strict argument type constraints] in PmOracle.
 * Efficient handling of literal splitting, large enumerations and accurate
   redundancy warnings for `COMPLETE` groups through the oracle.
-  See Note [Refutable shapes] in PmOracle.
 -}
 
 -- ----------------------------------------------------------------------------
