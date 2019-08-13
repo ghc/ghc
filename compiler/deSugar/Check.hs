@@ -1310,12 +1310,12 @@ pmcheck (PmFake : ps) guards vva n delta =
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
   tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
   y <- mkPmId (pmPatType p)
-  delta' <- expectJust "y was fresh" <$> solveOneEq delta (TVC y e)
+  delta' <- expectJust "y was fresh" <$> addTermEquality delta (TVC y e)
   pmcheckI (pv ++ ps) guards (y : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
 pmcheck (PmVar x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> solveOneEq delta (TVC x (PmExprVar y))
+  delta' <- expectJust "x is fresh" <$> addTermEquality delta (TVC x (PmExprVar y))
   pmcheckI ps guards vva n delta'
 
 -- ConVar
