@@ -46,7 +46,7 @@ import qualified Data.Map as Map
 import Data.Word
 import Data.Char
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 
 -- | Individual dwarf records. Each one will be encoded as an entry in
 -- the @.debug_info@ section.

@@ -8,7 +8,7 @@
 --
 -----------------------------------------------------------------------------
 
-module CgUtils (
+module GHC.StgToCmm.CgUtils (
         fixStgRegisters,
         baseRegOffset,
         get_Regtable_addr_from_offset,
@@ -18,7 +18,7 @@ module CgUtils (
 
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import Cmm
 import Hoopl.Block
 import Hoopl.Graph

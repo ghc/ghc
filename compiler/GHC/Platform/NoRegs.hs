@@ -1,10 +1,9 @@
 {-# LANGUAGE CPP #-}
 
-module CodeGen.Platform.SPARC where
+module GHC.Platform.NoRegs where
 
 import GhcPrelude
 
-#define MACHREGS_NO_REGS 0
-#define MACHREGS_sparc 1
+#define MACHREGS_NO_REGS 1
 #include "../../../../includes/CodeGen.Platform.hs"
 

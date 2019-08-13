@@ -120,8 +120,8 @@ data CmmStackInfo
    = StackInfo {
        arg_space :: ByteOff,
                -- number of bytes of arguments on the stack on entry to the
-               -- the proc.  This is filled in by StgCmm.codeGen, and used
-               -- by the stack allocator later.
+               -- the proc.  This is filled in by GHC.StgToCmm.codeGen, and
+               -- used by the stack allocator later.
        updfr_space :: Maybe ByteOff,
                -- XXX: this never contains anything useful, but it should.
                -- See comment in CmmLayoutStack.

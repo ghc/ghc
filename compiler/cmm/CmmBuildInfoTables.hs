@@ -28,7 +28,7 @@ import Outputable
 import SMRep
 import UniqSupply
 import CostCentre
-import StgCmmHeap
+import GHC.StgToCmm.Heap
 
 import PprCmm()
 import Control.Monad
