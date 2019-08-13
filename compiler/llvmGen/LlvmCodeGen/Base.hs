@@ -44,7 +44,7 @@ import Llvm
 import LlvmCodeGen.Regs
 
 import CLabel
-import CodeGen.Platform ( activeStgRegs )
+import GHC.Common.Platform ( activeStgRegs )
 import DynFlags
 import FastString
 import Cmm              hiding ( succ )
