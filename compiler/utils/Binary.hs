@@ -82,7 +82,7 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
-import Util (log2Word)
+-- import Util (log2Word)
 
 import Foreign
 import Data.Array

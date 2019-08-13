@@ -210,7 +210,7 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
-import CgTypes          ( LambdaFormInfo )
+import CgTypes          ( LambdaFormInfo, CgIfaceInfoList )
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -235,8 +235,9 @@ data HscStatus
         { hscs_guts       :: CgGuts -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary -- ^ Module info
         -- TODO: Should we drop the change flag and just always write it?
-        , hscs_iface_info :: (ModIface, IfaceChanged)
-                            -- ^ Info required to update iface.
+        , hscs_iface_gen :: Maybe CgIfaceInfoList -> IO (ModIface, Bool)
+                            -- ^ Function to generate iface after codegen.
+        -- , hscs_mod_details :: ModDetails
 
         }
 
@@ -635,8 +636,7 @@ lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
 -- we must check for a hit on the right Module
 lookupHptByModule hpt mod
-  = -- pprTrace "lookupHptByModule" (ppr mod) $
-    case lookupHpt hpt (moduleName mod) of
+  = case lookupHpt hpt (moduleName mod) of
       Just hm | mi_module (hm_iface hm) == mod -> Just hm
       _otherwise                               -> Nothing
 

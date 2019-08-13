@@ -11,7 +11,7 @@
 -- read from interface files.
 
 module CgTypes
-  ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
+  ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo, CgIfaceInfoList
   , exportLF
   , whnfLF
   ) where
@@ -27,6 +27,7 @@ import Outputable
 import SMRep
 import DataCon
 import NameEnv
+import Name
 
 {- Note [Backend information in interface files]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -49,6 +50,7 @@ This allows us to generate
 
 -- | Information about imported things coming from interface files.
 type CgIfaceInfo = NameEnv LambdaFormInfo
+type CgIfaceInfoList = [(Name,LambdaFormInfo)]
 
 -- | Recursivity Flag
 data FreeVarFlag = HasFreeVars

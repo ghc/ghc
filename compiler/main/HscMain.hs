@@ -76,7 +76,7 @@ module HscMain
       -- hscFileFrontEnd in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule'
     , getHscEnv
-    , hscSimpleIface', hscNormalIface'
+    , hscSimpleIface' --, hscNormalIface'
     , oneShotMsg
     , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
     , ioMsgMaybe
@@ -127,7 +127,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
-import CgTypes          ( LambdaFormInfo, CgIfaceInfo, exportLF )
+import CgTypes          ( LambdaFormInfo, CgIfaceInfo, exportLF, CgIfaceInfoList )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -729,7 +729,7 @@ hscIncrementalCompile :: Bool
                       -> (Int,Int)
                       -- HomeModInfo does not contain linkable, since we haven't
                       -- code-genned yet
-                      -> IO (HscStatus, HomeModInfo)
+                      -> IO (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
@@ -773,7 +773,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                     hm_details = details,
                     hm_iface = iface,
                     hm_linkable = Nothing }
-            return (HscUpToDate, hmi)
+            return (HscUpToDate, Left hmi)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
@@ -787,10 +787,23 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 -- as up-to-date and good unfoldings and other info as possible
 -- in the interface file.
 -- However we might extend the interface further during actual code gen.
-finish :: ModSummary
+
+
+-- Runs the post-typechecking frontend (desugar and simplify).
+-- We want to generate most of the interface as late as possible
+-- so we can get as up-to-date and good unfoldings and other info as possible
+-- in the interface file.
+-- We might create a interface right away, in which case we also return the
+-- updated HomeModInfo. But we might also run the backend (Stg->Cmm) first.
+-- In the later case HomeModInfo will be zero, and Status will be HscRecomp.
+-- HscRecomp in return will carry the information required to compute
+-- HomeModeInfo (as well as info for the code generator)
+
+finish :: HasDebugCallStack
+       => ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, HomeModInfo)
+       -> Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
 finish summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
@@ -798,6 +811,7 @@ finish summary tc_result mb_old_hash = do
       hsc_src = ms_hsc_src summary
       should_desugar =
         ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      mk_simple_iface :: Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
       mk_simple_iface = do
         let hsc_status =
               case (target, hsc_src) of
@@ -807,33 +821,56 @@ finish summary tc_result mb_old_hash = do
                 _ -> panic "finish"
         (iface, no_change, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
-        return (iface, no_change, details, hsc_status)
-  (iface, no_change, details, hsc_status) <-
+        liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
+        return (hsc_status, Left HomeModInfo
+                {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
+
     -- we usually desugar even when we are not generating code, otherwise
     -- we would miss errors thrown by the desugaring (see #10600). The only
     -- exceptions are when the Module is Ghc.Prim or when
     -- it is not a HsSrcFile Module.
-    if should_desugar
-      then do
-        desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
-        if target == HscNothing
-          -- We are not generating code, so we can skip simplification
-          -- and generate a simple interface.
-          then mk_simple_iface
-          else do
+  if should_desugar
+    then do
+      desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
+      if target == HscNothing
+        -- We are not generating code, so we can skip simplification
+        -- and generate a simple interface.
+        then mk_simple_iface
+        else do
             plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
             desugared_guts <- hscSimplify' plugins desugared_guts0
-            (iface, no_change, details, cgguts) <-
-              liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
-            let has_changed = if no_change then Unchanged else HasChanged
-            return (iface, no_change, details, HscRecomp cgguts summary (iface, has_changed))
-      else mk_simple_iface
-  unless (needsIfaceUpdate hsc_status) $ do
-    liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
-  return
-    ( hsc_status
-    , HomeModInfo
-      {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
+
+            (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+                liftIO $ tidyProgram hsc_env desugared_guts
+
+            let iface_gen :: Maybe CgIfaceInfoList -> IO (ModIface, Bool)
+                iface_gen cg_info = do
+                    -- BUILD THE NEW ModIface and ModDetails
+                    --  and emit external core if necessary
+                    -- This has to happen *after* code gen so that the back-end
+                    -- info has been set. Not yet clear if it matters waiting
+                    -- until after code output.
+                    -- This captures hsc_env, we might get away with keeping
+                    -- less of the environment alive here.
+
+                    res <-  {-# SCC "MkFinalIface" #-}
+                            mkIface hsc_env mb_old_hash details desugared_guts cg_info
+
+                    dumpIfaceStats hsc_env
+
+                    return res
+                    -- TODO: Should we also write the iface here?
+
+            return (HscRecomp cg_guts summary iface_gen,
+                    Right $ \iface -> HomeModInfo { hm_details = details
+                                , hm_iface = iface
+                                , hm_linkable = Nothing})
+    else mk_simple_iface
+
+  -- return
+  --   ( hsc_status
+  --   , HomeModInfo
+  --     {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
 {- Note [Writing interface files]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1353,36 +1390,6 @@ hscSimpleIface' tc_result mb_old_iface = do
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, no_change, details)
 
-hscNormalIface :: HscEnv
-               -> ModGuts
-               -> Maybe Fingerprint
-               -> IO (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface hsc_env simpl_result mb_old_iface =
-    runHsc hsc_env $ hscNormalIface' simpl_result mb_old_iface
-
-hscNormalIface' :: ModGuts
-                -> Maybe Fingerprint
-                -> Hsc (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface' simpl_result mb_old_iface = do
-    hsc_env <- getHscEnv
-    (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-                          liftIO $ tidyProgram hsc_env simpl_result
-
-    -- BUILD THE NEW ModIface and ModDetails
-    --  and emit external core if necessary
-    -- This has to happen *after* code gen so that the back-end
-    -- info has been set. Not yet clear if it matters waiting
-    -- until after code output
-    (new_iface, no_change)
-        <- {-# SCC "MkFinalIface" #-}
-           liftIO $
-               mkIface hsc_env mb_old_iface details simpl_result
-
-    liftIO $ dumpIfaceStats hsc_env
-
-    -- Return the prepared code.
-    return (new_iface, no_change, details, cg_guts)
-
 --------------------------------------------------------------
 -- BackEnd combinators
 --------------------------------------------------------------
@@ -1397,11 +1404,12 @@ So we only load the base name from ModLocation and replace the
 actual extension according to the information in DynFlags.
 
 If we generate a interface file right after running the core pipeline
-we will have set -dynamic-too and generate both interface files at the
-same time.
+we will have set -dynamic-too and potentially generate both interface
+files at the same time.
 
 If we generate a interface file after running the backend then dynamic-too
-won't be set, however the
+won't be set, however then the extension will be contained in the dynflags
+instead so things still work out fine.
 -}
 
 hscWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()

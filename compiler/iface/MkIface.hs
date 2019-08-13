@@ -113,7 +113,7 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
-import CgTypes (LambdaFormInfo )
+import CgTypes -- (LambdaFormInfo, CgIfaceInfo )
 
 import Control.Monad
 import Data.Function
@@ -143,6 +143,7 @@ mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
+        -> Maybe CgIfaceInfoList
         -> IO (ModIface, -- The new one
                Bool)     -- True <=> there was an old Iface, and the
                          --          new one is identical, so no need
@@ -164,13 +165,14 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_decl_docs    = decl_docs,
                       mg_arg_docs     = arg_docs
                     }
+         cg_details
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src used_th deps rdr_env fix_env
                    warns hpc_info self_trust
                    safe_mode usages
                    doc_hdr decl_docs arg_docs
                    --TODO: Currently we just stub it out here.
-                   mod_details
+                   mod_details cg_details
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -221,7 +223,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
-                   mod_details
+                   mod_details Nothing
 
 
 
@@ -235,6 +237,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
+         -> Maybe CgIfaceInfoList
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
@@ -247,6 +250,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
+         cg_details
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -281,6 +285,10 @@ mkIface_ hsc_env maybe_old_fingerprint
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+        lf_info :: Maybe [(Name, IfLFInfo)]
+        lf_info = fmap (mapSnd toIfLFInfo) .
+                  fmap (sortBy (\x y -> stableNameCmp (fst x) (fst y))) $
+                  cg_details
 
         intermediate_iface = ModIface {
               mi_module      = this_mod,
@@ -331,7 +339,8 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_doc_hdr     = doc_hdr,
               mi_decl_docs   = decl_docs,
               mi_arg_docs    = arg_docs,
-              mi_lf_info     = Nothing }
+              mi_lf_info     = lf_info
+              }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
@@ -706,10 +715,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - flag abi hash
+   --   - exported cg info
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0)
+                       mi_warns iface0,
+                       mi_lf_info iface0)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus

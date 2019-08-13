@@ -467,7 +467,6 @@ loadInterface doc_str mod from
 
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
         ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
-        -- ; pprTraceM "new_eps_decsl" (ppr new_eps_decls)
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
@@ -524,8 +523,7 @@ loadInterface doc_str mod from
                                      extendModuleEnv (eps_mod_fam_inst_env eps)
                                                      mod
                                                      fam_inst_env,
-                  eps_cg_info_env  = --extendNameEnvList :: NameEnv a -> [(Name, a)] -> NameEnv a
-                                     extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env
+                  eps_cg_info_env  = extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env
 
 
                                       ,
