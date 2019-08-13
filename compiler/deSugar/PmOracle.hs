@@ -636,42 +636,46 @@ mkOneConFull :: Id -> ConLike -> PmM (InhabitationCandidate, [TyVar], [Id])
 --          [e1,..,en]
 --          [y1,..,yn]
 mkOneConFull x con = do
-  env <- dsGetFamInstEnvs
   let res_ty  = idType x
       (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
-      arg_is_banged = map isBanged $ conLikeImplBangs con
-      tc_args'
-        | Just (tc, tc_args) <- splitTyConApp_maybe res_ty
-        -- tc might be a data family, but univ_tvs above is relative to the
-        -- representation data type. We need to "translate" tc_args accordingly.
-        , (_rep_tc, tc_args', _) <- tcLookupDataFamInst env tc tc_args
-        -- Just a sanity check that x is actually compatible with con
-        = ASSERT( _rep_tc == fst (splitTyConApp con_res_ty) ) tc_args'
-        | (_var, tc_args) <- splitAppTys res_ty
-        -- This hits for e.g. T11336(b), where we have an app like @s a@.
-        -- I hope this does the right thing. At least splitAppTys probably won't
-        -- crash after type checking.
-        = tc_args
-  let subst1 = case con of
-                  RealDataCon {} -> zipTvSubst univ_tvs tc_args'
-                  -- The expectJust is always satisfied as long as we filter
-                  -- with 'isValidCompleteMatch' in 'allCompleteMatches'
-                  -- Note that PatSyn's are always associated to the data family
-                  -- TyCon, not the representation TyCon! Hence match with
-                  -- un-normalised res_ty.
-                  PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
-                                    -- See Note [Pattern synonym result type] in PatSyn
-
-  (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
-
+  -- Substitute universals for type arguments
+  env <- dsGetFamInstEnvs
+  let subst_univ = case con of
+        RealDataCon {} -> case splitTyConApp_maybe res_ty of
+          Just (tc, tc_args)
+            -- tc might be a data family, but univ_tvs above is relative to the
+            -- representation data type. We need to "translate" tc_args
+            -- accordingly.
+            | (_rep_tc, tc_args', _) <- tcLookupDataFamInst env tc tc_args
+            -- Just a sanity check that x is actually compatible with con
+            -> ASSERT( _rep_tc == fst (splitTyConApp con_res_ty) )
+               zipTvSubst univ_tvs tc_args'
+          Nothing
+            -- This hits for e.g. T11336b, where we have an app like @s a@.
+            -- I hope this does the right thing. Since s can't be data family
+            -- partial application, it probably does. At least splitAppTys
+            -- probably won't crash after type checking and if this was
+            -- ill-formed, the type oracle would reject anyway.
+            | (_var, tc_args) <- splitAppTys res_ty
+            -> zipTvSubst univ_tvs tc_args
+        -- Note that PatSyn's are always associated to the data family
+        -- TyCon, not the representation TyCon! Hence match with
+        -- un-normalised res_ty.
+        -- See Note [Pattern synonym result type] in PatSyn
+        PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
+  -- Instantiate fresh existentials as arguments to the contructor
+  (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let arg_tys' = substTys subst arg_tys
-  -- Fresh term variables (VAs) as arguments to the constructor
+  -- Instantiate fresh term variables (VAs) as arguments to the constructor
   vars <- mapM mkPmId arg_tys'
-  -- All constraints bound by the constructor (alpha-renamed)
+  let expr = PmExprCon (PmAltConLike con) vars
+  -- All constraints bound by the constructor (alpha-renamed), these are added
+  -- to the type oracle
   let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   evvars <- mapM (nameType "pm") theta_cs
-  let expr = PmExprCon (PmAltConLike con) vars
+  -- Figure out the types of strict constructor fields
+  let arg_is_banged = map isBanged $ conLikeImplBangs con
       strict_arg_tys = filterByList arg_is_banged arg_tys'
   let ic = InhabitationCandidate
            { ic_tm_cs          = unitBag (TVC x expr)
