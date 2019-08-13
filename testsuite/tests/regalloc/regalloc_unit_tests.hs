@@ -24,7 +24,7 @@ import qualified RegAlloc.Graph.Stats as Color
 import qualified RegAlloc.Linear.Base as Linear
 import qualified X86.Instr
 import HscMain
-import CgUtils
+import GHC.StgToCmm.CgUtils
 import AsmCodeGen
 import CmmBuildInfoTables
 import CmmPipeline

@@ -60,7 +60,7 @@ import Cmm
 import CLabel           ( CLabel )
 import Unique
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import DynFlags
 import Outputable
 import GHC.Platform

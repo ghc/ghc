@@ -1000,7 +1000,7 @@ applyTypes = [
 --
 --  NOTE: other places to change if you change stackApplyTypes:
 --       - includes/rts/storage/FunTypes.h
---       - compiler/codeGen/StgCmmLayout.hs: stdPattern
+--       - GHC.StgToCmm.Layout: stdPattern
 stackApplyTypes = [
         [],
         [N],
