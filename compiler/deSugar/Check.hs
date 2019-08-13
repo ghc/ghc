@@ -381,7 +381,7 @@ getNFirstUncovered vars n (delta:deltas) = do
   pure (front ++ back)
 
 -- | The maximum successive number of refinements ('refineToAltCon') we allow
--- per representative. See Note [TODO]
+-- per representative. See Note [Limit the number of refinements].
 mAX_REFINEMENTS :: Int
 -- The current number is chosen so that PrelRules is still checked with
 -- reasonable performance. If this is set to below 2, ds022 will start to fail.
@@ -401,6 +401,7 @@ tHRESHOLD_GUARD_DELTAS = 100
 -- | Multiply the estimated number of 'Delta's to process by a constant
 -- branching factor induced by a guard and return the new estimate if it
 -- doesn't exceed a constant threshold.
+-- See 6. in Note [Guards and Approximation].
 tryMultiplyDeltas :: Int -> Int -> Maybe Int
 tryMultiplyDeltas multiplier n_delta
   -- The ^2 below is intentional: We want to give up on guards with a large
@@ -925,7 +926,7 @@ They are mainly covered in Note [Undecidable Equality for PmAltCons] and
 Note [Translate Overloaded Literals for Exhaustiveness Checking] in PmExpr.
 
 4. N+K Patterns & Pattern Synonyms
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------
 An n+k pattern (n+k) should be translated to @x (True <- x >= k) (n <- x-k)@.
 Since the only pattern of the three that causes failure is guard @(n <- x-k)@,
 and has two possible outcomes. Hence, there is no benefit in using a dummy and
@@ -943,6 +944,66 @@ in the pattern bind case). Hence, we safely drop them.
 Additionally, top-level guard translation (performed by @translateGuards@)
 replaces guards that cannot be reasoned about (like the ones we described in
 1-4) with a single @PmFake@ to record the possibility of failure to match.
+
+6. Combinatorial explosion
+--------------------------
+Function with many clauses and deeply nested guards like in #11195 tend to
+overwhelm the checker because they lead to exponential splitting behavior.
+See the comments on #11195 on refinement trees. Every guard refines the
+disjunction of Deltas by another split. This no different than the ConVar case,
+but in stark contrast we mostly don't get any useful information out of that
+split! Hence splitting k-fold just means having k-fold more work. The problem
+exacerbates for larger k, because it gets even more unlikely that we can handle
+all of the arising Deltas better than just continue working on the original
+Delta.
+Long story short: At each point we estimate the number of Deltas we possibly
+have to check in the same manner as the current Delta. If we hit a guard that
+splits the current Delta k-fold, we check whether this split would get us beyond
+a certain threshold ('tryMultiplyDeltas') and continue to check the other guards
+with the original Delta.
+
+Note [Limit the number of refinements]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In PrelRules, we have a huge case with relatively deep matches on pattern
+synonyms. Since we allow multiple compatible solutions in the oracle
+(i.e. @x ~ [I# y, 42]@), and every pattern synonym is compatible according to
+'decEqPmAltCon' with every other (no generativity as with DataCons), what would
+usually result in a ConVar split where only one branch is satisfiable results
+in a blow-up of Deltas. Here's an example:
+    case x of
+      A (A _) -> ()
+      B (B _) -> ()
+      ...
+By the time we hit the first clause's RHS, we have split the initial Delta twice
+and handled the {x~A y, y ~ A z} case, leaving {x/~A} and {x~A y, y/~A} models
+for the second clause to check.
+
+Now consider what happens if A=Left, B=Right. We get x~B y' from the match,
+which contradicts with {x~A y, y/~A}, because A and B are incompatible due to
+the generative nature of DataCons. This leaves only {x/~A} for checking B's
+clause, which ultimately leaves {x/~[A,B]} and {x~B y', y'/~B} uncovered.
+Resulting in three models to check for the next clause. That's only linear
+growth in the number of models for each clause.
+
+Consider A and B were arbitrary pattern synonyms instead. We still get x~B y'
+from the match, but this no longer refutes {x~A y, y/~A}, because we don't
+assume generativity for pattern synonyms. Ergo, @decEqPmAltCon A B == Nothing@
+and we get to check the second clause's inner match with {x~B y', x/~A} and
+{x~[A y,B y'], y/~A}, splitting both in turn. That makes 4 instead of 3 deltas.
+If we keep on doing this, we see that in the nth clause we'd have O(2^n) models
+to check instead of just O(n) as above!
+
+Clearly we have to put a stop to this. So we count in the oracle the number of
+times we refined x to some constructor. If the number of splits exceeds the
+'mAX_REFINEMENTS', we check the next clause using the original Delta rather
+than the union of Deltas arising from the ConVar split.
+
+If for the above example we had mAX_REFINEMENTS=1, then in the second clause
+we would still check the inner match with {x~B y', x/~A} and {x~[A y,B y'], y/~A}
+but *discard* the two Deltas arising from splitting {x~[A y,B y'], y/~A},
+checking the next clause with {x~A y, y/~A} instead of its two refinements.
+In addition to {x~B y', y'~B z', x/~A} (which arose from the other split) and
+{x/~[A,B]} that makes 3 models for the third equation, so linear :).
 
 Note [Translate CoPats]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1260,6 +1321,7 @@ pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
   let (n', unc')
+        -- See 6. in Note [Guards and Approximation]
         | Just n' <- tryMultiplyDeltas (length unc) n = (n', unc)
         | otherwise                                   = (n, unc)
   (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
@@ -1274,7 +1336,8 @@ pmcheck
   :: PatVec   -- ^ Patterns of the clause
   -> [PatVec] -- ^ (Possibly multiple) guards of the clause
   -> ValVec   -- ^ The value vector abstraction to match against
-  -> Int      -- ^ Estimate on the number of similar 'Delta's to handle
+  -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
+              --   See 6. in Note [Guards and Approximation]
   -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
   -> PmM PartialResult
 pmcheck [] guards [] n delta
@@ -1328,6 +1391,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   case (presultUncovered pr_pos', presultUncovered pr_neg) of
     ([], _)                                   -> pure pr
     (_, [])                                   -> pure pr
+    -- See Note [Limit the number of refinements]
     _ | lookupNumberOfRefinements delta x < mAX_REFINEMENTS
       -> pure pr
       | otherwise                             -> pure pr{ presultUncovered = [delta] }
