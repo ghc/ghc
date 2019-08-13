@@ -33,7 +33,7 @@ import Outputable
 import ErrUtils
 import Util
 import Bag
-import UniqSet
+import UniqDSet
 import Unique
 import Id
 import VarEnv
@@ -87,10 +87,14 @@ mkPmId ty = getUniqueM >>= \unique ->
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 
-type ConLikeSet = UniqSet ConLike -- TODO: UniqDSet?
+-----------------------------------------------
+-- * Caching possible matches of a COMPLETE set
 
-data PossibleMatches = PM TyCon (NonEmpty ConLikeSet)
-                     | NoPM   -- Overloaded literals
+type ConLikeSet = UniqDSet ConLike
+
+data PossibleMatches
+  = PM TyCon (NonEmpty ConLikeSet)
+  | NoPM   -- Overloaded literals
   -- Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
   --
   -- NonEmpty because the empty case would mean that there
@@ -114,10 +118,10 @@ initIM ty = case splitTyConApp_maybe ty of
     pragmas <- dsGetCompleteMatches tc
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
-    pure (PM tc . fmap mkUniqSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
+    pure (PM tc . fmap mkUniqDSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
 
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
-markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqSet` con) ms)
+markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqDSet` con) ms)
 markMatched _   NoPM = NoPM
 
 ensureInhabited :: Monad m
@@ -133,7 +137,7 @@ ensureInhabited :: Monad m
 ensureInhabited _        NoPM = pure (Just NoPM)
 ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
   where
-    one_set cs = find_one_inh cs (nonDetEltsUniqSet cs)
+    one_set cs = find_one_inh cs (uniqDSetToList cs)
 
     -- find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT m ConLikeSet
     -- (find_one_inh cs cls) iterates over cls, deleting from cs
@@ -143,7 +147,7 @@ ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
     find_one_inh _  [] = mzero
     find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
       True  -> pure cs
-      False -> find_one_inh (delOneFromUniqSet cs con) cons
+      False -> find_one_inh (delOneFromUniqDSet cs con) cons
 
 -- | Satisfiability decisions as a data type. The @proof@ can carry a witness
 -- for satisfiability and might even be instantiated to 'Data.Void.Void' to
@@ -165,7 +169,7 @@ getUnmatchedConstructor NoPM = PossiblySatisfiable
 getUnmatchedConstructor (PM _tc ms)
   = maybeSatisfiable $ NonEmpty.head <$> traverse pick_one_conlike ms
   where
-    pick_one_conlike cs = case nonDetEltsUniqSet cs of
+    pick_one_conlike cs = case uniqDSetToList cs of
       [] -> Nothing
       (cl:_) -> Just cl
 
