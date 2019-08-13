@@ -635,7 +635,8 @@ lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
 -- we must check for a hit on the right Module
 lookupHptByModule hpt mod
-  = case lookupHpt hpt (moduleName mod) of
+  = -- pprTrace "lookupHptByModule" (ppr mod) $
+    case lookupHpt hpt (moduleName mod) of
       Just hm | mi_module (hm_iface hm) == mod -> Just hm
       _otherwise                               -> Nothing
 

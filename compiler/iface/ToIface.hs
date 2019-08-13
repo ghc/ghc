@@ -76,9 +76,9 @@ import TyCoTidy ( tidyCo )
 import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
-import Data.Bits
 
-import PackedFlags
+-- import Data.Bits
+-- import PackedFlags
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr

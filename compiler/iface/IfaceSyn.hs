@@ -79,7 +79,7 @@ import CgTypes (StandardFormInfo)
 
 import Control.Monad
 import System.IO.Unsafe
-import Data.Bits
+-- import Data.Bits
 import Data.Word
 
 infixl 3 &&&
@@ -1405,7 +1405,7 @@ instance Outputable IfaceUnfolding where
 
 instance Outputable IfLFInfo where
     ppr (ILFReEntrant fields) =
-        text "LFReEntrant" <> ppr fields
+        text "LFReEntrant" <+> ppr fields
         -- text "LFReEntrant" <> brackets (ppr oneshot <+>
         --                                 ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
       where
@@ -1413,7 +1413,7 @@ instance Outputable IfLFInfo where
           -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
           -- rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
     ppr (ILFThunk fields sfi) =
-        text "LFThunk" <> ppr fields <> ppr sfi
+        text "LFThunk" <+> ppr fields <+> ppr sfi
                                 -- brackets (ppr fvs_flag <+> ppr upd_flag <+>
                                     -- ppr sfi <+> ppr fun_flag)
       where
@@ -2446,8 +2446,8 @@ instance Binary IfLFInfo where
     put_ bh (ILFUnlifted) =
         putByte bh 3
     get bh = do
-        con <- getByte bh
-        case con of
+        tag <- getByte bh
+        case tag of
             0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, Bool))
             1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
             2 -> pure ILFCon <*> get bh

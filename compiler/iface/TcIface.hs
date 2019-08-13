@@ -11,6 +11,10 @@ Type checking of type signatures in interface files
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
+
 module TcIface (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
@@ -85,9 +89,9 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
-import PackedFlags
-import Data.Bits
-import Data.Word
+-- import PackedFlags
+-- import Data.Bits
+-- import Data.Word
 import SMRep
 
 {-
@@ -1861,12 +1865,9 @@ tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 -- tcLFInfo _ = return $ LFUnknown True
 tcLFInfo (ILFReEntrant (oneshot,rep,fvs_flag)) = do
     return $! LFReEntrant TopLevel (toEnum $ fromIntegral oneshot) (fromIntegral rep) fvs_flag (ArgUnknown)
-    -- pure $! LFUnknown True
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
     pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
-    -- pure $! LFUnknown True
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do
-      -- pure $! LFUnknown True
-      LFCon <$> (tcIfaceDataCon conName)
+        LFCon <$!> tcIfaceDataCon conName

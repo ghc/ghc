@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Code generation related types used in other parts of the compiler.
 
@@ -12,6 +13,7 @@
 module CgTypes
   ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo
   , exportLF
+  , whnfLF
   ) where
 
 #include "HsVersions.h"
@@ -112,6 +114,18 @@ data LambdaFormInfo
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
   deriving (Eq)
+
+whnfLF :: LambdaFormInfo -> ()
+whnfLF LFLetNoEscape = ()
+whnfLF LFUnlifted = ()
+whnfLF (LFUnknown !_a1) = ()
+whnfLF (LFCon !_a1) = ()
+whnfLF (LFThunk !_a1 _ _ _ _) = ()
+whnfLF LFReEntrant { lf_arg_desc = !_a1 } = ()
+
+
+
+
 
 exportLF :: LambdaFormInfo -> Bool
 exportLF LFUnlifted     = False

@@ -67,7 +67,6 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import UniqSupply
 
 import Exception
 import System.Directory
@@ -1194,11 +1193,6 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     return (RealPhase next_phase, outputFilename)
-                  where
-                    -- -- | Add information produced by codeGen to the iface.
-                    -- -- mkIfaceCgIfaceInfo :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
-                    -- mkIfaceCgIfaceInfo core_iface lf_info =
-                    --   core_iface { mi_lf_info = Just lf_info }
 
 
 -----------------------------------------------------------------------------

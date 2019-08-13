@@ -80,7 +80,6 @@ import RnModIface
 import UniqDSet
 import Plugins
 
-import MonadUtils ( mapSndM )
 import Control.Monad
 import Control.Exception
 import Data.IORef

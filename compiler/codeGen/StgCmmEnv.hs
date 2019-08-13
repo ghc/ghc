@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -127,65 +128,54 @@ addBindsC new_bindings = do
         setBinds new_binds
 
 getCgIdInfo :: Id -> FCode CgIdInfo
-getCgIdInfo id
+getCgIdInfo v_id
   = do  { dflags <- getDynFlags
         ; local_binds <- getBinds -- Try local bindings first
-        ; case lookupVarEnv local_binds id of {
+        ; case lookupVarEnv local_binds v_id of {
             Just info -> return info ;
             Nothing   -> do {
 
                 -- Should be imported; make up a CgIdInfo for it
-          let name = idName id
+          let name = idName v_id
         ; if isExternalName name then
-            let unlifted = isUnliftedType (idType id)
+            let unlifted = isUnliftedType (idType v_id)
             in  if unlifted then
                   -- An unlifted external Id must refer to a top-level
                   -- string literal. See Note [Bytes label] in CLabel.
-                  let ext_lbl = ASSERT( idType id `eqType` addrPrimTy )
+                  let ext_lbl = ASSERT( idType v_id `eqType` addrPrimTy )
                                 mkBytesLabel name
-                  in return $ litIdInfo dflags id mkLFStringLit (CmmLabel ext_lbl)
+                  in return $ litIdInfo dflags v_id mkLFStringLit (CmmLabel ext_lbl)
                 else do
-                { let ext_lbl = mkClosureLabel name $ idCafInfo id
-                ; let lf_computed = approximateLF
-                ; lf_cached <- reliableLF <$> lookupImportedLF name
+                { let !ext_lbl = mkClosureLabel name $ idCafInfo v_id
+                ; lf_cached <- lookupImportedLF name
                 ; let lf_static = mkStaticLF unlifted
-                -- ; case lf_cached of
-                --     Just (lf @ LFThunk {}) -> do
-                --       pprTraceM "Imported Thunk - " $
-                --         ppr name $$
-                --         text "imported:" <> (ppr lf) <+>
-                --         text "approx:" <> ppr (mkStaticLF unlifted <|> pure lf_computed)
-                --     _ -> return ()
-                -- ; if (not $ isJust lf_cached) then return () else pprTraceM "Cached info for " $ ppr id <+> text "is" <+> ppr lf_cached
-                ; let lf_info = fromJust (lf_static <|> lf_cached <|> pure lf_computed)
-                ; return $ litIdInfo dflags id lf_info (CmmLabel ext_lbl);
+                ; let lf_info = fromMaybe approximateLF (lf_static <|> lf_cached)
+                ; let cg_info = litIdInfo dflags v_id lf_info (CmmLabel ext_lbl);
+                -- See Note [CodeGenerator EPS <<loop>>]
+                ; seq (whnfLF lf_info) $ (return $! cg_info)
                 }
           else
-              cgLookupPanic id -- Bug
+              cgLookupPanic v_id -- Bug
         }}}
   where
-    reliableLF :: Maybe LambdaFormInfo -> Maybe LambdaFormInfo
-    reliableLF (Just lf)
-      | lfIsUnknown lf = Nothing
-    reliableLF lf = lf
     mkStaticLF :: Bool -> Maybe LambdaFormInfo
     mkStaticLF unlifted
       | unlifted = return $! mkLFStringLit
 
-      | Just con <- isDataConWorkId_maybe id
+      | Just con <- isDataConWorkId_maybe v_id
       , isNullaryRepDataCon con
       = Just $! mkConLFInfo con
 
       | otherwise = Nothing
                     -- An imported nullary constructor
                     -- We assume that the constructor is evaluated so that
-                    -- the id really does point directly to the constructor
+                    -- the v_id really does point directly to the constructor
     approximateLF
       | arity > 0
       = mkUnknownLFReEntrant TopLevel arity
-      | otherwise = mkLFArgument id
+      | otherwise = mkLFArgument v_id
       where
-        arity = idFunRepArity id
+        arity = idFunRepArity v_id
 
 
 cgLookupPanic :: Id -> FCode a

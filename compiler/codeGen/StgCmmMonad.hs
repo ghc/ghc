@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -56,7 +57,8 @@ module StgCmmMonad (
         getBinds, setBinds, lookupImportedLF,
 
         -- out of general friendliness, we also export ...
-        CgInfoDownwards(..), CgState(..)        -- non-abstract
+        CgInfoDownwards(..), CgState(..)        -- non-abstract,
+
     ) where
 
 import GhcPrelude hiding( sequence, succ )
@@ -85,8 +87,6 @@ import Util
 
 import Control.Monad
 import Data.List
-
-
 
 --------------------------------------------------------
 -- The FCode monad and its types
@@ -461,9 +461,9 @@ setBinds new_binds = do
 
 lookupImportedLF :: Name -> FCode (Maybe LambdaFormInfo)
 lookupImportedLF name = do
-        cg_imports <- cgg_lf_info <$> getInfoGlobal
-        -- pprTraceM "Lookup up lfinfo" $ ppr (name, lookupNameEnv cg_imports name)
-        return $ lookupNameEnv cg_imports name
+        cg_imports <- cgg_lf_info <$> getInfoGlobal :: FCode CgIfaceInfo
+        return $! lookupNameEnv cg_imports name
+
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \globals info_down state ->

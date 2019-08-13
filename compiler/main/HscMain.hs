@@ -1409,7 +1409,6 @@ hscWriteIface dflags iface no_change mod_location = do
     -- mod_location only contains the base name, so we rebuild the
     -- correct file extension from the dynflags.
     let ifaceBaseFile = ml_hi_file mod_location
-    pprTraceM "HiSuffix:" (text $ hiSuf dflags)
     unless no_change $
         let ifaceFile = buildIfName ifaceBaseFile (hiSuf dflags)
         in  {-# SCC "writeIface" #-}
@@ -1427,7 +1426,7 @@ hscWriteIface dflags iface no_change mod_location = do
       | Just name <- outputHi dflags
       = name
       | otherwise
-      = let with_hi = replaceExtension baseName (hiSuf dflags)
+      = let with_hi = replaceExtension baseName suffix
         in  addBootSuffix_maybe (mi_boot iface) with_hi
 
 -- | Compile to hard-code.
@@ -1475,7 +1474,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- top-level function, so showPass isn't very useful here.
         -- Hence we have one showPass for the whole backend, the
         -- next showPass after this will be "Assembler".
-        (output_filename, stub_c_exists, foreign_fps, stream_result) <-
+        (output_filename, stub_c_exists, foreign_fps, stream_result') <-
           withTiming (pure dflags)
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
@@ -1503,16 +1502,22 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- Only external names are actually visible to codeGen
         -- which we can't recompute easily
 
-        let infoExported = filter (exportLF . snd) .
+        let infoToExport = filter (exportLF . snd) .
                            filter (isExternalName . fst) .
-                           map (first idName) $ stream_result
+                           map (first idName) $ stream_result'
 
         -- We update the EPS here to populate the exported lf_infos.
-        eps <- hscEPS hsc_env
-        let eps' = eps { eps_cg_info_env = extendNameEnvList (eps_cg_info_env eps) infoExported }
-        writeIORef (hsc_EPS hsc_env) eps'
+        -- We have to make sure the generated info does not depend lazily
+        -- on the eps or <<loop>> happens. Hence the bangs.
+        -- See Note [CodeGenerator EPS <<loop>>]
+        !eps <- hscEPS hsc_env
+        let !eps_imported = eps_cg_info_env eps
+            !combined = extendNameEnvList eps_imported infoToExport
 
-        return (output_filename, stub_c_exists, foreign_fps, infoExported)
+        let eps' = eps { eps_cg_info_env = combined }
+        writeIORef (hsc_EPS hsc_env) $! eps'
+
+        return (output_filename, stub_c_exists, foreign_fps, infoToExport)
 
 
 hscInteractive :: HscEnv
@@ -1635,6 +1640,7 @@ doCodeGen hsc_env this_mod data_tycons
                         "Output Cmm" (ppr a)
                      return a
 
+        ppr_stream2 :: Stream IO CmmGroup [(Id, LambdaFormInfo)]
         ppr_stream2 = Stream.mapM dump2 pipeline_stream
 
     return ppr_stream2

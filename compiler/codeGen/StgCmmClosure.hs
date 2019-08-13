@@ -27,7 +27,7 @@ module StgCmmClosure (
         mkApLFInfo, mkLFArgument, mkLFLetNoEscape, mkUnknownLFReEntrant,
         mkLFStringLit,
         lfDynTag,
-        isLFThunk, isLFReEntrant, lfUpdatable, lfIsUnknown,
+        isLFThunk, isLFReEntrant, lfUpdatable,
 
         -- * Used by other modules
         CgLoc(..), SelfLoopInfo, CallMethod(..),
@@ -220,7 +220,7 @@ mkUnknownLFReEntrant :: TopLevelFlag
                      -> RepArity
                      -> LambdaFormInfo
 mkUnknownLFReEntrant top arity
-  = LFReEntrant top noOneShotInfo arity True (panic "arg_descr")
+  = LFReEntrant top noOneShotInfo arity True ArgUnknown
 
 -------------
 mkLFThunk :: Type -> TopLevelFlag -> [Id] -> UpdateFlag -> LambdaFormInfo
@@ -728,9 +728,6 @@ closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
 lfUpdatable :: LambdaFormInfo -> Bool
 lfUpdatable (LFThunk _ _ upd _ _)  = upd
 lfUpdatable _ = False
-
-lfIsUnknown (LFUnknown {}) = True
-lfIsUnknown _              = False
 
 closureSingleEntry :: ClosureInfo -> Bool
 closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
