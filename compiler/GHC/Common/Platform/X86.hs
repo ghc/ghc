@@ -1,10 +1,10 @@
 {-# LANGUAGE CPP #-}
 
-module CodeGen.Platform.ARM64 where
+module GHC.Common.Platform.X86 where
 
 import GhcPrelude
 
 #define MACHREGS_NO_REGS 0
-#define MACHREGS_aarch64 1
+#define MACHREGS_i386 1
 #include "../../../../includes/CodeGen.Platform.hs"
 

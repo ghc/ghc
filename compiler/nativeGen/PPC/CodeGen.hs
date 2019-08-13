@@ -27,7 +27,7 @@ where
 -- NCG stuff:
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Common.Platform
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs

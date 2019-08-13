@@ -1,5 +1,5 @@
 
-module CodeGen.Platform
+module GHC.Common.Platform
        (callerSaves, activeStgRegs, haveRegBase, globalRegMaybe, freeReg)
        where
 
@@ -9,13 +9,13 @@ import CmmExpr
 import GHC.Platform
 import Reg
 
-import qualified CodeGen.Platform.ARM        as ARM
-import qualified CodeGen.Platform.ARM64      as ARM64
-import qualified CodeGen.Platform.PPC        as PPC
-import qualified CodeGen.Platform.SPARC      as SPARC
-import qualified CodeGen.Platform.X86        as X86
-import qualified CodeGen.Platform.X86_64     as X86_64
-import qualified CodeGen.Platform.NoRegs     as NoRegs
+import qualified GHC.Common.Platform.ARM        as ARM
+import qualified GHC.Common.Platform.ARM64      as ARM64
+import qualified GHC.Common.Platform.PPC        as PPC
+import qualified GHC.Common.Platform.SPARC      as SPARC
+import qualified GHC.Common.Platform.X86        as X86
+import qualified GHC.Common.Platform.X86_64     as X86_64
+import qualified GHC.Common.Platform.NoRegs     as NoRegs
 
 -- | Returns 'True' if this global register is stored in a caller-saves
 -- machine register.

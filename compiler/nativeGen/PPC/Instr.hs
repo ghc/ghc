@@ -33,7 +33,7 @@ import TargetReg
 import RegClass
 import Reg
 
-import CodeGen.Platform
+import GHC.Common.Platform
 import BlockId
 import Hoopl.Collections
 import Hoopl.Label

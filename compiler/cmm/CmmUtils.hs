@@ -80,7 +80,7 @@ import CLabel
 import Outputable
 import DynFlags
 import Unique
-import CodeGen.Platform
+import GHC.Common.Platform
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS

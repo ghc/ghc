@@ -52,7 +52,7 @@ where
 
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Common.Platform
 import Reg
 import RegClass
 
