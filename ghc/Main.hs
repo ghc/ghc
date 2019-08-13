@@ -78,6 +78,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Prelude
+import System.Mem.Weak
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -814,12 +815,13 @@ dumpFinalStats dflags =
 
 dumpFastStringStats :: DynFlags -> IO ()
 dumpFastStringStats dflags = do
-  segments <- getFastStringTable
+  segments <- traverse (traverse (traverse deRefWeak)) =<< getFastStringTable
   let buckets = concat segments
       bucketsPerSegment = map length segments
       entriesPerBucket = map length buckets
       entries = sum entriesPerBucket
-      hasZ = sum $ map (length . filter hasZEncoding) buckets
+      hasZ = sum $ map (length . filter hasZEncoding . catMaybes) buckets
+      gced = sum $ map (length . filter isNothing) buckets
       msg = text "FastString stats:" $$ nest 4 (vcat
         [ text "segments:         " <+> int (length segments)
         , text "buckets:          " <+> int (sum bucketsPerSegment)
@@ -828,6 +830,7 @@ dumpFastStringStats dflags = do
         , text "smallest segment: " <+> int (minimum bucketsPerSegment)
         , text "longest bucket:   " <+> int (maximum entriesPerBucket)
         , text "has z-encoding:   " <+> (hasZ `pcntOf` entries)
+        , text "gc percentage     " <+> (gced `pcntOf` entries)
         ])
         -- we usually get more "has z-encoding" than "z-encoded", because
         -- when we z-encode a string it might hash to the exact same string,

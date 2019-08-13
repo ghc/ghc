@@ -119,7 +119,10 @@ import Data.Data
 import Data.IORef
 import Data.Maybe       ( isJust )
 import Data.Char
+import Data.List (deleteBy)
 import Data.Semigroup as Semi
+
+import System.Mem.Weak
 
 import GHC.IO
 
@@ -251,7 +254,7 @@ data FastStringTable = FastStringTable
 data FastStringTableSegment = FastStringTableSegment
   {-# UNPACK #-} !(MVar ()) -- the lock for write in each segment
   {-# UNPACK #-} !(IORef Int) -- the number of elements
-  (MutableArray# RealWorld [FastString]) -- buckets in this segment
+  (MutableArray# RealWorld [Weak FastString]) -- buckets in this segment
 
 {-
 Following parameters are determined based on:
@@ -271,7 +274,7 @@ hashToSegment# hash# = hash# `andI#` segmentMask#
   where
     !(I# segmentMask#) = segmentMask
 
-hashToIndex# :: MutableArray# RealWorld [FastString] -> Int# -> Int#
+hashToIndex# :: MutableArray# RealWorld [Weak FastString] -> Int# -> Int#
 hashToIndex# buckets# hash# =
   (hash# `uncheckedIShiftRL#` segmentBits#) `remInt#` size#
   where
@@ -292,14 +295,18 @@ maybeResizeSegment segmentRef = do
         (# s2#, arr# #) -> (# s2#, FastStringTableSegment lock counter arr# #)
     forM_ [0 .. (I# oldSize#) - 1] $ \(I# i#) -> do
       fsList <- IO $ readArray# old# i#
-      forM_ fsList $ \fs -> do
-        let -- Shall we store in hash value in FastString instead?
-            !(I# hash#) = hashFastString fs
-            idx# = hashToIndex# new# hash#
-        IO $ \s1# ->
-          case readArray# new# idx# s1# of
-            (# s2#, bucket #) -> case writeArray# new# idx# (fs: bucket) s2# of
-              s3# -> (# s3#, () #)
+      forM_ fsList $ \wfs -> do
+        mfs <- deRefWeak wfs
+        case mfs of
+          Just fs -> do
+            let -- Shall we store in hash value in FastString instead?
+              !(I# hash#) = hashFastString fs
+              idx# = hashToIndex# new# hash#
+            IO $ \s1# ->
+              case readArray# new# idx# s1# of
+                (# s2#, bucket #) -> case writeArray# new# idx# (wfs: bucket) s2# of
+                  s3# -> (# s3#, () #)
+          Nothing -> return ()
     writeIORef segmentRef resizedSegment
     return resizedSegment
 
@@ -427,22 +434,38 @@ mkFastStringWith mk_fs !ptr !len = do
         -- before we acquired the write lock.
         Just found -> return found
         Nothing -> do
+          v <- mkWeak (uniqueOfFS fs) fs Nothing
           IO $ \s1# ->
-            case writeArray# buckets# idx# (fs: bucket) s1# of
+            case writeArray# buckets# idx# (v: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
+          let u = uniqueOfFS fs
           return fs
+          {-
+    delete_fs :: Int -> IO ()
+    delete_fs fs = do
+      FastStringTableSegment _ _ buckets# <- readIORef segmentRef
+      let idx# = hashToIndex# buckets# hash#
+      bucket <- IO $ readArray# buckets# idx#
+      IO $ \s1# -> do
+        case writeArray# buckets# idx# (filter ((/= fs) . uniqueOfFS) bucket) s1# of
+              s2# -> (# s2#, () #)
+              -}
 
-bucket_match :: [FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
+bucket_match :: [Weak FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
 bucket_match [] _ _ = return Nothing
-bucket_match (v@(FastString _ _ bs _):ls) len ptr
-      | len == BS.length bs = do
+bucket_match (v:ls) len ptr = do
+  mv <- deRefWeak v
+  case mv of
+    Just fs@(FastString _ _ bs _)
+      | len == BS.length bs -> do
          b <- BS.unsafeUseAsCString bs $ \buf ->
              cmpStringPrefix ptr (castPtr buf) len
-         if b then return (Just v)
+         if b then return (Just fs)
               else bucket_match ls len ptr
-      | otherwise =
+       | otherwise ->
          bucket_match ls len ptr
+    Nothing -> bucket_match ls len ptr
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
@@ -604,7 +627,7 @@ isUnderscoreFS fs = fs == fsLit "_"
 -- -----------------------------------------------------------------------------
 -- Stats
 
-getFastStringTable :: IO [[[FastString]]]
+getFastStringTable :: IO [[[Weak FastString]]]
 getFastStringTable =
   forM [0 .. numSegments - 1] $ \(I# i#) -> do
     let (# segmentRef #) = indexArray# segments# i#
