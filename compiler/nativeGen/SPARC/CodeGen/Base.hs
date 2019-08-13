@@ -22,7 +22,7 @@ import SPARC.Regs
 import Format
 import Reg
 
-import CodeGen.Platform
+import GHC.Common.Platform
 import DynFlags
 import Cmm
 import PprCmmExpr ()

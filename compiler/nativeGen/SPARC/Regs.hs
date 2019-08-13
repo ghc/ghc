@@ -34,7 +34,7 @@ where
 
 import GhcPrelude
 
-import CodeGen.Platform.SPARC
+import GHC.Common.Platform.SPARC
 import Reg
 import RegClass
 import Format

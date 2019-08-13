@@ -40,7 +40,7 @@ import Reg
 import Format
 
 import CLabel
-import CodeGen.Platform
+import GHC.Common.Platform
 import BlockId
 import DynFlags
 import Cmm
