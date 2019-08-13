@@ -41,7 +41,7 @@ import X86.RegInfo
 --TODO: Remove - Just for development/debugging
 import X86.Ppr()
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import CPrim
 import Debug            ( DebugBlock(..), UnwindPoint(..), UnwindTable
                         , UnwindExpr(UwReg), toUnwindExpr )

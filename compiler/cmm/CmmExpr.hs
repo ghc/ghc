@@ -598,7 +598,7 @@ globalRegType _      (DoubleReg _)     = cmmFloat W64
 globalRegType _      (LongReg _)       = cmmBits W64
 -- TODO: improve the internal model of SIMD/vectorized registers
 -- the right design SHOULd improve handling of float and double code too.
--- see remarks in "NOTE [SIMD Design for the future]"" in StgCmmPrim
+-- see remarks in "NOTE [SIMD Design for the future]"" in GHC.StgToCmm.Prim
 globalRegType _      (XmmReg _)        = cmmVec 4 (cmmBits W32)
 globalRegType _      (YmmReg _)        = cmmVec 8 (cmmBits W32)
 globalRegType _      (ZmmReg _)        = cmmVec 16 (cmmBits W32)

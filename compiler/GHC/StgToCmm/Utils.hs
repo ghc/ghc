@@ -8,7 +8,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmUtils (
+module GHC.StgToCmm.Utils (
         cgLit, mkSimpleLit,
         emitDataLits, mkDataLits,
         emitRODataLits, mkRODataLits,
@@ -45,16 +45,16 @@ module StgCmmUtils (
 
 import GhcPrelude
 
-import StgCmmMonad
-import StgCmmClosure
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Closure
 import Cmm
 import BlockId
 import MkGraph
-import CodeGen.Platform
+import GHC.Platform.Regs
 import CLabel
 import CmmUtils
 import CmmSwitch
-import CgUtils
+import GHC.StgToCmm.CgUtils
 
 import ForeignCall
 import IdInfo

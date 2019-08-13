@@ -30,7 +30,7 @@ import TargetReg
 import BlockId
 import Hoopl.Collections
 import Hoopl.Label
-import CodeGen.Platform
+import GHC.Platform.Regs
 import Cmm
 import FastString
 import Outputable

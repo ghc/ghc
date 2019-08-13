@@ -22,7 +22,7 @@
  * putting the 8-byte fields on an 8-byte boundary.  Padding can
  * vary between C compilers, and we don't take into account any
  * possible padding when generating CCS and CC decls in the code
- * generator (compiler/codeGen/StgCmmProf.hs).
+ * generator (GHC.StgToCmm.Prof).
  */
 
 typedef struct CostCentre_ {
