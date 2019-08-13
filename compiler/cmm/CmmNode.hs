@@ -26,7 +26,7 @@ module CmmNode (
 
 import GhcPrelude hiding (succ)
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import CmmExpr
 import CmmSwitch
 import DynFlags
@@ -90,7 +90,7 @@ data CmmNode e x where
       -- See Note [Unsafe foreign calls clobber caller-save registers]
       --
       -- Invariant: the arguments and the ForeignTarget must not
-      -- mention any registers for which CodeGen.Platform.callerSaves
+      -- mention any registers for which GHC.Platform.callerSaves
       -- is True.  See Note [Register Parameter Passing].
 
   CmmBranch :: ULabel -> CmmNode O C
@@ -199,7 +199,7 @@ sequence.
 
 A foreign call is defined to clobber any GlobalRegs that are mapped to
 caller-saves machine registers (according to the prevailing C ABI).
-StgCmmUtils.callerSaves tells you which GlobalRegs are caller-saves.
+GHC.StgToCmm.Utils.callerSaves tells you which GlobalRegs are caller-saves.
 
 This is a design choice that makes it easier to generate code later.
 We could instead choose to say that foreign calls do *not* clobber
@@ -221,7 +221,7 @@ convention, rdi, rsi, rdx and rcx (as well as r8 and r9) may be used for
 argument passing.  These are registers R3-R6, which our generated
 code may also be using; as a result, it's necessary to save these
 values before doing a foreign call.  This is done during initial
-code generation in callerSaveVolatileRegs in StgCmmUtils.hs.  However,
+code generation in callerSaveVolatileRegs in GHC.StgToCmm.Utils.  However,
 one result of doing this is that the contents of these registers
 may mysteriously change if referenced inside the arguments.  This
 is dangerous, so you'll need to disable inlining much in the same
