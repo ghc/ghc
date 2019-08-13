@@ -4,11 +4,10 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
--- | The term equality oracle. The main export of the module are the functions
--- 'pmOracle', 'addTermEquality' and 'tryAddRefutableAltCon'.
---
--- If you are looking for an oracle that can solve type-level constraints, look
--- at 'TcSimplify.tcCheckSatisfiability'.
+-- | The pattern match oracle. The main export of the module are the functions
+-- 'addTermEquality', 'refineToAltCon' and 'tryAddRefutableAltCon' for adding
+-- facts to the oracle, and 'provideEvidenceForEquation' to turn a 'Delta' into
+-- a concrete evidence for an equation.
 module PmOracle (
 
         PmM, tracePm, mkPmId,
@@ -19,7 +18,7 @@ module PmOracle (
         inhabitants,
         tryAddRefutableAltCon, -- Add a negative equality
         refineToAltCon,        -- Add a positive equality x ~ K _ _
-        addTermEquality,            -- Add a positive equality x ~ e
+        addTermEquality,       -- Add a positive equality x ~ e
         provideEvidenceForEquation,
     ) where
 
@@ -773,13 +772,8 @@ we do the following:
      pattern match checking.
 -}
 
-{-
-%************************************************************************
-%*                                                                      *
-                              The type oracle
-%*                                                                      *
-%************************************************************************
--}
+----------------
+-- * Type oracle
 
 -- | Check whether a set of type constraints is satisfiable.
 tyOracle :: Bag EvVar -> PmM Bool
@@ -789,66 +783,20 @@ tyOracle evs
             Just sat -> return sat
             Nothing  -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
 
-{-
-%************************************************************************
-%*                                                                      *
-                      The term equality oracle
-%*                                                                      *
-%************************************************************************
--}
-{-
--- | Pretty much a @['TmVarCt']@ association list. This is the type of 'tm_pos',
--- where we store solutions for rigid pattern match variables.
-type TmVarCtEnv = IdEnv PmExpr
+------------------------
+-- * DIdEnv with sharing
 
--- | An environment assigning shapes to variables that immediately lead to a
--- refutation. So, if this maps @x :-> [Just]@, then trying to solve a
--- 'TmVarCt' like @x ~ Just False@ immediately leads to a contradiction.
--- Additionally, this stores the 'Type' from which to draw 'ConLike's from.
---
--- Determinism is important since we use this for warning messages in
--- 'PmPpr.pprUncovered'. We don't do the same for 'TmVarCtEnv', so that is a plain
--- 'IdEnv'.
---
--- See also Note [Refutable shapes] in PmOracle.
-type PmRefutEnv = DIdEnv [PmAltCon]
--}
-{-
--- | The state of the term oracle. Tracks all term-level facts of the form "x is
--- @True@" ('tm_pos') and "x is not @5@" ('tm_neg').
---
--- Subject to Note [The Pos/Neg invariant].
-data TmState = TmS
-  { tm_pos :: !TmVarCtEnv
-  -- ^ A substitution with solutions we extend with every step and return as a
-  -- result. The substitution is in /triangular form/: It might map @x@ to @y@
-  -- where @y@ itself occurs in the domain of 'tm_pos', rendering lookup
-  -- non-idempotent. This means that 'varDeepLookup' potentially has to walk
-  -- along a chain of var-to-var mappings until we find the solution but has the
-  -- advantage that when we update the solution for @y@ above, we automatically
-  -- update the solution for @x@ in a union-find-like fashion.
-  , tm_neg :: !PmRefutEnv
-  -- ^ Maps each variable @x@ to a list of 'PmAltCon's that @x@ definitely
-  -- cannot match. Example, assuming
-  --
-  -- @
-  --     data T = Leaf Int | Branch T T | Node Int T
-  -- @
-  --
-  -- then @x :-> [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
-  -- and hence can only match @Branch@. Should we later 'equate' @x@ to a
-  -- variable @y@, we merge the refutable shapes of @x@ into those of @y@. See
-  -- also Note [The Pos/Neg invariant].
-  }
--}
-
-data Blarg a
+-- | Either @Indirect x@, meaning the value is represented by that of @x@, or
+-- an @Entry@ containing containing the actual value it represents.
+data Shared a
   = Indirect Id
   | Entry a
 
--- |
+-- | A 'DIdEnv' in which entries can be shared by multiple 'Id's.
+-- Merge equivalence classes of two Ids by 'setIndirectSDIE' and set the entry
+-- of an Id with 'setEntrySDIE'.
 newtype SharedDIdEnv a
-  = SDIE { unSDIE :: DIdEnv (Blarg a) }
+  = SDIE { unSDIE :: DIdEnv (Shared a) }
 
 emptySDIE :: SharedDIdEnv a
 emptySDIE = SDIE emptyDVarEnv
@@ -864,6 +812,7 @@ lookupReprAndEntrySDIE sdie@(SDIE env) x = case lookupDVarEnv env x of
 lookupSDIE :: SharedDIdEnv a -> Id -> Maybe a
 lookupSDIE sdie x = snd (lookupReprAndEntrySDIE sdie x)
 
+-- | Check if two variables are part of the same equivalence class.
 sameRepresentative :: SharedDIdEnv a -> Id -> Id -> Bool
 sameRepresentative sdie x y =
   fst (lookupReprAndEntrySDIE sdie x) == fst (lookupReprAndEntrySDIE sdie y)
@@ -887,77 +836,130 @@ traverseSharedIdEnv f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unS
     g (u, Indirect y) = pure (u,Indirect y)
     g (u, Entry a)    = (u,) . Entry <$> f a
 
-instance Outputable a => Outputable (Blarg a) where
+instance Outputable a => Outputable (Shared a) where
   ppr (Indirect x) = ppr x
   ppr (Entry a)    = ppr a
 
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
+----------------------
+-- * Term oracle state
+
+-- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
+-- entries are possibly shared when we figure out that two variables must be
+-- equal, thus represent the same set of values.
+--
+-- See Note [TmState invariants].
 newtype TmState = TS (SharedDIdEnv VarInfo)
   -- Deterministic so that we generate deterministic error messages
 
+-- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
+-- and negative ('vi_neg') facts, like "x is not (:)".
+-- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
+-- ('vi_cache') and the number of times each variable was refined
+-- ('vi_n_refines').
+--
+-- Subject to Note [The Pos/Neg invariant].
 data VarInfo
   = VI
-  { vi_ty  :: Type -- The type of the variable, think Gamma. Important for rejecting possible GADT constructors or incompatible pattern synonyms (think Just42).
-  , vi_pos :: [(PmAltCon, [Id])] -- Positive info: things it is, all at the same time (think: intersection). Therefore no more than one RealDataCon, otherwise contradiction. TODO: Of these, the data con solution is special in that it is an actual solution, the others just denote equivalent expressions, similar to guards. We'll probably change this representation later on. BUT: On the other hand, these things will have to be inhabitated individually, so this is more information than just equiavelence to an arbitrary expression
-  , vi_neg :: [PmAltCon]         -- Negative info: it is not headed by these AltCons. must be orthogonal to anything from vi_pos
-  , vi_cache :: PossibleMatches  -- Only a cache of the different COMPLETE sets. At any time superset of possible constructors of each COMPLETE set.
-  , vi_n_refines :: !Int         -- Purely for performance reasons. The number of times this representative was refined ('refineToAltCon') in the Check's ConVar split. Sadly, we can't store this info in the Check module, as it's tightly couple to the particular 'Delta' and also is per *representative*, not per syntactic variable. Note that this number does not always correspond to the length of solutions: 'pmInitialTmTyCs' might add a solution without incurring the potential exponential blowup by ConVar.
+  { vi_ty  :: !Type
+  -- ^ The type of the variable. Important for rejecting possible GADT
+  -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
+  , vi_pos :: [(PmAltCon, [Id])]
+  -- ^ Positive info: 'PmExprCon's it is (i.e. @x ~ [Just y, PatSyn 42]@), all
+  -- at the same time (i.e. conjunctive). Therefore no more than one
+  -- RealDataCon, otherwise contradiction because of generativity.
+  , vi_neg :: ![PmAltCon]
+  -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
+  -- Example, assuming
+  --
+  -- @
+  --     data T = Leaf Int | Branch T T | Node Int T
+  -- @
+  --
+  -- then @x /~ [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
+  -- and hence can only match @Branch@. Is orthogonal to anything from 'vi_pos',
+  -- in the sense that 'decEqPmAltCon' returns @Nothing@ for any pairing between
+  -- 'vi_pos' and 'vi_neg'.
+  , vi_cache :: !PossibleMatches
+  -- ^ A cache of the associated COMPLETE sets. At any time a superset of
+  -- possible constructors of each COMPLETE set. So, if it's not in here, we
+  -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
+  -- to recognise completion of a COMPLETE set efficiently for large enums.
+  , vi_n_refines :: !Int
+  -- ^ Purely for Check performance reasons. The number of times this
+  -- representative was refined ('refineToAltCon') in the Check's ConVar split.
+  -- Sadly, we can't store this info in the Check module, as it's tightly couple
+  -- to the particular 'Delta' and also is per *representative*, not per
+  -- syntactic variable. Note that this number does not always correspond to the
+  -- length of solutions: 'pmInitialTmTyCs' might add a solution without
+  -- incurring the potential exponential blowup by ConVar.
   }
-
-{- Note [Maintaining invariantes in TmState]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Suppoose we add the fact (x~y) to TmState
-    x /~ True
-    y /~ False
-  Then we want to get x /~ [True,False], hence vacuous
-
-
--}
-
-data PossibleShape
-  = Rigid !PmExpr
-      -- Get this in the "taken" branch of a pattern match;
-      --   e.g. f x@(Just y) = <rhs>
-      --   In <rhs> we have x ~ Just y
-      --
-      -- The PmExpr is: a data con application, literal
-      --  ToDo:  Rigid PmAltCon [Id], perhaps
-
-  | CompleteSets !PossibleMatches
-
-  | NoInfoYet    -- The type of the variable is not (yet) a data type
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant: In any 'TmState', whenever there is @x ~ C@ in 'tm_pos',
-an entry @x :-> cs@ in 'tm_neg' may only have incomparable 'PmAltCons' according
-to 'decEqPmAltCons'.
+Invariant applying to each VarInfo: Whenever we have @(C, [y,z])@ in 'vi_pos',
+any entry in 'vi_neg' must be incomparable to C (return Nothing) according to
+'decEqPmAltCons'. Those entries that are comparable either lead to a refutation
+or are redudant. Examples:
+* @x ~ Just y@, @x /~ [Just]@. 'decEqPmAltCon' returns Just True, so refute.
+* @x ~ Nothing@, @x /~ [Just]@. 'decEqPmAltCon' returns Just False, so negative
+  info is redundant and should be discarded.
+* @x ~ I# y@, @x /~ [4,2]@. 'decEqPmAltCon' returns Nothing, so orthogal. We
+  keep this info in order to be able to refute a redundant match on i.e. 4
+  later on.
 
-For example, it would make no sense to say both
-    tm_pos = [...x :-> 3...]
-    tm_neg = [...x :-> [4,42]...]
-The positive information is strictly more informative than the negative.
-On the other hand
-    tm_pos = [...x :-> I# y...]
-    tm_neg = [...x :-> [4]...]
-We want to know that @x@ is certainly not the literal 4 when we know it is a
-@I#@. Notice that @PmAltLit 4@ and @PmAltConLike I#@ are incomparable. In
-general, we consider every binding in 'tm_neg' informative when the equality
-relation to the solution is undecidable ('decEqPmAltCons').
+This carries over to pattern synonyms and overloaded literals. Say, we have
+    pattern Just42 = Just 42
+    case Just42 of x
+      Nothing -> ()
+      Just _  -> ()
+Even though we had a solution for the value abstraction called x here in form
+of a PatSynCon (Just42,[]), this solution is incomparable to both Nothing and
+Just. Hence we retain the info in vi_neg, which eventually allows us to detect
+the complete pattern match.
 
-  ToDo: add an example with pattern synonyms, to show it's
-        not just about literals
+The Pos/Neg invariant extends to vi_cache, which stores essentially positive
+information. We make sure that vi_neg and vi_cache never overlap. This isn't
+strictly necessary since vi_cache is just a cache, so doesn't need to be
+accurate: Every suggestion of a possible ConLike from vi_cache might be
+refutable by the type oracle anyway. But it helps to maintain sanity while
+debugging traces.
 
-Now, suppose we are adding the (positive) fact @x :-> e@ to 'tm_pos'. Then we
-must delete any comparable negative facts (after considering them for
-refutation) for @x@ from 'tm_neg', to uphold the invariant.
+Note [TmState invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The term oracle state is never obviously (i.e., without consulting the type
+oracle) contradictory. This implies a few invariants:
+* Whenever vi_pos overlaps with vi_neg according to 'decEqPmAltCon', we refute.
+  This is implied by the Note [Pos/Neg invariant].
+* Whenever vi_neg subsumes a COMPLETE set, we refute. We consult vi_cache to
+  detect this, but we could just compare whole COMPLETE sets to vi_neg every
+  time, if it weren't for performance.
 
-But there is more! Suppose we are adding @x :-> y@ to 'tm_pos', and 'tm_neg'
-contains @x :-> cs, y :-> ds@. Then we want to update 'tm_neg' to
-@y :-> (cs ++ ds)@, to make use of the negative information we have about @x@,
-while we can *completely* discard the entry for @x@ in 'tm_neg'.
+Maintaining these invariants in 'unify' (the core of the term oracle) and
+'tryAddRefutableAltCon' is subtle.
+* Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
+  - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
+    @x /~ [True,False]@. This is vacuous by matter of comparing to the vanilla
+    COMPLETE set, so should refute.
+  - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
+* Adding positive information. Example: Add the fact @x ~ K ys@ (see 'trySolve')
+  - (Neg) If we had @x /~ K@, refute.
+  - (Pos) If we had @x ~ K2@, and that contradicts the new solution according to
+    'decEqPmAltCon' (ex. K2 is [] and K is (:)), then refute.
+  - (Refine) If we had @x /~ K zs@, unify each y with each z in turn.
+* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'tryAddRefutableAltCon')
+  - (Refut) If we have @x ~ K ys@, refute.
+  - (Redundant) If we have @x ~ K2@ and @decEqPmAltCon K K2 == Just False@
+    (ex. Just and Nothing), the info is redundant and can be
+    discarded.
+  - (COMPLETE) If K=Nothing and we had @x /~ Just@, then we get
+    @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the vanilla
+    COMPLETE set, so should refute.
+
+Note that merging VarInfo in equate can be done by calling out to 'trySolve' and
+'tryAddRefutableAltCon' for each of the facts individually.
 -}
 
 -- | Not user-facing.
@@ -967,13 +969,7 @@ instance Outputable TmState where
 -- | Not user-facing.
 instance Outputable VarInfo where
   ppr (VI ty pos neg cache n)
-    = braces (fsep (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
-
--- | Not user-facing.
-instance Outputable PossibleShape where
-  ppr NoInfoYet = char '?'
-  ppr (Rigid sol) = ppr sol
-  ppr (CompleteSets sets) = ppr sets
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
@@ -1001,8 +997,8 @@ initPossibleMatches vi                      = pure vi
 initLookupVarInfo :: TmState -> Id -> DsM VarInfo
 initLookupVarInfo ts x = initPossibleMatches (lookupVarInfo ts x)
 
------------------------------------------------
--- * Exported utility function querying 'Delta'
+------------------------------------------------
+-- * Exported utility functions querying 'Delta'
 
 -- | Check whether a constraint (x ~ BOT) can succeed,
 -- given the resulting state of the term oracle.
@@ -1052,12 +1048,13 @@ lookupNumberOfRefinements delta x
 -- * Adding facts to the oracle
 
 -- | Add a positive term equality ('TmVarCt') to 'Delta'.
+-- See Note [TmState invariants].
 addTermEquality :: Delta -> TmVarCt -> DsM (Maybe Delta)
 addTermEquality delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
--- See Note [Refutable shapes].
+-- See Note [TmState invariants].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMaybeT $ do
   VI ty pos neg pm n <- lift (initLookupVarInfo ts x)
@@ -1392,6 +1389,8 @@ isVanillaDataType ty = fromMaybe False $ do
 -- Returns @Nothing@ when there's a contradiction. Returns @Just ts@
 -- when the constraint was compatible with prior facts, in which case @ts@ has
 -- integrated the knowledge from the equality constraint.
+--
+-- See Note [TmState invariants].
 unify :: Delta -> (PmExpr, PmExpr) -> MaybeT DsM Delta
 unify delta@MkDelta{ delta_tm_cs = TS env } eq = case eq of
   (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case decEqPmAltCon c1 c2 of
@@ -1418,6 +1417,8 @@ unify delta@MkDelta{ delta_tm_cs = TS env } eq = case eq of
 -- Makes sure that the positive and negative facts of @x@ and @y@ are
 -- compatible.
 -- Preconditions: @not (sameRepresentative env x y)@
+--
+-- See Note [TmState invariants].
 equate :: Delta -> Id -> Id -> MaybeT DsM Delta
 equate delta@MkDelta{ delta_tm_cs = TS env } x y
   = ASSERT( not (sameRepresentative env x y) )
@@ -1450,6 +1451,8 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
 -- solution, reject (@Nothing@) otherwise.
 --
 -- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
+--
+-- See Note [TmState invariants].
 trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
 trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
   VI ty pos neg cache n <- lift (initLookupVarInfo ts x)
@@ -1468,8 +1471,8 @@ trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
       -- the new solution)
-      let neg'   = filter ((== Nothing) . decEqPmAltCon alt) neg
-      let pos'   = (alt,args):pos
+      let neg' = filter ((== Nothing) . decEqPmAltCon alt) neg
+      let pos' = (alt,args):pos
       pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos' neg' cache n))}
 
 -- | External interface to the term oracle.
@@ -1599,58 +1602,4 @@ intuition formal, we say that a type is definitely inhabitable (DI) if:
 
 It's relatively cheap to check if a type is DI, so before we call `nonVoid`
 on a list of strict argument types, we filter out all of the DI ones.
-
-Note [Refutable shapes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Consider a pattern match like
-
-    foo x
-      | 0 <- x = 42
-      | 0 <- x = 43
-      | 1 <- x = 44
-      | otherwise = 45
-
-This will result in the following initial matching problem:
-
-    PatVec: x     (0 <- x)
-    ValVec: $tm_y
-
-Where the first line is the pattern vector and the second line is the value
-vector abstraction. When we handle the first pattern guard in Check, it will be
-desugared to a match of the form
-
-    PatVec: x     0
-    ValVec: $tm_y x
-
-In LitVar, this will split the value vector abstraction for `x` into a positive
-`PmLit 0` and a negative `PmLit x [0]` value abstraction. While the former is
-immediately matched against the pattern vector, the latter (vector value
-abstraction `~[0] $tm_y`) is completely uncovered by the clause.
-
-`pmcheck` proceeds by *discarding* the the value vector abstraction involving
-the guard to accomodate for the desugaring. But this also discards the valuable
-information that `x` certainly is not the literal 0! Consequently, we wouldn't
-be able to report the second clause as redundant.
-
-That's a typical example of why we need the term oracle, and in this specific
-case, the ability to encode that `x` certainly is not the literal 0. Now the
-term oracle can immediately refute the constraint `x ~ 0` generated by the
-second clause and report the clause as redundant. After the third clause, the
-set of such *refutable* literals is again extended to `[0, 1]`.
-
-In general, we want to store a set of refutable shapes (`PmAltCon`) for each
-variable. That's the purpose of the `PmRefutEnv`. This extends to
-`ConLike`s, where all value arguments are universally quantified implicitly.
-So, if the `PmRefutEnv` contains an entry for `x` with `Just [Bool]`, then this
-corresponds to the fact that `forall y. x ≁ Just @Bool y`.
-
-`tryAddRefutableAltCon` will add such a refutable mapping to the `PmRefutEnv`
-in the term oracles state and check if it causes any immediate contradiction.
-Whenever we record a solution in the substitution via `extendSubstAndSolve`, the
-refutable environment is checked for any matching refutable `PmAltCon`.
-
-Note that `PmAltConLike` carries a list of type arguments. This purely for the
-purpose of being able to reconstruct all other constructors of the matching
-group the `ConLike` is part of through calling `allCompleteMatches` in Check.
 -}
