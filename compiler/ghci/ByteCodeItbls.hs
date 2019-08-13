@@ -20,8 +20,8 @@ import NameEnv
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import RepType
-import StgCmmLayout     ( mkVirtConstrSizes )
-import StgCmmClosure    ( tagForCon, NonVoid (..) )
+import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
+import GHC.StgToCmm.Closure ( tagForCon, NonVoid (..) )
 import Util
 import Panic
 

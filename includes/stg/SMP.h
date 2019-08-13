@@ -166,7 +166,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  *  - Eager blackholing a THUNK:
  *    This is protected by an explicit write barrier in the eager blackholing
- *    code produced by the codegen. See StgCmmBind.emitBlackHoleCode.
+ *    code produced by the codegen. See GHC.StgToCmm.Bind.emitBlackHoleCode.
  *
  *  - Lazy blackholing a THUNK:
  *    This is is protected by an explicit write barrier in the thread suspension
@@ -189,8 +189,8 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  *  - Write to an Array#, ArrayArray#, or SmallArray#:
  *    This case is protected by an explicit write barrier in the code produced
- *    for this primop by the codegen. See StgCmmPrim.doWritePtrArrayOp and
- *    StgCmmPrim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
+ *    for this primop by the codegen. See GHC.StgToCmm.Prim.doWritePtrArrayOp and
+ *    GHC.StgToCmm.Prim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
  *
  *  - Write to MutVar# via writeMutVar#:
  *    This case is protected by an explicit write barrier in the code produced

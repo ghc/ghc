@@ -72,7 +72,7 @@ import Dwarf
 import Debug
 
 import BlockId
-import CgUtils          ( fixStgRegisters )
+import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import Cmm
 import CmmUtils
 import Hoopl.Collections

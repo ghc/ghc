@@ -18,7 +18,7 @@ import LlvmCodeGen.Regs
 import LlvmMangler
 
 import BlockId
-import CgUtils ( fixStgRegisters )
+import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import Cmm
 import CmmUtils
 import Hoopl.Block

@@ -4,14 +4,14 @@
 --
 -- Stg to C--: code generation for constructors
 --
--- This module provides the support code for StgCmm to deal with with
+-- This module provides the support code for StgToCmm to deal with with
 -- constructors on the RHSs of let(rec)s.
 --
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
 
-module StgCmmCon (
+module GHC.StgToCmm.Con (
         cgTopRhsCon, buildDynCon, bindConArgs
     ) where
 
@@ -22,12 +22,12 @@ import GhcPrelude
 import StgSyn
 import CoreSyn  ( AltCon(..) )
 
-import StgCmmMonad
-import StgCmmEnv
-import StgCmmHeap
-import StgCmmLayout
-import StgCmmUtils
-import StgCmmClosure
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Env
+import GHC.StgToCmm.Heap
+import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Closure
 
 import CmmExpr
 import CmmUtils
@@ -89,7 +89,7 @@ cgTopRhsCon dflags id con args =
                 amode <- getArgAmode arg
                 case amode of
                   CmmLit lit -> return lit
-                  _          -> panic "StgCmmCon.cgTopRhsCon"
+                  _          -> panic "GHC.StgToCmm.Con.cgTopRhsCon"
 
             nonptr_wds = tot_wds - ptr_wds
 
@@ -272,7 +272,7 @@ bindConArgs (DataAlt con) base args
            -- when accessing the constructor field.
            bind_arg :: (NonVoid Id, ByteOff) -> FCode (Maybe LocalReg)
            bind_arg (arg@(NonVoid b), offset)
-             | isDeadBinder b  -- See Note [Dead-binder optimisation] in StgCmmExpr
+             | isDeadBinder b  -- See Note [Dead-binder optimisation] in GHC.StgToCmm.Expr
              = return Nothing
              | otherwise
              = do { emit $ mkTaggedObjectLoad dflags (idToReg dflags arg)

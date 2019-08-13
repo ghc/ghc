@@ -2509,7 +2509,7 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     // Allocation in the current block will be subtracted by
     // getThreadAllocationCounter#, so we have to offset any existing
     // allocation here.  See also openNursery/closeNursery in
-    // compiler/codeGen/StgCmmForeign.hs.
+    // GHC.StgToCmm.Foreign.
     W_ offset;
     offset = Hp - bdescr_start(CurrentNursery);
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);

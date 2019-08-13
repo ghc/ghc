@@ -27,7 +27,7 @@ import Outputable
 import SMRep
 import UniqSupply
 import CostCentre
-import StgCmmHeap
+import GHC.StgToCmm.Heap
 
 import Control.Monad
 import Data.Map (Map)

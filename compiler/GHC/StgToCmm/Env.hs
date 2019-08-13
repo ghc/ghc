@@ -7,7 +7,7 @@
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
-module StgCmmEnv (
+module GHC.StgToCmm.Env (
         CgIdInfo,
 
         litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
@@ -27,9 +27,9 @@ module StgCmmEnv (
 import GhcPrelude
 
 import TyCon
-import StgCmmMonad
-import StgCmmUtils
-import StgCmmClosure
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Closure
 
 import CLabel
 
@@ -146,7 +146,7 @@ getCgIdInfo id
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
   = do  local_binds <- getBinds
-        pprPanic "StgCmmEnv: variable not found"
+        pprPanic "GHC.StgToCmm.Env: variable not found"
                 (vcat [ppr id,
                 text "local binds for:",
                 pprUFM local_binds $ \infos ->

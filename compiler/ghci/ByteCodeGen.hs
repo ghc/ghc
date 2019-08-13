@@ -48,8 +48,8 @@ import ErrUtils
 import Unique
 import FastString
 import Panic
-import StgCmmClosure    ( NonVoid(..), fromNonVoid, nonVoidIds )
-import StgCmmLayout
+import GHC.StgToCmm.Closure    ( NonVoid(..), fromNonVoid, nonVoidIds )
+import GHC.StgToCmm.Layout
 import SMRep hiding (WordOff, ByteOff, wordsToBytes)
 import Bitmap
 import OrdList

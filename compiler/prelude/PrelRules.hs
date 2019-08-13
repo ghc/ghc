@@ -1079,7 +1079,7 @@ is:
   regardless of the evaluated-ness of their argument.
   See CoreUtils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
 
-* There is a special case for DataToTagOp in StgCmmExpr.cgExpr,
+* There is a special case for DataToTagOp in GHC.StgToCmm.Expr.cgExpr,
   that evaluates its argument and then extracts the tag from
   the returned value.
 
@@ -1146,7 +1146,7 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - PrelRules.seqRule: eliminate (seq# <whnf> s)
 
-- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+- GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
 
 - CoreUtils.exprOkForSpeculation;
   see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in CoreUtils

@@ -1,12 +1,12 @@
 -----------------------------------------------------------------------------
 --
--- Argument representations used in StgCmmLayout.
+-- Argument representations used in GHC.StgToCmm.Layout.
 --
 -- (c) The University of Glasgow 2013
 --
 -----------------------------------------------------------------------------
 
-module StgCmmArgRep (
+module GHC.StgToCmm.ArgRep (
         ArgRep(..), toArgRep, argRepSizeW,
 
         argRepString, isNonV, idArgRep,
@@ -17,7 +17,7 @@ module StgCmmArgRep (
 
 import GhcPrelude
 
-import StgCmmClosure    ( idPrimRep )
+import GHC.StgToCmm.Closure ( idPrimRep )
 
 import SMRep            ( WordOff )
 import Id               ( Id )
@@ -30,7 +30,7 @@ import Outputable
 import FastString
 
 -- I extricated this code as this new module in order to avoid a
--- cyclic dependency between StgCmmLayout and StgCmmTicky.
+-- cyclic dependency between GHC.StgToCmm.Layout and GHC.StgToCmm.Ticky.
 --
 -- NSF 18 Feb 2013
 
@@ -38,7 +38,7 @@ import FastString
 --      Classifying arguments: ArgRep
 -------------------------------------------------------------------------
 
--- ArgRep is re-exported by StgCmmLayout, but only for use in the
+-- ArgRep is re-exported by GHC.StgToCmm.Layout, but only for use in the
 -- byte-code generator which also needs to know about the
 -- classification of arguments.
 
@@ -108,7 +108,7 @@ idArgRep = toArgRep . idPrimRep
 -- This list of argument patterns should be kept in sync with at least
 -- the following:
 --
---  * StgCmmLayout.stdPattern maybe to some degree?
+--  * GHC.StgToCmm.Layout.stdPattern maybe to some degree?
 --
 --  * the RTS_RET(stg_ap_*) and RTS_FUN_DECL(stg_ap_*_fast)
 --  declarations in includes/stg/MiscClosures.h

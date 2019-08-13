@@ -185,7 +185,7 @@ STG programs after unarisation have these invariants:
 
   * DataCon applications (StgRhsCon and StgConApp) don't have void arguments.
     This means that it's safe to wrap `StgArg`s of DataCon applications with
-    `StgCmmEnv.NonVoid`, for example.
+    `GHC.StgToCmm.Env.NonVoid`, for example.
 
   * Alt binders (binders in patterns) are always non-void.
 

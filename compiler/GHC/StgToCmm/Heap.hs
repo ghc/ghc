@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmHeap (
+module GHC.StgToCmm.Heap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset,
 
@@ -24,13 +24,13 @@ import GhcPrelude hiding ((<*>))
 
 import StgSyn
 import CLabel
-import StgCmmLayout
-import StgCmmUtils
-import StgCmmMonad
-import StgCmmProf (profDynAlloc, dynProfHdr, staticProfHdr)
-import StgCmmTicky
-import StgCmmClosure
-import StgCmmEnv
+import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Prof (profDynAlloc, dynProfHdr, staticProfHdr)
+import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Env
 
 import MkGraph
 
@@ -659,7 +659,7 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- Self-recursive loop header is required by loopification optimization (See
--- Note [Self-recursive tail calls] in StgCmmExpr). We emit it if:
+-- Note [Self-recursive tail calls] in GHC.StgToCmm.Expr). We emit it if:
 --
 --  1. There is information about self-loop in the FCode environment. We don't
 --     check the binder (first component of the self_loop_info) because we are

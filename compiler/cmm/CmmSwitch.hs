@@ -32,7 +32,7 @@ import qualified Data.Map as M
 --
 -- The overall plan is:
 --  * The Stg → Cmm transformation creates a single `SwitchTargets` in
---    emitSwitch and emitCmmLitSwitch in StgCmmUtils.hs.
+--    emitSwitch and emitCmmLitSwitch in GHC.StgToCmm/Utils.hs.
 --    At this stage, they are unsuitable for code generation.
 --  * A dedicated Cmm transformation (CmmImplementSwitchPlans) replaces these
 --    switch statements with code that is suitable for code generation, i.e.

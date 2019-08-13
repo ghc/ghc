@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmForeign (
+module GHC.StgToCmm.Foreign (
   cgForeignCall,
   emitPrimCall, emitCCall,
   emitForeignCall,     -- For CmmParse
@@ -21,12 +21,12 @@ module StgCmmForeign (
 import GhcPrelude hiding( succ, (<*>) )
 
 import StgSyn
-import StgCmmProf (storeCurCCS, ccsType)
-import StgCmmEnv
-import StgCmmMonad
-import StgCmmUtils
-import StgCmmClosure
-import StgCmmLayout
+import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
+import GHC.StgToCmm.Env
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Layout
 
 import BlockId (newBlockId)
 import Cmm

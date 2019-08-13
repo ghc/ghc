@@ -6,18 +6,18 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmHpc ( initHpc, mkTickBox ) where
+module GHC.StgToCmm.Hpc ( initHpc, mkTickBox ) where
 
 import GhcPrelude
 
-import StgCmmMonad
+import GHC.StgToCmm.Monad
 
 import MkGraph
 import CmmExpr
 import CLabel
 import Module
 import CmmUtils
-import StgCmmUtils
+import GHC.StgToCmm.Utils
 import HscTypes
 import DynFlags
 

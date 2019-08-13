@@ -676,7 +676,7 @@ data StgOp
   | StgFCallOp ForeignCall Type
         -- The Type, which is obtained from the foreign import declaration
         -- itself, is needed by the stg-to-cmm pass to determine the offset to
-        -- apply to unlifted boxed arguments in StgCmmForeign. See Note
+        -- apply to unlifted boxed arguments in GHC.StgToCmm.Foreign. See Note
         -- [Unlifted boxed arguments to foreign calls]
 
 {-

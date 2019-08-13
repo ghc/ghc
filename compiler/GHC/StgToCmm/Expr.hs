@@ -8,25 +8,25 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmExpr ( cgExpr ) where
+module GHC.StgToCmm.Expr ( cgExpr ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude hiding ((<*>))
 
-import {-# SOURCE #-} StgCmmBind ( cgBind )
+import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 
-import StgCmmMonad
-import StgCmmHeap
-import StgCmmEnv
-import StgCmmCon
-import StgCmmProf (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
-import StgCmmLayout
-import StgCmmPrim
-import StgCmmHpc
-import StgCmmTicky
-import StgCmmUtils
-import StgCmmClosure
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Heap
+import GHC.StgToCmm.Env
+import GHC.StgToCmm.Con
+import GHC.StgToCmm.Prof (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
+import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Prim
+import GHC.StgToCmm.Hpc
+import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Closure
 
 import StgSyn
 
@@ -552,9 +552,9 @@ check will reset the heap usage. Slop in the heap breaks LDV profiling
 
 Note [Inlining out-of-line primops and heap checks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If shouldInlinePrimOp returns True when called from StgCmmExpr for the
+If shouldInlinePrimOp returns True when called from GHC.StgToCmm.Expr for the
 purpose of heap check placement, we *must* inline the primop later in
-StgCmmPrim. If we don't things will go wrong.
+GHC.StgToCmm.Prim. If we don't things will go wrong.
 -}
 
 -----------------
@@ -851,18 +851,18 @@ cgIdApp fun_id args = do
 --
 --   * Whenever we are compiling a function, we set that information to reflect
 --     the fact that function currently being compiled can be jumped to, instead
---     of called. This is done in closureCodyBody in StgCmmBind.
+--     of called. This is done in closureCodyBody in GHC.StgToCmm.Bind.
 --
 --   * We also have to emit a label to which we will be jumping. We make sure
 --     that the label is placed after a stack check but before the heap
 --     check. The reason is that making a recursive tail-call does not increase
 --     the stack so we only need to check once. But it may grow the heap, so we
 --     have to repeat the heap check in every self-call. This is done in
---     do_checks in StgCmmHeap.
+--     do_checks in GHC.StgToCmm.Heap.
 --
 --   * When we begin compilation of another closure we remove the additional
 --     information from the environment. This is done by forkClosureBody
---     in StgCmmMonad. Other functions that duplicate the environment -
+--     in GHC.StgToCmm.Monad. Other functions that duplicate the environment -
 --     forkLneBody, forkAlts, codeOnly - duplicate that information. In other
 --     words, we only need to clean the environment of the self-loop information
 --     when compiling right hand side of a closure (binding).

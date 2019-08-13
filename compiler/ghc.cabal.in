@@ -170,10 +170,10 @@ Library
         cbits/genSym.c
 
     hs-source-dirs:
+        .
         backpack
         basicTypes
         cmm
-        codeGen
         coreSyn
         deSugar
         ghci
@@ -291,32 +291,32 @@ Library
         PprCmmDecl
         PprCmmExpr
         Bitmap
-        CodeGen.Platform
-        CodeGen.Platform.ARM
-        CodeGen.Platform.ARM64
-        CodeGen.Platform.NoRegs
-        CodeGen.Platform.PPC
-        CodeGen.Platform.SPARC
-        CodeGen.Platform.X86
-        CodeGen.Platform.X86_64
-        CgUtils
-        StgCmm
-        StgCmmBind
-        StgCmmClosure
-        StgCmmCon
-        StgCmmEnv
-        StgCmmExpr
-        StgCmmForeign
-        StgCmmHeap
-        StgCmmHpc
-        StgCmmArgRep
-        StgCmmLayout
-        StgCmmMonad
-        StgCmmPrim
-        StgCmmProf
-        StgCmmTicky
-        StgCmmUtils
-        StgCmmExtCode
+        GHC.Platform.Regs
+        GHC.Platform.ARM
+        GHC.Platform.ARM64
+        GHC.Platform.NoRegs
+        GHC.Platform.PPC
+        GHC.Platform.SPARC
+        GHC.Platform.X86
+        GHC.Platform.X86_64
+        GHC.StgToCmm.CgUtils
+        GHC.StgToCmm
+        GHC.StgToCmm.Bind
+        GHC.StgToCmm.Closure
+        GHC.StgToCmm.Con
+        GHC.StgToCmm.Env
+        GHC.StgToCmm.Expr
+        GHC.StgToCmm.Foreign
+        GHC.StgToCmm.Heap
+        GHC.StgToCmm.Hpc
+        GHC.StgToCmm.ArgRep
+        GHC.StgToCmm.Layout
+        GHC.StgToCmm.Monad
+        GHC.StgToCmm.Prim
+        GHC.StgToCmm.Prof
+        GHC.StgToCmm.Ticky
+        GHC.StgToCmm.Utils
+        GHC.StgToCmm.ExtCode
         SMRep
         CoreArity
         CoreFVs

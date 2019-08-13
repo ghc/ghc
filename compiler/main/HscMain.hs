@@ -124,7 +124,7 @@ import SimplCore
 import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
-import qualified StgCmm ( codeGen )
+import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -1412,7 +1412,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         withTiming (pure dflags)
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
-            cmms <- {-# SCC "StgCmm" #-}
+            cmms <- {-# SCC "StgToCmm" #-}
                             doCodeGen hsc_env this_mod data_tycons
                                 cost_centre_info
                                 stg_binds hpc_info
@@ -1507,8 +1507,8 @@ doCodeGen hsc_env this_mod data_tycons
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
     let cmm_stream :: Stream IO CmmGroup ()
-        cmm_stream = {-# SCC "StgCmm" #-}
-            StgCmm.codeGen dflags this_mod data_tycons
+        cmm_stream = {-# SCC "StgToCmm" #-}
+            StgToCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new

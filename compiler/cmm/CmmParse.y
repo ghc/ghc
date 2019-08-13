@@ -204,21 +204,21 @@ module CmmParse ( parseCmmFile ) where
 
 import GhcPrelude
 
-import StgCmmExtCode
+import GHC.StgToCmm.ExtCode
 import CmmCallConv
-import StgCmmProf
-import StgCmmHeap
-import StgCmmMonad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit, emitStore
-                          , emitAssign, emitOutOfLine, withUpdFrameOff
-                          , getUpdFrameOff )
-import qualified StgCmmMonad as F
-import StgCmmUtils
-import StgCmmForeign
-import StgCmmExpr
-import StgCmmClosure
-import StgCmmLayout     hiding (ArgRep(..))
-import StgCmmTicky
-import StgCmmBind       ( emitBlackHoleCode, emitUpdateFrame )
+import GHC.StgToCmm.Prof
+import GHC.StgToCmm.Heap
+import GHC.StgToCmm.Monad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit
+                               , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff
+                               , getUpdFrameOff )
+import qualified GHC.StgToCmm.Monad as F
+import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Foreign
+import GHC.StgToCmm.Expr
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Layout     hiding (ArgRep(..))
+import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
 import CoreSyn          ( Tickish(SourceNote) )
 
 import CmmOpt
