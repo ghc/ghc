@@ -1303,7 +1303,6 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     build_newtype (ty, dc) x = do
       -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
       y <- mkPmId ty
-      pprTrace "build_newtype" (ppr x <+> ppr (idType x) $$ ppr y <+> ppr (idType y)) (return ())
       pure (y, TVC y (mkPmExprData dc [x]))
 
     build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmVarCt])
