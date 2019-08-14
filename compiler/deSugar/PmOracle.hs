@@ -237,6 +237,10 @@ mkOneConFull res_ty con = do
         -- un-normalised res_ty.
         -- See Note [Pattern synonym result type] in PatSyn
         PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
+                            -- T11336b has a universal tyvar 's' not mentioned
+                            -- in the PatSyn's con_res_ty, so we need to make
+                            -- sure all univ_tvs are in scope.
+                            `extendTCvInScopeList` univ_tvs
   -- Instantiate fresh existentials as arguments to the contructor
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let arg_tys' = substTys subst arg_tys
