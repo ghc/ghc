@@ -76,7 +76,7 @@ module HscMain
       -- hscFileFrontEnd in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule'
     , getHscEnv
-    , hscSimpleIface' --, hscNormalIface'
+    , hscSimpleIface'
     , oneShotMsg
     , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
     , ioMsgMaybe
@@ -716,9 +716,10 @@ genericHscFrontend' mod_summary
 -- Compilers
 --------------------------------------------------------------
 
--- Compile Haskell/boot in OneShot mode, but used by
--- both OneShot and batch mode.
--- Does NOT create an interface file.
+-- | Used by both OneShot and batch mode.
+-- Runs the pipeline HsSyn and Core parts of the pipeline
+-- either returning a HomeModInfo if we are done at that point
+-- or a function to build one if the backend also has to be run.
 hscIncrementalCompile :: Bool
                       -> Maybe TcGblEnv
                       -> Maybe Messager
@@ -781,23 +782,20 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Right (FrontendTypecheck tc_result, mb_old_hash) ->
             finish mod_summary tc_result mb_old_hash
 
--- Runs the post-typechecking frontend (desugar and simplify),
--- and then generates and returns the interface. We want
--- to generate most of the interface AFTER simplification so we can get
--- as up-to-date and good unfoldings and other info as possible
--- in the interface file.
--- However we might extend the interface further during actual code gen.
-
 
 -- Runs the post-typechecking frontend (desugar and simplify).
--- We want to generate most of the interface as late as possible
--- so we can get as up-to-date and good unfoldings and other info as possible
+-- We want to generate most of the interface as late as possible.
+-- This gets us up-to-date and good unfoldings and other info
 -- in the interface file.
 -- We might create a interface right away, in which case we also return the
--- updated HomeModInfo. But we might also run the backend (Stg->Cmm) first.
--- In the later case HomeModInfo will be zero, and Status will be HscRecomp.
--- HscRecomp in return will carry the information required to compute
--- HomeModeInfo (as well as info for the code generator)
+-- updated HomeModInfo. But we might also need to run the backend first.
+-- In the later case Status will be HscRecomp and we return a function
+-- from ModIface -> HomeModInfo.
+-- HscRecomp in turn will carry the information required to compute
+-- a interface when passed the result of the code generator.
+-- So all this can and is done at the call site of the backend code gen
+-- if it is run.
+
 
 finish :: HasDebugCallStack
        => ModSummary
@@ -851,15 +849,12 @@ finish summary tc_result mb_old_hash = do
                     -- info has been set. Not yet clear if it matters waiting
                     -- until after code output.
                     -- This captures hsc_env, we might get away with keeping
-                    -- less of the environment alive here.
+                    -- less of the environment alive here but don't do so currently.
 
                     res <-  {-# SCC "MkFinalIface" #-}
                             mkIface hsc_env mb_old_hash details desugared_guts cg_info
-
                     dumpIfaceStats hsc_env
-
                     return res
-                    -- TODO: Should we also write the iface here?
 
             return (HscRecomp cg_guts summary iface_gen,
                     Right $ \iface -> HomeModInfo { hm_details = details
@@ -867,26 +862,18 @@ finish summary tc_result mb_old_hash = do
                                 , hm_linkable = Nothing})
     else mk_simple_iface
 
-  -- return
-  --   ( hsc_status
-  --   , HomeModInfo
-  --     {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
-
 {- Note [Writing interface files]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We write interface files in HscMain.hs and DriverPipeline.hs
-using hscMaybeWriteIface but try to only write them once per compilation.
-In practice this means:
+using hscMaybeWriteIface, but only once per compilation (twice with dynamic-too).
 
 * If a compilation does NOT require recompilation of the hard code
-  we write it in HscMain:finish.
+  we call hscMaybeWriteIface inside HscMain:finish.
 * If we run in One Shot mode and target bytecode we write it in compileOne'
 * Otherwise we must be compiling to regular hard code and require recompilation.
-  In this case we write interface files inside RunPhase.
-
-For dynamic-too to work properly we have to do: What exactly?
-
+  In this case we write interface files inside RunPhase using the interface
+  generator contained inside the HscRecomp status.
 
 -}
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
@@ -1417,8 +1404,10 @@ hscWriteIface dflags iface no_change mod_location = do
         -- TODO: We should do a no_change check for the dynamic
         --       interface file too
         -- When we generate iface files after core
-        let dynIfaceFile = buildIfName ifaceBaseFile (dynHiSuf dflags)
-            dynDflags = dynamicTooMkDynamicDynFlags dflags
+        let dynDflags = dynamicTooMkDynamicDynFlags dflags
+            -- dynDflags will have set hiSuf correctly.
+            dynIfaceFile = buildIfName ifaceBaseFile (hiSuf dynDflags)
+
         writeIfaceFile dynDflags dynIfaceFile iface
   where
     buildIfName :: String -> String -> String
@@ -1499,8 +1488,9 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, stream_result)
 
-        -- Only external names are actually visible to codeGen
-        -- which we can't recompute easily
+        -- Only external names are actually visible to codeGen.
+        -- So they are the only ones we care about. `exportLF` filters
+        -- a few more we can recompute easily via their types.
 
         let infoToExport = filter (exportLF . snd) .
                            filter (isExternalName . fst) .

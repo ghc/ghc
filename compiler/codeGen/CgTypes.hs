@@ -38,9 +38,13 @@ which only becomes obvious during code generation.
 One of these cases is the information required to tag or enter
 a reference via the fast path. This info is contained in LambdaFormInfo.
 
-This allows us to generate
+This allows the code generate to decide on an accurate call pattern
+potentially avoiding slow calls. It also allows us to tag references
+to constructors correctly avoiding the need to enter their closure.
 
-
+The information is gathered while running the backend inside the stream.
+Once the stream has run we write out the information into interface files
+as usual.
 
 -}
 
@@ -49,7 +53,10 @@ This allows us to generate
 -----------------------------------------------------------------------------
 
 -- | Information about imported things coming from interface files.
+--   A map for faster lookup.
 type CgIfaceInfo = NameEnv LambdaFormInfo
+-- | The information in list form as it will be writting to the interface
+--   file.
 type CgIfaceInfoList = [(Name,LambdaFormInfo)]
 
 -- | Recursivity Flag
@@ -78,7 +85,8 @@ data LfValueFlag = Value            -- ^ Definitely a value (eg. Nothing)
 -- Information about an identifier, from the code generator's point of
 -- view.  Every identifier is bound to a LambdaFormInfo in the
 -- environment, which gives the code generator enough info to be able to
--- tail call or return that identifier.
+-- tail call or return that identifier. We also share this view via interface
+-- files for exported ids.
 
 data LambdaFormInfo
   = LFReEntrant         -- ^ Reentrant closure (a function)
@@ -117,6 +125,7 @@ data LambdaFormInfo
   | LFLetNoEscape       -- See LetNoEscape module for precise description
   deriving (Eq)
 
+-- | Force fields of LambdaFormInfo into whnf.
 whnfLF :: LambdaFormInfo -> ()
 whnfLF LFLetNoEscape = ()
 whnfLF LFUnlifted = ()
@@ -125,10 +134,9 @@ whnfLF (LFCon !_a1) = ()
 whnfLF (LFThunk !_a1 _ _ _ _) = ()
 whnfLF LFReEntrant { lf_arg_desc = !_a1 } = ()
 
-
-
-
-
+-- | Should we export this info?
+-- There is no point in exporting LFUnlifted,
+-- it is easily recreated based on an ids type.
 exportLF :: LambdaFormInfo -> Bool
 exportLF LFUnlifted     = False
 exportLF _              = True

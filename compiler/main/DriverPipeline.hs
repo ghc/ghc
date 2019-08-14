@@ -81,7 +81,6 @@ import Data.IORef
 
 import Data.Time        ( UTCTime )
 
-
 -- ---------------------------------------------------------------------------
 -- Pre-process
 
@@ -213,8 +212,8 @@ compileOne' m_tc_result mHscMessage
             let linkable = LM o_time this_mod [DotO object_filename]
             return (expectHm hmi0) { hm_linkable = Just linkable }
         (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
-            -- In interpreted mode the codeGen backend is not run so we generate
-            -- a interface with a codeGen info of Nothing.
+            -- In interpreted mode the regular codeGen backend is not run
+            -- so we generate a interface without codeGen info.
             (iface, no_change) <- iface_gen Nothing
             -- If we interpret the code, then we can write the interface file here.
             liftIO $ hscMaybeWriteIface dflags iface no_change
@@ -327,11 +326,14 @@ compileOne' m_tc_result mHscMessage
                                              HscInterpreted -> True
                                              _ -> False
 
+       --
        expectHm (Left x)= x
-       expectHm (Right _) = error "Failedsagfafsdg"
+       expectHm (Right _) =
+            panic "hscIncrementalCompile should return a HomeMod for this status"
 
        expectHmBuilder iface (Right f) = f iface
-       expectHmBuilder _ (Left _) = error "Not builder"
+       expectHmBuilder _ (Left _) =
+            error "hscIncrementalCompile should return a function for this status"
 
 
 -----------------------------------------------------------------------------
@@ -758,27 +760,13 @@ pipeLoop phase input_fn = do
      -> do liftIO $ debugTraceMsg dflags 4
                                   (text "Running phase" <+> ppr phase)
 
-          --  (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
-          --  case phase of
-          --      HscOut {} -> do
-          --          r <- pipeLoop next_phase output_fn
-          --          whenGeneratingDynamicToo dflags $ do
-          --              setDynFlags $ dynamicTooMkDynamicDynFlags dflags
-          --              -- TODO shouldn't ignore result:
-          --              _ <- pipeLoop phase input_fn
-          --              return ()
-          --          return r
-          --      _ -> do
-          --          r <- pipeLoop next_phase output_fn
-          --          return r
-
-
-
            (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
            case phase of
                HscOut {} -> do
-                   -- We unset Opt_BuildDynamicToo for the backend,
-                   -- it makes no use of it and is instead run twice.
+                   -- We don't pass Opt_BuildDynamicToo to the backend
+                   -- in DynFlags.
+                   -- Instead it's run twice with flags accordingly set
+                   -- per run.
                    let noDynToo = pipeLoop next_phase output_fn
                    let dynToo = do
                           setDynFlags $ gopt_unset dflags Opt_BuildDynamicToo
@@ -1202,8 +1190,6 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
 
                     (iface, no_change) <- liftIO $ iface_gen (Just cgInfoExported)
 
-                    -- let iface' = addIfaceCgIfaceInfo iface cgInfoExported
-
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
                     liftIO $ hscMaybeWriteIface if_dflags iface no_change
@@ -1215,7 +1201,6 @@ runPhase (HscOut src_flavour mod_name result ) _ dflags = do
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     return (RealPhase next_phase, outputFilename)
-
 
 -----------------------------------------------------------------------------
 -- Cmm phase

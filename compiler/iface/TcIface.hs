@@ -1854,7 +1854,6 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 
 -- Forcing the LambdaForms:
 
--- If we don't force the
 -- We also force the LambaForms to WHNF.Otherwise they end up keeping
 -- the ILFInfos alive.
 
@@ -1872,7 +1871,6 @@ tcStandardFormInfo (IfStandardFormInfo w)
       | otherwise = SelectorThunk
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
--- tcLFInfo _ = return $ LFUnknown True
 tcLFInfo (ILFReEntrant oneshot rep fvs_flag) = do
     return $! LFReEntrant TopLevel (oneshot) (rep) fvs_flag (ArgUnknown)
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
