@@ -79,14 +79,10 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, uint32_t size )
  * used to avoid recursion between checking PAPs and checking stack
  * chunks.
  */
-
 static void
 checkClosureShallow( const StgClosure* p )
 {
-    const StgClosure *q;
-
-    q = UNTAG_CONST_CLOSURE(p);
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(UNTAG_CONST_CLOSURE(p)));
 }
 
 // check an individual stack object
@@ -223,6 +219,7 @@ checkClosureProfSanity(const StgClosure *p)
 }
 #endif
 
+// Returns closure size in words
 StgOffset
 checkClosure( const StgClosure* p )
 {
@@ -464,11 +461,9 @@ checkClosure( const StgClosure* p )
 
 void checkHeapChain (bdescr *bd)
 {
-    StgPtr p;
-
     for (; bd != NULL; bd = bd->link) {
         if(!(bd->flags & BF_SWEPT)) {
-            p = bd->start;
+            StgPtr p = bd->start;
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
@@ -511,27 +506,42 @@ checkLargeObjects(bdescr *bd)
 static void
 checkCompactObjects(bdescr *bd)
 {
-    // Compact objects are similar to large objects,
-    // but they have a StgCompactNFDataBlock at the beginning,
-    // before the actual closure
+    // Compact objects are similar to large objects, but they have a
+    // StgCompactNFDataBlock at the beginning, before the actual closure
 
     for ( ; bd != NULL; bd = bd->link) {
-        StgCompactNFDataBlock *block, *last;
-        StgCompactNFData *str;
-        StgWord totalW;
-
         ASSERT(bd->flags & BF_COMPACT);
 
-        block = (StgCompactNFDataBlock*)bd->start;
-        str = block->owner;
+        StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
+        StgCompactNFData *str = block->owner;
         ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
-        totalW = 0;
+        StgWord totalW = 0;
+        StgCompactNFDataBlock *last;
         for ( ; block ; block = block->next) {
             last = block;
             ASSERT(block->owner == str);
 
             totalW += Bdescr((P_)block)->blocks * BLOCK_SIZE_W;
+
+            StgPtr start = Bdescr((P_)block)->start + sizeofW(StgCompactNFDataBlock);
+            StgPtr free;
+            if (Bdescr((P_)block)->start == (P_)str->nursery) {
+                free = str->hp;
+            } else {
+                free = Bdescr((P_)block)->free;
+            }
+            StgPtr p = start;
+            while (p < free)  {
+                // We can't use checkClosure() here because in
+                // compactAdd#/compactAddWithSharing# when we see a non-
+                // compactable object (a function, mutable object, or pinned
+                // object) we leave the location for the object in the payload
+                // empty.
+                StgClosure *c = (StgClosure*)p;
+                checkClosureShallow(c);
+                p += closure_sizeW(c);
+            }
         }
 
         ASSERT(str->totalW == totalW);
