@@ -223,9 +223,7 @@ mkOneConFull res_ty con = do
             -- representation data type. We need to "translate" tc_args
             -- accordingly.
             | (_rep_tc, tc_args', _) <- tcLookupDataFamInst env tc tc_args
-            -- Just a sanity check that res_ty is actually compatible with con
-            -> ASSERT( _rep_tc == fst (splitTyConApp con_res_ty) )
-               zipTvSubst univ_tvs tc_args'
+            -> zipTvSubst univ_tvs tc_args'
           Nothing
             -- This hits for e.g. T11336b, where we have an app like @s a@.
             -- I hope this does the right thing. Since s can't be data family
