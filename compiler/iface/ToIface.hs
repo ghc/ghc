@@ -77,7 +77,8 @@ import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
 
--- import Data.Bits
+import Data.Bits
+import Data.Word
 -- import PackedFlags
 
 ----------------
@@ -671,12 +672,28 @@ outside of the hs-boot loop.
 ************************************************************************
 -}
 
+toIfStandardFormInfo :: StandardFormInfo -> IfStandardFormInfo
+toIfStandardFormInfo (NonStandardThunk) = IfStandardFormInfo 1
+toIfStandardFormInfo sf =
+    IfStandardFormInfo $
+      (tag sf) .|. (encodeField (field sf))
+  where tag (SelectorThunk {})  = 0
+        tag (ApThunk {})        = 2 -- setBit 0 1
+        field (SelectorThunk n) = n
+        field (ApThunk n)       = n
+        encodeField n =
+          let wn = fromIntegral n :: Word
+              shifted = n `unsafeShiftL` 2
+          in ASSERT(shifted < fromIntegral (maxBound :: Word16))
+             (fromIntegral shifted :: Word16)
+
+
 toIfLFInfo :: LambdaFormInfo -> IfLFInfo
 toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
     -- ASSERT(rep <= (2 ^ (14 :: Int) - 1) && fromEnum oneshot <= 1 && fromEnum fvs <= 1)
     -- let rep' = fromIntegral rep :: SizedInt 14
     -- in
-     ILFReEntrant (fromIntegral $ fromEnum oneshot,rep,fvs_flag)
+     ILFReEntrant oneshot rep fvs_flag
 
 toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
     ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)

@@ -4,7 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -24,7 +24,7 @@ module IfaceSyn (
         IfaceCompleteMatch(..),
 
         -- * CodeGen Information
-        IfLFInfo(..),
+        IfLFInfo(..), IfStandardFormInfo(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -562,14 +562,17 @@ TODO:
   to ensure there is an unfolding.
 -}
 
+newtype IfStandardFormInfo = IfStandardFormInfo Word16 deriving Binary
+
 data IfLFInfo =
     -- | We encode the fields bitwise:
     --    bit 0: OneShotInfo
     --    bit 1: no fvs
     --    bit 2-15 arity
     ILFReEntrant
-        (Word8,RepArity,Bool)
-        -- !Word32
+        OneShotInfo
+        RepArity
+        Bool
 
         -- TopLevelFlag => Implied true
         -- !OneShotInfo    -- => Not currently used by codegen, but we store it just in case
@@ -1404,8 +1407,8 @@ instance Outputable IfaceUnfolding where
                                 2 (sep (map pprParendIfaceExpr es))
 
 instance Outputable IfLFInfo where
-    ppr (ILFReEntrant fields) =
-        text "LFReEntrant" <+> ppr fields
+    ppr (ILFReEntrant oneshot rep fvs_flag) =
+        text "LFReEntrant" <+> ppr (oneshot, rep, fvs_flag)
         -- text "LFReEntrant" <> brackets (ppr oneshot <+>
         --                                 ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
       where
@@ -2433,9 +2436,11 @@ instance Binary IfaceCompleteMatch where
 instance Binary IfLFInfo where
     -- TODO: We could pack the bytes somewhat
 
-    put_ bh (ILFReEntrant fields) =
+    put_ bh (ILFReEntrant oneshot rep fvs_flag) =
         putByte bh 0 >>
-        put_ bh (fields :: (Word8, RepArity, Bool))
+        put_ bh oneshot >>
+        put_ bh rep >>
+        put_ bh fvs_flag
     put_ bh (ILFThunk encoded_flds sfi) =
         putByte bh 1 >>
         put_ bh (encoded_flds :: (Bool, Bool, Bool)) >>
@@ -2448,7 +2453,7 @@ instance Binary IfLFInfo where
     get bh = do
         tag <- getByte bh
         case tag of
-            0 -> pure ILFReEntrant <*> (get bh :: IO (Word8, RepArity, Bool))
+            0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh
             1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted

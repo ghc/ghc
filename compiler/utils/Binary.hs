@@ -1252,3 +1252,13 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
+
+instance Binary OneShotInfo where
+  put_ bh NoOneShotInfo = putByte bh 0
+  put_ bh OneShotLam = putByte bh 1
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> return NoOneShotInfo
+      1 -> return OneShotLam
+      _ -> panic "Binary:Invalid byte"
