@@ -39,7 +39,7 @@ module HscMain
     , Messager, batchMsg
     , HscStatus (..)
     , hscIncrementalCompile
-    , hscMaybeWriteIface, addIfaceCgIfaceInfo
+    , hscMaybeWriteIface
     , hscCompileCmmFile
 
     , hscGenHardCode
@@ -898,14 +898,6 @@ hscMaybeWriteIface dflags iface no_change location =
                             _               -> True
     in when (write_interface || force_write_interface) $
             hscWriteIface dflags iface no_change location
-
--- | Update information produced by codeGen in the iface.
-addIfaceCgIfaceInfo :: ModIface -> [(Name,LambdaFormInfo)] -> ModIface
-addIfaceCgIfaceInfo core_iface lf_info =
-  let infos = mapSnd cgInfoToIfaceCgInfo lf_info
-      sorted = sortBy (\x y -> stableNameCmp (fst x) (fst y) ) infos
-  in
-  core_iface { mi_lf_info = Just sorted }
 
 --------------------------------------------------------------
 -- NoRecomp handlers

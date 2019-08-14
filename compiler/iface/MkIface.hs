@@ -662,8 +662,24 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        dep_finsts (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/commentary/compiler/recompilation-avoidance
-                       mi_trust iface0)
-                        -- Make sure change of Safe Haskell mode causes recomp.
+                       mi_trust iface0,
+                       -- Make sure change of Safe Haskell mode causes recomp.
+                       mi_lf_info iface0)
+                       -- Include cg info so that dependent modules are recompiled
+                       -- with the new info on change.
+                       -- See Note [Export hash depends on codegen info]
+
+   -- Note [Export hash depends on codegen info]
+   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  --  If module X imports a definition from A
+  --  we must ensure X is recompiled if A changes
+  --  the codegen info of it's exported bindings.
+  --
+  --  Otherwise a definition might change and e.g. no
+  --  longer require a slowcall, and as such we won't
+  --  have a _slow entry label. But X might still assume
+  --  otherwise and try to jump to that one leading to a
+  --  linker error (or worse!).
 
    -- Note [Export hash depends on non-orphan family instances]
    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -715,12 +731,10 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - flag abi hash
-   --   - exported cg info
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0,
-                       mi_lf_info iface0)
+                       mi_warns iface0)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
