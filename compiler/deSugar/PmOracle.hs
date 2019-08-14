@@ -395,7 +395,7 @@ data TopNormaliseTypeResult
   -- ^ 'tcNormalise' was able to simplify the type with some local constraint
   -- from the type oracle, but 'topNormaliseTypeX' couldn't identify a type
   -- redex.
-  | HadRedexes Type [DataCon] Type
+  | HadRedexes Type [(Type, DataCon)] Type
   -- ^ 'tcNormalise' may or may not been able to simplify the type, but
   -- 'topNormaliseTypeX' made progress either way and got rid of at least one
   -- outermost type or data family redex or newtype.
@@ -407,6 +407,8 @@ data TopNormaliseTypeResult
   -- Core (modulo casts).
   -- The second field is the list of Newtype 'DataCon's that we looked through
   -- in the chain of reduction steps between the Source type and the Core type.
+  -- We also keep the type of the DataCon application, so that we don't have to
+  -- reconstruct it in inhabitationCandidates.build_newtype.
 
 -- | Just give me the potentially normalised source type, unchanged or not!
 normalisedSourceType :: TopNormaliseTypeResult -> Type
@@ -480,18 +482,19 @@ pmTopNormaliseType ty_cs typ
 
     -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
     -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
-    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[DataCon] -> [DataCon])
+    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[(Type, DataCon)] -> [(Type, DataCon)])
     newTypeStepper rec_nts tc tys
       | Just (ty', _co) <- instNewTyCon_maybe tc tys
+      , let orig_ty = TyConApp tc tys
       = case checkRecTc rec_nts tc of
-          Just rec_nts' -> let tyf = ((TyConApp tc tys):)
-                               tmf = ((tyConSingleDataCon tc):)
+          Just rec_nts' -> let tyf = (orig_ty:)
+                               tmf = ((orig_ty, tyConSingleDataCon tc):)
                            in  NS_Step rec_nts' ty' (tyf, tmf)
           Nothing       -> NS_Abort
       | otherwise
       = NS_Done
 
-    tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
+    tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], a -> a)
     tyFamStepper env rec_nts tc tys  -- Try to step a type/data family
       = let (_args_co, ntys, _res_co) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
@@ -557,9 +560,9 @@ then
   (a) src_ty is the rewritten type which we can show to the user. That is, the
       type we get if we rewrite type families but not data families or
       newtypes.
-  (b) dcs is the list of data constructors "skipped", every time we normalise a
-      newtype to its core representation, we keep track of the source data
-      constructor.
+  (b) dcs is the list of newtype constructors "skipped", every time we normalise
+      a newtype to its core representation, we keep track of the source data
+      constructor and the type we unwrap.
   (c) core_ty is the rewritten type. That is,
         pmTopNormaliseType env ty_cs ty = Just (src_ty, dcs, core_ty)
       implies
@@ -583,7 +586,7 @@ To see how all cases come into play, consider the following example:
 
 In this case pmTopNormaliseType env ty_cs (F Int) results in
 
-  Just (G2, [MkG2,MkG1], R:TInt)
+  Just (G2, [(G2,MkG2),(G1,MkG1)], R:TInt)
 
 Which means that in source Haskell:
   - G2 is equivalent to F Int (in contrast, G1 isn't).
@@ -1298,18 +1301,20 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
                           , intTyCon, wordTyCon, word8TyCon ]
 
-    build_newtype :: DataCon -> Id -> DsM (Id, TmVarCt)
-    build_newtype dc x = do
-      y <- mkPmId (mkTyConApp (dataConTyCon dc) [idType x])
+    build_newtype :: (Type, DataCon) -> Id -> DsM (Id, TmVarCt)
+    build_newtype (ty, dc) x = do
+      -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
+      y <- mkPmId ty
+      pprTrace "build_newtype" (ppr x <+> ppr (idType x) $$ ppr y <+> ppr (idType y)) (return ())
       pure (y, TVC y (mkPmExprData dc [x]))
 
-    build_newtypes :: Id -> [DataCon] -> DsM (Id, [TmVarCt])
+    build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmVarCt])
     build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
       where
         go dc x cts = second (:cts) <$> build_newtype dc x
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType
-    alts_to_check :: Type -> Type -> [DataCon]
+    alts_to_check :: Type -> Type -> [(Type, DataCon)]
                   -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
       Just (tc, _)
@@ -1467,8 +1472,8 @@ definitelyInhabitedType ty_cs ty = do
            HadRedexes _ cons _ -> any meets_criteria cons
            _                   -> False
   where
-    meets_criteria :: DataCon -> Bool
-    meets_criteria con =
+    meets_criteria :: (Type, DataCon) -> Bool
+    meets_criteria (_, con) =
       null (dataConEqSpec con) && -- (1)
       null (dataConImplBangs con) -- (2)
 
