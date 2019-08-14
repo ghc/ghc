@@ -194,6 +194,7 @@ cmmLlvmGen _ = return ()
 
 cmmMetaLlvmPrelude :: LlvmM ()
 cmmMetaLlvmPrelude = do
+  stgTBAA <- undefined --getStgTBAA
   metas <- flip mapM stgTBAA $ \(uniq, name, parent) -> do
     -- Generate / lookup meta data IDs
     tbaaId <- getMetaUniqueId

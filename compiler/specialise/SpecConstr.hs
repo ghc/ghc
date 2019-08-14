@@ -61,6 +61,8 @@ import Module
 import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
 import Data.Ord( comparing )
+import qualified Data.Map as Map
+import Annotations
 
 {-
 -----------------------------------------------------
@@ -843,7 +845,7 @@ data ScEnv = SCE { sc_dflags    :: DynFlags,
                         -- but NOT (Just (expensive v))
                         -- See Note [Work-free values only in environment]
 
-                   sc_annotations :: UniqFM SpecConstrAnnotation
+                   sc_annotations :: Map.Map (AnnTarget Name) SpecConstrAnnotation
              }
 
 ---------------------
@@ -860,7 +862,7 @@ instance Outputable Value where
    ppr LambdaVal         = text "<Lambda>"
 
 ---------------------
-initScEnv :: DynFlags -> Module -> UniqFM SpecConstrAnnotation -> ScEnv
+initScEnv :: DynFlags -> Module -> Map.Map (AnnTarget Name) SpecConstrAnnotation -> ScEnv
 initScEnv dflags this_mod anns
   = SCE { sc_dflags      = dflags,
           sc_module      = this_mod,
@@ -1010,7 +1012,7 @@ ignoreType env ty
 
 ignoreTyCon :: ScEnv -> TyCon -> Bool
 ignoreTyCon env tycon
-  = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
+  = Map.lookup (NamedTarget (getName tycon)) (sc_annotations env) == Just NoSpecConstr
 
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
@@ -1025,7 +1027,7 @@ forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
   , tycon /= funTyCon
       = tyConName tycon == specTyConName
-        || lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
+        || Map.lookup (NamedTarget (getName tycon)) (sc_annotations env) == Just ForceSpecConstr
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False

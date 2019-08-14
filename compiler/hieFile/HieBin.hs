@@ -76,7 +76,7 @@ data HieSymbolTable = HieSymbolTable
 
 data HieDictionary = HieDictionary
   { hie_dict_next :: !FastMutInt -- The next index to use
-  , hie_dict_map  :: !(IORef (UniqFM (Int,FastString))) -- indexed by FastString
+  , hie_dict_map  :: !(IORef (FastStringEnv (Int,FastString))) -- indexed by FastString
   }
 
 initBinMemSize :: Int
@@ -126,7 +126,7 @@ writeHieFile hie_file_path hiefile = do
                       hie_symtab_map  = symtab_map }
   dict_next_ref <- newFastMutInt
   writeFastMutInt dict_next_ref 0
-  dict_map_ref <- newIORef emptyUFM
+  dict_map_ref <- newIORef emptyFsEnv
   let hie_dict = HieDictionary {
                       hie_dict_next = dict_next_ref,
                       hie_dict_map  = dict_map_ref }
@@ -280,14 +280,13 @@ putFastString HieDictionary { hie_dict_next = j_r,
                               hie_dict_map  = out_r}  bh f
   = do
     out <- readIORef out_r
-    let unique = getUnique f
-    case lookupUFM out unique of
+    case lookupFsEnv out f of
         Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
         Nothing -> do
            j <- readFastMutInt j_r
            put_ bh (fromIntegral j :: Word32)
            writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out unique (j, f)
+           writeIORef out_r $! extendFsEnv out f (j, f)
 
 putSymbolTable :: BinHandle -> Int -> UniqFM (Int,HieName) -> IO ()
 putSymbolTable bh next_off symtab = do

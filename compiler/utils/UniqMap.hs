@@ -10,7 +10,7 @@
 --
 -- Key preservation is right-biased.
 module UniqMap (
-    UniqMap,
+    UniqMap(..),
     emptyUniqMap,
     isNullUniqMap,
     unitUniqMap,
@@ -31,6 +31,7 @@ module UniqMap (
     plusUniqMapList,
     minusUniqMap,
     intersectUniqMap,
+    intersectUniqMap_C,
     disjointUniqMap,
     mapUniqMap,
     filterUniqMap,
@@ -41,7 +42,12 @@ module UniqMap (
     lookupWithDefaultUniqMap,
     anyUniqMap,
     allUniqMap,
-    -- Non-deterministic functions omitted
+    pprUniqMap,
+    -- Non-deterministic functions
+    nonDetEltsUniqMap,
+    nonDetEltsUniqMap_K,
+    nonDetFoldUniqMap
+
 ) where
 
 import GhcPrelude
@@ -69,9 +75,12 @@ instance Monoid (UniqMap k a) where
     mappend = (Semi.<>)
 
 instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
-    ppr (UniqMap m) =
-        brackets $ fsep $ punctuate comma $
-        [ ppr k <+> text "->" <+> ppr v
+    ppr m = pprUniqMap ppr m
+
+pprUniqMap :: Outputable k => (a -> SDoc) -> UniqMap k a -> SDoc
+pprUniqMap f (UniqMap m) =
+    brackets $ fsep $ punctuate comma $
+        [ ppr k <+> text "->" <+> f v
         | (k, v) <- eltsUFM m ]
 
 liftC :: (a -> a -> a) -> (k, a) -> (k, a) -> (k, a)
@@ -174,6 +183,9 @@ minusUniqMap (UniqMap m1) (UniqMap m2) = UniqMap $ minusUFM m1 m2
 intersectUniqMap :: UniqMap k a -> UniqMap k b -> UniqMap k a
 intersectUniqMap (UniqMap m1) (UniqMap m2) = UniqMap $ intersectUFM m1 m2
 
+intersectUniqMap_C :: (a -> b -> c) -> UniqMap k a -> UniqMap k b -> UniqMap k c
+intersectUniqMap_C f (UniqMap m1) (UniqMap m2) = UniqMap $ intersectUFM_C (\(k1, m) (_, n) -> (k1, f m n)) m1 m2
+
 disjointUniqMap :: UniqMap k a -> UniqMap k b -> Bool
 disjointUniqMap (UniqMap m1) (UniqMap m2) = disjointUFM m1 m2
 
@@ -204,3 +216,12 @@ anyUniqMap f (UniqMap m) = anyUFM (f . snd) m
 
 allUniqMap :: (a -> Bool) -> UniqMap k a -> Bool
 allUniqMap f (UniqMap m) = allUFM (f . snd) m
+
+nonDetEltsUniqMap :: UniqMap k a -> [a]
+nonDetEltsUniqMap (UniqMap m) = map snd . nonDetEltsUFM $ m
+
+nonDetEltsUniqMap_K :: UniqMap k a -> [(k, a)]
+nonDetEltsUniqMap_K (UniqMap m) = nonDetEltsUFM $ m
+
+nonDetFoldUniqMap :: (a -> b -> b) -> b -> UniqMap k a -> b
+nonDetFoldUniqMap k a (UniqMap m) =  nonDetFoldUFM (\(_, c) d -> k c d) a m

@@ -64,7 +64,6 @@ import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
 
-import Unique           ( mkVarOccUnique )
 
 {-
 ************************************************************************
@@ -2127,7 +2126,7 @@ getMonadFailOp
         (failExpr, failFvs) <- lookupSyntaxName failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
         let arg_lit = mkVarOcc "arg"
-        arg_name <- newSysName arg_occ
+        arg_name <- newSysName arg_lit
         let arg_syn_expr = mkRnSyntaxExpr arg_name
             body :: LHsExpr GhcRn =
               nlHsApp (noLoc $ syn_expr failExpr)

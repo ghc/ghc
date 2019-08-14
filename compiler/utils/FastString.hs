@@ -1,7 +1,7 @@
 -- (c) The University of Glasgow, 1997-2006
 
 {-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples,
-    GeneralizedNewtypeDeriving #-}
+    GeneralizedNewtypeDeriving, RecordWildCards #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -62,7 +62,6 @@ module FastString
         zEncodeFS,
 
         -- ** Operations
-        uniqueOfFS,
         lengthFS,
         nullFS,
         appendFS,
@@ -73,12 +72,17 @@ module FastString
         nilFS,
         isUnderscoreFS,
 
+        -- ** Class
+        HasFastString(..),
+
         -- ** Outputing
         hPutFS,
 
         -- ** Internal
         getFastStringTable,
+        fastStringGcCounter,
         hasZEncoding,
+        uniqueOfFS,
 
         -- * PtrStrings
         PtrString (..),
@@ -133,6 +137,7 @@ import GHC.Conc.Sync    (sharedCAF)
 #endif
 
 import GHC.Base         ( unpackCString#, unpackNBytes# )
+import Debug.Trace
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
@@ -175,6 +180,12 @@ mkFastZStringString str = FastZString (BSC.pack str)
 
 -- -----------------------------------------------------------------------------
 
+class HasFastString a where
+  getFastString :: a -> FastString
+
+instance HasFastString FastString where
+  getFastString = id
+
 {-|
 A 'FastString' is an array of bytes, hashed to support fast O(1)
 comparison.  It is also associated with a character encoding, so that
@@ -192,7 +203,9 @@ data FastString = FastString {
   }
 
 instance Eq FastString where
-  f1 == f2  =  uniq f1 == uniq f2
+  f1 == f2  =
+    --traceShow (f1, f2, uniq f1 == uniq f2, compare f1 f2) $ 
+      uniq f1 == uniq f2
 
 instance Ord FastString where
     -- Compares lexicographically, not by unique
@@ -306,6 +319,7 @@ maybeResizeSegment segmentRef = do
               case readArray# new# idx# s1# of
                 (# s2#, bucket #) -> case writeArray# new# idx# (wfs: bucket) s2# of
                   s3# -> (# s3#, () #)
+          -- WeakPTRs get GCd on resize
           Nothing -> return ()
     writeIORef segmentRef resizedSegment
     return resizedSegment
@@ -379,6 +393,10 @@ mkFastString# :: Addr# -> FastString
 mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
   where ptr = Ptr a#
 
+fastStringGcCounter :: IORef Int
+fastStringGcCounter = unsafePerformIO $ newIORef 0
+{-# NOINLINE fastStringGcCounter #-}
+
 {- Note [Updating the FastString table]
 
 We use a concurrent hashtable which contains multiple segments, each hash value
@@ -424,7 +442,7 @@ mkFastStringWith mk_fs !ptr !len = do
 
     !(I# hash#) = hashStr ptr len
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
-    insert fs = do
+    insert fs@FastString{..} = do
       FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
@@ -434,7 +452,7 @@ mkFastStringWith mk_fs !ptr !len = do
         -- before we acquired the write lock.
         Just found -> return found
         Nothing -> do
-          v <- mkWeak (uniqueOfFS fs) fs Nothing
+          v <- mkWeakPtr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
             case writeArray# buckets# idx# (v: bucket) s1# of
               s2# -> (# s2#, () #)

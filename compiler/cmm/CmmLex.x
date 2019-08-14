@@ -22,7 +22,7 @@ import CmmExpr
 import Lexer
 import CmmMonad
 import SrcLoc
-import UniqFM
+import FastStringEnv
 import StringBuffer
 import FastString
 import Ctype
@@ -214,13 +214,13 @@ strtoken f span buf len =
 
 name :: Action
 name span buf len =
-  case lookupUFM reservedWordsFM fs of
+  case lookupFsEnv reservedWordsFM fs of
         Just tok -> return (L span tok)
         Nothing  -> return (L span (CmmT_Name fs))
   where
         fs = lexemeToFastString buf len
 
-reservedWordsFM = listToUFM $
+reservedWordsFM = mkFsEnv $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "CLOSURE",            CmmT_CLOSURE ),
         ( "INFO_TABLE",         CmmT_INFO_TABLE ),

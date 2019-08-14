@@ -173,7 +173,7 @@ data BCInstr
    | RETURN_UBX ArgRep -- return an unlifted value, here's its rep
 
    -- Breakpoints
-   | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
+   | BRK_FUN          Word16 FastString (RemotePtr CostCentre)
 
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions

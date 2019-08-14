@@ -680,6 +680,9 @@ class NamedThing a where
 instance NamedThing e => NamedThing (Located e) where
     getName = getName . unLoc
 
+instance HasFastString Name where
+  getFastString = getOccFS
+
 getSrcLoc           :: NamedThing a => a -> SrcLoc
 getSrcSpan          :: NamedThing a => a -> SrcSpan
 getOccString        :: NamedThing a => a -> String

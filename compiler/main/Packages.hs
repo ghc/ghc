@@ -81,6 +81,7 @@ import GHC.Platform
 import Outputable
 import Maybes
 import CmdLineParser
+import FsSet
 
 import System.Environment ( getEnv )
 import FastString
@@ -104,6 +105,7 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
 import Data.Version
+import FastStringEnv
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -244,7 +246,7 @@ originEmpty (ModOrigin Nothing [] [] False) = True
 originEmpty _ = False
 
 -- | 'UniqFM' map from 'InstalledUnitId'
-type InstalledUnitIdMap = UniqDFM
+type InstalledUnitIdMap a = DFastStringEnv a
 
 -- | 'UniqFM' map from 'UnitId' to 'PackageConfig', plus
 -- the transitive closure of preload packages.
@@ -253,7 +255,7 @@ data PackageConfigMap = PackageConfigMap {
         -- | The set of transitively reachable packages according
         -- to the explicitly provided command line arguments.
         -- See Note [UnitId to InstalledUnitId improvement]
-        preloadClosure :: UniqSet InstalledUnitId
+        preloadClosure :: FsSet InstalledUnitId
     }
 
 -- | 'UniqFM' map from 'UnitId' to a 'UnitVisibility'.
@@ -377,7 +379,7 @@ type InstalledPackageIndex = Map InstalledUnitId PackageConfig
 
 -- | Empty package configuration map
 emptyPackageConfigMap :: PackageConfigMap
-emptyPackageConfigMap = PackageConfigMap emptyUDFM emptyUniqSet
+emptyPackageConfigMap = PackageConfigMap emptyUDFM emptyFsSet
 
 -- | Find the package we know about with the given unit id, if any
 lookupPackage :: DynFlags -> UnitId -> Maybe PackageConfig
@@ -388,13 +390,13 @@ lookupPackage dflags = lookupPackage' (isIndefinite dflags) (pkgIdMap (pkgState 
 -- just a 'PackageConfigMap' rather than a 'DynFlags' (so it can
 -- be used while we're initializing 'DynFlags'
 lookupPackage' :: Bool -> PackageConfigMap -> UnitId -> Maybe PackageConfig
-lookupPackage' False (PackageConfigMap pkg_map _) uid = lookupUDFM pkg_map uid
+lookupPackage' False (PackageConfigMap pkg_map _) uid = lookupDFsEnv pkg_map uid
 lookupPackage' True m@(PackageConfigMap pkg_map _) uid =
     case splitUnitIdInsts uid of
         (iuid, Just indef) ->
             fmap (renamePackage m (indefUnitIdInsts indef))
-                 (lookupUDFM pkg_map iuid)
-        (_, Nothing) -> lookupUDFM pkg_map uid
+                 (lookupDFsEnv pkg_map iuid)
+        (_, Nothing) -> lookupDFsEnv pkg_map uid
 
 {-
 -- | Find the indefinite package for a given 'ComponentId'.
@@ -423,7 +425,7 @@ extendPackageConfigMap (PackageConfigMap pkg_map closure) new_pkgs
   = PackageConfigMap (foldl' add pkg_map new_pkgs) closure
     -- We also add the expanded version of the packageConfigId, so that
     -- 'improveUnitId' can find it.
-  where add pkg_map p = addToUDFM (addToUDFM pkg_map (expandedPackageConfigId p) p)
+  where add pkg_map p = addToDFsEnv (addToDFsEnv pkg_map (expandedPackageConfigId p) p)
                                   (installedPackageConfigId p) p
 
 -- | Looks up the package with the given id in the package state, panicing if it is
@@ -436,7 +438,7 @@ lookupInstalledPackage :: DynFlags -> InstalledUnitId -> Maybe PackageConfig
 lookupInstalledPackage dflags uid = lookupInstalledPackage' (pkgIdMap (pkgState dflags)) uid
 
 lookupInstalledPackage' :: PackageConfigMap -> InstalledUnitId -> Maybe PackageConfig
-lookupInstalledPackage' (PackageConfigMap db _) uid = lookupUDFM db uid
+lookupInstalledPackage' (PackageConfigMap db _) uid = lookupDFsEnv db uid
 
 getInstalledPackageDetails :: DynFlags -> InstalledUnitId -> PackageConfig
 getInstalledPackageDetails dflags uid =
@@ -448,7 +450,7 @@ getInstalledPackageDetails dflags uid =
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
 listPackageConfigMap :: DynFlags -> [PackageConfig]
-listPackageConfigMap dflags = eltsUDFM pkg_map
+listPackageConfigMap dflags = dFsEnvElts pkg_map
   where
     PackageConfigMap pkg_map _ = pkgIdMap (pkgState dflags)
 
@@ -861,7 +863,7 @@ selectPackages prec_map arg pkgs unusable
 renamePackage :: PackageConfigMap -> [(ModuleName, Module)]
               -> PackageConfig -> PackageConfig
 renamePackage pkg_map insts conf =
-    let hsubst = listToUFM insts
+    let hsubst = mkFsEnv insts
         smod  = renameHoleModule' pkg_map hsubst
         new_insts = map (\(k,v) -> (k,smod v)) (instantiatedWith conf)
     in conf {
@@ -1473,18 +1475,20 @@ mkPackageState dflags dbs preload0 = do
   -- Then we create an initial visibility map with default visibilities for all
   -- exposed, definite units which belong to the latest valid packages.
   --
-  let preferLater unit unit' =
+  let preferLater (_, unit) (fs, unit') =
         case compareByPreference prec_map unit unit' of
-            GT -> unit
-            _  -> unit'
-      addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
+            GT -> (fs, unit)
+            _  -> (fs, unit')
+      addIfMorePreferable m unit = 
+          let fs = fsPackageName unit
+          in addToUDFM_C preferLater m (FastStringU fs) (fs, unit)
       -- This is the set of maximally preferable packages. In fact, it is a set of
       -- most preferable *units* keyed by package name, which act as stand-ins in
       -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
       mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
-                    then emptyUDFM
-                    else foldl' addIfMorePreferable emptyUDFM pkgs1
+                    then emptyDFsEnv
+                    else foldl' addIfMorePreferable emptyDFsEnv pkgs1
       -- When exposing units, we want to consider all of those in the most preferable
       -- packages. We can implement that by looking for units that are equi-preferable
       -- with the most preferable unit for package. Being equi-preferable means that
@@ -1493,7 +1497,7 @@ mkPackageState dflags dbs preload0 = do
       -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
       mostPreferable u =
-        case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
+        case lookupDFsEnv mostPreferablePackageReps (fsPackageName u) of
           Nothing -> False
           Just u' -> compareByPreference prec_map u u' == EQ
       vis_map1 = foldl' (\vm p ->
@@ -1592,7 +1596,7 @@ mkPackageState dflags dbs preload0 = do
       -- add base & rts to the preload packages
       basicLinkedPackages
        | gopt Opt_AutoLinkPackages dflags
-          = filter (flip elemUDFM (unPackageConfigMap pkg_db))
+          = filter (flip elemDFsEnv (unPackageConfigMap pkg_db))
                 [baseUnitId, rtsUnitId]
        | otherwise = []
       -- but in any case remove the current package from the set of
@@ -1672,7 +1676,7 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
 
   default_vis = Map.fromList
                   [ (packageConfigId pkg, mempty)
-                  | pkg <- eltsUDFM (unPackageConfigMap pkg_db)
+                  | (_, pkg) <- eltsUDFM (unPackageConfigMap pkg_db)
                   -- Exclude specific instantiations of an indefinite
                   -- package
                   , indefinite pkg || null (instantiatedWith pkg)
@@ -1697,7 +1701,7 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
     rnBinding :: (ModuleName, ModuleName)
               -> (ModuleName, Map Module ModuleOrigin)
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
-     where origEntry = case lookupUFM esmap orig of
+     where origEntry = case lookupFsEnv esmap orig of
             Just r -> r
             Nothing -> throwGhcException (CmdLineError (showSDoc dflags
                         (text "package flag: could not find module name" <+>
@@ -1714,8 +1718,8 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
             in (pk', m', fromReexportedModules e pkg')
      return (m, mkModMap pk' m' origin')
 
-    esmap :: UniqFM (Map Module ModuleOrigin)
-    esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
+    esmap :: FastStringEnv (Map Module ModuleOrigin)
+    esmap = mkFsEnv (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
     hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
@@ -2192,7 +2196,7 @@ improveUnitId pkg_map uid =
             -- Do NOT improve if the indefinite unit id is not
             -- part of the closure unique set.  See
             -- Note [UnitId to InstalledUnitId improvement]
-            if installedPackageConfigId pkg `elementOfUniqSet` preloadClosure pkg_map
+            if installedPackageConfigId pkg `elementOfFsSet` preloadClosure pkg_map
                 then packageConfigId pkg
                 else uid
 

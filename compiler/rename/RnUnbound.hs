@@ -30,7 +30,8 @@ import DynFlags
 import FastString
 import Data.List
 import Data.Function ( on )
-import UniqDFM (udfmToList)
+import UniqDFM
+import FastStringEnv
 
 {-
 ************************************************************************
@@ -332,9 +333,9 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
       | is_last_loaded_mod modnam hpt_uniques = False                  -- 2.2
       | otherwise                             = True
     where
-      hpt_uniques = map fst (udfmToList hpt)
+      hpt_uniques = map (fst . snd) (udfmToList hpt)
       is_last_loaded_mod _ []         = False
-      is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
+      is_last_loaded_mod modnam uniqs = last uniqs == getFastString modnam
       globMods = nub [ mod
                      | gre <- globalRdrEnvElts global_env
                      , isGreOk where_look gre

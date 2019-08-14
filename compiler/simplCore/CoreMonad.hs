@@ -49,12 +49,14 @@ module CoreMonad (
 
 import GhcPrelude hiding ( read )
 
+import Name
 import CoreSyn
 import HscTypes
 import Module
 import DynFlags
 import BasicTypes       ( CompilerPhase(..) )
 import Annotations
+import FastStringEnv
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
@@ -79,7 +81,7 @@ import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 import Panic (throwGhcException, GhcException(..))
-
+import qualified Data.Map as Map
 {-
 ************************************************************************
 *                                                                      *
@@ -745,16 +747,16 @@ getPackageFamInstEnv = do
 -- annotations.
 --
 -- See Note [Annotations]
-getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM [a])
+getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (Map.Map (AnnTarget Name) [a])
 getAnnotations deserialize guts = do
      hsc_env <- getHscEnv
      ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
      return (deserializeAnns deserialize ann_env)
 
 -- | Get at most one annotation of a given type per Unique.
-getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM a)
+getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (Map.Map (AnnTarget Name) a)
 getFirstAnnotations deserialize guts
-  = liftM (mapUFM head . filterUFM (not . null))
+  = liftM (Map.map head . Map.filter (not . null))
   $ getAnnotations deserialize guts
 
 {-

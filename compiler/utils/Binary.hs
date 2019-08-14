@@ -70,6 +70,8 @@ import FastMutInt
 import Fingerprint
 import BasicTypes
 import SrcLoc
+import FastStringEnv
+import UniqMap
 
 import Foreign
 import Data.Array
@@ -893,10 +895,10 @@ undef s = panic ("Binary.UserData: no " ++ s)
 type Dictionary = Array Int FastString -- The dictionary
                                        -- Should be 0-indexed
 
-putDictionary :: BinHandle -> Int -> UniqFM (Int,FastString) -> IO ()
+putDictionary :: BinHandle -> Int -> FastStringEnv (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
   put_ bh sz
-  mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUFM dict)))
+  mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUniqMap dict)))
     -- It's OK to use nonDetEltsUFM here because the elements have indices
     -- that array uses to create order
 

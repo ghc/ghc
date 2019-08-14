@@ -67,6 +67,7 @@ import BinFingerprint
 import LoadIface
 import ToIface
 import FlagChecker
+import FastStringEnv
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
@@ -474,8 +475,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        -- This is computed by finding the free external names of each
        -- declaration, including IfaceDeclExtras (things that a
        -- declaration implicitly depends on).
-       edges :: [ Node Unique IfaceDeclABI ]
-       edges = [ DigraphNode abi (getUnique (getOccName decl)) out
+       edges :: [ Node FastStringU IfaceDeclABI ]
+       edges = [ DigraphNode abi (FastStringU $ getOccFS decl) out
                | decl <- new_decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
@@ -483,7 +484,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs =
-         map (getUnique . getParent . getOccName)
+         map (FastStringU . occNameFS . getParent . getOccName)
                         -- NB: names always use semantic module, so
                         -- filtering must be on the semantic module!
                         -- See Note [Identity versus semantic module]

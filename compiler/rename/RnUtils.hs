@@ -326,7 +326,7 @@ warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })
 -- names, to be used when reporting unused record fields.
 mkFieldEnv :: GlobalRdrEnv -> NameEnv (FieldLabelString, Name)
 mkFieldEnv rdr_env = mkNameEnv [ (gre_name gre, (lbl, par_is (gre_par gre)))
-                               | gres <- occEnvElts rdr_env
+                               | gres <- nonDetOccEnvElts rdr_env
                                , gre <- gres
                                , Just lbl <- [greLabel gre]
                                ]

@@ -180,6 +180,7 @@ import VarEnv
 import Module
 import SrcLoc
 import VarSet
+import FastStringEnv
 import ErrUtils
 import UniqFM
 import UniqSupply
@@ -521,7 +522,7 @@ data TcGblEnv
           -- NB. BangPattern is to fix a leak, see #15111
         tcg_fam_inst_env :: !FamInstEnv, -- ^ Ditto for family instances
           -- NB. BangPattern is to fix a leak, see #15111
-        tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
+        tcg_ann_env      :: AnnEnv Name,     -- ^ And for annotations
 
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.
@@ -1405,20 +1406,20 @@ data ImportAvails
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
           -> ModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl' add emptyUFM deps
+mkModDeps deps = foldl' add emptyFsEnv deps
                where
-                 add env elt@(m,_) = addToUFM env m elt
+                add env elt@(m,_) = extendFsEnv env m elt
 
 modDepsElts
   :: ModuleNameEnv (ModuleName, IsBootInterface)
   -> [(ModuleName, IsBootInterface)]
-modDepsElts = sort . nonDetEltsUFM
+modDepsElts = sort . modDepsElts
   -- It's OK to use nonDetEltsUFM here because sorting by module names
   -- restores determinism
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_dep_mods      = emptyUFM,
+                                   imp_dep_mods      = emptyFsEnv,
                                    imp_dep_pkgs      = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
@@ -1441,7 +1442,7 @@ plusImportAvails
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
-                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
+                   imp_dep_mods      = plusFsEnv_C plus_mod_dep dmods1 dmods2,
                    imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,

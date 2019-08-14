@@ -54,11 +54,12 @@ import Hoopl.Label
 import CLabel           ( CLabel )
 import Debug
 import FastString       ( FastString )
-import UniqFM
 import UniqSupply
 import Unique           ( Unique )
 import DynFlags
 import Module
+import FastStringEnv
+import UniqMap
 
 import Control.Monad    ( ap )
 
@@ -111,7 +112,7 @@ data NatM_State
         -- generated instructions. So instead we update the CFG as we go.
         }
 
-type DwarfFiles = UniqFM (FastString, Int)
+type DwarfFiles = FastStringEnv Int
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
     deriving (Functor)
@@ -282,10 +283,10 @@ getModLoc
 
 getFileId :: FastString -> NatM Int
 getFileId f = NatM $ \st ->
-  case lookupUFM (natm_fileid st) f of
-    Just (_,n) -> (n, st)
-    Nothing    -> let n = 1 + sizeUFM (natm_fileid st)
-                      fids = addToUFM (natm_fileid st) f (f,n)
+  case lookupFsEnv (natm_fileid st) f of
+    Just n     -> (n, st)
+    Nothing    -> let n = 1 + nonDetFoldUniqMap (\_ n -> n + 1) 0 (natm_fileid st)
+                      fids = extendFsEnv (natm_fileid st) f n
                   in n `seq` fids `seq` (n, st { natm_fileid = fids  })
 
 getDebugBlock :: Label -> NatM (Maybe DebugBlock)

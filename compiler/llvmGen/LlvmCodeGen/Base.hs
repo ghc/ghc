@@ -51,7 +51,9 @@ import Cmm              hiding ( succ )
 import Outputable as Outp
 import GHC.Platform
 import UniqFM
+import FsSet
 import Unique
+import FastStringEnv
 import BufWrite   ( BufHandle )
 import UniqSet
 import UniqSupply
@@ -208,8 +210,8 @@ data LlvmEnv = LlvmEnv
   , envUniq :: UniqSupply          -- ^ Supply of unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
-  , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
-  , envAliases :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
+  , envFunMap :: LlvmFSEnvMap        -- ^ Global functions so far, with type
+  , envAliases :: FsSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
   , envUsedVars :: [LlvmVar]       -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
 
     -- the following get cleared for every function (see @withClearVars@)
@@ -218,6 +220,7 @@ data LlvmEnv = LlvmEnv
   }
 
 type LlvmEnvMap = UniqFM LlvmType
+type LlvmFSEnvMap = FastStringEnv LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
@@ -257,11 +260,11 @@ runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM () -> IO 
 runLlvm dflags ver out us m = do
     _ <- runLlvmM m env
     return ()
-  where env = LlvmEnv { envFunMap = emptyUFM
+  where env = LlvmEnv { envFunMap = emptyFsEnv
                       , envVarMap = emptyUFM
                       , envStackRegs = []
                       , envUsedVars = []
-                      , envAliases = emptyUniqSet
+                      , envAliases = emptyFsSet
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
@@ -293,14 +296,16 @@ withClearVars m = LlvmM $ \env -> do
     return (x, env' { envVarMap = emptyUFM, envStackRegs = [] })
 
 -- | Insert variables or functions into the environment.
-varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmM ()
+varInsert :: Uniquable key => key -> LlvmType -> LlvmM ()
+funInsert :: HasFastString key => key -> LlvmType -> LlvmM ()
 varInsert s t = modifyEnv $ \env -> env { envVarMap = addToUFM (envVarMap env) s t }
-funInsert s t = modifyEnv $ \env -> env { envFunMap = addToUFM (envFunMap env) s t }
+funInsert s t = modifyEnv $ \env -> env { envFunMap = extendFsEnv (envFunMap env) s t }
 
 -- | Lookup variables or functions in the environment.
-varLookup, funLookup :: Uniquable key => key -> LlvmM (Maybe LlvmType)
+varLookup :: Uniquable key => key -> LlvmM (Maybe LlvmType)
+funLookup :: HasFastString key => key -> LlvmM (Maybe LlvmType)
 varLookup s = getEnv (flip lookupUFM s . envVarMap)
-funLookup s = getEnv (flip lookupUFM s . envFunMap)
+funLookup s = getEnv (flip lookupFsEnv s . envFunMap)
 
 -- | Set a register as allocated on the stack
 markStackReg :: GlobalReg -> LlvmM ()
@@ -358,7 +363,7 @@ getUsedVars = getEnv envUsedVars
 -- | Saves that at some point we didn't know the type of the label and
 -- generated a reference to a type variable instead
 saveAlias :: LMString -> LlvmM ()
-saveAlias lbl = modifyEnv $ \env -> env { envAliases = addOneToUniqSet (envAliases env) lbl }
+saveAlias lbl = modifyEnv $ \env -> env { envAliases = addOneToFsSet (envAliases env) lbl }
 
 -- | Sets metadata node for a given unique
 setUniqMeta :: Unique -> MetaId -> LlvmM ()
@@ -460,7 +465,7 @@ llvmDefLabel = (`appendFS` fsLit "$def")
 -- will be generated anymore!
 generateExternDecls :: LlvmM ([LMGlobal], [LlvmType])
 generateExternDecls = do
-  delayed <- fmap nonDetEltsUniqSet $ getEnv envAliases
+  delayed <- fmap nonDetEltsFsSet $ getEnv envAliases
   -- This is non-deterministic but we do not
   -- currently support deterministic code-generation.
   -- See Note [Unique Determinism and code generation]
@@ -478,7 +483,7 @@ generateExternDecls = do
         in return [LMGlobal var Nothing]
 
   -- Reset forward list
-  modifyEnv $ \env -> env { envAliases = emptyUniqSet }
+  modifyEnv $ \env -> env { envAliases = emptyFsSet }
   return (concat defss, [])
 
 -- | Here we take a global variable definition, rename it with a

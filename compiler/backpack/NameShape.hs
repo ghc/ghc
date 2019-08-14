@@ -18,6 +18,7 @@ import Outputable
 import HscTypes
 import Module
 import UniqFM
+import UniqMap
 import Avail
 import FieldLabel
 
@@ -219,11 +220,11 @@ mergeAvails as1 as2 =
 -- with only name holes from @flexi@ unifiable (all other name holes rigid.)
 uAvailInfos :: ModuleName -> [AvailInfo] -> [AvailInfo] -> Either SDoc ShNameSubst
 uAvailInfos flexi as1 as2 = -- pprTrace "uAvailInfos" (ppr as1 $$ ppr as2) $
-    let mkOE as = listToUFM $ do a <- as
+    let mkOE as = mkFsEnv  $  do a <- as
                                  n <- availNames a
                                  return (nameOccName n, a)
     in foldM (\subst (a1, a2) -> uAvailInfo flexi subst a1 a2) emptyNameEnv
-             (eltsUFM (intersectUFM_C (,) (mkOE as1) (mkOE as2)))
+             (nonDetEltsUniqMap (intersectUniqMap_C (,) (mkOE as1) (mkOE as2)))
              -- Edward: I have to say, this is pretty clever.
 
 -- | Unify two 'AvailInfo's, given an existing substitution @subst@,

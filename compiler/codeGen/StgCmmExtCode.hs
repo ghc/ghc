@@ -49,6 +49,7 @@ import MkGraph
 import BlockId
 import DynFlags
 import FastString
+import FastStringEnv
 import Module
 import UniqFM
 import Unique
@@ -65,7 +66,7 @@ data Named
         | LabelN BlockId                -- ^ A blockid of some code or data.
 
 -- | An environment of named things.
-type Env        = UniqFM Named
+type Env        = FastStringEnv Named
 
 -- | Local declarations that are in scope during code generation.
 type Decls      = [(FastString,Named)]
@@ -112,7 +113,7 @@ loopDecls :: CmmParse a -> CmmParse a
 loopDecls (EC fcode) =
       EC $ \c e globalDecls -> do
         (_, a) <- F.fixC $ \ ~(decls, _) ->
-          fcode c (addListToUFM e decls) globalDecls
+          fcode c (extendFsEnvList e decls) globalDecls
         return (globalDecls, a)
 
 
@@ -189,9 +190,9 @@ lookupLabel :: FastString -> CmmParse BlockId
 lookupLabel name = do
   env <- getEnv
   return $
-     case lookupUFM env name of
+     case lookupFsEnv env name of
         Just (LabelN l) -> l
-        _other          -> mkBlockId (newTagUnique (getUnique name) 'L')
+        _other          -> mkBlockId (newTagUnique (mkUniqueGrimily (uniqueOfFS name)) 'L')
 
 
 -- | Lookup the location of a named variable.
@@ -202,7 +203,7 @@ lookupName :: FastString -> CmmParse CmmExpr
 lookupName name = do
   env    <- getEnv
   return $
-     case lookupUFM env name of
+     case lookupFsEnv env name of
         Just (VarN e)   -> e
         Just (FunN pkg) -> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
         _other          -> CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId name))

@@ -562,6 +562,7 @@ Library
         FastMutInt
         FastString
         FastStringEnv
+        FsSet
         Fingerprint
         FiniteMap
         FV

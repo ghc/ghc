@@ -51,7 +51,7 @@ module Unique (
         mkPreludeTyConUnique, mkPreludeClassUnique,
         mkCoVarUnique,
 
-        mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
+        --mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
         mkCostCentreUnique,
 
@@ -64,7 +64,9 @@ module Unique (
         -- *** From TyCon name uniques
         tyConRepNameUnique,
         -- *** From DataCon name uniques
-        dataConWorkerUnique, dataConTyRepNameUnique
+        dataConWorkerUnique, dataConTyRepNameUnique,
+
+        unsafeFastStringUnique
     ) where
 
 #include "HsVersions.h"
@@ -190,9 +192,6 @@ class Uniquable a where
 
 hasKey          :: Uniquable a => a -> Unique -> Bool
 x `hasKey` k    = getUnique x == k
-
-instance Uniquable FastString where
- getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
@@ -434,12 +433,17 @@ mkRegClassUnique  = mkUnique 'L'
 mkCostCentreUnique :: Int -> Unique
 mkCostCentreUnique = mkUnique 'C'
 
+{-
 mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
 -- See Note [The Unique of an OccName] in OccName
 mkVarOccUnique  fs = mkUnique 'i' (uniqueOfFS fs)
 mkDataOccUnique fs = mkUnique 'd' (uniqueOfFS fs)
 mkTvOccUnique   fs = mkUnique 'v' (uniqueOfFS fs)
 mkTcOccUnique   fs = mkUnique 'c' (uniqueOfFS fs)
+-}
+
+unsafeFastStringUnique :: FastString -> Unique
+unsafeFastStringUnique = mkUniqueGrimily . uniqueOfFS
 
 initExitJoinUnique :: Unique
 initExitJoinUnique = mkUnique 's' 0

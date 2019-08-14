@@ -123,7 +123,7 @@ module Module
         lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
         moduleEnvKeys, moduleEnvElts, moduleEnvToList,
         unitModuleEnv, isEmptyModuleEnv,
-        extendModuleEnvWith, filterModuleEnv,
+        extendModuleEnvWith, 
 
         -- * ModuleName mappings
         ModuleNameEnv, DModuleNameEnv,
@@ -150,6 +150,9 @@ import Data.List
 import Data.Ord
 import GHC.PackageDb (BinaryStringRep(..), DbUnitIdModuleRep(..), DbModule(..), DbUnitId(..))
 import Fingerprint
+import FastStringEnv
+import UniqMap
+import FsSet
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
@@ -326,11 +329,13 @@ addBootSuffixLocnOut locn
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
 
-instance Uniquable ModuleName where
-  getUnique (ModuleName nm) = getUnique nm
+instance HasFastString ModuleName where
+  getFastString (ModuleName nm) = nm
 
 instance Eq ModuleName where
-  nm1 == nm2 = getUnique nm1 == getUnique nm2
+  nm1 == nm2 = getFastString nm1 == getFastString nm2
+
+
 
 instance Ord ModuleName where
   nm1 `compare` nm2 = stableModuleNameCmp nm1 nm2
@@ -424,22 +429,23 @@ data Module = Module {
 --
 -- If a module has free holes, that means that substitutions can operate on it;
 -- if it has no free holes, substituting over a module has no effect.
-moduleFreeHoles :: Module -> UniqDSet ModuleName
+moduleFreeHoles :: Module -> DFastStringEnv ModuleName
 moduleFreeHoles m
-    | isHoleModule m = unitUniqDSet (moduleName m)
+    | isHoleModule m = mkDFsEnv [(getFastString (moduleName m), (moduleName m))]
     | otherwise = unitIdFreeHoles (moduleUnitId m)
 
 -- | A 'Module' is definite if it has no free holes.
 moduleIsDefinite :: Module -> Bool
-moduleIsDefinite = isEmptyUniqDSet . moduleFreeHoles
+moduleIsDefinite = isNullUDFM . moduleFreeHoles
 
 -- | Create a module variable at some 'ModuleName'.
 -- See Note [Representation of module/name variables]
 mkHoleModule :: ModuleName -> Module
 mkHoleModule = mkModule holeUnitId
 
-instance Uniquable Module where
-  getUnique (Module p n) = getUnique (unitIdFS p `appendFS` moduleNameFS n)
+instance HasFastString Module where
+  getFastString (Module p n) = (unitIdFS p `appendFS` moduleNameFS n)
+
 
 instance Outputable Module where
   ppr = pprModule
@@ -521,8 +527,8 @@ instance BinaryStringRep ComponentId where
   fromStringRep = ComponentId . mkFastStringByteString
   toStringRep (ComponentId s) = bytesFS s
 
-instance Uniquable ComponentId where
-  getUnique (ComponentId n) = getUnique n
+instance HasFastString ComponentId where
+  getFastString (ComponentId n) = n
 
 instance Outputable ComponentId where
   ppr cid@(ComponentId fs) =
@@ -561,9 +567,8 @@ unitIdFS :: UnitId -> FastString
 unitIdFS (IndefiniteUnitId x) = indefUnitIdFS x
 unitIdFS (DefiniteUnitId (DefUnitId x)) = installedUnitIdFS x
 
-unitIdKey :: UnitId -> Unique
-unitIdKey (IndefiniteUnitId x) = indefUnitIdKey x
-unitIdKey (DefiniteUnitId (DefUnitId x)) = installedUnitIdKey x
+unitIdKey :: UnitId -> FastString
+unitIdKey = unitIdFS
 
 -- | A unit identifier which identifies an indefinite
 -- library (with holes) that has been *on-the-fly* instantiated
@@ -581,8 +586,6 @@ data IndefUnitId
         -- and is just used to get a unique; in particular, we don't use it for
         -- symbols (indefinite libraries are not compiled).
         indefUnitIdFS :: FastString,
-        -- | Cached unique of 'unitIdFS'.
-        indefUnitIdKey :: Unique,
         -- | The component identity of the indefinite library that
         -- is being instantiated.
         indefUnitIdComponentId :: !ComponentId,
@@ -592,11 +595,11 @@ data IndefUnitId
         -- This lets us efficiently tell if a 'UnitId' has been
         -- fully instantiated (free module variables are empty)
         -- and whether or not a substitution can have any effect.
-        indefUnitIdFreeHoles :: UniqDSet ModuleName
+        indefUnitIdFreeHoles :: DFastStringEnv ModuleName
     }
 
 instance Eq IndefUnitId where
-  u1 == u2 = indefUnitIdKey u1 == indefUnitIdKey u2
+  u1 == u2 = indefUnitIdFS u1 == indefUnitIdFS u2
 
 instance Ord IndefUnitId where
   u1 `compare` u2 = indefUnitIdFS u1 `compare` indefUnitIdFS u2
@@ -612,9 +615,8 @@ instance Binary IndefUnitId where
     return IndefUnitId {
             indefUnitIdComponentId = cid,
             indefUnitIdInsts = insts,
-            indefUnitIdFreeHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
-            indefUnitIdFS = fs,
-            indefUnitIdKey = getUnique fs
+            indefUnitIdFreeHoles = plusUDFMs (map (moduleFreeHoles.snd) insts),
+            indefUnitIdFS = fs
            }
 
 -- | Create a new 'IndefUnitId' given an explicit module substitution.
@@ -623,9 +625,8 @@ newIndefUnitId cid insts =
     IndefUnitId {
         indefUnitIdComponentId = cid,
         indefUnitIdInsts = sorted_insts,
-        indefUnitIdFreeHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
-        indefUnitIdFS = fs,
-        indefUnitIdKey = getUnique fs
+        indefUnitIdFreeHoles = plusUDFMs (map (moduleFreeHoles.snd) insts),
+        indefUnitIdFS = fs
     }
   where
      fs = hashUnitId cid sorted_insts
@@ -687,13 +688,13 @@ instance BinaryStringRep InstalledUnitId where
   toStringRep   = error "BinaryStringRep InstalledUnitId: not implemented"
 
 instance Eq InstalledUnitId where
-    uid1 == uid2 = installedUnitIdKey uid1 == installedUnitIdKey uid2
+    uid1 == uid2 = installedUnitIdFS uid1 == installedUnitIdFS uid2
 
 instance Ord InstalledUnitId where
     u1 `compare` u2 = installedUnitIdFS u1 `compare` installedUnitIdFS u2
 
-instance Uniquable InstalledUnitId where
-    getUnique = installedUnitIdKey
+instance HasFastString InstalledUnitId where
+    getFastString = installedUnitIdFS
 
 instance Outputable InstalledUnitId where
     ppr uid@(InstalledUnitId fs) =
@@ -702,9 +703,6 @@ instance Outputable InstalledUnitId where
           case displayInstalledUnitId dflags uid of
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
-
-installedUnitIdKey :: InstalledUnitId -> Unique
-installedUnitIdKey = getUnique . installedUnitIdFS
 
 -- | Lossy conversion to the on-disk 'InstalledUnitId' for a component.
 toInstalledUnitId :: UnitId -> InstalledUnitId
@@ -819,17 +817,17 @@ delInstalledModuleEnv (InstalledModuleEnv e) m = InstalledModuleEnv (Map.delete 
 -- closure of all the packages which were explicitly specified.
 
 -- | Retrieve the set of free holes of a 'UnitId'.
-unitIdFreeHoles :: UnitId -> UniqDSet ModuleName
+unitIdFreeHoles :: UnitId -> DFastStringEnv ModuleName
 unitIdFreeHoles (IndefiniteUnitId x) = indefUnitIdFreeHoles x
 -- Hashed unit ids are always fully instantiated
-unitIdFreeHoles (DefiniteUnitId _) = emptyUniqDSet
+unitIdFreeHoles (DefiniteUnitId _) = emptyDFsEnv
 
 instance Show UnitId where
     show = unitIdString
 
 -- | A 'UnitId' is definite if it has no free holes.
 unitIdIsDefinite :: UnitId -> Bool
-unitIdIsDefinite = isEmptyUniqDSet . unitIdFreeHoles
+unitIdIsDefinite = isNullUDFM . unitIdFreeHoles
 
 -- | Generate a uniquely identifying 'FastString' for a unit
 -- identifier.  This is a one-way function.  You can rely on one special
@@ -872,8 +870,8 @@ pprUnitId (IndefiniteUnitId uid) = ppr uid
 instance Eq UnitId where
   uid1 == uid2 = unitIdKey uid1 == unitIdKey uid2
 
-instance Uniquable UnitId where
-  getUnique = unitIdKey
+instance HasFastString UnitId where
+  getFastString = unitIdKey
 
 instance Ord UnitId where
   nm1 `compare` nm2 = stableUnitIdCmp nm1 nm2
@@ -959,7 +957,7 @@ renameHoleModule' pkg_map env m
   | not (isHoleModule m) =
         let uid = renameHoleUnitId' pkg_map env (moduleUnitId m)
         in mkModule uid (moduleName m)
-  | Just m' <- lookupUFM env (moduleName m) = m'
+  | Just m' <- lookupFsEnv env (moduleName m) = m'
   -- NB m = <Blah>, that's what's in scope.
   | otherwise = m
 
@@ -972,7 +970,7 @@ renameHoleUnitId' pkg_map env uid =
         IndefUnitId{ indefUnitIdComponentId = cid
                    , indefUnitIdInsts       = insts
                    , indefUnitIdFreeHoles   = fh })
-          -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
+          -> if isNullUniqMap (intersectUniqMap_C const (dFsEnvToDsEnv fh) env)
                 then uid
                 -- Functorially apply the substitution to the instantiation,
                 -- then check the 'PackageConfigMap' to see if there is
@@ -1152,7 +1150,7 @@ wiredInUnitIds = [ primUnitId,
 -}
 
 -- | A map keyed off of 'Module's
-newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
+newtype ModuleEnv elt = ModuleEnv (FastStringEnv (Module, elt))
 
 {-
 Note [ModuleEnv performance and determinism]
@@ -1170,72 +1168,65 @@ nondeterminismand and Note [Deterministic UniqFM] for explanation of why
 it matters for maps.
 -}
 
-newtype NDModule = NDModule { unNDModule :: Module }
-  deriving Eq
   -- A wrapper for Module with faster nondeterministic Ord.
   -- Don't export, See [ModuleEnv performance and determinism]
 
-instance Ord NDModule where
-  compare (NDModule (Module p1 n1)) (NDModule (Module p2 n2)) =
-    (getUnique p1 `nonDetCmpUnique` getUnique p2) `thenCmp`
-    (getUnique n1 `nonDetCmpUnique` getUnique n2)
 
-filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
-filterModuleEnv f (ModuleEnv e) =
-  ModuleEnv (Map.filterWithKey (f . unNDModule) e)
 
 elemModuleEnv :: Module -> ModuleEnv a -> Bool
-elemModuleEnv m (ModuleEnv e) = Map.member (NDModule m) e
+elemModuleEnv m (ModuleEnv e) = elemFsEnv m e
 
 extendModuleEnv :: ModuleEnv a -> Module -> a -> ModuleEnv a
-extendModuleEnv (ModuleEnv e) m x = ModuleEnv (Map.insert (NDModule m) x e)
+extendModuleEnv (ModuleEnv e) m x = ModuleEnv (extendFsEnv e m (m,x))
 
 extendModuleEnvWith :: (a -> a -> a) -> ModuleEnv a -> Module -> a
                     -> ModuleEnv a
 extendModuleEnvWith f (ModuleEnv e) m x =
-  ModuleEnv (Map.insertWith f (NDModule m) x e)
+  ModuleEnv (extendFsEnv_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e m (m, x))
 
 extendModuleEnvList :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
 extendModuleEnvList (ModuleEnv e) xs =
-  ModuleEnv (Map.insertList [(NDModule k, v) | (k,v) <- xs] e)
+  ModuleEnv (extendFsEnvList e [(k, (k, v)) | (k,v) <- xs])
 
 extendModuleEnvList_C :: (a -> a -> a) -> ModuleEnv a -> [(Module, a)]
                       -> ModuleEnv a
 extendModuleEnvList_C f (ModuleEnv e) xs =
-  ModuleEnv (Map.insertListWith f [(NDModule k, v) | (k,v) <- xs] e)
+  ModuleEnv (extendFsEnvList_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e [(k,(k, v)) | (k,v) <- xs])
 
 plusModuleEnv_C :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
 plusModuleEnv_C f (ModuleEnv e1) (ModuleEnv e2) =
-  ModuleEnv (Map.unionWith f e1 e2)
+  ModuleEnv (plusFsEnv_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e1 e2)
 
 delModuleEnvList :: ModuleEnv a -> [Module] -> ModuleEnv a
 delModuleEnvList (ModuleEnv e) ms =
-  ModuleEnv (Map.deleteList (map NDModule ms) e)
+  ModuleEnv (delListFromFsEnv e ms)
 
 delModuleEnv :: ModuleEnv a -> Module -> ModuleEnv a
-delModuleEnv (ModuleEnv e) m = ModuleEnv (Map.delete (NDModule m) e)
+delModuleEnv (ModuleEnv e) m = ModuleEnv (delFromFsEnv e m)
 
 plusModuleEnv :: ModuleEnv a -> ModuleEnv a -> ModuleEnv a
-plusModuleEnv (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (Map.union e1 e2)
+plusModuleEnv (ModuleEnv e1) (ModuleEnv e2) = ModuleEnv (plusFsEnv e1 e2)
 
 lookupModuleEnv :: ModuleEnv a -> Module -> Maybe a
-lookupModuleEnv (ModuleEnv e) m = Map.lookup (NDModule m) e
+lookupModuleEnv (ModuleEnv e) m = snd <$> lookupFsEnv e m
 
 lookupWithDefaultModuleEnv :: ModuleEnv a -> a -> Module -> a
 lookupWithDefaultModuleEnv (ModuleEnv e) x m =
-  Map.findWithDefault x (NDModule m) e
+  case lookupFsEnv e m of
+    Just (_, v) -> v
+    Nothing -> x
 
 mapModuleEnv :: (a -> b) -> ModuleEnv a -> ModuleEnv b
-mapModuleEnv f (ModuleEnv e) = ModuleEnv (Map.mapWithKey (\_ v -> f v) e)
+mapModuleEnv f (ModuleEnv e) = ModuleEnv (mapFsEnv (\(m,v) -> (m, f v)) e)
 
 mkModuleEnv :: [(Module, a)] -> ModuleEnv a
-mkModuleEnv xs = ModuleEnv (Map.fromList [(NDModule k, v) | (k,v) <- xs])
+mkModuleEnv xs = ModuleEnv (mkFsEnv [(m, (m, x)) | (m, x) <- xs])
 
 emptyModuleEnv :: ModuleEnv a
-emptyModuleEnv = ModuleEnv Map.empty
+emptyModuleEnv = ModuleEnv emptyFsEnv
 
 moduleEnvKeys :: ModuleEnv a -> [Module]
-moduleEnvKeys (ModuleEnv e) = sort $ map unNDModule $ Map.keys e
+moduleEnvKeys m = sort $ map fst $ moduleEnvToList m
   -- See Note [ModuleEnv performance and determinism]
 
 moduleEnvElts :: ModuleEnv a -> [a]
@@ -1244,50 +1235,50 @@ moduleEnvElts e = map snd $ moduleEnvToList e
 
 moduleEnvToList :: ModuleEnv a -> [(Module, a)]
 moduleEnvToList (ModuleEnv e) =
-  sortBy (comparing fst) [(m, v) | (NDModule m, v) <- Map.toList e]
+  sortBy (comparing fst) [(m, v) | (m, v) <- nonDetEltsUniqMap e]
   -- See Note [ModuleEnv performance and determinism]
 
 unitModuleEnv :: Module -> a -> ModuleEnv a
-unitModuleEnv m x = ModuleEnv (Map.singleton (NDModule m) x)
+unitModuleEnv m x = ModuleEnv (unitFsEnv m (m, x))
 
 isEmptyModuleEnv :: ModuleEnv a -> Bool
-isEmptyModuleEnv (ModuleEnv e) = Map.null e
+isEmptyModuleEnv (ModuleEnv e) = isNullUniqMap e
 
 -- | A set of 'Module's
-type ModuleSet = Set NDModule
+type ModuleSet = FsSet Module
 
 mkModuleSet :: [Module] -> ModuleSet
-mkModuleSet = Set.fromList . coerce
+mkModuleSet = mkFsSet
 
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
-extendModuleSet s m = Set.insert (NDModule m) s
+extendModuleSet = addOneToFsSet 
 
 extendModuleSetList :: ModuleSet -> [Module] -> ModuleSet
-extendModuleSetList s ms = foldl' (coerce . flip Set.insert) s ms
+extendModuleSetList = addListToFsSet
 
 emptyModuleSet :: ModuleSet
-emptyModuleSet = Set.empty
+emptyModuleSet = emptyFsSet
 
 moduleSetElts :: ModuleSet -> [Module]
-moduleSetElts = sort . coerce . Set.toList
+moduleSetElts = sort . nonDetEltsFsSet
 
 elemModuleSet :: Module -> ModuleSet -> Bool
-elemModuleSet = Set.member . coerce
+elemModuleSet = elementOfFsSet
 
 intersectModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
-intersectModuleSet = coerce Set.intersection
+intersectModuleSet = intersectFsSets
 
 minusModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
-minusModuleSet = coerce Set.difference
+minusModuleSet = minusFsSet
 
 delModuleSet :: ModuleSet -> Module -> ModuleSet
-delModuleSet = coerce (flip Set.delete)
+delModuleSet = delOneFromFsSet
 
 unionModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
-unionModuleSet = coerce Set.union
+unionModuleSet = unionFsSets
 
 unitModuleSet :: Module -> ModuleSet
-unitModuleSet = coerce Set.singleton
+unitModuleSet = unitFsSet
 
 {-
 A ModuleName has a Unique, so we can build mappings of these using
@@ -1295,9 +1286,9 @@ UniqFM.
 -}
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
-type ModuleNameEnv elt = UniqFM elt
+type ModuleNameEnv elt = FastStringEnv elt
 
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
-type DModuleNameEnv elt = UniqDFM elt
+type DModuleNameEnv elt = DFastStringEnv elt

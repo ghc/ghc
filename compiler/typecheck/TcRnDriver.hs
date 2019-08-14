@@ -54,6 +54,8 @@ import IfaceEnv( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
+import UniqMap
+import FastStringEnv
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
 import RnTypes
@@ -331,7 +333,7 @@ tcRnImports hsc_env import_decls
                 -- modules batch (@--make@) compiled before this one, but
                 -- which are not below this one.
               ; want_instances :: ModuleName -> Bool
-              ; want_instances mod = mod `elemUFM` dep_mods
+              ; want_instances mod = (elemFsEnv mod dep_mods)
                                    && mod /= moduleName this_mod
               ; (home_insts, home_fam_insts) = hptInstances hsc_env
                                                             want_instances
@@ -1516,7 +1518,7 @@ tcPreludeClashWarn warnFlag name = do
     -- Continue only the name is imported from Prelude
     ; when (importedViaPrelude name rnImports) $ do
       -- Handle 2.-4.
-    { rdrElts <- fmap (concat . occEnvElts . tcg_rdr_env) getGblEnv
+    { rdrElts <- fmap (concat . nonDetOccEnvElts . tcg_rdr_env) getGblEnv
 
     ; let clashes :: GlobalRdrElt -> Bool
           clashes x = isLocalDef && nameClashes && isNotInProperModule
@@ -1847,7 +1849,7 @@ runTcInteractive hsc_env thing_inside
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
                  , text "ic_rn_gbl_env (LocalDef)" <+>
-                      vcat (map ppr [ local_gres | gres <- occEnvElts (ic_rn_gbl_env icxt)
+                      vcat (map ppr [ local_gres | gres <- nonDetOccEnvElts (ic_rn_gbl_env icxt)
                                                  , let local_gres = filter isLocalGRE gres
                                                  , not (null local_gres) ]) ]
 
@@ -2744,7 +2746,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , ppr_rules rules
          , text "Dependent modules:" <+>
-                pprUFM (imp_dep_mods imports) (ppr . sort)
+                pprUniqMap ppr (imp_dep_mods imports) 
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_pkgs imports)]
   where         -- The use of sort is just to reduce unnecessary

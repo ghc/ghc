@@ -37,6 +37,7 @@ import GHC.Platform
 import Util
 import Unique
 import UniqDSet
+import FastString
 
 -- From iserv
 import SizedSeq
@@ -432,10 +433,10 @@ assembleI dflags i = case i of
   RETURN_UBX rep           -> emit (return_ubx rep) []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
-  BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
-                                 q <- int (getKey uniq)
-                                 np <- addr cc
-                                 emit bci_BRK_FUN [Op p1, SmallOp index,
+  BRK_FUN index fs cc    -> do p1 <- ptr BCOPtrBreakArray
+                               q <- int (uniqueOfFS fs)
+                               np <- addr cc
+                               emit bci_BRK_FUN [Op p1, SmallOp index,
                                                    Op q, Op np]
 
   where

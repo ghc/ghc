@@ -97,7 +97,9 @@ import Bag
 import Outputable
 import StringBuffer
 import FastString
+import UniqMap
 import UniqFM
+import FastStringEnv
 import Util             ( readRational, readHexRational )
 
 -- compiler/main
@@ -794,8 +796,8 @@ instance Outputable Token where
 -- facilitates using a keyword in two different extensions that can be
 -- activated independently)
 --
-reservedWordsFM :: UniqFM (Token, ExtsBitmap)
-reservedWordsFM = listToUFM $
+reservedWordsFM :: FastStringEnv (Token, ExtsBitmap)
+reservedWordsFM = mkFsEnv $
     map (\(x, y, z) -> (mkFastString x, (y, z)))
         [( "_",              ITunderscore,    0 ),
          ( "as",             ITas,            0 ),
@@ -877,8 +879,8 @@ Also, note that these are included in the `varid` production in the parser --
 a key detail to make all this work.
 -------------------------------------}
 
-reservedSymsFM :: UniqFM (Token, IsUnicodeSyntax, ExtsBitmap)
-reservedSymsFM = listToUFM $
+reservedSymsFM :: FastStringEnv (Token, IsUnicodeSyntax, ExtsBitmap)
+reservedSymsFM = mkFsEnv $
     map (\ (x,w,y,z) -> (mkFastString x,(w,y,z)))
       [ ("..",  ITdotdot,                   NormalSyntax,  0 )
         -- (:) is a reserved op, meaning only list cons
@@ -1311,7 +1313,7 @@ splitQualName orig_buf len parens = split orig_buf orig_buf
 
 varid :: Action
 varid span buf len =
-  case lookupUFM reservedWordsFM fs of
+  case lookupFsEnv reservedWordsFM fs of
     Just (ITcase, _) -> do
       lastTk <- getLastTk
       keyword <- case lastTk of
@@ -1354,7 +1356,7 @@ consym = sym ITconsym
 
 sym :: (FastString -> Token) -> Action
 sym con span buf len =
-  case lookupUFM reservedSymsFM fs of
+  case lookupFsEnv reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
       return $ L span keyword
     Just (keyword, NormalSyntax, i) -> do

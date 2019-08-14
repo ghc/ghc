@@ -501,7 +501,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
    exn_name <- newInteractiveBinder hsc_env exn_occ span
 
    let e_fs    = fsLit "e"
-       e_name  = mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
+       e_name  = undefined --mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar = mkRuntimeUnkTyVar e_name liftedTypeKind
        exn_id  = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)
 
@@ -1184,7 +1184,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- We will ignore the returned [Id], namely [expr_id], and not really
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
-      expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
+      expr_name = mkInternalName (undefined) (mkTyVarOccFS expr_fs) loc
       let_stmt = L loc . LetStmt noExtField . L loc . (HsValBinds noExtField) $
         ValBinds noExtField
                      (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []

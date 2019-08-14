@@ -183,12 +183,12 @@ initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
 initRnIface hsc_env iface insts nsubst do_this = do
     errs_var <- newIORef emptyBag
     let dflags = hsc_dflags hsc_env
-        hsubst = listToUFM insts
+        hsubst = mkFsEnv insts
         rn_mod = renameHoleModule dflags hsubst
         env = ShIfEnv {
             sh_if_module = rn_mod (mi_module iface),
             sh_if_semantic_module = rn_mod (mi_semantic_module iface),
-            sh_if_hole_subst = listToUFM insts,
+            sh_if_hole_subst = mkFsEnv insts,
             sh_if_shape = nsubst,
             sh_if_errs = errs_var
         }

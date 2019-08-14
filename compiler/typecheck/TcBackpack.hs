@@ -66,6 +66,7 @@ import Util
 
 import Control.Monad
 import Data.List (find)
+import FastStringEnv
 
 import {-# SOURCE #-} TcRnDriver
 
@@ -256,9 +257,9 @@ requirementMerges dflags mod_name =
 findExtraSigImports' :: HscEnv
                      -> HscSource
                      -> ModuleName
-                     -> IO (UniqDSet ModuleName)
+                     -> IO (DFastStringEnv ModuleName)
 findExtraSigImports' hsc_env HsigFile modname =
-    fmap unionManyUniqDSets (forM reqs $ \(IndefModule iuid mod_name) ->
+    fmap mconcat (forM reqs $ \(IndefModule iuid mod_name) ->
         (initIfaceLoad hsc_env
             . withException
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
@@ -266,7 +267,7 @@ findExtraSigImports' hsc_env HsigFile modname =
   where
     reqs = requirementMerges (hsc_dflags hsc_env) modname
 
-findExtraSigImports' _ _ _ = return emptyUniqDSet
+findExtraSigImports' _ _ _ = return emptyDFsEnv
 
 -- | 'findExtraSigImports', but in a convenient form for "GhcMake" and
 -- "TcRnDriver".
@@ -275,7 +276,7 @@ findExtraSigImports :: HscEnv -> HscSource -> ModuleName
 findExtraSigImports hsc_env hsc_src modname = do
     extra_requirements <- findExtraSigImports' hsc_env hsc_src modname
     return [ (Nothing, noLoc mod_name)
-           | mod_name <- uniqDSetToList extra_requirements ]
+           | mod_name <- dFsEnvElts extra_requirements ]
 
 -- A version of 'implicitRequirements'' which is more friendly
 -- for "GhcMake" and "TcRnDriver".
@@ -299,7 +300,7 @@ implicitRequirements' hsc_env normal_imports
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
             Found _ mod | thisPackage dflags /= moduleUnitId mod ->
-                return (uniqDSetToList (moduleFreeHoles mod))
+                return (dFsEnvElts (moduleFreeHoles mod))
             _ -> return []
   where dflags = hsc_dflags hsc_env
 

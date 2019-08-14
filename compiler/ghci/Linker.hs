@@ -73,6 +73,7 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import Exception
+import FastStringEnv
 
 {- **********************************************************************
 
@@ -625,7 +626,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
         -- (omitting modules from the interactive package, which is already linked)
       ; (mods_s, pkgs_s) <- follow_deps (filterOut isInteractiveModule mods)
-                                        emptyUniqDSet emptyUniqDSet;
+                                        emptyDFsEnv emptyDFsEnv;
 
       ; let {
         -- 2.  Exclude ones already linked
@@ -653,11 +654,11 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         -- dependencies of that.  Hence we need to traverse the dependency
         -- tree recursively.  See bug #936, testcase ghci/prog007.
     follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet ModuleName         -- accum. module dependencies
-                -> UniqDSet InstalledUnitId          -- accum. package dependencies
+                -> DFastStringEnv ModuleName         -- accum. module dependencies
+                -> DFastStringEnv InstalledUnitId          -- accum. package dependencies
                 -> IO ([ModuleName], [InstalledUnitId]) -- result
     follow_deps []     acc_mods acc_pkgs
-        = return (uniqDSetToList acc_mods, uniqDSetToList acc_pkgs)
+        = return (dFsEnvElts acc_mods, dFsEnvElts acc_pkgs)
     follow_deps (mod:mods) acc_mods acc_pkgs
         = do
           mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
@@ -676,13 +677,13 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
                     where is_boot (m,True)  = Left m
                           is_boot (m,False) = Right m
-
-            boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
-            acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
+            dup x = (x, x)
+            boot_deps' = filter (not . (`elemDFsEnv` acc_mods)) boot_deps
+            acc_mods'  = addListToDFsEnv acc_mods (map dup (moduleName mod : mod_deps))
+            acc_pkgs'  = addListToDFsEnv acc_pkgs $ map (dup . fst) pkg_deps
           --
           if pkg /= this_pkg
-             then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toInstalledUnitId pkg))
+             then follow_deps mods acc_mods (addToDFsEnv acc_pkgs' (toInstalledUnitId pkg) (toInstalledUnitId pkg))
              else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where

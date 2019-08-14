@@ -69,6 +69,9 @@ import Util
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
 import FileCleanup
+import FsSet
+import UniqDFM
+import UniqMap
 
 import Data.Either ( rights, partitionEithers )
 import qualified Data.Map as Map
@@ -94,6 +97,7 @@ import System.Directory
 import System.FilePath
 import System.IO        ( fixIO )
 import System.IO.Error  ( isDoesNotExistError )
+import FastStringEnv
 
 import GHC.Conc ( getNumProcessors, getNumCapabilities, setNumCapabilities )
 
@@ -354,8 +358,8 @@ load' how_much mHscMessage mod_graph = do
     -- The downsweep should have ensured this does not happen
     -- (see msDeps)
     let all_home_mods =
-          mkUniqSet [ ms_mod_name s
-                    | s <- mgModSummaries mod_graph, not (isBootSummary s)]
+          mkFsEnv [ let f = ms_mod_name s in (f, f)
+                  | s <- mgModSummaries mod_graph, not (isBootSummary s)]
     -- TODO: Figure out what the correct form of this assert is. It's violated
     -- when you have HsBootMerge nodes in the graph: then you'll have hs-boot
     -- files without corresponding hs files.
@@ -370,7 +374,7 @@ load' how_much mHscMessage mod_graph = do
         checkHowMuch _ = id
 
         checkMod m and_then
-            | m `elementOfUniqSet` all_home_mods = and_then
+            | m `elemFsEnv` all_home_mods = and_then
             | otherwise = do
                     liftIO $ errorMsg dflags (text "no such module:" <+>
                                      quotes (ppr m))
@@ -413,8 +417,8 @@ load' how_much mHscMessage mod_graph = do
 
     -- Unload any modules which are going to be re-linked this time around.
     let stable_linkables = [ linkable
-                           | m <- nonDetEltsUniqSet stable_obj ++
-                                  nonDetEltsUniqSet stable_bco,
+                           | m <- nonDetEltsFsSet stable_obj ++
+                                  nonDetEltsFsSet stable_bco,
                              -- It's OK to use nonDetEltsUniqSet here
                              -- because it only affects linking. Besides
                              -- this list only serves as a poor man's set.
@@ -466,8 +470,8 @@ load' how_much mHscMessage mod_graph = do
               stable_mod_summary ms ]
 
         stable_mod_summary ms =
-          ms_mod_name ms `elementOfUniqSet` stable_obj ||
-          ms_mod_name ms `elementOfUniqSet` stable_bco
+          ms_mod_name ms `elementOfFsSet` stable_obj ||
+          ms_mod_name ms `elementOfFsSet` stable_bco
 
         -- the modules from partial_mg that are not also stable
         -- NB. also keep cycles, we need to emit an error message later
@@ -700,13 +704,13 @@ pruneHomePackageTable hpt summ (stable_obj, stable_bco)
                 = hmi{ hm_linkable = Nothing }
                 | otherwise
                 = hmi
-                where ms = expectJust "prune" (lookupUFM ms_map modl)
+                where ms = expectJust "prune" (lookupFsEnv ms_map modl)
 
-        ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
+        ms_map = mkFsEnv [(ms_mod_name ms, ms) | ms <- summ]
 
         is_stable m =
-          m `elementOfUniqSet` stable_obj ||
-          m `elementOfUniqSet` stable_bco
+          m `elementOfFsSet` stable_obj ||
+          m `elementOfFsSet` stable_bco
 
 -- -----------------------------------------------------------------------------
 --
@@ -791,36 +795,38 @@ unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
 -}
 
 type StableModules =
-  ( UniqSet ModuleName  -- stableObject
-  , UniqSet ModuleName  -- stableBCO
+  ( FsSet ModuleName  -- stableObject
+  , FsSet ModuleName  -- stableBCO
   )
 
 
 checkStability
         :: HomePackageTable   -- HPT from last compilation
         -> [SCC ModSummary]   -- current module graph (cyclic)
-        -> UniqSet ModuleName -- all home modules
+        -> FastStringEnv ModuleName -- all home modules
         -> StableModules
 
 checkStability hpt sccs all_home_mods =
-  foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
+  foldl' checkSCC (emptyFsSet, emptyFsSet) sccs
   where
    checkSCC :: StableModules -> SCC ModSummary -> StableModules
    checkSCC (stable_obj, stable_bco) scc0
-     | stableObjects = (addListToUniqSet stable_obj scc_mods, stable_bco)
-     | stableBCOs    = (stable_obj, addListToUniqSet stable_bco scc_mods)
+     | stableObjects = (addListToFsSet stable_obj scc_mods, stable_bco)
+     | stableBCOs    = (stable_obj, addListToFsSet stable_bco scc_mods)
      | otherwise     = (stable_obj, stable_bco)
      where
         scc = flattenSCC scc0
         scc_mods = map ms_mod_name scc
+        home_module :: ModuleName -> Bool
         home_module m =
-          m `elementOfUniqSet` all_home_mods && m `notElem` scc_mods
+          (m `elemFsEnv` all_home_mods) && m `notElem` scc_mods
 
+        scc_allimps :: [ModuleName]
         scc_allimps = nub (filter home_module (concatMap ms_home_allimps scc))
             -- all imports outside the current SCC, but in the home pkg
 
-        stable_obj_imps = map (`elementOfUniqSet` stable_obj) scc_allimps
-        stable_bco_imps = map (`elementOfUniqSet` stable_bco) scc_allimps
+        stable_obj_imps = map (`elementOfFsSet` stable_obj) scc_allimps
+        stable_bco_imps = map (`elementOfFsSet` stable_bco) scc_allimps
 
         stableObjects =
            and stable_obj_imps
@@ -1355,7 +1361,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                            (unitIdsToCheck dflags) done_holes
    return (res, reverse $ mgModSummaries done)
  where
-  done_holes = emptyUniqSet
+  done_holes = emptyFsSet
 
   upsweep'
     :: GhcMonad m
@@ -1365,7 +1371,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     -> Int
     -> Int
     -> [UnitId]
-    -> UniqSet ModuleName
+    -> FsSet ModuleName
     -> m (SuccessFlag, ModuleGraph)
   upsweep' _old_hpt done
      [] _ _ uids_to_check _
@@ -1391,12 +1397,16 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         -- TODO: Cache this, so that we don't repeatedly re-check
         -- our imports when you run --make.
         let (ready_uids, uids_to_check')
-                = partition (\uid -> isEmptyUniqDSet
-                    (unitIdFreeHoles uid `uniqDSetMinusUniqSet` done_holes))
+                = partition (\uid -> isNullUDFM
+                    (unitIdFreeHoles uid `combine` done_holes))
                      uids_to_check
+            combine :: DFastStringEnv ModuleName -> FsSet ModuleName -> DFastStringEnv ModuleName
+            combine d ds = udfmMinusUFM d u
+              where
+                UniqMap u = (getFsSet ds)
             done_holes'
                 | ms_hsc_src mod == HsigFile
-                = addOneToUniqSet done_holes (ms_mod_name mod)
+                = addOneToFsSet done_holes (ms_mod_name mod)
                 | otherwise = done_holes
         liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnitId hsc_env) ready_uids
 
@@ -1507,8 +1517,8 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             obj_fn      = ml_obj_file (ms_location summary)
             hs_date     = ms_hs_date summary
 
-            is_stable_obj = this_mod_name `elementOfUniqSet` stable_obj
-            is_stable_bco = this_mod_name `elementOfUniqSet` stable_bco
+            is_stable_obj = this_mod_name `elementOfFsSet` stable_obj
+            is_stable_bco = this_mod_name `elementOfFsSet` stable_bco
 
             old_hmi = lookupHpt old_hpt this_mod_name
 

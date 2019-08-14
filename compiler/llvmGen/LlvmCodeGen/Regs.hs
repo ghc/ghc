@@ -6,7 +6,7 @@
 
 module LlvmCodeGen.Regs (
         lmGlobalRegArg, lmGlobalRegVar, alwaysLive,
-        stgTBAA, baseN, stackN, heapN, rxN, topN, tbaa, getTBAA
+        stgTBAA,  getTBAA
     ) where
 
 #include "HsVersions.h"
@@ -97,9 +97,10 @@ alwaysLive :: [GlobalReg]
 alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
 -- | STG Type Based Alias Analysis hierarchy
-stgTBAA :: [(Unique, LMString, Maybe Unique)]
-stgTBAA
-  = [ (rootN,  fsLit "root",   Nothing)
+stgTBAA :: Monad m => (FastString -> m Unique) -> m [(Unique, LMString, Maybe Unique)]
+stgTBAA m = undefined 
+{-
+  = return [ (rootN,  fsLit "root",   Nothing)
     , (topN,   fsLit "top",   Just rootN)
     , (stackN, fsLit "stack", Just topN)
     , (heapN,  fsLit "heap",  Just topN)
@@ -110,27 +111,23 @@ stgTBAA
     -- on its own branch that is never aliased (e.g never use top as a TBAA
     -- node).
     ]
-
+-}
 -- | Id values
 -- The `rootN` node is the root (there can be more than one) of the TBAA
 -- hierarchy and as of LLVM 4.0 should *only* be referenced by other nodes. It
 -- should never occur in any LLVM instruction statement.
-rootN, topN, stackN, heapN, rxN, baseN :: Unique
-rootN  = getUnique (fsLit "LlvmCodeGen.Regs.rootN")
-topN   = getUnique (fsLit "LlvmCodeGen.Regs.topN")
-stackN = getUnique (fsLit "LlvmCodeGen.Regs.stackN")
-heapN  = getUnique (fsLit "LlvmCodeGen.Regs.heapN")
-rxN    = getUnique (fsLit "LlvmCodeGen.Regs.rxN")
-baseN  = getUnique (fsLit "LlvmCodeGen.Regs.baseN")
 
 -- | The TBAA metadata identifier
 tbaa :: LMString
 tbaa = fsLit "tbaa"
 
 -- | Get the correct TBAA metadata information for this register type
+getTBAA = undefined
+{-
 getTBAA :: GlobalReg -> Unique
 getTBAA BaseReg          = baseN
 getTBAA Sp               = stackN
 getTBAA Hp               = heapN
 getTBAA (VanillaReg _ _) = rxN
 getTBAA _                = topN
+-}

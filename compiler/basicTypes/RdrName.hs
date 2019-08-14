@@ -356,7 +356,7 @@ instance Outputable LocalRdrEnv where
                     <+> pprUFM (getUniqSet ns) (braces . pprWithCommas ppr)
                  ] <+> char '}')
     where
-      ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name
+      ppr_elt name = parens (ppr (uniqueOfFS (getFastString (nameOccName name))) <+> ppr name)
                      -- So we can see if the keys line up correctly
 
 emptyLocalRdrEnv :: LocalRdrEnv
@@ -401,7 +401,7 @@ elemLocalRdrEnv rdr_name (LRE { lre_env = env, lre_in_scope = ns })
       Orig {} -> False
 
 localRdrEnvElts :: LocalRdrEnv -> [Name]
-localRdrEnvElts (LRE { lre_env = env }) = occEnvElts env
+localRdrEnvElts (LRE { lre_env = env }) = nonDetOccEnvElts env
 
 inLocalRdrEnvScope :: Name -> LocalRdrEnv -> Bool
 -- This is the point of the NameSet
@@ -756,7 +756,7 @@ emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
 
 globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
-globalRdrEnvElts env = foldOccEnv (++) [] env
+globalRdrEnvElts env = nonDetFoldOccEnv (++) [] env
 
 instance Outputable GlobalRdrElt where
   ppr gre = hang (ppr (gre_name gre) <+> ppr (gre_par gre))
@@ -766,14 +766,14 @@ pprGlobalRdrEnv :: Bool -> GlobalRdrEnv -> SDoc
 pprGlobalRdrEnv locals_only env
   = vcat [ text "GlobalRdrEnv" <+> ppWhen locals_only (ptext (sLit "(locals only)"))
              <+> lbrace
-         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- occEnvElts env ]
+         , nest 2 (vcat [ pp (remove_locals gre_list) | gre_list <- nonDetOccEnvElts env ]
              <+> rbrace) ]
   where
     remove_locals gres | locals_only = filter isLocalGRE gres
                        | otherwise   = gres
     pp []   = empty
     pp gres = hang (ppr occ
-                     <+> parens (text "unique" <+> ppr (getUnique occ))
+                     <+> parens (text "unique" <+> ppr (uniqueOfFS (getFastString occ)))
                      <> colon)
                  2 (vcat (map ppr gres))
       where

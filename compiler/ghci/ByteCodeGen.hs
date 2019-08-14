@@ -428,7 +428,7 @@ schemeER_wrk d p rhs
         dflags <- getDynFlags
         let cc | interpreterProfiled dflags = cc_arr ! tick_no
                | otherwise = toRemotePtr nullPtr
-        let breakInstr = BRK_FUN (fromIntegral tick_no) (getUnique this_mod) cc
+        let breakInstr = BRK_FUN (fromIntegral tick_no) (getFastString this_mod) cc
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs
 

@@ -86,6 +86,7 @@ import UniqFM
 import UniqSupply
 import DynFlags
 import Util
+import UniqMap
 
 import BasicTypes       ( Alignment )
 import qualified Pretty
@@ -107,6 +108,8 @@ import Data.Ord         ( comparing )
 import Control.Exception
 import Control.Monad
 import System.IO
+import FastStringEnv
+import Data.Coerce
 
 {-
 The native-code generator has machine-independent and
@@ -322,7 +325,7 @@ nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
+        let ngs0 = NGS [] [] [] [] [] [] emptyFsEnv mapEmpty
         (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
                                          cmms ngs0
         finishNativeGen dflags modLoc bufh us' ngs
@@ -464,8 +467,9 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
         -- Generate .file directives for every new file that has been
         -- used. Note that it is important that we generate these in
         -- ascending order, as Clang's 3.6 assembler complains.
-        let newFileIds = sortBy (comparing snd) $
-                         nonDetEltsUFM $ fileIds' `minusUFM` fileIds
+        let newFileIds :: [(FastString, Int)]
+            newFileIds = coerce $ sortBy (comparing snd) $
+                         nonDetEltsUniqMap_K $ fileIds' `minusUniqMap` fileIds
             -- See Note [Unique Determinism and code generation]
             pprDecl (f,n) = text "\t.file " <> ppr n <+>
                             pprFilePathString (unpackFS f)

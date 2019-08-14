@@ -169,6 +169,7 @@ import Var
 import Id
 import IdInfo           ( IdDetails(..), RecSelParent(..))
 import Type
+import FsSet
 
 import ApiAnnotation    ( ApiAnns )
 import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
@@ -207,6 +208,7 @@ import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
+import FastStringEnv
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -493,7 +495,7 @@ data HscEnv
 data IServ = IServ
   { iservPipe :: Pipe
   , iservProcess :: ProcessHandle
-  , iservLookupSymbolCache :: IORef (UniqFM (Ptr ()))
+  , iservLookupSymbolCache :: IORef (FastStringEnv (Ptr ()))
   , iservPendingFrees :: [HValueRef]
   }
 
@@ -580,38 +582,38 @@ pprHPT :: HomePackageTable -> SDoc
 pprHPT hpt = pprUDFM hpt $ \hms ->
     vcat [ hang (ppr (mi_module (hm_iface hm)))
               2 (ppr (md_types (hm_details hm)))
-         | hm <- hms ]
+         | (_, hm) <- hms ]
 
 lookupHpt :: HomePackageTable -> ModuleName -> Maybe HomeModInfo
-lookupHpt = lookupUDFM
+lookupHpt = lookupDFsEnv
 
 lookupHptDirectly :: HomePackageTable -> Unique -> Maybe HomeModInfo
-lookupHptDirectly = lookupUDFM_Directly
+lookupHptDirectly h u = snd <$> lookupUDFM_Directly h u
 
 eltsHpt :: HomePackageTable -> [HomeModInfo]
-eltsHpt = eltsUDFM
+eltsHpt = dFsEnvElts
 
 filterHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> HomePackageTable
-filterHpt = filterUDFM
+filterHpt f = filterUDFM (f . snd)
 
 allHpt :: (HomeModInfo -> Bool) -> HomePackageTable -> Bool
-allHpt = allUDFM
+allHpt f = allUDFM (f . snd)
 
 mapHpt :: (HomeModInfo -> HomeModInfo) -> HomePackageTable -> HomePackageTable
-mapHpt = mapUDFM
+mapHpt f = mapUDFM (\(k, v) -> (k, f v))
 
 delFromHpt :: HomePackageTable -> ModuleName -> HomePackageTable
-delFromHpt = delFromUDFM
+delFromHpt = delFromDFsEnv
 
 addToHpt :: HomePackageTable -> ModuleName -> HomeModInfo -> HomePackageTable
-addToHpt = addToUDFM
+addToHpt = addToDFsEnv
 
 addListToHpt
   :: HomePackageTable -> [(ModuleName, HomeModInfo)] -> HomePackageTable
-addListToHpt = addListToUDFM
+addListToHpt = addListToDFsEnv
 
 listToHpt :: [(ModuleName, HomeModInfo)] -> HomePackageTable
-listToHpt = listToUDFM
+listToHpt = mkDFsEnv
 
 lookupHptByModule :: HomePackageTable -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
@@ -780,7 +782,7 @@ metaRequestAW h = fmap unMetaResAW . h (MetaAW MetaResAW)
 
 -- | Deal with gathering annotations in from all possible places
 --   and combining them into a single 'AnnEnv'
-prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
+prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO (AnnEnv Name)
 prepareAnnotations hsc_env mb_guts = do
     eps <- hscEPS hsc_env
     let -- Extract annotations from the module being compiled if supplied one
@@ -1010,14 +1012,14 @@ mi_semantic_module iface = case mi_sig_of iface of
 
 -- | The "precise" free holes, e.g., the signatures that this
 -- 'ModIface' depends on.
-mi_free_holes :: ModIface -> UniqDSet ModuleName
+mi_free_holes :: ModIface -> DFastStringEnv ModuleName
 mi_free_holes iface =
   case splitModuleInsts (mi_module iface) of
     (_, Just indef)
         -- A mini-hack: we rely on the fact that 'renameFreeHoles'
         -- drops things that aren't holes.
-        -> renameFreeHoles (mkUniqDSet cands) (indefUnitIdInsts (indefModuleUnitId indef))
-    _   -> emptyUniqDSet
+        -> renameFreeHoles (mkDFsEnv (map (\x -> (x, x)) cands)) (indefUnitIdInsts (indefModuleUnitId indef))
+    _   -> emptyDFsEnv
   where
     cands = map fst (dep_mods (mi_deps iface))
 
@@ -1026,15 +1028,16 @@ mi_free_holes iface =
 -- identifier.  For example, if we have A and B free, and
 -- our unit identity is @p[A=<C>,B=impl:B]@, the renamed free
 -- holes are just C.
-renameFreeHoles :: UniqDSet ModuleName -> [(ModuleName, Module)] -> UniqDSet ModuleName
+renameFreeHoles :: DFastStringEnv ModuleName -> [(ModuleName, Module)] -> DFastStringEnv ModuleName
 renameFreeHoles fhs insts =
-    unionManyUniqDSets (map lookup_impl (uniqDSetToList fhs))
+    plusUDFMs (map lookup_impl (dFsEnvElts fhs))
   where
-    hmap = listToUFM insts
+    hmap = mkFsEnv insts
+    lookup_impl :: ModuleName -> DFastStringEnv ModuleName
     lookup_impl mod_name
-        | Just mod <- lookupUFM hmap mod_name = moduleFreeHoles mod
+        | Just mod <- lookupFsEnv hmap mod_name = moduleFreeHoles mod
         -- It wasn't actually a hole
-        | otherwise                           = emptyUniqDSet
+        | otherwise                           = emptyDFsEnv
 
 instance Binary ModIface where
    put_ bh (ModIface {
@@ -2544,7 +2547,7 @@ type PackageTypeEnv          = TypeEnv
 type PackageRuleBase         = RuleBase
 type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
-type PackageAnnEnv           = AnnEnv
+type PackageAnnEnv           = AnnEnv Name
 type PackageCompleteMatchMap = CompleteMatchMap
 
 -- | Information about other packages that we have slurped in by reading
@@ -2584,7 +2587,7 @@ data ExternalPackageState
                 --
                 -- * Deprecations and warnings
 
-        eps_free_holes :: InstalledModuleEnv (UniqDSet ModuleName),
+        eps_free_holes :: InstalledModuleEnv (DFastStringEnv ModuleName),
                 -- ^ Cache for 'mi_free_holes'.  Ordinarily, we can rely on
                 -- the 'eps_PIT' for this information, EXCEPT that when
                 -- we do dependency analysis, we need to look at the

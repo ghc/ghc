@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-
 %
 % (c) The University of Glasgow 2006
@@ -24,15 +25,35 @@ module FastStringEnv (
         DFastStringEnv,
 
         -- ** Manipulating these environments
-        mkDFsEnv, emptyDFsEnv, dFsEnvElts, lookupDFsEnv
+        mkDFsEnv, emptyDFsEnv, dFsEnvElts, lookupDFsEnv,
+        addToDFsEnv, elemDFsEnv, addListToDFsEnv, delFromDFsEnv,
+        FastStringU(..), dFsEnvToDsEnv
     ) where
 
 import GhcPrelude
 
-import UniqFM
+import UniqMap
+import Data.Data
 import UniqDFM
 import Maybes
 import FastString
+import Unique
+import Outputable
+
+import Data.Coerce
+
+
+-- Uniquable is very bad because it means that we lose the reference to the
+-- fast string which means that it gets GCd. FastStringEnv ensures that
+-- the map also contains a copy of the key so we retain a reference.
+newtype FastStringU = FastStringU FastString
+      deriving Data
+
+instance Outputable FastStringU where
+  ppr (FastStringU f) = ppr f
+
+instance Uniquable FastStringU where
+  getUnique (FastStringU fs) = mkUniqueGrimily (uniqueOfFS fs)
 
 
 -- | A non-deterministic set of FastStrings.
@@ -40,44 +61,52 @@ import FastString
 -- deterministic and why it matters. Use DFastStringEnv if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code.
-type FastStringEnv a = UniqFM a  -- Domain is FastString
+type FastStringEnv a = UniqMap FastStringU a  -- Domain is FastString
 
 emptyFsEnv         :: FastStringEnv a
-mkFsEnv            :: [(FastString,a)] -> FastStringEnv a
-alterFsEnv         :: (Maybe a-> Maybe a) -> FastStringEnv a -> FastString -> FastStringEnv a
-extendFsEnv_C      :: (a->a->a) -> FastStringEnv a -> FastString -> a -> FastStringEnv a
-extendFsEnv_Acc    :: (a->b->b) -> (a->b) -> FastStringEnv b -> FastString -> a -> FastStringEnv b
-extendFsEnv        :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+mkFsEnv            :: HasFastString f => [(f,a)] -> FastStringEnv a
+alterFsEnv         :: HasFastString f => (Maybe a-> Maybe a) -> FastStringEnv a -> f -> FastStringEnv a
+extendFsEnv_C      :: HasFastString f => (a->a->a) -> FastStringEnv a -> f -> a -> FastStringEnv a
+extendFsEnv_Acc    :: HasFastString f => (a->b->b) -> (a->b) -> FastStringEnv b -> f -> a -> FastStringEnv b
+extendFsEnv        :: HasFastString f => FastStringEnv a -> f -> a -> FastStringEnv a
 plusFsEnv          :: FastStringEnv a -> FastStringEnv a -> FastStringEnv a
 plusFsEnv_C        :: (a->a->a) -> FastStringEnv a -> FastStringEnv a -> FastStringEnv a
-extendFsEnvList    :: FastStringEnv a -> [(FastString,a)] -> FastStringEnv a
-extendFsEnvList_C  :: (a->a->a) -> FastStringEnv a -> [(FastString,a)] -> FastStringEnv a
-delFromFsEnv       :: FastStringEnv a -> FastString -> FastStringEnv a
-delListFromFsEnv   :: FastStringEnv a -> [FastString] -> FastStringEnv a
-elemFsEnv          :: FastString -> FastStringEnv a -> Bool
-unitFsEnv          :: FastString -> a -> FastStringEnv a
-lookupFsEnv        :: FastStringEnv a -> FastString -> Maybe a
-lookupFsEnv_NF     :: FastStringEnv a -> FastString -> a
+extendFsEnvList    :: HasFastString f => FastStringEnv a -> [(f,a)] -> FastStringEnv a
+extendFsEnvList_C  :: HasFastString f => (a->a->a) -> FastStringEnv a -> [(f,a)] -> FastStringEnv a
+delFromFsEnv       :: HasFastString f => FastStringEnv a -> f -> FastStringEnv a
+delListFromFsEnv   :: HasFastString f => FastStringEnv a -> [f] -> FastStringEnv a
+elemFsEnv          :: HasFastString f => f -> FastStringEnv a -> Bool
+unitFsEnv          :: HasFastString f => f -> a -> FastStringEnv a
+lookupFsEnv        :: HasFastString f => FastStringEnv a -> f -> Maybe a
+lookupFsEnv_NF     :: HasFastString f => FastStringEnv a -> f -> a
 filterFsEnv        :: (elt -> Bool) -> FastStringEnv elt -> FastStringEnv elt
 mapFsEnv           :: (elt1 -> elt2) -> FastStringEnv elt1 -> FastStringEnv elt2
 
-emptyFsEnv                = emptyUFM
-unitFsEnv x y             = unitUFM x y
-extendFsEnv x y z         = addToUFM x y z
-extendFsEnvList x l       = addListToUFM x l
-lookupFsEnv x y           = lookupUFM x y
-alterFsEnv                = alterUFM
-mkFsEnv     l             = listToUFM l
-elemFsEnv x y             = elemUFM x y
-plusFsEnv x y             = plusUFM x y
-plusFsEnv_C f x y         = plusUFM_C f x y
-extendFsEnv_C f x y z     = addToUFM_C f x y z
-mapFsEnv f x              = mapUFM f x
-extendFsEnv_Acc x y z a b = addToUFM_Acc x y z a b
-extendFsEnvList_C x y z   = addListToUFM_C x y z
-delFromFsEnv x y          = delFromUFM x y
-delListFromFsEnv x y      = delListFromUFM x y
-filterFsEnv x y           = filterUFM x y
+coerceF :: HasFastString f => f -> FastStringU
+coerceF = coerce . getFastString
+coerceFL :: HasFastString f => [f] -> [FastStringU]
+coerceFL = coerce . map getFastString
+
+coerceFT :: HasFastString f => [(f, a)] -> [(FastStringU, a)]
+coerceFT = coerce . map (\(a, b) -> (getFastString a, b))
+
+emptyFsEnv                = emptyUniqMap
+unitFsEnv x y             = unitUniqMap (coerceF x) y
+extendFsEnv x y z         = addToUniqMap x (coerceF y) z
+extendFsEnvList x l       = addListToUniqMap x (coerceFT l)
+lookupFsEnv x y           = lookupUniqMap x (coerceF y)
+alterFsEnv  x y a         = alterUniqMap x y (coerceF a)
+mkFsEnv     l             = listToUniqMap (coerceFT l)
+elemFsEnv x y             = elemUniqMap (coerceF x) y
+plusFsEnv x y             = plusUniqMap x y
+plusFsEnv_C f x y         = plusUniqMap_C f x y
+extendFsEnv_C f x y z     = addToUniqMap_C f x (coerceF y) z
+mapFsEnv f x              = mapUniqMap f x
+extendFsEnv_Acc x y z a b = addToUniqMap_Acc x y z (coerceF a) b
+extendFsEnvList_C x y z   = addListToUniqMap_C x y (coerceFT z)
+delFromFsEnv x y          = delFromUniqMap x (coerceF y)
+delListFromFsEnv x y      = delListFromUniqMap x (coerceFL y)
+filterFsEnv x y           = filterUniqMap x y
 
 lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
 
@@ -85,16 +114,36 @@ lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
 -- DFastStringEnv.
 
-type DFastStringEnv a = UniqDFM a  -- Domain is FastString
+type DFastStringEnv a = UniqDFM (FastString, a)  -- Domain is FastString
+
+dFsEnvToDsEnv :: DFastStringEnv a -> FastStringEnv a
+dFsEnvToDsEnv = UniqMap . udfmToUfm . coerce
 
 emptyDFsEnv :: DFastStringEnv a
 emptyDFsEnv = emptyUDFM
 
 dFsEnvElts :: DFastStringEnv a -> [a]
-dFsEnvElts = eltsUDFM
+dFsEnvElts = map snd . eltsUDFM
 
-mkDFsEnv :: [(FastString,a)] -> DFastStringEnv a
-mkDFsEnv l = listToUDFM l
+addToDFsEnv :: 
+  HasFastString f => DFastStringEnv a -> f -> a -> DFastStringEnv a
+addToDFsEnv m f a = addToUDFM m (FastStringU $ getFastString f) (getFastString f, a)
 
-lookupDFsEnv :: DFastStringEnv a -> FastString -> Maybe a
-lookupDFsEnv = lookupUDFM
+addListToDFsEnv :: 
+  HasFastString f => DFastStringEnv a -> [(f,a)] -> DFastStringEnv a
+addListToDFsEnv m fs = 
+    addListToUDFM m (map (\(f,a) -> ((FastStringU $ getFastString f), (getFastString f, a))) fs)
+
+
+mkDFsEnv :: HasFastString f => [(f,a)] -> DFastStringEnv a
+mkDFsEnv l = listToUDFM 
+  (map (\(f, x) -> (FastStringU (getFastString f), (getFastString f, x))) l)
+
+lookupDFsEnv :: HasFastString f => DFastStringEnv a -> f -> Maybe a
+lookupDFsEnv d f = snd <$> lookupUDFM d (FastStringU (getFastString f))
+
+elemDFsEnv :: HasFastString f => f -> DFastStringEnv a -> Bool
+elemDFsEnv f e = elemUDFM (FastStringU (getFastString f)) e
+
+delFromDFsEnv :: HasFastString f => DFastStringEnv a -> f -> DFastStringEnv a
+delFromDFsEnv e f = delFromUDFM e (FastStringU (getFastString f))

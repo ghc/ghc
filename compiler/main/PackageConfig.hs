@@ -69,10 +69,10 @@ instance BinaryStringRep PackageName where
   toStringRep (PackageName s) = bytesFS s
 
 instance Uniquable SourcePackageId where
-  getUnique (SourcePackageId n) = getUnique n
+  getUnique (SourcePackageId n) = unsafeFastStringUnique n
 
 instance Uniquable PackageName where
-  getUnique (PackageName n) = getUnique n
+  getUnique (PackageName n) = unsafeFastStringUnique n
 
 instance Outputable SourcePackageId where
   ppr (SourcePackageId str) = ftext str

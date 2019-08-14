@@ -125,7 +125,7 @@ import Outputable
 import FastString
 import DynFlags
 import GHC.Platform
-import UniqSet
+import FsSet
 import Util
 import PprCore ( {- instances -} )
 
@@ -802,11 +802,11 @@ maybeLocalBlockLabel _                     = Nothing
 --      to the C compiler. For these labels we avoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
-isMathFun (ForeignLabel fs _ _ _)       = fs `elementOfUniqSet` math_funs
+isMathFun (ForeignLabel fs _ _ _)       = fs `elementOfFsSet` math_funs
 isMathFun _ = False
 
-math_funs :: UniqSet FastString
-math_funs = mkUniqSet [
+math_funs :: FsSet FastString
+math_funs = mkFsSet [
         -- _ISOC99_SOURCE
         (fsLit "acos"),         (fsLit "acosf"),        (fsLit "acosh"),
         (fsLit "acoshf"),       (fsLit "acoshl"),       (fsLit "acosl"),

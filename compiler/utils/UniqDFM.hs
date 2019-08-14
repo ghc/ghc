@@ -35,6 +35,7 @@ module UniqDFM (
         alterUDFM,
         mapUDFM,
         plusUDFM,
+        plusUDFMs,
         plusUDFM_C,
         lookupUDFM, lookupUDFM_Directly,
         elemUDFM,
@@ -238,6 +239,10 @@ plusUDFM udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- to insert the smaller one into the bigger one
   | i > j = insertUDFMIntoLeft udfml udfmr
   | otherwise = insertUDFMIntoLeft udfmr udfml
+
+plusUDFMs :: [UniqDFM elt] -> UniqDFM elt
+plusUDFMs [] = emptyUDFM
+plusUDFMs xs = foldr1 plusUDFM xs
 
 insertUDFMIntoLeft :: UniqDFM elt -> UniqDFM elt -> UniqDFM elt
 insertUDFMIntoLeft udfml udfmr = addListToUDFM_Directly udfml $ udfmToList udfmr

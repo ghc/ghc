@@ -46,7 +46,7 @@ import HscTypes
 
 import BasicTypes hiding (SuccessFlag(..))
 import TcRnMonad
-
+import FastStringEnv
 import Constants
 import PrelNames
 import PrelInfo
@@ -664,9 +664,9 @@ computeInterface doc_str hi_boot_file mod0 = do
 -- @p[A=<A>,B=<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
-    -> TcRnIf gbl lcl (MaybeErr MsgDoc (UniqDSet ModuleName))
+    -> TcRnIf gbl lcl (MaybeErr MsgDoc (DFastStringEnv ModuleName))
 moduleFreeHolesPrecise doc_str mod
- | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
+ | moduleIsDefinite mod = return (Succeeded emptyDFsEnv)
  | otherwise =
    case splitModuleInsts mod of
     (imod, Just indef) -> do
@@ -678,7 +678,7 @@ moduleFreeHolesPrecise doc_str mod
         case tryEpsAndHpt dflags eps hpt `firstJust` tryDepsCache eps imod insts of
             Just r -> return (Succeeded r)
             Nothing -> readAndCache imod insts
-    (_, Nothing) -> return (Succeeded emptyUniqDSet)
+    (_, Nothing) -> return (Succeeded emptyDNameEnv)
   where
     tryEpsAndHpt dflags eps hpt =
         fmap mi_free_holes (lookupIfaceByModule dflags hpt (eps_PIT eps) mod)
@@ -717,7 +717,7 @@ wantHiBootFile dflags eps mod from
                                -- We never import boot modules from other packages!
 
           | otherwise
-          -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
+          -> case lookupFsEnv (eps_is_boot eps) (moduleName mod) of
                 Just (_, is_boot) -> Succeeded is_boot
                 Nothing           -> Succeeded False
                      -- The boot-ness of the requested interface,
@@ -1012,7 +1012,7 @@ readIface wanted_mod file_path
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState
   = EPS {
-      eps_is_boot          = emptyUFM,
+      eps_is_boot          = emptyFsEnv,
       eps_PIT              = emptyPackageIfaceTable,
       eps_free_holes       = emptyInstalledModuleEnv,
       eps_PTE              = emptyTypeEnv,

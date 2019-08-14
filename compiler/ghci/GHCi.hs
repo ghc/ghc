@@ -60,6 +60,7 @@ import GHCi.BreakArray (BreakArray)
 import Fingerprint
 import HscTypes
 import UniqFM
+import FastStringEnv
 import Panic
 import DynFlags
 import ErrUtils
@@ -379,7 +380,7 @@ lookupSymbol hsc_env@HscEnv{..} str
      -- to purge this cache when unloading code though.
      withIServ hsc_env $ \iserv@IServ{..} -> do
        cache <- readIORef iservLookupSymbolCache
-       case lookupUFM cache str of
+       case lookupFsEnv cache str of
          Just p -> return (Just p)
          Nothing -> do
            m <- uninterruptibleMask_ $
@@ -388,7 +389,7 @@ lookupSymbol hsc_env@HscEnv{..} str
              Nothing -> return Nothing
              Just r -> do
                let p = fromRemotePtr r
-               writeIORef iservLookupSymbolCache $! addToUFM cache str p
+               writeIORef iservLookupSymbolCache $! extendFsEnv cache str p
                return (Just p)
  | otherwise =
 #if defined(HAVE_INTERNAL_INTERPRETER)
@@ -405,7 +406,7 @@ purgeLookupSymbolCache :: HscEnv -> IO ()
 purgeLookupSymbolCache hsc_env@HscEnv{..} =
  when (gopt Opt_ExternalInterpreter hsc_dflags) $
    withIServ hsc_env $ \IServ{..} ->
-     writeIORef iservLookupSymbolCache emptyUFM
+     writeIORef iservLookupSymbolCache emptyFsEnv
 
 
 -- | loadDLL loads a dynamic library using the OS's native linker
@@ -506,7 +507,7 @@ startIServ dflags = do
                               dflags
   (ph, rh, wh) <- runWithPipes createProc prog opts
   lo_ref <- newIORef Nothing
-  cache_ref <- newIORef emptyUFM
+  cache_ref <- newIORef emptyFsEnv
   return $ IServ
     { iservPipe = Pipe { pipeRead = rh
                        , pipeWrite = wh

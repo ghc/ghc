@@ -43,6 +43,7 @@ import DynFlags
 import RnHsDoc          ( rnHsDoc )
 import RdrHsSyn        ( setRdrNameSpace )
 import Data.Either      ( partitionEithers )
+import FsSet
 
 {-
 ************************************************************************
@@ -130,10 +131,10 @@ data ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ExportAccum
         ExportOccMap           --  Tracks exported occurrence names
-        (UniqSet ModuleName)   --  Tracks (re-)exported module names
+        (FsSet ModuleName)   --  Tracks (re-)exported module names
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum emptyOccEnv emptyUniqSet
+emptyExportAccum = ExportAccum emptyOccEnv emptyFsSet
 
 accumExports :: (ExportAccum -> x -> TcRn (Maybe (ExportAccum, y)))
              -> [x]
@@ -281,7 +282,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
                       -> RnM (Maybe (ExportAccum, (LIE GhcRn, Avails)))
     exports_from_item (ExportAccum occs earlier_mods)
                       (dL->L loc ie@(IEModuleContents _ lmod@(dL->L _ mod)))
-        | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
+        | mod `elementOfFsSet` earlier_mods    -- Duplicate export of M
         = do { warnIfFlag Opt_WarnDuplicateExports True
                           (dupModuleExport mod) ;
                return Nothing }
@@ -294,7 +295,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
                                    | (gre, _) <- gre_prs
                                    , gre' <- expand_tyty_gre gre ]
                    ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
-                   ; mods        = addOneToUniqSet earlier_mods mod
+                   ; mods        = addOneToFsSet earlier_mods mod
                    }
 
              ; checkErr exportValid (moduleNotImported mod)

@@ -938,7 +938,7 @@ genStore addr@(CmmMachOp (MO_Sub _) [
 
 -- generic case
 genStore addr val
-    = getTBAAMeta topN >>= genStore_slow addr val
+    = getTBAAMeta undefined >>= genStore_slow addr val
 
 -- | CmmStore operation
 -- This is a special case for storing to a global register pointer
@@ -1601,7 +1601,7 @@ genLoad atomic e@(CmmMachOp (MO_Sub _) [
 
 -- generic case
 genLoad atomic e ty
-    = getTBAAMeta topN >>= genLoad_slow atomic e ty
+    = getTBAAMeta undefined >>= genLoad_slow atomic e ty
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
@@ -1961,7 +1961,7 @@ pprPanic s d = Outputable.pprPanic ("LlvmCodeGen.CodeGen." ++ s) d
 getTBAAMeta :: Unique -> LlvmM [MetaAnnot]
 getTBAAMeta u = do
     mi <- getUniqMeta u
-    return [MetaAnnot tbaa (MetaNode i) | let Just i = mi]
+    return [MetaAnnot undefined (MetaNode i) | let Just i = mi]
 
 -- | Returns TBAA meta data for given register
 getTBAARegMeta :: GlobalReg -> LlvmM [MetaAnnot]

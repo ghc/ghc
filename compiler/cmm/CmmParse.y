@@ -241,6 +241,7 @@ import GHC.Platform
 import Literal
 import Unique
 import UniqFM
+import FastStringEnv
 import SrcLoc
 import DynFlags
 import ErrUtils
@@ -901,14 +902,14 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
-  case lookupUFM machOps name of
+  case lookupFsEnv machOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
 exprOp name args_code = do
   dflags <- getDynFlags
-  case lookupUFM (exprMacros dflags) name of
+  case lookupFsEnv (exprMacros dflags) name of
      Just f  -> return $ do
         args <- sequence args_code
         return (f args)
@@ -916,8 +917,8 @@ exprOp name args_code = do
         mo <- nameToMachOp name
         return $ mkMachOp mo args_code
 
-exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
-exprMacros dflags = listToUFM [
+exprMacros :: DynFlags -> FastStringEnv ([CmmExpr] -> CmmExpr)
+exprMacros dflags = mkFsEnv [
   ( fsLit "ENTRY_CODE",   \ [x] -> entryCode dflags x ),
   ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr dflags x ),
   ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
@@ -931,7 +932,7 @@ exprMacros dflags = listToUFM [
   ]
 
 -- we understand a subset of C-- primitives:
-machOps = listToUFM $
+machOps = mkFsEnv $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "add",        MO_Add ),
         ( "sub",        MO_Sub ),
@@ -998,8 +999,8 @@ machOps = listToUFM $
         ( "i2f64",    flip MO_SF_Conv W64 )
         ]
 
-callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
-callishMachOps = listToUFM $
+callishMachOps :: FastStringEnv ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
+callishMachOps = mkFsEnv $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "read_barrier", (MO_ReadBarrier,)),
         ( "write_barrier", (MO_WriteBarrier,)),
@@ -1087,14 +1088,14 @@ happyError = PD $ \_ s -> unP srcParseFail s
 
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
-  case lookupUFM stmtMacros fun of
+  case lookupFsEnv stmtMacros fun of
     Nothing -> fail ("unknown macro: " ++ unpackFS fun)
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
 
-stmtMacros :: UniqFM ([CmmExpr] -> FCode ())
-stmtMacros = listToUFM [
+stmtMacros :: FastStringEnv ([CmmExpr] -> FCode ())
+stmtMacros = mkFsEnv [
   ( fsLit "CCS_ALLOC",             \[words,ccs]  -> profAlloc words ccs ),
   ( fsLit "ENTER_CCS_THUNK",       \[e] -> enterCostCentreThunk e ),
 
@@ -1264,7 +1265,7 @@ primCall
         -> [CmmParse CmmExpr]
         -> PD (CmmParse ())
 primCall results_code name args_code
-  = case lookupUFM callishMachOps name of
+  = case lookupFsEnv callishMachOps name of
         Nothing -> fail ("unknown primitive " ++ unpackFS name)
         Just f  -> return $ do
                 results <- sequence results_code
@@ -1411,7 +1412,7 @@ forkLabelledCode p = do
 -- The initial environment: we define some constants that the compiler
 -- knows about here.
 initEnv :: DynFlags -> Env
-initEnv dflags = listToUFM [
+initEnv dflags = mkFsEnv [
   ( fsLit "SIZEOF_StgHeader",
     VarN (CmmLit (CmmInt (fromIntegral (fixedHdrSize dflags)) (wordWidth dflags)) )),
   ( fsLit "SIZEOF_StgInfoTable",

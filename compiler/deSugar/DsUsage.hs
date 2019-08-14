@@ -25,6 +25,7 @@ import Fingerprint
 import Maybes
 import Packages
 import Finder
+import FastStringEnv
 
 import Control.Monad (filterM)
 import Data.List
@@ -69,7 +70,7 @@ mkDependencies iuid pluginModules
       let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
           plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
       th_used <- readIORef th_var
-      let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
+      let dep_mods = modDepsElts (delFromFsEnv (imp_dep_mods imports)
                                              (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!

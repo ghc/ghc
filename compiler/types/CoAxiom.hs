@@ -543,8 +543,8 @@ instance Data.Data CoAxiomRule where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "CoAxiomRule"
 
-instance Uniquable CoAxiomRule where
-  getUnique = getUnique . coaxrName
+instance HasFastString CoAxiomRule where
+  getFastString = coaxrName
 
 instance Eq CoAxiomRule where
   x == y = coaxrName x == coaxrName y

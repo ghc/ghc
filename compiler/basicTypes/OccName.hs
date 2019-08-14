@@ -81,7 +81,7 @@ module OccName (
         -- * The 'OccEnv' type
         OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
         lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
-        occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
+        plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, pprOccEnv,
 
@@ -90,7 +90,7 @@ module OccName (
         extendOccSetList,
         unionOccSets, unionManyOccSets, minusOccSet, elemOccSet,
         isEmptyOccSet, intersectOccSet, intersectsOccSet,
-        filterOccSet,
+        filterOccSet, nonDetOccEnvElts, nonDetFoldOccEnv,
 
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
@@ -107,8 +107,10 @@ import Unique
 import DynFlags
 import UniqFM
 import UniqSet
+import UniqMap
 import FastString
 import FastStringEnv
+import FsSet
 import Outputable
 import Lexeme
 import Binary
@@ -384,14 +386,14 @@ where 'ns' is a Char representing the name space.  This in turn makes it
 easy to build an OccEnv.
 -}
 
-instance Uniquable OccName where
+instance HasFastString OccName where
       -- See Note [The Unique of an OccName]
-  getUnique (OccName VarName   fs) = mkVarOccUnique  fs
-  getUnique (OccName DataName  fs) = mkDataOccUnique fs
-  getUnique (OccName TvName    fs) = mkTvOccUnique   fs
-  getUnique (OccName TcClsName fs) = mkTcOccUnique   fs
+  getFastString (OccName VarName   fs) = "v" `appendFS`  fs
+  getFastString (OccName DataName  fs) = "d" `appendFS` fs
+  getFastString (OccName TvName    fs) = "tv" `appendFS` fs
+  getFastString (OccName TcClsName fs) = "tc" `appendFS` fs
 
-newtype OccEnv a = A (UniqFM a)
+newtype OccEnv a = A (FastStringEnv a)
   deriving Data
 
 emptyOccEnv :: OccEnv a
@@ -402,8 +404,8 @@ lookupOccEnv :: OccEnv a -> OccName -> Maybe a
 mkOccEnv     :: [(OccName,a)] -> OccEnv a
 mkOccEnv_C   :: (a -> a -> a) -> [(OccName,a)] -> OccEnv a
 elemOccEnv   :: OccName -> OccEnv a -> Bool
-foldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
-occEnvElts   :: OccEnv a -> [a]
+nonDetFoldOccEnv   :: (a -> b -> b) -> b -> OccEnv a -> b
+nonDetOccEnvElts   :: OccEnv a -> [a]
 extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
 extendOccEnv_Acc :: (a->b->b) -> (a->b) -> OccEnv b -> OccName -> a -> OccEnv b
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
@@ -414,33 +416,33 @@ delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
 filterOccEnv       :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
 alterOccEnv        :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
 
-emptyOccEnv      = A emptyUFM
-unitOccEnv x y = A $ unitUFM x y
-extendOccEnv (A x) y z = A $ addToUFM x y z
-extendOccEnvList (A x) l = A $ addListToUFM x l
-lookupOccEnv (A x) y = lookupUFM x y
-mkOccEnv     l    = A $ listToUFM l
-elemOccEnv x (A y)       = elemUFM x y
-foldOccEnv a b (A c)     = foldUFM a b c
-occEnvElts (A x)         = eltsUFM x
-plusOccEnv (A x) (A y)   = A $ plusUFM x y
-plusOccEnv_C f (A x) (A y)       = A $ plusUFM_C f x y
-extendOccEnv_C f (A x) y z   = A $ addToUFM_C f x y z
-extendOccEnv_Acc f g (A x) y z   = A $ addToUFM_Acc f g x y z
-mapOccEnv f (A x)        = A $ mapUFM f x
-mkOccEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
-delFromOccEnv (A x) y    = A $ delFromUFM x y
-delListFromOccEnv (A x) y  = A $ delListFromUFM x y
-filterOccEnv x (A y)       = A $ filterUFM x y
-alterOccEnv fn (A y) k     = A $ alterUFM fn y k
+emptyOccEnv      = A emptyFsEnv
+unitOccEnv x y = A $ unitFsEnv x y
+extendOccEnv (A x) y z = A $ extendFsEnv x y z
+extendOccEnvList (A x) l = A $ extendFsEnvList x l
+lookupOccEnv (A x) y = lookupFsEnv x y
+mkOccEnv     l    = A $ mkFsEnv l
+elemOccEnv x (A y)       = elemFsEnv x y
+nonDetFoldOccEnv a b (A c)     = nonDetFoldUniqMap a b c
+nonDetOccEnvElts (A x)         = nonDetEltsUniqMap x
+plusOccEnv (A x) (A y)   = A $ plusFsEnv x y
+plusOccEnv_C f (A x) (A y)       = A $ plusFsEnv_C f x y
+extendOccEnv_C f (A x) y z   = A $ extendFsEnv_C f x y z
+extendOccEnv_Acc f g (A x) y z   = A $ extendFsEnv_Acc f g x y z
+mapOccEnv f (A x)        = A $ mapFsEnv f x
+mkOccEnv_C comb l = A $ extendFsEnvList_C comb emptyFsEnv l
+delFromOccEnv (A x) y    = A $ delFromFsEnv x y
+delListFromOccEnv (A x) y  = A $ delListFromFsEnv x y
+filterOccEnv x (A y)       = A $ filterFsEnv x y
+alterOccEnv fn (A y) k     = A $ alterFsEnv fn y k
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x
 
 pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
-pprOccEnv ppr_elt (A env) = pprUniqFM ppr_elt env
+pprOccEnv ppr_elt (A env) = pprUniqMap ppr_elt env
 
-type OccSet = UniqSet OccName
+type OccSet = FsSet OccName
 
 emptyOccSet       :: OccSet
 unitOccSet        :: OccName -> OccSet
@@ -456,19 +458,19 @@ intersectOccSet   :: OccSet -> OccSet -> OccSet
 intersectsOccSet  :: OccSet -> OccSet -> Bool
 filterOccSet      :: (OccName -> Bool) -> OccSet -> OccSet
 
-emptyOccSet       = emptyUniqSet
-unitOccSet        = unitUniqSet
-mkOccSet          = mkUniqSet
-extendOccSet      = addOneToUniqSet
-extendOccSetList  = addListToUniqSet
-unionOccSets      = unionUniqSets
-unionManyOccSets  = unionManyUniqSets
-minusOccSet       = minusUniqSet
-elemOccSet        = elementOfUniqSet
-isEmptyOccSet     = isEmptyUniqSet
-intersectOccSet   = intersectUniqSets
+emptyOccSet       = emptyFsSet
+unitOccSet        = unitFsSet
+mkOccSet          = mkFsSet
+extendOccSet      = addOneToFsSet
+extendOccSetList  = addListToFsSet
+unionOccSets      = unionFsSets
+unionManyOccSets  = unionManyFsSets
+minusOccSet       = minusFsSet
+elemOccSet        = elementOfFsSet
+isEmptyOccSet     = isEmptyFsSet
+intersectOccSet   = intersectFsSets
 intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
-filterOccSet      = filterUniqSet
+filterOccSet      = filterFsSet
 
 {-
 ************************************************************************
@@ -835,37 +837,37 @@ This is #12382.
 
 -}
 
-type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
+type TidyOccEnv = FastStringEnv Int    -- The in-scope OccNames
   -- See Note [TidyOccEnv]
 
 emptyTidyOccEnv :: TidyOccEnv
-emptyTidyOccEnv = emptyUFM
+emptyTidyOccEnv = emptyFsEnv
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv       -- Initialise with names to avoid!
-initTidyOccEnv = foldl' add emptyUFM
+initTidyOccEnv = foldl' add emptyFsEnv
   where
-    add env (OccName _ fs) = addToUFM env fs 1
+    add env (OccName _ fs) = extendFsEnv env fs 1
 
 -- see Note [Tidying multiple names at once]
 avoidClashesOccEnv :: TidyOccEnv -> [OccName] -> TidyOccEnv
-avoidClashesOccEnv env occs = go env emptyUFM occs
+avoidClashesOccEnv env occs = go env emptyFsEnv occs
   where
     go env _        [] = env
     go env seenOnce ((OccName _ fs):occs)
-      | fs `elemUFM` env      = go env seenOnce                  occs
-      | fs `elemUFM` seenOnce = go (addToUFM env fs 1) seenOnce  occs
-      | otherwise             = go env (addToUFM seenOnce fs ()) occs
+      | fs `elemFsEnv` env      = go env seenOnce                  occs
+      | fs `elemFsEnv` seenOnce = go (extendFsEnv env fs 1) seenOnce  occs
+      | otherwise             = go env (extendFsEnv seenOnce fs ()) occs
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
-  | not (fs `elemUFM` env)
+  | not (fs `elemFsEnv` env)
   = -- Desired OccName is free, so use it,
     -- and record in 'env' that it's no longer available
-    (addToUFM env fs 1, occ)
+    (extendFsEnv env fs 1, occ)
 
   | otherwise
-  = case lookupUFM env base1 of
-       Nothing -> (addToUFM env base1 2, OccName occ_sp base1)
+  = case lookupFsEnv env base1 of
+       Nothing -> (extendFsEnv env base1 2, OccName occ_sp base1)
        Just n  -> find 1 n
   where
     base :: String  -- Drop trailing digits (see Note [TidyOccEnv])
@@ -873,7 +875,7 @@ tidyOccName env occ@(OccName occ_sp fs)
     base1 = mkFastString (base ++ "1")
 
     find !k !n
-      = case lookupUFM env new_fs of
+      = case lookupFsEnv env new_fs of
           Just {} -> find (k+1 :: Int) (n+k)
                        -- By using n+k, the n argument to find goes
                        --    1, add 1, add 2, add 3, etc which
@@ -882,7 +884,7 @@ tidyOccName env occ@(OccName occ_sp fs)
           Nothing -> (new_env, OccName occ_sp new_fs)
        where
          new_fs = mkFastString (base ++ show n)
-         new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)
+         new_env = extendFsEnv (extendFsEnv env new_fs 1) base1 (n+1)
                      -- Update:  base1,  so that next time we'll start where we left off
                      --          new_fs, so that we know it is taken
                      -- If they are the same (n==1), the former wins

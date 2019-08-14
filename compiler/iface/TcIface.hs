@@ -75,6 +75,7 @@ import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
+import UniqMap
 
 import Control.Monad
 import qualified Data.Map as Map
@@ -370,7 +371,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
                         ::  OccEnv IfaceDecl
     -- TODO: change loadDecls to accept w/o Fingerprint
     names_w_things <- loadDecls ignore_prags (map (\x -> (fingerprint0, x))
-                                                  (occEnvElts decl_env))
+                                                  (nonDetOccEnvElts decl_env))
     let global_type_env = mkNameEnv names_w_things
     writeMutVar tc_env_var global_type_env
 
@@ -530,7 +531,7 @@ tcHiBootIface hsc_src mod
         -- a SOURCE import) or that our hi-boot file has mysteriously
         -- disappeared.
     do  { eps <- getEps
-        ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
+        ; case lookupFsEnv (eps_is_boot eps) (moduleName mod) of
             Nothing -> return NoSelfBoot -- The typical case
 
             Just (_, False) -> failWithTc moduleLoop
@@ -1565,7 +1566,7 @@ tcPragExpr toplvl name expr
                        mkVarSet rec_ids) }
 
     bindingsVars :: FastStringEnv Var -> VarSet
-    bindingsVars ufm = mkVarSet $ nonDetEltsUFM ufm
+    bindingsVars ufm = mkVarSet $ nonDetEltsUniqMap ufm
       -- It's OK to use nonDetEltsUFM here because we immediately forget
       -- the ordering by creating a set
 
