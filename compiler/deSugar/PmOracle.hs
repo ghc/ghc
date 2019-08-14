@@ -106,7 +106,7 @@ data PossibleMatches
 
 instance Outputable PossibleMatches where
   ppr (PM _tc cs) = ppr (NonEmpty.toList cs)
-  ppr NoPM = empty
+  ppr NoPM = text "<NoPM>"
 
 initIM :: Type -> DsM (Maybe PossibleMatches)
 initIM ty = case splitTyConApp_maybe ty of
@@ -275,7 +275,7 @@ data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~I
                      , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
 
 instance Outputable Delta where
-  ppr delta = hcat [
+  ppr delta = vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
       ppr (delta_tm_cs delta),
@@ -385,33 +385,81 @@ pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
 -----------------------
 -- * Type normalisation
 
-pmTopNormaliseType_maybe :: Bag EvVar -> Type
-                         -> PmM (Maybe (Type, [DataCon], Type))
+-- | The return value of 'pmTopNormaliseType'
+data TopNormaliseTypeResult
+  = NoChange Type
+  -- ^ 'tcNormalise' failed to simplify the type and 'topNormaliseTypeX' was
+  -- unable to reduce the outermost type application, so the type came out
+  -- unchanged.
+  | NormalisedByConstraints Type
+  -- ^ 'tcNormalise' was able to simplify the type with some local constraint
+  -- from the type oracle, but 'topNormaliseTypeX' couldn't identify a type
+  -- redex.
+  | HadRedexes Type [DataCon] Type
+  -- ^ 'tcNormalise' may or may not been able to simplify the type, but
+  -- 'topNormaliseTypeX' made progress either way and got rid of at least one
+  -- outermost type or data family redex or newtype.
+  -- The first field is the last type that was reduced solely through type
+  -- family applications (possibly just the 'tcNormalise'd type). This is the
+  -- one that is equal (in source Haskell) to the initial type.
+  -- The third field is the type that we get when also looking through data
+  -- family applications and newtypes. This would be the representation type in
+  -- Core (modulo casts).
+  -- The second field is the list of Newtype 'DataCon's that we looked through
+  -- in the chain of reduction steps between the Source type and the Core type.
+
+-- | Just give me the potentially normalised source type, unchanged or not!
+normalisedSourceType :: TopNormaliseTypeResult -> Type
+normalisedSourceType (NoChange ty)                = ty
+normalisedSourceType (NormalisedByConstraints ty) = ty
+normalisedSourceType (HadRedexes ty _ _)          = ty
+
+instance Outputable TopNormaliseTypeResult where
+  ppr (NoChange ty)                  = text "NoChange" <+> ppr ty
+  ppr (NormalisedByConstraints ty)   = text "NormalisedByConstraints" <+> ppr ty
+  ppr (HadRedexes src_ty ds core_ty) = text "HadRedexes" <+> braces fields
+    where
+      fields = fsep (punctuate comma [ text "src_ty =" <+> ppr src_ty
+                                     , text "newtype_dcs =" <+> ppr ds
+                                     , text "core_ty =" <+> ppr core_ty ])
+
+pmTopNormaliseType :: Bag EvVar -> Type -> PmM TopNormaliseTypeResult
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
 --      * data family redex
 --      * newtypes
 --
--- Behaves exactly like `topNormaliseType_maybe`, but instead of returning a
+-- Behaves like `topNormaliseType_maybe`, but instead of returning a
 -- coercion, it returns useful information for issuing pattern matching
 -- warnings. See Note [Type normalisation for EmptyCase] for details.
+-- It also initially 'tcNormalise's the type with the bag of local constraints.
+--
+-- See 'TopNormaliseTypeResult' for the meaning of the return value.
 --
 -- NB: Normalisation can potentially change kinds, if the head of the type
 -- is a type family with a variable result kind. I (Richard E) can't think
 -- of a way to cause trouble here, though.
-pmTopNormaliseType_maybe ty_cs typ
+pmTopNormaliseType ty_cs typ
   = do env <- dsGetFamInstEnvs
+       -- Before proceeding, we chuck typ into the constraint solver, in case
+       -- solving for given equalities may reduce typ some. See
+       -- "Wrinkle: local equalities" in Note [Type normalisation for EmptyCase].
        (_, mb_typ') <- initTcDsForSolver $ tcNormalise ty_cs typ
-         -- Before proceeding, we chuck typ into the constraint solver, in case
-         -- solving for given equalities may reduce typ some. See
-         -- "Wrinkle: local equalities" in
-         -- Note [Type normalisation for EmptyCase].
-       pure $ do typ' <- mb_typ'
-                 ((ty_f,tm_f), ty) <- topNormaliseTypeX (stepper env) comb typ'
-                 -- We need to do topNormaliseTypeX in addition to tcNormalise,
-                 -- since topNormaliseX looks through newtypes, which
-                 -- tcNormalise does not do.
-                 Just (eq_src_ty ty (typ' : ty_f [ty]), tm_f [], ty)
+       -- If tcNormalise didn't manage to simplify the type, continue anyway.
+       -- We might be able to reduce type applications nonetheless!
+       let typ' = fromMaybe typ mb_typ'
+       -- Now we look with topNormaliseTypeX through type and data family
+       -- applications and newtypes, which tcNormalise does not do.
+       -- See also 'TopNormaliseTypeResult'.
+       pure $ case topNormaliseTypeX (stepper env) comb typ' of
+         Nothing
+           | Nothing <- mb_typ' -> NoChange typ
+           | otherwise          -> NormalisedByConstraints typ'
+         Just ((ty_f,tm_f), ty) -> HadRedexes src_ty newtype_dcs core_ty
+           where
+             src_ty = eq_src_ty ty (typ' : ty_f [ty])
+             newtype_dcs = tm_f []
+             core_ty = ty
   where
     -- Find the first type in the sequence of rewrites that is a data type,
     -- newtype, or a data family application (not the representation tycon!).
@@ -494,7 +542,7 @@ pmIsClosedType ty
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 EmptyCase is an exception for pattern matching, since it is strict. This means
 that it boils down to checking whether the type of the scrutinee is inhabited.
-Function pmTopNormaliseType_maybe gets rid of the outermost type function/data
+Function pmTopNormaliseType gets rid of the outermost type function/data
 family redex and newtypes, in search of an algebraic type constructor, which is
 easier to check for inhabitation.
 
@@ -504,7 +552,7 @@ It returns 3 results instead of one, because there are 2 subtle points:
 2. The representational data family tycon is used internally but should not be
    shown to the user
 
-Hence, if pmTopNormaliseType_maybe env ty_cs ty = Just (src_ty, dcs, core_ty),
+Hence, if pmTopNormaliseType env ty_cs ty = Just (src_ty, dcs, core_ty),
 then
   (a) src_ty is the rewritten type which we can show to the user. That is, the
       type we get if we rewrite type families but not data families or
@@ -513,7 +561,7 @@ then
       newtype to its core representation, we keep track of the source data
       constructor.
   (c) core_ty is the rewritten type. That is,
-        pmTopNormaliseType_maybe env ty_cs ty = Just (src_ty, dcs, core_ty)
+        pmTopNormaliseType env ty_cs ty = Just (src_ty, dcs, core_ty)
       implies
         topNormaliseType_maybe env ty = Just (co, core_ty)
       for some coercion co.
@@ -533,7 +581,7 @@ To see how all cases come into play, consider the following example:
   type instance F Int  = F Char
   type instance F Char = G2
 
-In this case pmTopNormaliseType_maybe env ty_cs (F Int) results in
+In this case pmTopNormaliseType env ty_cs (F Int) results in
 
   Just (G2, [MkG2,MkG1], R:TInt)
 
@@ -559,7 +607,7 @@ You might think "of course, since `x` is obviously of type Void". But the
 idType of `x` is technically F i, not Void, so if we pass F i to
 inhabitationCandidates, we'll mistakenly conclude that `f` is non-exhaustive.
 In order to avoid this pitfall, we need to normalise the type passed to
-pmTopNormaliseType_maybe, using the constraint solver to solve for any local
+pmTopNormaliseType, using the constraint solver to solve for any local
 equalities (such as i ~ Int) that may be in scope.
 -}
 
@@ -804,17 +852,25 @@ lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
 lookupVarInfo (TS env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
-initPossibleMatches :: VarInfo -> DsM VarInfo
-initPossibleMatches vi@VI{ vi_ty = ty, vi_cache = NoPM } = initIM ty >>= \case
-  Nothing -> pure vi
-  Just pm -> pure vi{ vi_cache = pm }
-initPossibleMatches vi                      = pure vi
+initPossibleMatches :: Bag EvVar -> VarInfo -> DsM VarInfo
+initPossibleMatches ty_cs vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
+  -- New evidence might lead to refined info on ty, in turn leading to discovery
+  -- of a COMPLETE set.
+  res <- pmTopNormaliseType ty_cs ty
+  let ty' = normalisedSourceType res
+  mb_pm <- initIM ty'
+  -- tracePm "initPossibleMatches" (ppr vi $$ ppr ty' $$ ppr res $$ ppr mb_pm)
+  case mb_pm of
+    Nothing -> pure vi
+    Just pm -> pure vi{ vi_ty = ty', vi_cache = pm }
+initPossibleMatches _     vi                                   = pure vi
 
 -- | @initLookupVarInfo ts x@ looks up the 'VarInfo' for @x@ in @ts@ and tries
 -- to initialise the 'vi_cache' component if it was 'NoPM' through
 -- 'initPossibleMatches'.
-initLookupVarInfo :: TmState -> Id -> DsM VarInfo
-initLookupVarInfo ts x = initPossibleMatches (lookupVarInfo ts x)
+initLookupVarInfo :: Delta -> Id -> DsM VarInfo
+initLookupVarInfo MkDelta{ delta_tm_cs = ts, delta_ty_cs = ty_cs } x
+  = initPossibleMatches ty_cs (lookupVarInfo ts x)
 
 ------------------------------------------------
 -- * Exported utility functions querying 'Delta'
@@ -875,8 +931,8 @@ addTermEquality delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
 -- See Note [TmState invariants].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = ts@(TS env) } x nalt = runMaybeT $ do
-  VI ty pos neg pm n <- lift (initLookupVarInfo ts x)
+tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $ do
+  VI ty pos neg pm n <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = decEqPmAltCon cl nalt == Just True
   guard (not (any (contradicts nalt) pos))
@@ -949,8 +1005,8 @@ refineToAltCon delta x alt@(PmAltConLike con) ex_tvs1  = do
 
   -- mkOneConFull doesn't cope with type families, so we have to normalise
   -- x's result type first
-  mb_norm_ty <- pmTopNormaliseType_maybe (delta_ty_cs delta) (idType x)
-  let norm_ty = maybe (idType x) fstOf3 mb_norm_ty
+  res <- pmTopNormaliseType (delta_ty_cs delta) (idType x)
+  let norm_ty = normalisedSourceType res
   (arg_vars, theta_ev_vars, strict_arg_tys, ex_tvs2) <- mkOneConFull norm_ty con
 
   -- If we have identical constructors but different existential
@@ -1171,8 +1227,8 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
 --
 -- See Note [TmState invariants].
 trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-trySolve delta@MkDelta{ delta_tm_cs = ts@(TS env) } x alt args = do
-  VI ty pos neg cache n <- lift (initLookupVarInfo ts x)
+trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
+  VI ty pos neg cache n <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Just True) . decEqPmAltCon alt) neg)
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1233,9 +1289,10 @@ mkInhabitationCandidate x con = do
 inhabitationCandidates :: Delta -> Type
                        -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
 inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
-  pmTopNormaliseType_maybe ty_cs ty >>= \case
-    Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
-    Nothing                     -> alts_to_check ty     ty      []
+  pmTopNormaliseType ty_cs ty >>= \case
+    NoChange _                    -> alts_to_check ty     ty      []
+    NormalisedByConstraints ty'   -> alts_to_check ty'    ty'     []
+    HadRedexes src_ty dcs core_ty -> alts_to_check src_ty core_ty dcs
   where
     -- All these types are trivially inhabited
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
@@ -1251,7 +1308,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
       where
         go dc x cts = second (:cts) <$> build_newtype dc x
 
-    -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
+    -- Inhabitation candidates, using the result of pmTopNormaliseType
     alts_to_check :: Type -> Type -> [DataCon]
                   -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
@@ -1301,7 +1358,7 @@ for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
 we do the following:
 
 1. We normalise the outermost type family redex, data family redex or newtype,
-   using pmTopNormaliseType_maybe (in types/FamInstEnv.hs). This computes 3
+   using pmTopNormaliseType (in types/FamInstEnv.hs). This computes 3
    things:
    (a) A normalised type src_ty, which is equal to the type of the scrutinee in
        source Haskell (does not normalise newtypes or data families)
@@ -1405,10 +1462,10 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
 -- See the @Note [Strict argument type constraints]@.
 definitelyInhabitedType :: Bag EvVar -> Type -> PmM Bool
 definitelyInhabitedType ty_cs ty = do
-  mb_res <- pmTopNormaliseType_maybe ty_cs ty
-  pure $ case mb_res of
-           Just (_, cons, _) -> any meets_criteria cons
-           Nothing           -> False
+  res <- pmTopNormaliseType ty_cs ty
+  pure $ case res of
+           HadRedexes _ cons _ -> any meets_criteria cons
+           _                   -> False
   where
     meets_criteria :: DataCon -> Bool
     meets_criteria con =
@@ -1558,7 +1615,7 @@ provideEvidenceForEquation = go init_ts
     go _      _      0 _     = pure []
     go _      []     _ delta = pure [delta]
     go rec_ts (x:xs) n delta = do
-      VI ty pos neg pm _ <- initLookupVarInfo (delta_tm_cs delta) x
+      VI ty pos neg pm _ <- initLookupVarInfo delta x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
