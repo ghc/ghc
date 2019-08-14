@@ -301,5 +301,6 @@ test('T16563', extra_hc_opts("-clear-package-db -global-package-db"), ghci_scrip
 test('T16569', normal, ghci_script, ['T16569.script'])
 test('T16767', normal, ghci_script, ['T16767.script'])
 test('T16575', normal, ghci_script, ['T16575.script'])
+test('T16509', normal, ghci_script, ['T16509.script'])
 test('T16804', extra_files(['T16804a.hs', 'T16804b.hs']), ghci_script, ['T16804.script'])
 test('T15546', normal, ghci_script, ['T15546.script'])
