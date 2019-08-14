@@ -20,6 +20,7 @@ module PmExpr (
 import GhcPrelude
 
 import Util
+import DynFlags
 import BasicTypes (IntegralLit(..), negateIntegralLit)
 import FastString
 import HsSyn
@@ -269,19 +270,22 @@ instance Outputable TmVarCt where
 
 -- | Mimics 'MatchLit.tidyNPat', but solely for purposes of better pattern match
 -- warnings. See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-hsOverLitAsHsLit :: HsOverLit GhcTc -> Bool -> Type -> Maybe (HsLit GhcTc)
-hsOverLitAsHsLit (OverLit (OverLitTc False ty) val _) negated outer_ty
-  | types_equal, isStringTy    ty, HsIsString src s <- val, not negated
+hsOverLitAsHsLit :: DynFlags -> HsOverLit GhcTc -> Bool -> Type -> Maybe (HsLit GhcTc)
+hsOverLitAsHsLit dflags (OverLit (OverLitTc False ty) val _) negated outer_ty
+  | types_equal, isStringTy   ty, HsIsString src s <- val, not negated
   = Just (HsString src s)
-  | types_equal,  isIntTy       ty, HsIntegral i <- val
-  = Just (HsInt noExtField (apply_negation i))
-  | types_equal,  isWordTy      ty, HsIntegral i <- val
+  | types_equal,  isIntTy     ty, HsIntegral i <- val
   , let ni = apply_negation i
+  , inIntRange dflags (il_value ni)
+  = Just (HsInt noExtField ni)
+  | types_equal,  isWordTy    ty, HsIntegral i <- val
+  , let ni = apply_negation i
+  , inWordRange dflags (il_value ni)
   -- this is a type error... But as long as we do this consistently, this
   -- shouldn't be a problem. The proper solution would be to return a HsExpr,
   -- but that would require non-trivial boilerplate at the two call sites.
   = Just (HsWordPrim (il_text ni) (il_value ni))
-  | types_equal,  isIntegerTy   ty, HsIntegral i <- val
+  | types_equal,  isIntegerTy ty, HsIntegral i <- val
   , let ni = apply_negation i
   = Just (HsInteger (il_text ni) (il_value ni) ty)
   where
@@ -289,7 +293,7 @@ hsOverLitAsHsLit (OverLit (OverLitTc False ty) val _) negated outer_ty
     apply_negation
       | negated   = negateIntegralLit
       | otherwise = id
-hsOverLitAsHsLit _ _ _ = Nothing
+hsOverLitAsHsLit _ _ _ _ = Nothing
 
 {- Note [Translate Overloaded Literals for Exhaustiveness Checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

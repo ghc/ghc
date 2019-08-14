@@ -473,139 +473,141 @@ mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
 -- * Transform (Pat Id) into of (PmPat Id)
 
 translatePat :: FamInstEnvs -> Pat GhcTc -> (PatVec -> PmM a) -> PmM a
-translatePat fam_insts pat k = case pat of
-  WildPat  ty  -> mkPmVars [ty] >>= k
-  VarPat _ id  -> k [PmVar (unLoc id)]
-  ParPat _ p   -> translatePat fam_insts (unLoc p) k
-  LazyPat _ _  -> mkPmVars [hsPatType pat] >>= k -- like a variable
+translatePat fam_insts pat k = do
+  dflags <- getDynFlags
+  case pat of
+    WildPat  ty  -> mkPmVars [ty] >>= k
+    VarPat _ id  -> k [PmVar (unLoc id)]
+    ParPat _ p   -> translatePat fam_insts (unLoc p) k
+    LazyPat _ _  -> mkPmVars [hsPatType pat] >>= k -- like a variable
 
-  -- ignore strictness annotations for now
-  BangPat _ p  -> translatePat fam_insts (unLoc p) k
+    -- ignore strictness annotations for now
+    BangPat _ p  -> translatePat fam_insts (unLoc p) k
 
-  AsPat _ lid p -> flip runContT k $ do
-    -- Note [Translating As Patterns]
-    ps <- ContT (translatePat fam_insts (unLoc p))
-    [(e, _)] <- ContT (patVecToPmExprs ps)
-    let g = PmGrd [PmVar (unLoc lid)] e
-    pure (ps ++ [g])
+    AsPat _ lid p -> flip runContT k $ do
+      -- Note [Translating As Patterns]
+      ps <- ContT (translatePat fam_insts (unLoc p))
+      [(e, _)] <- ContT (patVecToPmExprs ps)
+      let g = PmGrd [PmVar (unLoc lid)] e
+      pure (ps ++ [g])
 
-  SigPat _ p _ty -> translatePat fam_insts (unLoc p) k
+    SigPat _ p _ty -> translatePat fam_insts (unLoc p) k
 
-  -- See Note [Translate CoPats]
-  CoPat _ wrapper p ty
-    | isIdHsWrapper wrapper                   -> translatePat fam_insts p k
-    | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts p k
-    | otherwise -> flip runContT k $ do
-        ps <- ContT (translatePat fam_insts p)
-        (xp,xe) <- lift (mkPmId2Forms ty)
-        g <- ContT (mkGuard ps (mkHsWrap wrapper (unLoc xe)))
-        pure [xp,g]
+    -- See Note [Translate CoPats]
+    CoPat _ wrapper p ty
+      | isIdHsWrapper wrapper                   -> translatePat fam_insts p k
+      | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts p k
+      | otherwise -> flip runContT k $ do
+          ps <- ContT (translatePat fam_insts p)
+          (xp,xe) <- lift (mkPmId2Forms ty)
+          g <- ContT (mkGuard ps (mkHsWrap wrapper (unLoc xe)))
+          pure [xp,g]
 
-  -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
-  NPlusKPat ty (dL->L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty >>= k
+    -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
+    NPlusKPat ty (dL->L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty >>= k
 
-  -- (fun -> pat)   ===>   x (pat <- fun x)
-  ViewPat arg_ty lexpr lpat ->
-    translatePat fam_insts (unLoc lpat) $ \ps -> do
-      -- See Note [Guards and Approximation]
-      res <- allM cantFailPattern ps
-      case res of
-        True  -> do
-          (xp,xe) <- mkPmId2Forms arg_ty
-          mkGuard ps (HsApp noExtField lexpr xe) $ \g -> k [xp, g]
-        False -> mkCanFailPmPat arg_ty >>= k
+    -- (fun -> pat)   ===>   x (pat <- fun x)
+    ViewPat arg_ty lexpr lpat ->
+      translatePat fam_insts (unLoc lpat) $ \ps -> do
+        -- See Note [Guards and Approximation]
+        res <- allM cantFailPattern ps
+        case res of
+          True  -> do
+            (xp,xe) <- mkPmId2Forms arg_ty
+            mkGuard ps (HsApp noExtField lexpr xe) $ \g -> k [xp, g]
+          False -> mkCanFailPmPat arg_ty >>= k
 
-  -- list
-  ListPat (ListPatTc ty Nothing) ps -> do
-    translatePatVec fam_insts (map unLoc ps) $ \pv ->
-      k (foldr (mkListPatVec ty) [nilPattern ty] pv)
+    -- list
+    ListPat (ListPatTc ty Nothing) ps -> do
+      translatePatVec fam_insts (map unLoc ps) $ \pv ->
+        k (foldr (mkListPatVec ty) [nilPattern ty] pv)
 
-  -- overloaded list
-  ListPat (ListPatTc _elem_ty (Just (pat_ty, _to_list))) lpats -> do
-    dflags <- getDynFlags
-    if xopt LangExt.RebindableSyntax dflags
-       then mkCanFailPmPat pat_ty >>= k
-       else case splitListTyConApp_maybe pat_ty of
-              Just e_ty -> translatePat fam_insts
-                                        (ListPat (ListPatTc e_ty Nothing) lpats)
-                                        k
-              Nothing   -> mkCanFailPmPat pat_ty >>= k
-    -- (a) In the presence of RebindableSyntax, we don't know anything about
-    --     `toList`, we should treat `ListPat` as any other view pattern.
-    --
-    -- (b) In the absence of RebindableSyntax,
-    --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
-    --       as ordinary list pattern. Although we can give an instance
-    --       `IsList [Int]` (more specific than the default `IsList [a]`), in
-    --       practice, we almost never do that. We assume the `_to_list` is
-    --       the `toList` from `instance IsList [a]`.
-    --
-    --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
-    --
-    -- See #14547, especially comment#9 and comment#10.
-    --
-    -- Here we construct CanFailPmPat directly, rather can construct a view
-    -- pattern and do further translation as an optimization, for the reason,
-    -- see Note [Guards and Approximation].
+    -- overloaded list
+    ListPat (ListPatTc _elem_ty (Just (pat_ty, _to_list))) lpats -> do
+      dflags <- getDynFlags
+      if xopt LangExt.RebindableSyntax dflags
+        then mkCanFailPmPat pat_ty >>= k
+        else case splitListTyConApp_maybe pat_ty of
+                Just e_ty -> translatePat fam_insts
+                                          (ListPat (ListPatTc e_ty Nothing) lpats)
+                                          k
+                Nothing   -> mkCanFailPmPat pat_ty >>= k
+      -- (a) In the presence of RebindableSyntax, we don't know anything about
+      --     `toList`, we should treat `ListPat` as any other view pattern.
+      --
+      -- (b) In the absence of RebindableSyntax,
+      --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
+      --       as ordinary list pattern. Although we can give an instance
+      --       `IsList [Int]` (more specific than the default `IsList [a]`), in
+      --       practice, we almost never do that. We assume the `_to_list` is
+      --       the `toList` from `instance IsList [a]`.
+      --
+      --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
+      --
+      -- See #14547, especially comment#9 and comment#10.
+      --
+      -- Here we construct CanFailPmPat directly, rather can construct a view
+      -- pattern and do further translation as an optimization, for the reason,
+      -- see Note [Guards and Approximation].
 
-  ConPatOut { pat_con     = (dL->L _ con)
-            , pat_arg_tys = arg_tys
-            , pat_tvs     = ex_tvs
-            , pat_args    = ps } -> do
-    let ty = conLikeResTy con arg_tys
-    groups <- allCompleteMatches ty
-    case groups of
-      [] -> mkCanFailPmPat ty >>= k
-      _  -> do
-        translateConPatVec fam_insts arg_tys ex_tvs con ps $ \args ->
-          k [PmCon { pm_con_con     = PmAltConLike con
-                   , pm_con_arg_tys = arg_tys
-                   , pm_con_tvs     = ex_tvs
-                   , pm_con_args    = args }]
+    ConPatOut { pat_con     = (dL->L _ con)
+              , pat_arg_tys = arg_tys
+              , pat_tvs     = ex_tvs
+              , pat_args    = ps } -> do
+      let ty = conLikeResTy con arg_tys
+      groups <- allCompleteMatches ty
+      case groups of
+        [] -> mkCanFailPmPat ty >>= k
+        _  -> do
+          translateConPatVec fam_insts arg_tys ex_tvs con ps $ \args ->
+            k [PmCon { pm_con_con     = PmAltConLike con
+                    , pm_con_arg_tys = arg_tys
+                    , pm_con_tvs     = ex_tvs
+                    , pm_con_args    = args }]
 
-  -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-  NPat ty (dL->L _ olit) mb_neg _
-    | Just lit <- hsOverLitAsHsLit olit (isJust mb_neg) ty
-    -> translatePat fam_insts (LitPat noExtField lit) k
-  NPat _ (dL->L _ olit) mb_neg _ -> do
-    core_expr <- dsOverLit olit
-    let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
-    let lit' = case mb_neg of
-          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
-          Nothing -> lit
-    k [mkPmLitPattern lit']
+    -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
+    NPat ty (dL->L _ olit) mb_neg _
+      | Just lit <- hsOverLitAsHsLit dflags olit (isJust mb_neg) ty
+      -> translatePat fam_insts (LitPat noExtField lit) k
+    NPat _ (dL->L _ olit) mb_neg _ -> do
+      core_expr <- dsOverLit olit
+      let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
+      let lit' = case mb_neg of
+            Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
+            Nothing -> lit
+      k [mkPmLitPattern lit']
 
-  -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-  LitPat _ lit
-    | HsString src s <- lit ->
-        translatePatVec fam_insts
-          (map (LitPat noExtField . HsChar src) (unpackFS s))
-          (\pv -> k (foldr (mkListPatVec charTy) [nilPattern charTy] pv))
-    | otherwise -> do
-        core_expr <- dsLit (convertLit lit)
-        let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
-        k [mkPmLitPattern lit]
+    -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
+    LitPat _ lit
+      | HsString src s <- lit ->
+          translatePatVec fam_insts
+            (map (LitPat noExtField . HsChar src) (unpackFS s))
+            (\pv -> k (foldr (mkListPatVec charTy) [nilPattern charTy] pv))
+      | otherwise -> do
+          core_expr <- dsLit (convertLit lit)
+          let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+          k [mkPmLitPattern lit]
 
-  TuplePat tys ps boxity -> do
-    translatePatVec fam_insts (map unLoc ps) $ \tidy_ps -> do
-      let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
-          tys' = case boxity of
-                  Boxed -> tys
-                  -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-                  Unboxed -> map getRuntimeRep tys ++ tys
-      k [vanillaConPattern tuple_con tys' (concat tidy_ps)]
+    TuplePat tys ps boxity -> do
+      translatePatVec fam_insts (map unLoc ps) $ \tidy_ps -> do
+        let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
+            tys' = case boxity of
+                    Boxed -> tys
+                    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                    Unboxed -> map getRuntimeRep tys ++ tys
+        k [vanillaConPattern tuple_con tys' (concat tidy_ps)]
 
-  SumPat ty p alt arity -> do
-    translatePat fam_insts (unLoc p) $ \tidy_p -> do
-      let sum_con = RealDataCon (sumDataCon alt arity)
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-      k [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
+    SumPat ty p alt arity -> do
+      translatePat fam_insts (unLoc p) $ \tidy_p -> do
+        let sum_con = RealDataCon (sumDataCon alt arity)
+        -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+        k [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
 
-  -- --------------------------------------------------------------------------
-  -- Not supposed to happen
-  ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
-  SplicePat {} -> panic "Check.translatePat: SplicePat"
-  XPat      {} -> panic "Check.translatePat: XPat"
+    -- --------------------------------------------------------------------------
+    -- Not supposed to happen
+    ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
+    SplicePat {} -> panic "Check.translatePat: SplicePat"
+    XPat      {} -> panic "Check.translatePat: XPat"
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
