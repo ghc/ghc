@@ -219,7 +219,7 @@ The impact of this treatment of overloaded literals is the following:
 
 Similar reasoning applies to pattern synonyms: In contrast to data constructors,
 which are generative, constraints like F a ~ G b for two different pattern
-synonyms F and G aren't immediately unsatisfiable. We know F a ~ F a, though.
+synonyms F and G aren't immediately unsatisfiable. We assume F a ~ F a, though.
 -}
 
 mkPmExprData :: DataCon -> [Id] -> PmExpr

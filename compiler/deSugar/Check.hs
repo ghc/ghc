@@ -758,6 +758,7 @@ hsExprToPmExpr expr k = do
 coreExprToPmExpr :: CoreExpr -> ContT r PmM PmExpr
 -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
 coreExprToPmExpr (Cast e _co) = coreExprToPmExpr e
+coreExprToPmExpr (Tick _t e) = coreExprToPmExpr e
 coreExprToPmExpr e
   | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
   , exprType e `eqType` stringTy
@@ -803,6 +804,7 @@ splitDataConApp_maybe _ = Nothing
 
 coreExprAsPmLit :: CoreExpr -> Maybe PmLit
 -- coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
+coreExprAsPmLit (Tick _t e) = coreExprAsPmLit e
 coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
 coreExprAsPmLit e = case collectArgs e of
   (Var x, [Lit l])
