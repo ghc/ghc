@@ -11,7 +11,6 @@ import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode
 import SPARC.Regs
-import SPARC.Ppr        ()
 import Instruction
 import Reg
 import Format

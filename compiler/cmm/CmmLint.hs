@@ -21,7 +21,7 @@ import Cmm
 import CmmUtils
 import CmmLive
 import CmmSwitch (switchTargetsToList)
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 import Outputable
 import DynFlags
 

@@ -46,7 +46,6 @@ import GhcPrelude
 
 import DynFlags
 import CoreSyn
-import PprCore          ()      -- Instances
 import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
 import CoreOpt
 import CoreArity       ( manifestArity )

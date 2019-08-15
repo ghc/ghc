@@ -32,7 +32,7 @@ import BlockId
 import CLabel
 import ForeignCall
 import Cmm hiding (pprBBlock)
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 import Hoopl.Block
 import Hoopl.Collections
 import Hoopl.Graph

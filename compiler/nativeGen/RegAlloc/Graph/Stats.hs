@@ -28,7 +28,6 @@ import RegClass
 import Reg
 import TargetReg
 
-import PprCmm()
 import Outputable
 import UniqFM
 import UniqSet

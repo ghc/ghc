@@ -38,9 +38,6 @@ import X86.Cond
 import X86.Regs
 import X86.RegInfo
 
---TODO: Remove - Just for development/debugging
-import X86.Ppr()
-
 import CodeGen.Platform
 import CPrim
 import Debug            ( DebugBlock(..), UnwindPoint(..), UnwindTable
@@ -60,7 +57,6 @@ import GHC.Platform
 import BasicTypes
 import BlockId
 import Module           ( primUnitId )
-import PprCmm           ()
 import CmmUtils
 import CmmSwitch
 import Cmm
