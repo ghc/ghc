@@ -286,18 +286,18 @@ putWord8 h w = putPrim h 1 (\op -> poke op w)
 getWord8 :: BinHandle -> IO Word8
 getWord8 h = getPrim h 1 peek
 
-putWord16 :: BinHandle -> Word16 -> IO ()
-putWord16 h w = putPrim h 2 (\op -> do
-  pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
-  pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
-  )
+-- putWord16 :: BinHandle -> Word16 -> IO ()
+-- putWord16 h w = putPrim h 2 (\op -> do
+--   pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
+--   pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
+--   )
 
-getWord16 :: BinHandle -> IO Word16
-getWord16 h = getPrim h 2 (\op -> do
-  w0 <- fromIntegral <$> peekElemOff op 0
-  w1 <- fromIntegral <$> peekElemOff op 1
-  return $! w0 `shiftL` 8 .|. w1
-  )
+-- getWord16 :: BinHandle -> IO Word16
+-- getWord16 h = getPrim h 2 (\op -> do
+--   w0 <- fromIntegral <$> peekElemOff op 0
+--   w1 <- fromIntegral <$> peekElemOff op 1
+--   return $! w0 `shiftL` 8 .|. w1
+--   )
 
 putWord32 :: BinHandle -> Word32 -> IO ()
 putWord32 h w = putPrim h 4 (\op -> do
@@ -320,38 +320,38 @@ getWord32 h = getPrim h 4 (\op -> do
             w3
   )
 
-putWord64 :: BinHandle -> Word64 -> IO ()
-putWord64 h w = putPrim h 8 (\op -> do
-  pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
-  pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
-  pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
-  pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
-  pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
-  pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
-  pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
-  pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
-  )
+-- putWord64 :: BinHandle -> Word64 -> IO ()
+-- putWord64 h w = putPrim h 8 (\op -> do
+--   pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
+--   pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
+--   pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
+--   pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
+--   pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
+--   pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
+--   pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
+--   pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
+--   )
 
-getWord64 :: BinHandle -> IO Word64
-getWord64 h = getPrim h 8 (\op -> do
-  w0 <- fromIntegral <$> peekElemOff op 0
-  w1 <- fromIntegral <$> peekElemOff op 1
-  w2 <- fromIntegral <$> peekElemOff op 2
-  w3 <- fromIntegral <$> peekElemOff op 3
-  w4 <- fromIntegral <$> peekElemOff op 4
-  w5 <- fromIntegral <$> peekElemOff op 5
-  w6 <- fromIntegral <$> peekElemOff op 6
-  w7 <- fromIntegral <$> peekElemOff op 7
+-- getWord64 :: BinHandle -> IO Word64
+-- getWord64 h = getPrim h 8 (\op -> do
+--   w0 <- fromIntegral <$> peekElemOff op 0
+--   w1 <- fromIntegral <$> peekElemOff op 1
+--   w2 <- fromIntegral <$> peekElemOff op 2
+--   w3 <- fromIntegral <$> peekElemOff op 3
+--   w4 <- fromIntegral <$> peekElemOff op 4
+--   w5 <- fromIntegral <$> peekElemOff op 5
+--   w6 <- fromIntegral <$> peekElemOff op 6
+--   w7 <- fromIntegral <$> peekElemOff op 7
 
-  return $! (w0 `shiftL` 56) .|.
-            (w1 `shiftL` 48) .|.
-            (w2 `shiftL` 40) .|.
-            (w3 `shiftL` 32) .|.
-            (w4 `shiftL` 24) .|.
-            (w5 `shiftL` 16) .|.
-            (w6 `shiftL` 8)  .|.
-            w7
-  )
+--   return $! (w0 `shiftL` 56) .|.
+--             (w1 `shiftL` 48) .|.
+--             (w2 `shiftL` 40) .|.
+--             (w3 `shiftL` 32) .|.
+--             (w4 `shiftL` 24) .|.
+--             (w5 `shiftL` 16) .|.
+--             (w6 `shiftL` 8)  .|.
+--             w7
+--   )
 
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh w = putWord8 bh w
@@ -371,6 +371,7 @@ getByte h = getWord8 h
 -- TODO: Use putPrimMax to avoid checking array bounds each iteration.
 
 -- Unsigned numbers
+{-# SPECIALISE putULEB128 :: BinHandle -> Word -> IO () #-}
 putULEB128 :: forall a. (Integral a, FiniteBits a) => BinHandle -> a -> IO ()
 putULEB128 bh w =
 #if defined(DEBUG)
@@ -384,7 +385,7 @@ putULEB128 bh w =
       = putByte bh (fromIntegral w :: Word8)
       | otherwise = do
         -- bit 7 (8th bit) indicates more to come.
-        let byte = setBit (fromIntegral w) 7 :: Word8
+        let !byte = setBit (fromIntegral w) 7 :: Word8
         putByte bh byte
         go (w `unsafeShiftR` 7)
 
@@ -631,7 +632,6 @@ since we encod chars as Word32 as well.
 We can easily do better. The new plan is:
 
 * Start with a tag byte
- Variable length encoding for Binary instances.
   * 1 => Int64
   * 2 => Negative large interger
   * 3 => Positive large integer
