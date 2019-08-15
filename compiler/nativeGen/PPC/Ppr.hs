@@ -27,7 +27,7 @@ import Hoopl.Label
 
 import BlockId
 import CLabel
-import PprCmmExpr ()
+import PprCmmExpr () -- For Outputable instances
 
 import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform

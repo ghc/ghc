@@ -11,7 +11,6 @@ module FlagChecker (
 import GhcPrelude
 
 import Binary
-import BinIface ()
 import DynFlags
 import HscTypes
 import Module

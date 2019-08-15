@@ -46,7 +46,6 @@ import GhcPrelude
 import IfaceType
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
-import PprCore()            -- Printing DFunArgs
 import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
 import Demand
 import Class

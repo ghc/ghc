@@ -31,7 +31,6 @@ import SPARC.CodeGen.CondCode
 import SPARC.CodeGen.Gen64
 import SPARC.CodeGen.Gen32
 import SPARC.CodeGen.Base
-import SPARC.Ppr        ()
 import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode

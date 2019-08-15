@@ -35,7 +35,6 @@ import DynFlags
 import ErrUtils
 import Util
 import Outputable
-import Pretty           ()
 import Maybes
 import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils

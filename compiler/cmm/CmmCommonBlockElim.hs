@@ -13,7 +13,6 @@ import Cmm
 import CmmUtils
 import CmmSwitch (eqSwitchTargetWith)
 import CmmContFlowOpt
--- import PprCmm ()
 
 import Hoopl.Block
 import Hoopl.Graph

@@ -48,7 +48,6 @@ import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
 import TcType
-import TrieMap       () -- DV: for now
 import Type
 import TysWiredIn    ( liftedRepTy )
 import Unify         ( tcMatchTyKi )
