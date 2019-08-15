@@ -183,6 +183,7 @@ import VarSet
 import FastStringEnv
 import ErrUtils
 import UniqFM
+import UniqMap
 import UniqSupply
 import BasicTypes
 import Bag
@@ -1413,7 +1414,7 @@ mkModDeps deps = foldl' add emptyFsEnv deps
 modDepsElts
   :: ModuleNameEnv (ModuleName, IsBootInterface)
   -> [(ModuleName, IsBootInterface)]
-modDepsElts = sort . modDepsElts
+modDepsElts = sort . nonDetEltsUniqMap
   -- It's OK to use nonDetEltsUFM here because sorting by module names
   -- restores determinism
 

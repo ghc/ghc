@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
@@ -475,8 +476,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        -- This is computed by finding the free external names of each
        -- declaration, including IfaceDeclExtras (things that a
        -- declaration implicitly depends on).
-       edges :: [ Node FastStringU IfaceDeclABI ]
-       edges = [ DigraphNode abi (FastStringU $ getOccFS decl) out
+       edges :: [ Node OccName IfaceDeclABI ]
+       edges = [ DigraphNode abi (getOccName decl) out
                | decl <- new_decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
@@ -484,7 +485,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
        name_module n = ASSERT2( isExternalName n, ppr n ) nameModule n
        localOccs =
-         map (FastStringU . occNameFS . getParent . getOccName)
+         map (getParent . getOccName)
                         -- NB: names always use semantic module, so
                         -- filtering must be on the semantic module!
                         -- See Note [Identity versus semantic module]
@@ -509,7 +510,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
         -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups = stronglyConnCompFromEdgedVerticesUniq edges
+       groups = stronglyConnCompFromEdgedVerticesFS edges
 
        global_hash_fn = mkHashFun hsc_env eps
 

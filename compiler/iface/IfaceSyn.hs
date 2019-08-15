@@ -70,6 +70,7 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import Unique
 
 import Control.Monad
 import System.IO.Unsafe
@@ -629,6 +630,9 @@ instance HasOccName IfaceConDecl where
 
 instance NamedThing IfaceDecl where
   getName = ifName
+
+instance Uniquable IfaceDecl where
+  getUnique = getUnique . getName
 
 instance HasOccName IfaceDecl where
   occName = getOccName

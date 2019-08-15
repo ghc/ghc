@@ -1182,7 +1182,7 @@ extendModuleEnv (ModuleEnv e) m x = ModuleEnv (extendFsEnv e m (m,x))
 extendModuleEnvWith :: (a -> a -> a) -> ModuleEnv a -> Module -> a
                     -> ModuleEnv a
 extendModuleEnvWith f (ModuleEnv e) m x =
-  ModuleEnv (extendFsEnv_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e m (m, x))
+  ModuleEnv (extendFsEnv_C (\(m, v1) (_, v2) -> (m, f v2 v1)) e m (m, x))
 
 extendModuleEnvList :: ModuleEnv a -> [(Module, a)] -> ModuleEnv a
 extendModuleEnvList (ModuleEnv e) xs =
@@ -1191,11 +1191,11 @@ extendModuleEnvList (ModuleEnv e) xs =
 extendModuleEnvList_C :: (a -> a -> a) -> ModuleEnv a -> [(Module, a)]
                       -> ModuleEnv a
 extendModuleEnvList_C f (ModuleEnv e) xs =
-  ModuleEnv (extendFsEnvList_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e [(k,(k, v)) | (k,v) <- xs])
+  ModuleEnv (extendFsEnvList_C (\(m, v1) (_, v2) -> (m, f v2 v1)) e [(k,(k, v)) | (k,v) <- xs])
 
 plusModuleEnv_C :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
 plusModuleEnv_C f (ModuleEnv e1) (ModuleEnv e2) =
-  ModuleEnv (plusFsEnv_C (\(m, v1) (_, v2) -> (m, f v1 v2)) e1 e2)
+  ModuleEnv (plusFsEnv_C (\(m, v1) (_, v2) -> (m, f v2 v1)) e1 e2)
 
 delModuleEnvList :: ModuleEnv a -> [Module] -> ModuleEnv a
 delModuleEnvList (ModuleEnv e) ms =

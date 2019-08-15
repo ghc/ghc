@@ -20,6 +20,8 @@ module Digraph(
         stronglyConnCompFromEdgedVerticesOrdR,
         stronglyConnCompFromEdgedVerticesUniq,
         stronglyConnCompFromEdgedVerticesUniqR,
+        stronglyConnCompFromEdgedVerticesFS,
+        stronglyConnCompFromEdgedVerticesFSR,
 
         -- Simple way to classify edges
         EdgeType(..), classifyEdges
@@ -47,6 +49,8 @@ import GhcPrelude
 import Util        ( minWith, count )
 import Outputable
 import Maybes      ( expectJust )
+import FastString
+import FastStringEnv
 
 -- std interfaces
 import Data.Maybe
@@ -199,6 +203,9 @@ reduceNodesIntoVerticesOrd = reduceNodesIntoVertices Map.fromList Map.lookup
 reduceNodesIntoVerticesUniq :: Uniquable key => ReduceFn key payload
 reduceNodesIntoVerticesUniq = reduceNodesIntoVertices listToUFM (flip lookupUFM)
 
+reduceNodesIntoVerticesFS :: (Outputable key, HasFastString key) => ReduceFn key payload
+reduceNodesIntoVerticesFS = reduceNodesIntoVertices mkFsEnv (\k v -> lookupFsEnv v k)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -319,6 +326,16 @@ stronglyConnCompFromEdgedVerticesUniq
 stronglyConnCompFromEdgedVerticesUniq
   = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesUniqR
 
+-- The following two versions are provided for backwards compatibility:
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesFS
+        :: (Outputable key, HasFastString key)
+        => [Node key payload]
+        -> [SCC payload]
+stronglyConnCompFromEdgedVerticesFS
+  = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesFSR
+
 -- The "R" interface is used when you expect to apply SCC to
 -- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
@@ -340,6 +357,17 @@ stronglyConnCompFromEdgedVerticesUniqR
         -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesUniqR =
   stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesUniq
+
+-- The "R" interface is used when you expect to apply SCC to
+-- (some of) the result of SCC, so you don't want to lose the dependency info
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesFSR
+        :: (Outputable key, HasFastString key)
+        => [Node key payload]
+        -> [SCC (Node key payload)]
+stronglyConnCompFromEdgedVerticesFSR =
+  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesFS
 
 {-
 ************************************************************************

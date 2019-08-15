@@ -192,7 +192,7 @@ lookupLabel name = do
   return $
      case lookupFsEnv env name of
         Just (LabelN l) -> l
-        _other          -> mkBlockId (newTagUnique (mkUniqueGrimily (uniqueOfFS name)) 'L')
+        _other          -> mkBlockId (newTagUnique (unsafeFastStringUnique name) 'L')
 
 
 -- | Lookup the location of a named variable.
