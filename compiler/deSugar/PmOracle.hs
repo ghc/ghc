@@ -231,7 +231,9 @@ mkOneConFull res_ty con = do
             -- probably won't crash after type checking and if this was
             -- ill-formed, the type oracle would reject anyway.
             | (_var, tc_args) <- splitAppTys res_ty
-            -> zipTvSubst univ_tvs tc_args
+            -- HACK: See Note [Ignoring required thetas seems suspicious]
+            , (univ_tvs', tc_args') <- unzip (zip (reverse univ_tvs) (reverse tc_args))
+            -> zipTvSubst univ_tvs' tc_args'
         -- Note that PatSyn's are always associated to the data family
         -- TyCon, not the representation TyCon! Hence match with
         -- un-normalised res_ty.
@@ -270,10 +272,10 @@ equateTyVars ex_tvs1 ex_tvs2
 {- Note [Ignoring required thetas seems suspicious]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Currently we ignore the required thetas of a pattern synonym in mkOneConFull.
-I find that dubious, but apparently we seem to be fine as long as the
-type-checker does the right thing. We still generate questionable field types in
-T11336b, for example. There we have a uni-directional pattern synonym
+I find that dubious, and it leads to a brittle hack for T11336b, where we
+generate questionable field types. Consider a uni-directional pattern synonym
 
+    instance C Proxy
     pattern PProxy :: C s => s a -> Proxy a
     pattern PProxy s <- ...
     f :: Proxy a -> ()
@@ -282,23 +284,37 @@ T11336b, for example. There we have a uni-directional pattern synonym
 When we call @mkOneConFull "Proxy a" PProxy@, we ultimately instantiate
 'PProxy's field to a fresh @x :: s a@, where we don't know anything about @s@.
 This seems wrong; we might want to record a Wanted constraint for @C s@,
-'PProxy's required theta.
-This is also weird in that the *type* oracle now decides over the
-'PossibleMatches' of @x@, at least in the sense that it's the union of the
-'PossibleMatches' all possible instantiations of @s@ (those with a @C s@
-instance) the type oracle suggests.
-This doesn't matter in practice, because we get the type refinement from the
-inner @Proxy@ match, but it might open the door for surprising bugs.
+'PProxy's required theta, in @x :: forall s. C s => s a@.
 
-Note how this also applies to equality constraints like (a ~ Int) in
+In the inner match on 'Proxy' we call @mkOneConFull "s a" Proxy@, which will
+ultimately match the type @s a@ against @Proxy {k} t@ by calling
+@zipTcSubst [k, t] [a]@, which is utterly wrong. Not only is there a mismatch
+in the length of the lists, but also in kinding if we ignored it (k ~ a).
+With knowledge of the required theta and the 'C' instance for @Proxy {*}@ we
+could instantiate (I believe) @s ~ Proxy {*}@ and see that
+@(t :: k) ~ (a :: *)@.
+
+Lacking proper handling of the required theta, we have to live with the ugly
+hack that will just drop the first element of 'Proxy's @univ_tvs@ to unify @t@
+with @a@, hopefully deducing @k ~ *@ on the way. Though not very principled on
+first thought, it actually makes a lot of sense, since most (tm) class instances
+will be on partial applications of a particular type constructor.
+
+A couple of side notes:
+
+* The "correct" typing @x :: forall s. C s => s a@ is also weird in that the
+  *type* oracle now decides over the 'PossibleMatches' of @x@, at least in the
+  sense that it's the union of the 'PossibleMatches' all possible instantiations
+  of @s@ (those with a @C s@ instance) the type oracle suggests.
+
+* Note how this also applies to equality constraints like (a ~ Int) in
 
     pattern Just42 :: (a ~ Int) => Maybe a
     pattern Just42 = Just 42
 
-So if mkOneConFull was to handle required thetas correctly (whatever that
-entails), we could drop the 'isValidCompleteMatch' check in
-'Check.allCompleteMatches', for example, because mkOneConFull would generate an
-unsatisfiable Wanted constraint anyway.
+  So if mkOneConFull was to handle required thetas correctly, we could drop the
+  'isValidCompleteMatch' check in 'Check.allCompleteMatches', for example,
+  because mkOneConFull would generate an unsatisfiable Wanted constraint anyway.
 -}
 
 -------------------------
