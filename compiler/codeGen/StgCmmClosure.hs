@@ -71,7 +71,7 @@ import GhcPrelude
 import StgSyn
 import SMRep
 import Cmm
-import PprCmmExpr()
+import PprCmmExpr() -- For Outputable instances
 
 import CostCentre
 import BlockId

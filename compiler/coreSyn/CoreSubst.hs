@@ -61,7 +61,6 @@ import UniqSupply
 import Maybes
 import Util
 import Outputable
-import PprCore          ()              -- Instances
 import Data.List
 
 

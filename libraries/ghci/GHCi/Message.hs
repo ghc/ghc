@@ -25,7 +25,7 @@ module GHCi.Message
 import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
 import GHCi.FFI
-import GHCi.TH.Binary ()
+import GHCi.TH.Binary () -- For Binary instances
 import GHCi.BreakArray
 
 import GHC.LanguageExtensions

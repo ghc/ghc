@@ -19,7 +19,6 @@ import Module
 import GHC.Platform
 import Digraph
 import CLabel
-import PprCmmDecl ()
 import Cmm
 import CmmUtils
 import DynFlags
@@ -30,7 +29,6 @@ import UniqSupply
 import CostCentre
 import StgCmmHeap
 
-import PprCmm()
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map

@@ -9,7 +9,7 @@ where
 import GhcPrelude
 
 import SPARC.Instr
-import SPARC.Ppr        ()
+import SPARC.Ppr        () -- For Outputable instances
 import Instruction
 
 import Cmm

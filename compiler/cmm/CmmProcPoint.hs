@@ -14,7 +14,7 @@ import DynFlags
 import BlockId
 import CLabel
 import Cmm
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 import CmmUtils
 import CmmInfo
 import CmmLive

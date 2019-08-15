@@ -28,7 +28,6 @@ import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsExtension
 import HsTypes
-import PprCore ()
 import CoreSyn
 import TcEvidence
 import Type

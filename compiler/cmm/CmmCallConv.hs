@@ -10,7 +10,7 @@ import GhcPrelude
 import CmmExpr
 import SMRep
 import Cmm (Convention(..))
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 
 import DynFlags
 import GHC.Platform

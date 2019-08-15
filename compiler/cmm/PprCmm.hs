@@ -41,7 +41,6 @@ where
 
 import GhcPrelude hiding (succ)
 
-import BlockId ()
 import CLabel
 import Cmm
 import CmmUtils
@@ -52,7 +51,6 @@ import Outputable
 import PprCmmDecl
 import PprCmmExpr
 import Util
-import PprCore ()
 
 import BasicTypes
 import Hoopl.Block

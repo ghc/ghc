@@ -32,7 +32,6 @@ import CoreSyn
 import FastString      ( nilFS, mkFastString )
 import Module
 import Outputable
-import PprCore         ()
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
 import Util            ( seqList )
