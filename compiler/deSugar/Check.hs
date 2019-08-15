@@ -1239,6 +1239,23 @@ OK. Consider this example (from #14059):
 In the incomplete pattern match for `wobble`, we /do/ want to warn that SFalse
 should be matched against, even though its type, SBool False, does not match
 the scrutinee type, SBool z.
+
+SG: Another angle at this is that the implied constraints when we instantiate
+universal type variables in the return type of a GADT will lead to *provided*
+thetas, whereas when we instantiate the return type of a pattern synonym that
+corresponds to a *required* theta. See Note [Pattern synonym result type] in
+PatSyn. Note how isValidCompleteMatches will successfully filter out
+
+    pattern Just42 :: Maybe Int
+    pattern Just42 = Just 42
+
+But fail to filter out the equivalent
+
+    pattern Just'42 :: (a ~ Int) => Maybe a
+    pattern Just'42 = Just 42
+
+Which seems fine as far as tcMatchTy is concerned, but it raises a few eye
+brows.
 -}
 
 {-

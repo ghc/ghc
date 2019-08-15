@@ -245,6 +245,7 @@ mkOneConFull res_ty con = do
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let arg_tys' = substTys subst arg_tys
   -- Instantiate fresh term variables (VAs) as arguments to the constructor
+  -- See Note [Ignoring required thetas seems suspicious]
   vars <- mapM mkPmId arg_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle
@@ -265,6 +266,40 @@ equateTyVars ex_tvs1 ex_tvs2
       | otherwise  = Just <$> to_evvar tv1 tv2
     to_evvar tv1 tv2 = nameType "pmConCon" $
                        mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
+
+{- Note [Ignoring required thetas seems suspicious]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently we ignore the required thetas of a pattern synonym in mkOneConFull.
+I find that dubious, but apparently we seem to be fine as long as the
+type-checker does the right thing. We still generate questionable field types in
+T11336b, for example. There we have a uni-directional pattern synonym
+
+    pattern PProxy :: C s => s a -> Proxy a
+    pattern PProxy s <- ...
+    f :: Proxy a -> ()
+    f (PProxy Proxy) = ()
+
+When we call @mkOneConFull "Proxy a" PProxy@, we ultimately instantiate
+'PProxy's field to a fresh @x :: s a@, where we don't know anything about @s@.
+This seems wrong; we might want to record a Wanted constraint for @C s@,
+'PProxy's required theta.
+This is also weird in that the *type* oracle now decides over the
+'PossibleMatches' of @x@, at least in the sense that it's the union of the
+'PossibleMatches' all possible instantiations of @s@ (those with a @C s@
+instance) the type oracle suggests.
+This doesn't matter in practice, because we get the type refinement from the
+inner @Proxy@ match, but it might open the door for surprising bugs.
+
+Note how this also applies to equality constraints like (a ~ Int) in
+
+    pattern Just42 :: (a ~ Int) => Maybe a
+    pattern Just42 = Just 42
+
+So if mkOneConFull was to handle required thetas correctly (whatever that
+entails), we could drop the 'isValidCompleteMatch' check in
+'Check.allCompleteMatches', for example, because mkOneConFull would generate an
+unsatisfiable Wanted constraint anyway.
+-}
 
 -------------------------
 -- * Pattern match oracle
