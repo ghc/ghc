@@ -371,6 +371,7 @@ getByte h = getWord8 h
 -- TODO: Use putPrimMax to avoid checking array bounds each iteration.
 
 -- Unsigned numbers
+{-# SPECIALISE putULEB128 :: BinHandle -> Word -> IO () #-}
 putULEB128 :: forall a. (Integral a, FiniteBits a) => BinHandle -> a -> IO ()
 putULEB128 bh w =
 #if defined(DEBUG)
@@ -631,7 +632,6 @@ since we encod chars as Word32 as well.
 We can easily do better. The new plan is:
 
 * Start with a tag byte
- Variable length encoding for Binary instances.
   * 1 => Int64
   * 2 => Negative large interger
   * 3 => Positive large integer
