@@ -21,3 +21,4 @@ test('compact_share', omit_ways(['ghci', 'profasm', 'profthreaded']),
 		      compile_and_run, [''])
 test('compact_bench', [ ignore_stdout, extra_run_opts('100') ],
                        compile_and_run, [''])
+test('T17044', normal, compile_and_run, [''])
