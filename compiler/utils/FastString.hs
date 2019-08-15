@@ -267,7 +267,7 @@ data FastStringTable = FastStringTable
 data FastStringTableSegment = FastStringTableSegment
   {-# UNPACK #-} !(MVar ()) -- the lock for write in each segment
   {-# UNPACK #-} !(IORef Int) -- the number of elements
-  (MutableArray# RealWorld [Weak FastString]) -- buckets in this segment
+  (MutableArray# RealWorld [Either FastString (Weak FastString)]) -- buckets in this segment
 
 {-
 Following parameters are determined based on:
@@ -287,7 +287,7 @@ hashToSegment# hash# = hash# `andI#` segmentMask#
   where
     !(I# segmentMask#) = segmentMask
 
-hashToIndex# :: MutableArray# RealWorld [Weak FastString] -> Int# -> Int#
+hashToIndex# :: MutableArray# RealWorld [Either FastString (Weak FastString)] -> Int# -> Int#
 hashToIndex# buckets# hash# =
   (hash# `uncheckedIShiftRL#` segmentBits#) `remInt#` size#
   where
@@ -309,7 +309,7 @@ maybeResizeSegment segmentRef = do
     forM_ [0 .. (I# oldSize#) - 1] $ \(I# i#) -> do
       fsList <- IO $ readArray# old# i#
       forM_ fsList $ \wfs -> do
-        mfs <- deRefWeak wfs
+        mfs <- either (return . Just) deRefWeak wfs
         case mfs of
           Just fs -> do
             let -- Shall we store in hash value in FastString instead?
@@ -452,9 +452,9 @@ mkFastStringWith mk_fs !ptr !len = do
         -- before we acquired the write lock.
         Just found -> return found
         Nothing -> do
-          v <- mkWeakPtr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
+          v <- mkWeak fs_bs fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
-            case writeArray# buckets# idx# (v: bucket) s1# of
+            case writeArray# buckets# idx# (Left fs: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
           let u = uniqueOfFS fs
@@ -470,10 +470,10 @@ mkFastStringWith mk_fs !ptr !len = do
               s2# -> (# s2#, () #)
               -}
 
-bucket_match :: [Weak FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
+bucket_match :: [Either FastString (Weak FastString)] -> Int -> Ptr Word8 -> IO (Maybe FastString)
 bucket_match [] _ _ = return Nothing
 bucket_match (v:ls) len ptr = do
-  mv <- deRefWeak v
+  mv <- either (return . Just) deRefWeak v
   case mv of
     Just fs@(FastString _ _ bs _)
       | len == BS.length bs -> do
@@ -645,7 +645,7 @@ isUnderscoreFS fs = fs == fsLit "_"
 -- -----------------------------------------------------------------------------
 -- Stats
 
-getFastStringTable :: IO [[[Weak FastString]]]
+getFastStringTable :: IO [[[Either FastString (Weak FastString)]]]
 getFastStringTable =
   forM [0 .. numSegments - 1] $ \(I# i#) -> do
     let (# segmentRef #) = indexArray# segments# i#

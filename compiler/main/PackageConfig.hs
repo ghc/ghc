@@ -68,11 +68,11 @@ instance BinaryStringRep PackageName where
   fromStringRep = PackageName . mkFastStringByteString
   toStringRep (PackageName s) = bytesFS s
 
-instance Uniquable SourcePackageId where
-  getUnique (SourcePackageId n) = unsafeFastStringUnique n
+instance HasFastString SourcePackageId where
+  getFastString (SourcePackageId n) = n
 
-instance Uniquable PackageName where
-  getUnique (PackageName n) = unsafeFastStringUnique n
+instance HasFastString PackageName where
+  getFastString (PackageName n) = n
 
 instance Outputable SourcePackageId where
   ppr (SourcePackageId str) = ftext str

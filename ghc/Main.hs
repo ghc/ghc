@@ -818,7 +818,7 @@ dumpFinalStats dflags = do
 
 dumpFastStringStats :: DynFlags -> IO ()
 dumpFastStringStats dflags = do
-  segments <- traverse (traverse (traverse deRefWeak)) =<< getFastStringTable
+  segments <- traverse (traverse (traverse (either (return . Just) deRefWeak))) =<< getFastStringTable
   gcCount <- readIORef fastStringGcCounter
   let buckets = concat segments
       bucketsPerSegment = map length segments
