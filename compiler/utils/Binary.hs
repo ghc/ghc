@@ -46,6 +46,12 @@ module Binary
    putByte,
    getByte,
 
+   -- * Variable length encodings
+   putULEB128,
+   getULEB128,
+   putSLEB128,
+   getSLEB128,
+
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
@@ -85,7 +91,7 @@ import Type.Reflection
 import Type.Reflection.Unsafe
 import Data.Kind (Type)
 import GHC.Exts (TYPE, RuntimeRep(..), VecCount(..), VecElem(..))
-import Control.Monad            ( when, (<$!>) )
+import Control.Monad            ( when, (<$!>), unless )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
@@ -140,6 +146,8 @@ castBin (BinPtr i) = BinPtr i
 -- class Binary
 ---------------------------------------------------------------
 
+-- | Do not rely on instance sizes for general types,
+-- we use variable length encoding for many of them.
 class Binary a where
     put_   :: BinHandle -> a -> IO ()
     put    :: BinHandle -> a -> IO (Bin a)
@@ -173,14 +181,14 @@ tellBin :: BinHandle -> IO (Bin a)
 tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
+seekBin h@(BinMem _ ix_r sz_r _) (BinPtr !p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
 seekBy :: BinHandle -> Int -> IO ()
-seekBy h@(BinMem _ ix_r sz_r _) off = do
+seekBy h@(BinMem _ ix_r sz_r _) !off = do
   sz <- readFastMutInt sz_r
   ix <- readFastMutInt ix_r
   let ix' = ix + off
@@ -222,9 +230,9 @@ readBinMem filename = do
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ _ sz_r arr_r) off = do
-   sz <- readFastMutInt sz_r
-   let sz' = head (dropWhile (<= off) (iterate (* 2) sz))
+expandBin (BinMem _ _ sz_r arr_r) !off = do
+   !sz <- readFastMutInt sz_r
+   let !sz' = getSize sz
    arr <- readIORef arr_r
    arr' <- mallocForeignPtrBytes sz'
    withForeignPtr arr $ \old ->
@@ -232,10 +240,20 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
        copyBytes new old sz
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
+   where
+    getSize :: Int -> Int
+    getSize !sz
+      | sz > off
+      = sz
+      | otherwise
+      = getSize (sz * 2)
 
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
 
+-- | Takes a size and action writing up to @size@ bytes.
+--   After the action has run advance the index to the buffer
+--   by size bytes.
 putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
 putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
   ix <- readFastMutInt ix_r
@@ -245,6 +263,18 @@ putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
   arr <- readIORef arr_r
   withForeignPtr arr $ \op -> f (op `plusPtr` ix)
   writeFastMutInt ix_r (ix + size)
+
+-- -- | Similar to putPrim but advances the index by the actual number of
+-- -- bytes written.
+-- putPrimMax :: BinHandle -> Int -> (Ptr Word8 -> IO Int) -> IO ()
+-- putPrimMax h@(BinMem _ ix_r sz_r arr_r) size f = do
+--   ix <- readFastMutInt ix_r
+--   sz <- readFastMutInt sz_r
+--   when (ix + size > sz) $
+--     expandBin h (ix + size)
+--   arr <- readIORef arr_r
+--   written <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+--   writeFastMutInt ix_r (ix + written)
 
 getPrim :: BinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
 getPrim (BinMem _ ix_r sz_r arr_r) size f = do
@@ -258,23 +288,23 @@ getPrim (BinMem _ ix_r sz_r arr_r) size f = do
   return w
 
 putWord8 :: BinHandle -> Word8 -> IO ()
-putWord8 h w = putPrim h 1 (\op -> poke op w)
+putWord8 h !w = putPrim h 1 (\op -> poke op w)
 
 getWord8 :: BinHandle -> IO Word8
 getWord8 h = getPrim h 1 peek
 
-putWord16 :: BinHandle -> Word16 -> IO ()
-putWord16 h w = putPrim h 2 (\op -> do
-  pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
-  pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
-  )
+-- putWord16 :: BinHandle -> Word16 -> IO ()
+-- putWord16 h w = putPrim h 2 (\op -> do
+--   pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
+--   pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
+--   )
 
-getWord16 :: BinHandle -> IO Word16
-getWord16 h = getPrim h 2 (\op -> do
-  w0 <- fromIntegral <$> peekElemOff op 0
-  w1 <- fromIntegral <$> peekElemOff op 1
-  return $! w0 `shiftL` 8 .|. w1
-  )
+-- getWord16 :: BinHandle -> IO Word16
+-- getWord16 h = getPrim h 2 (\op -> do
+--   w0 <- fromIntegral <$> peekElemOff op 0
+--   w1 <- fromIntegral <$> peekElemOff op 1
+--   return $! w0 `shiftL` 8 .|. w1
+--   )
 
 putWord32 :: BinHandle -> Word32 -> IO ()
 putWord32 h w = putPrim h 4 (\op -> do
@@ -297,63 +327,188 @@ getWord32 h = getPrim h 4 (\op -> do
             w3
   )
 
-putWord64 :: BinHandle -> Word64 -> IO ()
-putWord64 h w = putPrim h 8 (\op -> do
-  pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
-  pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
-  pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
-  pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
-  pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
-  pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
-  pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
-  pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
-  )
+-- putWord64 :: BinHandle -> Word64 -> IO ()
+-- putWord64 h w = putPrim h 8 (\op -> do
+--   pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
+--   pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
+--   pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
+--   pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
+--   pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
+--   pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
+--   pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
+--   pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
+--   )
 
-getWord64 :: BinHandle -> IO Word64
-getWord64 h = getPrim h 8 (\op -> do
-  w0 <- fromIntegral <$> peekElemOff op 0
-  w1 <- fromIntegral <$> peekElemOff op 1
-  w2 <- fromIntegral <$> peekElemOff op 2
-  w3 <- fromIntegral <$> peekElemOff op 3
-  w4 <- fromIntegral <$> peekElemOff op 4
-  w5 <- fromIntegral <$> peekElemOff op 5
-  w6 <- fromIntegral <$> peekElemOff op 6
-  w7 <- fromIntegral <$> peekElemOff op 7
+-- getWord64 :: BinHandle -> IO Word64
+-- getWord64 h = getPrim h 8 (\op -> do
+--   w0 <- fromIntegral <$> peekElemOff op 0
+--   w1 <- fromIntegral <$> peekElemOff op 1
+--   w2 <- fromIntegral <$> peekElemOff op 2
+--   w3 <- fromIntegral <$> peekElemOff op 3
+--   w4 <- fromIntegral <$> peekElemOff op 4
+--   w5 <- fromIntegral <$> peekElemOff op 5
+--   w6 <- fromIntegral <$> peekElemOff op 6
+--   w7 <- fromIntegral <$> peekElemOff op 7
 
-  return $! (w0 `shiftL` 56) .|.
-            (w1 `shiftL` 48) .|.
-            (w2 `shiftL` 40) .|.
-            (w3 `shiftL` 32) .|.
-            (w4 `shiftL` 24) .|.
-            (w5 `shiftL` 16) .|.
-            (w6 `shiftL` 8)  .|.
-            w7
-  )
+--   return $! (w0 `shiftL` 56) .|.
+--             (w1 `shiftL` 48) .|.
+--             (w2 `shiftL` 40) .|.
+--             (w3 `shiftL` 32) .|.
+--             (w4 `shiftL` 24) .|.
+--             (w5 `shiftL` 16) .|.
+--             (w6 `shiftL` 8)  .|.
+--             w7
+--   )
 
 putByte :: BinHandle -> Word8 -> IO ()
-putByte bh w = putWord8 bh w
+putByte bh !w = putWord8 bh w
 
 getByte :: BinHandle -> IO Word8
 getByte h = getWord8 h
 
 -- -----------------------------------------------------------------------------
+-- Encode numbers in LEB128 encoding.
+-- Requires one byte of space per 7 bits of data.
+--
+-- There are signed and unsigned variants.
+-- Do NOT use the unsigned one for signed values, at worst it will
+-- result in wrong results, at best it will lead to bad performance
+-- when coercing negative values to an unsigned type.
+--
+-- We mark them as SPECIALIZE as it's extremely critical that they get specialized
+-- to their specific types.
+--
+-- TODO: Each use of putByte performs a bounds check,
+--       we should use putPrimMax here. However it's quite hard to return
+--       the number of bytes written into putPrimMax without allocating an
+--       Int for it, while the code below does not allocate at all.
+--       So we eat the cost of the bounds check instead of increasing allocations
+--       for now.
+
+-- Unsigned numbers
+{-# SPECIALISE putULEB128 :: BinHandle -> Word -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Word64 -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Word32 -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Word16 -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Int -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Int64 -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Int32 -> IO () #-}
+{-# SPECIALISE putULEB128 :: BinHandle -> Int16 -> IO () #-}
+putULEB128 :: forall a. (Integral a, FiniteBits a) => BinHandle -> a -> IO ()
+putULEB128 bh w =
+#if defined(DEBUG)
+    (if w < 0 then panic "putULEB128: Signed number" else id) $
+#endif
+    go w
+  where
+    go :: a -> IO ()
+    go w
+      | w <= (127 :: a)
+      = putByte bh (fromIntegral w :: Word8)
+      | otherwise = do
+        -- bit 7 (8th bit) indicates more to come.
+        let !byte = setBit (fromIntegral w) 7 :: Word8
+        putByte bh byte
+        go (w `unsafeShiftR` 7)
+
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Word #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Word64 #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Word32 #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Word16 #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Int #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Int64 #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Int32 #-}
+{-# SPECIALISE getULEB128 :: BinHandle -> IO Int16 #-}
+getULEB128 :: forall a. (Integral a, FiniteBits a) => BinHandle -> IO a
+getULEB128 bh =
+    go 0 0
+  where
+    go :: Int -> a -> IO a
+    go shift w = do
+        b <- getByte bh
+        let !hasMore = testBit b 7
+        let !val = w .|. ((clearBit (fromIntegral b) 7) `unsafeShiftL` shift) :: a
+        if hasMore
+            then do
+                go (shift+7) val
+            else
+                return $! val
+
+-- Signed numbers
+{-# SPECIALISE putSLEB128 :: BinHandle -> Word -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Word64 -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Word32 -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Word16 -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Int -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Int64 -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Int32 -> IO () #-}
+{-# SPECIALISE putSLEB128 :: BinHandle -> Int16 -> IO () #-}
+putSLEB128 :: forall a. (Integral a, Bits a) => BinHandle -> a -> IO ()
+putSLEB128 bh initial = go initial
+  where
+    go :: a -> IO ()
+    go val = do
+        let !byte = fromIntegral (clearBit val 7) :: Word8
+        let !val' = val `unsafeShiftR` 7
+        let !signBit = testBit byte 6
+        let !done =
+                -- Unsigned value, val' == 0 and and last value can
+                -- be discriminated from a negative number.
+                ((val' == 0 && not signBit) ||
+                -- Signed value,
+                 (val' == -1 && signBit))
+
+        let !byte' = if done then byte else setBit byte 7
+        putByte bh byte'
+
+        unless done $ go val'
+
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Word #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Word64 #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Word32 #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Word16 #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Int #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Int64 #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Int32 #-}
+{-# SPECIALISE getSLEB128 :: BinHandle -> IO Int16 #-}
+getSLEB128 :: forall a. (Show a, Integral a, FiniteBits a) => BinHandle -> IO a
+getSLEB128 bh = do
+    (val,shift,signed) <- go 0 0
+    if signed && (shift < finiteBitSize val )
+        then return $! ((complement 0 `unsafeShiftL` shift) .|. val)
+        else return val
+    where
+        go :: Int -> a -> IO (a,Int,Bool)
+        go shift val = do
+            byte <- getByte bh
+            let !byteVal = fromIntegral (clearBit byte 7) :: a
+            let !val' = val .|. (byteVal `unsafeShiftL` shift)
+            let !more = testBit byte 7
+            let !shift' = shift+7
+            if more
+                then go (shift') val'
+                else do
+                    let !signed = testBit byte 6
+                    return (val',shift',signed)
+
+-- -----------------------------------------------------------------------------
 -- Primitive Word writes
 
 instance Binary Word8 where
-  put_ = putWord8
+  put_ bh !w = putWord8 bh w
   get  = getWord8
 
 instance Binary Word16 where
-  put_ h w = putWord16 h w
-  get h = getWord16 h
+  put_ = putULEB128
+  get  = getULEB128
 
 instance Binary Word32 where
-  put_ h w = putWord32 h w
-  get h = getWord32 h
+  put_ = putULEB128
+  get  = getULEB128
 
 instance Binary Word64 where
-  put_ h w = putWord64 h w
-  get h = getWord64 h
+  put_ = putULEB128
+  get = getULEB128
 
 -- -----------------------------------------------------------------------------
 -- Primitive Int writes
@@ -363,16 +518,16 @@ instance Binary Int8 where
   get h    = do w <- get h; return $! (fromIntegral (w::Word8))
 
 instance Binary Int16 where
-  put_ h w = put_ h (fromIntegral w :: Word16)
-  get h    = do w <- get h; return $! (fromIntegral (w::Word16))
+  put_ = putSLEB128
+  get = getSLEB128
 
 instance Binary Int32 where
-  put_ h w = put_ h (fromIntegral w :: Word32)
-  get h    = do w <- get h; return $! (fromIntegral (w::Word32))
+  put_ = putSLEB128
+  get = getSLEB128
 
 instance Binary Int64 where
-  put_ h w = put_ h (fromIntegral w :: Word64)
-  get h    = do w <- get h; return $! (fromIntegral (w::Word64))
+  put_ h w = putSLEB128 h w
+  get h    = getSLEB128 h
 
 -- -----------------------------------------------------------------------------
 -- Instances for standard types
@@ -398,15 +553,11 @@ instance Binary Int where
 instance Binary a => Binary [a] where
     put_ bh l = do
         let len = length l
-        if (len < 0xff)
-          then putByte bh (fromIntegral len :: Word8)
-          else do putByte bh 0xff; put_ bh (fromIntegral len :: Word32)
+        put_ bh len
         mapM_ (put_ bh) l
     get bh = do
-        b <- getByte bh
-        len <- if b == 0xff
-                  then get bh
-                  else return (fromIntegral b :: Word32)
+        len <- get bh :: IO Int -- Int is variable length encoded so only
+                                -- one byte for small lists.
         let loop 0 = return []
             loop n = do a <- get bh; as <- loop (n-1); return (a:as)
         loop len
@@ -527,12 +678,11 @@ since we encod chars as Word32 as well.
 We can easily do better. The new plan is:
 
 * Start with a tag byte
-  * 0 => Int32 value
-  * 1 => Int64
-  * 2 => Negative large interger
-  * 3 => Positive large integer
+  * 0 => Int64 (LEB128 encoded)
+  * 1 => Negative large interger
+  * 2 => Positive large integer
 * Followed by the value:
-  * Int32/64 is encoded as usual
+  * Int64 is encoded as usual
   * Large integers are encoded as a list of bytes (Word8).
     We use Data.Bits which defines a bit order independent of the representation.
     Values are stored LSB first.
@@ -545,45 +695,44 @@ This means our example value `2724268014499746065` is now only 10 bytes large.
 The new scheme also does not depend in any way on
 architecture specific details.
 
+We still use this scheme even with LEB128 available,
+as it has less overhead for truely large numbers. (> maxBound :: Int64)
+
 The instance is used for in Binary Integer and Binary Rational in basicTypes/Literal.hs
 -}
 
 instance Binary Integer where
     put_ bh i
-      | i >= lo32 && i <= hi32 = do
-          putWord8 bh 0
-          put_ bh (fromIntegral i :: Int32)
       | i >= lo64 && i <= hi64 = do
-          putWord8 bh 1
+          putWord8 bh 0
           put_ bh (fromIntegral i :: Int64)
       | otherwise = do
           if i < 0
-            then putWord8 bh 2
-            else putWord8 bh 3
+            then putWord8 bh 1
+            else putWord8 bh 2
           put_ bh (unroll $ abs i)
       where
-        lo32 = fromIntegral (minBound :: Int32)
-        hi32 = fromIntegral (maxBound :: Int32)
         lo64 = fromIntegral (minBound :: Int64)
         hi64 = fromIntegral (maxBound :: Int64)
     get bh = do
       int_kind <- getWord8 bh
       case int_kind of
-        0 -> fromIntegral <$!> (get bh :: IO Int32)
-        1 -> fromIntegral <$!> (get bh :: IO Int64)
+        0 -> fromIntegral <$!> (get bh :: IO Int64)
         -- Large integer
-        _ -> do
-          !i <- roll <$!> (get bh :: IO [Word8]) :: IO Integer
-          if int_kind == 2 then return $! negate i -- Negative
-                           else return $! i        -- Positive
+        1 -> negate <$!> getInt
+        2 -> getInt
+        _ -> panic "Binary Integer - Invalid byte"
+        where
+          getInt :: IO Integer
+          getInt = roll <$!> (get bh :: IO [Word8])
 
-unroll :: (Integral a, Bits a) => a -> [Word8]
+unroll :: Integer -> [Word8]
 unroll = unfoldr step
   where
     step 0 = Nothing
     step i = Just (fromIntegral i, i `shiftR` 8)
 
-roll :: (Integral a, Bits a) => [Word8] -> a
+roll :: [Word8] -> Integer
 roll   = foldl' unstep 0 . reverse
   where
     unstep a b = a `shiftL` 8 .|. fromIntegral b
@@ -660,9 +809,11 @@ instance (Binary a) => Binary (Ratio a) where
     put_ bh (a :% b) = do put_ bh a; put_ bh b
     get bh = do a <- get bh; b <- get bh; return (a :% b)
 
+-- Instance uses fixed-width encoding to allow inserting
+-- Bin placeholders in the stream.
 instance Binary (Bin a) where
-  put_ bh (BinPtr i) = put_ bh (fromIntegral i :: Int32)
-  get bh = do i <- get bh; return (BinPtr (fromIntegral (i :: Int32)))
+  put_ bh (BinPtr i) = putWord32 bh (fromIntegral i :: Word32)
+  get bh = do i <- getWord32 bh; return (BinPtr (fromIntegral (i :: Word32)))
 
 -- -----------------------------------------------------------------------------
 -- Instances for Data.Typeable stuff
