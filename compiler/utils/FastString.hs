@@ -120,11 +120,8 @@ import GHC.Exts
 import System.IO
 import Data.Data
 import Data.IORef
-import Data.Maybe       ( isJust )
 import Data.Char
-import Data.List (deleteBy)
 import Data.Semigroup as Semi
-import Debug.Trace
 
 import System.Mem.Weak
 
@@ -137,7 +134,6 @@ import GHC.Conc.Sync    (sharedCAF)
 #endif
 
 import GHC.Base         ( unpackCString#, unpackNBytes# )
-import Debug.Trace
 import GHC.ForeignPtr
 import GHC.Weak
 
@@ -201,10 +197,13 @@ newtype FastString = FastString {
       fs_bs   :: ByteString
   }
 
+
+-- It is sufficient to test pointer equality as we guarantee that
+-- each string is uniquely allocated.
 instance Eq FastString where
   f1 == f2  =
     case (fs_bs f1, fs_bs f2) of
-      ((BS.PS fp i len), (BS.PS fp' i' len1)) -> fp == fp' && i == i'
+      ((BS.PS fp i _len), (BS.PS fp' i' _len1)) -> fp == fp' && i == i'
   {-# NOINLINE (==) #-}
 
 instance Ord FastString where
@@ -436,8 +435,7 @@ mkFastStringWith mk_fs !ptr !len = do
       !new_fs <- mk_fs
       withMVar lock $ \_ -> insert new_fs
   where
-    !(FastStringTable uid segments#) = stringTable
-    get_uid = atomicModifyIORef' uid $ \n -> (n+1,n)
+    !(FastStringTable _uid segments#) = stringTable
 
     !(I# hash#) = hashStr ptr len
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
@@ -458,10 +456,9 @@ mkFastStringWith mk_fs !ptr !len = do
                (# s1, w #) -> (# s1, Weak w #)
 --          v <- mkWeak fptr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
-            case writeArray# buckets# idx# (Left fs: bucket) s1# of
+            case writeArray# buckets# idx# (Right v: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
-          let u = uniqueOfFS fs
           return fs
           {-
     delete_fs :: Int -> IO ()

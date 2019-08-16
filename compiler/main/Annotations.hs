@@ -125,7 +125,7 @@ findAnns deserialize (MkAnnEnv ann_env)
 --   only transient annotations will be returned.
 findAnnsByTypeRep :: AnnEnv Name -> CoreAnnTarget -> TypeRep -> [[Word8]]
 findAnnsByTypeRep (MkAnnEnv ann_env) target tyrep
-  = [ ws | Serialized tyrep' ws <- Map.findWithDefault [] target ann_env 
+  = [ ws | Serialized tyrep' ws <- Map.findWithDefault [] target ann_env
     , tyrep' == tyrep ]
 
 -- | Deserialize all annotations of a given type. This happens lazily, that is

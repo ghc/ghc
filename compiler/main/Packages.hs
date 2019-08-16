@@ -1479,7 +1479,7 @@ mkPackageState dflags dbs preload0 = do
         case compareByPreference prec_map unit unit' of
             GT -> (fs, unit)
             _  -> (fs, unit')
-      addIfMorePreferable m unit = 
+      addIfMorePreferable m unit =
           let fs = fsPackageName unit
           in addToUDFM_C preferLater m (FastStringU fs) (fs, unit)
       -- This is the set of maximally preferable packages. In fact, it is a set of

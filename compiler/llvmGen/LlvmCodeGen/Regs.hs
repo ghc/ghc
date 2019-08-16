@@ -98,7 +98,7 @@ alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
 -- | STG Type Based Alias Analysis hierarchy
 stgTBAA :: Monad m => (FastString -> m Unique) -> m [(Unique, LMString, Maybe Unique)]
-stgTBAA m = undefined 
+stgTBAA m = undefined
 {-
   = return [ (rootN,  fsLit "root",   Nothing)
     , (topN,   fsLit "top",   Just rootN)

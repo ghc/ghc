@@ -897,6 +897,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     all_avails = mi_exports iface
 
         -- See Note [Dealing with imports]
+    -- If you remove the bang here then `imp_occ_env` gets computed
+    -- multiple times. (I think, it fixes a problem to do with GCing
+    -- FastString at least)
     imp_occ_env :: OccEnv (Name,    -- the name
                            AvailInfo,   -- the export item providing the name
                            Maybe Name)  -- the parent of associated types
@@ -923,7 +926,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
        | Just succ <- mb_success = return succ
        | otherwise               = failLookupWith (BadImport ie)
       where
-        mb_success = lookupOccEnv imp_occ_env (rdrNameOcc rdr)
+        mb_success = do
+          lookupOccEnv imp_occ_env (rdrNameOcc rdr)
 
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, AvailInfo)]
     lookup_lie (L loc ieRdr)

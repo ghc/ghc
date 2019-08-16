@@ -2746,7 +2746,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , ppr_rules rules
          , text "Dependent modules:" <+>
-                pprUniqMap ppr (imp_dep_mods imports) 
+                pprUniqMap ppr (imp_dep_mods imports)
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_pkgs imports)]
   where         -- The use of sort is just to reduce unnecessary

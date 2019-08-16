@@ -123,7 +123,7 @@ module Module
         lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
         moduleEnvKeys, moduleEnvElts, moduleEnvToList,
         unitModuleEnv, isEmptyModuleEnv,
-        extendModuleEnvWith, 
+        extendModuleEnvWith,
 
         -- * ModuleName mappings
         ModuleNameEnv, DModuleNameEnv,
@@ -1251,7 +1251,7 @@ mkModuleSet :: [Module] -> ModuleSet
 mkModuleSet = mkFsSet
 
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
-extendModuleSet = addOneToFsSet 
+extendModuleSet = addOneToFsSet
 
 extendModuleSetList :: ModuleSet -> [Module] -> ModuleSet
 extendModuleSetList = addListToFsSet
@@ -1292,3 +1292,4 @@ type ModuleNameEnv elt = FastStringEnv elt
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
 type DModuleNameEnv elt = DFastStringEnv elt
+

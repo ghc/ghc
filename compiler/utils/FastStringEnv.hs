@@ -125,18 +125,18 @@ emptyDFsEnv = emptyUDFM
 dFsEnvElts :: DFastStringEnv a -> [a]
 dFsEnvElts = map snd . eltsUDFM
 
-addToDFsEnv :: 
+addToDFsEnv ::
   HasFastString f => DFastStringEnv a -> f -> a -> DFastStringEnv a
 addToDFsEnv m f a = addToUDFM m (FastStringU $ getFastString f) (getFastString f, a)
 
-addListToDFsEnv :: 
+addListToDFsEnv ::
   HasFastString f => DFastStringEnv a -> [(f,a)] -> DFastStringEnv a
-addListToDFsEnv m fs = 
+addListToDFsEnv m fs =
     addListToUDFM m (map (\(f,a) -> ((FastStringU $ getFastString f), (getFastString f, a))) fs)
 
 
 mkDFsEnv :: HasFastString f => [(f,a)] -> DFastStringEnv a
-mkDFsEnv l = listToUDFM 
+mkDFsEnv l = listToUDFM
   (map (\(f, x) -> (FastStringU (getFastString f), (getFastString f, x))) l)
 
 lookupDFsEnv :: HasFastString f => DFastStringEnv a -> f -> Maybe a
