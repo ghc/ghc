@@ -15,6 +15,7 @@ module TcHsType (
         kcClassSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
         tcHsPartialSigType,
+        tcTLKS,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
         tcHsClsInstType,
@@ -250,6 +251,33 @@ tcHsSigType ctxt sig_ty
       TopKindSigCtxt{} -> kindLevelMode
       _ -> typeLevelMode
     skol_info = SigTypeSkol ctxt
+
+tcTLKS :: LTopKindSig GhcRn -> TcM (Name, Kind)
+tcTLKS (L _ tlks) = case tlks of
+  TopKindSig _ (L _ name) ksig ->
+    do { unzonked_kind <-
+           tcHsSigType (TopKindSigCtxt name) $
+           dropWildCards ksig -- See Note [Wildcards in TLKS]
+       ; kind <- zonkTcTypeToType unzonked_kind
+       ; return (name, kind) }
+  XTopKindSig nec -> noExtCon nec
+
+{- Note [Wildcards in TLKS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Top-level kind signatures enable polymorphic recursion, and it is unclear how
+to reconcile this with partial type signatures, so we disallow wildcards in
+TLKSs.
+
+We reject wildcards in 'renameTLKS' by returning False for 'TopKindSigCtx' in
+'wildCardsAllowed'. By the time we are in 'tcTLKS', we know there are no
+wildcards left and can simply 'dropWildCards'.
+
+The alternative design is to have special treatment for partial TLKSs,
+much like we have special treatment for partial type signatures in terms.
+However, partial TLKSs are not a proper replacement for CUSKs, so this
+would be a separate feature.
+-}
+
 
 tc_hs_sig_type :: TcTyMode -> SkolemInfo -> LHsSigType GhcRn
                -> ContextKind -> TcM (Bool, TcType)
@@ -1787,7 +1815,8 @@ kcLHsQTyVars name flav cusk tvs thing_inside
 
 
 kcLHsQTyVars_Cusk, kcLHsQTyVars_NonCusk
-    :: Name              -- ^ of the thing being checked
+    :: HasCallStack
+    => Name              -- ^ of the thing being checked
     -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
     -> LHsQTyVars GhcRn
     -> TcM Kind          -- ^ The result kind
@@ -1916,7 +1945,7 @@ kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 -- See Note [Arity inference in kcDeclHeader]
 kcDeclHeader :: Name              -- ^ of the thing being checked
              -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-             -> Kind              -- ^ Top-level kind signature
+             -> Kind              -- ^ Top-level kind signature, fully zonked! (zonkTcTypeToType)
              -> LHsQTyVars GhcRn  -- ^ Binders in the header
              -> Maybe (TcM Kind)  -- ^ The result kind
              -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
@@ -1925,135 +1954,104 @@ kcDeclHeader name flav tlks ktvs kc_res_ki =
     pushTcLevelM_ $
     solveEqualities $  -- #16687
     bind_implicit (hsq_ext ktvs) $ \implicit_tv_prs ->
-      goVis implicit_tv_prs tlks init_subst [] [] (hsq_explicit ktvs)
+      goVis implicit_tv_prs tlks [] [] (hsq_explicit ktvs)
   where
-    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType tlks))
-
     goVis
       :: [(Name,TcTyVar)]      -- implicit_tv_prs (tcTyConHeaderKiVars)
       -> Kind                  -- the TLKS kind
-      -> TCvSubst              -- new skolems with TcLevel=1
       -> [TyConBinder]         -- accumulated TyConBinders, reversed
       -> [(Name,TcTyVar)]      -- accumulated scoped type variables, reversed
       -> [LHsTyVarBndr GhcRn]  -- the header binders
       -> TcM TcTyCon
-    goVis hkv d_ki subst tcb_acc stv_acc bndrs@(b:bs) =
+    goVis hkv d_ki tcb_acc stv_acc bndrs@(b:bs) =
       case tcSplitPiTy_maybe d_ki of
         Just (Named (Bndr v Specified), d_ki') ->
-          withSpecified subst v $ \subst' tcb stv ->
-          goVis hkv d_ki' subst' (tcb:tcb_acc) (stv:stv_acc) bndrs
+          withSpecified v >>= \(tcb, stv) ->
+          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bndrs
         Just (Named (Bndr v Inferred), d_ki') ->
-          withInferred subst v $ \subst' tcb stv ->
-          goVis hkv d_ki' subst' (tcb:tcb_acc) (stv:stv_acc) bndrs
+          withInferred v >>= \(tcb, stv) ->
+          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bndrs
         Just (Anon InvisArg bndr_ki, d_ki') ->
-          withAnonInvis subst bndr_ki $ \tcb ->
-          goVis hkv d_ki' subst (tcb:tcb_acc) stv_acc bndrs
+          withAnonInvis bndr_ki >>= \tcb ->
+          goVis hkv d_ki' (tcb:tcb_acc) stv_acc bndrs
         Just (Anon VisArg bndr_ki, d_ki') ->
-          withAnonVis subst b bndr_ki $ \tcb stv ->
-          goVis hkv d_ki' subst (tcb:tcb_acc) (stv:stv_acc) bs
+          withAnonVis b bndr_ki >>= \(tcb, stv) ->
+          tcExtendNameTyVarEnv [stv] $
+          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bs
         Just (Named (Bndr v Required), d_ki') ->
-          withRequired subst b v $ \subst' tcb stv ->
-          goVis hkv d_ki' subst' (tcb:tcb_acc) (stv:stv_acc) bs
+          withRequired b v >>= \(tcb, stv) ->
+          tcExtendNameTyVarEnv [stv] $
+          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bs
         Nothing -> failWithTc (tooManyBindersErr d_ki bndrs)
-    goVis hkv d_ki subst tcb_acc stv_acc [] = do
+    goVis hkv d_ki tcb_acc stv_acc [] = do
       m_res_ki <- sequenceA kc_res_ki
       let n_inst = mkInstPlan d_ki m_res_ki
-      goInvis hkv d_ki subst tcb_acc stv_acc m_res_ki n_inst
+      goInvis hkv d_ki tcb_acc stv_acc m_res_ki n_inst
 
     goInvis
       :: [(Name,TcTyVar)]      -- implicit_tv_prs (tcTyConHeaderKiVars)
       -> Kind                  -- the TLKS kind
-      -> TCvSubst              -- new skolems with TcLevel=1
       -> [TyConBinder]         -- accumulated TyConBinders, reversed
       -> [(Name,TcTyVar)]      -- accumulated scoped type variables, reversed
       -> Maybe Kind            -- the result kind
       -> Int                   -- how much to instantiate?
       -> TcM TcTyCon
-    goInvis hkv d_ki subst tcb_acc stv_acc m_res_ki n_inst
+    goInvis hkv d_ki tcb_acc stv_acc m_res_ki n_inst
       | n_inst <= 0 =
-          done hkv (substTy subst d_ki) tcb_acc stv_acc m_res_ki
+          done hkv d_ki tcb_acc stv_acc m_res_ki
       | otherwise   =  -- n_inst > 0
           case tcSplitPiTy_maybe d_ki of
             Just (Named (Bndr v Specified), d_ki') ->
-              withSpecified subst v $ \subst' tcb stv ->
-              goInvis hkv d_ki' subst' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
+              withSpecified v >>= \(tcb, stv) ->
+              goInvis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
             Just (Named (Bndr v Inferred), d_ki') ->
-              withInferred subst v $ \subst' tcb stv ->
-              goInvis hkv d_ki' subst' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
+              withInferred v >>= \(tcb, stv) ->
+              goInvis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
             Just (Anon InvisArg bndr_ki, d_ki') ->
-              withAnonInvis subst bndr_ki $ \tcb ->
-              goInvis hkv d_ki' subst (tcb:tcb_acc) stv_acc m_res_ki (n_inst - 1)
+              withAnonInvis bndr_ki >>= \tcb ->
+              goInvis hkv d_ki' (tcb:tcb_acc) stv_acc m_res_ki (n_inst - 1)
             _ -> panic "goInvis: expected more invisible binders"
 
     withSpecified, withInferred
-      :: TCvSubst
-      -> TyVar
-      -> (TCvSubst -> TyConBinder -> (Name,TcTyVar) -> TcM r)
-      -> TcM r
-    withSpecified subst v cont = do
-      let b_ki = substTy subst (varType v)
-          b_name = tyVarName v
-      tcv <- newSkolemTyVar b_name b_ki
-      let tcb = mkNamedTyConBinder Specified tcv
-          stv = (b_name, tcv)
-          subst' = extendTvSubstWithClone subst v tcv
-      tcExtendNameTyVarEnv [stv] $
-        cont subst' tcb stv
-    withInferred subst v cont = do
-      let b_ki = substTy subst (varType v)
-          b_name = tyVarName v
-      tcv <- newSkolemTyVar b_name b_ki
-      let tcb = mkNamedTyConBinder Inferred tcv
-          stv = (b_name, tcv)
-          subst' = extendTvSubstWithClone subst v tcv
-      tcExtendNameTyVarEnv [stv] $
-        cont subst' tcb stv
+      :: TyVar
+      -> TcM (TyConBinder, (Name,TcTyVar))
+    withSpecified v = do
+      let tcb = mkNamedTyConBinder Specified v
+          stv = (tyVarName v, v)
+      return (tcb, stv)
+    withInferred v = do
+      let tcb = mkNamedTyConBinder Inferred v
+          stv = (tyVarName v, v)
+      return (tcb, stv)
 
-    withAnonInvis
-      :: TCvSubst
-      -> Kind
-      -> (TyConBinder -> TcM r)
-      -> TcM r
-    withAnonInvis subst bndr_ki cont = do
-      let b_ki = substTy subst bndr_ki
+    withAnonInvis :: Kind -> TcM TyConBinder
+    withAnonInvis bndr_ki = do
       tcv <- do
         uniq <- newUnique
         let name = mkSystemName uniq (mkTyVarOccFS (fsLit "ev"))
-        newSkolemTyVar name b_ki
-      let tcb = mkAnonTyConBinder InvisArg tcv
-      cont tcb
+        newSkolemTyVar name bndr_ki
+      return $ mkAnonTyConBinder InvisArg tcv
 
     withAnonVis
-      :: TCvSubst
-      -> LHsTyVarBndr GhcRn
+      :: LHsTyVarBndr GhcRn
       -> Kind
-      -> (TyConBinder -> (Name,TcTyVar) -> TcM r)
-      -> TcM r
-    withAnonVis subst b bndr_ki cont = do
-      let b_ki = substTy subst bndr_ki
-      v_name <- checkVar b_ki b
-      tcv <- newSkolemTyVar v_name b_ki
+      -> TcM (TyConBinder, (Name,TcTyVar))
+    withAnonVis b bndr_ki = do
+      v_name <- checkVar bndr_ki b
+      tcv <- newSkolemTyVar v_name bndr_ki
       let tcb = mkAnonTyConBinder VisArg tcv
           stv = (v_name, tcv)
-      tcExtendNameTyVarEnv [stv] $
-        cont tcb stv
+      return (tcb, stv)
 
     withRequired
-      :: TCvSubst
-      -> LHsTyVarBndr GhcRn
+      :: LHsTyVarBndr GhcRn
       -> TyVar
-      -> (TCvSubst -> TyConBinder -> (Name,TcTyVar) -> TcM r)
-      -> TcM r
-    withRequired subst b v cont = do
-      let b_ki = substTy subst (varType v)
-          b_name = tyVarName v
-      v_name <- checkVar b_ki b
-      tcv <- newSkolemTyVar b_name b_ki
-      let tcb = mkNamedTyConBinder Required tcv
-          stv = (v_name, tcv)
-          subst' = extendTvSubstWithClone subst v tcv
-      tcExtendNameTyVarEnv [stv] $
-        cont subst' tcb stv
+      -> TcM (TyConBinder, (Name,TcTyVar))
+    withRequired b v = do
+      v_name <- checkVar (varType v) b
+      let tcb = mkNamedTyConBinder Required v
+          stv = (v_name, v)
+      return (tcb, stv)
 
     done hkv r_ki tcb_acc stv_acc m_res_ki =
       do { let tcbs = reverse tcb_acc
