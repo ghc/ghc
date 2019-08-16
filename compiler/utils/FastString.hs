@@ -1,7 +1,7 @@
 -- (c) The University of Glasgow, 1997-2006
 
 {-# LANGUAGE BangPatterns, CPP, MagicHash, UnboxedTuples,
-    GeneralizedNewtypeDeriving, RecordWildCards #-}
+    GeneralizedNewtypeDeriving, RecordWildCards, BangPatterns #-}
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -125,6 +125,7 @@ import Data.Maybe       ( isJust )
 import Data.Char
 import Data.List (deleteBy)
 import Data.Semigroup as Semi
+import Debug.Trace
 
 import System.Mem.Weak
 
@@ -138,6 +139,8 @@ import GHC.Conc.Sync    (sharedCAF)
 
 import GHC.Base         ( unpackCString#, unpackNBytes# )
 import Debug.Trace
+import GHC.ForeignPtr
+import GHC.Weak
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
@@ -204,8 +207,9 @@ data FastString = FastString {
 
 instance Eq FastString where
   f1 == f2  =
-    --traceShow (f1, f2, uniq f1 == uniq f2, compare f1 f2) $ 
-      uniq f1 == uniq f2
+    case (fs_bs f1, fs_bs f2) of
+      ((BS.PS fp i len), (BS.PS fp' i' len1)) -> fp == fp' && i == i'
+  {-# NOINLINE (==) #-}
 
 instance Ord FastString where
     -- Compares lexicographically, not by unique
@@ -434,7 +438,7 @@ mkFastStringWith mk_fs !ptr !len = do
       -- only run partially and putMVar is not called after takeMVar.
       noDuplicate
       n <- get_uid
-      new_fs <- mk_fs n
+      !new_fs <- mk_fs n
       withMVar lock $ \_ -> insert new_fs
   where
     !(FastStringTable uid segments#) = stringTable
@@ -442,7 +446,7 @@ mkFastStringWith mk_fs !ptr !len = do
 
     !(I# hash#) = hashStr ptr len
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
-    insert fs@FastString{..} = do
+    insert !fs = do
       FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
@@ -452,9 +456,14 @@ mkFastStringWith mk_fs !ptr !len = do
         -- before we acquired the write lock.
         Just found -> return found
         Nothing -> do
-          v <- mkWeak fs_bs fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
+--          print $ "NOT FOUND:" <> (show fs)
+          let !(BS.PS (ForeignPtr fptr _) _ _) = fs_bs fs
+          v <- IO $ \s ->
+            case mkWeakNoFinalizer# fptr fs s of
+               (# s1, w #) -> (# s1, Weak w #)
+--          v <- mkWeak fptr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
-            case writeArray# buckets# idx# (Left fs: bucket) s1# of
+            case writeArray# buckets# idx# (Right v: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
           let u = uniqueOfFS fs
