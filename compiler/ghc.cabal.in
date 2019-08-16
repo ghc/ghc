@@ -592,7 +592,6 @@ Library
         UniqMap
         UniqSet
         Util
-        PackedFlags
         Hoopl.Block
         Hoopl.Collections
         Hoopl.Dataflow

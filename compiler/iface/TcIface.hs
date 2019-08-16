@@ -25,7 +25,6 @@ module TcIface (
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
 
-        --tcLFInfo,
         tcCodeGenInfos
  ) where
 
@@ -89,9 +88,6 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
--- import PackedFlags
-import Data.Bits
-import Data.Word
 import SMRep
 
 {-
