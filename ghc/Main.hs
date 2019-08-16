@@ -824,7 +824,6 @@ dumpFastStringStats dflags = do
       bucketsPerSegment = map length segments
       entriesPerBucket = map length buckets
       entries = sum entriesPerBucket
-      hasZ = sum $ map (length . filter hasZEncoding . catMaybes) buckets
       gced = sum $ map (length . filter isNothing) buckets
       msg = text "FastString stats:" $$ nest 4 (vcat
         [ text "segments:         " <+> int (length segments)
@@ -833,7 +832,6 @@ dumpFastStringStats dflags = do
         , text "largest segment:  " <+> int (maximum bucketsPerSegment)
         , text "smallest segment: " <+> int (minimum bucketsPerSegment)
         , text "longest bucket:   " <+> int (maximum entriesPerBucket)
-        , text "has z-encoding:   " <+> (hasZ `pcntOf` entries)
         , text "gc total          " <+> int gcCount
         ])
         -- we usually get more "has z-encoding" than "z-encoded", because
