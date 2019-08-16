@@ -49,7 +49,8 @@ cprAnalTopBind env (Rec pairs)
 -- * Analysing expressions
 --
 
--- Main CPR Analysis machinery
+-- | The abstract semantic function ⟦_⟧ : Expr -> Env -> A from
+-- "Constructed Product Result Analysis for Haskell"
 cprAnal, cprAnal'
   :: AnalEnv
   -> CoreExpr            -- ^ expression to be denoted by a 'CprType'
@@ -174,19 +175,11 @@ cprFix top_lvl env orig_pairs
     initial_pairs | ae_virgin env = [(setIdCprInfo id botCpr, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
-    -- If fixed-point iteration does not yield a result we use this instead
-    -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, [(Id,CoreExpr)])
-    abort = (env, zapped_pairs)
-      where pairs' = step True (zapIdCprInfo orig_pairs)
-            zapped_pairs = zapIdCprInfo pairs'
-
     -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
     -- annotation does not change any more.
     loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
     loop n pairs
       | found_fixpoint = (final_anal_env, pairs')
-      | n == 10        = abort
       | otherwise      = loop (n+1) pairs'
       where
         found_fixpoint    = map (idCprInfo . fst) pairs' == map (idCprInfo . fst) pairs
@@ -204,20 +197,12 @@ cprFix top_lvl env orig_pairs
         start = extendAnalEnvs start_env (map fst pairs)
 
         (_, pairs') = mapAccumL my_downRhs start pairs
-                -- mapAccumL: Use the new signature to do the next pair
-                -- The occurrence analyser has arranged them in a good order
-                -- so this can significantly reduce the number of iterations needed
 
         my_downRhs env (id,rhs)
           = (env', (id', rhs'))
           where
             (id', rhs') = cprAnalBind top_lvl env id rhs
             env'        = extendAnalEnv env id (get_idCprInfo id')
-
-
-    zapIdCprInfo :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdCprInfo pairs = [(setIdCprInfo id topCpr, rhs) | (id, rhs) <- pairs ]
-
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
