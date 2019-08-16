@@ -43,7 +43,6 @@ import ClsInst( AssocInstInfo(..) )
 import TcMType
 import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
-import TcSigs ( tcTLKS )
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv

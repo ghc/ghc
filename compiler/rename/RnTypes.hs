@@ -246,7 +246,7 @@ extraConstraintWildCardsAllowed env
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
       DerivDeclCtx {}     -> True
-      TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcSigs
+      TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcHsType
       _                   -> False
 
 -- | Finds free type and kind variables in a type,
@@ -739,7 +739,7 @@ wildCardsAllowed env
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True
-       TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcSigs
+       TopKindSigCtx {}    -> False  -- See Note [Wildcards in TLKS] in TcHsType
        _                   -> False
 
 
