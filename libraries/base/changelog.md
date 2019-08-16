@@ -57,7 +57,7 @@
     `Word`, and `WordN` now throw an overflow exception for negative shift
     values (instead of being undefined behaviour).
 
-  * `scanr` no longer participates in list fusion (due #16943)
+  * `scanr` no longer crashes when passed a fusable, infinite list. (#16943)
 
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
