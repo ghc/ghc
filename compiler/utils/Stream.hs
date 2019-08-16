@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2012
@@ -106,14 +107,15 @@ mapM f str = Stream $ do
 
 -- | analog of the list-based 'mapAccumL' on Streams.  This is a simple
 -- way to map over a Stream while carrying some state around.
+-- Head-strict in intermediate and final results
 mapAccumL :: Monad m => (c -> a -> m (c,b)) -> c -> Stream m a d
           -> Stream m b (c,d)
 mapAccumL f c str = Stream $ do
   r <- runStream str
   case r of
     Left  d -> return (Left (c,d))
-    Right (a, str') -> do
-      (c',b) <- f c a
+    Right (!a, str') -> do
+      (!c',!b) <- f c a
       return (Right (b, mapAccumL f c' str'))
 
 -- | analog of the list-based 'mapAccumL' on Streams.  This is a simple

@@ -51,10 +51,9 @@ import UniqFM
 import Util
 import VarEnv
 
-import Data.Maybe
-import Control.Applicative
+import CgTypes ( CgIfaceInfo, exportLF, whnfLF )
 
-import CgTypes -- TODO: Remove and keep LLambdaFormInfo abstract
+import Data.Maybe
 
 -------------------------------------
 --        Manipulating CgIdInfo
@@ -147,12 +146,16 @@ getCgIdInfo v_id
                   in return $ litIdInfo dflags v_id mkLFStringLit (CmmLabel ext_lbl)
                 else do
                 { let !ext_lbl = mkClosureLabel name $ idCafInfo v_id
-                ; lf_cached <- lookupImportedLF name
-                ; let lf_static = mkStaticLF unlifted
-                ; let lf_info = fromMaybe approximateLF (lf_static <|> lf_cached)
-                ; let cg_info = litIdInfo dflags v_id lf_info (CmmLabel ext_lbl);
+                -- ; let !lf_static =
+                ; lf_info <- case mkStaticLF unlifted of
+                    Just static -> return $! static
+                    Nothing -> do !lf_cached <- lookupImportedLF name
+                                  return $! fromMaybe approximateLF lf_cached
+                -- ; !lf_cached <- maybe (return lf_static fromMaybe () (return $ Just lf_static)
+                -- ; !lf_info <- fromMaybe approximateLF lf_cached
+                ; let !cg_info = litIdInfo dflags v_id (whnfLF lf_info) (CmmLabel ext_lbl);
                 -- See Note [CodeGenerator EPS <<loop>>]
-                ; seq (whnfLF lf_info) $ (return $! cg_info)
+                ; return cg_info
                 }
           else
               cgLookupPanic v_id -- Bug

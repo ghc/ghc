@@ -26,7 +26,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
-import CgTypes ( CgIfaceInfo )
+import CgTypes ( CgIfaceInfo, exportLF )
 
 import Cmm
 import CmmUtils
@@ -39,6 +39,7 @@ import ErrUtils
 import HscTypes
 import CostCentre
 import Id
+import Name
 import IdInfo
 import RepType
 import DataCon
@@ -54,6 +55,7 @@ import OrdList
 import MkGraph
 
 import Data.IORef
+import Data.Maybe
 import Control.Monad (when,void)
 import Util
 
@@ -64,7 +66,7 @@ codeGen :: DynFlags
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
         -> CgIfaceInfo
-        -> Stream IO CmmGroup [(Id,LambdaFormInfo)]
+        -> Stream IO CmmGroup [(Name,LambdaFormInfo)]
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
@@ -95,6 +97,7 @@ codeGen dflags this_mod data_tycons
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
 
+        ; !st <- liftIO $ readIORef cgref
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in
@@ -107,13 +110,24 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
-        ; !st <- liftIO $ readIORef cgref
-        -- See Note [CodeGenerator EPS <<loop>>] for info about the bangs.
-        ; let extractInfo info =
-                let !id = cg_id info
-                    !lf = cg_lf info
-                in (id,lf)
-        ; let generatedInfo = Prelude.map extractInfo $ eltsUFM $ cgs_binds st
+        -- See Note [CodeGenerator EPS <<loop>>] for info about why we are so
+        -- strict here.
+
+        -- Only external names are actually visible to codeGen.
+        -- So they are the only ones we care about. `exportLF` filters
+        -- a few more we can recompute easily via their types.
+        ; let extractInfo info
+                | not (isExternalName $ idName id)
+                = Nothing
+                | not (exportLF lf)
+                = Nothing
+                | otherwise
+                = lf `seq` Just (idName id,lf)
+                where
+                  id = cg_id info
+                  lf = cg_lf info
+        ; let generatedInfo = mapMaybe extractInfo $ eltsUFM $ cgs_binds st
+
         ; return $! seqList generatedInfo generatedInfo
         }
 

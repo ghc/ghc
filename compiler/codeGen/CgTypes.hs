@@ -126,13 +126,13 @@ data LambdaFormInfo
   deriving (Eq)
 
 -- | Force fields of LambdaFormInfo into whnf.
-whnfLF :: LambdaFormInfo -> ()
-whnfLF LFLetNoEscape = ()
-whnfLF LFUnlifted = ()
-whnfLF (LFUnknown !_a1) = ()
-whnfLF (LFCon !_a1) = ()
-whnfLF (LFThunk !_a1 _ _ _ _) = ()
-whnfLF LFReEntrant { lf_arg_desc = !_a1 } = ()
+whnfLF :: LambdaFormInfo -> LambdaFormInfo
+whnfLF lf@LFLetNoEscape = lf
+whnfLF lf@LFUnlifted = lf
+whnfLF lf@(LFUnknown !_a1) = lf
+whnfLF lf@(LFCon !_a1) = lf
+whnfLF lf@(LFThunk !_a1 _ _ _ _) = lf
+whnfLF lf@LFReEntrant { lf_arg_desc = !_a1 } = lf
 
 -- | Should we export this info?
 -- There is no point in exporting LFUnlifted,

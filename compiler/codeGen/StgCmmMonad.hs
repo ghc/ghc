@@ -171,9 +171,9 @@ fixC fcode = FCode $
 -- | Constant throughout the Monad.
 data CgInfoGlobal
   = MkCgInfoGlobal {
-        cgg_dflags        :: DynFlags,    -- ^ Used for word size and the like
-        cgg_mod           :: Module,      -- ^ Module being compiled
-        cgg_lf_info       :: CgIfaceInfo  -- ^ Imported LFInfos
+        cgg_dflags        :: !DynFlags,    -- ^ Used for word size and the like
+        cgg_mod           :: !Module,      -- ^ Module being compiled
+        cgg_lf_info       :: !CgIfaceInfo  -- ^ Imported LFInfos
   }
 
 data CgInfoDownwards        -- information only passed *downwards* by the monad

@@ -223,18 +223,6 @@ data ArgDescr
                         -- we are compiling.
   deriving Eq
 
-instance Binary ArgDescr where
-  put_ bh (ArgSpec spec)    = putByte bh 0 >> put_ bh spec
-  put_ bh (ArgGen liveness) = putByte bh 1 >> put_ bh liveness
-  put_ bh (ArgUnknown)      = putByte bh 2
-  get bh = do
-    tag <- getByte bh
-    case tag of
-      0 -> ArgSpec  <$> get bh
-      1 -> ArgGen   <$> get bh
-      2 -> pure ArgUnknown
-      _ -> panic "Invalid byte"
-
 -----------------------------------------------------------------------------
 -- Construction
 

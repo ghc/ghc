@@ -1488,26 +1488,18 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                   foreign_stubs foreign_files dependencies rawcmms1
             return (output_filename, stub_c_exists, foreign_fps, stream_result)
 
-        -- Only external names are actually visible to codeGen.
-        -- So they are the only ones we care about. `exportLF` filters
-        -- a few more we can recompute easily via their types.
-
-        let infoToExport = filter (exportLF . snd) .
-                           filter (isExternalName . fst) .
-                           map (first idName) $ stream_result'
-
         -- We update the EPS here to populate the exported lf_infos.
         -- We have to make sure the generated info does not depend lazily
         -- on the eps or <<loop>> happens. Hence the bangs.
         -- See Note [CodeGenerator EPS <<loop>>]
         !eps <- hscEPS hsc_env
         let !eps_imported = eps_cg_info_env eps
-            !combined = extendNameEnvList eps_imported infoToExport
+            !combined = extendNameEnvList eps_imported stream_result'
 
         let eps' = eps { eps_cg_info_env = combined }
         writeIORef (hsc_EPS hsc_env) $! eps'
 
-        return (output_filename, stub_c_exists, foreign_fps, infoToExport)
+        return (output_filename, stub_c_exists, foreign_fps, stream_result')
 
 
 hscInteractive :: HscEnv
@@ -1572,7 +1564,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup [(Id,LambdaFormInfo)])
+            -> IO (Stream IO CmmGroup [(Name,LambdaFormInfo)])
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1584,7 +1576,7 @@ doCodeGen hsc_env this_mod data_tycons
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
-    let cmm_stream :: Stream IO CmmGroup [(Id,LambdaFormInfo)]
+    let cmm_stream :: Stream IO CmmGroup [(Name,LambdaFormInfo)]
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
@@ -1630,7 +1622,7 @@ doCodeGen hsc_env this_mod data_tycons
                         "Output Cmm" (ppr a)
                      return a
 
-        ppr_stream2 :: Stream IO CmmGroup [(Id, LambdaFormInfo)]
+        ppr_stream2 :: Stream IO CmmGroup [(Name, LambdaFormInfo)]
         ppr_stream2 = Stream.mapM dump2 pipeline_stream
 
     return ppr_stream2

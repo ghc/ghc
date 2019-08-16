@@ -523,10 +523,9 @@ loadInterface doc_str mod from
                                      extendModuleEnv (eps_mod_fam_inst_env eps)
                                                      mod
                                                      fam_inst_env,
-                  eps_cg_info_env  = extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env
+                  eps_cg_info_env  = extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env,
 
 
-                                      ,
                   -- TODO: Stats
                   eps_stats        = addEpsInStats (eps_stats eps)
                                                    (length new_eps_decls)
