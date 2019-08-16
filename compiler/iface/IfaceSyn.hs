@@ -40,8 +40,10 @@ module IfaceSyn (
         -- Pretty printing
         pprIfaceExpr,
         pprIfaceDecl,
-        AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader
+        AltPpr(..), ShowSub(..), ShowHowMuch(..), showToIface, showToHeader,
 
+        -- Here to make it useable for the Outputable instance.
+        tcStandardFormInfo
 
     ) where
 
@@ -75,11 +77,11 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
-import CgTypes (StandardFormInfo)
+import CgTypes
 
 import Control.Monad
 import System.IO.Unsafe
--- import Data.Bits
+import Data.Bits
 import Data.Word
 
 infixl 3 &&&
@@ -562,7 +564,21 @@ TODO:
   to ensure there is an unfolding.
 -}
 
-newtype IfStandardFormInfo = IfStandardFormInfo Word16 deriving Binary
+newtype IfStandardFormInfo = IfStandardFormInfo Word16
+
+tcStandardFormInfo :: IfStandardFormInfo -> StandardFormInfo
+tcStandardFormInfo (IfStandardFormInfo w)
+  | testBit w 0 = NonStandardThunk
+  | otherwise = con field
+  where
+    field = fromIntegral (w `unsafeShiftR` 2)
+    con
+      | testBit w 1 = ApThunk
+      | otherwise = SelectorThunk
+
+instance Binary IfStandardFormInfo where
+    put_ bh (IfStandardFormInfo w) = put_ bh (w :: Word16)
+    get bh = IfStandardFormInfo <$> (get bh :: IO Word16)
 
 data IfLFInfo =
     -- | We encode the fields bitwise:
@@ -589,7 +605,7 @@ data IfLFInfo =
         -- TopLevelFlag => Implied True
         -- !Bool           -- True <=> no free vars
         -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
-        !StandardFormInfo
+        !IfStandardFormInfo
         -- !Bool           -- True <=> *might* be a function type
 
   | ILFCon               -- A saturated constructor application
@@ -1406,6 +1422,7 @@ instance Outputable IfaceUnfolding where
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
 
+
 instance Outputable IfLFInfo where
     ppr (ILFReEntrant oneshot rep fvs_flag) =
         text "LFReEntrant" <+> ppr (oneshot, rep, fvs_flag)
@@ -1416,13 +1433,10 @@ instance Outputable IfLFInfo where
           -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
           -- rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
     ppr (ILFThunk fields sfi) =
-        text "LFThunk" <+> ppr fields <+> ppr sfi
+        text "LFThunk" <+> ppr fields <+> ppr (tcStandardFormInfo sfi)
                                 -- brackets (ppr fvs_flag <+> ppr upd_flag <+>
                                     -- ppr sfi <+> ppr fun_flag)
-      where
-          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 1) `unsafeShiftR` 0) :: Bool
-          -- upd_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
-          -- fun_flag  = toEnum $ fromIntegral ((fields .&. 4) `unsafeShiftR` 2) :: Bool
+
     ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (ILFUnlifted) = text "LFUnlifted"
 
@@ -2441,9 +2455,9 @@ instance Binary IfLFInfo where
         put_ bh oneshot >>
         put_ bh rep >>
         put_ bh fvs_flag
-    put_ bh (ILFThunk encoded_flds sfi) =
-        putByte bh 1 >>
-        put_ bh (encoded_flds :: (Bool, Bool, Bool)) >>
+    put_ bh (ILFThunk encoded_flds sfi) = do
+        putByte bh 1
+        put_ bh (encoded_flds :: (Bool, Bool, Bool))
         put_ bh sfi
     put_ bh (ILFCon conName) =
         putByte bh 2 >>
@@ -2454,7 +2468,7 @@ instance Binary IfLFInfo where
         tag <- getByte bh
         case tag of
             0 -> pure ILFReEntrant <*> get bh <*> get bh <*> get bh
-            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh)
+            1 -> pure ILFThunk <*> (get bh :: IO (Bool, Bool, Bool)) <*> (get bh :: IO IfStandardFormInfo)
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"

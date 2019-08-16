@@ -1860,21 +1860,11 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
 tcCodeGenInfos = mapSndM tcLFInfo
 
-tcStandardFormInfo :: IfStandardFormInfo -> StandardFormInfo
-tcStandardFormInfo (IfStandardFormInfo w)
-  | testBit w 0 = NonStandardThunk
-  | otherwise = con field
-  where
-    field = fromIntegral (w `unsafeShiftR` 2)
-    con
-      | testBit w 1 = ApThunk
-      | otherwise = SelectorThunk
-
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 tcLFInfo (ILFReEntrant oneshot rep fvs_flag) = do
     return $! LFReEntrant TopLevel (oneshot) (rep) fvs_flag (ArgUnknown)
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
-    pure $! LFThunk TopLevel fvs_flag upd_flag sfi fun_flag
+    pure $ LFThunk TopLevel fvs_flag upd_flag (tcStandardFormInfo sfi) fun_flag
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do

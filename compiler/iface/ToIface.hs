@@ -679,12 +679,14 @@ toIfStandardFormInfo sf =
       (tag sf) .|. (encodeField (field sf))
   where tag (SelectorThunk {})  = 0
         tag (ApThunk {})        = 2 -- setBit 0 1
+        tag _ = panic "Impossible"
         field (SelectorThunk n) = n
         field (ApThunk n)       = n
+        field _ = panic "Impossible"
         encodeField n =
           let wn = fromIntegral n :: Word
-              shifted = n `unsafeShiftL` 2
-          in ASSERT(shifted < fromIntegral (maxBound :: Word16))
+              shifted = wn `unsafeShiftL` 2
+          in ASSERT(shifted > 0 && shifted < fromIntegral (maxBound :: Word16))
              (fromIntegral shifted :: Word16)
 
 
@@ -697,7 +699,7 @@ toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
 
 toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
     ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
-    ILFThunk (hasfv, updateable, m_function) sfi
+    ILFThunk (hasfv, updateable, m_function) (toIfStandardFormInfo sfi)
 
 toIfLFInfo (LFUnlifted) = ILFUnlifted
 toIfLFInfo (LFCon con) = ILFCon (dataConName con)
