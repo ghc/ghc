@@ -458,7 +458,7 @@ mkFastStringWith mk_fs !ptr !len = do
                (# s1, w #) -> (# s1, Weak w #)
 --          v <- mkWeak fptr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
-            case writeArray# buckets# idx# (Right v: bucket) s1# of
+            case writeArray# buckets# idx# (Left fs: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
           let u = uniqueOfFS fs
@@ -608,6 +608,9 @@ tailFS (FastString bs) =
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
 
+-- MP: I think this is safe because the bytestring will take up
+-- the start position + (length * words) space, so adding the offset will
+-- still be a memory position within the bytestring
 uniqueOfFS :: FastString -> Int
 uniqueOfFS (FastString (BS.PS (ForeignPtr a _) o _)) =
   (I# (addr2Int# a)) + o
