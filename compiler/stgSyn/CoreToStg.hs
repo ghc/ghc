@@ -268,7 +268,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    assertConsistentCaInfo dflags id bind (ppr bind)
+    assertConsistentCafInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,17 +296,17 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    assertConsistentCaInfo dflags (head binders) bind (ppr binders)
+    assertConsistentCafInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
 
 -- | CAF consistency issues will generally result in segfaults and are quite
 -- difficult to debug (see #16846). We enable checking of the
 -- 'consistentCafInfo' invariant with @-dstg-lint@ to increase the chance that
 -- we catch these issues.
-assertConsistentCaInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
-assertConsistentCaInfo dflags id bind err_doc result
+assertConsistentCafInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
+assertConsistentCafInfo dflags id bind err_doc result
   | gopt Opt_DoStgLinting dflags || debugIsOn
-  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCaInfo" err_doc
+  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCafInfo" err_doc
   | otherwise = result
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
