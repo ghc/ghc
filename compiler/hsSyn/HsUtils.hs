@@ -1000,7 +1000,7 @@ collect_out_binds ps = foldr (collect_binds ps . snd) []
 collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
                  [IdP (GhcPass p)] -> [IdP (GhcPass p)]
 -- Collect Ids, or Ids + pattern synonyms, depending on boolean flag
-collect_binds ps binds acc = foldrBag (collect_bind ps . unLoc) acc binds
+collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
 collect_bind :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
                 Bool -> HsBindLR p idR -> [IdP p] -> [IdP p]
@@ -1019,7 +1019,7 @@ collect_bind _ (XHsBindsLR _) acc = acc
 
 collectMethodBinders :: LHsBindsLR idL idR -> [Located (IdP idL)]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
-collectMethodBinders binds = foldrBag (get . unLoc) [] binds
+collectMethodBinders binds = foldr (get . unLoc) [] binds
   where
     get (FunBind { fun_id = f }) fs = f : fs
     get _                        fs = fs
@@ -1201,7 +1201,7 @@ hsPatSynSelectors :: HsValBinds (GhcPass p) -> [IdP (GhcPass p)]
 -- names are collected by collectHsValBinders.
 hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
-  = foldrBag addPatSynSelector [] . unionManyBags $ map snd binds
+  = foldr addPatSynSelector [] . unionManyBags $ map snd binds
 
 addPatSynSelector:: LHsBind p -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels

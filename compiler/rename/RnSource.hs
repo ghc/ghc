@@ -2135,7 +2135,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
    ; setEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
   where
     new_ps :: HsValBinds GhcPs -> TcM [(Name, [FieldLabel])]
-    new_ps (ValBinds _ binds _) = foldrBagM new_ps' [] binds
+    new_ps (ValBinds _ binds _) = foldrM new_ps' [] binds
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs

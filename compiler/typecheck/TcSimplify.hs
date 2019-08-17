@@ -1849,7 +1849,7 @@ neededEvVars implic@(Implic { ic_given = givens
  = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
 
-      ; let seeds1        = foldrBag add_implic_seeds old_needs implics
+      ; let seeds1        = foldr add_implic_seeds old_needs implics
             seeds2        = foldEvBindMap add_wanted seeds1 ev_binds
             seeds3        = seeds2 `unionVarSet` tcvs
             need_inner    = findNeededEvVars ev_binds seeds3
@@ -2127,7 +2127,7 @@ approximateWC float_past_equalities wc
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
 
     do_bag :: (a -> Bag c) -> Bag a -> Bag c
-    do_bag f = foldrBag (unionBags.f) emptyBag
+    do_bag f = foldr (unionBags.f) emptyBag
 
     is_floatable skol_tvs ct
        | isGivenCt ct     = False
@@ -2368,7 +2368,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
 
              seed_skols = mkVarSet skols     `unionVarSet`
                           mkVarSet given_ids `unionVarSet`
-                          foldrBag add_non_flt_ct emptyVarSet no_float_cts `unionVarSet`
+                          foldr add_non_flt_ct emptyVarSet no_float_cts `unionVarSet`
                           foldEvBindMap add_one_bind emptyVarSet binds
              -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
              -- Include the EvIds of any non-floating constraints
@@ -2407,7 +2407,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
       | otherwise      = not (ctEvId ct `elemVarSet` skols)
 
     add_captured_ev_ids :: Cts -> VarSet -> VarSet
-    add_captured_ev_ids cts skols = foldrBag extra_skol emptyVarSet cts
+    add_captured_ev_ids cts skols = foldr extra_skol emptyVarSet cts
        where
          extra_skol ct acc
            | isDerivedCt ct                           = acc

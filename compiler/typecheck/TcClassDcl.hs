@@ -369,7 +369,7 @@ findMethodBind  :: Name                 -- Selector
                 -- site of the method binder, and any inline or
                 -- specialisation pragmas
 findMethodBind sel_name binds prag_fn
-  = foldlBag mplus Nothing (mapBag f binds)
+  = foldl' mplus Nothing (mapBag f binds)
   where
     prags    = lookupPragEnv prag_fn sel_name
 

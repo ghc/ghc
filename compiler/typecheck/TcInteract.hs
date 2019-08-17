@@ -223,7 +223,7 @@ solveSimples :: Cts -> TcS ()
 
 solveSimples cts
   = {-# SCC "solveSimples" #-}
-    do { updWorkListTcS (\wl -> foldrBag extendWorkListCt wl cts)
+    do { updWorkListTcS (\wl -> foldr extendWorkListCt wl cts)
        ; solve_loop }
   where
     solve_loop

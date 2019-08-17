@@ -1973,11 +1973,11 @@ genAuxBinds dflags loc b = genAuxBinds' b2 where
   splitDerivAuxBind (DerivAuxBind x) = Left x
   splitDerivAuxBind  x               = Right x
 
-  rm_dups = foldrBag dup_check emptyBag
+  rm_dups = foldr dup_check emptyBag
   dup_check a b = if anyBag (== a) b then b else consBag a b
 
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
-  genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
+  genAuxBinds' = foldr f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
                             , emptyBag )
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before

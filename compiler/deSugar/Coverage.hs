@@ -121,7 +121,7 @@ guessSourceFile :: LHsBinds GhcTc -> FilePath -> FilePath
 guessSourceFile binds orig_file =
      -- Try look for a file generated from a .hsc file to a
      -- .hs file, by peeking ahead.
-     let top_pos = catMaybes $ foldrBag (\ (dL->L pos _) rest ->
+     let top_pos = catMaybes $ foldr (\ (dL->L pos _) rest ->
                                  srcSpanFileName_maybe pos : rest) [] binds
      in
      case top_pos of

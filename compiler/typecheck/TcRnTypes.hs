@@ -1978,7 +1978,7 @@ tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 -- | Returns free variables of a bag of constraints as a composable FV
 -- computation. See Note [Deterministic FV] in FV.
 tyCoFVsOfCts :: Cts -> FV
-tyCoFVsOfCts = foldrBag (unionFV . tyCoFVsOfCt) emptyFV
+tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
 -- set. See Note [Deterministic FV] in FV.
@@ -2015,7 +2015,7 @@ tyCoFVsOfImplic (Implic { ic_skols = skols
     tyCoFVsOfWC wanted
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
-tyCoFVsOfBag tvs_of = foldrBag (unionFV . tvs_of) emptyFV
+tyCoFVsOfBag tvs_of = foldr (unionFV . tvs_of) emptyFV
 
 ---------------------------
 dropDerivedWC :: WantedConstraints -> WantedConstraints
@@ -2525,7 +2525,7 @@ ppr_bag :: Outputable a => SDoc -> Bag a -> SDoc
 ppr_bag doc bag
  | isEmptyBag bag = empty
  | otherwise      = hang (doc <+> equals)
-                       2 (foldrBag (($$) . ppr) empty bag)
+                       2 (foldr (($$) . ppr) empty bag)
 
 {- Note [Given insolubles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

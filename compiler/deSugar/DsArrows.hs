@@ -50,7 +50,6 @@ import TysWiredIn
 import BasicTypes
 import PrelNames
 import Outputable
-import Bag
 import VarSet
 import SrcLoc
 import ListSetOps( assocMaybe )
@@ -1251,7 +1250,7 @@ collectl (dL->L _ pat) bndrs
     go p@(XPat {})                = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]
-collectEvBinders (EvBinds bs)   = foldrBag add_ev_bndr [] bs
+collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
 collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
 
 add_ev_bndr :: EvBind -> [Id] -> [Id]

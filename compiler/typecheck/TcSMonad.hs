@@ -1668,7 +1668,7 @@ kick_out_rewritable new_fr new_tv
     -- constraints, which perhaps may have become soluble after new_tv
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
-    kicked_out = foldrBag extendWorkListCt
+    kicked_out = foldr extendWorkListCt
                           (emptyWorkList { wl_eqs    = tv_eqs_out
                                          , wl_funeqs = feqs_out })
                           ((dicts_out `andCts` irs_out)
@@ -2054,7 +2054,7 @@ getNoGivenEqs :: TcLevel          -- TcLevel of this implication
 getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = irreds })
               <- getInertCans
-       ; let has_given_eqs = foldrBag ((||) . ct_given_here) False irreds
+       ; let has_given_eqs = foldr ((||) . ct_given_here) False irreds
                           || anyDVarEnv eqs_given_here ieqs
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
@@ -2317,7 +2317,7 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
 ********************************************************************* -}
 
 foldIrreds :: (Ct -> b -> b) -> Cts -> b -> b
-foldIrreds k irreds z = foldrBag k z irreds
+foldIrreds k irreds z = foldr k z irreds
 
 
 {- *********************************************************************
@@ -2467,7 +2467,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM m cls (foldrBag add emptyTM items)
+  = addToUDFM m cls (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)

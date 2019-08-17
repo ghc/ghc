@@ -1164,7 +1164,7 @@ mk_ev_binds ds_binds
   = map ds_scc (stronglyConnCompFromEdgedVerticesUniq edges)
   where
     edges :: [ Node EvVar (EvVar,CoreExpr) ]
-    edges = foldrBag ((:) . mk_node) [] ds_binds
+    edges = foldr ((:) . mk_node) [] ds_binds
 
     mk_node :: (Id, CoreExpr) -> Node EvVar (EvVar,CoreExpr)
     mk_node b@(var, rhs)
