@@ -819,7 +819,6 @@ dumpFastStringStats dflags = do
       bucketsPerSegment = map length segments
       entriesPerBucket = map length buckets
       entries = sum entriesPerBucket
-      hasZ = sum $ map (length . filter hasZEncoding) buckets
       msg = text "FastString stats:" $$ nest 4 (vcat
         [ text "segments:         " <+> int (length segments)
         , text "buckets:          " <+> int (sum bucketsPerSegment)
@@ -827,7 +826,6 @@ dumpFastStringStats dflags = do
         , text "largest segment:  " <+> int (maximum bucketsPerSegment)
         , text "smallest segment: " <+> int (minimum bucketsPerSegment)
         , text "longest bucket:   " <+> int (maximum entriesPerBucket)
-        , text "has z-encoding:   " <+> (hasZ `pcntOf` entries)
         ])
         -- we usually get more "has z-encoding" than "z-encoded", because
         -- when we z-encode a string it might hash to the exact same string,
@@ -835,8 +833,6 @@ dumpFastStringStats dflags = do
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
   putMsg dflags msg
-  where
-   x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
 showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
