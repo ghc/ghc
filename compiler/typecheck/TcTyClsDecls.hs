@@ -1938,11 +1938,12 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; let (_, final_res_kind) = splitPiTys res_kind
   ; checkDataKindSig DataFamilySort final_res_kind
   ; tc_rep_name <- newTyConRepName tc_name
-  ; let tycon = mkFamilyTyCon tc_name binders
+  ; let inj   = Injective $ replicate (length binders) True
+        tycon = mkFamilyTyCon tc_name binders
                               res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
-                              parent NotInjective
+                              parent inj
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
