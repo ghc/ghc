@@ -1246,12 +1246,13 @@ UseLibdw=NO
 USE_LIBDW=0
 AC_ARG_ENABLE(dwarf-unwind,
     [AC_HELP_STRING([--enable-dwarf-unwind],
-        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
-    [AC_CHECK_LIB(dw, dwfl_attach_state,
+        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
+if test "$enable_dwarf_unwind" = "yes" ; then
+  AC_CHECK_LIB(dw, dwfl_attach_state,
       [UseLibdw=YES],
-      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])],
-    [UseLibdw=NO]
-)
+      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
+fi
+
 AC_SUBST(UseLibdw)
 if test $UseLibdw = "YES" ; then
 	USE_LIBDW=1
