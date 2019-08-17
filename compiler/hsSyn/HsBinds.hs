@@ -1080,15 +1080,20 @@ type instance XXFixitySig (GhcPass p) = NoExtCon
 -- | Located Top-Level Kind Signature
 type LTopKindSig pass = Located (TopKindSig pass)
 
+data TopKindSigFromCusk = TopKindSigFromCusk Bool
+
 data TopKindSig pass
-  = TopKindSig (XTopKindSig pass) (Located (IdP pass)) (LHsSigWcType pass)
+  = TopKindSig (XTopKindSig pass)
+               TopKindSigFromCusk
+               (Located (IdP pass))
+               (LHsSigWcType pass)
   | XTopKindSig (XXTopKindSig pass)
 
-type instance XTopKindSig  (GhcPass p) = NoExtField
+type instance XTopKindSig (GhcPass p) = NoExtField
 type instance XXTopKindSig (GhcPass p) = NoExtCon
 
 tlksName :: TopKindSig (GhcPass p) -> IdP (GhcPass p)
-tlksName (TopKindSig _ lname _) = unLoc lname
+tlksName (TopKindSig _ _ lname _) = unLoc lname
 tlksName (XTopKindSig nec) = noExtCon nec
 
 -- | Type checker Specialisation Pragmas
@@ -1237,7 +1242,12 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TopKindSig p) where
-  ppr (TopKindSig _ v ki) = text "type" <+> ppr v <+> text "::" <+> ppr ki
+  ppr (TopKindSig _ prov v ki) =
+    text "type" <+> pprov <+> ppr v <+> text "::" <+> ppr ki
+    where
+      pprov = case prov of
+        TopKindSigFromCusk True -> text "{- CUSK -}"
+        TopKindSigFromCusk False -> empty
   ppr (XTopKindSig nec) = noExtCon nec
 
 pragBrackets :: SDoc -> SDoc
