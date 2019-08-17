@@ -55,6 +55,8 @@ import Data.Maybe
 ************************************************************************
 -}
 
+type HooksPlugin = Hooks -> Hooks
+
 -- | Hooks can be used by GHC API clients to replace parts of
 --   the compiler pipeline. If a hook is not installed, GHC
 --   uses the default built-in behaviour
