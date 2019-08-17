@@ -248,9 +248,10 @@ mkTopLevelKindSig
 mkTopLevelKindSig loc lhs rhs =
   do { v <- checkLhs lhs
      ; return $ cL loc $
-        TLKS noExtField $ TopKindSig noExtField v (mkLHsSigWcType rhs)
+        TLKS noExtField $ TopKindSig noExtField fromCusk v (mkLHsSigWcType rhs)
      }
   where
+    fromCusk = TopKindSigFromCusk False  -- this TLKS is not extracted from a CUSK
     checkLhs (unLoc->HsTyVar _ NotPromoted v@(unLoc->name))
       | isUnqual name, isTcOcc (rdrNameOcc name)
       = return v

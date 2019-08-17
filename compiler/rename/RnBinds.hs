@@ -1048,13 +1048,13 @@ renameSig _ TLKS{} = panic "renameSig: TLKS"  -- See Note [TLKS relocation]
 renameSig _ (XSig nec) = noExtCon nec
 
 renameTLKS :: NameSet -> TopKindSig GhcPs -> RnM (TopKindSig GhcRn, FreeVars)
-renameTLKS tc_names sig@(TopKindSig _ v ki)
+renameTLKS tc_names sig@(TopKindSig _ prov v ki)
   = do  { tlks_ok <- xoptM LangExt.TopLevelKindSignatures
         ; unless tlks_ok $ addErr tlksErr
         ; new_v <- lookupSigOccRn (TopSigCtxt tc_names) (TLKS noExtField sig) v
         ; let doc = TopKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigWcType BindUnlessForall doc KindLevel ki
-        ; return (TopKindSig noExtField new_v new_ki, fvs)
+        ; return (TopKindSig noExtField prov new_v new_ki, fvs)
         }
   where
     tlksErr :: SDoc

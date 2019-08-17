@@ -254,7 +254,7 @@ tcHsSigType ctxt sig_ty
 
 tcTLKS :: LTopKindSig GhcRn -> TcM (Name, Kind)
 tcTLKS (L _ tlks) = case tlks of
-  TopKindSig _ (L _ name) ksig ->
+  TopKindSig _ _ (L _ name) ksig ->
     do { unzonked_kind <-
            tcHsSigType (TopKindSigCtxt name) $
            dropWildCards ksig -- See Note [Wildcards in TLKS]
@@ -1795,26 +1795,63 @@ It has two cases:
 -}
 
 ------------------------------
--- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
--- user-supplied kind signature (CUSK), generalise the result.
--- Used in 'getInitialKind' (for tycon kinds and other kinds)
--- and in kind-checking (but not for tycon kinds, which are checked with
--- tcTyClDecls). See Note [CUSKs: complete user-supplied kind signatures]
--- in HsDecls.
+-- | Kind-check a 'LHsQTyVars'. Used in 'getInitialKind' (for tycon kinds and
+-- other kinds) and in kind-checking (but not for tycon kinds, which are
+-- checked with tcTyClDecls).
 --
 -- This function does not do telescope checking.
 kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-             -> Bool              -- ^ True <=> the decl being checked has a CUSK
              -> LHsQTyVars GhcRn
              -> TcM Kind          -- ^ The result kind
              -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
-kcLHsQTyVars name flav cusk tvs thing_inside
-  | cusk      = kcLHsQTyVars_Cusk    name flav tvs thing_inside
-  | otherwise = kcLHsQTyVars_NonCusk name flav tvs thing_inside
+kcLHsQTyVars name flav
+              (HsQTvs { hsq_ext = kv_ns
+                      , hsq_explicit = hs_tvs }) thing_inside
+  -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
+  = do { (scoped_kvs, (tc_tvs, res_kind))
+           -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
+           -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
+           <- bindImplicitTKBndrs_Q_Tv kv_ns            $
+              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_tvs $
+              thing_inside
+              -- Why "_Tv" not "_Skol"? See third wrinkle in
+              -- Note [Inferring kinds for type declarations] in TcTyClsDecls,
 
+       ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
+               -- might unify with kind vars in other types in a mutually
+               -- recursive group.
+               -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
 
-kcLHsQTyVars_Cusk, kcLHsQTyVars_NonCusk
+             tc_binders = mkAnonTyConBinders VisArg tc_tvs
+               -- Also, note that tc_binders has the tyvars from only the
+               -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
+               -- in TcTyClsDecls
+               --
+               -- mkAnonTyConBinder: see Note [No polymorphic recursion]
+
+             all_tv_prs = (kv_ns                `zip` scoped_kvs) ++
+                          (hsLTyVarNames hs_tvs `zip` tc_tvs)
+               -- NB: bindIplicitTKBndrs_Q_Tv makes /freshly-named/ unification
+               --     variables, hence the need to zip here.  Ditto bindExplicit..
+               -- See TcMType Note [Unification variables need fresh Names]
+
+             tycon = mkTcTyCon name tc_binders res_kind all_tv_prs []
+                               False -- not yet generalised
+                               flav
+
+       ; traceTc "kcLHsQTyVars: not-cusk" $
+         vcat [ ppr name, ppr kv_ns, ppr hs_tvs
+              , ppr scoped_kvs
+              , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
+       ; return tycon }
+  where
+    ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
+              | otherwise            = AnyKind
+
+kcLHsQTyVars _ _ (XLHsQTyVars nec) _ = noExtCon nec
+
+kcLHsQTyVars_Cusk
     :: HasCallStack
     => Name              -- ^ of the thing being checked
     -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
@@ -1894,53 +1931,6 @@ kcLHsQTyVars_Cusk name flav
 kcLHsQTyVars_Cusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 ------------------------------
-kcLHsQTyVars_NonCusk name flav
-              (HsQTvs { hsq_ext = kv_ns
-                      , hsq_explicit = hs_tvs }) thing_inside
-  -- Non_CUSK case
-  -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
-  = do { (scoped_kvs, (tc_tvs, res_kind))
-           -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
-           -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
-           <- bindImplicitTKBndrs_Q_Tv kv_ns            $
-              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_tvs $
-              thing_inside
-              -- Why "_Tv" not "_Skol"? See third wrinkle in
-              -- Note [Inferring kinds for type declarations] in TcTyClsDecls,
-
-       ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
-               -- might unify with kind vars in other types in a mutually
-               -- recursive group.
-               -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
-
-             tc_binders = mkAnonTyConBinders VisArg tc_tvs
-               -- Also, note that tc_binders has the tyvars from only the
-               -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
-               -- in TcTyClsDecls
-               --
-               -- mkAnonTyConBinder: see Note [No polymorphic recursion]
-
-             all_tv_prs = (kv_ns                `zip` scoped_kvs) ++
-                          (hsLTyVarNames hs_tvs `zip` tc_tvs)
-               -- NB: bindIplicitTKBndrs_Q_Tv makes /freshly-named/ unification
-               --     variables, hence the need to zip here.  Ditto bindExplicit..
-               -- See TcMType Note [Unification variables need fresh Names]
-
-             tycon = mkTcTyCon name tc_binders res_kind all_tv_prs []
-                               False -- not yet generalised
-                               flav
-
-       ; traceTc "kcLHsQTyVars: not-cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_tvs
-              , ppr scoped_kvs
-              , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
-       ; return tycon }
-  where
-    ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
-              | otherwise            = AnyKind
-
-kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
-
 data ZippedBinder pass =
   ZippedBinder TyBinder (Maybe (LHsTyVarBndr pass))
 

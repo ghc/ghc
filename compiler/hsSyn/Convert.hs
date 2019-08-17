@@ -178,7 +178,7 @@ cvtDec (TH.SigD nm typ)
 cvtDec (TH.KiSigD nm ki)
   = do  { nm' <- tconNameL nm
         ; ki' <- cvtType ki
-        ; let sig' = TopKindSig noExtField nm' (mkLHsSigWcType ki')
+        ; let sig' = TopKindSig noExtField (TopKindSigFromCusk False) nm' (mkLHsSigWcType ki')
         ; returnJustL $ Hs.SigD noExtField (TLKS noExtField sig') }
 
 cvtDec (TH.InfixD fx nm)

@@ -70,7 +70,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe, catMaybes )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -1290,7 +1290,7 @@ rnTyClDecls :: NameSet
 rnTyClDecls tc_bndrs tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
          tlkss_w_fvs <- rnTLKSs tc_bndrs (tyClGroupTLKSs tycl_ds)
-       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; (tycls_w_fvs, cusks_w_fvs) <- rnLTyClDeclsWithCusks (tyClGroupTyClDecls tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_bndrs (tyClGroupRoleDecls tycl_ds)
 
@@ -1298,7 +1298,7 @@ rnTyClDecls tc_bndrs tycl_ds
        ; rdr_env <- getGlobalRdrEnv
        ; let tycl_sccs = depAnalTyClDecls rdr_env tlks_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
-             tlks_env = mkTLKS_fv_env tlkss_w_fvs
+             tlks_env = mkTLKS_fv_env (tlkss_w_fvs ++ cusks_w_fvs)
 
              tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
@@ -1653,6 +1653,28 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
     cls_doc  = ClassDeclCtx lcls
 
 rnTyClDecl (XTyClDecl nec) = noExtCon nec
+
+rnLTyClDeclWithCusk
+  :: LTyClDecl GhcPs
+  -> RnM ( (LTyClDecl GhcRn, FreeVars)
+         , Maybe (LTopKindSig GhcRn, FreeVars) )
+rnLTyClDeclWithCusk pdecl =
+  do { decl_with_fvs@(decl, _) <- wrapLocFstM rnTyClDecl pdecl
+     ; cusks_enabled <- xoptM LangExt.CUSKs
+     ; let name = tyClDeclLName (unLoc decl)
+           cusk = hsDeclHasCusk cusks_enabled (unLoc decl)
+     ; m_cusk_with_fvs <-
+       if cusk then Just <$> wrapLocFstM (extractTopKindSigFromCusk name) pdecl
+               else return Nothing
+     ; return (decl_with_fvs, m_cusk_with_fvs) }
+
+rnLTyClDeclsWithCusks
+  :: [LTyClDecl GhcPs]
+  -> RnM ( [(LTyClDecl GhcRn, FreeVars)]
+         , [(LTopKindSig GhcRn, FreeVars)] )
+rnLTyClDeclsWithCusks pdecls =
+  do { (decls_with_fvs, m_cusks_with_fvs) <- mapAndUnzipM rnLTyClDeclWithCusk pdecls
+     ; return (decls_with_fvs, catMaybes m_cusks_with_fvs) }
 
 -- Does the data type declaration include a CUSK?
 dataDeclHasCUSK :: LHsQTyVars pass -> NewOrData -> Bool -> Bool -> RnM Bool

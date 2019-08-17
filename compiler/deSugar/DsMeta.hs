@@ -156,7 +156,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds
-                                       ++ tlks_ds
+                                       ++ catMaybes tlks_ds
                                        ++ (concat fix_ds)
                                        ++ inst_ds ++ rule_ds ++ for_ds
                                        ++ ann_ds ++ deriv_ds) }) ;
@@ -350,10 +350,12 @@ repRoleD (dL->L loc (RoleAnnotDecl _ tycon roles))
 repRoleD _ = panic "repRoleD"
 
 -------------------------
-repTlksD :: LTopKindSig GhcRn -> DsM (SrcSpan, Core TH.DecQ)
+repTlksD :: LTopKindSig GhcRn -> DsM (Maybe (SrcSpan, Core TH.DecQ))
 repTlksD (dL->L loc tlks) =
   case tlks of
-    TopKindSig _ v ki -> rep_wc_ty_sig kiSigDName loc ki v
+    TopKindSig _ (TopKindSigFromCusk fromCusk) v ki ->
+      if fromCusk then return Nothing
+                  else Just <$> rep_wc_ty_sig kiSigDName loc ki v
     XTopKindSig nec -> noExtCon nec
 
 -------------------------

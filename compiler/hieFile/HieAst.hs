@@ -1342,7 +1342,7 @@ instance ToHie (LTopKindSig GhcRn) where
 
 instance ToHie (TopKindSig GhcRn) where
   toHie sig = concatM $ case sig of
-    TopKindSig _ name typ ->
+    TopKindSig _ _ name typ ->
       [ toHie $ [C TyDecl name]
       , toHie $ TS (UnresolvedScope [unLoc name] Nothing) typ
       ]
