@@ -853,7 +853,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
              -- for instance decls too
 
        -- Rename the bindings LHSs
-       ; binds' <- foldrBagM (rnMethodBindLHS is_cls_decl cls) emptyBag binds
+       ; binds' <- foldrM (rnMethodBindLHS is_cls_decl cls) emptyBag binds
 
        -- Rename the pragmas and signatures
        -- Annoyingly the type variables /are/ in scope for signatures, but
@@ -875,7 +875,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        ; scoped_tvs  <- xoptM LangExt.ScopedTypeVariables
        ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
               do { binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn other_sigs')) binds'
-                 ; let bind_fvs = foldrBag (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
+                 ; let bind_fvs = foldr (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
                                            emptyFVs binds_w_dus
                  ; return (mapBag fstOf3 binds_w_dus, bind_fvs) }
 
