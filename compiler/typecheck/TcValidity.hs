@@ -232,6 +232,7 @@ wantAmbiguityCheck ctxt
       GhciCtxt {}  -> False
       TySynCtxt {} -> False
       TypeAppCtxt  -> False
+      TopKindSigCtxt{} -> False
       _            -> True
 
 checkUserTypeError :: Type -> TcM ()
@@ -280,6 +281,10 @@ In a few places we do not want to check a user-specified type for ambiguity
      f @ty
   No need to check ty for ambiguity
 
+* TopKindSigCtxt: type T :: ksig
+  Kinds need a different ambiguity check than types, and the currently
+  implemented check is only good for types. See #14419, in particular
+  https://gitlab.haskell.org/ghc/ghc/issues/14419#note_160844
 
 ************************************************************************
 *                                                                      *

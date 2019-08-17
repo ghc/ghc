@@ -70,7 +70,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe, catMaybes )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -1290,7 +1290,7 @@ rnTyClDecls :: NameSet
 rnTyClDecls tc_bndrs tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
          tlkss_w_fvs <- rnTLKSs tc_bndrs (tyClGroupTLKSs tycl_ds)
-       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; (tycls_w_fvs, cusks_w_fvs) <- rnLTyClDeclsWithCusks (tyClGroupTyClDecls tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_bndrs (tyClGroupRoleDecls tycl_ds)
 
@@ -1298,7 +1298,7 @@ rnTyClDecls tc_bndrs tycl_ds
        ; rdr_env <- getGlobalRdrEnv
        ; let tycl_sccs = depAnalTyClDecls rdr_env tlks_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
-             tlks_env = mkTLKS_fv_env tlkss_w_fvs
+             tlks_env = mkTLKS_fv_env (tlkss_w_fvs ++ cusks_w_fvs)
 
              tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
              inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
@@ -1539,15 +1539,23 @@ getInsts bndrs inst_decl_map
 *                                                       *
 ****************************************************** -}
 
-rnTyClDecl :: TyClDecl GhcPs
-           -> RnM (TyClDecl GhcRn, FreeVars)
+-- Does the declaration have a CUSK?
+newtype HasCusk = HasCusk Bool
 
--- All flavours of type family declarations ("type family", "newtype family",
--- and "data family"), both top level and (for an associated type)
--- in a class decl
-rnTyClDecl (FamDecl { tcdFam = decl })
-  = do { (decl', fvs) <- rnFamDecl Nothing decl
-       ; return (FamDecl noExtField decl', fvs) }
+instance Outputable HasCusk where
+  ppr (HasCusk True) = text "HasCusk=True"
+  ppr (HasCusk False) = text "HasCusk=False"
+
+rnTyClDecl :: TyClDecl GhcPs
+           -> RnM ((TyClDecl GhcRn, HasCusk), FreeVars)
+
+-- All flavours of top-level type family declarations ("type family", "newtype
+-- family", and "data family")
+rnTyClDecl (FamDecl { tcdFam = fam })
+  = do { (fam', fvs) <- rnFamDecl Nothing fam
+       ; let cusk = fam_decl_has_cusk fam'
+             decl = FamDecl noExtField fam'
+       ; return ((decl, cusk), fvs) }
 
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
@@ -1557,14 +1565,14 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
     do { (rhs', fvs) <- rnTySyn doc rhs
-       ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
-                         , tcdFixity = fixity
-                         , tcdRhs = rhs', tcdSExt = fvs }, fvs) } }
+       ; let cusk = syn_decl_has_cusk tyvars' rhs'
+             decl = SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
+                            , tcdFixity = fixity
+                            , tcdRhs = rhs', tcdSExt = fvs }
+       ; return ((decl, cusk), fvs) } }
 
 -- "data", "newtype" declarations
--- both top level and (for an associated type) in an instance decl
-rnTyClDecl (DataDecl _ _ _ _ (XHsDataDefn _)) =
-  panic "rnTyClDecl: DataDecl with XHsDataDefn"
+rnTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
 rnTyClDecl (DataDecl
     { tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
@@ -1576,16 +1584,14 @@ rnTyClDecl (DataDecl
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
-       ; cusk <- dataDeclHasCUSK
-           tyvars' new_or_data no_rhs_kvs (isJust kind_sig)
-       ; let rn_info = DataDeclRn { tcdDataCusk = cusk
-                                  , tcdFVs      = fvs }
+       ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
+       ; let decl = DataDecl { tcdLName    = tycon'
+                             , tcdTyVars   = tyvars'
+                             , tcdFixity   = fixity
+                             , tcdDataDefn = defn'
+                             , tcdDExt     = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
-       ; return (DataDecl { tcdLName    = tycon'
-                          , tcdTyVars   = tyvars'
-                          , tcdFixity   = fixity
-                          , tcdDataDefn = defn'
-                          , tcdDExt     = rn_info }, fvs) } }
+       ; return ((decl, cusk), fvs) } }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
@@ -1643,32 +1649,80 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; docs' <- mapM (wrapLocM rnDocDecl) docs
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
-        ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
-                              tcdTyVars = tyvars', tcdFixity = fixity,
-                              tcdFDs = fds', tcdSigs = sigs',
-                              tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs },
-                  all_fvs ) }
+              cusk = HasCusk (hsTvbAllKinded tyvars')
+              decl = ClassDecl { tcdCtxt = context', tcdLName = lcls',
+                                 tcdTyVars = tyvars', tcdFixity = fixity,
+                                 tcdFDs = fds', tcdSigs = sigs',
+                                 tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
+                                 tcdDocs = docs', tcdCExt = all_fvs }
+        ; return ((decl, cusk), all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
 
 rnTyClDecl (XTyClDecl nec) = noExtCon nec
 
+rnLTyClDeclWithCusk
+  :: LTyClDecl GhcPs
+  -> RnM ( (LTyClDecl GhcRn, FreeVars)
+         , Maybe (LTopKindSig GhcRn, FreeVars) )
+rnLTyClDeclWithCusk (dL->L loc pdecl) =
+  do { ((decl, HasCusk cusk), decl_fvs) <- rnTyClDecl pdecl
+     ; let decl_with_fvs = (cL loc decl, decl_fvs)
+           name = tyClDeclLName decl
+     ; cusks_enabled <- xoptM LangExt.CUSKs
+     ; m_tlks_with_fvs <-
+       if cusks_enabled && cusk
+          then do
+            (tlks, tlks_fvs) <- extractTopKindSigFromCusk name pdecl
+            return (Just (cL loc tlks, tlks_fvs))
+          else return Nothing
+     ; return (decl_with_fvs, m_tlks_with_fvs) }
+
+rnLTyClDeclsWithCusks
+  :: [LTyClDecl GhcPs]
+  -> RnM ( [(LTyClDecl GhcRn, FreeVars)]
+         , [(LTopKindSig GhcRn, FreeVars)] )
+rnLTyClDeclsWithCusks pdecls =
+  do { (decls_with_fvs, m_cusks_with_fvs) <- mapAndUnzipM rnLTyClDeclWithCusk pdecls
+     ; return (decls_with_fvs, catMaybes m_cusks_with_fvs) }
+
 -- Does the data type declaration include a CUSK?
-dataDeclHasCUSK :: LHsQTyVars pass -> NewOrData -> Bool -> Bool -> RnM Bool
-dataDeclHasCUSK tyvars new_or_data no_rhs_kvs has_kind_sig = do
+data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM HasCusk
+data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
   ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
   ; let non_cusk_newtype
           | NewType <- new_or_data =
-              unlifted_newtypes && not has_kind_sig
+              unlifted_newtypes && isNothing kind_sig
           | otherwise = False
     -- See Note [CUSKs: complete user-supplied kind signatures] in HsDecls
-  ; cusks_enabled <- xoptM LangExt.CUSKs
-  ; return $ cusks_enabled && hsTvbAllKinded tyvars &&
-             no_rhs_kvs && not non_cusk_newtype
+  ; return $ HasCusk $
+      hsTvbAllKinded tyvars && no_rhs_kvs && not non_cusk_newtype
   }
+
+fam_decl_has_cusk :: FamilyDecl (GhcPass pass) -> HasCusk
+fam_decl_has_cusk
+    FamilyDecl { fdInfo      = fam_info
+               , fdTyVars    = tyvars
+               , fdResultSig = L _ resultSig }
+      = case fam_info of
+          ClosedTypeFamily {} ->
+            HasCusk $ hsTvbAllKinded tyvars &&
+                      isJust (famResultKindSignature resultSig)
+          _ -> HasCusk True
+                -- Un-associated open type/data families have CUSKs
+                -- Associated type families have CUSKs iff the parent class does
+fam_decl_has_cusk (XFamilyDecl nec) = noExtCon nec
+
+syn_decl_has_cusk :: LHsQTyVars pass -> LHsType pass -> HasCusk
+syn_decl_has_cusk tyvars rhs =
+  HasCusk $ hsTvbAllKinded tyvars && rhs_annotated rhs
+  where
+    rhs_annotated (L _ ty) = case ty of
+      HsParTy _ lty  -> rhs_annotated lty
+      HsKindSig {}   -> True
+      _              -> False
 
 {- Note [Unlifted Newtypes and CUSKs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
