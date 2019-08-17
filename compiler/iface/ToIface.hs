@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Functions for converting (mostly core) things to interface file things.
 module ToIface
@@ -675,17 +676,17 @@ outside of the hs-boot loop.
 toIfStandardFormInfo :: StandardFormInfo -> IfStandardFormInfo
 toIfStandardFormInfo (NonStandardThunk) = IfStandardFormInfo 1
 toIfStandardFormInfo sf =
-    IfStandardFormInfo $
+    IfStandardFormInfo $!
       (tag sf) .|. (encodeField (field sf))
   where tag (SelectorThunk {})  = 0
-        tag (ApThunk {})        = 2 -- setBit 0 1
+        tag (ApThunk {})        = 2 -- == setBit 0 1
         tag _ = panic "Impossible"
         field (SelectorThunk n) = n
         field (ApThunk n)       = n
         field _ = panic "Impossible"
         encodeField n =
-          let wn = fromIntegral n :: Word
-              shifted = wn `unsafeShiftL` 2
+          let !wn = fromIntegral n :: Word
+              !shifted = wn `unsafeShiftL` 2
           in ASSERT(shifted > 0 && shifted < fromIntegral (maxBound :: Word16))
              (fromIntegral shifted :: Word16)
 

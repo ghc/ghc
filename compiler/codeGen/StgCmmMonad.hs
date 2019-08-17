@@ -172,7 +172,7 @@ fixC fcode = FCode $
 data CgInfoGlobal
   = MkCgInfoGlobal {
         cgg_dflags        :: !DynFlags,    -- ^ Used for word size and the like
-        cgg_mod           :: !Module,      -- ^ Module being compiled
+        cgg_mod           :: Module,      -- ^ Module being compiled
         cgg_lf_info       :: !CgIfaceInfo  -- ^ Imported LFInfos
   }
 

@@ -1860,7 +1860,7 @@ tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 tcLFInfo (ILFReEntrant oneshot rep fvs_flag) = do
     return $! LFReEntrant TopLevel (oneshot) (rep) fvs_flag (ArgUnknown)
 tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
-    pure $ LFThunk TopLevel fvs_flag upd_flag (tcStandardFormInfo sfi) fun_flag
+    pure $! LFThunk TopLevel fvs_flag upd_flag (tcStandardFormInfo sfi) fun_flag
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do

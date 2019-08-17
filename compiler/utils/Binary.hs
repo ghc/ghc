@@ -51,12 +51,6 @@ module Binary
    putByte,
    getByte,
 
-   -- * Use for deriving instances
-  --  BoundedEnumPackable, PackedBinary,
-  --  Packable(..),
-
-
-
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
@@ -151,23 +145,23 @@ castBin (BinPtr i) = BinPtr i
 -- Helper instances/classes
 ---------------------------------------------------------------
 
-newtype BoundedEnumBinary a = BoundedEnumBinary a
+-- newtype BoundedEnumBinary a = BoundedEnumBinary a
 
-instance forall a. (Bounded a, Enum a) => Binary (BoundedEnumBinary a) where
-    put_ bh (BoundedEnumBinary x)
-      | maxSize <= 127
-      = putByte bh $ fromIntegral (fromEnum x)
-      | otherwise
-      = put_ bh (fromEnum x)
-      where
-        maxSize = fromEnum (maxBound :: a) :: Int
-    get  bh
-      | maxSize <= 127
-      = BoundedEnumBinary . toEnum . fromIntegral <$> getByte bh
-      | otherwise
-      = BoundedEnumBinary . toEnum <$> get bh
-      where
-        maxSize = fromEnum (maxBound :: a) :: Int
+-- instance forall a. (Bounded a, Enum a) => Binary (BoundedEnumBinary a) where
+--     put_ bh (BoundedEnumBinary x)
+--       | maxSize <= 127
+--       = putByte bh $ fromIntegral (fromEnum x)
+--       | otherwise
+--       = put_ bh (fromEnum x)
+--       where
+--         maxSize = fromEnum (maxBound :: a) :: Int
+--     get  bh
+--       | maxSize <= 127
+--       = BoundedEnumBinary . toEnum . fromIntegral <$> getByte bh
+--       | otherwise
+--       = BoundedEnumBinary . toEnum <$> get bh
+--       where
+--         maxSize = fromEnum (maxBound :: a) :: Int
 
 ---------------------------------------------------------------
 -- class Binary
