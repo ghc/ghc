@@ -1,0 +1,5 @@
+
+T13571.hs:5:1: error:
+    • Illegal result type variable r for ‘F’
+        Enable TypeFamilyDependencies to allow result variable names
+    • In the type family declaration for ‘F’
