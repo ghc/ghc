@@ -45,7 +45,6 @@ import Var      ( TyVar, tyVarKind )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
-import Bag( foldrBag )
 import Module( getModule )
 import Name
 import NameEnv
@@ -577,7 +576,7 @@ mkPragEnv sigs binds
 
     -- ar_env maps a local to the arity of its definition
     ar_env :: NameEnv Arity
-    ar_env = foldrBag lhsBindArity emptyNameEnv binds
+    ar_env = foldr lhsBindArity emptyNameEnv binds
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
