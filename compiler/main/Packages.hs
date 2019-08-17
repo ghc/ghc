@@ -71,9 +71,7 @@ import GHC.PackageDb
 import PackageConfig
 import DynFlags
 import Name             ( Name, nameModule_maybe )
-import UniqFM
 import UniqDFM
-import UniqSet
 import Module
 import Util
 import Panic

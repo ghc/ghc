@@ -14,7 +14,7 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.CodeGen
 import LlvmCodeGen.Data
 import LlvmCodeGen.Ppr
-import LlvmCodeGen.Regs
+--import LlvmCodeGen.Regs
 import LlvmMangler
 
 import BlockId

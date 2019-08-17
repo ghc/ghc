@@ -23,7 +23,7 @@ import Name
 import Module
 import SrcLoc
 import Outputable
-import PrelNames ( mkUnboundName, isUnboundName, getUnique)
+import PrelNames ( mkUnboundName, isUnboundName )
 import Util
 import Maybes
 import DynFlags
@@ -31,7 +31,6 @@ import FastString
 import Data.List
 import Data.Function ( on )
 import UniqDFM
-import FastStringEnv
 
 {-
 ************************************************************************

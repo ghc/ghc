@@ -68,7 +68,6 @@ import BinFingerprint
 import LoadIface
 import ToIface
 import FlagChecker
-import FastStringEnv
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
@@ -102,7 +101,6 @@ import Digraph
 import SrcLoc
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
-import Unique
 import Util             hiding ( eqListBy )
 import FastString
 import Maybes

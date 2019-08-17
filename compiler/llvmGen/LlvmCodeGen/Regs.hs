@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ExplicitForAll #-}
 
 --------------------------------------------------------------------------------
 -- | Deal with Cmm registers
@@ -98,7 +99,7 @@ alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
 -- | STG Type Based Alias Analysis hierarchy
 stgTBAA :: Monad m => (FastString -> m Unique) -> m [(Unique, LMString, Maybe Unique)]
-stgTBAA m = undefined
+stgTBAA _m = undefined
 {-
   = return [ (rootN,  fsLit "root",   Nothing)
     , (topN,   fsLit "top",   Just rootN)
@@ -118,10 +119,11 @@ stgTBAA m = undefined
 -- should never occur in any LLVM instruction statement.
 
 -- | The TBAA metadata identifier
-tbaa :: LMString
-tbaa = fsLit "tbaa"
+--tbaa :: LMString
+--tbaa = fsLit "tbaa"
 
 -- | Get the correct TBAA metadata information for this register type
+getTBAA :: forall a . a
 getTBAA = undefined
 {-
 getTBAA :: GlobalReg -> Unique

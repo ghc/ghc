@@ -500,7 +500,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
        span    = mkGeneralSrcSpan (fsLit "<unknown>")
    exn_name <- newInteractiveBinder hsc_env exn_occ span
 
-   let e_fs    = fsLit "e"
+   let -- e_fs    = fsLit "e"
        e_name  = undefined --mkInternalName (getUnique e_fs) (mkTyVarOccFS e_fs) span
        e_tyvar = mkRuntimeUnkTyVar e_name liftedTypeKind
        exn_id  = Id.mkVanillaGlobal exn_name (mkTyVarTy e_tyvar)

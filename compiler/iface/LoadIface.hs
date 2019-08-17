@@ -76,7 +76,6 @@ import Fingerprint
 import Hooks
 import FieldLabel
 import RnModIface
-import UniqDSet
 import Plugins
 
 import Control.Monad

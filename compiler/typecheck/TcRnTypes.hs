@@ -182,7 +182,6 @@ import SrcLoc
 import VarSet
 import FastStringEnv
 import ErrUtils
-import UniqFM
 import UniqMap
 import UniqSupply
 import BasicTypes

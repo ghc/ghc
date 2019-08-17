@@ -63,7 +63,6 @@ import NameSet
 import OccurAnal        ( occurAnalyseExpr )
 import Demand
 import Module
-import UniqFM
 import UniqSupply
 import Outputable
 import Maybes

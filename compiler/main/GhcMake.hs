@@ -60,11 +60,8 @@ import Outputable
 import Panic
 import SrcLoc
 import StringBuffer
-import UniqFM
-import UniqDSet
 import TcBackpack
 import Packages
-import UniqSet
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv

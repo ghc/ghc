@@ -139,10 +139,7 @@ module Module
 import GhcPrelude
 
 import Outputable
-import Unique
-import UniqFM
 import UniqDFM
-import UniqDSet
 import FastString
 import Binary
 import Util
@@ -162,14 +159,10 @@ import qualified Text.ParserCombinators.ReadP as Parse
 import Text.ParserCombinators.ReadP (ReadP, (<++))
 import Data.Char (isAlphaNum)
 import Control.DeepSeq
-import Data.Coerce
 import Data.Data
 import Data.Function
 import Data.Map (Map)
-import Data.Set (Set)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} DynFlags (DynFlags)

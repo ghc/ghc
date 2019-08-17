@@ -22,7 +22,6 @@ import PprCore
 import Outputable
 import FastString
 import Name
-import Unique
 import Id
 import CoreSyn
 import Literal

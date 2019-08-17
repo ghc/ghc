@@ -80,8 +80,6 @@ import Data.Maybe
 import Prelude
 import System.Mem.Weak
 import Data.IORef
-import Control.Concurrent
-import System.Mem
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -824,7 +822,6 @@ dumpFastStringStats dflags = do
       bucketsPerSegment = map length segments
       entriesPerBucket = map length buckets
       entries = sum entriesPerBucket
-      gced = sum $ map (length . filter isNothing) buckets
       msg = text "FastString stats:" $$ nest 4 (vcat
         [ text "segments:         " <+> int (length segments)
         , text "buckets:          " <+> int (sum bucketsPerSegment)
@@ -840,8 +837,6 @@ dumpFastStringStats dflags = do
         -- Z-encoding is different from the original string are counted in
         -- the "z-encoded" total.
   putMsg dflags msg
-  where
-   x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
 showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
 showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))

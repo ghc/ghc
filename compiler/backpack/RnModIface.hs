@@ -21,7 +21,6 @@ import SrcLoc
 import Outputable
 import HscTypes
 import Module
-import UniqFM
 import Avail
 import IfaceSyn
 import FieldLabel

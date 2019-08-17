@@ -55,7 +55,7 @@ import FsSet
 import Unique
 import FastStringEnv
 import BufWrite   ( BufHandle )
-import UniqSet
+--import UniqSet
 import UniqSupply
 import ErrUtils
 import qualified Stream

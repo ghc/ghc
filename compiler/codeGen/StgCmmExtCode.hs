@@ -51,7 +51,6 @@ import DynFlags
 import FastString
 import FastStringEnv
 import Module
-import UniqFM
 import Unique
 import UniqSupply
 

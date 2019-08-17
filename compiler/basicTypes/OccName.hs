@@ -105,8 +105,6 @@ import GhcPrelude
 import Util
 import Unique
 import DynFlags
-import UniqFM
-import UniqSet
 import UniqMap
 import FastString
 import FastStringEnv

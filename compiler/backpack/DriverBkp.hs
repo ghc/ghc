@@ -39,19 +39,16 @@ import FastString
 import ErrUtils
 import SrcLoc
 import HscMain
-import UniqFM
 import UniqDFM
 import Outputable
 import Maybes
 import HeaderInfo
 import MkIface
 import GhcMake
-import UniqDSet
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import Finder
 import Util
-import UniqDFM
 
 import qualified GHC.LanguageExtensions as LangExt
 

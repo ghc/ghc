@@ -35,9 +35,7 @@ import DynFlags
 import Outputable
 import GHC.Platform
 import Util
-import Unique
 import UniqDSet
-import FastString
 
 -- From iserv
 import SizedSeq

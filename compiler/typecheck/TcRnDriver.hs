@@ -110,7 +110,6 @@ import Id
 import IdInfo( IdDetails(..) )
 import VarEnv
 import Module
-import UniqFM
 import Name
 import NameEnv
 import NameSet
@@ -127,7 +126,7 @@ import Class
 import BasicTypes hiding( SuccessFlag(..) )
 import CoAxiom
 import Annotations
-import Data.List ( sortBy, sort )
+import Data.List ( sortBy )
 import Data.Ord
 import FastString
 import Maybes

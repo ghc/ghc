@@ -17,7 +17,6 @@ import GhcPrelude
 import Outputable
 import HscTypes
 import Module
-import UniqFM
 import UniqMap
 import Avail
 import FieldLabel

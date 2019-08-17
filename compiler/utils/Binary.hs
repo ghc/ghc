@@ -65,7 +65,6 @@ import GhcPrelude
 import {-# SOURCE #-} Name (Name)
 import FastString
 import PlainPanic
-import UniqFM
 import FastMutInt
 import Fingerprint
 import BasicTypes

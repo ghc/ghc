@@ -57,7 +57,6 @@ import PrelNames
 import qualified Data.Map as Map
 
 import Finder
-import UniqDSet
 import NameShape
 import TcErrors
 import TcUnify

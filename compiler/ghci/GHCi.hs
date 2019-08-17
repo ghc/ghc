@@ -59,7 +59,6 @@ import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
 import Fingerprint
 import HscTypes
-import UniqFM
 import FastStringEnv
 import Panic
 import DynFlags

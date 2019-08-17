@@ -169,7 +169,6 @@ import Var
 import Id
 import IdInfo           ( IdDetails(..), RecSelParent(..))
 import Type
-import FsSet
 
 import ApiAnnotation    ( ApiAnns )
 import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
@@ -205,7 +204,6 @@ import ErrUtils
 import NameCache
 import GHC.Platform
 import Util
-import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 import FastStringEnv

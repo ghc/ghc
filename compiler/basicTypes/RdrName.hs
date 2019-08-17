@@ -81,7 +81,6 @@ import SrcLoc
 import FastString
 import FieldLabel
 import Outputable
-import Unique
 import UniqFM
 import UniqSet
 import Util

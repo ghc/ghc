@@ -45,12 +45,10 @@ module FsSet (
 import GhcPrelude
 
 import FastStringEnv
-import Unique
 import Data.Coerce
 import Outputable
 import Data.Data
 import FastString
-import FastStringEnv
 import UniqMap
 import qualified Data.Semigroup as Semi
 

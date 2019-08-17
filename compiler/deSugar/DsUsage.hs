@@ -20,7 +20,6 @@ import Module
 import Outputable
 import Util
 import UniqSet
-import UniqFM
 import Fingerprint
 import Maybes
 import Packages

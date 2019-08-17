@@ -25,8 +25,6 @@ import Module           ( Module )
 import Name
 import Outputable
 import GHC.Serialized
-import UniqFM
-import Unique
 
 import Control.Monad
 import Data.Maybe

@@ -56,7 +56,6 @@ import Module
 import DynFlags
 import BasicTypes       ( CompilerPhase(..) )
 import Annotations
-import FastStringEnv
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
@@ -66,7 +65,6 @@ import FastString
 import qualified ErrUtils as Err
 import ErrUtils( Severity(..) )
 import UniqSupply
-import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 import NameCache
 import SrcLoc
@@ -81,7 +79,6 @@ import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
 import Panic (throwGhcException, GhcException(..))
-import qualified Data.Map as Map
 {-
 ************************************************************************
 *                                                                      *

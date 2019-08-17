@@ -34,7 +34,6 @@ import ConLike
 import DataCon
 import PatSyn
 import Maybes
-import UniqSet
 import Util (capitalise)
 import FastString (fsLit)
 

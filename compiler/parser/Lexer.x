@@ -97,8 +97,6 @@ import Bag
 import Outputable
 import StringBuffer
 import FastString
-import UniqMap
-import UniqFM
 import FastStringEnv
 import Util             ( readRational, readHexRational )
 

@@ -38,7 +38,6 @@ import Data.Version
 import FastString
 import Outputable
 import Module
-import Unique
 
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
