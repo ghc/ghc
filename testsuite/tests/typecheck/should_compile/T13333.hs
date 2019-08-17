@@ -6,16 +6,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 module T13333 where
 
 import Data.Data
-import Data.Kind
+import GHC.Exts (Constraint)
 
 data T (phantom :: k) = T
 
-type D :: (k -> Constraint) -> j -> Type
-data D p x where
+data D (p :: k -> Constraint) (x :: j) where
   D :: forall k (p :: k -> Constraint) (x :: k). p x => D p x
 
 class Possibly p x where

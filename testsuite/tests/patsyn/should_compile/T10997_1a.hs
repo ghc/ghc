@@ -1,11 +1,9 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies,
-             PolyKinds, KindSignatures, TopLevelKindSignatures #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
 module T10997_1a where
 
 import Data.Kind
 
-type Showable :: k -> Constraint
-type family Showable a where
+type family Showable (a :: k) :: Constraint where
   Showable (a :: Type) = (Show a)
   Showable a           = ()
 

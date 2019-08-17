@@ -1,7 +1,6 @@
 {-# Language RankNTypes, PatternSynonyms, DataKinds, PolyKinds, GADTs,
              TypeOperators, MultiParamTypeClasses, TypeFamilies,
-             TypeSynonymInstances, FlexibleInstances, InstanceSigs, FlexibleContexts,
-             TopLevelKindSignatures #-}
+             TypeSynonymInstances, FlexibleInstances, InstanceSigs, FlexibleContexts #-}
 
 {-# Options_GHC -fdefer-type-errors #-}
 
@@ -31,8 +30,7 @@ data NA a
 
 type SOP(kind::Type) code = NS (NP NA) code
 
-type ApplyT :: forall (kind::Type) -> kind -> Ctx(kind) -> Type
-data ApplyT k t ctx where
+data ApplyT(kind::Type) :: kind ->  Ctx(kind) -> Type where
  AO :: a -> ApplyT(Type) a E
  AS :: ApplyT(ks)      (f a) ctx
     -> ApplyT(k -> ks) f     (a:&:ctx)

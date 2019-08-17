@@ -1,5 +1,4 @@
-{-# LANGUAGE GADTs, TypeOperators, DataKinds, TypeFamilies, PolyKinds,
-             ExplicitForAll, TopLevelKindSignatures #-}
+{-# LANGUAGE GADTs, TypeOperators, DataKinds, TypeFamilies, PolyKinds #-}
 
 module T14749 where
 
@@ -15,13 +14,11 @@ type family IK (k :: KIND) = (res :: Type) where
   IK STAR   = Type
   IK (a:>b) = IK a -> IK b
 
-type I :: Ty k -> IK k
-type family I t = res where
+type family I (t :: Ty k) = (res :: IK k)  where
   I TMaybe     = Maybe
   I (TApp f a) = (I f) (I a)
 
-type TyRep :: forall (k :: KIND) -> Ty k -> Type
-data TyRep k t where
+data TyRep (k :: KIND) (t :: Ty k) where
   TyMaybe :: TyRep (STAR:>STAR) TMaybe
   TyApp   :: TyRep (a:>b) f -> TyRep a x -> TyRep b (TApp f x)
 

@@ -1,8 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T15380 where
 
@@ -14,8 +12,7 @@ class Generic a where
 class PGeneric a where
   type To a (x :: Rep a) :: a
 
-type MDefault :: a -> a
-type family MDefault x where
+type family MDefault (x :: a) :: a where
   MDefault x = To (M x)
 
 class C a where

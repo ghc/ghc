@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs, CUSKs #-}
+{-# LANGUAGE PolyKinds, GADTs #-}
 
 module T7053 where
 

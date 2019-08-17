@@ -15,7 +15,6 @@
 {-# language FunctionalDependencies #-}
 {-# language UndecidableSuperClasses #-}
 {-# language UndecidableInstances #-}
-{-# language TopLevelKindSignatures #-}
 
 module T11523 where
 
@@ -29,7 +28,6 @@ newtype Y (p :: i -> j -> Type) (a :: j) (b :: i) = Y { getY :: p b a }
 class Vacuous (a :: i)
 instance Vacuous a
 
-type Category :: Cat i -> Constraint
 class (Functor p, Dom p ~ Op p, Cod p ~ Nat p (->)) => Category (p :: Cat i) where
   type Op p :: Cat i
   type Op p = Y p

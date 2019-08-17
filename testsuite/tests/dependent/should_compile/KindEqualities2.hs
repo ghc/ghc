@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, PolyKinds, TypeFamilies, ExplicitForAll,
-             TemplateHaskell, UndecidableInstances, ScopedTypeVariables,
-             TopLevelKindSignatures #-}
+             TemplateHaskell, UndecidableInstances, ScopedTypeVariables #-}
 
 module KindEqualities2 where
 
@@ -16,8 +15,7 @@ data Ty :: Kind -> Type where
   TApp :: Ty (Arr k1 k2) -> Ty k1 -> Ty k2
 
 
-type TyRep :: forall (k :: Kind) -> Ty k -> Type
-data TyRep k t where
+data TyRep (k :: Kind) (t :: Ty k) where
   TyInt :: TyRep Star TInt
   TyBool :: TyRep Star TBool
   TyMaybe :: TyRep (Arr Star Star) TMaybe

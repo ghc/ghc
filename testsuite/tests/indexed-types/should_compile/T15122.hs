@@ -1,14 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
+{-# LANGUAGE TypeInType #-}
 module T15122 where
 
 import Data.Kind
 import Data.Proxy
 
-type IsStar :: k -> Type
-data IsStar a where
+data IsStar (a :: k) where
   IsStar :: IsStar (a :: Type)
 
 type family F (a :: k) :: k

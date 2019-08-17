@@ -4,7 +4,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module T16326_Compile1 where
 
@@ -21,15 +20,14 @@ type DComp a
            (x :: a) =
   f (g x)
 
-
-type ElimList ::
-  forall (a :: Type)
-         (p :: [a] -> Type)
-         (s :: [a])
-         (pNil :: p '[])
-         (pCons :: forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs))
-  -> p s
-type family ElimList a p s pNil pCons where
+-- Ensure that ElimList has a CUSK, beuas it is
+-- is used polymorphically its RHS (c.f. #16344)
+type family ElimList (a :: Type)
+                     (p :: [a] -> Type)
+                     (s :: [a])
+                     (pNil :: p '[])
+                     (pCons :: forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs))
+                  :: p s where
   forall a p pNil (pCons :: forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs)).
     ElimList a p '[] pNil pCons =
       pNil

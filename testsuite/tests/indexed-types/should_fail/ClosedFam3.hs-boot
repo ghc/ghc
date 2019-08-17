@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, PolyKinds, TopLevelKindSignatures #-}
+{-# LANGUAGE TypeFamilies, PolyKinds #-}
 
 module ClosedFam3 where
 
@@ -11,6 +11,5 @@ type family Bar a where
   Bar Int = Bool
   Bar Double = Char
 
-type Baz :: k -> Type
-type family Baz a where
+type family Baz (a :: k) :: Type where
   Baz Int = Bool

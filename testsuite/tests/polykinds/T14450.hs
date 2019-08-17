@@ -1,6 +1,6 @@
 {-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators,
              ConstraintKinds, TypeFamilies, DataKinds, GADTs,
-             AllowAmbiguousTypes, InstanceSigs, TopLevelKindSignatures #-}
+             AllowAmbiguousTypes, InstanceSigs #-}
 
 module T14450 where
 
@@ -12,11 +12,9 @@ type a ~> b = TyFun a b -> Type
 
 type Cat ob = ob -> ob -> Type
 
-type SameKind :: k -> k -> Constraint
-type SameKind a b = ()
+type SameKind (a :: k) (b :: k) = (() :: Constraint)
 
-type Apply :: (a ~> b) -> a -> b
-type family Apply f x where
+type family Apply (f :: a ~> b) (x :: a) :: b where
   Apply IddSym0 x = Idd x
 
 class Varpi (f :: i ~> j) where

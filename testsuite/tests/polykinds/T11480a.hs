@@ -2,8 +2,7 @@
   NoImplicitPrelude, FlexibleContexts,
   MultiParamTypeClasses, GADTs,
   ConstraintKinds, FlexibleInstances, UndecidableInstances,
-  FunctionalDependencies, UndecidableSuperClasses,
-  TopLevelKindSignatures #-}
+  FunctionalDependencies, UndecidableSuperClasses #-}
 
 module T11480a where
 
@@ -12,8 +11,7 @@ import qualified Prelude
 
 data Nat (c :: i -> i -> Type) (d :: j -> j -> Type) (f :: i -> j) (g :: i -> j)
 
-type Category :: (i -> i -> Type) -> Constraint
-class Functor p (Nat p (->)) p => Category p
+class Functor p (Nat p (->)) p => Category (p :: i -> i -> Type)
 
 class (Category dom, Category cod)
    => Functor (dom :: i -> i -> Type) (cod :: j -> j -> Type) (f :: i -> j)

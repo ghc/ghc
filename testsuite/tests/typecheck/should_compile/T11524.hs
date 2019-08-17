@@ -2,14 +2,10 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T11524 where
 
-import Data.Kind (Type)
-
-type AType :: k -> Type
-data AType a where
+data AType (a :: k) where
     AMaybe :: AType Maybe
     AInt :: AType Int
     AApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).

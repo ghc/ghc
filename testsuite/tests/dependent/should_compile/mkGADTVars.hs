@@ -1,10 +1,9 @@
-{-# LANGUAGE GADTs, PolyKinds, RankNTypes, TopLevelKindSignatures #-}
+{-# LANGUAGE GADTs, PolyKinds #-}
 
 module GADTVars where
 
 import Data.Kind
 import Data.Proxy
 
-type T :: Type -> forall (k2 :: Type) -> k2 -> k2 -> Type
-data T k1 k2 a b where
+data T (k1 :: Type) (k2 :: Type) (a :: k2) (b :: k2) where
   MkT :: T x1 Type (Proxy (y :: x1), z) z

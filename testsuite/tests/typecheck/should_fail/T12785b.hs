@@ -1,7 +1,6 @@
 {-# LANGUAGE RankNTypes, TypeOperators, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds, PolyKinds, GADTs #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T12785b where
 
@@ -14,8 +13,7 @@ data HTree n a where
   Leaf :: HTree (S n) a
   Branch :: a -> HTree n (HTree (S n) a) -> HTree (S n) a
 
-type STree :: forall (n :: Peano) -> forall a. (a -> Type) -> HTree n a -> Type
-data STree n f s where
+data STree (n ::Peano) :: forall a . (a -> Type) -> HTree n a -> Type where
   SPoint :: f a -> STree Z f (Point a)
   SLeaf :: STree (S n) f Leaf
   SBranch :: f a -> STree n (STree (S n) f) stru -> STree (S n) f (a `Branch` stru)
@@ -35,7 +33,6 @@ hmap f (Point a) = Point (f a)
 hmap f Leaf = Leaf
 hmap f (a `Branch` tr) = f a `Branch` hmap (hmap f) tr
 
-type Payload :: forall x. forall (n :: Peano) (s :: HTree n x) -> x
-type family Payload n s where
+type family Payload (n :: Peano) (s :: HTree n x) :: x where
   Payload Z (Point a) = a
   Payload (S n) (a `Branch` stru) = a

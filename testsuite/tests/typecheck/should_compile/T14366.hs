@@ -1,19 +1,13 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T14366 where
-
 import Data.Kind
 import Data.Type.Equality
 
-type Cast :: forall (a :: Type) (b :: Type) -> a :~: b -> a -> b
-type family Cast a b e x where
+type family Cast (a :: Type) (b :: Type) (e :: a :~: b) (x :: a) :: b where
   Cast _ _ Refl x = x
 
-type F :: Type -> Type
-type family F a where
+type family F (a :: Type) :: Type where
   F (a :: _) = a

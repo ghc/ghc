@@ -7,26 +7,22 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T11711 where
 
-import Data.Kind
+import Data.Kind (Type)
 
-type (:~~:) :: k1 -> k2 -> Type
-data (:~~:) a b where
+data (:~~:) (a :: k1) (b :: k2) where
     HRefl :: a :~~: a
 
-type TypeRep :: k -> Type
-data TypeRep a where
+data TypeRep (a :: k) where
     TrTyCon :: String -> TypeRep k -> TypeRep (a :: k)
     TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                TypeRep (a :: k1 -> k2)
             -> TypeRep (b :: k1)
             -> TypeRep (a b)
 
-type Typeable :: k -> Constraint
-class Typeable a where
+class Typeable (a :: k) where
     typeRep :: TypeRep a
 
 data SomeTypeRep where

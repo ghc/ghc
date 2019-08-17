@@ -4,15 +4,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds, PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 module Bug where
 
 import Data.Kind
 
 data family Sing (a :: k)
 
-type HR :: j -> k -> Type
-data HR a b where
+data HR (a :: j) (b :: k) where
   HRefl :: HR a a
 
 data instance Sing (z :: HR a b) where

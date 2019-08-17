@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
 
@@ -42,6 +42,5 @@ data instance In (F f) r x where
   D:R:InioFrx0 ::    R:InioFrx o i f ~ In i o ('F i o f)
 -}
 -- Requires polymorphic recursion
-type In' :: Code i o -> (i -> Type) -> (o -> Type)
-data In' g r t where
+data In' (f :: Code i o) :: (i -> Type) -> o -> Type where
   MkIn' :: In' g (Sum1 r (In' (F g) r)) t -> In' (F g) r t

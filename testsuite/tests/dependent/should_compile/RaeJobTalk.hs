@@ -6,7 +6,7 @@
              DataKinds, PolyKinds , ConstraintKinds, UndecidableInstances,
              FlexibleInstances, MultiParamTypeClasses, FunctionalDependencies,
              FlexibleContexts, StandaloneDeriving, InstanceSigs,
-             RankNTypes, UndecidableSuperClasses, TopLevelKindSignatures #-}
+             RankNTypes, UndecidableSuperClasses #-}
 
 module RaeJobTalk where
 
@@ -24,8 +24,7 @@ import Data.Maybe
 -- Utilities
 
 -- Heterogeneous propositional equality
-type (:~~:) :: k1 -> k2 -> Type
-data a :~~: b where
+data (a :: k1) :~~: (b :: k2) where
   HRefl :: a :~~: a
 
 -- Type-level inequality
@@ -74,8 +73,7 @@ Nil %:++ x = x
 -- Type-indexed type representations
 -- Based on "A reflection on types"
 
-type TyCon :: k -> Type
-data TyCon a where
+data TyCon (a :: k) where
   Int :: TyCon Int
   Bool :: TyCon Bool
   Char :: TyCon Char
@@ -105,8 +103,7 @@ type family Primitive (a :: k) :: Constraint where
   Primitive (_ _) = ('False ~ 'True)
   Primitive _     = (() :: Constraint)
 
-type TypeRep :: k -> Type
-data TypeRep a where
+data TypeRep (a :: k) where
   TyCon :: forall k (a :: k). (Primitive a, Typeable k) => TyCon a -> TypeRep a
   TyApp :: TypeRep a -> TypeRep b -> TypeRep (a b)
 

@@ -2,14 +2,12 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 module T15243 where
 
 data Unit = Unit
 
-$([d| type F :: k -> k
-      type family F a where
+$([d| type family F (a :: k) :: k where
         F 'Unit = 'Unit
         F '(,)  = '(,)
         F '[]   = '[]

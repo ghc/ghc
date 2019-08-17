@@ -3,7 +3,6 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T11362 where
 -- this file when compiled with -dunique-increment=-1 made GHC crash
@@ -25,6 +24,5 @@ data instance In (F f) r o where
   MkIn :: In f (Sum1 r (In (F f) r)) o -> In (F f) r o
 
 -- Requires polymorphic recursion
-type In' :: Code i o -> (i -> Type) -> o -> Type
-data In' f r t where
+data In' (f :: Code i o) :: (i -> Type) -> o -> Type where
   MkIn' :: In' g (Sum1 r (In' (F g) r)) t -> In' (F g) r t

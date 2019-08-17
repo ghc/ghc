@@ -1,10 +1,9 @@
-{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds, TopLevelKindSignatures #-}
+{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
 
 module DkNameRes where
 
 import Data.Proxy
 import Data.Kind
 
-type IfK :: Proxy (j :: Bool) -> Type
-type family IfK e where
+type family IfK (e :: Proxy (j :: Bool)) :: Type where
    IfK (_ :: Proxy True) = ()

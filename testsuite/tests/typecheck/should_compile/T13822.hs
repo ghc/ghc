@@ -1,6 +1,5 @@
 {-# LANGUAGE GADTs, TypeOperators, PolyKinds, DataKinds,
-             TypeFamilyDependencies, RankNTypes, LambdaCase, EmptyCase,
-             TopLevelKindSignatures #-}
+             TypeFamilyDependencies, RankNTypes, LambdaCase, EmptyCase #-}
 
 module T13822 where
 
@@ -19,16 +18,14 @@ type family
   IK STAR   = Type
   IK (a:>b) = IK a -> IK b
 
-type I :: Ty k -> IK k
 type family
-  I t = res | res -> t where
+  I (t :: Ty k) = (res :: IK k) | res -> t where
   I TInt       = Int
   I TBool      = Bool
   I TMaybe     = Maybe
   I (TApp f a) = (I f) (I a)
 
-type TyRep :: forall (k :: KIND) -> Ty k -> Type
-data TyRep k t where
+data TyRep (k :: KIND) (t :: Ty k) where
   TyInt   :: TyRep STAR         TInt
   TyBool  :: TyRep STAR         TBool
   TyMaybe :: TyRep (STAR:>STAR) TMaybe

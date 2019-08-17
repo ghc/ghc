@@ -3,7 +3,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 module T16255 where
 
 import Data.Kind
@@ -18,6 +17,5 @@ data family D1 :: forall k. k -> Type
 -- instances permit oversaturation in their equations.
 data instance D1 @Bool :: Bool -> Type
 
-type F2 :: j -> forall k. Either j k
 type family F2 (x :: j) :: forall k. Either j k where
   F2 5 @Symbol = Left 4

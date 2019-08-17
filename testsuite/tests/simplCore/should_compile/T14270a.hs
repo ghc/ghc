@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications, ScopedTypeVariables, GADTs, RankNTypes,
-             PolyKinds, TopLevelKindSignatures #-}
+             PolyKinds, KindSignatures #-}
 {-# OPTIONS_GHC -O2 #-} -- We are provoking a bug in SpecConstr
 
 module T14270a where
@@ -9,8 +9,7 @@ import Data.Proxy
 
 data T a = T1 (T a) | T2
 
-type K :: k -> Type
-data K a where
+data K (a :: k) where
   K1 :: K (a :: Type)
   K2 :: K a
 

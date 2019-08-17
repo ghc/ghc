@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, GADTs, ConstraintKinds #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 
 module T12919 where
 
@@ -13,8 +12,7 @@ data V :: N -> Type where
 type family VC (n :: N) :: Type where
   VC Z = Type
 
-type VF :: V n -> VC n -> Type
-type family VF xs f where
+type family VF (xs :: V n) (f :: VC n) :: Type where
   VF VZ f = f
 
 data Dict c where

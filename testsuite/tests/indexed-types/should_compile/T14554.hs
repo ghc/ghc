@@ -1,6 +1,5 @@
 {-# Language UndecidableInstances, DataKinds, TypeOperators, TypeFamilies,
-             PolyKinds, GADTs, LambdaCase, ScopedTypeVariables,
-             TopLevelKindSignatures #-}
+             PolyKinds, GADTs, LambdaCase, ScopedTypeVariables #-}
 
 module T14554 where
 
@@ -17,20 +16,17 @@ data TY :: KIND -> Type where
   ID    :: TY (FNARR X X)
   FNAPP :: TY (FNARR k k') -> TY k -> TY k'
 
-type TyRep :: forall (kind::KIND) -> TY kind -> Type
-data TyRep k t where
+data TyRep (kind::KIND) :: TY kind -> Type where
   TID    :: TyRep (FNARR X X)  ID
   TFnApp :: TyRep (FNARR k k') f
          -> TyRep k            a
          -> TyRep k'           (FNAPP f a)
 
-type IK :: KIND -> Type
-type family IK kind where
+type family IK (kind::KIND) :: Type where
   IK X            = Type
   IK (FNARR k k') = IK k ~> IK k'
 
-type IT :: TY kind -> IK kind
-type family IT ty
+type family IT (ty::TY kind) :: IK kind
 
 zero :: TyRep X a -> IT a
 zero x = case x of

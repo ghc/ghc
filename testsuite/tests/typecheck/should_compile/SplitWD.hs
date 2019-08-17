@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, DataKinds, PolyKinds,
-             TypeFamilies, GADTs, StandaloneDeriving, TopLevelKindSignatures #-}
+             TypeFamilies, GADTs, StandaloneDeriving #-}
 
 module SplitWD where
 
@@ -17,8 +17,7 @@ data Vec :: Type -> Nat -> Type where
   (:>) :: a -> Vec a n -> Vec a (Succ n)
 infixr 5 :>
 
-type (+++) :: Vec a n -> Vec a m -> Vec a (n + m)
-type family xs +++ ys where
+type family (xs :: Vec a n) +++ (ys :: Vec a m) :: Vec a (n + m) where
   VNil +++ ys = ys
   (x :> xs) +++ ys = x :> (xs +++ ys)
 infixr 5 +++

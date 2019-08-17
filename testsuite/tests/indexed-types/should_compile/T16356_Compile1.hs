@@ -2,15 +2,13 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TopLevelKindSignatures #-}
 module T16356_Compile1 where
 
 import Data.Kind (Type)
 
 data B (a :: k)
 
-type FClosed :: k -> Type
-type family FClosed where
+type family FClosed :: k -> Type where
   FClosed @k = B @k
 
 type family FOpen :: k -> Type

@@ -1,7 +1,6 @@
 {-# Language ViewPatterns, TypeOperators, KindSignatures, PolyKinds,
              StandaloneDeriving, GADTs, RebindableSyntax,
-             RankNTypes, LambdaCase, PatternSynonyms, TypeApplications,
-             TopLevelKindSignatures #-}
+             RankNTypes, LambdaCase, PatternSynonyms, TypeApplications #-}
 
 module T12698 where
 
@@ -37,8 +36,7 @@ splitApp = \case
   TP -> Nothing
   TA f x -> Just (App f x)
 
-type (:~~:) :: k1 -> k2 -> Type
-data a :~~: b where
+data (a :: k1) :~~: (b :: k2) where
   HRefl :: a :~~: a
 
 eqT :: T a -> T b -> Maybe (a :~~: b)
