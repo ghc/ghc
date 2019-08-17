@@ -15,11 +15,11 @@ module Bag (
         mapBag,
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
-        concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
+        concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, bagToList, mapAccumBagL,
         concatMapBag, concatMapBagPair, mapMaybeBag,
-        foldrBagM, foldlBagM, mapBagM, mapBagM_,
+        mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
         anyBagM, filterBagM
@@ -134,12 +134,12 @@ anyBagM p (TwoBags b1 b2) = do flag <- anyBagM p b1
 anyBagM p (ListBag xs)    = anyM p xs
 
 concatBag :: Bag (Bag a) -> Bag a
-concatBag bss = foldrBag add emptyBag bss
+concatBag bss = foldr add emptyBag bss
   where
     add bs rs = bs `unionBags` rs
 
 catBagMaybes :: Bag (Maybe a) -> Bag a
-catBagMaybes bs = foldrBag add emptyBag bs
+catBagMaybes bs = foldr add emptyBag bs
   where
     add Nothing rs = rs
     add (Just x) rs = x `consBag` rs
@@ -190,30 +190,6 @@ foldBag _ _ e EmptyBag        = e
 foldBag t u e (UnitBag x)     = u x `t` e
 foldBag t u e (TwoBags b1 b2) = foldBag t u (foldBag t u e b2) b1
 foldBag t u e (ListBag xs)    = foldr (t.u) e xs
-
-foldrBag :: (a -> r -> r) -> r
-         -> Bag a
-         -> r
--- Maintained for backward compatibility - now just a specialisation of
--- Foldable.
-foldrBag = Foldable.foldr
-
-foldlBag :: (r -> a -> r) -> r
-         -> Bag a
-         -> r
--- Maintained for backward compatibility - now just a specialisation of
--- Foldable.
-foldlBag = Foldable.foldl
-
-foldrBagM :: (Monad m) => (a -> b -> m b) -> b -> Bag a -> m b
--- Maintained for backward compatibility - now just a specialisation of
--- Foldable.
-foldrBagM = Foldable.foldrM
-
-foldlBagM :: (Monad m) => (b -> a -> m b) -> b -> Bag a -> m b
--- Maintained for backward compatibility - now just a specialisation of
--- Foldable.
-foldlBagM = Foldable.foldlM
 
 mapBag :: (a -> b) -> Bag a -> Bag b
 mapBag = fmap
@@ -324,7 +300,7 @@ listToBag [x] = UnitBag x
 listToBag vs = ListBag vs
 
 bagToList :: Bag a -> [a]
-bagToList b = foldrBag (:) [] b
+bagToList b = foldr (:) [] b
 
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))

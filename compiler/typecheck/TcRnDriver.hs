@@ -1458,7 +1458,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                           foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)

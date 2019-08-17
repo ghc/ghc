@@ -187,7 +187,7 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_binds = lbinds }) body
   = do { let body1 = foldr bind_export body exports
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
-       ; body2 <- foldlBagM (\body lbind -> dsUnliftedBind (unLoc lbind) body)
+       ; body2 <- foldlM (\body lbind -> dsUnliftedBind (unLoc lbind) body)
                             body1 lbinds
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
