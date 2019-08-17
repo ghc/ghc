@@ -21,12 +21,12 @@ TYPE CONSTRUCTORS
           nominal
           phantom
   data type T2{14} ::
-    forall {k1} {k2} (k3 :: k2) k7. forall k4 ->
+    forall {k1} {k2} (k3 :: k1) k7. forall k4 ->
     k4
     -> Proxy k3
     -> (k7 -> *)
     -> k7
-    -> forall (k5 :: k1).
+    -> forall (k5 :: k2).
        Proxy k5 -> forall k6 (k8 :: k6). Proxy k8 -> *
     roles nominal
           nominal

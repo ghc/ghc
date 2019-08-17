@@ -2,5 +2,5 @@
 T14175.hs:7:42: error:
     • Expecting one more argument to ‘k’
       Expected a type, but ‘k’ has kind ‘j -> *’
-    • In the kind ‘k’
-      In the type family declaration for ‘PComp’
+    • In a compiler-generated top-level kind signature for ‘PComp’:
+        forall (k :: j -> Type) -> k -> ()
