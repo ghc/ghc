@@ -1941,6 +1941,33 @@ kcLHsQTyVars_NonCusk name flav
 
 kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
+data ZippedBinder pass =
+  ZippedBinder TyBinder (Maybe (LHsTyVarBndr pass))
+
+zipBinders
+  :: Kind
+  -> [LHsTyVarBndr pass]
+  -> ([ZippedBinder pass], [LHsTyVarBndr pass], Kind)
+zipBinders = zip_binders []
+  where
+    zip_binders acc ki [] = (reverse acc, [], ki)
+    zip_binders acc ki (b:bs) =
+      case tcSplitPiTy_maybe ki of
+        Nothing -> (reverse acc, b:bs, ki)
+        Just (tb, ki') ->
+          let
+            zb = ZippedBinder tb (if zippable then Just b else Nothing)
+            bs' = if zippable then bs else b:bs
+            zippable =
+              case tb of
+                Named (Bndr _ Specified) -> False
+                Named (Bndr _ Inferred)  -> False
+                Named (Bndr _ Required)  -> True
+                Anon InvisArg _ -> False
+                Anon VisArg   _ -> True
+          in
+            zip_binders (zb:acc) ki' bs'
+
 -- | Kind-check a declaration header against a top-level kind signature.
 -- See Note [Arity inference in kcDeclHeader]
 kcDeclHeader :: Name              -- ^ of the thing being checked
@@ -1953,123 +1980,68 @@ kcDeclHeader name flav tlks ktvs kc_res_ki =
   addTyConFlavCtxt name flav $
     pushTcLevelM_ $
     solveEqualities $  -- #16687
-    bind_implicit (hsq_ext ktvs) $ \implicit_tv_prs ->
-      goVis implicit_tv_prs tlks [] [] (hsq_explicit ktvs)
+    bind_implicit (hsq_ext ktvs) $ \implicit_tv_prs -> do
+      let (zipped_binders, excess_bndrs, tlks') = zipBinders tlks (hsq_explicit ktvs)
+      unless (null excess_bndrs) $ failWithTc (tooManyBindersErr tlks' excess_bndrs)
+      (vis_tcbs, vis_tv_prs) <- mapAndUnzipM zippedToTyConBinder zipped_binders
+      tcExtendNameTyVarEnv vis_tv_prs $ do
+        mapM_ checkZippedBinder zipped_binders
+        m_res_ki <- sequenceA kc_res_ki
+        let (invis_binders, r_ki) = splitInvis tlks' m_res_ki
+        (invis_tcbs, invis_tv_prs) <- mapAndUnzipM invisToTyConBinder invis_binders
+        case m_res_ki of
+          Just res_ki -> discardResult $ unifyKind Nothing r_ki res_ki
+          Nothing -> return ()
+        let tcbs            = vis_tcbs   ++ invis_tcbs
+            explicit_tv_prs = vis_tv_prs ++ invis_tv_prs
+            tc = mkTcTyCon name tcbs r_ki explicit_tv_prs implicit_tv_prs True flav
+        traceTc "kcDeclHeader done:" $ vcat
+          [ text "tyConName = " <+> ppr (tyConName tc)
+          , text "tlks =" <+> debugPprType tlks
+          , text "tyConKind =" <+> debugPprType (tyConKind tc)
+          , text "tyConBinders = " <+> ppr (tyConBinders tc)
+          , text "tcTyConScopedTyVars" <+> ppr (tcTyConScopedTyVars tc)
+          , text "tcTyConHeaderKiVars" <+> ppr (tcTyConHeaderKiVars tc)
+          , text "tyConResKind" <+> debugPprType (tyConResKind tc)
+          ]
+        return tc
   where
-    goVis
-      :: [(Name,TcTyVar)]      -- implicit_tv_prs (tcTyConHeaderKiVars)
-      -> Kind                  -- the TLKS kind
-      -> [TyConBinder]         -- accumulated TyConBinders, reversed
-      -> [(Name,TcTyVar)]      -- accumulated scoped type variables, reversed
-      -> [LHsTyVarBndr GhcRn]  -- the header binders
-      -> TcM TcTyCon
-    goVis hkv d_ki tcb_acc stv_acc bndrs@(b:bs) =
-      case tcSplitPiTy_maybe d_ki of
-        Just (Named (Bndr v Specified), d_ki') ->
-          withSpecified v >>= \(tcb, stv) ->
-          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bndrs
-        Just (Named (Bndr v Inferred), d_ki') ->
-          withInferred v >>= \(tcb, stv) ->
-          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bndrs
-        Just (Anon InvisArg bndr_ki, d_ki') ->
-          withAnonInvis bndr_ki >>= \tcb ->
-          goVis hkv d_ki' (tcb:tcb_acc) stv_acc bndrs
-        Just (Anon VisArg bndr_ki, d_ki') ->
-          withAnonVis b bndr_ki >>= \(tcb, stv) ->
-          tcExtendNameTyVarEnv [stv] $
-          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bs
-        Just (Named (Bndr v Required), d_ki') ->
-          withRequired b v >>= \(tcb, stv) ->
-          tcExtendNameTyVarEnv [stv] $
-          goVis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) bs
-        Nothing -> failWithTc (tooManyBindersErr d_ki bndrs)
-    goVis hkv d_ki tcb_acc stv_acc [] = do
-      m_res_ki <- sequenceA kc_res_ki
-      let n_inst = mkInstPlan d_ki m_res_ki
-      goInvis hkv d_ki tcb_acc stv_acc m_res_ki n_inst
+    zippedToTyConBinder :: ZippedBinder GhcRn -> TcM (TyConBinder, (Name, TcTyVar))
+    zippedToTyConBinder zb = case zb of
+      ZippedBinder (Named (Bndr v Specified)) Nothing ->
+        return $
+          let tcb = mkNamedTyConBinder Specified v
+              stv = (tyVarName v, v)
+          in (tcb, stv)
+      ZippedBinder (Named (Bndr v Inferred)) Nothing ->
+        return $
+          let tcb = mkNamedTyConBinder Inferred v
+              stv = (tyVarName v, v)
+          in (tcb, stv)
+      ZippedBinder (Anon InvisArg bndr_ki) Nothing -> do
+        name <- newSysName (mkTyVarOccFS (fsLit "ev"))
+        return $
+          let tv = mkTyVar name bndr_ki
+              tcb = mkAnonTyConBinder InvisArg tv
+              stv = (tyVarName tv, tv)
+          in (tcb, stv)
+      ZippedBinder (Anon VisArg bndr_ki) (Just b) ->
+        return $
+          let v_name = hsTyVarBndrName b
+              tv = mkTyVar v_name bndr_ki
+              tcb = mkAnonTyConBinder VisArg tv
+              stv = (v_name, tv)
+          in (tcb, stv)
+      ZippedBinder (Named (Bndr v Required)) (Just b) ->
+        return $
+          let v_name = hsTyVarBndrName b
+              tcb = mkNamedTyConBinder Required v
+              stv = (v_name, v)
+          in (tcb, stv)
+      _ -> panic "goVis: invalid ZippedBinder"
 
-    goInvis
-      :: [(Name,TcTyVar)]      -- implicit_tv_prs (tcTyConHeaderKiVars)
-      -> Kind                  -- the TLKS kind
-      -> [TyConBinder]         -- accumulated TyConBinders, reversed
-      -> [(Name,TcTyVar)]      -- accumulated scoped type variables, reversed
-      -> Maybe Kind            -- the result kind
-      -> Int                   -- how much to instantiate?
-      -> TcM TcTyCon
-    goInvis hkv d_ki tcb_acc stv_acc m_res_ki n_inst
-      | n_inst <= 0 =
-          done hkv d_ki tcb_acc stv_acc m_res_ki
-      | otherwise   =  -- n_inst > 0
-          case tcSplitPiTy_maybe d_ki of
-            Just (Named (Bndr v Specified), d_ki') ->
-              withSpecified v >>= \(tcb, stv) ->
-              goInvis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
-            Just (Named (Bndr v Inferred), d_ki') ->
-              withInferred v >>= \(tcb, stv) ->
-              goInvis hkv d_ki' (tcb:tcb_acc) (stv:stv_acc) m_res_ki (n_inst - 1)
-            Just (Anon InvisArg bndr_ki, d_ki') ->
-              withAnonInvis bndr_ki >>= \tcb ->
-              goInvis hkv d_ki' (tcb:tcb_acc) stv_acc m_res_ki (n_inst - 1)
-            _ -> panic "goInvis: expected more invisible binders"
-
-    withSpecified, withInferred
-      :: TyVar
-      -> TcM (TyConBinder, (Name,TcTyVar))
-    withSpecified v = do
-      let tcb = mkNamedTyConBinder Specified v
-          stv = (tyVarName v, v)
-      return (tcb, stv)
-    withInferred v = do
-      let tcb = mkNamedTyConBinder Inferred v
-          stv = (tyVarName v, v)
-      return (tcb, stv)
-
-    withAnonInvis :: Kind -> TcM TyConBinder
-    withAnonInvis bndr_ki = do
-      tcv <- do
-        uniq <- newUnique
-        let name = mkSystemName uniq (mkTyVarOccFS (fsLit "ev"))
-        newSkolemTyVar name bndr_ki
-      return $ mkAnonTyConBinder InvisArg tcv
-
-    withAnonVis
-      :: LHsTyVarBndr GhcRn
-      -> Kind
-      -> TcM (TyConBinder, (Name,TcTyVar))
-    withAnonVis b bndr_ki = do
-      v_name <- checkVar bndr_ki b
-      tcv <- newSkolemTyVar v_name bndr_ki
-      let tcb = mkAnonTyConBinder VisArg tcv
-          stv = (v_name, tcv)
-      return (tcb, stv)
-
-    withRequired
-      :: LHsTyVarBndr GhcRn
-      -> TyVar
-      -> TcM (TyConBinder, (Name,TcTyVar))
-    withRequired b v = do
-      v_name <- checkVar (varType v) b
-      let tcb = mkNamedTyConBinder Required v
-          stv = (v_name, v)
-      return (tcb, stv)
-
-    done hkv r_ki tcb_acc stv_acc m_res_ki =
-      do { let tcbs = reverse tcb_acc
-               all_tv_prs = reverse stv_acc
-         ; case m_res_ki of
-             Just res_ki -> discardResult $ unifyKind Nothing r_ki res_ki
-             Nothing -> return ()
-         ; let tc = mkTcTyCon name tcbs r_ki all_tv_prs hkv True flav
-         ; traceTc "kcDeclHeader done:" $ vcat
-             [ text "tyConName = " <+> ppr (tyConName tc)
-             , text "tlks =" <+> debugPprType tlks
-             , text "tyConKind =" <+> debugPprType (tyConKind tc)
-             , text "tyConBinders = " <+> ppr (tyConBinders tc)
-             , text "tcTyConScopedTyVars" <+> ppr (tcTyConScopedTyVars tc)
-             , text "tcTyConHeaderKiVars" <+> ppr (tcTyConHeaderKiVars tc)
-             , text "tyConResKind" <+> debugPprType (tyConResKind tc)
-             ]
-         ; return tc }
+    invisToTyConBinder :: TyCoBinder -> TcM (TyConBinder, (Name, TcTyVar))
+    invisToTyConBinder tb = zippedToTyConBinder (ZippedBinder tb Nothing)
 
     bind_implicit :: [Name] -> ([(Name,TcTyVar)] -> TcM a) -> TcM a
     bind_implicit tv_names thing_inside =
@@ -2079,18 +2051,36 @@ kcDeclHeader name flav tlks ktvs kc_res_ki =
          ; tcvs <- mapM new_tv tv_names
          ; tcExtendNameTyVarEnv tcvs (thing_inside tcvs) }
 
-    checkVar :: Kind -> LHsTyVarBndr GhcRn -> TcM Name
-    checkVar b_ki b =
+    hsTyVarBndrName :: LHsTyVarBndr GhcRn -> Name
+    hsTyVarBndrName b =
       case unLoc b of
-        UserTyVar _ v -> return (unLoc v)
-        KindedTyVar _ v v_hs_ki ->
-          do { v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
-             ; discardResult $
-                 unifyKind (Just (HsTyVar noExtField NotPromoted v))
-                           b_ki
-                           v_ki
-             ; return (unLoc v) }
+        UserTyVar _ v -> unLoc v
+        KindedTyVar _ v _ -> unLoc v
         XTyVarBndr nec -> noExtCon nec
+
+    checkZippedBinder :: ZippedBinder GhcRn -> TcM ()
+    checkZippedBinder (ZippedBinder _ Nothing) = return ()
+    checkZippedBinder (ZippedBinder tb (Just b)) =
+      case unLoc b of
+        UserTyVar _ _ -> return ()
+        KindedTyVar _ v v_hs_ki -> do
+          v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
+          discardResult $
+            unifyKind (Just (HsTyVar noExtField NotPromoted v))
+                      (tyBinderType tb)
+                      v_ki
+        XTyVarBndr nec -> noExtCon nec
+
+    splitInvis :: Kind -> Maybe Kind -> ([TyCoBinder], Kind)
+    splitInvis sig_ki Nothing =
+      -- instantiate all invisible binders
+      splitPiTysInvisible sig_ki
+    splitInvis sig_ki (Just res_ki) =
+      -- subtraction a la checkExpectedKind
+      let n_res_invis_bndrs = invisibleTyBndrCount res_ki
+          n_sig_invis_bndrs = invisibleTyBndrCount sig_ki
+          n_inst = n_sig_invis_bndrs - n_res_invis_bndrs
+      in splitPiTysInvisibleN n_inst sig_ki
 
 tooManyBindersErr :: Kind -> [LHsTyVarBndr GhcRn] -> SDoc
 tooManyBindersErr ki bndrs =
@@ -2098,16 +2088,6 @@ tooManyBindersErr ki bndrs =
       4 (ppr ki) $$
    hang (text "but extra binders found:")
       4 (fsep (map ppr bndrs))
-
-mkInstPlan :: Kind -> Maybe Kind -> Int
-mkInstPlan sig_ki Nothing =
-  -- instantiate all invisible binders
-  invisibleTyBndrCount sig_ki
-mkInstPlan sig_ki (Just res_ki) =
-  -- subtraction a la checkExpectedKind
-  let n_res_invis_bndrs = invisibleTyBndrCount res_ki
-      n_sig_invis_bndrs = invisibleTyBndrCount sig_ki
-  in n_sig_invis_bndrs - n_res_invis_bndrs
 
 {- Note [Arity inference in kcDeclHeader]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
