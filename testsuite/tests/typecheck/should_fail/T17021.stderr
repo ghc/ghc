@@ -1,0 +1,11 @@
+
+T17021.hs:18:5: error:
+    Cannot use function with levity-polymorphic arguments:
+      T17021.MkT :: Int -> T
+    Levity-polymorphic arguments: Int :: TYPE (Id 'LiftedRep)
+
+T17021.hs:18:9: error:
+    A levity-polymorphic type is not allowed here:
+      Type: Int
+      Kind: TYPE (Id 'LiftedRep)
+    In the type of expression: 42
