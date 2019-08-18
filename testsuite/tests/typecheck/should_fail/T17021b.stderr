@@ -1,0 +1,5 @@
+
+T17021b.hs:10:1: error:
+    • Kind signature on data instance declaration has non-*
+      return kind ‘F Int’
+    • In the data instance declaration for ‘Fix’
