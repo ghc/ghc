@@ -1,8 +1,11 @@
 module HpcUtils where
 
-import Trace.Hpc.Util
+import Control.DeepSeq (deepseq)
+import Trace.Hpc.Util (catchIO, HpcPos, fromHpcPos)
 import qualified Data.Map as Map
+import System.Directory (createDirectoryIfMissing)
 import System.FilePath
+import System.IO
 
 dropWhileEndLE :: (a -> Bool) -> [a] -> [a]
 -- Spec: dropWhileEndLE p = reverse . dropWhile p . reverse
@@ -25,12 +28,30 @@ grabHpcPos hsMap srcspan =
 
 
 readFileFromPath :: (String -> IO String) -> String -> [String] -> IO String
-readFileFromPath _ filename@('/':_) _ = readFile filename
+readFileFromPath _ filename@('/':_) _ = readFileUtf8 filename
 readFileFromPath err filename path0 = readTheFile path0
   where
         readTheFile [] = err $ "could not find " ++ show filename
                                  ++ " in path " ++ show path0
         readTheFile (dir:dirs) =
-                catchIO (do str <- readFile (dir </> filename)
-                            return str)
+                catchIO (readFileUtf8 (dir </> filename))
                         (\ _ -> readTheFile dirs)
+
+-- | Read a file strictly, as opposed to how `readFile` does it using lazy IO, but also
+-- disregard system locale and assume that the file is encoded in UTF-8. Haskell source
+-- files are expected to be encoded in UTF-8 by GHC.
+readFileUtf8 :: FilePath -> IO String
+readFileUtf8 filepath =
+  withBinaryFile filepath ReadMode $ \h -> do
+    hSetEncoding h utf8  -- see #17073
+    contents <- hGetContents h
+    contents `deepseq` hClose h
+    return contents
+
+-- | Write file in UTF-8 encoding. Parent directory will be created if missing.
+writeFileUtf8 :: FilePath -> String -> IO ()
+writeFileUtf8 filepath str = do
+  createDirectoryIfMissing True (takeDirectory filepath)
+  withBinaryFile filepath WriteMode $ \h -> do
+    hSetEncoding h utf8  -- see #17073
+    hPutStr h str
