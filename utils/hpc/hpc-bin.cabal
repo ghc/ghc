@@ -29,9 +29,10 @@ Executable hpc
                    Paths_hpc_bin
 
     Build-Depends: base       >= 4   && < 5,
+                   deepseq    >= 1.1 && < 1.5,
                    directory  >= 1   && < 1.4,
                    filepath   >= 1   && < 1.5,
                    containers >= 0.1 && < 0.7,
                    array      >= 0.1 && < 0.6,
-                   hpc
+                   hpc        >= 0.6.1 && < 0.7
 
