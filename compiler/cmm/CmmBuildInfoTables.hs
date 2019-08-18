@@ -684,7 +684,7 @@ type SRTMap = Map CAFLabel (Maybe SRTEntry)
 -- | resolve a CAFLabel to its SRTEntry using the SRTMap
 resolveCAF :: SRTMap -> CAFLabel -> Maybe SRTEntry
 resolveCAF srtMap lbl@(CAFLabel l) =
-    pprTrace "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
+    srtTrace2 "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
   where
     ret = Map.findWithDefault (Just (SRTEntry (toClosureLbl l))) lbl srtMap
 
@@ -1062,5 +1062,5 @@ srtTrace :: String -> SDoc -> b -> b
 srtTrace _ _ b = b
 
 srtTrace2 :: String -> SDoc -> a -> a
-srtTrace2 = pprTrace
--- srtTrace2 _ _ a = a
+-- srtTrace2 = pprTrace
+srtTrace2 _ _ a = a
