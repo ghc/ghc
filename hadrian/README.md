@@ -121,6 +121,11 @@ build to check that the build system is well formed. Note that the Lint check
 currently fails under certain circumstances, as discussed in
 [this ticket](https://gitlab.haskell.org/ghc/ghc/issues/15971).
 
+#### Expressions
+
+Hadrian expressions are used extensively for specifying build settings. For an
+explanation of how they work, see the [documentation](doc/expressions.md).
+
 #### User settings
 
 The Make-based build system uses `mk/build.mk` to specify user build settings.
