@@ -1,6 +1,6 @@
 module HpcUtils where
 
-import Trace.Hpc.Util
+import Trace.Hpc.Util (catchIO, HpcPos, fromHpcPos, readFileUtf8)
 import qualified Data.Map as Map
 import System.FilePath
 
@@ -25,12 +25,11 @@ grabHpcPos hsMap srcspan =
 
 
 readFileFromPath :: (String -> IO String) -> String -> [String] -> IO String
-readFileFromPath _ filename@('/':_) _ = readFile filename
+readFileFromPath _ filename@('/':_) _ = readFileUtf8 filename
 readFileFromPath err filename path0 = readTheFile path0
   where
         readTheFile [] = err $ "could not find " ++ show filename
                                  ++ " in path " ++ show path0
         readTheFile (dir:dirs) =
-                catchIO (do str <- readFile (dir </> filename)
-                            return str)
+                catchIO (readFileUtf8 (dir </> filename))
                         (\ _ -> readTheFile dirs)
