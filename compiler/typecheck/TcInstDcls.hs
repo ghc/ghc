@@ -683,6 +683,8 @@ tcDataFamInstDecl mb_clsinfo
        -- NB: we can do this after eta-reducing the axiom, because if
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
+       --
+       -- See also Note [Datatype return kinds] in TcTyClsDecls
        ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
        ; checkDataKindSig (DataInstanceSort new_or_data) final_res_kind
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
@@ -810,6 +812,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   -- Add constraints from the data constructors
                   ; kcConDecls new_or_data res_kind hs_cons
 
+                  -- See Note [Datatype return kinds] in TcTyClsDecls, point (7).
                   ; lhs_ty <- checkExpectedKind_pp pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty) }
 
@@ -858,6 +861,10 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
            ; lvl <- getTcLevel
            ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
+           ; let final_kind = substTy subst inner_kind
+           ; checkDataKindSig (DataInstanceSort new_or_data) $
+               snd $ tcSplitPiTys final_kind
+             -- See Note [Datatype return kinds]
            ; return (substTy subst inner_kind) }
 
 {- Note [Result kind signature for a data family instance]
@@ -931,7 +938,8 @@ There are several fiddly subtleties lurking here
   tycon Drep.  The kind of D says it takses four arguments, but the
   data instance header only supplies three.  But the AlgTyCOn for Drep
   itself must have enough TyConBinders so that its result kind is Type.
-  So, with etaExpandAlgTyCon we make up some extra TyConBinders
+  So, with etaExpandAlgTyCon we make up some extra TyConBinders.
+  See point (3) in Note [Datatype return kinds] in TcTyClsDecls.
 
 * The result kind in the instance might be a polykind, like this:
      data family DP a :: forall k. k -> *

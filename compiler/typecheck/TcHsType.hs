@@ -2848,6 +2848,7 @@ etaExpandAlgTyCon :: [TyConBinder]
 -- Never emits constraints.
 -- It's a little trickier than you might think: see
 -- Note [TyConBinders for the result kind signature of a data type]
+-- See Note [Datatype return kinds] in TcTyClsDecls
 etaExpandAlgTyCon tc_bndrs kind
   = do  { loc     <- getSrcSpanM
         ; uniqs   <- newUniqueSupply
@@ -2916,6 +2917,8 @@ data DataSort
 -- 1. @TYPE r@ (for some @r@), or
 --
 -- 2. @k@ (where @k@ is a bare kind variable; see #12369)
+--
+-- See also Note [Datatype return kinds] in TcTyClsDecls
 checkDataKindSig :: DataSort -> Kind -> TcM ()
 checkDataKindSig data_sort kind = do
   dflags <- getDynFlags

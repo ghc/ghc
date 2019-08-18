@@ -1638,7 +1638,7 @@ STEP 3: Type-checking (desugaring), as done by tcTyClDecl. The key function
 here is tcConDecl. Once again, we must call unifyNewtypeKind, for two reasons:
 
   A. It is possible that a GADT has a CUSK. (Note that this is *not*
-     possible for H98 types. Recall that CUSK types don't go through
+     possible for H98 types.) Recall that CUSK types don't go through
      kcTyClDecl, so we might not have done this kind check.
   B. We need to produce the coercion to put on the argument type
      if the kinds are different (for both H98 and GADT).
@@ -1656,9 +1656,31 @@ axF :: F Int ~ LiftedRep. That way, the argument kind is the same as the
 newtype kind, which is the principal correctness condition for newtypes.
 This call to unifyNewtypeKind is what produces that coercion.
 
+Wrinkle: Consider (#17021, typecheck/should_fail/T17021)
+
+    type family Id (x :: a) :: a where
+      Id x = x
+
+    newtype T :: TYPE (Id LiftedRep) where
+      MkT :: Int -> T
+
+  In the type of MkT, we must end with (Int |> TYPE (sym axId)) -> T, never Int -> (T |>
+  TYPE axId); otherwise, the result type of the constructor wouldn't match the
+  datatype. However, type-checking the HsType T might reasonably result in
+  (T |> hole). We thus must ensure that this cast is dropped, forcing the
+  type-checker to add one to the Int instead.
+
+  Why is it always safe to drop the cast? This result type is type-checked by
+  tcHsOpenType, so its kind definitely looks like TYPE r, for some r. It is
+  important that even after dropping the cast, the type's kind has the form
+  TYPE r. This is guaranteed by restrictions on the kinds of datatypes.
+  For example, a declaration like `newtype T :: Id Type` is rejected: a
+  newtype's final kind always has the form TYPE r, just as we want.
+
 Note that this is possible in the H98 case only for a data family, because
 the H98 syntax doesn't permit a kind signature on the newtype itself.
 
+There are also some changes for deailng with families:
 
 1. In tcFamDecl1, we suppress a tcIsLiftedTypeKind check if
    UnliftedNewtypes is on. This allows us to write things like:
@@ -2040,6 +2062,89 @@ Since the LHS of an associated type family default is always just variables,
 it won't contain any tycons. Accordingly, the patterns used in the substitution
 won't actually be knot-tied, even though we're in the knot. This is too
 delicate for my taste, but it works.
+
+Note [Datatype return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several poorly lit corners around datatype/newtype return kinds.
+This Note explains these. Within this note, always understand "instance"
+to mean data or newtype instance, and understand "family" to mean data
+family. No type families or classes here.
+
+1. Where this applies: Only GADT syntax for data/newtype/instance declarations
+   can have declared return kinds. This Note does not apply to Haskell98
+   syntax.
+
+2. Where these kinds come from: Return kinds are processed through several
+   different code paths:
+
+     data/newtypes: The return kind is part of the TyCon kind, gotten either
+     by checkInitialKind (standalone kind signature / CUSK) or
+     inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
+     then passed to tcDataDefn.
+
+     families: The return kind is either written in a standalone signature
+     or extracted from a family declaration in getInitialKind.
+     If a family declaration is missing a result kind, it is assumed to be
+     Type. This assumption is in getInitialKind for CUSKs or
+     get_fam_decl_initial_kind for non-signature & non-CUSK cases.
+
+     instances: The data family already has a known kind. The return kind
+     of an instance is then calculated by applying the data family tycon
+     to the patterns provided, as computed by the typeKind lhs_ty in the
+     end of tcDataFamInstHeader. In the case of an instance written in GADT
+     syntax, there are potentially *two* return kinds: the one computed from
+     applying the data family tycon to the patterns, and the one given by
+     the user. This second kind is checked by the tc_kind_sig function within
+     tcDataFamInstHeader.
+
+3. Eta-expansion: Any forall-bound variables and function arguments in a result kind
+   become parameters to the type. That is, when we say
+
+     data T a :: Type -> Type where ...
+
+   we really mean for T to have two parameters. The second parameter
+   is produced by processing the return kind in etaExpandAlgTyCon,
+   called in tcDataDefn for data/newtypes and in tcDataFamInstDecl
+   for instances.
+
+   See also Note [TyConBinders for the result kind signatures of a data type]
+   in TcHsType.
+
+4. Datatype return kind restriction: A data/data-instance return kind must end
+   in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By
+   "end in", we mean we strip any foralls and function arguments off before
+   checking: this remaining part of the type is returned from
+   etaExpandAlgTyCon. Note that we do *not* do type family reduction here.
+
+   This check is done in checkDataKindSig. For data declarations, this
+   call is in tcDataDefn; for data instances, this call is in tcDataFamInstDecl.
+
+   However, because data instances in GADT syntax can have two return kinds (see
+   point (2) above), we must check both return kinds. The user-written return
+   kind is checked in tc_kind_sig within tcDataFamInstHeader.
+
+5. Newtype return kind restriction: If -XUnliftedNewtypes is on, then
+   a newtype/newtype-instance return kind must end in TYPE xyz, for some
+   xyz (after type synonym expansion). The "xyz" may include type families.
+   This kind is unified with the kind of the representation type (the type
+   of the one argument to the one constructor). See also steps (2) and (3)
+   of Note [Implementation of UnliftedNewtypes].
+
+   If -XUnliftedNewtypes is not on, then newtypes are treated just like datatypes.
+
+   The checks are done in the same places as for datatypes.
+
+6. Family return kind restrictions: The return kind of a data family must
+   be either TYPE xyz (for some xyz) or a kind variable. The idea is that
+   instances may specialise the kind variable to fit one of the restrictions
+   above. This is checked by the call to checkDataKindSig in tcFamDecl1.
+
+7. Two return kinds for instances: If an instance has two return kinds
+   (see point (2) above), they are unified. More accurately, we make sure
+   that the kind of the applied data family is a subkind of the user-written
+   kind. This is done by the call to checkExpectedKind_pp in tcDataFamInstHeader.
+   See also [Unifying data family kinds] in TcInstDcls on this point.
+
 -}
 
 {- *********************************************************************
@@ -2068,6 +2173,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   --   data family D a :: forall k. Type -> k
   -- When UnliftedNewtypes is enabled, we loosen this restriction
   -- on the return kind. See Note [Implementation of UnliftedNewtypes], wrinkle (1).
+  -- See also Note [Datatype return kinds]
   ; let (_, final_res_kind) = splitPiTys res_kind
   ; checkDataKindSig DataFamilySort final_res_kind
   ; tc_rep_name <- newTyConRepName tc_name
@@ -2222,6 +2328,7 @@ tcDataDefn err_ctxt
  =  do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
 
        ; tcg_env <- getGblEnv
+         -- see Note [Datatype return kinds]
        ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon tycon_binders res_kind
        ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
@@ -2771,7 +2878,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
                  ; let (arg_tys, stricts) = unzip btys
-                 ; res_ty <- tcHsOpenType hs_res_ty
+                 ; res_ty <- discardCast <$> tcHsOpenType hs_res_ty
                    -- See Note [Implementation of UnliftedNewtypes]
                  ; dflags <- getDynFlags
                  ; final_arg_tys <-
