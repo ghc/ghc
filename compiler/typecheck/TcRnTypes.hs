@@ -17,7 +17,7 @@ of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
 {-# LANGUAGE CPP, ExistentialQuantification, GeneralizedNewtypeDeriving,
-             ViewPatterns #-}
+             ViewPatterns, StandaloneDeriving, DeriveDataTypeable #-}
 
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -200,6 +200,7 @@ import qualified Control.Monad.Fail as MonadFail
 import Data.Set      ( Set )
 import qualified Data.Set as S
 
+import Data.Data ( Data )
 import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
@@ -904,6 +905,9 @@ data TcBinder
        Name           -- We bind the lexical name "a" to the type of y,
        TyVar          -- which might be an utterly different (perhaps
                       -- existential) tyvar
+                      --
+deriving instance Data TcBinder
+deriving instance Data TopLevelFlag
 
 instance Outputable TcBinder where
    ppr (TcIdBndr id top_lvl)           = ppr id <> brackets (ppr top_lvl)

@@ -1378,7 +1378,7 @@ mkPmId ty = getUniqueM >>= \unique ->
 mkPmId2Forms :: Type -> DsM (Pattern, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar x, noLoc (HsVar noExt (noLoc x)))
+  return (PmVar x, noLoc (HsVar [] (noLoc x)))
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr

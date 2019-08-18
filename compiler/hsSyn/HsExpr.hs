@@ -43,6 +43,7 @@ import Util
 import Outputable
 import FastString
 import Type
+import {-# SOURCE #-} TcRnTypes (TcBinderStack)
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -704,7 +705,10 @@ data RecordUpdTc = RecordUpdTc
 
 -- ---------------------------------------------------------------------
 
-type instance XVar           (GhcPass _) = NoExt
+type instance XVar           GhcPs = NoExt
+type instance XVar           GhcRn = NoExt
+type instance XVar           GhcTc = TcBinderStack
+
 type instance XUnboundVar    (GhcPass _) = NoExt
 type instance XConLikeOut    (GhcPass _) = NoExt
 type instance XRecFld        (GhcPass _) = NoExt

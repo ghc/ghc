@@ -17,6 +17,8 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsUtils(
   -- Terms
@@ -34,6 +36,7 @@ module HsUtils(
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   typeToLHsType,
+  NlHsVarExt (..),
 
   -- * Constructing general big tuples
   -- $big_tuples
@@ -204,11 +207,11 @@ mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
-nlHsTyApp :: IdP (GhcPass id) -> [Type] -> LHsExpr (GhcPass id)
+nlHsTyApp :: NlHsVarExt (XVar (GhcPass id)) => IdP (GhcPass id) -> [Type] -> LHsExpr (GhcPass id)
 nlHsTyApp fun_id tys
-  = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExt (noLoc fun_id)))
+  = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar nlHsVarExt (noLoc fun_id)))
 
-nlHsTyApps :: IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
+nlHsTyApps :: NlHsVarExt (XVar (GhcPass id)) => IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
            -> LHsExpr (GhcPass id)
 nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
 
@@ -389,8 +392,18 @@ userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar noExt (L loc v))
 ************************************************************************
 -}
 
-nlHsVar :: IdP (GhcPass id) -> LHsExpr (GhcPass id)
-nlHsVar n = noLoc (HsVar noExt (noLoc n))
+class NlHsVarExt a where
+  nlHsVarExt :: a
+
+instance NlHsVarExt NoExtField where
+  nlHsVarExt = noExtField
+
+instance NlHsVarExt [a] where
+  nlHsVarExt = []
+
+
+nlHsVar :: NlHsVarExt (XVar (GhcPass id)) => IdP (GhcPass id) -> LHsExpr (GhcPass id)
+nlHsVar n = noLoc (HsVar nlHsVarExt (noLoc n))
 
 -- NB: Only for LHsExpr **Id**
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
@@ -424,14 +437,14 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
   = mkLHsWrap res_wrap (foldl nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
 
-nlHsApps :: IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
+nlHsApps :: NlHsVarExt (XVar (GhcPass id)) => IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
 
-nlHsVarApps :: IdP (GhcPass id) -> [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
-nlHsVarApps f xs = noLoc (foldl mk (HsVar noExt (noLoc f))
-                                               (map ((HsVar noExt) . noLoc) xs))
+nlHsVarApps :: NlHsVarExt (XVar (GhcPass id)) => IdP (GhcPass id) -> [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
+nlHsVarApps f xs = noLoc (foldl mk (HsVar nlHsVarExt (noLoc f))
+                                               (map ((HsVar nlHsVarExt) . noLoc) xs))
                  where
-                   mk f a = HsApp noExt (noLoc f) (noLoc a)
+                   mk f a = HsApp nlHsVarExt (noLoc f) (noLoc a)
 
 nlConVarPat :: RdrName -> [RdrName] -> LPat GhcPs
 nlConVarPat con vars = nlConPat con (map nlVarPat vars)
@@ -523,7 +536,7 @@ mkLHsTupleExpr [e] = e
 mkLHsTupleExpr es
   = noLoc $ ExplicitTuple noExt (map (noLoc . (Present noExt)) es) Boxed
 
-mkLHsVarTuple :: [IdP (GhcPass a)] -> LHsExpr (GhcPass a)
+mkLHsVarTuple :: NlHsVarExt (XVar (GhcPass a)) => [IdP (GhcPass a)] -> LHsExpr (GhcPass a)
 mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
 
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
@@ -538,7 +551,7 @@ mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat noExt lpats Boxed
 
 -- The Big equivalents for the source tuple expressions
-mkBigLHsVarTup :: [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
+mkBigLHsVarTup :: NlHsVarExt (XVar (GhcPass id)) => [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
 mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
 
 mkBigLHsTup :: [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)

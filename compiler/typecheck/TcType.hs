@@ -15,7 +15,7 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 -}
 
-{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts, StandaloneDeriving, DeriveDataTypeable #-}
 
 module TcType (
   --------------------------------
@@ -225,6 +225,8 @@ import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.Data ( Data(..), mkConstr, mkDataType )
+import qualified Data.Data as D
 import Data.List  ( mapAccumL )
 import Data.Functor.Identity( Identity(..) )
 import Data.IORef
@@ -363,6 +365,14 @@ type TcDTyCoVarSet  = DTyCoVarSet
 -- See Note [ExpType] in TcMType, where you'll also find manipulators.
 data ExpType = Check TcType
              | Infer !InferResult
+
+deriving instance Data ExpType
+
+instance Data InferResult where
+  gunfold _ f _ = f undefined
+  toConstr a = mkConstr (dataTypeOf a) "IR" [] D.Prefix
+  dataTypeOf _ = mkDataType "InferResult" []
+
 
 data InferResult
   = IR { ir_uniq :: Unique  -- For debugging only

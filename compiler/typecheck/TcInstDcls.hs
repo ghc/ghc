@@ -954,8 +954,8 @@ addDFunPrags dfun_id sc_meth_ids
    [dict_con]  = tyConDataCons clas_tc
    is_newtype  = isNewTyCon clas_tc
 
-wrapId :: HsWrapper -> IdP (GhcPass id) -> HsExpr (GhcPass id)
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExt (noLoc id))
+wrapId :: NlHsVarExt (XVar (GhcPass id)) => HsWrapper -> IdP (GhcPass id) -> HsExpr (GhcPass id)
+wrapId wrapper id = mkHsWrap wrapper (HsVar nlHsVarExt (noLoc id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

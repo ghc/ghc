@@ -98,7 +98,7 @@ newMethodFromName origin name inst_ty
        ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
                  instCall origin [inst_ty] theta
 
-       ; return (mkHsWrap wrap (HsVar noExt (noLoc id))) }
+       ; return (mkHsWrap wrap (HsVar [] (noLoc id))) }
 
 {-
 ************************************************************************

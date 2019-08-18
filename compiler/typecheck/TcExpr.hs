@@ -213,7 +213,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExt (noLoc ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar [] (noLoc ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -232,7 +232,7 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
                          ; loc <- getSrcSpanM
                          ; var <- emitWantedEvVar origin pred
                          ; tcWrapResult e
-                                       (fromDict pred (HsVar noExt (L loc var)))
+                                       (fromDict pred (HsVar [] (L loc var)))
                                         alpha res_ty } }
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `t`,
@@ -244,7 +244,7 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   applyFromLabel loc fromLabel =
     HsAppType
          (mkEmptyWildCardBndrs (L loc (HsTyLit noExt (HsStrTy NoSourceText l))))
-         (L loc (HsVar noExt (L loc fromLabel)))
+         (L loc (HsVar [] (L loc fromLabel)))
 
 tcExpr (HsLam x match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
@@ -363,7 +363,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; arg2_ty <- readExpType arg2_exp_ty
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                   (HsVar noExt (L lv op_id)))
+                                   (HsVar [] (L lv op_id)))
        ; return $ OpApp fix arg1' op' arg2' }
 
   | (L loc (HsVar _ (L lv op_name))) <- op
@@ -404,7 +404,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
                                                , arg2_sigma
                                                , res_ty])
-                                   (HsVar noExt (L lv op_id)))
+                                   (HsVar [] (L lv op_id)))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
              -- wrap_res :: op_res_ty "->" res_ty
@@ -1194,7 +1194,7 @@ tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
        ; let [alpha, beta] = mkTemplateTyVars [liftedTypeKind, tYPE rep]
              seq_ty = mkSpecForAllTys [alpha,beta]
                       (mkTyVarTy alpha `mkFunTy` mkTyVarTy beta `mkFunTy` mkTyVarTy beta)
-             seq_fun = L loc (HsVar noExt (L loc seqId))
+             seq_fun = L loc (HsVar [] (L loc seqId))
              -- seq_ty = forall (a:*) (b:TYPE r). a -> b -> b
              -- where 'r' is a meta type variable
         ; tcFunApp m_herald fun seq_fun seq_ty args res_ty }
@@ -1724,8 +1724,8 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt False (HsVar noExt (noLoc name)) actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name) (HsVar noExt (noLoc name)) expr
+       ; addFunResCtxt False (HsVar [] (noLoc name)) actual_res_ty res_ty $
+         tcWrapResultO (OccurrenceOf name) (HsVar [] (noLoc name)) expr
                                                           actual_res_ty res_ty }
 
 tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
@@ -1777,7 +1777,7 @@ tc_infer_assert assert_name
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExt (noLoc assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar [] (noLoc assert_error_id)), id_rho)
        }
 
 tc_infer_id :: RdrName -> Name -> TcM (HsExpr GhcTcId, TcSigmaType)
@@ -1803,7 +1803,7 @@ tc_infer_id lbl id_name
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
-    return_id id = return (HsVar noExt (noLoc id), idType id)
+    return_id id = return (HsVar [] (noLoc id), idType id)
 
     return_data_con con
        -- For data constructors, must perform the stupid-theta check
@@ -1852,8 +1852,9 @@ tcUnboundId rn_expr unbound res_ty
                                               , ctev_loc  = loc}
                            , cc_hole = ExprHole unbound }
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExt (noLoc ev))
-                                                                     ty res_ty }
+      ; env <- getLclEnv
+      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar (tcl_bndrs env) (noLoc ev))
+                                                                               ty res_ty }
 
 
 {-
@@ -1949,7 +1950,7 @@ tcTagToEnum loc fun_name args res_ty
                  (mk_error ty' doc2)
 
        ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy)
-       ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar noExt (L loc fun)))
+       ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar [] (L loc fun)))
              rep_ty = mkTyConApp rep_tc rep_args
              out_args = concat
               [ pars1
@@ -2034,7 +2035,7 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId THNames.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar noExt (noLoc sid)) }
+                        ; return (HsVar [] (noLoc sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
