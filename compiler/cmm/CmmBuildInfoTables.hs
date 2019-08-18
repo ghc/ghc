@@ -854,27 +854,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     nonRec = cafs `Set.difference`
       (Set.fromList caf_lbls `Set.difference` Set.fromList otherFunLabels)
 
-  let
-  {-
-    -- First resolve all the CAFLabels to SRTEntries
-    -- Implements the [Inline] optimisation.
-    resolve_caf (CAFLabel l)
-      | l `elem` statics
-      = Just l
-      | otherwise
-      = resolveCAF srtMap 
-      -}
-    resolve_caf :: CAFLabel -> Maybe SRTEntry
-    resolve_caf caf@(CAFLabel l)
-      | let cond = l `elem` static_data
-      , pprTrace "resolve_caf" ("elem" <+> ppr l <+> ppr static_data <+> char '=' <+> ppr cond) cond
-      = pprTrace "resolve_caf" ("Not resolving static label:" <+> ppr l)
-         (Just (SRTEntry (toClosureLbl l)))
-      | otherwise
-      = resolveCAF srtMap caf
-
-    -- resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
-    resolved = mapMaybe resolve_caf (Set.toList nonRec)
+    resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =
@@ -903,9 +883,14 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- update the SRTMap for the label to point to a closure. It's
     -- important that we don't do this for static functions or CAFs,
     -- see Note [Invalid optimisation: shortcutting].
+    updateSRTMap :: Maybe SRTEntry -> StateT (Map CAFLabel (Maybe SRTEntry)) (StateT ModuleSRTInfo UniqSM) ()
     updateSRTMap srtEntry =
       when (not isCAF && not isStaticFun) $ do
-        let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- caf_lbls]
+        let newSRTMap = Map.fromList
+              [ (cafLbl, srtEntry)
+              | cafLbl@(CAFLabel clbl) <- caf_lbls
+              , not (elem clbl static_data)
+              ]
         put (Map.union newSRTMap srtMap)
 
     this_mod = thisModule topSRT
