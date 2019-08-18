@@ -780,6 +780,19 @@ validate-x86_64-windows:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
+nightly-x86_64-windows:
+  extends: .build-windows-make
+  stage: full-build
+  variables:
+    BUILD_FLAVOUR: "validate"
+    MSYSTEM: MINGW64
+    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
+  only:
+    variables:
+      - $NIGHTLY
+  cache:
+    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
+
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   extends: validate-x86_64-windows
