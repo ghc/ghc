@@ -240,10 +240,14 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = traceToolCommand dflags "linker" $ do
   -- See Note [Run-time linker info]
+  --
+  -- `-optl` args come at the end, so that later `-l` options
+  -- given there manually can fill in symbols needed by
+  -- Haskell libaries coming in via `args`.
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
-      args1     = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ linkargs ++ args1 ++ args
+      optl_args = map Option (getOpts dflags opt_l)
+      args2     = args0 ++ linkargs ++ args ++ optl_args
   mb_env <- getGccEnv args2
   runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
