@@ -14,7 +14,7 @@ import HpcUtils
 
 import System.Directory
 import System.FilePath
-import System.IO (localeEncoding)
+import System.IO (hSetEncoding, hPutStr, utf8)
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Semigroup as Semi
@@ -85,7 +85,7 @@ markup_main flags (prog:modNames) = do
         writeFileUsing (dest_dir </> filename <.> "html") $
             "<html>" ++
             "<head>" ++
-            charEncodingTag ++
+            "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8>" ++
             "<style type=\"text/css\">" ++
             "table.bar { background-color: #f25913; }\n" ++
             "td.bar { background-color: #60de51;  }\n" ++
@@ -138,11 +138,6 @@ markup_main flags (prog:modNames) = do
 
 markup_main _ []
     = hpcError markup_plugin $ "no .tix file or executable name specified"
-
-charEncodingTag :: String
-charEncodingTag =
-    "<meta http-equiv=\"Content-Type\" " ++
-          "content=\"text/html; " ++ "charset=" ++ show localeEncoding ++ "\">"
 
 -- Add characters to the left of a string until it is at least as
 -- large as requested.
@@ -494,7 +489,9 @@ writeFileUsing filename text = do
   -- create the dest_dir if needed
   createDirectoryIfMissing True (takeDirectory filename)
 
-  writeFile filename text
+  withFile filename $ \f -> do
+    hSetEncoding f utf8  -- see #17073
+    hPutStr f text
 
 ------------------------------------------------------------------------------
 -- global color pallete
