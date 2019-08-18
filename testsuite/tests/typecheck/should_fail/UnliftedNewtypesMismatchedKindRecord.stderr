@@ -1,5 +1,7 @@
-UnliftedNewtypesMismatchedKindRecord.hs:11:3:
-     Expected kind ‘TYPE 'IntRep’,
+
+UnliftedNewtypesMismatchedKindRecord.hs:11:23: error:
+    • Expected kind ‘TYPE 'IntRep’,
         but ‘Word#’ has kind ‘TYPE 'WordRep’
-     In the definition of data constructor ‘FooC’
+    • In the type ‘Word#’
+      In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’

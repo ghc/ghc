@@ -923,6 +923,77 @@ for further details. If you are using kind polymorphism and are confused as to
 why GHC is rejecting (or accepting) your program, we encourage you to turn on
 these flags, especially :ghc-flag:`-fprint-explicit-kinds`.
 
+Datatype return kinds
+---------------------
+
+With :extension:`KindSignatures`, we can give the kind of a datatype written
+in GADT-syntax (see :extension:`GADTSyntax`). For example::
+
+  data T :: Type -> Type where ...
+
+There are a number of restrictions around these *return kinds*. The text below
+considers :extension:`UnliftedNewtypes` and data families (enabled by :extension:`TypeFamilies`).
+The discussion also assumes familiarity with :ref:`levity polymorphism <runtime-rep>`.
+
+1. ``data`` and ``data instance`` declarations must have return kinds that
+   end in ``TYPE LiftedRep``. (Recall that ``Type`` is just a synonym for
+   ``TYPE LiftedRep``.) By "end in", we refer to the kind left over after
+   all arguments (introduced either by ``forall`` or ``->``) are stripped
+   off and type synonyms expanded. Note that no type family expansion
+   is done when performing this check.
+
+2. If :extension:`UnliftedNewtypes` is enabled, then ``newtype`` and
+   ``newtype instance`` declarations must have return kinds that end
+   in ``TYPE rep`` for some ``rep``. The ``rep`` may mention type families,
+   but the ``TYPE`` must be apparent without type family expansion.
+   (Type synonym expansion is acceptable.)
+
+   If :extension:`UnliftedNewtypes` is not enabled, then ``newtype`` and
+   ``newtype instance`` declarations have the same restrictions as ``data``
+   declarations.
+
+3. A ``data`` or ``newtype`` instance actually can have *two* return kinds.
+   The first is the kind derived by applying the data family to the
+   patterns provided in the instance declaration. The second is given by
+   a kind annotation. Both return kinds must satisfy the restrictions
+   above.
+
+Examples::
+
+  data T1 :: Type             -- good: Type expands to TYPE LiftedRep
+  data T2 :: TYPE LiftedRep   -- good
+  data T3 :: forall k. k -> Type -> Type  -- good: arguments are dropped
+
+  type LR = LiftedRep
+  data T3 :: TYPE LR          -- good: we look through type synonyms
+
+  type family F a where
+    F Int = LiftedRep
+
+  data T4 :: TYPE (F Int)     -- bad: we do not look through type families
+
+  type family G a where
+    G Int = Type
+
+  data T5 :: G Int            -- bad: we do not look through type families
+
+  -- assume -XUnliftedNewtypes
+  newtype T6 :: Type where ...             -- good
+  newtype T7 :: TYPE (F Int) where ...     -- good
+  newtype T8 :: G Int where ...            -- bad
+
+  data family DF a :: Type
+  data instance DF Int :: Type             -- good
+  data instance DF Bool :: TYPE LiftedRep  -- good
+  data instance DF Char :: G Int           -- bad
+
+  data family DF2 k :: k                   -- good
+  data family DF2 Type                     -- good
+  data family DF2 Bool                     -- bad
+  data family DF2 (G Int)                  -- bad for 2 reasons:
+                                           --  a type family can't be in a pattern, and
+                                           --  the kind fails the restrictions here
+
 .. index::
    single: TYPE
    single: levity polymorphism

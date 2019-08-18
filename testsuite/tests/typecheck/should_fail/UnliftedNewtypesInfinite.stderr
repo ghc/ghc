@@ -1,6 +1,7 @@
 
-UnliftedNewtypesInfinite.hs:9:15: error:
+UnliftedNewtypesInfinite.hs:9:20: error:
     • Occurs check: cannot construct the infinite kind:
         t0 ~ 'GHC.Types.TupleRep '[ 'GHC.Types.IntRep, t0]
-    • In the definition of data constructor ‘FooC’
+    • In the type ‘(# Int#, Foo #)’
+      In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’

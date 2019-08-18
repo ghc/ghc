@@ -1,5 +1,12 @@
-UnliftedNewtypesMultiFieldGadt.hs:19:3:
-     The constructor of a newtype must have exactly one field
-        but ‘FooC’ has two
-     In the definition of data constructor ‘FooC’
+
+UnliftedNewtypesMultiFieldGadt.hs:19:11: error:
+    • Expecting an unlifted type, but ‘Bool’ is lifted
+    • In the type ‘Bool’
+      In the definition of data constructor ‘FooC’
+      In the newtype declaration for ‘Foo’
+
+UnliftedNewtypesMultiFieldGadt.hs:19:19: error:
+    • Expecting an unlifted type, but ‘Char’ is lifted
+    • In the type ‘Char’
+      In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’

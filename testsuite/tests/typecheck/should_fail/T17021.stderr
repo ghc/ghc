@@ -1,0 +1,14 @@
+
+T17021.hs:18:5: error:
+    Cannot use function with levity-polymorphic arguments:
+      T17021.MkT :: Int -> T
+    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
+    are eta-expanded internally because they must occur fully saturated.
+    Use -fprint-typechecker-elaboration to display the full expression.)
+    Levity-polymorphic arguments: Int :: TYPE (Id 'LiftedRep)
+
+T17021.hs:18:9: error:
+    A levity-polymorphic type is not allowed here:
+      Type: Int
+      Kind: TYPE (Id 'LiftedRep)
+    In the type of expression: 42

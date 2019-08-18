@@ -1,0 +1,4 @@
+
+T17021b.hs:10:1: error:
+    • Data instance has non-* return kind ‘F Int’
+    • In the data instance declaration for ‘Fix’

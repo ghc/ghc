@@ -198,6 +198,17 @@ axiom as a whole, and they are computed only when the final axiom is built.
 
 During serialization, the list is converted into a list of the indices
 of the branches.
+
+Note [CoAxioms are homogeneous]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+All axioms must be *homogeneous*, meaning that the kind of the LHS must
+match the kind of the RHS. In practice, this means:
+
+  Given a CoAxiom { co_ax_tc = ax_tc },
+  for every branch CoAxBranch { cab_lhs = lhs, cab_rhs = rhs }:
+    typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs
+
+This is checked in FamInstEnv.mkCoAxBranch.
 -}
 
 -- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
@@ -233,6 +244,7 @@ data CoAxBranch
     , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
     , cab_rhs      :: Type          -- Right-hand side of the equality
+                                    -- See Note [CoAxioms are homogeneous]
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
     }

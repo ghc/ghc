@@ -8,4 +8,3 @@ newtype A where
    MkA :: Int# -> A
 
 newtype B = MkB Int#
-
