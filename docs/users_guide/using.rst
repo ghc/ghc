@@ -1153,3 +1153,14 @@ Some flags only make sense for a particular use case.
     included. This option can be used to specify the path to the
     ``ghcversions.h`` file to be included. This is primarily intended to be
     used by GHC's build system.
+
+Other environment variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. index::
+   single: environment variables
+
+GHC can also be configured using environment variables. Currently the only
+variable it supports is ``GHC_NO_UNICODE``, which, when set, disables Unicode
+output regardless of locale settings. ``GHC_NO_UNICODE`` can be set to anything
++(event an empty string) to trigger this behaviour.
