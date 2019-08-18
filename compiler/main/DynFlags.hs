@@ -1894,6 +1894,10 @@ initDynFlags dflags = do
                           do str' <- peekCString enc cstr
                              return (str == str'))
                          `catchIOError` \_ -> return False
+ maybeGhcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
+ let adjustNoUnicode (Just _) = False
+     adjustNoUnicode Nothing = True
+ let useUnicode' = (adjustNoUnicode maybeGhcNoUnicodeEnv) && canUseUnicode
  canUseColor <- stderrSupportsAnsiColors
  maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
  maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
@@ -1909,7 +1913,7 @@ initDynFlags dflags = do
         dirsToClean    = refDirsToClean,
         generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
-        useUnicode    = canUseUnicode,
+        useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = canUseColor,
         colScheme     = colScheme',
