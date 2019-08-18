@@ -1351,7 +1351,8 @@ lintInTy ty
   = addLoc (InType ty) $
     do  { ty' <- applySubstTy ty
         ; k  <- lintType ty'
-        ; lintKind k  -- The kind returned by lintType is already
+        ; addLoc (InKind ty' k) $
+          lintKind k  -- The kind returned by lintType is already
                       -- a LintedKind but we also want to check that
                       -- k :: *, which lintKind does
         ; return (ty', k) }
@@ -2238,6 +2239,7 @@ data LintLocInfo
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
   | InType Type         -- Inside a type
+  | InKind Type Kind    -- Inside a kind
   | InCo   Coercion     -- Inside a coercion
 
 initL :: DynFlags -> LintFlags -> InScopeSet
@@ -2482,6 +2484,8 @@ dumpLoc TopLevelBindings
   = (noSrcLoc, Outputable.empty)
 dumpLoc (InType ty)
   = (noSrcLoc, text "In the type" <+> quotes (ppr ty))
+dumpLoc (InKind ty ki)
+  = (noSrcLoc, text "In the kind of" <+> parens (ppr ty <+> dcolon <+> ppr ki))
 dumpLoc (InCo co)
   = (noSrcLoc, text "In the coercion" <+> quotes (ppr co))
 
