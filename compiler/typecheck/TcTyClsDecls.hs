@@ -1508,7 +1508,7 @@ STEP 3: Type-checking (desugaring), as done by tcTyClDecl. The key function
 here is tcConDecl. Once again, we must call unifyNewtypeKind, for two reasons:
 
   A. It is possible that a GADT has a CUSK. (Note that this is *not*
-     possible for H98 types. Recall that CUSK types don't go through
+     possible for H98 types.) Recall that CUSK types don't go through
      kcTyClDecl, so we might not have done this kind check.
   B. We need to produce the coercion to put on the argument type
      if the kinds are different (for both H98 and GADT).
@@ -1526,9 +1526,31 @@ axF :: F Int ~ LiftedRep. That way, the argument kind is the same as the
 newtype kind, which is the principal correctness condition for newtypes.
 This call to unifyNewtypeKind is what produces that coercion.
 
+Wrinkle: Consider (#17021, typecheck/should_fail/T17021)
+
+    type family Id (x :: a) :: a where
+      Id x = x
+
+    newtype T :: TYPE (Id LiftedRep) where
+      MkT :: Int -> T
+
+  In the type of MkT, we must end with (Int |> TYPE (sym axId)) -> T, never Int -> (T |>
+  TYPE axId); otherwise, the result type of the constructor wouldn't match the
+  datatype. However, type-checking the HsType T might reasonably result in
+  (T |> hole). We thus must ensure that this cast is dropped, forcing the
+  type-checker to add one to the Int instead.
+
+  Why is it always safe to drop the cast? This result type is type-checked by
+  tcHsOpenType, so its kind definitely looks like TYPE r, for some r. It is
+  important that even after dropping the cast, the type's kind has the form
+  TYPE r. This is guaranteed by restrictions on the kinds of datatypes.
+  For example, a declaration like `newtype T :: Id Type` is rejected: a
+  newtype's final kind always has the form TYPE r, just as we want.
+
 Note that this is possible in the H98 case only for a data family, because
 the H98 syntax doesn't permit a kind signature on the newtype itself.
 
+There are also some changes for deailng with families:
 
 1. In tcFamDecl1, we suppress a tcIsLiftedTypeKind check if
    UnliftedNewtypes is on. This allows us to write things like:
@@ -2633,7 +2655,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
               do { ctxt <- tcHsMbContext cxt
                  ; btys <- tcConArgs hs_args
                  ; let (arg_tys, stricts) = unzip btys
-                 ; res_ty <- tcHsOpenType hs_res_ty
+                 ; res_ty <- discardCast <$> tcHsOpenType hs_res_ty
                    -- See Note [Implementation of UnliftedNewtypes]
                  ; dflags <- getDynFlags
                  ; final_arg_tys <-
