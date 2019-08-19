@@ -7,7 +7,7 @@ Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall {a}. GHC.Prim.Void# -> a
-[GblId, Arity=1, Str=<B,A>b, Cpr=b, Unf=OtherCon []]
+[GblId, Arity=1, Str=<B,A>b, Cpr=* b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 end Rec }
 
@@ -16,7 +16,7 @@ f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
 [GblId,
  Arity=1,
  Str=<B,A>b,
- Cpr=b,
+ Cpr=* b,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
@@ -33,6 +33,10 @@ T13143.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule3 :: GHC.Types.TrName
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=# 1(-),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
@@ -47,6 +51,10 @@ T13143.$trModule2 = "T13143"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule1 :: GHC.Types.TrName
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=# 1(-),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
@@ -54,6 +62,10 @@ T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule :: GHC.Types.Module
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=#1(#, #) 1(1(-), 1(-)),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T13143.$trModule
@@ -61,7 +73,7 @@ T13143.$trModule
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
-[GblId, Str=b, Cpr=b]
+[GblId, Str=b, Cpr=* b]
 lvl = T13143.$wf @Int GHC.Prim.void#
 
 Rec {
@@ -90,7 +102,7 @@ g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
  Str=<S,1*U><S,1*U><S,1*U(U)>,
- Cpr=m1,
+ Cpr=*1(#) 1(-),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)

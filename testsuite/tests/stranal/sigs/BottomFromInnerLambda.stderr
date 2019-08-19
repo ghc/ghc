@@ -7,9 +7,15 @@ BottomFromInnerLambda.f: <S(S),1*U(U)>
 
 
 ==================== Cpr signatures ====================
+<<<<<<< HEAD
 BottomFromInnerLambda.$trModule:
 BottomFromInnerLambda.expensive: m1
 BottomFromInnerLambda.f:
+=======
+BottomFromInnerLambda.$trModule: #1(#, #) 1(1(-), 1(-))
+BottomFromInnerLambda.expensive: * 1(-)
+BottomFromInnerLambda.f: * -
+>>>>>>> 6bb3d74323... Nested CPR
 
 
 
