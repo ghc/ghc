@@ -6,8 +6,8 @@ T5075.loop: <S(LLC(C(S))LLLLL),U(A,A,C(C1(U)),A,A,A,A,A)><L,U(A,A,C(C1(U)),A,A,A
 
 
 ==================== Cpr signatures ====================
-T5075.$trModule: m1
-T5075.loop:
+T5075.$trModule: #1(#, #) 1(1(-), 1(-))
+T5075.loop: * -
 
 
 
