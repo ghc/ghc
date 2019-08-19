@@ -5,6 +5,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWorkerArgs
@@ -28,7 +29,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unbox
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
-                        , mkCoreApp, mkCoreLet )
+                        , mkCoreApp, mkWildValBinder, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Builtin.Types      ( tupleDataCon, unboxedUnitTy )
 import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
@@ -54,8 +55,11 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
+import GHC.Data.OrdList
 
-import Control.Applicative ( (<|>) )
+import Control.Monad (zipWithM)
+import Control.Applicative ((<|>))
+import Data.List (unzip4)
 
 {-
 ************************************************************************
@@ -155,7 +159,7 @@ mkWwBodies :: WwOpts
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
-           -> CprResult      -- Info about function result
+           -> Cpr            -- Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -180,7 +184,7 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr opts ret_ubx_strat res_ty cpr_info
+              <- mkWWcpr_start opts ret_ubx_strat res_ty cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs (wo_fun_to_thunk opts) work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -210,7 +214,7 @@ mkWwBodies opts rhs_fvs fun_id demands cpr_info
     has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
                           -- See Note [Do not unpack class dictionaries]
 
-    ret_ubx_strat :: UnboxingStrategy CprResult
+    ret_ubx_strat :: UnboxingStrategy Cpr
     ret_ubx_strat = wantToUnboxResult (wo_fam_envs opts)
 
     -- Note [Do not split void functions]
@@ -581,12 +585,12 @@ wantToUnboxArg fam_envs has_inlineable_prag ty dmd
 
 
 -- | 'UnboxingStrategy' for constructed results
-wantToUnboxResult :: FamInstEnvs -> UnboxingStrategy CprResult
+wantToUnboxResult :: FamInstEnvs -> UnboxingStrategy Cpr
 -- See Note [Which types are unboxed?]
 wantToUnboxResult fam_envs ty cpr
-  | Just con_tag <- asConCpr cpr
+  | Just (con_tag, arg_cprs) <- asConCpr cpr
   , Just (tc, tc_args, co) <- normSplitTyConApp_maybe fam_envs ty
-  , isDataTyCon tc -- NB: No unboxed sums or tuples
+  -- See Note [non-algebraic or open body type warning]
   , Just dcs <- tyConAlgDataCons_maybe tc <|> open_body_ty_warning
   , dcs `lengthAtLeast` con_tag -- This might not be true if we import the
                                 -- type constructor via a .hs-boot file (#8743)
@@ -599,7 +603,7 @@ wantToUnboxResult fam_envs ty cpr
   -- Deactivates CPR worker/wrapper splits on constructors with non-linear
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
-  = Unbox (DataConPatContext dc tc_args co) []
+  = Unbox (DataConPatContext dc tc_args co) arg_cprs
 
   | otherwise
   = StopUnboxing
@@ -613,7 +617,118 @@ isLinear (Scaled w _ ) =
     One -> True
     _ -> False
 
-{-
+{- Note [Which types are unboxed?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Worker/wrapper will unbox
+
+  1. A strict data type argument, that
+       * is an algebraic data type (not a newtype)
+       * has a single constructor (thus is a "product")
+       * that may bind existentials
+     We can transform
+     > f (D @ex a b) = e
+     to
+     > $wf @ex a b = e
+     via 'mkWWstr'.
+
+  2. The constructed result of a function, if
+       * its type is an algebraic data type (not a newtype)
+       * (might have multiple constructors, in contrast to (1))
+       * the applied data constructor *does not* bind existentials
+     We can transform
+     > f x y = let ... in D a b
+     to
+     > $wf x y = let ... in (# a, b #)
+     via 'mkWWcpr_one'.
+
+     NB: We don't allow existentials for CPR W/W, because we don't have unboxed
+     dependent tuples (yet?). Otherwise, we could transform
+     > f x y = let ... in D @ex (a :: ..ex..) (b :: ..ex..)
+     to
+     > $wf xopts want_to_unbox = let ... in (# @ex, (a :: ..ex..), (b :: ..ex..) #)
+
+The respective tests are in 'wantToUnboxArg' and
+'wantToUnboxResult', respectively.
+
+Note that the data constructor /can/ have evidence arguments: equality
+constraints, type classes etc.  So it can be GADT.  These evidence
+arguments are simply value arguments, and should not get in the way.
+
+Note [Unpacking arguments with product and polymorphic demands]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The argument is unpacked in a case if it has a product type and has a
+strict *and* used demand put on it. I.e., arguments, with demands such
+as the following ones:
+
+   <S,U(U, L)>
+   <S(L,S),U>
+
+will be unpacked, but
+
+   <S,U> or <B,U>
+
+will not, because the pieces aren't used. This is quite important otherwise
+we end up unpacking massive tuples passed to the bottoming function. Example:
+
+        f :: ((Int,Int) -> String) -> (Int,Int) -> a
+        f g pr = error (g pr)
+
+        main = print (f fst (1, error "no"))
+
+Does 'main' print "error 1" or "error no"?  We don't really want 'f'
+to unbox its second argument.  This actually happened in GHC's onwn
+source code, in Packages.applyPackageFlag, which ended up un-boxing
+the enormous DynFlags tuple, and being strict in the
+as-yet-un-filled-in unitState files.
+
+Note [Do not unpack class dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   f :: Ord a => [a] -> Int -> a
+   {-# INLINABLE f #-}
+and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
+(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
+which can still be specialised by the type-class specialiser, something like
+   fw :: Ord a => [a] -> Int# -> a
+
+BUT if f is strict in the Ord dictionary, we might unpack it, to get
+   fw :: (a->a->Bool) -> [a] -> Int# -> a
+and the type-class specialiser can't specialise that. An example is #6056.
+
+But in any other situation a dictionary is just an ordinary value,
+and can be unpacked.  So we track the INLINABLE pragma, and switch
+off the unpacking in mkWWstr_one (see the isClassPred test).
+
+Historical note: #14955 describes how I got this fix wrong the first time.
+
+Note [mkWWstr and unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+By using unsafeCoerce, it is possible to make the number of demands fail to
+match the number of constructor arguments; this happened in #8037.
+If so, the worker/wrapper split doesn't work right and we get a Core Lint
+bug.  The fix here is simply to decline to do w/w if that happens.
+
+Note [non-algebraic or open body type warning]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are a few cases where the W/W transformation is told that something
+returns a constructor, but the type at hand doesn't really match this. One
+real-world example involves unsafeCoerce:
+  foo = IO a
+  foo = unsafeCoerce c_exit
+  foreign import ccall "c_exit" c_exit :: IO ()
+Here CPR will tell you that `foo` returns a () constructor for sure, but trying
+to create a worker/wrapper for type `a` obviously fails.
+(This was a real example until ee8e792  in libraries/base.)
+
+It does not seem feasible to avoid all such cases already in the analyser (and
+after all, the analysis is not really wrong), so we simply do nothing here in
+mkWWcpr_one. But we still want to emit warning with -DDEBUG, to hopefully catch
+other cases where something went avoidably wrong.
+
+This warning also triggers for the stream fusion library within `text`.
+We can'easily W/W constructed results like `Stream` because we have no simple
+way to express existential types in the worker's type signature.
+
 ************************************************************************
 *                                                                      *
 \subsection{Strictness stuff}
@@ -647,40 +762,11 @@ mkWWstr opts want_to_unbox args
                                   , wrap_fn1 . wrap_fn2
                                   , work_fn1 . work_fn2) }
 
-{-
-Note [Unpacking arguments with product and polymorphic demands]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The argument is unpacked in a case if it has a product type and has a
-strict *and* used demand put on it. I.e., arguments, with demands such
-as the following ones:
-
-   <S,U(U, L)>
-   <S(L,S),U>
-
-will be unpacked, but
-
-   <S,U> or <B,U>
-
-will not, because the pieces aren't used. This is quite important otherwise
-we end up unpacking massive tuples passed to the bottoming function. Example:
-
-        f :: ((Int,Int) -> String) -> (Int,Int) -> a
-        f g pr = error (g pr)
-
-        main = print (f fst (1, error "no"))
-
-Does 'main' print "error 1" or "error no"?  We don't really want 'f'
-to unbox its second argument.  This actually happened in GHC's onwn
-source code, in Packages.applyPackageFlag, which ended up un-boxing
-the enormous DynFlags tuple, and being strict in the
-as-yet-un-filled-in unitState files.
--}
-
 ----------------------
 -- mkWWstr_one wrap_arg = (useful, work_args, wrap_fn, work_fn)
 --   *  wrap_fn assumes wrap_arg is in scope,
 --        brings into scope work_args (via cases)
---   * work_fn assumes work_args are in scope, a
+--   * work_fn assumes work_args are in scope,
 --        brings into scope wrap_arg (via lets)
 -- See Note [How to do the worker/wrapper split]
 mkWWstr_one :: WwOpts
@@ -698,20 +784,20 @@ mkWWstr_one opts want_to_unbox arg =
          -- (that's what mk_absent_let does)
        -> return (True, [], nop_fn, work_fn)
 
-     Unbox dcpc cs -> unbox_one opts want_to_unbox arg cs dcpc
+     Unbox dcpc cs -> unbox_one_arg opts want_to_unbox arg cs dcpc
 
      _ -> do_nothing -- Other cases, like StopUnboxing
 
   where
     do_nothing = return (False, [arg], nop_fn, nop_fn)
 
-unbox_one :: WwOpts
+unbox_one_arg :: WwOpts
           -> UnboxingStrategy Demand
           -> Var
           -> [Demand]
           -> DataConPatContext
           -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-unbox_one opts want_to_unbox arg cs
+unbox_one_arg opts want_to_unbox arg cs
           DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                             , dcpc_co = co }
   = do { (case_bndr_uniq:pat_bndrs_uniqs) <- getUniquesM
@@ -720,7 +806,7 @@ unbox_one opts want_to_unbox arg cs
                dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix) pat_bndrs_uniqs (idMult arg) dc tc_args
              -- See Note [Add demands for strict constructors]
              cs'       = addDataConStrictness dc cs
-             arg_ids'  = zipWithEqual "unbox_one" setIdDemandInfo arg_ids cs'
+             arg_ids'  = zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids cs'
              unbox_fn  = mkUnpackCase (Var arg) co (idMult arg) case_bndr_uniq
                                       dc (ex_tvs' ++ arg_ids')
              arg_no_unf = zapStableUnfolding arg
@@ -933,81 +1019,11 @@ applying the strictness demands to the final result of DmdAnal. The result is
 that we get the strict demand signature we wanted even if we can't float
 the case on `x` up through the case on `burble`.
 
-
-Note [mkWWstr and unsafeCoerce]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-By using unsafeCoerce, it is possible to make the number of demands fail to
-match the number of constructor arguments; this happened in #8037.
-If so, the worker/wrapper split doesn't work right and we get a Core Lint
-bug.  The fix here is simply to decline to do w/w if that happens.
-
-Note [Record evaluated-ness in worker/wrapper]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-
-   data T = MkT !Int Int
-
-   f :: T -> T
-   f x = e
-
-and f's is strict, and has the CPR property.  The we are going to generate
-this w/w split
-
-   f x = case x of
-           MkT x1 x2 -> case $wf x1 x2 of
-                           (# r1, r2 #) -> MkT r1 r2
-
-   $wfw x1 x2 = let x = MkT x1 x2 in
-                case e of
-                  MkT r1 r2 -> (# r1, r2 #)
-
-Note that
-
-* In the worker $wf, inside 'e' we can be sure that x1 will be
-  evaluated (it came from unpacking the argument MkT.  But that's no
-  immediately apparent in $wf
-
-* In the wrapper 'f', which we'll inline at call sites, we can be sure
-  that 'r1' has been evaluated (because it came from unpacking the result
-  MkT.  But that is not immediately apparent from the wrapper code.
-
-Missing these facts isn't unsound, but it loses possible future
-opportunities for optimisation.
-
-Solution: use setCaseBndrEvald when creating
- (A) The arg binders x1,x2 in mkWstr_one
-         See #13077, test T13077
- (B) The result binders r1,r2 in mkWWcpr_help
-         See Trace #13077, test T13077a
-         And #13027 comment:20, item (4)
-to record that the relevant binder is evaluated.
-
-
 ************************************************************************
 *                                                                      *
          Type scrutiny that is specific to demand analysis
 *                                                                      *
 ************************************************************************
-
-Note [Do not unpack class dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have
-   f :: Ord a => [a] -> Int -> a
-   {-# INLINABLE f #-}
-and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-(see Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
-which can still be specialised by the type-class specialiser, something like
-   fw :: Ord a => [a] -> Int# -> a
-
-BUT if f is strict in the Ord dictionary, we might unpack it, to get
-   fw :: (a->a->Bool) -> [a] -> Int# -> a
-and the type-class specialiser can't specialise that. An example is #6056.
-
-But in any other situation a dictionary is just an ordinary value,
-and can be unpacked.  So we track the INLINABLE pragma, and switch
-off the unpacking in mkWWstr_one (see the isClassPred test).
-
-Historical note: #14955 describes how I got this fix wrong the first time.
 -}
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
@@ -1068,43 +1084,7 @@ dubiousDataConInstArgTys dc tc_args = arg_tys
     subst    = extendTCvInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
     arg_tys  = map (substTy subst . scaledThing) (dataConRepArgTys dc)
 
-{- Note [Which types are unboxed?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Worker/wrapper will unbox
-
-  1. A strict data type argument, that
-       * is an algebraic data type (not a newtype)
-       * has a single constructor (thus is a "product")
-       * that may bind existentials
-     We can transform
-     > f (D @ex a b) = e
-     to
-     > $wf @ex a b = e
-     via 'mkWWstr'.
-
-  2. The constructed result of a function, if
-       * its type is an algebraic data type (not a newtype)
-       * (might have multiple constructors, in contrast to (1))
-       * the applied data constructor *does not* bind existentials
-     We can transform
-     > f x y = let ... in D a b
-     to
-     > $wf x y = let ... in (# a, b #)
-     via 'mkWWcpr'.
-
-     NB: We don't allow existentials for CPR W/W, because we don't have unboxed
-     dependent tuples (yet?). Otherwise, we could transform
-     > f x y = let ... in D @ex (a :: ..ex..) (b :: ..ex..)
-     to
-     > $wf x y = let ... in (# @ex, (a :: ..ex..), (b :: ..ex..) #)
-
-The respective tests are in 'splitArgType_maybe' and
-'splitResultType_maybe', respectively.
-
-Note that the data constructor /can/ have evidence arguments: equality
-constraints, type classes etc.  So it can be GADT.  These evidence
-arguments are simply value arguments, and should not get in the way.
-
+{-
 ************************************************************************
 *                                                                      *
 \subsection{CPR stuff}
@@ -1112,7 +1092,7 @@ arguments are simply value arguments, and should not get in the way.
 ************************************************************************
 
 
-@mkWWcpr@ takes the worker/wrapper pair produced from the strictness
+@mkWWcpr_one@ opts want_to_unbox the worker/wrapper pair produced from the strictness
 info and adds in the CPR transformation.  The worker returns an
 unboxed tuple containing non-CPR components.  The wrapper takes this
 tuple and re-produces the correct structured output.
@@ -1121,111 +1101,158 @@ The non-CPR results appear ordered in the unboxed tuple as if by a
 left-to-right traversal of the result structure.
 -}
 
-mkWWcpr :: WwOpts
-        -> UnboxingStrategy CprResult
-        -> Type                              -- function body type
-        -> CprResult                         -- CPR analysis results
-        -> UniqSM (Bool,                     -- Is w/w'ing useful?
-                   CoreExpr -> CoreExpr,     -- New wrapper
-                   CoreExpr -> CoreExpr,     -- New worker
-                   Type)                     -- Type of worker's body
+mkWWcpr_start
+  :: WwOpts
+  -> UnboxingStrategy Cpr
+  -> Type                              -- function body
+  -> Cpr                               -- CPR analysis results
+  -> UniqSM (Bool,                     -- Is w/w'ing useful?
+             CoreExpr -> CoreExpr,     -- New wrapper
+             CoreExpr -> CoreExpr,     -- New worker
+             Type)                     -- Type of worker's body
+mkWWcpr_start opts want_to_unbox body_ty cpr
+  | not (wo_cpr_anal opts) = return (False, id, id, body_ty)
+  | otherwise = do
+    ret_uniq <- getUniqueM
+    -- See Note [Linear types and CPR]
+    let res_bndr = mk_ww_local ret_uniq MarkedStrict (linear body_ty)
+                     `setIdCprInfo` mkCprSig 0 cpr -- so that we see that it terminates
+    (useful, fromOL -> transit_vars, wrap_build_res, work_unpack_res) <-
+      mkWWcpr_one opts want_to_unbox res_bndr cpr
+    let (unbox_transit_tup, transit_tup) = move_transit_vars transit_vars
+        wrap_fn = unbox_transit_tup (wrap_build_res (Var res_bndr))
+        work_fn body = mkDefaultCase body res_bndr (work_unpack_res transit_tup)
+        work_body_ty = exprType transit_tup
+    return $ if not useful
+                then (False, nop_fn, nop_fn, body_ty)
+                else (True, wrap_fn, work_fn, work_body_ty)
 
-mkWWcpr opts want_to_unbox body_ty cpr = case want_to_unbox body_ty cpr of
-   Unbox dcpc _arg_cprs -- not nestedly (yet)
-     | wo_cpr_anal opts -> mkWWcpr_help dcpc
-   _                    -> return (False, id, id, body_ty)  -- No CPR info
+-- | If `move_transit_vars [a,b] = (unbox, tup)` then
+--     * `a` and `b` are the \"transit vars\" to be returned from the worker
+--       to the wrapper
+--     * `unbox scrut alt = (case <scrut> of (# a, b #) -> <alt>)`
+--     * `tup = (# a, b #)`
+-- Special case: If there's only a single var `a` which is known
+-- to be cheap to evaluate, then there's no need for a `(# a #)`
+-- singleton tuple and we can just pass `a` around.
+move_transit_vars :: [Id] -> (CoreExpr -> CoreExpr -> CoreExpr, CoreExpr)
+move_transit_vars vars
+  | [var] <- vars
+  , let var_ty = idType var
+  , isUnliftedType var_ty || whnf_term var == Terminates
+  -- Special case when there is a single result of unlifted type
+  --   * Wrapper: `unbox scrut alt = (case <scrut> of a -> <alt>)`
+  --   * Worker:  `tup = a`
+  = ( \build_res wkr_call -> mkDefaultCase wkr_call var build_res
+    , varToCoreExpr var ) -- varToCoreExpr important here: var can be a coercion
+                          -- Lacking this caused #10658
 
-mkWWcpr_help :: DataConPatContext
-             -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
-
-mkWWcpr_help (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
-                                , dcpc_co = co })
-  | ASSERT2( null (dataConExTyCoVars dc), ppr dc ) True
-      -- No existentials! Should have been caught in 'wantToUnboxResult'
-  , [arg_ty]   <- dataConInstArgTys dc tc_args
-  , [str_mark] <- dataConRepStrictness dc
-  , isUnliftedType (scaledThing arg_ty)
-  , isLinear arg_ty
-        -- Special case when there is a single result of unlifted, linear, type
-        --
-        -- Wrapper:     case (..call worker..) of x -> C x
-        -- Worker:      case (   ..body..    ) of C x -> x
-  = do { (work_uniq : arg_uniq : _) <- getUniquesM
-       ; let arg_id    = mk_ww_local arg_uniq str_mark arg_ty
-             con_app   = mkConApp2 dc tc_args [arg_id] `mkCast` mkSymCo co
-
-       ; return ( True
-                , \ wkr_call -> mkDefaultCase wkr_call arg_id con_app
-                , \ body     -> mkUnpackCase body co One work_uniq dc [arg_id] (varToCoreExpr arg_id)
-                                -- varToCoreExpr important here: arg can be a coercion
-                                -- Lacking this caused #10658
-                , scaledThing arg_ty ) }
-
-  | otherwise   -- The general case
-        -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
-        -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
-        --
-        -- Remark on linearity: in both the case of the wrapper and the worker,
-        -- we build a linear case. All the multiplicity information is kept in
-        -- the constructors (both C and (#, #)). In particular (#,#) is
-        -- parametrised by the multiplicity of its fields. Specifically, in this
-        -- instance, the multiplicity of the fields of (#,#) is chosen to be the
-        -- same as those of C.
-  = do { (work_uniq : wild_uniq : pat_bndrs_uniqs) <- getUniquesM
-       ; let case_mult       = One -- see above
-             (_exs, arg_ids) =
-               dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs case_mult dc tc_args
-             wrap_wild       = mk_ww_local wild_uniq MarkedStrict (Scaled case_mult ubx_tup_ty)
-             ubx_tup_ty      = exprType ubx_tup_app
-             ubx_tup_app     = mkCoreUbxTup (map idType arg_ids) (map varToCoreExpr arg_ids)
-             con_app         = mkConApp2 dc tc_args arg_ids `mkCast` mkSymCo co
-             tup_con         = tupleDataCon Unboxed (length arg_ids)
-
-       ; MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
-
-       ; return (True
-                , \ wkr_call -> mkSingleAltCase wkr_call wrap_wild
-                                                (DataAlt tup_con) arg_ids con_app
-                , \ body     -> mkUnpackCase body co case_mult work_uniq dc arg_ids ubx_tup_app
-                , ubx_tup_ty ) }
-
-mkUnpackCase ::  CoreExpr -> Coercion -> Mult -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
--- (mkUnpackCase e co uniq Con args body)
---      returns
--- case e |> co of bndr { Con args -> body }
-
-mkUnpackCase (Tick tickish e) co mult uniq con args body   -- See Note [Profiling and unpacking]
-  = Tick tickish (mkUnpackCase e co mult uniq con args body)
-mkUnpackCase scrut co mult uniq boxing_con unpk_args body
-  = mkSingleAltCase casted_scrut bndr
-                    (DataAlt boxing_con) unpk_args body
+  | otherwise
+  -- The general case: Just return an unboxed tuple from the worker
+  --   * Wrapper: `unbox scrut alt = (case <scrut> of (# a, b #) -> <alt>)`
+  --   * Worker:  `tup = (# a, b #)`
+  = ( \build_res wkr_call -> mkSingleAltCase wkr_call case_bndr
+                                    (DataAlt tup_con) vars build_res
+    , ubx_tup_app )
   where
-    casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq MarkedStrict (Scaled mult (exprType casted_scrut))
-      -- An unpacking case can always be chosen linear, because the variables
-      -- are always passed to a constructor. This limits the
+    -- | Whether Termination analysis says that `v` terminates quickly
+    whnf_term v = fst $ forceCprTy seqDmd $ getCprSig $ idCprInfo $ v
+    ubx_tup_app = mkCoreUbxTup (map idType vars) (map varToCoreExpr vars)
+    tup_con     = tupleDataCon Unboxed (length vars)
+    -- See also Note [Linear types and CPR]
+    case_bndr   = mkWildValBinder cprCaseBndrMult (exprType ubx_tup_app)
+
+
+mkWWcpr
+  :: WwOpts
+  -> UnboxingStrategy Cpr
+  -> [Id]
+  -- NB: No TyVars. This rules out existentials. Checked in 'wantToUnboxResult',
+  -- asserted in 'unbox_one_result'.
+  -> [Cpr]
+  -> UniqSM (Bool, OrdList Var, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+mkWWcpr opts want_to_unbox vars cprs = do
+  MASSERT2( not (any isTyVar vars), ppr vars $$ ppr cprs )
+  MASSERT2( equalLength vars cprs, ppr vars $$ ppr cprs )
+  (usefuls, varss, wrap_build_ress, work_unpack_ress) <-
+    unzip4 <$> zipWithM (mkWWcpr_one opts want_to_unbox) vars cprs
+  return ( or usefuls
+         , concatOL varss
+         , foldl' (.) id wrap_build_ress
+         , foldl' (.) id work_unpack_ress )
+
+mkWWcpr_one
+  :: WwOpts
+  -> UnboxingStrategy Cpr
+  -> Id
+  -> Cpr                               -- CPR analysis results
+  -> UniqSM (Bool,                     -- Is w/w'ing useful?
+             OrdList Var,              -- Vars returned from worker to wrapper
+             CoreExpr -> CoreExpr, -- result build of wrapper
+             CoreExpr -> CoreExpr) -- result unpacker of worker
+mkWWcpr_one opts want_to_unbox res_bndr cpr
+  | ASSERT( not (isTyVar res_bndr) ) True
+  , Unbox dcpc arg_cprs <- want_to_unbox (idType res_bndr) cpr
+  = unbox_one_result opts want_to_unbox res_bndr arg_cprs dcpc
+  | otherwise
+  = return (False, unitOL res_bndr, nop_fn, nop_fn)
+
+unbox_one_result
+  :: WwOpts
+  -> UnboxingStrategy Cpr
+  -> Id
+  -> [Cpr]
+  -> DataConPatContext
+  -> UniqSM (Bool,                 -- Is w/w'ing useful?
+             OrdList Var,          -- Vars returned from worker to wrapper
+             CoreExpr -> CoreExpr, -- result builder of wrapper
+             CoreExpr -> CoreExpr) -- result unpacker of worker
+-- Nothing:   There is nothing worth taking apart.
+--            On the outer level, this will prevent mkWWcpr_one from doing anything at all
+--            Otherwise it means: Use the value directly
+-- Just (vars, con_app, decon):
+--   vars:    Variables used when deconstructing/constructing boxed values
+--   con_app: Assuming those variables are in scope, wraps them in the constructor
+--   decon:   Takes the constructor returned by the first argument apart, binds
+--            its parameters to `vars`, and in that scope executes the second argument.
+unbox_one_result opts want_to_unbox res_bndr arg_cprs
+                 DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
+                                   , dcpc_co = co } = do
+  -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
+  -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
+  case_bndr_uniq:pat_bndrs_uniqs <- getUniquesM
+  let (_exs, arg_ids) =
+        dataConRepFSInstPat (repeat ww_prefix) pat_bndrs_uniqs cprCaseBndrMult dc tc_args
+  MASSERT( null _exs ) -- Should have been caught by wantToUnboxResult
+
+  let -- transfer cpr info to field binders
+      arg_ids' = zipWithEqual "unbox_one_result" (flip setIdCprInfo . mkCprSig 0) arg_cprs arg_ids
+      -- con_app = (C a b |> sym co)
+      con_app = mkConApp2 dc tc_args arg_ids' `mkCast` mkSymCo co
+      -- this_wrap_build_res body = (let res_bndr = C a b |> sym co in <body>[r])
+      this_wrap_build_res  = Let (NonRec res_bndr con_app)
+      -- this_work_unpack_res alt = (case res_bndr |> co of C a b -> <alt>[a,b])
+      this_work_unpack_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult case_bndr_uniq dc arg_ids'
+
+  (nested_useful, transit_vars, wrap_build_res, work_unpack_res) <-
+    mkWWcpr opts want_to_unbox arg_ids' arg_cprs
+
+  -- Don't try to WW an unboxed tuple return type when there's nothing inside
+  -- to unbox further.
+  return $ if isUnboxedTupleDataCon dc && not nested_useful
+              then ( False, unitOL res_bndr, nop_fn, nop_fn )
+              else ( True
+                   , transit_vars
+                   , wrap_build_res . this_wrap_build_res
+                   , this_work_unpack_res . work_unpack_res
+                   )
+
 {-
-Note [non-algebraic or open body type warning]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are a few cases where the W/W transformation is told that something
-returns a constructor, but the type at hand doesn't really match this. One
-real-world example involves unsafeCoerce:
-  foo = IO a
-  foo = unsafeCoerce c_exit
-  foreign import ccall "c_exit" c_exit :: IO ()
-Here CPR will tell you that `foo` returns a () constructor for sure, but trying
-to create a worker/wrapper for type `a` obviously fails.
-(This was a real example until ee8e792  in libraries/base.)
-
-It does not seem feasible to avoid all such cases already in the analyser (and
-after all, the analysis is not really wrong), so we simply do nothing here in
-mkWWcpr. But we still want to emit warning with -DDEBUG, to hopefully catch
-other cases where something went avoidably wrong.
-
-This warning also triggers for the stream fusion library within `text`.
-We can'easily W/W constructed results like `Stream` because we have no simple
-way to express existential types in the worker's type signature.
+************************************************************************
+*                                                                      *
+\subsection{Utilities}
+*                                                                      *
+************************************************************************
 
 Note [Profiling and unpacking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1245,12 +1272,14 @@ eliminate the case, and the scc would get in the way?  I'm ok with
 including the case itself in the cost centre, since it is morally
 part of the function (post transformation) anyway.
 
-
-************************************************************************
-*                                                                      *
-\subsection{Utilities}
-*                                                                      *
-************************************************************************
+Note [Linear types and CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Remark on linearity: in both the case of the wrapper and the worker,
+we build a linear case to unpack constructed products. All the
+multiplicity information is kept in the constructors (both C and (#, #)).
+In particular (#,#) is parametrised by the multiplicity of its fields.
+Specifically, in this instance, the multiplicity of the fields of (#,#)
+is chosen to be the same as those of C.
 
 Note [Absent errors]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1333,7 +1362,67 @@ fragile
        ...f (MkT a (absentError Int# "blah"))...
    because `MkT` is strict in its Int# argument, so we get an absentError
    exception when we shouldn't.  Very annoying!
+
+Note [Record evaluated-ness in worker/wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+   data T = MkT !Int Int
+
+   f :: T -> T
+   f x = e
+
+and f's is strict, and has the CPR property.  The we are going to generate
+this w/w split
+
+   f x = case x of
+           MkT x1 x2 -> case $wf x1 x2 of
+                           (# r1, r2 #) -> MkT r1 r2
+
+   $wfw x1 x2 = let x = MkT x1 x2 in
+                case e of
+                  MkT r1 r2 -> (# r1, r2 #)
+
+Note that
+
+* In the worker $wf, inside 'e' we can be sure that x1 will be
+  evaluated (it came from unpacking the argument MkT.  But that's no
+  immediately apparent in $wf
+
+* In the wrapper 'f', which we'll inline at call sites, we can be sure
+  that 'r1' has been evaluated (because it came from unpacking the result
+  MkT.  But that is not immediately apparent from the wrapper code.
+
+Missing these facts isn't unsound, but it loses possible future
+opportunities for optimisation.
+
+Solution: use setCaseBndrEvald when creating
+ (A) The arg binders x1,x2 in mkWstr_one
+         See #13077, test T13077
+ (B) The result binders r1,r2 in mkWWcpr_one_help
+         See Trace #13077, test T13077a
+         And #13027 comment:20, item (4)
+to record that the relevant binder is evaluated.
+
 -}
+
+mkUnpackCase ::  CoreExpr -> Coercion -> Mult -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
+-- (mkUnpackCase e co uniq Con args body)
+--      returns
+-- case e |> co of bndr { Con args -> body }
+mkUnpackCase (Tick tickish e) co mult uniq  con args body   -- See Note [Profiling and unpacking]
+  = Tick tickish (mkUnpackCase e co mult uniq con args body)
+mkUnpackCase scrut co mult uniq boxing_con unpk_args body
+  = mkSingleAltCase casted_scrut bndr
+                    (DataAlt boxing_con) unpk_args body
+  where
+    casted_scrut = scrut `mkCast` co
+    bndr = mk_ww_local uniq MarkedStrict (Scaled mult (exprType casted_scrut))
+
+-- | The multiplicity of a case binder unboxing a constructed result.
+-- See Note [Linear types and CPR]
+cprCaseBndrMult :: Mult
+cprCaseBndrMult = One
 
 -- | Tries to find a suitable dummy RHS to bind the given absent identifier to.
 --
@@ -1366,7 +1455,7 @@ mk_absent_let opts arg dmd
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
   where
-    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 botCpr
+    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 divergeCpr
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)

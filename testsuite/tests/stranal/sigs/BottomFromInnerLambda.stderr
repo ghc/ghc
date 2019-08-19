@@ -7,9 +7,9 @@ BottomFromInnerLambda.f: <SP(MU)>
 
 
 ==================== Cpr signatures ====================
-BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: m1
-BottomFromInnerLambda.f:
+BottomFromInnerLambda.$trModule: *
+BottomFromInnerLambda.expensive: *c1(#)
+BottomFromInnerLambda.f: *
 
 
 
