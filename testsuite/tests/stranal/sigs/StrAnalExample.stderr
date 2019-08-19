@@ -6,8 +6,13 @@ StrAnalExample.foo: <S,1*U>
 
 
 ==================== Cpr signatures ====================
+<<<<<<< HEAD
 StrAnalExample.$trModule:
 StrAnalExample.foo:
+=======
+StrAnalExample.$trModule: #1(#, #) 1(1(-), 1(-))
+StrAnalExample.foo: * -
+>>>>>>> 6bb3d74323... Nested CPR
 
 
 
