@@ -149,7 +149,6 @@ import DynamicLoading   ( initializePlugins )
 
 import DynFlags
 import ErrUtils
-import GHC.Platform ( platformOS, osSubsectionsViaSymbols )
 
 import Outputable
 import NameEnv
@@ -1523,31 +1522,11 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-    -- We are building a single SRT for the entire module, so
-    -- we must thread it through all the procedures as we cps-convert them.
-    us <- mkSplitUniqSupply 'S'
+        pipeline_stream
+           = {-# SCC "cmmPipeline" #-}
+             let run_pipeline = cmmPipeline hsc_env
+             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
 
-    -- When splitting, we generate one SRT per split chunk, otherwise
-    -- we generate one SRT for the whole module.
-    let
-     pipeline_stream
-      | gopt Opt_SplitSections dflags ||
-        osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline us cmmgroup = do
-                (_topSRT, cmmgroup) <-
-                  cmmPipeline hsc_env (emptySRT this_mod) cmmgroup
-                return (us, cmmgroup)
-
-          in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
-                return ()
-
-      | otherwise
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline = cmmPipeline hsc_env
-          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
-
-    let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
