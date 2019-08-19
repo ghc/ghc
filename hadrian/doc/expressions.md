@@ -22,8 +22,9 @@ writing `Context` and `Builder` everywhere:
 type Expr a = H.Expr Context Builder a
 ```
 
-Where `H.Expr` is the `Expr c b a` defined above. All following references to
-`Expr` will refer to this type synonym.
+Where `H.Expr` is the `Expr c b a` defined above. The following references to
+`Expr` will generally refer to this type synonym unless there is extra
+parameterisation.
 
 Let's break down the type a bit, working from the outside in, left to right.
 
