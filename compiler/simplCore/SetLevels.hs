@@ -504,7 +504,7 @@ Consider this:
 Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
-           caes y of I# w ->
+           case y of I# w ->
              let f vs = ...(e)...f..
              in f vs
 
@@ -535,6 +535,32 @@ Things to note:
    If we floated the cases out we could eliminate one of them.
 
  * We only do this with a single-alternative case
+
+
+Note [Setting levels when floating single-alternative cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Handling level-setting when floating a single-alternative case binding
+is a bit subtle, as evidenced by #16978.  In particular, we must keep
+in mind that we are merely moving the case and its binders, not the
+body. For example, suppose 'a' is known to be evaluated and we have
+
+  \z -> case a of
+          (x,_) -> <body involving x and z>
+
+After floating we may have:
+
+  case a of
+    (x,_) -> \z -> <body involving x and z>
+      {- some expression involving x and z -}
+
+When analysing <body involving...> we want to use the /ambient/ level,
+and /not/ the desitnation level of the 'case a of (x,-) ->' binding.
+
+#16978 was caused by us setting the context level to the destination
+level of `x` when analysing <body>. This led us to conclude that we
+needed to quantify over some of its free variables (e.g. z), resulting
+in shadowing and very confusing Core Lint failures.
+
 
 Note [Check the output scrutinee for exprIsHNF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1669,14 +1695,17 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       | otherwise
       = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
 
+-- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
                new_lvl vs
   = do { us <- getUniqueSupplyM
        ; let (subst', vs') = cloneBndrs subst us vs
-             env' = env { le_ctxt_lvl  = new_lvl
-                        , le_join_ceil = new_lvl
-                        , le_lvl_env   = addLvls new_lvl lvl_env vs'
+             -- N.B. We are not moving the body of the case, merely its case
+             -- binders.  Consequently we should *not* set le_ctxt_lvl and
+             -- le_join_ceil.  See Note [Setting levels when floating
+             -- single-alternative cases].
+             env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
                         , le_env       = foldl' add_id id_env (vs `zip` vs') }
 
