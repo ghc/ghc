@@ -504,7 +504,7 @@ Consider this:
 Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
-           caes y of I# w ->
+           case y of I# w ->
              let f vs = ...(e)...f..
              in f vs
 
@@ -1674,9 +1674,7 @@ cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env
                new_lvl vs
   = do { us <- getUniqueSupplyM
        ; let (subst', vs') = cloneBndrs subst us vs
-             env' = env { le_ctxt_lvl  = new_lvl
-                        , le_join_ceil = new_lvl
-                        , le_lvl_env   = addLvls new_lvl lvl_env vs'
+             env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
                         , le_env       = foldl' add_id id_env (vs `zip` vs') }
 
