@@ -177,6 +177,10 @@ T18013.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule3 :: GHC.Types.TrName
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=# 1(-),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule3 = GHC.Types.TrNameS T18013.$trModule4
@@ -191,6 +195,10 @@ T18013.$trModule2 = "T18013"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule1 :: GHC.Types.TrName
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=# 1(-),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
@@ -198,6 +206,10 @@ T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule :: GHC.Types.Module
 [GblId,
+<<<<<<< HEAD
+=======
+ Cpr=#1(#, #) 1(1(-), 1(-)),
+>>>>>>> 6bb3d74323... Nested CPR
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule
