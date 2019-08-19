@@ -13,3 +13,9 @@ f_list_cmp a_cmp (a_x:a_xs) (a_y:a_ys)=
     else r_order
   where
     r_order = a_cmp a_x a_y
+
+
+-- But not every case binder has the CPR property.
+-- x below does not and we should not CPR nestedly for it:
+g :: [Int] -> (Int, Int)
+g xs = let x = xs !! 0 in x `seq` (x, x)

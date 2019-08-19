@@ -413,7 +413,7 @@ setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
 setCprInfo :: IdInfo -> CprSig -> IdInfo
-setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
+setCprInfo info cpr = seqCprSig cpr `seq` info { cprInfo = cpr }
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
