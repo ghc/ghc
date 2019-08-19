@@ -147,8 +147,7 @@ There are many wrinkles:
 --
 -- See Note [Grand plan for Typeable] in TcTypeable.
 mkTypeableBinds :: TcM TcGblEnv
-mkTypeableBinds = getGblEnv
-{-
+mkTypeableBinds
   = do { -- Create a binding for $trModule.
          -- Do this before processing any data type declarations,
          -- which need tcg_tr_module to be initialised
@@ -176,7 +175,6 @@ mkTypeableBinds = getGblEnv
           isAlgTyCon tc
        || isDataFamilyTyCon tc
        || isClassTyCon tc
--}
 
 
 {- *********************************************************************
