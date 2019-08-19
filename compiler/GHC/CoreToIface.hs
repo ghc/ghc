@@ -475,6 +475,7 @@ toIfaceIdInfo id_info
     cpr_info = cprInfo id_info
     cpr_hsinfo | cpr_info /= topCprSig = Just (HsCpr cpr_info)
                | otherwise             = Nothing
+
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)
     loop_breaker  = isStrongLoopBreaker (occInfo id_info)
