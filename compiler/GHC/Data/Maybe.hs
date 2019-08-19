@@ -22,7 +22,7 @@ module GHC.Data.Maybe (
         rightToMaybe,
 
         -- * MaybeT
-        MaybeT(..), liftMaybeT, tryMaybeT
+        MaybeT(..), liftMaybeT, hoistMaybe, tryMaybeT
     ) where
 
 import GHC.Prelude
@@ -80,6 +80,10 @@ rightToMaybe (Right x) = Just x
 
 liftMaybeT :: Monad m => m a -> MaybeT m a
 liftMaybeT act = MaybeT $ Just `liftM` act
+
+-- | Hoist a 'Maybe' into a 'MaybeT'
+hoistMaybe :: Applicative f => Maybe a -> MaybeT f a
+hoistMaybe = MaybeT . pure
 
 -- | Try performing an 'IO' action, failing on error.
 tryMaybeT :: IO a -> MaybeT IO a

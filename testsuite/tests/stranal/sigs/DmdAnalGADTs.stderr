@@ -14,6 +14,7 @@ DmdAnalGADTs.hasStrSig: <S,1*U(U)>
 
 
 ==================== Cpr signatures ====================
+<<<<<<< HEAD
 DmdAnalGADTs.$tc'A:
 DmdAnalGADTs.$tc'B:
 DmdAnalGADTs.$tcD:
@@ -24,6 +25,36 @@ DmdAnalGADTs.f': m1
 DmdAnalGADTs.g:
 DmdAnalGADTs.hasCPR:
 DmdAnalGADTs.hasStrSig: m1
+=======
+DmdAnalGADTs.$tc'A: #1(*, *, #1(#, #), #, *,
+                       #1(#1(*, *, #1(#, #), #, *, #4(#, #)),
+                          #2(#1(#1(*, *, #1(#, #), #, *, #), *), *))) 1(-, -, 1(1(-), 1(-)),
+                                                                        1(-), -,
+                                                                        1(1(-, -, 1(1(-), 1(-)),
+                                                                            1(-), -, 4(5(-), 5(-))),
+                                                                          2(1(1(-, -, 1(1(-), 1(-)),
+                                                                                1(-), -, 5(-)),
+                                                                              -),
+                                                                            -)))
+DmdAnalGADTs.$tc'B: #1(*, *, #1(#, #), #, *,
+                       #1(#1(*, *, #1(#, #), #, *, #4(#, #)),
+                          #2(#4(#1(#1(*, *, #1(#, #), #, *, #), *),
+                                #1(#1(*, *, #1(#, #), #, *, #), *)),
+                             *))) 1(-, -, 1(1(-), 1(-)), 1(-), -,
+                                    1(1(-, -, 1(1(-), 1(-)), 1(-), -, 4(5(-), 5(-))),
+                                      2(4(1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -),
+                                          1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -)),
+                                        -)))
+DmdAnalGADTs.$tcD: #1(*, *, #1(#, #), #, *, #4(#, #)) 1(-, -,
+                                                        1(1(-), 1(-)), 1(-), -, 4(5(-), 5(-)))
+DmdAnalGADTs.$trModule: #1(#, #) 1(1(-), 1(-))
+DmdAnalGADTs.diverges: *(#..) b
+DmdAnalGADTs.f: * -
+DmdAnalGADTs.f': * 1(-)
+DmdAnalGADTs.g: * -
+DmdAnalGADTs.hasCPR: # 1(-)
+DmdAnalGADTs.hasStrSig: * -
+>>>>>>> 6bb3d74323... Nested CPR
 
 
 
