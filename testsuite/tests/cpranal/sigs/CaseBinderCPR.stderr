@@ -1,0 +1,7 @@
+
+==================== Cpr signatures ====================
+CaseBinderCPR.$trModule: *
+CaseBinderCPR.f_list_cmp: *c1(*)
+CaseBinderCPR.g: *c1(#, #)
+
+
