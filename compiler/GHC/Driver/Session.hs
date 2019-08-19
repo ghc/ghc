@@ -3968,6 +3968,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_Strictness)
     , ([1,2],   Opt_UnboxSmallStrictFields)
     , ([1,2],   Opt_CprAnal)
+    , ([1,2],   Opt_CaseBinderCpr)
     , ([1,2],   Opt_WorkerWrapper)
     , ([1,2],   Opt_SolveConstantDicts)
     , ([1,2],   Opt_NumConstantFolding)

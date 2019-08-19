@@ -1,4 +1,4 @@
-Found 238 Language.Haskell.Syntax module dependencies
+Found 240 Language.Haskell.Syntax module dependencies
 GHC.Builtin.Names
 GHC.Builtin.PrimOps
 GHC.Builtin.Types
@@ -175,8 +175,10 @@ GHC.Types.SourceFile
 GHC.Types.SourceText
 GHC.Types.SrcLoc
 GHC.Types.Target
+GHC.Types.Termination
 GHC.Types.TyThing
 GHC.Types.TypeEnv
+GHC.Types.Unbox
 GHC.Types.Unique
 GHC.Types.Unique.DFM
 GHC.Types.Unique.DSet

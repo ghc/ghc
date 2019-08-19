@@ -58,6 +58,7 @@ module GHC.Types.Id (
         zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
         transferPolyIdInfo, scaleIdBy, scaleVarBy,
+        setDivergingIdInfo,
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder,
@@ -112,10 +113,12 @@ module GHC.Types.Id (
 
         setIdDemandInfo,
         setIdStrictness,
+        setIdTermInfo,
         setIdCprInfo,
 
         idDemandInfo,
         idStrictness,
+        idTermInfo,
         idCprInfo,
 
     ) where
@@ -145,6 +148,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Core.DataCon
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Termination
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Core.Class
@@ -179,7 +183,10 @@ infixl  1 `setIdUnfolding`,
 
           `setIdDemandInfo`,
           `setIdStrictness`,
+          `setIdTermInfo`,
           `setIdCprInfo`,
+
+          `setDivergingIdInfo`,
 
           `asJoinId`,
           `asJoinId_maybe`
@@ -259,6 +266,9 @@ modifyIdInfo fn id = setIdInfo id (fn (idInfo id))
 maybeModifyIdInfo :: Maybe IdInfo -> Id -> Id
 maybeModifyIdInfo (Just new_info) id = lazySetIdInfo id new_info
 maybeModifyIdInfo Nothing         id = id
+
+setDivergingIdInfo :: Id -> [Demand] -> Id
+setDivergingIdInfo id arg_dmds = modifyIdInfo (`setDivergingInfo` arg_dmds) id
 
 {-
 ************************************************************************
@@ -683,6 +693,12 @@ idStrictness id = strictnessInfo (idInfo id)
 setIdStrictness :: Id -> StrictSig -> Id
 setIdStrictness id sig = modifyIdInfo (`setStrictnessInfo` sig) id
 
+idTermInfo :: Id -> TermSig
+idTermInfo id = termInfo (idInfo id)
+
+setIdTermInfo :: Id -> TermSig -> Id
+setIdTermInfo id sig = modifyIdInfo (\info -> setTermInfo info sig) id
+
 idCprInfo :: Id -> CprSig
 idCprInfo id = cprInfo (idInfo id)
 
@@ -1001,12 +1017,14 @@ transferPolyIdInfo old_id abstract_wrt new_id
 
     old_strictness  = strictnessInfo old_info
     new_strictness  = prependArgsStrictSig arity_increase old_strictness
+    old_term        = termInfo old_info
     old_cpr         = cprInfo old_info
 
     transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setOccInfo` new_occ_info
                                  `setStrictnessInfo` new_strictness
+                                 `setTermInfo` old_term
                                  `setCprInfo` old_cpr
 
 isNeverLevPolyId :: Id -> Bool
