@@ -1,0 +1,12 @@
+
+==================== Term signatures ====================
+FacState.$trModule: *
+FacState.fac: #L#L*1(*, #1(#))
+
+
+
+==================== Cpr signatures ====================
+FacState.$trModule:
+FacState.fac: LL1(, 1)
+
+

@@ -10,14 +10,25 @@ T13380f.unsafeCall: <U>
 
 
 
+==================== Term signatures ====================
+T13380f.$trModule: *
+T13380f.f: #L#L#L*1(*, #1(#))
+T13380f.g: #L#L#L*1(*, #1(#))
+T13380f.h: #L#L#L*1(*, #1(#))
+T13380f.interruptibleCall: #L*1(*, #)
+T13380f.safeCall: #L*1(*, #)
+T13380f.unsafeCall: #L*1(*, #)
+
+
+
 ==================== Cpr signatures ====================
 T13380f.$trModule:
-T13380f.f:
-T13380f.g:
-T13380f.h:
-T13380f.interruptibleCall:
-T13380f.safeCall:
-T13380f.unsafeCall:
+T13380f.f: LLL1(, 1)
+T13380f.g: LLL1(, 1)
+T13380f.h: LLL1(, 1)
+T13380f.interruptibleCall: L1(, 1)
+T13380f.safeCall: L1(, 1)
+T13380f.unsafeCall: L1(, 1)
 
 
 

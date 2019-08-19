@@ -6,9 +6,16 @@ BottomFromInnerLambda.f: <SP(MU)>
 
 
 
+==================== Term signatures ====================
+BottomFromInnerLambda.$trModule: *
+BottomFromInnerLambda.expensive: #L*1(#)
+BottomFromInnerLambda.f: #L*L*(#..)
+
+
+
 ==================== Cpr signatures ====================
 BottomFromInnerLambda.$trModule:
-BottomFromInnerLambda.expensive: m1
+BottomFromInnerLambda.expensive: L1
 BottomFromInnerLambda.f:
 
 

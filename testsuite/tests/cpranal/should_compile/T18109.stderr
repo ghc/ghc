@@ -1,0 +1,30 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 39, types: 43, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 2, types: 3, coercions: 0, joins: 0/0}
+T18109.$wg :: (Int, Int) -> (Int, Int)
+T18109.$wg = \ (ww_sFZ :: (Int, Int)) -> ww_sFZ
+
+-- RHS size: {terms: 10, types: 10, coercions: 0, joins: 0/0}
+g :: T -> T
+g = \ (w_sFW :: T) -> case w_sFW of { T ww1_sFZ -> case T18109.$wg ww1_sFZ of ww2_sG4 { (ipv_sGq, ipv1_sGr) -> T18109.T ww2_sG4 } }
+
+-- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
+T18109.$wh :: [Int] -> [Int]
+T18109.$wh = \ (ww_sG9 :: [Int]) -> ww_sG9
+
+-- RHS size: {terms: 10, types: 6, coercions: 0, joins: 0/0}
+h :: U -> U
+h = \ (w_sG6 :: U) -> case w_sG6 of { U ww1_sG9 -> case T18109.$wh ww1_sG9 of ww2_sGe { __DEFAULT -> T18109.U ww2_sGe } }
+
+-- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
+T18109.$wf :: Int -> Int -> Int
+T18109.$wf = \ (w_sGg :: Int) (eta_B0 :: Int) -> GHC.Num.$fNumInt_$c+ eta_B0 w_sGg
+
+-- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}
+f :: Int -> F
+f = \ (w_sGg :: Int) -> T18109.F (T18109.$wf w_sGg)
+
+
+
