@@ -6,8 +6,8 @@ HyperStrUse.f: <SP(SP(U),A)><SU>
 
 
 ==================== Cpr signatures ====================
-HyperStrUse.$trModule:
-HyperStrUse.f: m1
+HyperStrUse.$trModule: *
+HyperStrUse.f: *c1(#)
 
 
 

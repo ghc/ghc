@@ -7,9 +7,9 @@ Foo.g: <SP(SP(U),SP(U))>
 
 
 ==================== Cpr signatures ====================
-Foo.$trModule:
-Foo.f: m1
-Foo.g: m1
+Foo.$trModule: *
+Foo.f: #c1(#)
+Foo.g: #c1(#)
 
 
 

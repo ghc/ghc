@@ -7,7 +7,7 @@ CHECK = grep -q -- '$1' integerConstantFolding.simpl || \
 
 .PHONY: integerConstantFolding
 integerConstantFolding:
-	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -ddump-simpl > integerConstantFolding.simpl
+	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -dno-debug-output -ddump-simpl > integerConstantFolding.simpl
 # All the 100nnn values should be constant-folded away
 	! grep -q '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl; }
 	$(call CHECK,\<200007\>,plusInteger)
@@ -40,7 +40,7 @@ integerConstantFolding:
 
 .PHONY: fromToInteger
 fromToInteger:
-	'$(TEST_HC)' -Wall -v0 -O -c fromToInteger.hs -fforce-recomp -ddump-simpl > fromToInteger.simpl
+	'$(TEST_HC)' -Wall -v0 -O -c fromToInteger.hs -fforce-recomp -dno-debug-output -ddump-simpl > fromToInteger.simpl
 # Rules should eliminate all functions
 	-grep integerToInt fromToInteger.simpl
 	-grep smallInteger fromToInteger.simpl
@@ -49,7 +49,7 @@ fromToInteger:
 
 .PHONY: IntegerConversionRules
 IntegerConversionRules:
-	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -ddump-simpl > $@.simpl
+	'$(TEST_HC)' -Wall -v0 -O -c $@.hs -fforce-recomp -dno-debug-output -ddump-simpl > $@.simpl
 	-grep -q smallInteger      $@.simpl && echo "smallInteger present"
 	-grep -q doubleFromInteger $@.simpl && echo "doubleFromInteger present"
 	-grep -q int2Double        $@.simpl || echo "int2Double absent"

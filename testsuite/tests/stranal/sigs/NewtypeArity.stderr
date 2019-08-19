@@ -9,11 +9,11 @@ Test.t2: <SP(U)><SP(U)>
 
 
 ==================== Cpr signatures ====================
-Test.$tc'MkT:
-Test.$tcT:
-Test.$trModule:
-Test.t: m1
-Test.t2: m1
+Test.$tc'MkT: *
+Test.$tcT: *
+Test.$trModule: *
+Test.t: #c1(#)
+Test.t2: #c1(#)
 
 
 
