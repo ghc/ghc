@@ -28,6 +28,8 @@
   * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
     `Generic` and `Generic1` instances to `Kleisli`
 
+  * Add `resizeSmallMutableArray#` to `GHC.Exts`.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 

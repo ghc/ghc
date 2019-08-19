@@ -224,6 +224,21 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
    }
 }
 
+// shrink size of SmallMutableArray in-place
+stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
+// SmallMutableArray# s -> Int# -> State# s -> State# s
+{
+   ASSERT(new_size >= 0);
+   ASSERT(new_size <= StgSmallMutArrPtrs_ptrs(mba));
+
+   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
+                                 new_size));
+   StgSmallMutArrPtrs_ptrs(mba) = new_size;
+   LDV_RECORD_CREATE(mba);
+
+   return ();
+}
+
 // RRN: This one does not use the "ticketing" approach because it
 // deals in unboxed scalars, not heap pointers.
 stg_casIntArrayzh( gcptr arr, W_ ind, W_ old, W_ new )

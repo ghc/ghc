@@ -431,6 +431,8 @@ emitPrimOp dflags [res] SizeofSmallArrayOp [arg] =
         (bWord dflags))
 emitPrimOp dflags [res] SizeofSmallMutableArrayOp [arg] =
     emitPrimOp dflags [res] SizeofSmallArrayOp [arg]
+emitPrimOp dflags [res] GetSizeofSmallMutableArrayOp [arg] =
+    emitPrimOp dflags [res] SizeofSmallArrayOp [arg]
 
 -- IndexXXXoffAddr
 
