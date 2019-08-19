@@ -328,3 +328,4 @@ test('T15631',
      ['$MAKE -s --no-print-directory T15631'])
 test('T15673', normal, compile, ['-O'])
 test('T16978', normal, compile, ['-O'])
+test('T16978A', normal, compile, ['-O'])
