@@ -6,8 +6,8 @@ StrAnalExample.foo: <SU>
 
 
 ==================== Cpr signatures ====================
-StrAnalExample.$trModule:
-StrAnalExample.foo:
+StrAnalExample.$trModule: *
+StrAnalExample.foo: #
 
 
 

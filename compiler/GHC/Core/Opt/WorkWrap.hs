@@ -499,7 +499,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in GHC.Core.Opt.CprAnal
     cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
-                          , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
+                          , ppr fn_id <> colon <+> text "ct_arty:" <+> ppr (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
@@ -584,12 +584,12 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 
 
 ---------------------
-splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
+splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> Cpr -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
 splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds use_cpr_info
+    stuff <- mkWwBodies (initWwOpts dflags fam_envs) rhs_fvs fn_id wrap_dmds body_cpr
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -630,7 +630,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
-                        `setIdCprInfo` mkCprSig work_arity work_cpr_info
+                        `setIdCprInfo` work_cpr_sig work_arity
 
                         `setIdDemandInfo` worker_demand
 
@@ -670,17 +670,21 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
+    -- body_cpr is the CPR we w/w the body for. Note that we kill it for join points,
     -- see Note [Don't w/w join points for CPR].
-    use_cpr_info  | isJoinId fn_id = topCpr
-                  | otherwise      = cpr
+    -- Also the body expr is put under WHNF, so we may force the CPR info accordingly.
+    body_cpr
+      | isJoinId fn_id = topCpr
+      | otherwise      = snd $ forceCpr seqDmd cpr
     -- Even if we don't w/w join points for CPR, we might still do so for
     -- strictness. In which case a join point worker keeps its original CPR
     -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
     -- doesn't have the CPR property anymore.
-    work_cpr_info | isJoinId fn_id = cpr
-                  | otherwise      = topCpr
-
+    -- No forcing here, because work_cpr_sig concerns *the signature*, not the
+    -- CPR of the body expression.
+    work_cpr_sig arity
+      | isJoinId fn_id = mkCprSig arity cpr
+      | otherwise      = topCprSig
 
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })

@@ -62,7 +62,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
 import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
-import GHC.Types.Cpr     ( mkCprSig, botCpr )
+import GHC.Types.Cpr     ( mkCprSig, divergeCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
@@ -1242,7 +1242,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     cpr = cprInfo idinfo
     final_cpr | Just _ <- mb_bot_str
-              = mkCprSig arity botCpr
+              = mkCprSig arity divergeCpr
               | otherwise
               = cpr
 

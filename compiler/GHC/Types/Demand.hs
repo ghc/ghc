@@ -559,17 +559,20 @@ mkCalledOnceDmds arity sd = iterate mkCalledOnceDmd sd !! arity
 -- | Peels one call level from the sub-demand, and also returns how many
 -- times we entered the lambda body.
 peelCallDmd :: SubDemand -> (Card, SubDemand)
-peelCallDmd sd = viewCall sd `orElse` (topCard, topSubDmd)
+peelCallDmd = peelManyCalls 1
 
 -- Peels multiple nestings of 'Call' sub-demands and also returns
 -- whether it was unsaturated in the form of a 'Card'inality, denoting
 -- how many times the lambda body was entered.
 -- See Note [Demands from unsaturated function calls].
-peelManyCalls :: Int -> SubDemand -> Card
-peelManyCalls 0 _                          = C_11
+peelManyCalls :: Int -> SubDemand -> (Card, SubDemand)
+peelManyCalls 0 sd                         = (C_11, sd)
 -- See Note [Call demands are relative]
-peelManyCalls n (viewCall -> Just (m, sd)) = m `multCard` peelManyCalls (n-1) sd
-peelManyCalls _ _                          = C_0N
+peelManyCalls n (viewCall -> Just (m, sd))
+  | (n, body_sd) <- peelManyCalls (n-1) sd
+  , !n' <- m `multCard` n
+  = (n', body_sd)
+peelManyCalls _ _                          = (topCard, topSubDmd)
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
@@ -618,7 +621,7 @@ argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
 -- There are at least n nested C1(..) calls.
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 saturatedByOneShots :: Int -> Demand -> Bool
-saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
+saturatedByOneShots n (_ :* sd) = isUsedOnce $ fst $ peelManyCalls n sd
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1502,7 +1505,7 @@ type DmdTransformer = SubDemand -> DmdType
 -- return how the function evaluates its free variables and arguments.
 dmdTransformSig :: StrictSig -> DmdTransformer
 dmdTransformSig (StrictSig dmd_ty@(DmdType _ arg_ds _)) sd
-  = multDmdType (peelManyCalls (length arg_ds) sd) dmd_ty
+  = multDmdType (fst $ peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
 
