@@ -279,11 +279,11 @@ resizeSmallMutableArray#
   -> (# State# s, SmallMutableArray# s a #)
 resizeSmallMutableArray# arr0 szNew a s0 =
   case getSizeofSmallMutableArray# arr0 s0 of
-    (# s1, szOld #) -> case szNew <# szOld of
-      1# -> case shrinkSmallMutableArray# arr0 szNew s1 of
+    (# s1, szOld #) -> if isTrue# (szNew <# szOld) of
+      then case shrinkSmallMutableArray# arr0 szNew s1 of
         s2 -> (# s2, arr0 #)
-      _ -> case szNew ># szOld of
-        1# -> case newSmallArray# szNew a s1 of
+      else if isTrue# (szNew ># szOld)
+        then case newSmallArray# szNew a s1 of
           (# s2, arr1 #) -> case copySmallMutableArray# arr0 0# arr1 0# szOld s2 of
             s3 -> (# s3, arr1 #)
-        _ -> (# s1, arr0 #)
+        else (# s1, arr0 #)
