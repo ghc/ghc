@@ -2,6 +2,15 @@
 
 - Shipped with GHC 8.10.1
 
+- Add primop for shrinking `SmallMutableArray#`
+  to `GHC.Prim`:
+
+        shrinkSmallMutableArray# :: SmallMutableArray# s a -> Int# -> State# s -> State# s
+
+  Note that `resizeSmallMutableArray#` is not included as
+  as primitive. It has been implemented in library space in
+  `GHC.Exts`. See the release notes of `base`.
+
 - Added to `GHC.Prim`:
 
         closureSize# :: a -> Int#
