@@ -885,13 +885,14 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- see Note [Invalid optimisation: shortcutting].
     updateSRTMap :: Maybe SRTEntry -> StateT (Map CAFLabel (Maybe SRTEntry)) (StateT ModuleSRTInfo UniqSM) ()
     updateSRTMap srtEntry =
+      srtTrace2 "updateSRTMap" (ppr srtEntry <+> "isCAF:" <+> ppr isCAF <+> "isStaticFun:" <+> ppr isStaticFun) $
       when (not isCAF && not isStaticFun) $ do
         let newSRTMap = Map.fromList
               [ (cafLbl, srtEntry)
               | cafLbl@(CAFLabel clbl) <- caf_lbls
               , not (elem clbl static_data)
               ]
-        put (Map.union newSRTMap srtMap)
+        srtTrace2 "newSRTMap" (ppr newSRTMap) $ put (Map.union newSRTMap srtMap)
 
     this_mod = thisModule topSRT
 
@@ -962,10 +963,13 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
               oldFlatSRTs = flatSRTs topSRT
               newFlatSRTs = Map.insert srtEntry allBelowThis oldFlatSRTs
               newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
+              -- When all definition in this group are static data we don't
+              -- generate any SRTs.
+              allStaticData = all (\(CAFLabel clbl) -> elem clbl static_data) caf_lbls
           lift (put (topSRT { dedupSRTs = newDedupSRTs
                             , flatSRTs = newFlatSRTs }))
           let SRTEntry lbl = srtEntry
-          return ((decls, map (,lbl) blockids, funSRTs), haskell_names)
+          return ((if allStaticData then [] else decls, map (,lbl) blockids, funSRTs), haskell_names)
 
 
 -- | build a static SRT object (or a chain of objects) from a list of
