@@ -2,7 +2,7 @@
 
 `Expr c b a` is a computation that produces a value of type `Action a` and can
 read parameters of the current build `Target c b`, but what does that mean
-exactly? Here's its definition:
+exactly? Here's its definition from `hadrian/src/Hadrian/Expression.hs`:
 
 ```haskell
 newtype Expr c b a = Expr (ReaderT (Target c b) Action a)
@@ -32,9 +32,10 @@ Let's break down the type a bit, working from the outside in, left to right.
 Put simply, `ReaderT (Target c b) Action a` adds a read-only environment
 `Target c b` (in the case of Hadrian: `Target Context Builder`) to values of
 type `Action a`. It's the equivalent of threading through a `Target c b`
-parameter to all our functions, but we only get have to worry about it when we
-need it, using `ask :: ReaderT (Target c b) Action (Target c b)` or other
-functions based on it.
+parameter to all our functions, but we only have to worry about it when we need
+it, using `ask :: Monad m => ReaderT r m r` (where `r` is `Target c b` and `m`
+is `Action` in this case) or other functions based on it. `ReaderT` and `ask`
+are defined in [`Control.Monad.Trans.Reader`](https://hackage.haskell.org/package/transformers-0.5.6.2/docs/Control-Monad-Trans-Reader.html).
 
 So, instead of:
 
@@ -176,8 +177,8 @@ data PackageType = Library | Program deriving (Eq, Generic, Ord, Show)
 ```
 
 This doesn't quite reflect how Cabal packages are actually structured, as
-discussed in https://github.com/snowleopard/hadrian/issues/12, but Hadrian
-can still function treating packages as either libraries or programs.
+discussed in https://github.com/snowleopard/hadrian/issues/12, but Hadrian can
+still function treating packages as either libraries or programs.
 
 Both `PackageName` and `FilePath` are just type synonyms of `String`.
 
