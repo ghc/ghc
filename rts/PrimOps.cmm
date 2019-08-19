@@ -174,12 +174,13 @@ stg_isMutableByteArrayPinnedzh ( gcptr mba )
 stg_shrinkMutableByteArrayzh ( gcptr mba, W_ new_size )
 // MutableByteArray# s -> Int# -> State# s -> State# s
 {
-   ASSERT(new_size >= 0);
    ASSERT(new_size <= StgArrBytes_bytes(mba));
 
    OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgArrBytes) +
                                  ROUNDUP_BYTES_TO_WDS(new_size)));
    StgArrBytes_bytes(mba) = new_size;
+   // See the comments in overwritingClosureOfs for an explanation
+   // of the interaction with LDV profiling.
    LDV_RECORD_CREATE(mba);
 
    return ();
@@ -222,6 +223,22 @@ stg_resizzeMutableByteArrayzh ( gcptr mba, W_ new_size )
 
       return (new_mba);
    }
+}
+
+// shrink size of SmallMutableArray in-place
+stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
+// SmallMutableArray# s -> Int# -> State# s -> State# s
+{
+   ASSERT(new_size <= StgSmallMutArrPtrs_ptrs(mba));
+
+   OVERWRITING_CLOSURE_OFS(mba, (BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) +
+                                 new_size));
+   StgSmallMutArrPtrs_ptrs(mba) = new_size;
+   // See the comments in overwritingClosureOfs for an explanation
+   // of the interaction with LDV profiling.
+   LDV_RECORD_CREATE(mba);
+
+   return ();
 }
 
 // RRN: This one does not use the "ticketing" approach because it
