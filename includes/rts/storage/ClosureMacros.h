@@ -559,13 +559,20 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 // be less than or equal to closure_sizeW(p), and usually at least as
 // large as the respective thunk header.
 //
-// Note: As this calls LDV_recordDead() you have to call LDV_RECORD()
+// Note: As this calls LDV_recordDead() you have to call LDV_RECORD_CREATE()
 //       on the final state of the closure at the call-site
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    // Set prim = true because only called on ARR_WORDS with the
-    // shrinkMutableByteArray# primop
+    // Set prim = true because overwritingClosureOfs is only
+    // ever called by
+    //   shrinkMutableByteArray# (ARR_WORDS)
+    //   shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
+    // This causes LDV_recordDead to be invoked. We want this
+    // to happen because the implementations of the above
+    // primops both call LDV_RECORD_CREATE after calling this,
+    // effectively replacing the LDV closure biography.
+    // See Note [LDV Profiling when Shrinking Arrays]
     overwritingClosure_(p, offset, closure_sizeW(p), true);
 }
 

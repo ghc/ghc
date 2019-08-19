@@ -466,6 +466,7 @@ dispatchPrimop dflags = \case
         (bWord dflags))
 
   SizeofSmallMutableArrayOp -> dispatchPrimop dflags SizeofSmallArrayOp
+  GetSizeofSmallMutableArrayOp -> dispatchPrimop dflags SizeofSmallArrayOp
 
 -- IndexXXXoffAddr
 
