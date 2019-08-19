@@ -9,7 +9,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Types.Demand (
-        StrDmd, UseDmd(..), Count,
+        StrDmd(..), Str(..), ArgStr, strBot, strTop, UseDmd(..), Count, ArgUse,
+        peelStrCall, mkSCalls, toStrDmd, glbArgStr, seqArgStrList,
 
         Demand, DmdShell, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
@@ -18,7 +19,6 @@ module GHC.Types.Demand (
         lubDmd, bothDmd,
         lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd,
         isTopDmd, isAbsDmd, isSeqDmd,
-        peelUseCall, cleanUseDmd_maybe, strictenDmd, bothCleanDmd,
         addCaseBndrDmd,
 
         DmdType(..), dmdTypeDepth, lubDmdType, bothDmdType,
@@ -229,6 +229,10 @@ mkSCall :: StrDmd -> StrDmd
 mkSCall HyperStr = HyperStr
 mkSCall s        = SCall s
 
+-- | @mkSCalls n s@ returns @C(C...(s))@ where there are @n@ @S@'s.
+mkSCalls :: Arity -> StrDmd -> StrDmd
+mkSCalls n s = iterate mkSCall s !! n
+
 mkSProd :: [ArgStr] -> StrDmd
 mkSProd sx
   | any isHyperStr sx = HyperStr
@@ -260,18 +264,29 @@ lubArgStr _        Lazy     = Lazy
 lubArgStr (Str s1) (Str s2) = Str (s1 `lubStr` s2)
 
 lubStr :: StrDmd -> StrDmd -> StrDmd
-lubStr HyperStr s              = s
-lubStr (SCall s1) HyperStr     = SCall s1
-lubStr (SCall _)  HeadStr      = HeadStr
-lubStr (SCall s1) (SCall s2)   = SCall (s1 `lubStr` s2)
-lubStr (SCall _)  (SProd _)    = HeadStr
-lubStr (SProd sx) HyperStr     = SProd sx
-lubStr (SProd _)  HeadStr      = HeadStr
+lubStr HyperStr s            = s
+lubStr s        HyperStr     = s
+lubStr HeadStr  _            = HeadStr
+lubStr _        HeadStr      = HeadStr
+lubStr (SCall s1) (SCall s2) = SCall (s1 `lubStr` s2)
 lubStr (SProd s1) (SProd s2)
-    | s1 `equalLength` s2      = mkSProd (zipWith lubArgStr s1 s2)
-    | otherwise                = HeadStr
-lubStr (SProd _) (SCall _)     = HeadStr
-lubStr HeadStr   _             = HeadStr
+    | s1 `equalLength` s2    = mkSProd (zipWith lubArgStr s1 s2)
+lubStr _          _          = HeadStr
+
+glbArgStr :: ArgStr -> ArgStr -> ArgStr
+glbArgStr Lazy     s        = s
+glbArgStr s        Lazy     = s
+glbArgStr (Str s1) (Str s2) = Str (s1 `glbStr` s2)
+
+glbStr :: StrDmd -> StrDmd -> StrDmd
+glbStr HyperStr   _            = HyperStr
+glbStr _          HyperStr     = HyperStr
+glbStr HeadStr    s            = s
+glbStr s          HeadStr      = s
+glbStr (SCall s1) (SCall s2)   = SCall (s1 `glbStr` s2)
+glbStr (SProd s1) (SProd s2)
+    | s1 `equalLength` s2      = mkSProd (zipWith glbArgStr s1 s2)
+glbStr _          _            = HyperStr
 
 bothArgStr :: ArgStr -> ArgStr -> ArgStr
 bothArgStr Lazy     s        = s
@@ -295,13 +310,13 @@ bothStr (SProd _) (SCall _)    = HyperStr
 
 -- utility functions to deal with memory leaks
 seqStrDmd :: StrDmd -> ()
-seqStrDmd (SProd ds)   = seqStrDmdList ds
+seqStrDmd (SProd ds)   = seqArgStrList ds
 seqStrDmd (SCall s)    = seqStrDmd s
 seqStrDmd _            = ()
 
-seqStrDmdList :: [ArgStr] -> ()
-seqStrDmdList [] = ()
-seqStrDmdList (d:ds) = seqArgStr d `seq` seqStrDmdList ds
+seqArgStrList :: [ArgStr] -> ()
+seqArgStrList [] = ()
+seqArgStrList (d:ds) = seqArgStr d `seq` seqArgStrList ds
 
 seqArgStr :: ArgStr -> ()
 seqArgStr Lazy    = ()
@@ -466,10 +481,6 @@ bothUse (UProd {}) (UCall {})       = Used
 bothUse Used (UProd ux)             = UProd (map (`bothArgUse` useTop) ux)
 bothUse (UProd ux) Used             = UProd (map (`bothArgUse` useTop) ux)
 bothUse Used _                      = Used  -- Note [Used should win]
-
-peelUseCall :: UseDmd -> Maybe (Count, UseDmd)
-peelUseCall (UCall c u)   = Just (c,u)
-peelUseCall _             = Nothing
 
 addCaseBndrDmd :: Demand    -- On the case binder
                -> [Demand]  -- On the components of the constructor
@@ -663,10 +674,6 @@ should be: <L,C(U(AU))>m
 type CleanDemand = JointDmd StrDmd UseDmd
      -- A demand that is at least head-strict
 
-bothCleanDmd :: CleanDemand -> CleanDemand -> CleanDemand
-bothCleanDmd (JD { sd = s1, ud = a1}) (JD { sd = s2, ud = a2})
-  = JD { sd = s1 `bothStr` s2, ud = a1 `bothUse` a2 }
-
 mkHeadStrict :: CleanDemand -> CleanDemand
 mkHeadStrict cd = cd { sd = HeadStr }
 
@@ -789,10 +796,6 @@ isStrictDmd _                = True
 
 isWeakDmd :: Demand -> Bool
 isWeakDmd (JD {sd = s, ud = a}) = isLazy s && isUsedMU a
-
-cleanUseDmd_maybe :: Demand -> Maybe UseDmd
-cleanUseDmd_maybe (JD { ud = Use _ u }) = Just u
-cleanUseDmd_maybe _                     = Nothing
 
 splitFVs :: Bool   -- Thunk
          -> DmdEnv -> (DmdEnv, DmdEnv)
@@ -1307,20 +1310,19 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
 
-strictenDmd :: Demand -> Demand
-strictenDmd (JD { sd = s, ud = u})
-  = JD { sd = poke_s s, ud = poke_u u }
-  where
-    poke_s Lazy      = Str HeadStr
-    poke_s s         = s
-    poke_u Abs       = useTop
-    poke_u u         = u
-
 -- Deferring and peeling
 
 type DmdShell   -- Describes the "outer shell"
                 -- of a Demand
    = JointDmd (Str ()) (Use ())
+
+toStrDmd :: ArgStr -> (Str (), StrDmd)
+toStrDmd Lazy    = (Lazy,   HeadStr)
+toStrDmd (Str s) = (Str (), s)
+
+toUseDmd :: ArgUse -> (Use (), UseDmd)
+toUseDmd Abs       = (Abs, Used) -- Pretty sure this should be UHead instead
+toUseDmd (Use c s) = (Use c(), s)
 
 toCleanDmd :: Demand -> (DmdShell, CleanDemand)
 -- Splits a Demand into its "shell" and the inner "clean demand"
@@ -1329,13 +1331,8 @@ toCleanDmd (JD { sd = s, ud = u })
     -- See Note [Analyzing with lazy demand and lambdas]
     -- See Note [Analysing with absent demand]
   where
-    (ss, s') = case s of
-                Str s' -> (Str (), s')
-                Lazy   -> (Lazy,   HeadStr)
-
-    (us, u') = case u of
-                 Use c u' -> (Use c (), u')
-                 Abs      -> (Abs,      Used)
+    (ss, s') = toStrDmd s
+    (us, u') = toUseDmd u
 
 -- This is used in dmdAnalStar when post-processing
 -- a function's argument demand. So we only care about what
@@ -1386,6 +1383,16 @@ postProcessDmd (JD { sd = ss, ud = us }) (JD { sd = s, ud = a})
            Use Many _ -> markReusedDmd a
            Use One  _ -> a
 
+peelStrCall :: StrDmd -> (StrDmd, Str ())
+peelStrCall (SCall s') = (s', Str ())
+peelStrCall HyperStr   = (HyperStr, Str ())
+peelStrCall _          = (HeadStr, Lazy)
+
+peelUseCall :: UseDmd -> (UseDmd, Use ())
+peelUseCall (UCall c u') = (u', Use c ())
+peelUseCall UHead        = (UHead, Abs)
+peelUseCall _            = (Used, Use Many ())
+
 -- Peels one call level from the demand, and also returns
 -- whether it was unsaturated (separately for strictness and usage)
 peelCallDmd :: CleanDemand -> (CleanDemand, DmdShell)
@@ -1395,16 +1402,8 @@ peelCallDmd :: CleanDemand -> (CleanDemand, DmdShell)
 peelCallDmd (JD {sd = s, ud = u})
   = (JD { sd = s', ud = u' }, JD { sd = ss, ud = us })
   where
-    (s', ss) = case s of
-                 SCall s' -> (s',       Str ())
-                 HyperStr -> (HyperStr, Str ())
-                 _        -> (HeadStr,  Lazy)
-    (u', us) = case u of
-                 UCall c u' -> (u',   Use c    ())
-                 _          -> (Used, Use Many ())
-       -- The _ cases for usage includes UHead which seems a bit wrong
-       -- because the body isn't used at all!
-       -- c.f. the Abs case in toCleanDmd
+    (s', ss) = peelStrCall s
+    (u', us) = peelUseCall u
 
 -- Peels that multiple nestings of calls clean demand and also returns
 -- whether it was unsaturated (separately for strictness and usage

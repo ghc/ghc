@@ -44,11 +44,16 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Data.Maybe
 import GHC.Utils.Misc
+import GHC.Utils.Monad (zipWith3M)
 import GHC.Utils.Outputable
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
+
+import Control.Monad    (guard, mzero)
+import Control.Applicative ((<|>))
+import Control.Monad.Trans.Class (lift)
 
 {-
 ************************************************************************
@@ -131,7 +136,8 @@ mkWwBodies :: DynFlags
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
-           -> CprResult      -- Info about function result
+           -> Termination    -- Deep info about rapid termination
+           -> Cpr            -- Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -145,7 +151,7 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
+mkWwBodies dflags fam_envs rhs_fvs fun_id demands term_info cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
@@ -156,7 +162,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty cpr_info
+              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty term_info cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -986,7 +992,7 @@ deepSplitCprType_maybe fam_envs con_tag ty
   | let (co, ty1) = topNormaliseType_maybe fam_envs ty
                     `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  , isDataTyCon tc
+  , isDataTyCon tc || isUnboxedTupleTyCon tc
   , let cons = tyConDataCons tc
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
@@ -999,7 +1005,7 @@ deepSplitCprType_maybe fam_envs con_tag ty
   -- multiplicity fields.
   = Just DataConAppContext { dcac_dc = con
                            , dcac_tys = tc_args
-                           , dcac_arg_tys = zipEqual "dspt" arg_tys strict_marks
+                           , dcac_arg_tys = zipEqual "dsct" arg_tys strict_marks
                            , dcac_co = co }
 deepSplitCprType_maybe _ _ _ = Nothing
 
@@ -1072,72 +1078,77 @@ left-to-right traversal of the result structure.
 mkWWcpr :: Bool
         -> FamInstEnvs
         -> Type                              -- function body type
-        -> CprResult                         -- CPR analysis results
+        -> Termination                       -- Termination analysis results
+        -> Cpr                               -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr opt_CprAnal fam_envs body_ty cpr
+mkWWcpr opt_CprAnal fam_envs body_ty term cpr
     -- CPR explicitly turned off (or in -O0)
   | not opt_CprAnal = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
-  | otherwise
-  = case asConCpr cpr of
-       Nothing      -> return (False, id, id, body_ty)  -- No CPR info
-       Just con_tag | Just dcac <- deepSplitCprType_maybe fam_envs con_tag body_ty
-                    -> mkWWcpr_help dcac
-                    |  otherwise
-                       -- See Note [non-algebraic or open body type warning]
-                    -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-                       return (False, id, id, body_ty)
+  | otherwise = do
+      -- We assume WHNF, so the outer layer always terminates.
+      let (_tm, term') = forceTerm (getStrDmd seqDmd) term
+      mb_stuff <- mkWWcpr_one_layer fam_envs body_ty term' cpr
+      case mb_stuff of
+        Nothing -> return (False, id, id, body_ty)
+        Just stuff -> do
+          (build_wrk, build_wrp, body_ty) <- mkWWcpr_build stuff
+          -- pprTrace "mkWWcpr" (ppr (build_wrk (mkCharExpr 's')) $$ ppr (build_wrp (mkCharExpr 's')) $$ ppr body_ty) (return ())
+          return (True, build_wrk, build_wrp, body_ty)
 
-mkWWcpr_help :: DataConAppContext
-             -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
+type CprWWBuilder = ([Id], CoreExpr, CoreExpr -> CoreExpr -> CoreExpr)
 
-mkWWcpr_help (DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
-                                , dcac_arg_tys = arg_tys, dcac_co = co })
-  | [arg1@(arg_ty1, _)] <- arg_tys
-  , isUnliftedType (scaledThing arg_ty1)
-  , isLinear arg_ty1
-        -- Special case when there is a single result of unlifted, linear, type
-        --
-        -- Wrapper:     case (..call worker..) of x -> C x
-        -- Worker:      case (   ..body..    ) of C x -> x
-  = do { (work_uniq : arg_uniq : _) <- getUniquesM
-       ; let arg       = mk_ww_local arg_uniq arg1
-             con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
+mkWWcpr_one_layer :: FamInstEnvs -> Type -> Termination -> Cpr -> UniqSM (Maybe CprWWBuilder)
+-- Nothing:   There is nothing worth taking apart.
+--            On the outer level, this will prevent mkWWcpr from doing anything at all
+--            Otherwise it means: Use the value directly
+-- Just (vars, con_app, decon):
+--   vars:    Variables used when deconstructing/constructing boxed values
+--   con_app: Assuming those variables are in scope, wraps them in the constructor
+--   decon:   Takes the constructor returned by the first argument apart, binds
+--            its parameters to `vars`, and in that scope executes the second argument.
+mkWWcpr_one_layer fam_envs body_ty term cpr = runMaybeT $ do
+  (con_tag, arg_terms, arg_cprs) <- hoistMaybe $ asConCpr term cpr
 
-       ; return ( True
-                , \ wkr_call -> mkDefaultCase wkr_call arg con_app
-                , \ body     -> mkUnpackCase body co One work_uniq data_con [arg] (varToCoreExpr arg)
-                                -- varToCoreExpr important here: arg can be a coercion
-                                -- Lacking this caused #10658
-                , scaledThing arg_ty1 ) }
+  DataConAppContext { dcac_dc = data_con, dcac_tys = inst_tys
+                    , dcac_arg_tys = arg_tys, dcac_co = co }
+    <- hoistMaybe (deepSplitCprType_maybe fam_envs con_tag body_ty)
+       -- See Note [non-algebraic or open body type warning]
+       <|> (WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
+            mzero)
 
-  | otherwise   -- The general case
-        -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
-        -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
-        --
-        -- Remark on linearity: in both the case of the wrapper and the worker,
-        -- we build a linear case. All the multiplicity information is kept in
-        -- the constructors (both C and (#, #)). In particular (#,#) is
-        -- parametrised by the multiplicity of its fields. Specifically, in this
-        -- instance, the multiplicity of the fields of (#,#) is chosen to be the
-        -- same as those of C.
-  = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict)
-             args        = zipWith mk_ww_local uniqs arg_tys
-             ubx_tup_ty  = exprType ubx_tup_app
-             ubx_tup_app = mkCoreUbxTup (map (scaledThing . fst) arg_tys) (map varToCoreExpr args)
-             con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
-             tup_con     = tupleDataCon Unboxed (length arg_tys)
+  uniq1:arg_uniqs <- lift getUniquesM
+  let arg_vars = zipWith mk_ww_local arg_uniqs arg_tys
 
-       ; return (True
-                , \ wkr_call -> mkSingleAltCase wkr_call wrap_wild
-                                                (DataAlt tup_con) args con_app
-                , \ body     -> mkUnpackCase body co One work_uniq data_con args ubx_tup_app
-                , ubx_tup_ty ) }
+  maybe_arg_stuff <- lift $ zipWith3M (mkWWcpr_one_layer fam_envs)
+                                      (map fst arg_tys)
+                                      arg_terms
+                                      arg_cprs
+
+  let go_arg_stuff var mb_stuff =
+        case mb_stuff of
+          Nothing ->
+            -- this argument does not need to be deconstructed further
+            ([var], varToCoreExpr var, id)
+          Just (inner_vars, arg_con, arg_decon) ->
+            (inner_vars, arg_con, arg_decon (varToCoreExpr var))
+
+  let (inner_arg_varss, arg_cons, arg_decons) = unzip3 $ zipWith go_arg_stuff arg_vars maybe_arg_stuff
+      inner_arg_vars = concat     inner_arg_varss
+      inner_decon    = foldl' (.) id arg_decons
+
+  -- Don't try to WW an unboxed tuple return type when there's nothing inside
+  -- to unbox further.
+  guard (not (isUnboxedTupleCon data_con && all isNothing maybe_arg_stuff))
+
+  return ( inner_arg_vars
+         , mkConApp data_con (map Type inst_tys ++ arg_cons) `mkCast` mkSymCo co
+         , \e body -> mkUnpackCase e co One uniq1 data_con arg_vars (inner_decon body)
+         )
 
 mkUnpackCase ::  CoreExpr -> Coercion -> Mult -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
 -- (mkUnpackCase e co uniq Con args body)
@@ -1154,10 +1165,48 @@ mkUnpackCase scrut co mult uniq boxing_con unpk_args body
     bndr = mk_ww_local uniq (Scaled mult (exprType casted_scrut), MarkedStrict)
       -- An unpacking case can always be chosen linear, because the variables
       -- are always passed to a constructor. This limits the
-{-
-Note [non-algebraic or open body type warning]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+-- | Turns the result of 'mkWWcpr_one_layer' into a worker
+mkWWcpr_build :: CprWWBuilder -> UniqSM (CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
+mkWWcpr_build ([arg_var], con_app, decon)
+  | let arg_ty = idType arg_var
+  , isUnliftedType (scaledThing arg_ty)
+  , isLinear arg_ty
+  -- Special case when there is a single result of unlifted, linear type
+  --
+  -- Wrapper:     case (..call worker..) of x -> C x
+  -- Worker:      case (   ..body..    ) of C x -> x
+  = return ( \ wkr_call -> mkDefaultCase wkr_call arg_var con_app
+           , \ body     -> decon body (varToCoreExpr arg_var)
+           , scaledThing arg_ty )
+mkWWcpr_build (arg_vars, con_app, decon) = do
+  -- The general case
+  --
+  -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
+  -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
+  --
+  -- Remark on linearity: in both the case of the wrapper and the worker,
+  -- we build a linear case. All the multiplicity information is kept in
+  -- the constructors (both C and (#, #)). In particular (#,#) is
+  -- parametrised by the multiplicity of its fields. Specifically, in this
+  -- instance, the multiplicity of the fields of (#,#) is chosen to be the
+  -- same as those of C.
+  wrap_wild_uniq <- getUniqueM
+
+  let wrap_wild   = mk_ww_local wrap_wild_uniq (linear ubx_tup_ty,MarkedStrict)
+      arg_tys     = map idType arg_vars
+      ubx_tup_app = mkCoreUbxTup (map (scaledThing . fst) arg_tys) (map varToCoreExpr args)
+      ubx_tup_ty  = exprType ubx_tup_app
+      tup_con     = tupleDataCon Unboxed (length arg_tys)
+
+  return ( \ wkr_call -> mkSingleAltCase wkr_call wrap_wild (DataAlt tup_con)
+                                         arg_vars con_app
+         , \ body     -> decon body ubx_tup_app
+         , ubx_tup_ty )
+
+{- Note [non-algebraic or open body type warning]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>>>>>> 2eabe61c94... Nested CPR
 There are a few cases where the W/W transformation is told that something
 returns a constructor, but the type at hand doesn't really match this. One
 real-world example involves unsafeCoerce:
@@ -1262,7 +1311,7 @@ mk_absent_let dflags fam_envs arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
   where
-    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 botCpr
+    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 topTerm botCpr
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
