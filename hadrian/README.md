@@ -124,7 +124,7 @@ currently fails under certain circumstances, as discussed in
 #### Expressions
 
 Hadrian expressions are used extensively for specifying build settings. For an
-explaination of how they work, see the [documentation](doc/expressions.md).
+explanation of how they work, see the [documentation](doc/expressions.md).
 
 #### User settings
 
