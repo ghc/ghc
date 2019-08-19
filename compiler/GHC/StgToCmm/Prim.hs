@@ -466,6 +466,7 @@ dispatchPrimop dflags = \case
         (bWord dflags))
 
   SizeofSmallMutableArrayOp -> dispatchPrimop dflags SizeofSmallArrayOp
+  GetSizeofSmallMutableArrayOp -> dispatchPrimop dflags SizeofSmallArrayOp
 
 -- IndexXXXoffAddr
 
@@ -1445,6 +1446,7 @@ dispatchPrimop dflags = \case
   ByteArrayIsPinnedOp -> alwaysExternal
   ShrinkMutableByteArrayOp_Char -> alwaysExternal
   ResizeMutableByteArrayOp_Char -> alwaysExternal
+  ShrinkSmallMutableByteArrayOp_Char -> alwaysExternal
   NewArrayArrayOp -> alwaysExternal
   NewMutVarOp -> alwaysExternal
   AtomicModifyMutVar2Op -> alwaysExternal
