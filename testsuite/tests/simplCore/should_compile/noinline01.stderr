@@ -14,7 +14,11 @@ Noinline01.$trModule4 :: GHC.Prim.Addr#
     "main"#;
 
 Noinline01.$trModule3 :: GHC.Types.TrName
+<<<<<<< HEAD
 [GblId, Unf=OtherCon []] =
+=======
+[GblId, Cpr=# 1(-), Unf=OtherCon []] =
+>>>>>>> 6bb3d74323... Nested CPR
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
@@ -22,11 +26,19 @@ Noinline01.$trModule2 :: GHC.Prim.Addr#
     "Noinline01"#;
 
 Noinline01.$trModule1 :: GHC.Types.TrName
+<<<<<<< HEAD
 [GblId, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
 [GblId, Unf=OtherCon []] =
+=======
+[GblId, Cpr=# 1(-), Unf=OtherCon []] =
+    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
+
+Noinline01.$trModule :: GHC.Types.Module
+[GblId, Cpr=#1(#, #) 1(1(-), 1(-)), Unf=OtherCon []] =
+>>>>>>> 6bb3d74323... Nested CPR
     CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
 
