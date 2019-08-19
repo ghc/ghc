@@ -565,7 +565,9 @@ EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
     // Set prim = true because only called on ARR_WORDS with the
-    // shrinkMutableByteArray# primop
+    // shrinkMutableByteArray# primop and on
+    // SMALL_MUT_ARR_PTRS_CLEAN and SMALL_MUT_ARR_PTRS_DIRTY
+    // with the shrinkSmallMutableArray# primop.
     overwritingClosure_(p, offset, closure_sizeW(p), true);
 }
 

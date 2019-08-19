@@ -36,6 +36,8 @@
   * Add newtypes for `CSocklen` (`socklen_t`) and `CNfds` (`nfds_t`) to
     `System.Posix.Types`.
 
+  * Add `resizeSmallMutableArray#` to `GHC.Exts`.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
