@@ -26,3 +26,5 @@ test('ArithWord16', omit_ways(['ghci']), compile_and_run, [''])
 
 test('CmpInt16', normal, compile_and_run, [''])
 test('CmpWord16', normal, compile_and_run, [''])
+test('ShrinkSmallMutableArrayA', normal, compile_and_run, [''])
+test('ShrinkSmallMutableArrayB', normal, compile_and_run, [''])
