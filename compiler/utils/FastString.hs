@@ -197,14 +197,12 @@ newtype FastString = FastString {
       fs_bs   :: ByteString
   }
 
-
 -- It is sufficient to test pointer equality as we guarantee that
 -- each string is uniquely allocated.
 instance Eq FastString where
-  f1 == f2  =
-    case (fs_bs f1, fs_bs f2) of
+  (FastString f1) == (FastString f2)  =
+    case (f1,f2) of
       ((BS.PS fp i _len), (BS.PS fp' i' _len1)) -> fp == fp' && i == i'
-  {-# NOINLINE (==) #-}
 
 instance Ord FastString where
     -- Compares lexicographically, not by unique
@@ -450,9 +448,11 @@ mkFastStringWith mk_fs !ptr !len = do
         Just found -> return found
         Nothing -> do
 --          print $ "NOT FOUND:" <> (show fs)
-          let !(BS.PS (ForeignPtr fptr _) _ _) = fs_bs fs
+--          let !(BS.PS (ForeignPtr fptr _) _ _) = fs_bs fs
+          let !bs = fs_bs fs
           v <- IO $ \s ->
-            case mkWeakNoFinalizer# fptr fs s of
+            -- Ben says that this mkWeak is very dodgy
+            case mkWeakNoFinalizer# bs fs s of
                (# s1, w #) -> (# s1, Weak w #)
 --          v <- mkWeak fptr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
