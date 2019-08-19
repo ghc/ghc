@@ -8,7 +8,12 @@ foo _ = Left True
 {-# NOINLINE foo #-}
 
 bar :: a -> (Either Int a, Either Bool a)
-bar x = (Right x, Right x)
+-- lazy prevents Nested CPR from returning just (# x, x #) here.
+-- Doing so would lead to reboxing at the call site, where CSE
+-- isn't able to see that both tuple components are equivalent.
+-- This is unfortunate, but this testcase is about demonstrating
+-- effectiveness of STG CSE.
+bar x = (lazy $ Right x, lazy $ Right x)
 {-# NOINLINE bar #-}
 
 nested :: Either Int (Either Int a) -> Either Bool (Either Bool a)

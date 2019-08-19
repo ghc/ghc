@@ -7,9 +7,15 @@ Foo.g: <S(SS),1*U(1*U(U),1*U(U))>
 
 
 ==================== Cpr signatures ====================
+<<<<<<< HEAD
 Foo.$trModule:
 Foo.f: m1
 Foo.g: m1
+=======
+Foo.$trModule: #1(#, #) 1(1(-), 1(-))
+Foo.f: #1(#) 1(-)
+Foo.g: #1(#) 1(-)
+>>>>>>> 6bb3d74323... Nested CPR
 
 
 

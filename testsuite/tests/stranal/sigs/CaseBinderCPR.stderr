@@ -6,8 +6,13 @@ CaseBinderCPR.f_list_cmp: <L,C(C1(U(U)))><S,1*U><S,1*U>
 
 
 ==================== Cpr signatures ====================
+<<<<<<< HEAD
 CaseBinderCPR.$trModule:
 CaseBinderCPR.f_list_cmp: m1
+=======
+CaseBinderCPR.$trModule: #1(#, #) 1(1(-), 1(-))
+CaseBinderCPR.f_list_cmp: * 1(-)
+>>>>>>> 6bb3d74323... Nested CPR
 
 
 
