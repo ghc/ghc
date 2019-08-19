@@ -1,10 +1,10 @@
-# Hadrian Expressions
+# Expressions
 
 `Expr c b a` is a computation that produces a value of type `Action a` and can
 read parameters of the current build `Target c b`, but what does that mean
 exactly? Here's its definition:
 
-```
+```haskell
 newtype Expr c b a = Expr (ReaderT (Target c b) Action a)
     deriving (Applicative, Functor, Monad)
 ```
@@ -18,7 +18,7 @@ to Shake users via a library.
 A type synonym from `hadrian/src/Expression/Type.hs` is often used to avoid
 writing `Context` and `Builder` everywhere:
 
-```
+```haskell
 type Expr a = H.Expr Context Builder a
 ```
 
@@ -38,7 +38,7 @@ functions based on it.
 
 So, instead of:
 
-```
+```haskell
 foo :: Target Context Builder -> Action ()
 foo target = do
   liftIO $ putStrLn "Some message"
@@ -51,13 +51,13 @@ bar target' = do
 
 baz :: Target Context Builder -> Action ()
 baz target'' = do
-  liftIO $ putStrLn "Yet another message
-  liftIO $ print target''
+  liftIO $ putStrLn "Yet another message"
+  liftIO $ print target
 ```
 
 We can write:
 
-```
+```haskell
 foo :: ReaderT (Target Context Builder) Action ()
 foo = do
   liftIO $ putStrLn "Some message"
@@ -78,7 +78,7 @@ baz = do
 And to make those into Hadrian Expressions all we have to do is change the type
 and add the constructor:
 
-```
+```haskell
 foo :: Expr ()
 foo = Expr $ do
   liftIO $ putStrLn "Some message"
@@ -104,7 +104,7 @@ From `hadrian/src/Hadrian/Target.hs`:
 > comprises a build context (type variable `c`), a builder (type variable `b`),
 > a list of input files and a list of output files. For example:
 >
-> ```
+> ```haskell
 > preludeTarget = Target (GHC.Context) (GHC.Builder)
 >     { context = Context Stage1 base profiling
 >     , builder = Ghc Stage1
@@ -114,7 +114,7 @@ From `hadrian/src/Hadrian/Target.hs`:
 
 The data type is as follows and is fairly self-explanatory:
 
-```
+```haskell
 data Target c b = Target
     { context :: c          -- ^ Current build context
     , builder :: b          -- ^ Builder to be invoked
@@ -131,7 +131,7 @@ context for the build (in Hadrian: `Context`), and the builder (in Hadrian:
 
 From `hadrian/src/Context/Type.hs`:
 
-```
+```haskell
 data Context = Context
     { stage   :: Stage   -- ^ Currently build Stage
     , package :: Package -- ^ Currently build Package
@@ -146,7 +146,7 @@ context for some particular `Target`.
 
 From `hadrian/src/Stage.hs`:
 
-```
+```haskell
 data Stage = Stage0 | Stage1 | Stage2 | Stage3
     deriving (Show, Eq, Ord, Enum, Generic, Bounded)
 ```
@@ -155,7 +155,7 @@ data Stage = Stage0 | Stage1 | Stage2 | Stage3
 
 From `hadrian/src/Hadrian/Package.hs`:
 
-```
+```haskell
 data Package = Package {
     -- | The package type. 'Library' and 'Program' packages are supported.
     pkgType :: PackageType,
@@ -171,7 +171,7 @@ data Package = Package {
 
 `PackageType` is simply defined as:
 
-```
+```haskell
 data PackageType = Library | Program deriving (Eq, Generic, Ord, Show)
 ```
 
@@ -185,7 +185,7 @@ Both `PackageName` and `FilePath` are just type synonyms of `String`.
 
 From `hadrian/src/Way/Type.hs`:
 
-```
+```haskell
 newtype Way = Way IntSet
 ```
 
@@ -193,7 +193,7 @@ Where `Way` is a set of enumerated `WayUnit`s wrapped in a `newtype`.
 
 `WayUnit` is defined as:
 
-```
+```haskell
 data WayUnit = Threaded
              | Debug
              | Profiling
@@ -205,7 +205,7 @@ data WayUnit = Threaded
 There are also some helper functions in this module to abstract away this
 complexity. For example:
 
-```
+```haskell
 import qualified Data.IntSet as Set
 
 wayFromUnits :: [WayUnit] -> Way
@@ -224,7 +224,7 @@ when we're building with a particular `WayUnit`, but not otherwise.
 
 For example, using `getWay :: Expr Context b Way` from `hadrian/src/Context.hs`:
 
-```
+```haskell
 foo :: Expr ()
 foo = do
   w <- getWay
@@ -249,7 +249,7 @@ From `hadrian/src/Builder.hs`:
 The data type itself is simply a long set of constructors that may or may not
 be parameterised:
 
-```
+```haskell
 data Builder = Alex
              | Ar ArMode Stage
              | Autoreconf FilePath
@@ -267,3 +267,61 @@ data Builder = Alex
 using `liftIO` and keeps track of the dependencies for a rule. For more
 information on `Action`, see the Shake docs:
 https://hackage.haskell.org/package/shake-0.18.3/docs/Development-Shake.html
+
+# Predicates
+
+One useful kind of Hadrian expression is `Predicate`, which is just a type
+synonym for `Expr Bool`. These expressions can read from the `Target` and
+possibly perform `IO` or any other `Action` to return a `Bool`.
+
+A particularly useful operator for using `Predicate`s is `?`. Its real type and
+implementation can be found in `hadrian/src/Hadrian/Expression.hs`, but for the
+sake of illustrating how it works in most cases, imagine it's defined like
+this:
+
+```haskell
+(?) :: Monoid a => Predicate -> Expr a -> Expr a
+predicate ? expr = do
+  bool <- predicate
+  if bool then expr else return mempty
+```
+
+If the `Predicate` returns `True`, we return the `Expr` we give it, otherwise
+we return `mempty` (which is why we need the `Monoid` type constraint). In fact
+thanks to some added type class complexity in the real definition, we can
+give `?` a `Bool` instead of a `Predicate` and it works the same way.
+
+To show how we might use `Predicate`s and `?` in practice, say we want to
+compile all the Haskell modules in `compiler/` with `-O0` during stage 0. We can
+do that by going to `UserSettings.hs` (see
+[the user settings docs](user-settings.md)) and changing `userArgs` to:
+
+```haskell
+userArgs :: Args
+userArgs = package compiler ? builder (Ghc CompileHs stage0) ? arg "-O0"
+```
+
+`Args` is just a type synonym for `Expr [String]` and `arg` just lifts a
+`String` into an `Args`.
+
+`package :: Package -> Predicate` from `hadrian/src/Expression.hs` takes a
+`Package` and returns a `Predicate` that will return `True` if the current
+`Target` is part of that package and `False` otherwise. In this case we give
+it `compiler` which is defined in `hadrian/src/Packages.hs` along with many
+other convenient `Package` definitions.
+
+`builder` comes from `hadrian/src/Expression.hs`:
+
+> This type class allows the user to construct both precise builder
+> predicates, such as `builder (Ghc CompileHs Stage1)`, as well as predicates
+> covering a set of similar builders. For example, `builder (Ghc CompileHs)`
+> matches any stage, and `builder Ghc` matches any stage and any GHC mode.
+
+```haskell
+class BuilderPredicate a where
+    -- | Is a particular builder being used?
+    builder :: a -> Predicate
+```
+
+Other useful `Predicate` functions can be found in `hadrian/src/Expression.hs`
+and `hadrian/src/Hadrian/Expression.hs`.
