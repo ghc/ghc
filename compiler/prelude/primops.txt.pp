@@ -1244,6 +1244,14 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
 
+primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> State# s -> State# s
+   {Shrink mutable array to new specified size, in
+    the specified state thread. The new size argument must be less than or
+    equal to the current size as reported by {\tt sizeofSmallMutableArray\#}.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
@@ -1264,6 +1272,13 @@ primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
 
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int#
+   {Return the number of elements in the array. Note that this is deprecated
+   as it is unsafe in the presence of resize operations on the
+   same byte array.}
+   with deprecated_msg = { Use 'getSizeofSmallMutableArray#' instead }
+
+primop  GetSizeofSmallMutableArrayOp "getSizeofSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> State# s -> (# State# s, Int# #)
    {Return the number of elements in the array.}
 
 primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
@@ -1463,7 +1478,7 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
    {Return the size of the array in bytes. Note that this is deprecated as it is
-   unsafe in the presence of concurrent resize operations on the same byte
+   unsafe in the presence of resize operations on the same byte
    array.}
    with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 

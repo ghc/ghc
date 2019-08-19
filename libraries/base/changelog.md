@@ -37,7 +37,9 @@
     `System.Posix.Types`.
 
   * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
-    and `(,,,) a b c`
+    and `(,,,) a b c`.
+
+  * Add `resizeSmallMutableArray#` to `GHC.Exts`.
 
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
