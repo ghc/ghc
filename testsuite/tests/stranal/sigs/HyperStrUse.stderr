@@ -5,9 +5,15 @@ HyperStrUse.f: <SP(SP(U),A)><SU>
 
 
 
+==================== Term signatures ====================
+HyperStrUse.$trModule: *
+HyperStrUse.f: *1(#)
+
+
+
 ==================== Cpr signatures ====================
 HyperStrUse.$trModule:
-HyperStrUse.f: m1
+HyperStrUse.f: 1
 
 
 

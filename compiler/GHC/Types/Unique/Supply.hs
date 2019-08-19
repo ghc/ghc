@@ -45,7 +45,7 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
-import GHC.Exts( Ptr(..), noDuplicate# )
+import GHC.Exts( Ptr(..), noDuplicate#, lazy )
 #if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
 #if defined(DEBUG)
@@ -227,8 +227,12 @@ mkSplitUniqSupply c
         -- deferred IO computations
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
-        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        (# s4, dont_cpr $ MkSplitUniqSupply (mask .|. u) x y #)
         }}}}
+
+     -- Do not CPR the occ of MkSplitUniqsupply, it won't cancel through
+     -- 'unsafeDupableInterleaveIO' anyway.
+     dont_cpr = GHC.Exts.lazy
 
 #if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 foreign import ccall unsafe "genSym" genSym :: IO Int

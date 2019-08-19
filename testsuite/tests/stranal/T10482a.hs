@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-unbox-small-strict-fields #-}
                 -- Makes f2 a bit more challenging
+                -- ... and also invalid?!
 
 module Foo where
 
@@ -22,8 +23,8 @@ f1 x = case h x x of
 
 
 ------- f2 -----------
--- We used to unbox x here and rebox it in the wrapper. After #17932, we don't.
--- After #17932, we don't.
+-- We used to unbox x here and rebox it in the wrapper.
+-- After #17932, we don't, because of -fno-unbox-small-strict-fields.
 -- Historical comment:
 -- x is a strict field of MkT2, so we'll pass it unboxed
 -- to $wf2, so it's available unboxed.  This depends on

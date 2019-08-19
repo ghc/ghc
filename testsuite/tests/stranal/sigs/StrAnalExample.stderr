@@ -5,6 +5,12 @@ StrAnalExample.foo: <SU>
 
 
 
+==================== Term signatures ====================
+StrAnalExample.$trModule: *
+StrAnalExample.foo: #
+
+
+
 ==================== Cpr signatures ====================
 StrAnalExample.$trModule:
 StrAnalExample.foo:

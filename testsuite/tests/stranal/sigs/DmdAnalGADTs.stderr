@@ -13,6 +13,20 @@ DmdAnalGADTs.hasStrSig: <SP(U)>
 
 
 
+==================== Term signatures ====================
+DmdAnalGADTs.$tc'A: *
+DmdAnalGADTs.$tc'B: *
+DmdAnalGADTs.$tcD: *
+DmdAnalGADTs.$trModule: *
+DmdAnalGADTs.diverges: *(#..)
+DmdAnalGADTs.f: #
+DmdAnalGADTs.f': #1(#)
+DmdAnalGADTs.g: *L*(#..)
+DmdAnalGADTs.hasCPR: *
+DmdAnalGADTs.hasStrSig: #1(#)
+
+
+
 ==================== Cpr signatures ====================
 DmdAnalGADTs.$tc'A:
 DmdAnalGADTs.$tc'B:
@@ -20,10 +34,10 @@ DmdAnalGADTs.$tcD:
 DmdAnalGADTs.$trModule:
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f:
-DmdAnalGADTs.f': m1
+DmdAnalGADTs.f': 1
 DmdAnalGADTs.g:
 DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: m1
+DmdAnalGADTs.hasStrSig: 1
 
 
 

@@ -1,0 +1,14 @@
+
+==================== Term signatures ====================
+CaseBinderCPR.$trModule: *
+CaseBinderCPR.f_list_cmp: *
+CaseBinderCPR.g: *1(#, #)
+
+
+
+==================== Cpr signatures ====================
+CaseBinderCPR.$trModule:
+CaseBinderCPR.f_list_cmp:
+CaseBinderCPR.g: 1
+
+

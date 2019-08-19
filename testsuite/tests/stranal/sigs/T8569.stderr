@@ -8,6 +8,15 @@ T8569.addUp: <SU><U>
 
 
 
+==================== Term signatures ====================
+T8569.$tc'Rdata: *
+T8569.$tc'Rint: *
+T8569.$tcRep: *
+T8569.$trModule: *
+T8569.addUp: *
+
+
+
 ==================== Cpr signatures ====================
 T8569.$tc'Rdata:
 T8569.$tc'Rint:

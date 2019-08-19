@@ -43,7 +43,8 @@ import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
 import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrUsedDmd
                         , mkClosedStrictSig, topDmd, seqDmd, isDeadEndDiv )
-import GHC.Types.Cpr    ( mkCprSig, botCpr )
+import GHC.Types.Cpr
+import GHC.Types.Termination
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
@@ -537,6 +538,7 @@ prepareBinding env top_lvl old_bndr bndr rhs
  where
    info = idInfo bndr
    worker_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
+                               `setTermInfo`       termInfo info
                                `setCprInfo`        cprInfo info
                                `setDemandInfo`     demandInfo info
                                `setInlinePragInfo` inlinePragInfo info
@@ -816,12 +818,13 @@ addLetBndrInfo new_bndr new_arity_type new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
+    -- We should use setDivergingIdInfo here, but that won't inherit the 'div'
     info4 | isDeadEndDiv div = info3 `setStrictnessInfo` bot_sig
-                                     `setCprInfo`        bot_cpr
+                                     `setTermInfo`       divergeTermSig
+                                     `setCprInfo`        botCprSig
           | otherwise        = info3
 
-    bot_sig = mkClosedStrictSig (replicate new_arity topDmd) div
-    bot_cpr = mkCprSig new_arity botCpr
+    bot_sig  = mkClosedStrictSig (replicate new_arity topDmd) div
 
      -- Zap call arity info. We have used it by now (via
      -- `tryEtaExpandRhs`), and the simplifier can invalidate this

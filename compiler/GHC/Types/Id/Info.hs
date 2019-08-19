@@ -23,6 +23,7 @@ module GHC.Types.Id.Info (
         -- * The IdInfo type
         IdInfo,         -- Abstract
         vanillaIdInfo, noCafIdInfo,
+        setDivergingInfo,
 
         -- ** The OneShotInfo type
         OneShotInfo(..),
@@ -43,6 +44,7 @@ module GHC.Types.Id.Info (
 
         -- ** Demand and strictness Info
         strictnessInfo, setStrictnessInfo,
+        termInfo, setTermInfo,
         cprInfo, setCprInfo,
         demandInfo, setDemandInfo, pprStrictness,
 
@@ -107,6 +109,7 @@ import GHC.Types.ForeignCall
 import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Termination
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -126,10 +129,12 @@ infixl  1 `setRuleInfo`,
           `setOccInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
+          `setTermInfo`,
           `setCprInfo`,
           `setDemandInfo`,
           `setNeverLevPoly`,
-          `setLevityInfoWithType`
+          `setLevityInfoWithType`,
+          `setDivergingInfo`
 
 {-
 ************************************************************************
@@ -266,6 +271,9 @@ data IdInfo
         strictnessInfo  :: StrictSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
+        termInfo        :: TermSig,
+        -- ^ Deep rapid termination information at different levels.
+        -- A nested and second-order 'GHC.Core.Utils.exprOkForSpeculation'.
         cprInfo         :: CprSig,
         -- ^ Information on whether the function will ultimately return a
         -- freshly allocated constructor.
@@ -412,8 +420,11 @@ setDemandInfo info dd = dd `seq` info { demandInfo = dd }
 setStrictnessInfo :: IdInfo -> StrictSig -> IdInfo
 setStrictnessInfo info dd = dd `seq` info { strictnessInfo = dd }
 
+setTermInfo :: IdInfo -> TermSig -> IdInfo
+setTermInfo info term = seqTermSig term `seq` info { termInfo = term }
+
 setCprInfo :: IdInfo -> CprSig -> IdInfo
-setCprInfo info cpr = cpr `seq` info { cprInfo = cpr }
+setCprInfo info cpr = seqCprSig cpr `seq` info { cprInfo = cpr }
 
 -- | Basic 'IdInfo' that carries no useful information whatsoever
 vanillaIdInfo :: IdInfo
@@ -425,6 +436,7 @@ vanillaIdInfo
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
+            termInfo            = topTermSig,
             cprInfo             = topCprSig,
             bitfield            = bitfieldSetCafInfo vanillaCafInfo $
                                   bitfieldSetArityInfo unknownArity $
@@ -691,6 +703,17 @@ zapTailCallInfo info
 
 zapCallArityInfo :: IdInfo -> IdInfo
 zapCallArityInfo info = setCallArityInfo info 0
+
+-- | Set the 'IdInfo' for a binding forces its arguments according to the given
+-- demands and then diverges..
+setDivergingInfo :: IdInfo -> [Demand] -> IdInfo
+setDivergingInfo info arg_dmds =
+  info `setStrictnessInfo` mkClosedStrictSig arg_dmds botDiv
+       `setTermInfo`       divergeTermSig
+       `setCprInfo`        botCprSig
+       `setArityInfo`      arity
+  where
+    !arity = length arg_dmds
 
 {-
 ************************************************************************

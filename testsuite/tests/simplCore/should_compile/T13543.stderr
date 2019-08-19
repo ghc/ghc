@@ -6,10 +6,17 @@ Foo.g: <SP(SP(U),SP(U))>
 
 
 
+==================== Term signatures ====================
+Foo.$trModule: *
+Foo.f: #1(#)
+Foo.g: #1(#)
+
+
+
 ==================== Cpr signatures ====================
 Foo.$trModule:
-Foo.f: m1
-Foo.g: m1
+Foo.f: 1
+Foo.g: 1
 
 
 

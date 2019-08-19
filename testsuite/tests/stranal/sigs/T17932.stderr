@@ -9,6 +9,16 @@ T17932.flags: <SP(SU,SU)>
 
 
 
+==================== Term signatures ====================
+T17932.$tc'Options: *
+T17932.$tc'X: *
+T17932.$tcOptions: *
+T17932.$tcX: *
+T17932.$trModule: *
+T17932.flags: *
+
+
+
 ==================== Cpr signatures ====================
 T17932.$tc'Options:
 T17932.$tc'X:

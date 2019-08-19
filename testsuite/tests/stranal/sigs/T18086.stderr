@@ -6,10 +6,17 @@ T18086.panic: <U>x
 
 
 
+==================== Term signatures ====================
+T18086.$trModule: *
+T18086.m: *(#..)
+T18086.panic: *
+
+
+
 ==================== Cpr signatures ====================
 T18086.$trModule:
 T18086.m: b
-T18086.panic:
+T18086.panic: b
 
 
 

@@ -62,7 +62,6 @@ import GHC.Types.Var  ( EvVar, setTyVarUnique )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Demand
-import GHC.Types.Cpr
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Literal
 import GHC.Types.Unique.Supply
@@ -891,9 +890,7 @@ mkExceptionId :: Name -> Id
 mkExceptionId name
   = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
-      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
-                     `setCprInfo` mkCprSig 0 botCpr
-                     `setArityInfo` 0
+      (vanillaIdInfo `setDivergingInfo` []
                      `setCafInfo` NoCafRefs) -- #15038
 
 mkRuntimeErrorId :: Name -> Id
@@ -906,11 +903,7 @@ mkRuntimeErrorId :: Name -> Id
 mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
-    bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
-                                   `setCprInfo`           mkCprSig 1 botCpr
-                                   `setArityInfo`         1
-                        -- Make arity and strictness agree
-
+    bottoming_info = vanillaIdInfo `setDivergingInfo` [evalDmd]
         -- Do *not* mark them as NoCafRefs, because they can indeed have
         -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
         -- which has some CAFs
@@ -919,8 +912,6 @@ mkRuntimeErrorId name
         -- can give them NoCaf info.  As it is, any function that calls
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
-
-    strict_sig = mkClosedStrictSig [evalDmd] botDiv
 
 runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a

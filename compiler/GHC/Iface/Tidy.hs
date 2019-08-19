@@ -60,7 +60,8 @@ import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
 import GHC.Types.Demand  ( appIsDeadEnd, isTopSig, isDeadEndSig )
-import GHC.Types.Cpr     ( mkCprSig, botCpr )
+import GHC.Types.Cpr
+import GHC.Types.Termination
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
@@ -1203,6 +1204,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   = vanillaIdInfo
         `setArityInfo`         arity
         `setStrictnessInfo`    final_sig
+        `setTermInfo`          final_term
         `setCprInfo`           final_cpr
         `setOccInfo`           robust_occ_info
         `setInlinePragInfo`    (inlinePragInfo idinfo)
@@ -1220,6 +1222,7 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
     --------- Strictness ------------
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
+    -- final_* should agree with setDivergingInfo
     sig = strictnessInfo idinfo
     final_sig | not $ isTopSig sig
               = WARN( _bottom_hidden sig , ppr name ) sig
@@ -1227,11 +1230,13 @@ tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
               | Just (_, nsig) <- mb_bot_str = nsig
               | otherwise                    = sig
 
+    term = termInfo idinfo
     cpr = cprInfo idinfo
-    final_cpr | Just _ <- mb_bot_str
-              = mkCprSig arity botCpr
-              | otherwise
-              = cpr
+    (final_term, final_cpr)
+      | Just _ <- mb_bot_str
+      = (divergeTermSig, botCprSig)
+      | otherwise
+      = (term, cpr)
 
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False

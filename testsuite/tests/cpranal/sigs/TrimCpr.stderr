@@ -1,0 +1,24 @@
+
+==================== Term signatures ====================
+TrimCpr.$tc'A: *
+TrimCpr.$tc'B: *
+TrimCpr.$tcT: *
+TrimCpr.$trModule: *
+TrimCpr.expensive: *
+TrimCpr.trimByArity: *L#
+TrimCpr.trimByArity2: *1(#)
+TrimCpr.trimByTerm: *
+
+
+
+==================== Cpr signatures ====================
+TrimCpr.$tc'A:
+TrimCpr.$tc'B:
+TrimCpr.$tcT:
+TrimCpr.$trModule:
+TrimCpr.expensive:
+TrimCpr.trimByArity:
+TrimCpr.trimByArity2:
+TrimCpr.trimByTerm:
+
+

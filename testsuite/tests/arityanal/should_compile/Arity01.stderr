@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 61, types: 45, coercions: 0, joins: 0/0}
+Result size of Tidy Core = {terms: 61, types: 41, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 F1.f2 :: Integer
@@ -13,9 +13,9 @@ F1.f1_h1 [Occ=LoopBreaker] :: Integer -> Integer -> Integer -> Integer
 [GblId, Arity=3, Str=<MU><MU><MU>, Unf=OtherCon []]
 F1.f1_h1
   = \ (n :: Integer) (x :: Integer) (eta :: Integer) ->
-      case GHC.Num.Integer.integerCompare x n of {
+      case GHC.Num.Integer.integerLt# x n of {
         __DEFAULT -> eta;
-        LT -> F1.f1_h1 n (GHC.Num.Integer.integerAdd x F1.f2) (GHC.Num.Integer.integerAdd x eta)
+        1# -> F1.f1_h1 n (GHC.Num.Integer.integerAdd x F1.f2) (GHC.Num.Integer.integerAdd x eta)
       }
 end Rec }
 
@@ -43,11 +43,12 @@ F1.s1 :: Integer
 [GblId, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 F1.s1 = 3
 
--- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 8, types: 7, coercions: 0, joins: 0/0}
 s :: forall {t1} {t2}. Num t1 => (t1 -> t2) -> t2
 [GblId,
  Arity=2,
  Str=<1P(A,A,A,A,A,A,1C1(U))><SCS(U)>,
+ Term=#L#L#,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@t) (@t1) ($dNum [Occ=Once1] :: Num t) (f [Occ=Once1!] :: t -> t1) -> f (fromInteger @t $dNum F1.s1)}]
 s = \ (@t) (@t1) ($dNum :: Num t) (f :: t -> t1) -> f (fromInteger @t $dNum F1.s1)

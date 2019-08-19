@@ -5,9 +5,15 @@ T8598.fun: <SP(U)>
 
 
 
+==================== Term signatures ====================
+T8598.$trModule: *
+T8598.fun: *
+
+
+
 ==================== Cpr signatures ====================
 T8598.$trModule:
-T8598.fun: m1
+T8598.fun: 1
 
 
 

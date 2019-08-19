@@ -69,6 +69,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import GHC.Types.Termination
 import GHC.Types.TyThing
 import GHC.Core
 import GHC.Types.Unique
@@ -483,7 +484,6 @@ mkDictSelId name clas
     base_info = noCafIdInfo
                 `setArityInfo`          1
                 `setStrictnessInfo`     strict_sig
-                `setCprInfo`            topCprSig
                 `setLevityInfoWithType` sel_ty
 
     info | new_tycon
@@ -580,7 +580,6 @@ mkDataConWorkId wkr_name data_con
     ----------- Workers for data types --------------
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
-                   `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
@@ -607,31 +606,6 @@ mkDataConWorkId wkr_name data_con
                    mkCompulsoryUnfolding defaultSimpleOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
-
-dataConCPR :: DataCon -> CprResult
-dataConCPR con
-  | isDataTyCon tycon     -- Real data types only; that is,
-                          -- not unboxed tuples or newtypes
-  , null (dataConExTyCoVars con)  -- No existentials
-  , wkr_arity > 0
-  , wkr_arity <= mAX_CPR_SIZE
-  = conCpr (dataConTag con)
-  | otherwise
-  = topCpr
-  where
-    tycon     = dataConTyCon con
-    wkr_arity = dataConRepArity con
-
-    mAX_CPR_SIZE :: Arity
-    mAX_CPR_SIZE = 10
-    -- We do not treat very big tuples as CPR-ish:
-    --      a) for a start we get into trouble because there aren't
-    --         "enough" unboxed tuple types (a tiresome restriction,
-    --         but hard to fix),
-    --      b) more importantly, big unboxed tuples get returned mainly
-    --         on the stack, and are often then allocated in the heap
-    --         by the caller.  So doing CPR for them may in fact make
-    --         things worse.
 
 {-
 -------------------------------------------------
@@ -709,7 +683,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
-                         `setCprInfo`           mkCprSig wrap_arity (dataConCPR data_con)
+                         -- `setCprInfo` topCprSig -- See Note [CPR for DataCon wrappers]
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
@@ -717,10 +691,11 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
              wrap_sig = mkClosedStrictSig wrap_arg_dmds topDiv
 
+             -- Don't forget the dictionary arguments when building the
+             -- strictness signature (#14290). Notably, this does not include
+             -- eq_spec, because they are generated inside the wrapper.
              wrap_arg_dmds =
                replicate (length theta) topDmd ++ map mk_dmd arg_ibangs
-               -- Don't forget the dictionary arguments when building
-               -- the strictness signature (#14290).
 
              mk_dmd str | isBanged str = evalDmd
                         | otherwise    = topDmd
@@ -735,8 +710,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- particular, the wrapper constructor is not inlined inside
              -- an INLINE rhs or when it is not applied to any arguments.
              -- See Note [Inline partially-applied constructor wrappers]
-             -- Passing Nothing here allows the wrapper to inline when
-             -- unsaturated.
              wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOpts wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
                       | otherwise        = mkInlineUnfolding defaultSimpleOpts wrap_rhs
@@ -1318,16 +1291,25 @@ mkPrimOpId prim_op
                          (AnId id) UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
-    -- PrimOps don't ever construct a product, but we want to preserve bottoms
-    cpr
-      | isDeadEndDiv (snd (splitStrictSig strict_sig)) = botCpr
-      | otherwise                                      = topCpr
+    -- PrimOps never construct a product, but we want to assume that
+    --   1. Ok-for-spec ones (i.e. `+#`) terminate.
+    --   2. Those which have dead end Divergence (i.e. `raise#`) have
+    --      `divergeTerm`. If we manage to evaluate them to WHNF (which we
+    --      never do), they have infinitely deep CPR and termination: This is
+    --      so that we give an `if ... then error "blah" else (1, 2)` the
+    --      nested CPR property.
+    -- In all other cases we simply assume `topCpr`.
+    (term, cpr) | primOpOkForSpeculation prim_op = (whnfTermSig,    topCprSig)
+                | isDeadEndSig strict_sig        = (divergeTermSig, botCprSig)
+                | otherwise                      = (topTermSig,     topCprSig)
+
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            mkCprSig arity cpr
+           `setTermInfo`           term
+           `setCprInfo`            cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
@@ -1360,7 +1342,6 @@ mkFCallId dflags uniq fcall ty
     info = noCafIdInfo
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            topCprSig
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
