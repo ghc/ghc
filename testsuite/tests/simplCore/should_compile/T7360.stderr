@@ -9,7 +9,6 @@ T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
  Arity=1,
  Caf=NoCafRefs,
  Str=<S,U>,
- Cpr=m3,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -36,7 +35,7 @@ fun2 :: forall {a}. [a] -> ((), Int)
 [GblId,
  Arity=1,
  Str=<L,1*U>,
- Cpr=m1,
+ Cpr=#1(*, *1(#)) 1(-, 1(-)),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -190,7 +189,6 @@ T7360.$tc'Foo2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
-[GblId, Unf=OtherCon []]
 T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

@@ -2244,7 +2244,8 @@ instance Binary IfaceInfoItem where
             4 -> return HsNoCafRefs
             5 -> return HsLevity
             6 -> HsCpr <$> get bh
-            _ -> HsLFInfo <$> get bh
+            7 -> HsLFInfo <$> get bh
+            _ -> pprPanic "Binary IfaceInfoItem: Invalid tag" (int (fromIntegral h))
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do
