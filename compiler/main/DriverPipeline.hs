@@ -66,7 +66,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
 import Ar
 import Bag              ( unitBag )
-import FastString       ( mkFastString )
+import FastString       ( mkFastString, gcTable )
 
 import Exception
 import System.Directory
@@ -168,7 +168,7 @@ compileOne' m_tc_result mHscMessage
            unless (gopt Opt_KeepOFiles flags) $
                addFilesToClean flags TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
-
+   gcTable
    case (status, hsc_lang) of
         (HscUpToDate, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!

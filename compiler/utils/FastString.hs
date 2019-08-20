@@ -45,7 +45,7 @@ module FastString
         lengthFZS,
 
         -- * FastStrings
-        FastString(..),     -- not abstract, for now.
+        FastString,     -- not abstract, for now.
 
         -- ** Construction
         fsLit,
@@ -82,6 +82,7 @@ module FastString
         getFastStringTable,
         fastStringGcCounter,
         uniqueOfFS,
+        gcTable,
 
         -- * PtrStrings
         PtrString (..),
@@ -136,6 +137,8 @@ import GHC.Conc.Sync    (sharedCAF)
 import GHC.Base         ( unpackCString#, unpackNBytes# )
 import GHC.ForeignPtr
 import GHC.Weak
+import System.Mem
+import MonadUtils
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
@@ -290,6 +293,49 @@ hashToIndex# buckets# hash# =
   where
     !(I# segmentBits#) = segmentBits
     size# = sizeofMutableArray# buckets#
+
+
+mkWeakFS :: FastString -> IO (Weak FastString)
+mkWeakFS fs = mkWeakPtr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
+
+unweakFS :: Weak FastString -> IO (Maybe FastString)
+unweakFS = deRefWeak
+
+gcTable :: IO ()
+gcTable = do
+  forM_ [0 .. (I# sz) - 1] $ \(I# i#) -> do
+    let (# iref #) = indexArray# segments# i#
+    gcSegment iref
+  performGC
+  forM_ [0 .. (I# sz) - 1] $ \(I# i#) -> do
+    let (# iref #) = indexArray# segments# i#
+    collectSegment iref
+
+  where
+    !(FastStringTable _uid segments#) = stringTable
+    sz = sizeofArray# segments#
+
+gcSegment :: IORef FastStringTableSegment -> IO ()
+gcSegment segmentRef = do
+  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
+  let size# = sizeofMutableArray# old#
+  forM_ [0 .. (I# size#) - 1] $ \(I# i#) -> do
+    fsList <- IO $ readArray# old# i#
+    new_list <- mapM (fmap Right . either mkWeakFS return) fsList
+    IO $ \s -> case writeArray# old# i# new_list s of
+                  s2# -> (# s2#, () #)
+
+collectSegment :: IORef FastStringTableSegment -> IO ()
+collectSegment segmentRef = do
+  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
+  let size# = sizeofMutableArray# old#
+  forM_ [0 .. (I# size#) - 1] $ \(I# i#) -> do
+    fsList <- IO $ readArray# old# i#
+    new_fs_list <- map Left <$> mapMaybeM (either (return . Just) unweakFS) fsList
+    IO $ \s -> case writeArray# old# i# new_fs_list s of
+                  s3# -> (# s3#, () #)
+
+
 
 maybeResizeSegment :: IORef FastStringTableSegment -> IO FastStringTableSegment
 maybeResizeSegment segmentRef = do
@@ -450,13 +496,8 @@ mkFastStringWith mk_fs !ptr !len = do
 --          print $ "NOT FOUND:" <> (show fs)
 --          let !(BS.PS (ForeignPtr fptr _) _ _) = fs_bs fs
           let !bs = fs_bs fs
-          v <- IO $ \s ->
-            -- Ben says that this mkWeak is very dodgy
-            case mkWeakNoFinalizer# bs fs s of
-               (# s1, w #) -> (# s1, Weak w #)
---          v <- mkWeak fptr fs (Just $ atomicModifyIORef' fastStringGcCounter (\x -> (x +1, ())))
           IO $ \s1# ->
-            case writeArray# buckets# idx# (Right v: bucket) s1# of
+            case writeArray# buckets# idx# (Left fs: bucket) s1# of
               s2# -> (# s2#, () #)
           modifyIORef' counter succ
           return fs
