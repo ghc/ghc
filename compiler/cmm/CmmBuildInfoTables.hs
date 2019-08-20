@@ -854,7 +854,16 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     nonRec = cafs `Set.difference`
       (Set.fromList caf_lbls `Set.difference` Set.fromList otherFunLabels)
 
-    resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
+    resolve_caf :: CAFLabel -> Maybe SRTEntry
+    resolve_caf l@(CAFLabel l')
+      -- For static data refer directly to the static object, not to its SRT
+      | elem l' static_data
+      = Just (SRTEntry (toClosureLbl l'))
+      | otherwise
+      = resolveCAF srtMap l
+
+    resolved :: [SRTEntry]
+    resolved = mapMaybe resolve_caf (Set.toList nonRec)
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =
@@ -863,7 +872,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
     -- Remove SRTEntries that are also in an SRT that we refer to.
     -- Implements the [Filter] optimisation.
-    filtered = Set.difference (Set.fromList resolved) allBelow
+    filtered = Set.fromList resolved `Set.difference` allBelow
 
   srtTrace2 "oneSRT:"
      (text "srtMap:" <+> ppr srtMap $$
@@ -897,6 +906,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     this_mod = thisModule topSRT
 
     haskell_names = mapMaybe (hasHaskellName . cafLabelCLabel) caf_lbls
+
+    allStaticData = all (\(CAFLabel clbl) -> elem clbl static_data) caf_lbls
 
   case Set.toList filtered of
     [] -> do
@@ -938,6 +949,9 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
             updateSRTMap (Just one)
             return (([], map (,lbl) blockids, []), haskell_names)
 
+    _cafList | allStaticData ->
+      return (([], [], []), haskell_names)
+
     cafList ->
       -- Check whether an SRT with the same entries has been emitted already.
       -- Implements the [Common] optimisation.
@@ -948,9 +962,6 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           return (([], map (,srtLbl) blockids, []), haskell_names)
         Nothing -> do
           -- No duplicates: we have to build a new SRT object
-          srtTrace2 "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                   text "haskell_names:" <+> ppr haskell_names $$
-                                   text "filtered:" <+> ppr filtered) $ return ()
           (decls, funSRTs, srtEntry) <-
             case maybeFunClosure of
               Just (fun,block) ->
@@ -960,16 +971,20 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 return (decls, [], entry)
           updateSRTMap (Just srtEntry)
           let allBelowThis = Set.union allBelow filtered
-              oldFlatSRTs = flatSRTs topSRT
-              newFlatSRTs = Map.insert srtEntry allBelowThis oldFlatSRTs
-              newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
+              newFlatSRTs = Map.insert srtEntry allBelowThis (flatSRTs topSRT)
               -- When all definition in this group are static data we don't
               -- generate any SRTs.
-              allStaticData = all (\(CAFLabel clbl) -> elem clbl static_data) caf_lbls
+              newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
           lift (put (topSRT { dedupSRTs = newDedupSRTs
                             , flatSRTs = newFlatSRTs }))
+          srtTrace2 "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
+                                   text "haskell_names:" <+> ppr haskell_names $$
+                                   text "filtered:" <+> ppr filtered $$
+                                   text "srtEntry:" <+> ppr srtEntry $$
+                                   text "newDedupSRTs:" <+> ppr newDedupSRTs $$
+                                   text "newFlatSRTs:" <+> ppr newFlatSRTs) $ return ()
           let SRTEntry lbl = srtEntry
-          return ((if allStaticData then [] else decls, map (,lbl) blockids, funSRTs), haskell_names)
+          return ((decls, map (,lbl) blockids, funSRTs), haskell_names)
 
 
 -- | build a static SRT object (or a chain of objects) from a list of
