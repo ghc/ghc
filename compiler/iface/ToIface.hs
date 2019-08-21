@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
 
 -- | Functions for converting Core things to interface file things.
 module ToIface
@@ -72,6 +73,32 @@ import TyCoTidy ( tidyCo )
 import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
+
+{- Note [Avoiding space leaks in toIface*]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Building a interface file depends on the output of the simplifier.
+If we build these lazily this would mean keeping the Core AST alive
+much longer than necessary causing a space "leak".
+
+This happens for example when we only write the interface file to disk
+after code gen has run, in which case we might carry megabytes of core
+AST in the heap which is no longer needed.
+
+We avoid this in two ways.
+* First we use -XStrict in ToIface which avoids many thunks to begin with.
+* Second we define NFData instance for IFaceSyn and use them to
+  force any remaining thunks.
+
+-XStrict is not sufficient as patterns of the form `f (g x)` would still
+result in a thunk being allocated for `g x`.
+
+NFData is sufficient for the space leak, but using -XStrict reduces allocation
+by ~0.1% when compiling with -O. (nofib/spectral/simple, T10370).
+It's essentially free performance hence we use -XStrict on top of NFData.
+
+MR !1633 on gitlab, has more discussion on the topic.
+-}
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
