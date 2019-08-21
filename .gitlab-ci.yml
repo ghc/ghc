@@ -286,6 +286,7 @@ hadrian-ghc-in-ghci:
   <<: *only-default
   variables:
     TEST_TYPE: test
+    RTS_HC_OPTS: ""
   before_script:
     - git clean -xdf && git submodule foreach git clean -xdf
   script:
@@ -293,7 +294,7 @@ hadrian-ghc-in-ghci:
     - ./configure $CONFIGURE_ARGS
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror
+      make V=0 -j$THREADS WERROR=-Werror GhcRtsHcOpts=$RTS_HC_OPTS
     - make binary-dist-prep TAR_COMP_OPTS="-1"
     - make test_bindist TEST_PREP=YES
     - |
@@ -607,6 +608,16 @@ nightly-x86_64-linux-deb9-integer-simple:
     TEST_TYPE: slowtest
   artifacts:
     expire_in: 2 year
+  only:
+    variables:
+      - $NIGHTLY
+
+nightly-x86_64-linux-deb9-tsan:
+  extends: .build-x86_64-linux-deb9
+  stage: full-build
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-tsan"
+    RTS_HC_OPTS: "-optc-fsanitize=thread"
   only:
     variables:
       - $NIGHTLY
