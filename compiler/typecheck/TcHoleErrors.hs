@@ -51,7 +51,7 @@ import TcUnify       ( tcSubType_NC )
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface(..) )
+import HscTypes        ( ModIface_(..) )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)

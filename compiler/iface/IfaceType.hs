@@ -9,6 +9,7 @@ This module defines interface types and binders
 {-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
 module IfaceType (
@@ -79,6 +80,7 @@ import Util
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi
+import Control.DeepSeq
 
 {-
 ************************************************************************
@@ -1959,3 +1961,75 @@ instance Binary (DefMethSpec IfaceType) where
             case h of
               0 -> return VanillaDM
               _ -> do { t <- get bh; return (GenericDM t) }
+
+instance NFData IfaceType where
+  rnf = \case
+    IfaceFreeTyVar f1 -> f1 `seq` ()
+    IfaceTyVar f1 -> rnf f1
+    IfaceLitTy f1 -> rnf f1
+    IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceFunTy f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
+    IfaceForAllTy f1 f2 -> f1 `seq` rnf f2
+    IfaceTyConApp f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceCoercionTy f1 -> rnf f1
+    IfaceTupleTy f1 f2 f3 -> f1 `seq` f2 `seq` rnf f3
+
+instance NFData IfaceTyLit where
+  rnf = \case
+    IfaceNumTyLit f1 -> rnf f1
+    IfaceStrTyLit f1 -> rnf f1
+
+instance NFData IfaceCoercion where
+  rnf = \case
+    IfaceReflCo f1 -> rnf f1
+    IfaceGReflCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
+    IfaceFunCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
+    IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
+    IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceForAllCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+    IfaceCoVarCo f1 -> rnf f1
+    IfaceAxiomInstCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+    IfaceAxiomRuleCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceUnivCo f1 f2 f3 f4 -> rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4
+    IfaceSymCo f1 -> rnf f1
+    IfaceTransCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceNthCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceLRCo f1 f2 -> f1 `seq` rnf f2
+    IfaceInstCo f1 f2 -> rnf f1 `seq` rnf f2
+    IfaceKindCo f1 -> rnf f1
+    IfaceSubCo f1 -> rnf f1
+    IfaceFreeCoVar f1 -> f1 `seq` ()
+    IfaceHoleCo f1 -> f1 `seq` ()
+
+instance NFData IfaceUnivCoProv where
+  rnf x = seq x ()
+
+instance NFData IfaceMCoercion where
+  rnf x = seq x ()
+
+instance NFData IfaceOneShot where
+  rnf x = seq x ()
+
+instance NFData IfaceTyConSort where
+  rnf = \case
+    IfaceNormalTyCon -> ()
+    IfaceTupleTyCon arity sort -> rnf arity `seq` sort `seq` ()
+    IfaceSumTyCon arity -> rnf arity
+    IfaceEqualityTyCon -> ()
+
+instance NFData IfaceTyConInfo where
+  rnf (IfaceTyConInfo f s) = f `seq` rnf s
+
+instance NFData IfaceTyCon where
+  rnf (IfaceTyCon nm info) = rnf nm `seq` rnf info
+
+instance NFData IfaceBndr where
+  rnf = \case
+    IfaceIdBndr id_bndr -> rnf id_bndr
+    IfaceTvBndr tv_bndr -> rnf tv_bndr
+
+instance NFData IfaceAppArgs where
+  rnf = \case
+    IA_Nil -> ()
+    IA_Arg f1 f2 f3 -> rnf f1 `seq` f2 `seq` rnf f3
