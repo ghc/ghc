@@ -10,8 +10,8 @@
 -- writing them to disk and comparing two versions to see if
 -- recompilation is required.
 module MkIface (
-        mkIface,        -- Build a ModIface from a ModGuts,
-                        -- including computing version information
+        mkPartialIface,
+        mkFullIface,
 
         mkIfaceTc,
 
@@ -135,48 +135,51 @@ import qualified Data.Semigroup
 ************************************************************************
 -}
 
-mkIface :: HscEnv
-        -> Maybe Fingerprint    -- The old fingerprint, if we have it
-        -> ModDetails           -- The trimmed, tidied interface
-        -> ModGuts              -- Usages, deprecations, etc
-        -> IO (ModIface, -- The new one
-               Bool)     -- True <=> there was an old Iface, and the
-                         --          new one is identical, so no need
-                         --          to write it
+mkPartialIface :: HscEnv
+               -> ModDetails
+               -> ModGuts
+               -> PartialModIface
+mkPartialIface hsc_env mod_details
+  ModGuts{ mg_module       = this_mod
+         , mg_hsc_src      = hsc_src
+         , mg_usages       = usages
+         , mg_used_th      = used_th
+         , mg_deps         = deps
+         , mg_rdr_env      = rdr_env
+         , mg_fix_env      = fix_env
+         , mg_warns        = warns
+         , mg_hpc_info     = hpc_info
+         , mg_safe_haskell = safe_mode
+         , mg_trust_pkg    = self_trust
+         , mg_doc_hdr      = doc_hdr
+         , mg_decl_docs    = decl_docs
+         , mg_arg_docs     = arg_docs
+         }
+  = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
+             safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
-mkIface hsc_env maybe_old_fingerprint mod_details
-         ModGuts{     mg_module       = this_mod,
-                      mg_hsc_src      = hsc_src,
-                      mg_usages       = usages,
-                      mg_used_th      = used_th,
-                      mg_deps         = deps,
-                      mg_rdr_env      = rdr_env,
-                      mg_fix_env      = fix_env,
-                      mg_warns        = warns,
-                      mg_hpc_info     = hpc_info,
-                      mg_safe_haskell = safe_mode,
-                      mg_trust_pkg    = self_trust,
-                      mg_doc_hdr      = doc_hdr,
-                      mg_decl_docs    = decl_docs,
-                      mg_arg_docs     = arg_docs
-                    }
-        = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod hsc_src used_th deps rdr_env fix_env
-                   warns hpc_info self_trust
-                   safe_mode usages
-                   doc_hdr decl_docs arg_docs
-                   mod_details
+-- | Fully instantiate a interface
+-- Adds fingerprints and potentially code generator produced information.
+mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
+mkFullIface hsc_env partial_iface = do
+    full_iface <-
+      {-# SCC "addFingerprints" #-}
+      addFingerprints hsc_env partial_iface (mi_decls partial_iface)
 
--- | make an interface from the results of typechecking only.  Useful
+    -- Debug printing
+    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
+
+    return full_iface
+
+-- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
 -- object code at all ('HscNothing').
 mkIfaceTc :: HscEnv
-          -> Maybe Fingerprint  -- The old fingerprint, if we have it
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
           -> TcGblEnv           -- Usages, deprecations, etc
-          -> IO (ModIface, Bool)
-mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
+          -> IO ModIface
+mkIfaceTc hsc_env safe_mode mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -210,7 +213,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
 
           let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
 
-          mkIface_ hsc_env maybe_old_fingerprint
+          let partial_iface = mkIface_ hsc_env
                    this_mod hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
@@ -218,9 +221,9 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
+          mkFullIface hsc_env partial_iface
 
-
-mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
+mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> Bool
@@ -230,8 +233,8 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
-         -> IO (ModIface, Bool)
-mkIface_ hsc_env maybe_old_fingerprint
+         -> PartialModIface
+mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          doc_hdr decl_docs arg_docs
@@ -277,72 +280,38 @@ mkIface_ hsc_env maybe_old_fingerprint
         annotations = map mkIfaceAnnotation anns
         icomplete_sigs = map mkIfaceCompleteSig complete_sigs
 
-        intermediate_iface = ModIface {
-              mi_module      = this_mod,
-              -- Need to record this because it depends on the -instantiated-with flag
-              -- which could change
-              mi_sig_of      = if semantic_mod == this_mod
-                                then Nothing
-                                else Just semantic_mod,
-              mi_hsc_src     = hsc_src,
-              mi_deps        = deps,
-              mi_usages      = usages,
-              mi_exports     = mkIfaceExports exports,
+    ModIface {
+          mi_module      = this_mod,
+          -- Need to record this because it depends on the -instantiated-with flag
+          -- which could change
+          mi_sig_of      = if semantic_mod == this_mod
+                            then Nothing
+                            else Just semantic_mod,
+          mi_hsc_src     = hsc_src,
+          mi_deps        = deps,
+          mi_usages      = usages,
+          mi_exports     = mkIfaceExports exports,
 
-              -- Sort these lexicographically, so that
-              -- the result is stable across compilations
-              mi_insts       = sortBy cmp_inst     iface_insts,
-              mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-              mi_rules       = sortBy cmp_rule     iface_rules,
+          -- Sort these lexicographically, so that
+          -- the result is stable across compilations
+          mi_insts       = sortBy cmp_inst     iface_insts,
+          mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
+          mi_rules       = sortBy cmp_rule     iface_rules,
 
-              mi_fixities    = fixities,
-              mi_warns       = warns,
-              mi_anns        = annotations,
-              mi_globals     = maybeGlobalRdrEnv rdr_env,
-
-              -- Left out deliberately: filled in by addFingerprints
-              mi_iface_hash  = fingerprint0,
-              mi_mod_hash    = fingerprint0,
-              mi_flag_hash   = fingerprint0,
-              mi_opt_hash    = fingerprint0,
-              mi_hpc_hash    = fingerprint0,
-              mi_exp_hash    = fingerprint0,
-              mi_plugin_hash = fingerprint0,
-              mi_used_th     = used_th,
-              mi_orphan_hash = fingerprint0,
-              mi_orphan      = False, -- Always set by addFingerprints, but
-                                      -- it's a strict field, so we can't omit it.
-              mi_finsts      = False, -- Ditto
-              mi_decls       = deliberatelyOmitted "decls",
-              mi_hash_fn     = deliberatelyOmitted "hash_fn",
-              mi_hpc         = isHpcUsed hpc_info,
-              mi_trust       = trust_info,
-              mi_trust_pkg   = pkg_trust_req,
-
-              -- And build the cached values
-              mi_warn_fn     = mkIfaceWarnCache warns,
-              mi_fix_fn      = mkIfaceFixCache fixities,
-              mi_complete_sigs = icomplete_sigs,
-              mi_doc_hdr     = doc_hdr,
-              mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
-
-    (new_iface, no_change_at_all)
-          <- {-# SCC "versioninfo" #-}
-                   addFingerprints hsc_env maybe_old_fingerprint
-                                   intermediate_iface decls
-
-    -- Debug printing
-    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
-                  (pprModIface new_iface)
-
-    -- bug #1617: on reload we weren't updating the PrintUnqualified
-    -- correctly.  This stems from the fact that the interface had
-    -- not changed, so addFingerprints returns the old ModIface
-    -- with the old GlobalRdrEnv (mi_globals).
-    let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
-
-    return (final_iface, no_change_at_all)
+          mi_fixities    = fixities,
+          mi_warns       = warns,
+          mi_anns        = annotations,
+          mi_globals     = maybeGlobalRdrEnv rdr_env,
+          mi_used_th     = used_th,
+          mi_decls       = decls,
+          mi_hpc         = isHpcUsed hpc_info,
+          mi_trust       = trust_info,
+          mi_trust_pkg   = pkg_trust_req,
+          mi_complete_sigs = icomplete_sigs,
+          mi_doc_hdr     = doc_hdr,
+          mi_decl_docs   = decl_docs,
+          mi_arg_docs    = arg_docs,
+          mi_final_exts        = () }
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -362,9 +331,6 @@ mkIface_ hsc_env maybe_old_fingerprint
      maybeGlobalRdrEnv rdr_env
          | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
          | otherwise                                   = Nothing
-
-     deliberatelyOmitted :: String -> a
-     deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
      ifFamInstTcName = ifFamInstFam
 
@@ -409,7 +375,7 @@ mkHashFun hsc_env eps name
                       iface <- initIfaceLoad hsc_env . withException
                             $ loadInterface (text "lookupVers2") mod ImportBySystem
                       return iface
-        return $ snd (mi_hash_fn iface occ `orElse`
+        return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 
 -- ---------------------------------------------------------------------------
@@ -443,17 +409,16 @@ thing that we are currently fingerprinting.
 -- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
-        -> Maybe Fingerprint -- the old fingerprint, if any
-        -> ModIface          -- The new interface (lacking decls)
+        -> PartialModIface   -- The new interface (lacking decls)
         -> [IfaceDecl]       -- The new decls
-        -> IO (ModIface,     -- Updated interface
-               Bool)         -- True <=> no changes at all;
-                             -- no need to write Iface
-
-addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
+        -> IO ModIface       -- Updated interface
+addFingerprints hsc_env iface0 new_decls
  = do
    eps <- hscEPS hsc_env
    let
+       warn_fn = mkIfaceWarnCache (mi_warns iface0)
+       fix_fn = mkIfaceFixCache (mi_fixities iface0)
+
         -- The ABI of a declaration represents everything that is made
         -- visible about the declaration that a client can depend on.
         -- see IfaceDeclABI below.
@@ -719,26 +684,27 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        mi_hpc iface0)
 
    let
-    no_change_at_all = Just iface_hash == mb_old_fingerprint
-
-    final_iface = iface0 {
-                mi_mod_hash    = mod_hash,
-                mi_iface_hash  = iface_hash,
-                mi_exp_hash    = export_hash,
-                mi_orphan_hash = orphan_hash,
-                mi_flag_hash   = flag_hash,
-                mi_opt_hash    = opt_hash,
-                mi_hpc_hash    = hpc_hash,
-                mi_plugin_hash = plugin_hash,
-                mi_orphan      = not (   all ifRuleAuto orph_rules
-                                           -- See Note [Orphans and auto-generated rules]
-                                      && null orph_insts
-                                      && null orph_fis),
-                mi_finsts      = not . null $ mi_fam_insts iface0,
-                mi_decls       = sorted_decls,
-                mi_hash_fn     = lookupOccEnv local_env }
+    final_iface_exts = ModIfaceBackend
+      { mi_iface_hash  = iface_hash
+      , mi_mod_hash    = mod_hash
+      , mi_flag_hash   = flag_hash
+      , mi_opt_hash    = opt_hash
+      , mi_hpc_hash    = hpc_hash
+      , mi_plugin_hash = plugin_hash
+      , mi_orphan      = not (   all ifRuleAuto orph_rules
+                                   -- See Note [Orphans and auto-generated rules]
+                              && null orph_insts
+                              && null orph_fis)
+      , mi_finsts      = not (null (mi_fam_insts iface0))
+      , mi_exp_hash    = export_hash
+      , mi_orphan_hash = orphan_hash
+      , mi_warn_fn     = warn_fn
+      , mi_fix_fn      = fix_fn
+      , mi_hash_fn     = lookupOccEnv local_env
+      }
+    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --
-   return (final_iface, no_change_at_all)
+   return final_iface
 
   where
     this_mod = mi_module iface0
@@ -747,7 +713,6 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
-    fix_fn = mi_fix_fn iface0
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
@@ -789,11 +754,11 @@ getOrphanHashes hsc_env mods = do
     dflags     = hsc_dflags hsc_env
     get_orph_hash mod =
           case lookupIfaceByModule dflags hpt pit mod of
-            Just iface -> return (mi_orphan_hash iface)
+            Just iface -> return (mi_orphan_hash (mi_final_exts iface))
             Nothing    -> do -- similar to 'mkHashFun'
                 iface <- initIfaceLoad hsc_env . withException
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
-                return (mi_orphan_hash iface)
+                return (mi_orphan_hash (mi_final_exts iface))
 
   --
   mapM get_orph_hash mods
@@ -1327,7 +1292,7 @@ checkVersions hsc_env mod_summary iface
 checkPlugins :: HscEnv -> ModIface -> IfG RecompileRequired
 checkPlugins hsc iface = liftIO $ do
   new_fingerprint <- fingerprintPlugins hsc
-  let old_fingerprint = mi_plugin_hash iface
+  let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
   pr <- mconcat <$> mapM pluginRecompile' (plugins (hsc_dflags hsc))
   return $
     pluginRecompileToRecompileRequired old_fingerprint new_fingerprint pr
@@ -1424,7 +1389,7 @@ checkHie mod_summary = do
 -- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
-    let old_hash = mi_flag_hash iface
+    let old_hash = mi_flag_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env)
                                              (mi_module iface)
                                              putNameLiterally
@@ -1437,7 +1402,7 @@ checkFlagHash hsc_env iface = do
 -- | Check the optimisation flags haven't changed
 checkOptimHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkOptimHash hsc_env iface = do
-    let old_hash = mi_opt_hash iface
+    let old_hash = mi_opt_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -1452,7 +1417,7 @@ checkOptimHash hsc_env iface = do
 -- | Check the HPC flags haven't changed
 checkHpcHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkHpcHash hsc_env iface = do
-    let old_hash = mi_hpc_hash iface
+    let old_hash = mi_hpc_hash (mi_final_exts iface)
     new_hash <- liftIO $ fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -1635,7 +1600,7 @@ checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod_hash = old_mod_hash }
   = needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
@@ -1644,7 +1609,7 @@ checkModUsage _this_pkg UsagePackageModule{
 checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash }
   = needInterface mod $ \iface -> do
     let reason = moduleNameString (moduleName mod) ++ " changed (raw)"
-    checkModuleFingerprint reason old_mod_hash (mi_mod_hash iface)
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
 
 checkModUsage this_pkg UsageHomeModule{
                                 usg_mod_name = mod_name,
@@ -1656,9 +1621,9 @@ checkModUsage this_pkg UsageHomeModule{
     needInterface mod $ \iface -> do
 
     let
-        new_mod_hash    = mi_mod_hash    iface
-        new_decl_hash   = mi_hash_fn     iface
-        new_export_hash = mi_exp_hash    iface
+        new_mod_hash    = mi_mod_hash (mi_final_exts iface)
+        new_decl_hash   = mi_hash_fn  (mi_final_exts iface)
+        new_export_hash = mi_exp_hash (mi_final_exts iface)
 
         reason = moduleNameString mod_name ++ " changed"
 

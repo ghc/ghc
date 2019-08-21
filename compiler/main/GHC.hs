@@ -85,7 +85,7 @@ module GHC (
         lookupGlobalName,
         findGlobalAnns,
         mkPrintUnqualifiedForModule,
-        ModIface(..),
+        ModIface, ModIface_(..),
         SafeHaskellMode(..),
 
         -- * Querying the environment

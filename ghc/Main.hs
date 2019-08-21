@@ -903,7 +903,7 @@ abiHash strs = do
   put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
-  mapM_ (put_ bh . mi_mod_hash) ifaces
+  mapM_ (put_ bh . mi_mod_hash . mi_final_exts) ifaces
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)
