@@ -18,6 +18,7 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
+  - schildkroete
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
@@ -614,13 +615,10 @@ nightly-x86_64-linux-deb9-integer-simple:
 
 nightly-x86_64-linux-deb9-tsan:
   extends: .build-x86_64-linux-deb9
-  stage: full-build
+  stage: schildkroete
   variables:
     TEST_ENV: "x86_64-linux-deb9-tsan"
     RTS_HC_OPTS: "-optc-fsanitize=thread"
-  only:
-    variables:
-      - $NIGHTLY
 
 release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
