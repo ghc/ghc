@@ -25,6 +25,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
+import CgTypes (CgIfaceInfo (..))
 
 import Cmm
 import CmmUtils
@@ -60,7 +61,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
+        -> Stream IO CmmGroup CgIfaceInfo
+                                       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
@@ -102,6 +104,8 @@ codeGen dflags this_mod data_tycons
                  mapM_ (cg . cgDataCon) (tyConDataCons tycon)
 
         ; mapM_ do_tycon data_tycons
+
+        ; return CgIfaceInfo
         }
 
 ---------------------------------------------------------------

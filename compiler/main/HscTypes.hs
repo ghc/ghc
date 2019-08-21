@@ -208,6 +208,8 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
+import CgTypes          ( CgIfaceInfo )
+
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
 import Data.IORef
@@ -223,11 +225,20 @@ import System.Process   ( ProcessHandle )
 
 -- | Status of a compilation to hard-code
 data HscStatus
-    = HscNotGeneratingCode
-    | HscUpToDate
-    | HscUpdateBoot
-    | HscUpdateSig
-    | HscRecomp CgGuts ModSummary
+    = HscNotGeneratingCode  -- ^ Nothing to do.
+    | HscUpToDate           -- ^ Nothing to do because code already exists.
+    | HscUpdateBoot         -- ^ Update boot file result.
+    | HscUpdateSig          -- ^ Generate signature file (backpack)
+    | HscRecomp             -- ^ Recompile this module.
+        { hscs_guts       :: CgGuts
+                            -- ^ Information for the code generator.
+        , hscs_summary    :: ModSummary
+                            -- ^ Module info
+        , hscs_iface_gen  :: Maybe CgIfaceInfo -> IO (ModIface, Bool)
+                            -- ^ Function to generate iface after codegen.
+        }
+-- Should HscStatus contain the HomeModInfo?
+-- All places where we return a status we also return a HomeModInfo.
 
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
