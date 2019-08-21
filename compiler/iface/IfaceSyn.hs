@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -70,9 +71,11 @@ import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
+import Util (seqList)
 
 import Control.Monad
 import System.IO.Unsafe
+import Control.DeepSeq
 
 infixl 3 &&&
 
@@ -2414,3 +2417,177 @@ instance Binary IfaceTyConParent where
 instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
+
+
+{-
+************************************************************************
+*                                                                      *
+                NFData instances
+   See Note [Avoiding space leaks in toIface*] in ToIface
+*                                                                      *
+************************************************************************
+-}
+
+instance NFData IfaceDecl where
+  rnf = \case
+    IfaceId f1 f2 f3 f4 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+
+    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 ->
+      f1 `seq` seqList f2 `seq` f3 `seq` f4 `seq` f5 `seq`
+      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9
+
+    IfaceSynonym f1 f2 f3 f4 f5 ->
+      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+
+    IfaceFamily f1 f2 f3 f4 f5 f6 ->
+      rnf f1 `seq` rnf f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5 `seq` f6 `seq` ()
+
+    IfaceClass f1 f2 f3 f4 f5 ->
+      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+
+    IfaceAxiom nm tycon role ax ->
+      rnf nm `seq`
+      rnf tycon `seq`
+      role `seq`
+      rnf ax
+
+    IfacePatSyn f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` f6 `seq`
+      rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` f11 `seq` ()
+
+instance NFData IfaceAxBranch where
+  rnf (IfaceAxBranch f1 f2 f3 f4 f5 f6 f7) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq` rnf f7
+
+instance NFData IfaceClassBody where
+  rnf = \case
+    IfAbstractClass -> ()
+    IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+
+instance NFData IfaceAT where
+  rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2
+
+instance NFData IfaceClassOp where
+  rnf (IfaceClassOp f1 f2 f3) = rnf f1 `seq` rnf f2 `seq` f3 `seq` ()
+
+instance NFData IfaceTyConParent where
+  rnf = \case
+    IfNoParent -> ()
+    IfDataInstance f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+
+instance NFData IfaceConDecls where
+  rnf = \case
+    IfAbstractTyCon -> ()
+    IfDataTyCon f1 -> rnf f1
+    IfNewTyCon f1 -> rnf f1
+
+instance NFData IfaceConDecl where
+  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq`
+    rnf f7 `seq` rnf f8 `seq` f9 `seq` rnf f10 `seq` rnf f11
+
+instance NFData IfaceSrcBang where
+  rnf (IfSrcBang f1 f2) = f1 `seq` f2 `seq` ()
+
+instance NFData IfaceBang where
+  rnf x = x `seq` ()
+
+instance NFData IfaceIdDetails where
+  rnf = \case
+    IfVanillaId -> ()
+    IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
+    IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
+    IfDFunId -> ()
+
+instance NFData IfaceIdInfo where
+  rnf = \case
+    NoInfo -> ()
+    HasInfo f1 -> rnf f1
+
+instance NFData IfaceInfoItem where
+  rnf = \case
+    HsArity a -> rnf a
+    HsStrictness str -> seqStrictSig str
+    HsInline p -> p `seq` () -- TODO: seq further?
+    HsUnfold b unf -> rnf b `seq` rnf unf
+    HsNoCafRefs -> ()
+    HsLevity -> ()
+
+instance NFData IfaceUnfolding where
+  rnf = \case
+    IfCoreUnfold inlinable expr ->
+      rnf inlinable `seq` rnf expr
+    IfCompulsory expr ->
+      rnf expr
+    IfInlineRule arity b1 b2 e ->
+      rnf arity `seq` rnf b1 `seq` rnf b2 `seq` rnf e
+    IfDFunUnfold bndrs exprs ->
+      rnf bndrs `seq` rnf exprs
+
+instance NFData IfaceExpr where
+  rnf = \case
+    IfaceLcl nm -> rnf nm
+    IfaceExt nm -> rnf nm
+    IfaceType ty -> rnf ty
+    IfaceCo co -> rnf co
+    IfaceTuple sort exprs -> sort `seq` rnf exprs
+    IfaceLam bndr expr -> rnf bndr `seq` rnf expr
+    IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
+    IfaceCase e nm alts -> rnf e `seq` nm `seq` rnf alts
+    IfaceECase e ty -> rnf e `seq` rnf ty
+    IfaceLet bind e -> rnf bind `seq` rnf e
+    IfaceCast e co -> rnf e `seq` rnf co
+    IfaceLit l -> l `seq` () -- FIXME
+    IfaceFCall fc ty -> fc `seq` rnf ty
+    IfaceTick tick e -> rnf tick `seq` rnf e
+
+instance NFData IfaceBinding where
+  rnf = \case
+    IfaceNonRec bndr e -> rnf bndr `seq` rnf e
+    IfaceRec binds -> rnf binds
+
+instance NFData IfaceLetBndr where
+  rnf (IfLetBndr nm ty id_info join_info) =
+    rnf nm `seq` rnf ty `seq` rnf id_info `seq` rnf join_info
+
+instance NFData IfaceFamTyConFlav where
+  rnf = \case
+    IfaceDataFamilyTyCon -> ()
+    IfaceOpenSynFamilyTyCon -> ()
+    IfaceClosedSynFamilyTyCon f1 -> rnf f1
+    IfaceAbstractClosedSynFamilyTyCon -> ()
+    IfaceBuiltInSynFamTyCon -> ()
+
+instance NFData IfaceJoinInfo where
+  rnf x = x `seq` ()
+
+instance NFData IfaceTickish where
+  rnf = \case
+    IfaceHpcTick m i -> rnf m `seq` rnf i
+    IfaceSCC cc b1 b2 -> cc `seq` rnf b1 `seq` rnf b2
+    IfaceSource src str -> src `seq` rnf str
+
+instance NFData IfaceConAlt where
+  rnf = \case
+    IfaceDefault -> ()
+    IfaceDataAlt nm -> rnf nm
+    IfaceLitAlt lit -> lit `seq` ()
+
+instance NFData IfaceCompleteMatch where
+  rnf (IfaceCompleteMatch f1 f2) = rnf f1 `seq` rnf f2
+
+instance NFData IfaceRule where
+  rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =
+    rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` f8 `seq` ()
+
+instance NFData IfaceFamInst where
+  rnf (IfaceFamInst f1 f2 f3 f4) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+
+instance NFData IfaceClsInst where
+  rnf (IfaceClsInst f1 f2 f3 f4 f5) =
+    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` ()
+
+instance NFData IfaceAnnotation where
+  rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()
