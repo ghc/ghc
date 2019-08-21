@@ -7,6 +7,7 @@ Loading interface files
 -}
 
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module LoadIface (
         -- Importing one thing
@@ -422,7 +423,7 @@ loadInterface doc_str mod from
                            Succeeded hi_boot_file -> computeInterface doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let fake_iface = emptyModIface mod
+                { let fake_iface = emptyFullModIface mod
 
                 ; updateEps_ $ \eps ->
                         eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
@@ -965,7 +966,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                   r <- read_file dynFilePath
                   case r of
                       Succeeded (dynIface, _)
-                       | mi_mod_hash iface == mi_mod_hash dynIface ->
+                       | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
                           return ()
                        | otherwise ->
                           do traceIf (text "Dynamic hash doesn't match")
@@ -1039,13 +1040,15 @@ initExternalPackageState
 
 ghcPrimIface :: ModIface
 ghcPrimIface
-  = (emptyModIface gHC_PRIM) {
+  = empty_iface {
         mi_exports  = ghcPrimExports,
         mi_decls    = [],
         mi_fixities = fixities,
-        mi_fix_fn  = mkIfaceFixCache fixities
-    }
+        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities }
+        }
   where
+    empty_iface = emptyFullModIface gHC_PRIM
+
     -- The fixities listed here for @`seq`@ or @->@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
@@ -1118,21 +1121,21 @@ pprModIfaceSimple iface = ppr (mi_module iface) $$ pprDeps (mi_deps iface) $$ ne
 
 pprModIface :: ModIface -> SDoc
 -- Show a ModIface
-pprModIface iface
+pprModIface iface@ModIface{ mi_final_exts = exts }
  = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
-                <+> (if mi_orphan iface then text "[orphan module]" else Outputable.empty)
-                <+> (if mi_finsts iface then text "[family instance module]" else Outputable.empty)
-                <+> (if mi_hpc    iface then text "[hpc]" else Outputable.empty)
+                <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
+                <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
+                <+> (if mi_hpc iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
-        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
-        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
-        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
-        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
-        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash iface))
-        , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash iface))
-        , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash iface))
-        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash iface))
+        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash exts))
+        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
+        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash exts))
+        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
+        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash exts))
+        , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
+        , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
+        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
