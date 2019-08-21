@@ -207,6 +207,7 @@ import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
+import CgTypes
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -223,11 +224,20 @@ import System.Process   ( ProcessHandle )
 
 -- | Status of a compilation to hard-code
 data HscStatus
-    = HscNotGeneratingCode
-    | HscUpToDate
-    | HscUpdateBoot
-    | HscUpdateSig
-    | HscRecomp CgGuts ModSummary
+    = HscNotGeneratingCode  -- ^ Nothing to do.
+    | HscUpToDate           -- ^ Nothing to do because code already exists.
+    | HscUpdateBoot         -- ^ Update boot file result.
+    | HscUpdateSig          -- ^ Generate signature file (backpack)
+    | HscRecomp             -- ^ Recompile this module.
+        { hscs_guts       :: CgGuts
+                            -- ^ Information for the code generator.
+        , hscs_summary    :: ModSummary
+                            -- ^ Module info
+        , hscs_iface_gen  :: Maybe CgIfaceInfo -> IO (ModIface, Bool)
+                            -- ^ Function to generate iface after codegen.
+        }
+-- Should HscStatus contain the HomeModInfo?
+-- All places where we return a status we also return a HomeModInfo.
 
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
@@ -986,8 +996,11 @@ data ModIface
         mi_decl_docs :: DeclDocMap,
                 -- ^ Docs on declarations.
 
-        mi_arg_docs :: ArgDocMap
+        mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
+
+        mi_cg_info  :: Maybe CgIfaceInfo
+                -- ^ Codegen info.
      }
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
@@ -1068,7 +1081,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
-                 mi_arg_docs  = arg_docs }) = do
+                 mi_arg_docs  = arg_docs,
+                 mi_cg_info   = cg_info }) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1100,6 +1114,7 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        put_ bh cg_info
 
    get bh = do
         mod         <- get bh
@@ -1133,6 +1148,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        cg_info     <- get bh
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1169,7 +1185,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
-                 mi_arg_docs    = arg_docs })
+                 mi_arg_docs    = arg_docs,
+                 mi_cg_info     = cg_info })
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1211,7 +1228,8 @@ emptyModIface mod
                mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
-               mi_arg_docs    = emptyArgDocMap }
+               mi_arg_docs    = emptyArgDocMap,
+               mi_cg_info     = Nothing }
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
@@ -2614,7 +2632,9 @@ data ExternalPackageState
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
 
-        eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
+        eps_stats :: !EpsStats,                -- ^ Stastics about what was loaded from external packages
+
+        eps_cg_info :: !PackageCgInfo
   }
 
 -- | Accumulated statistics about what we are putting into the 'ExternalPackageState'.
