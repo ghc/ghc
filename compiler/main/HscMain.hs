@@ -1426,7 +1426,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps)
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, ())
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
