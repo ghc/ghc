@@ -590,10 +590,10 @@ primop   WordQuotRemOp "quotRemWord#" GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with can_fail = True
 
--- Takes high word of dividend, then low word of dividend, then divisor.
--- Requires that high word is not divisible by divisor.
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
    Word# -> Word# -> Word# -> (# Word#, Word# #)
+         { Takes high word of dividend, then low word of dividend, then divisor.
+           Requires that high word < divisor.}
    with can_fail = True
 
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
