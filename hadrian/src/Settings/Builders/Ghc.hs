@@ -75,6 +75,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libffiName' <- libffiName
     debugged <- ghcDebugged <$> expr flavour
 
+    libWays <- getLibraryWays
+
     let
         dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
@@ -108,6 +110,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
         -- TODO: Could we get away with just one rpath...?
         bindistRpath = "$ORIGIN" -/- ".." -/- ".." -/- originToLibsDir
 
+        hasVanilla = vanilla `elem` libWays
+        hasDynamic = any (wayUnit Dynamic) libWays
+
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
@@ -128,7 +133,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
-
+            , platformSupportsSharedLibs ? hasVanilla && hasDynamic ?
+              arg "-dynamic-too"
             ]
 
 findHsDependencies :: Args
