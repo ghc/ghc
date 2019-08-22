@@ -509,7 +509,7 @@ validate-x86_64-linux-deb9-debug:
     expire_in: 2 week
 
 # Disabled to alleviate CI load
-.validate-x86_64-linux-deb9-llvm:
+validate-x86_64-linux-deb9-llvm:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
