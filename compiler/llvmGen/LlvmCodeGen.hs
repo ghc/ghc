@@ -79,8 +79,7 @@ llvmCodeGen' cmm_stream
         cmmMetaLlvmPrelude
 
         -- Procedures
-        let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
-        _ <- Stream.collect llvmStream
+        () <- Stream.consume cmm_stream llvmGroupLlvmGens
 
         -- Declare aliases for forward references
         renderLlvm . pprLlvmData =<< generateExternDecls
