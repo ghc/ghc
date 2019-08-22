@@ -12,19 +12,19 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 
 import GhcPrelude
 
-import AsmCodeGen ( nativeCodeGen )
-import LlvmCodeGen ( llvmCodeGen )
+import AsmCodeGen       ( nativeCodeGen )
+import LlvmCodeGen      ( llvmCodeGen )
 
 import UniqSupply       ( mkSplitUniqSupply )
 
 import Finder           ( mkStubPaths )
-import PprC             ( writeCs )
+import PprC             ( writeC )
 import CmmLint          ( cmmLint )
 import Packages
 import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
-import Stream           (Stream)
+import Stream           ( Stream )
 import qualified Stream
 import FileCleanup
 
@@ -117,9 +117,6 @@ outputC :: DynFlags
 
 outputC dflags filenm cmm_stream packages
   = do
-       -- ToDo: make the C backend consume the C-- incrementally, by
-       -- pushing the cmm_stream inside (c.f. nativeCodeGen)
-       rawcmms <- Stream.collect cmm_stream
        withTiming (return dflags) (text "C codegen") id $ do
 
          -- figure out which header files to #include in the generated .hc file:
@@ -142,7 +139,7 @@ outputC dflags filenm cmm_stream packages
          doOutput filenm $ \ h -> do
             hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
             hPutStr h cc_injects
-            writeCs dflags h rawcmms
+            Stream.consume cmm_stream (writeC dflags h)
 
 {-
 ************************************************************************

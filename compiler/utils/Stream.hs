@@ -7,7 +7,7 @@
 -- -----------------------------------------------------------------------------
 module Stream (
     Stream(..), yield, liftIO,
-    collect, fromList,
+    collect, consume, fromList,
     Stream.map, Stream.mapM, Stream.mapAccumL
   ) where
 
@@ -70,6 +70,15 @@ collect str = go str []
     case r of
       Left () -> return (reverse acc)
       Right (a, str') -> go str' (a:acc)
+
+consume :: Monad m => Stream m a b -> (a -> m ()) -> m b
+consume str f = do
+    r <- runStream str
+    case r of
+      Left ret -> return ret
+      Right (a, str') -> do
+        f a
+        consume str' f
 
 -- | Turn a list into a 'Stream', by yielding each element in turn.
 fromList :: Monad m => [a] -> Stream m a ()
