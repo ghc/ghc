@@ -43,6 +43,13 @@ compilePackage rs = do
 
       -- All else is haskell.
       -- This comes last as it overlaps with the above rules' file patterns.
+      [ root -/- "**/build/**/*.dyn_o", root -/- "**/build/**/*.dyn_hi" ]
+        &%> \ [dyn_o, _dyn_hi] -> do
+          let o  = dyn_o -<.> "o"
+              hi = dyn_o -<.> "hi"
+
+          need [o, hi]
+
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
         [ root -/- "**/build/**/*." ++ wayPat ++ oExt
         , root -/- "**/build/**/*." ++ wayPat ++ hiExt ]
@@ -183,8 +190,8 @@ compileHsObjectAndHi rs objpath = do
   -- Note that this may allow too many *.hi and *.hi-boot files, but
   -- calculating the exact set of direct inputs is not feasible.
   trackAllow [ "**/*." ++ hisuf     way
-             , "**/*." ++ hibootsuf way
-             ]
+            , "**/*." ++ hibootsuf way
+            ]
 
   buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
 

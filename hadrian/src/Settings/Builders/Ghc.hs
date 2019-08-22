@@ -30,7 +30,15 @@ toolArgs = do
 
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
+    libWays <- getLibraryWays
+
+    let hasVanilla = vanilla `elem` libWays
+        hasDynamic = any (wayUnit Dynamic) libWays
+
     mconcat [ arg "-Wall"
+            , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
+              platformSupportsSharedLibs ? arg "-dynamic-too"
+            -- , builder (Ghc CompileHs) ? platformSupportsSharedLibs ? arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs
@@ -127,9 +135,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , rtsFfiArg
             , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
-              arg "-debug"
-
-            ]
+              arg "-debug" ]
 
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
@@ -162,6 +168,7 @@ commonGhcArgs = do
     way  <- getWay
     path <- getBuildPath
     ghcVersion <- expr ghcVersionH
+
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
@@ -176,7 +183,8 @@ commonGhcArgs = do
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
-            , arg "-outputdir", arg path ]
+            , arg "-outputdir", arg path
+            ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
