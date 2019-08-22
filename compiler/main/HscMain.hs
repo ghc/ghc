@@ -848,7 +848,7 @@ finish summary tc_result mb_old_hash = do
                   -- less of the environment alive here but don't do so
                   -- currently.
                   res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts -- TODO: pass cg_info here
+                          mkIface hsc_env mb_old_hash details desugared_guts cg_info
                   dumpIfaceStats hsc_env
                   return res
 
@@ -1558,6 +1558,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
+    import_cg_info <- eps_cg_info <$> hscEPS hsc_env
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     dumpIfSet_dyn dflags Opt_D_dump_stg_final
@@ -1566,6 +1567,7 @@ doCodeGen hsc_env this_mod data_tycons
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
+                           import_cg_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

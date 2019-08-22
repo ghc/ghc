@@ -25,7 +25,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
-import CgTypes (CgIfaceInfo (..))
+import CgTypes
 
 import Cmm
 import CmmUtils
@@ -61,12 +61,13 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
+        -> PackageCgInfo
         -> Stream IO CmmGroup CgIfaceInfo
                                        -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
-        cost_centre_info stg_binds hpc_info
+        cost_centre_info stg_binds hpc_info _cg_info
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.

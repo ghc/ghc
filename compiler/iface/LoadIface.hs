@@ -78,6 +78,7 @@ import FieldLabel
 import RnModIface
 import UniqDSet
 import Plugins
+import CgTypes
 
 import Control.Monad
 import Control.Exception
@@ -1026,7 +1027,8 @@ initExternalPackageState
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
-                           , n_rules_in = length builtinRules, n_rules_out = 0 }
+                           , n_rules_in = length builtinRules, n_rules_out = 0 },
+      eps_cg_info = emptyPackageCgInfo
     }
 
 {-

@@ -110,6 +110,7 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
+import CgTypes
 
 import Control.Monad
 import Data.Function
@@ -139,6 +140,7 @@ mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
+        -> Maybe CgIfaceInfo
         -> IO (ModIface, -- The new one
                Bool)     -- True <=> there was an old Iface, and the
                          --          new one is identical, so no need
@@ -216,7 +218,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
-                   mod_details
+                   mod_details Nothing
 
 
 
@@ -230,6 +232,7 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
+         -> Maybe CgIfaceInfo
          -> IO (ModIface, Bool)
 mkIface_ hsc_env maybe_old_fingerprint
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
@@ -242,6 +245,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
+         mb_cg_info
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -325,7 +329,8 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_complete_sigs = icomplete_sigs,
               mi_doc_hdr     = doc_hdr,
               mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
+              mi_arg_docs    = arg_docs,
+              mi_cg_info     = mb_cg_info }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}
