@@ -134,6 +134,9 @@ void initRtsFlagsDefaults(void)
     // if getPhysicalMemorySize fails just move along with an 8MB limit
     if (maxStkSize == 0)
         maxStkSize = 8 * 1024 * 1024;
+    // GcFlags.maxStkSiz is 32-bit, so we need to cap to prevent overflow (#17019)
+    else if (maxStkSize > UINT32_MAX * sizeof(W_))
+        maxStkSize = UINT32_MAX * sizeof(W_);
 
     RtsFlags.GcFlags.statsFile          = NULL;
     RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
@@ -1041,7 +1044,7 @@ error = true;
               case 'K':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, 0, HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, 0, UINT32_MAX)
                       / sizeof(W_);
                   break;
 
