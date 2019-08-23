@@ -23,7 +23,7 @@ import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (LlvmVersion (..), llvmVersionStr, supportedLlvmVersion)
+import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info
@@ -209,7 +209,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
       -- of the options they've specified. llc doesn't care what other
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
-  ver <- catchIO (do
+  catchIO (do
               (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
               {- > llc -version
@@ -220,17 +220,11 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
               hSetBinaryMode pout False
               _     <- hGetLine pout
               vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
-              v     <- case span (/= '.') vline of
-                        ("",_)  -> fail "no digits!"
-                        (x,"") -> return $ LlvmVersion (read x)
-                        (x,y) -> return $ LlvmVersionOld
-                                            (read x)
-                                            (read $ takeWhile isDigit $ drop 1 y)
-
+              let mb_ver = parseLlvmVersion vline
               hClose pin
               hClose pout
               hClose perr
-              return $ Just v
+              return mb_ver
             )
             (\err -> do
                 debugTraceMsg dflags 2
@@ -242,7 +236,6 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                           text ("Make sure you have installed LLVM " ++
                                 llvmVersionStr supportedLlvmVersion) ]
                 return Nothing)
-  return ver
 
 
 runLink :: DynFlags -> [Option] -> IO ()
