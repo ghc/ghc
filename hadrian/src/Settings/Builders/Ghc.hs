@@ -75,8 +75,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libffiName' <- libffiName
     debugged <- ghcDebugged <$> expr flavour
 
-    libWays <- getLibraryWays
-
     let
         dynamic = Dynamic `wayUnit` way
         distPath = libPath' -/- distDir
@@ -110,9 +108,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
         -- TODO: Could we get away with just one rpath...?
         bindistRpath = "$ORIGIN" -/- ".." -/- ".." -/- originToLibsDir
 
-        hasVanilla = vanilla `elem` libWays
-        hasDynamic = any (wayUnit Dynamic) libWays
-
     mconcat [ dynamic ? mconcat
                 [ arg "-dynamic"
                 -- TODO what about windows?
@@ -132,10 +127,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , rtsFfiArg
             , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
-              arg "-debug"
-            , platformSupportsSharedLibs ? hasVanilla && hasDynamic ?
-              arg "-dynamic-too"
-            ]
+              arg "-debug" ]
 
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
@@ -166,8 +158,13 @@ haddockGhcArgs = mconcat [ commonGhcArgs
 commonGhcArgs :: Args
 commonGhcArgs = do
     way  <- getWay
+    libWays <- getLibraryWays
     path <- getBuildPath
     ghcVersion <- expr ghcVersionH
+
+    let hasVanilla = vanilla `elem` libWays
+        hasDynamic = any (wayUnit Dynamic) libWays
+
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
@@ -182,7 +179,9 @@ commonGhcArgs = do
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
-            , arg "-outputdir", arg path ]
+            , arg "-outputdir", arg path
+            , (hasVanilla && hasDynamic) ? platformSupportsSharedLibs ?
+              arg "-dynamic-too" ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
