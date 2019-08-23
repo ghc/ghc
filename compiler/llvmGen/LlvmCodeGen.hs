@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP, TypeFamilies, ViewPatterns #-}
+{-# LANGUAGE CPP, TypeFamilies, ViewPatterns, OverloadedStrings #-}
 
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
 --
-module LlvmCodeGen ( LlvmVersion (..), llvmCodeGen, llvmFixupAsm ) where
+module LlvmCodeGen ( LlvmVersion, llvmVersionList, llvmCodeGen, llvmFixupAsm ) where
 
 #include "HsVersions.h"
 
@@ -34,7 +34,7 @@ import UniqSupply
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
-import Control.Monad ( when )
+import Control.Monad ( when, forM_ )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
@@ -52,21 +52,21 @@ llvmCodeGen dflags h us cmm_stream
        showPass dflags "LLVM CodeGen"
 
        -- get llvm version, cache for later use
-       ver <- (fromMaybe supportedLlvmVersion) `fmap` figureLlvmVersion dflags
+       mb_ver <- figureLlvmVersion dflags
 
        -- warn if unsupported
-       debugTraceMsg dflags 2
-            (text "Using LLVM version:" <+> text (show ver))
-       let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
-       when (ver /= supportedLlvmVersion && doWarn) $
-           putMsg dflags (text "You are using an unsupported version of LLVM!"
-                            $+$ text ("Currently only " ++
-                                      llvmVersionStr supportedLlvmVersion ++
-                                      " is supported.")
-                            $+$ text "We will try though...")
+       forM_ mb_ver $ \ver -> do
+         debugTraceMsg dflags 2
+              (text "Using LLVM version:" <+> text (llvmVersionStr ver))
+         let doWarn = wopt Opt_WarnUnsupportedLlvmVersion dflags
+         when (not (llvmVersionSupported ver) && doWarn) $ putMsg dflags $
+           "You are using an unsupported version of LLVM!" $$
+           "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
+           "System LLVM version: " <> text (llvmVersionStr ver) $$
+           "We will try though..."
 
        -- run code generation
-       runLlvm dflags ver bufh us $
+       runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh us $
          llvmCodeGen' (liftStream cmm_stream)
 
        bFlush bufh
