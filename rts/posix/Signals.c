@@ -128,7 +128,7 @@ more_handlers(int sig)
 }
 
 // Here's the pipe into which we will send our signals
-static volatile int io_manager_wakeup_fd = -1;
+static int io_manager_wakeup_fd = -1;
 static int timer_manager_control_wr_fd = -1;
 
 #define IO_MANAGER_WAKEUP 0xff
@@ -145,6 +145,7 @@ setIOManagerWakeupFd (int fd)
     // only called when THREADED_RTS, but unconditionally
     // compiled here because GHC.Event.Control depends on it.
     io_manager_wakeup_fd = fd;
+    write_barrier();
 }
 
 /* -----------------------------------------------------------------------------
@@ -163,19 +164,24 @@ ioManagerWakeup (void)
         StgWord8 byte = (StgWord8)IO_MANAGER_WAKEUP;
         r = write(io_manager_wakeup_fd, &byte, 1);
 #endif
+
         /* N.B. If the TimerManager is shutting down as we run this
          * then there is a possibility that our first read of
          * io_manager_wakeup_fd is non-negative, but before we get to the
          * write the file is closed. If this occurs, io_manager_wakeup_fd
          * will be written into with -1 (GHC.Event.Control does this prior
          * to closing), so checking this allows us to distinguish this case.
-         * To ensure we observe the correct ordering, we declare the
-         * io_manager_wakeup_fd as volatile.
-         * Since this is not an error condition, we do not print the error
-         * message in this case.
+         * To ensure we observe the correct ordering, we place a load-load
+         * barrier. Since this is not an error condition, we do not print the
+         * error message in this case.
          */
-        if (r == -1 && io_manager_wakeup_fd >= 0) {
-            sysErrorBelch("ioManagerWakeup: write");
+        if (r == -1) {
+            load_load_barrier();
+            if (io_manager_wakeup_fd >= 0) {
+                sysErrorBelch("ioManagerWakeup: write");
+            } else {
+                /* the fd has been closed, this is okay as we are shutting down. */
+            }
         }
     }
 }
