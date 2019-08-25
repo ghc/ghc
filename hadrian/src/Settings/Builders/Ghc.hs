@@ -30,7 +30,14 @@ toolArgs = do
 
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
+    libWays <- getLibraryWays
+
+    let hasVanilla = vanilla `elem` libWays
+        hasDynamic = any (wayUnit Dynamic) libWays
+
     mconcat [ arg "-Wall"
+            , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ? 
+              platformSupportsSharedLibs ? arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs
@@ -158,12 +165,8 @@ haddockGhcArgs = mconcat [ commonGhcArgs
 commonGhcArgs :: Args
 commonGhcArgs = do
     way  <- getWay
-    libWays <- getLibraryWays
     path <- getBuildPath
     ghcVersion <- expr ghcVersionH
-
-    let hasVanilla = vanilla `elem` libWays
-        hasDynamic = any (wayUnit Dynamic) libWays
 
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
@@ -180,8 +183,7 @@ commonGhcArgs = do
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
             , arg "-outputdir", arg path
-            , (hasVanilla && hasDynamic) ? platformSupportsSharedLibs ?
-              arg "-dynamic-too" ]
+            ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
