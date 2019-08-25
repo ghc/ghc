@@ -111,11 +111,12 @@ buildConf _ context@Context {..} conf = do
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    
+    libWays <- interpretInContext context getLibraryWays
+
     supportsSharedLibs <- platformSupportsSharedLibs
-    let hasVanilla = vanilla `elem` ways
-        hasDynamic = any (wayUnit Dynamic) ways
-        p = supportsSharedLibs && hasVanilla && hasDynamic
+    let hasVanilla = vanilla `elem` libWays
+        hasDynamic = any (wayUnit Dynamic) libWays
+        p = supportsSharedLibs && hasVanilla && hasDynamic && package /= rts
 
     need =<< concatMapM (libraryTargets True) [ context { way = w' } | w <- ways, let w' = if p then removeWayUnit Dynamic w else w ]
 
