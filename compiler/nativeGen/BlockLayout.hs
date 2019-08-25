@@ -4,9 +4,6 @@
 
 {-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP #-}
 
-{-# OPTIONS_GHC -fprof-auto #-}
---{-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-cmm #-}
-
 module BlockLayout
     ( sequenceTop )
 where
