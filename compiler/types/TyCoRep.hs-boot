@@ -2,8 +2,11 @@ module TyCoRep where
 
 import GhcPrelude
 
-import Data.Data  ( Data )
-import {-# SOURCE #-} Var( Var, ArgFlag, AnonArgFlag )
+import Data.Data ( Data )
+
+import {-# SOURCE #-} Var ( Var )
+
+import Var.Open ( ArgFlag, AnonArgFlag )
 
 data Type
 data TyThing
@@ -24,4 +27,4 @@ mkForAllTy :: Var -> ArgFlag -> Type -> Type
 
 isRuntimeRepTy :: Type -> Bool
 
-instance Data Type  -- To support Data instances in CoAxiom
+instance Data Type -- To support Data instances in CoAxiom

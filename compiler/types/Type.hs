@@ -432,8 +432,8 @@ expandTypeSynonyms ty
     go _     (LitTy l)     = LitTy l
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
-    go subst ty@(FunTy _ arg res)
-      = ty { ft_arg = go subst arg, ft_res = go subst res }
+    go subst (Type' ty@(FunTyF _ arg res))
+      = Type' $ ty { ft_arg = go subst arg, ft_res = go subst res }
     go subst (ForAllTy (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
         ForAllTy (Bndr tv' vis) (go subst' t)
@@ -567,9 +567,9 @@ mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
     go (CastTy ty co)  = mkCastTy <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go ty@(FunTy _ arg res)
-      = do { arg' <- go arg; res' <- go res
-           ; return (ty { ft_arg = arg', ft_res = res' }) }
+    go (Type' ty@(FunTyF _ arg res))
+      = do arg' <- go arg; res' <- go res
+           return $ Type' $ ty { ft_arg = arg', ft_res = res' }
 
     go ty@(TyConApp tc tys)
       | isTcTyCon tc
@@ -781,7 +781,7 @@ repSplitAppTy_maybe _other = Nothing
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
-tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 })
+tcRepSplitAppTy_maybe (Type' (FunTyF { ft_af = af, ft_arg = ty1, ft_res = ty2 }))
   | InvisArg <- af
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
 
@@ -978,13 +978,13 @@ splitFunTys ty = split [] ty ty
 funResultTy :: Type -> Type
 -- ^ Extract the function result type and panic if that is not possible
 funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
-funResultTy (FunTy { ft_res = res }) = res
+funResultTy (Type' (FunTyF { ft_res = res })) = res
 funResultTy ty                       = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
-funArgTy (FunTy { ft_arg = arg })    = arg
+funArgTy (Type' (FunTyF { ft_arg = arg })) = arg
 funArgTy ty                           = pprPanic "funArgTy" (ppr ty)
 
 -- ^ Just like 'piResultTys' but for a single argument
@@ -1001,7 +1001,7 @@ piResultTy_maybe :: Type -> Type -> Maybe Type
 piResultTy_maybe ty arg
   | Just ty' <- coreView ty = piResultTy_maybe ty' arg
 
-  | FunTy { ft_res = res } <- ty
+  | Type' (FunTyF { ft_res = res }) <- ty
   = Just res
 
   | ForAllTy (Bndr tv _) res <- ty
@@ -1039,7 +1039,7 @@ piResultTys ty orig_args@(arg:args)
   | Just ty' <- coreView ty
   = piResultTys ty' orig_args
 
-  | FunTy { ft_res = res } <- ty
+  | Type' (FunTyF { ft_res = res }) <- ty
   = piResultTys res args
 
   | ForAllTy (Bndr tv _) res <- ty
@@ -1057,7 +1057,7 @@ piResultTys ty orig_args@(arg:args)
       | Just ty' <- coreView ty
       = go subst ty' all_args
 
-      | FunTy { ft_res = res } <- ty
+      | Type' (FunTyF { ft_res = res }) <- ty
       = go subst res args
 
       | ForAllTy (Bndr tv _) res <- ty
@@ -1128,7 +1128,7 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
-  = FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
+  = Type' (FunTyF { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 })
     -- The FunTyCon (->) is always a visible one
 
   | otherwise
@@ -1576,7 +1576,7 @@ splitPiTy_maybe ty = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
-    go (FunTy { ft_af = af, ft_arg = arg, ft_res = res})
+    go (Type' (FunTyF { ft_af = af, ft_arg = arg, ft_res = res}))
                           = Just (Anon af arg, res)
     go _                  = Nothing
 
@@ -1593,7 +1593,7 @@ splitPiTys ty = split ty ty []
   where
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split _       (ForAllTy b res) bs = split res res (Named b  : bs)
-    split _       (FunTy { ft_af = af, ft_arg = arg, ft_res = res }) bs
+    split _       (Type' (FunTyF { ft_af = af, ft_arg = arg, ft_res = res })) bs
                                       = split res res (Anon af arg : bs)
     split orig_ty _                bs = (reverse bs, orig_ty)
 
@@ -1624,7 +1624,7 @@ splitPiTysInvisible ty = split ty ty []
     split _ (ForAllTy b res) bs
       | Bndr _ vis <- b
       , isInvisibleArgFlag vis   = split res res (Named b  : bs)
-    split _ (FunTy { ft_af = InvisArg, ft_arg = arg, ft_res = res })  bs
+    split _ (Type' (FunTyF { ft_af = InvisArg, ft_arg = arg, ft_res = res }))  bs
                                  = split res res (Anon InvisArg arg : bs)
     split orig_ty _          bs  = (reverse bs, orig_ty)
 
@@ -1640,7 +1640,7 @@ splitPiTysInvisibleN n ty = split n ty ty []
       | ForAllTy b res <- ty
       , Bndr _ vis <- b
       , isInvisibleArgFlag vis  = split (n-1) res res (Named b  : bs)
-      | FunTy { ft_af = InvisArg, ft_arg = arg, ft_res = res } <- ty
+      | Type' (FunTyF { ft_af = InvisArg, ft_arg = arg, ft_res = res }) <- ty
                                 = split (n-1) res res (Anon InvisArg arg : bs)
       | otherwise               = (reverse bs, orig_ty)
 
@@ -1729,7 +1729,7 @@ fun_kind_arg_flags = go emptyTCvSubst
     --
     -- [Inferred,   Specified, Required, Required, Specified, Required]
     -- forall {k1}. forall k2. k1 ->     k2 ->     forall k3. k3 ->     Type
-    go subst (FunTy{ft_af = af, ft_res = res_ki}) (_:arg_tys)
+    go subst (Type' (FunTyF {ft_af = af, ft_res = res_ki})) (_:arg_tys)
       = argf : go subst res_ki arg_tys
       where
         argf = case af of
@@ -1867,7 +1867,7 @@ tcReturnsConstraintKind :: Kind -> Bool
 tcReturnsConstraintKind kind
   | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
 tcReturnsConstraintKind (ForAllTy _ ty)         = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (FunTy { ft_res = ty }) = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (Type' (FunTyF { ft_res = ty })) = tcReturnsConstraintKind ty
 tcReturnsConstraintKind (TyConApp tc _)         = isConstraintKindCon tc
 tcReturnsConstraintKind _                       = False
 
@@ -2709,7 +2709,7 @@ tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
 tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
 tcTypeKind (CoercionTy co)   = coercionType co
 
-tcTypeKind (FunTy { ft_af = af, ft_res = res })
+tcTypeKind (Type' (FunTyF { ft_af = af, ft_res = res }))
   | InvisArg <- af
   , tcIsConstraintKind (tcTypeKind res)
   = constraintKind     -- Eq a => Ord a         :: Constraint
@@ -2829,10 +2829,10 @@ occCheckExpand vs_to_avoid ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
                                 ; ty2' <- go cxt ty2
                                 ; return (mkAppTy ty1' ty2') }
-    go cxt ty@(FunTy _ ty1 ty2)
+    go cxt (Type' ty@(FunTyF _ ty1 ty2))
        = do { ty1' <- go cxt ty1
             ; ty2' <- go cxt ty2
-            ; return (ty { ft_arg = ty1', ft_res = ty2' }) }
+            ; return (Type' $ ty { ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv' = setVarType tv ki'

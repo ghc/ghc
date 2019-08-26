@@ -196,7 +196,7 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec (Type' (FunTyF { ft_af = af, ft_arg = arg, ft_res = res }))
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arrow <+> debug_ppr_ty prec res]
   where

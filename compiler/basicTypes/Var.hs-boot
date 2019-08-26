@@ -10,6 +10,4 @@ import GhcPrelude ()
   -- that this module depends on GhcPrelude, which ensures
   -- that GHC.Type is built first.
 
-data ArgFlag
-data AnonArgFlag
 data Var

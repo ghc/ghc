@@ -132,9 +132,10 @@ tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
                                      in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ arg res)  = let { !arg' = tidyType env arg
-                                         ; !res' = tidyType env res }
-                                     in ty { ft_arg = arg', ft_res = res' }
+tidyType env ty@(FunTy _ arg res)  = let Type' ty' = ty
+                                         !arg' = tidyType env arg
+                                         !res' = tidyType env res
+                                     in Type' $ ty' { ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty
