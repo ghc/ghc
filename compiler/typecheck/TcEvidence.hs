@@ -499,7 +499,7 @@ filterEvBindMap k (EvBindMap { ev_bind_varenv = env })
   = EvBindMap { ev_bind_varenv = filterDVarEnv k env }
 
 instance Outputable EvBindMap where
-  type OutputableNeedsOfConfig EvBindMap = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvBindMap = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (EvBindMap m) = ppr m
 
 -----------------
@@ -901,7 +901,7 @@ can just squeeze by.  Here's how.
 -}
 
 instance Outputable HsWrapper where
-  type OutputableNeedsOfConfig HsWrapper = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig HsWrapper = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))
 
 pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
@@ -939,12 +939,12 @@ add_parens d False = d
 no_parens d _ = d
 
 instance Outputable TcEvBinds where
-  type OutputableNeedsOfConfig TcEvBinds = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig TcEvBinds = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (TcEvBinds v) = ppr v
   ppr (EvBinds bs)  = text "EvBinds" <> braces (vcat (map ppr (bagToList bs)))
 
 instance Outputable EvBindsVar where
-  type OutputableNeedsOfConfig EvBindsVar = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvBindsVar = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (EvBindsVar { ebv_uniq = u })
      = text "EvBindsVar" <> angleBrackets (ppr u)
   ppr (CoEvBindsVar { ebv_uniq = u })
@@ -954,7 +954,7 @@ instance Uniquable EvBindsVar where
   getUnique = ebv_uniq
 
 instance Outputable EvBind where
-  type OutputableNeedsOfConfig EvBind = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvBind = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })
      = sep [ pp_gw <+> ppr v
            , nest 2 $ equals <+> ppr e ]
@@ -963,7 +963,7 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  type OutputableNeedsOfConfig EvTerm = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvTerm = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (EvExpr e)         = ppr e
   ppr (EvTypeable ty ev) = ppr ev <+> dcolon <+> text "Typeable" <+> ppr ty
   ppr (EvFun { et_tvs = tvs, et_given = gs, et_binds = bs, et_body = w })
@@ -971,14 +971,14 @@ instance Outputable EvTerm where
            2 (ppr bs $$ ppr w)   -- Not very pretty
 
 instance Outputable EvCallStack where
-  type OutputableNeedsOfConfig EvCallStack = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvCallStack = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr EvCsEmpty
     = text "[]"
   ppr (EvCsPushCall name loc tm)
     = ppr (name,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
-  type OutputableNeedsOfConfig EvTypeable = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig EvTypeable = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
   ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)

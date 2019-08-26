@@ -253,7 +253,7 @@ pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 -- in debug mode, print the expression that it's resolved to, too
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsOverLit p) where
-  type OutputableNeedsOfConfig (HsOverLit p) = NoConstraint
+  type OutputableNeedsOfConfig (HsOverLit p) = OutputableBndrIdNeedsOfConfig p
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (whenPprDebug (parens (pprExpr witness)))
   ppr (XOverLit x) = ppr x

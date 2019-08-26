@@ -26,7 +26,7 @@ data ParamLocation
   | StackParam ByteOff
 
 instance Outputable ParamLocation where
-  type OutputableNeedsOfConfig ParamLocation = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig ParamLocation = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (RegisterParam g) = ppr g
   ppr (StackParam p)    = ppr p
 

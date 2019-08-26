@@ -764,7 +764,7 @@ data FamInstMatch = FamInstMatch { fim_instance :: FamInst
   -- See Note [Over-saturated matches]
 
 instance Outputable FamInstMatch where
-  type OutputableNeedsOfConfig FamInstMatch = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig FamInstMatch = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys
                     , fim_cos      = cos })

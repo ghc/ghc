@@ -127,8 +127,10 @@ import Outputable.DynFlags
 import FastString
 import DynFlags
 import GHC.Platform
+import GHC.Platform.Lens
 import UniqSet
 import Util
+import TypeSuppress ( HasTypeSuppress )
 import PprCore ( {- instances -} )
 
 -- -----------------------------------------------------------------------------
@@ -363,7 +365,7 @@ data ForeignLabelSource
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
 --      The regular Outputable instance only shows the label name, and not its other info.
 --
-pprDebugCLabel :: CLabel -> SDoc
+pprDebugCLabel :: CLabel -> SDoc' r
 pprDebugCLabel lbl
  = case lbl of
         IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
@@ -1151,10 +1153,10 @@ and are not externally visible.
 -}
 
 instance Outputable CLabel where
-  type OutputableNeedsOfConfig CLabel = (~) DynFlags -- TODO generalize
+  type OutputableNeedsOfConfig CLabel = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr c = sdocWithDynFlags $ \dynFlags -> pprCLabel dynFlags c
 
-pprCLabel :: DynFlags -> CLabel -> SDoc
+pprCLabel :: DynFlags -> CLabel -> SDoc' r
 
 pprCLabel _ (LocalBlockLabel u)
   =  tempLabelPrefixOrUnderscore <> pprUniqueAlways u
@@ -1201,13 +1203,13 @@ pprCLabel dynFlags lbl
      then maybe_underscore dynFlags $ pprAsmCLbl (targetPlatform dynFlags) lbl
      else pprCLbl lbl
 
-maybe_underscore :: DynFlags -> SDoc -> SDoc
+maybe_underscore :: DynFlags -> SDoc' r -> SDoc' r
 maybe_underscore dynFlags doc =
   if platformMisc_leadingUnderscore $ platformMisc dynFlags
   then pp_cSEP <> doc
   else doc
 
-pprAsmCLbl :: Platform -> CLabel -> SDoc
+pprAsmCLbl :: Platform -> CLabel -> SDoc' r
 pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
  | platformOS platform == OSMinGW32
     -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
@@ -1216,7 +1218,7 @@ pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
 pprAsmCLbl _ lbl
    = pprCLbl lbl
 
-pprCLbl :: CLabel -> SDoc
+pprCLbl :: CLabel -> SDoc' r
 pprCLbl (StringLitLabel u)
   = pprUniqueAlways u <> text "_str"
 
@@ -1315,7 +1317,7 @@ pprCLbl (DynamicLinkerLabel {}) = panic "pprCLbl DynamicLinkerLabel"
 pprCLbl (PicBaseLabel {})       = panic "pprCLbl PicBaseLabel"
 pprCLbl (DeadStripPreventer {}) = panic "pprCLbl DeadStripPreventer"
 
-ppIdFlavor :: IdLabelInfo -> SDoc
+ppIdFlavor :: IdLabelInfo -> SDoc' r
 ppIdFlavor x = pp_cSEP <> text
                (case x of
                        Closure          -> "closure"
@@ -1333,19 +1335,19 @@ ppIdFlavor x = pp_cSEP <> text
                       )
 
 
-pp_cSEP :: SDoc
+pp_cSEP :: SDoc' r
 pp_cSEP = char '_'
 
 
 instance Outputable ForeignLabelSource where
- type OutputableNeedsOfConfig ForeignLabelSource = (~) DynFlags -- TODO generalize
+ type OutputableNeedsOfConfig ForeignLabelSource = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
  ppr fs
   = case fs of
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
 
-internalNamePrefix :: Name -> SDoc
+internalNamePrefix :: HasPlatform r => Name -> SDoc' r
 internalNamePrefix name = getPprStyle $ \ sty ->
   if asmStyle sty && isRandomGenerated then
     sdocWithPlatform $ \platform ->
@@ -1355,7 +1357,14 @@ internalNamePrefix name = getPprStyle $ \ sty ->
   where
     isRandomGenerated = not $ isExternalName name
 
-tempLabelPrefixOrUnderscore :: SDoc
+tempLabelPrefixOrUnderscore
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     , HasPlatform r
+     )
+  => SDoc' r
 tempLabelPrefixOrUnderscore = sdocWithPlatform $ \platform ->
   getPprStyle $ \ sty ->
    if asmStyle sty then
@@ -1372,7 +1381,13 @@ asmTempLabelPrefix platform = case platformOS platform of
     OSAIX    -> sLit "__L" -- follow IBM XL C's convention
     _        -> sLit ".L"
 
-pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc
+pprDynamicLinkerAsmLabel
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc' r
 pprDynamicLinkerAsmLabel platform dllInfo lbl =
     case platformOS platform of
       OSDarwin

@@ -86,15 +86,15 @@ instance (Outputable d, Outputable info, Outputable i)
     ppr t = pprTop t
 
 instance Outputable CmmStatics where
-    type OutputableNeedsOfConfig CmmStatics = (~) DynFlags -- TODO
+    type OutputableNeedsOfConfig CmmStatics = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprStatics
 
 instance Outputable CmmStatic where
-    type OutputableNeedsOfConfig CmmStatic = (~) DynFlags -- TODO
+    type OutputableNeedsOfConfig CmmStatic = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprStatic
 
 instance Outputable CmmInfoTable where
-    type OutputableNeedsOfConfig CmmInfoTable = (~) DynFlags -- TODO
+    type OutputableNeedsOfConfig CmmInfoTable = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprInfoTable
 
 
@@ -158,7 +158,7 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
-  type OutputableNeedsOfConfig ForeignHint = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig ForeignHint = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr NoHint     = empty
   ppr SignedHint = quotes(text "signed")
 --  ppr AddrHint   = quotes(text "address")

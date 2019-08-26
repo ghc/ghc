@@ -54,27 +54,27 @@ import Numeric ( fromRat )
 -----------------------------------------------------------------------------
 
 instance Outputable CmmExpr where
-    type OutputableNeedsOfConfig CmmExpr = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmExpr = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr e = pprExpr e
 
 instance Outputable CmmReg where
-    type OutputableNeedsOfConfig CmmReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmReg = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr e = pprReg e
 
 instance Outputable CmmLit where
-    type OutputableNeedsOfConfig CmmLit = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmLit = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr l = pprLit l
 
 instance Outputable LocalReg where
-    type OutputableNeedsOfConfig LocalReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig LocalReg = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr e = pprLocalReg e
 
 instance Outputable Area where
-    type OutputableNeedsOfConfig Area = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig Area = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr e = pprArea e
 
 instance Outputable GlobalReg where
-    type OutputableNeedsOfConfig GlobalReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig GlobalReg = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr e = pprGlobalReg e
 
 -- --------------------------------------------------------------------------

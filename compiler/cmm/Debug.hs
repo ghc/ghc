@@ -76,7 +76,7 @@ dblIsEntry :: DebugBlock -> Bool
 dblIsEntry blk = dblProcedure blk == dblLabel blk
 
 instance Outputable DebugBlock where
-  type OutputableNeedsOfConfig DebugBlock = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig DebugBlock = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr blk = (if dblProcedure blk == dblLabel blk
              then text "proc "
              else if dblHasInfoTbl blk
@@ -491,7 +491,7 @@ LOC this information will end up in is Y.
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
 instance Outputable UnwindPoint where
-  type OutputableNeedsOfConfig UnwindPoint = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig UnwindPoint = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (UnwindPoint lbl uws) =
       braces $ ppr lbl<>colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
@@ -516,7 +516,7 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 deriving (Eq)
 
 instance Outputable UnwindExpr where
-  type OutputableNeedsOfConfig UnwindExpr = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig UnwindExpr = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   pprPrec _ (UwConst i)     = ppr i
   pprPrec _ (UwReg g 0)     = ppr g
   pprPrec p (UwReg g x)     = pprPrec p (UwPlus (UwReg g 0) (UwConst x))

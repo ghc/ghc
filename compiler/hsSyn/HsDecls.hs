@@ -276,7 +276,7 @@ appendGroups _ _ = panic "appendGroups"
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsDecl p) where
     type OutputableNeedsOfConfig (HsDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (TyClD _ dcl)             = ppr dcl
     ppr (ValD _ binds)            = ppr binds
     ppr (DefD _ def)              = ppr def
@@ -295,7 +295,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsDecl p) where
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsGroup p) where
     type OutputableNeedsOfConfig (HsGroup p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
                    hs_derivds = deriv_decls,
@@ -349,7 +349,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (SpliceDecl p) where
    type OutputableNeedsOfConfig (SpliceDecl p) = PairConstraint
           (OutputableBndrIdNeedsOfConfig p)
-          ((~) DynFlags) -- TODO generalize
+          (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
    ppr (SpliceDecl _ (L _ e) f) = pprSpliceDecl e f
    ppr (XSpliceDecl x) = ppr x
 
@@ -722,7 +722,7 @@ hsDeclHasCusk _ (XTyClDecl nec) = noExtCon nec
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (TyClDecl p) where
     type OutputableNeedsOfConfig (TyClDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (FamDecl { tcdFam = decl }) = ppr decl
     ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
                  , tcdRhs = rhs })
@@ -758,7 +758,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TyClGroup p) where
   type OutputableNeedsOfConfig (TyClGroup p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
                  , group_instds = instds
@@ -1139,7 +1139,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (FamilyDecl p) where
   type OutputableNeedsOfConfig (FamilyDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprFamilyDecl TopLevel
 
 pprFamilyDecl
@@ -1278,7 +1278,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsDerivingClause p) where
   type OutputableNeedsOfConfig (HsDerivingClause p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
@@ -1478,7 +1478,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsDataDefn p) where
    type OutputableNeedsOfConfig (HsDataDefn p) = PairConstraint
      (OutputableBndrIdNeedsOfConfig p)
-     ((~) DynFlags) -- TODO generalize
+     (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
 instance Outputable NewOrData where
@@ -1499,7 +1499,7 @@ pp_condecls cs                    -- In H98 syntax
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ConDecl p) where
     type OutputableNeedsOfConfig (ConDecl p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr = pprConDecl
 
 pprConDecl
@@ -1754,7 +1754,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (TyFamInstDecl p) where
   type OutputableNeedsOfConfig (TyFamInstDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprTyFamInstDecl TopLevel
 
 pprTyFamInstDecl
@@ -1794,7 +1794,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (DataFamInstDecl p) where
   type OutputableNeedsOfConfig (DataFamInstDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprDataFamInstDecl TopLevel
 
 pprDataFamInstDecl
@@ -1860,7 +1860,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ClsInstDecl p) where
     type OutputableNeedsOfConfig (ClsInstDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
@@ -1907,7 +1907,7 @@ ppOverlapPragma mb =
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (InstDecl p) where
     type OutputableNeedsOfConfig (InstDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
@@ -1970,7 +1970,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (DerivDecl p) where
     type OutputableNeedsOfConfig (DerivDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (DerivDecl { deriv_type = ty
                    , deriv_strategy = ds
                    , deriv_overlap_mode = o })
@@ -2013,7 +2013,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
         => Outputable (DerivStrategy p) where
     type OutputableNeedsOfConfig (DerivStrategy p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr StockStrategy    = text "stock"
     ppr AnyclassStrategy = text "anyclass"
     ppr NewtypeStrategy  = text "newtype"
@@ -2074,7 +2074,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (DefaultDecl p) where
     type OutputableNeedsOfConfig (DefaultDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (DefaultDecl _ tys)
       = text "default" <+> parens (interpp'SP tys)
     ppr (XDefaultDecl x) = ppr x
@@ -2185,7 +2185,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (ForeignDecl p) where
   type OutputableNeedsOfConfig (ForeignDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
     = hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
@@ -2316,7 +2316,7 @@ pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleDecls p) where
   type OutputableNeedsOfConfig (RuleDecls p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsRules { rds_src = st
                , rds_rules = rules })
     = pprWithSourceText st (text "{-# RULES")
@@ -2326,7 +2326,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleDecls p) wher
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleDecl p) where
   type OutputableNeedsOfConfig (RuleDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsRule { rd_name = name
               , rd_act  = act
               , rd_tyvs = tys
@@ -2347,7 +2347,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleDecl p) where
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleBndr p) where
    type OutputableNeedsOfConfig (RuleBndr p) = PairConstraint
           (OutputableBndrIdNeedsOfConfig p)
-          ((~) DynFlags) -- TODO generalize
+          (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
    ppr (RuleBndr _ name) = ppr name
    ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
    ppr (XRuleBndr x) = ppr x
@@ -2421,7 +2421,7 @@ instance (p ~ GhcPass pass,OutputableBndr (IdP p))
         => Outputable (WarnDecls p) where
     type OutputableNeedsOfConfig (WarnDecls p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (Warnings _ (SourceText src) decls)
       = text src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
     ppr (Warnings _ NoSourceText _decls) = panic "WarnDecls"
@@ -2431,7 +2431,7 @@ instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (WarnDecl p) where
     type OutputableNeedsOfConfig (WarnDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (Warning _ thing txt)
       = hsep ( punctuate comma (map ppr thing))
               <+> ppr txt
@@ -2467,7 +2467,7 @@ type instance XXAnnDecl     (GhcPass _) = NoExtCon
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (AnnDecl p) where
     type OutputableNeedsOfConfig (AnnDecl p) = PairConstraint
            (OutputableBndrIdNeedsOfConfig p)
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (HsAnnotation _ _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
     ppr (XAnnDecl x) = ppr x
@@ -2529,7 +2529,7 @@ instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (RoleAnnotDecl p) where
   type OutputableNeedsOfConfig (RoleAnnotDecl p) = PairConstraint
          (OutputableBndrIdNeedsOfConfig p)
-         ((~) DynFlags) -- TODO generalize
+         (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (RoleAnnotDecl _ ltycon roles)
     = text "type role" <+> pprPrefixOcc (unLoc ltycon) <+>
       hsep (map (pp_role . unLoc) roles)

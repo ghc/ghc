@@ -908,7 +908,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
       (PairConstraint
        (PairConstraint HasPprConfig HasNameSuppress)
        (PairConstraint HasTypeSuppress HasPackageState))
-      (OutputableNeedsOfConfig (IdP p))
+      (OutputableBndrIdNeedsOfConfig p)
   ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
   ppr (XConDeclField x) = ppr x
 
@@ -1461,7 +1461,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsType p) where
       (PairConstraint
        (PairConstraint HasPprConfig HasNameSuppress)
        (PairConstraint HasTypeSuppress HasPackageState))
-      (OutputableNeedsOfConfig (IdP p))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr ty = pprHsType ty
 
 instance Outputable HsTyLit where
@@ -1474,7 +1474,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
       (PairConstraint
        (PairConstraint HasPprConfig HasNameSuppress)
        (PairConstraint HasTypeSuppress HasPackageState))
-      (OutputableNeedsOfConfig (IdP p))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
     ppr (XLHsQTyVars x) = ppr x
 
@@ -1484,7 +1484,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
       (PairConstraint
        (PairConstraint HasPprConfig HasNameSuppress)
        (PairConstraint HasTypeSuppress HasPackageState))
-      (OutputableNeedsOfConfig (IdP p))
+      (OutputableBndrIdNeedsOfConfig p)
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
     ppr (XTyVarBndr n)      = ppr n
@@ -1508,7 +1508,7 @@ pprAnonWildCard = char '_'
 -- only when @-dppr-debug@ is enabled.
 pprHsForAll
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1527,7 +1527,7 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- printing the type will not print the extra-constraints wildcard.
 pprHsForAllExtra
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1548,7 +1548,7 @@ pprHsForAllExtra extra fvf qtvs cxt
 -- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
 pprHsExplicitForAll
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1568,7 +1568,7 @@ ppr_forall_separator ForallInvis = dot
 
 pprLHsContext
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1582,7 +1582,7 @@ pprLHsContext lctxt
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprLHsContextAlways
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1598,7 +1598,7 @@ pprLHsContextAlways (L _ ctxt)
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
 pprLHsContextExtra
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1614,7 +1614,7 @@ pprLHsContextExtra show_extra lctxt@(L _ ctxt)
 
 pprConDeclFields
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1647,7 +1647,7 @@ seems like the Right Thing anyway.)
 
 pprHsType
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1658,7 +1658,7 @@ pprHsType ty = ppr_mono_ty ty
 
 ppr_mono_lty
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1669,7 +1669,7 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r
@@ -1734,7 +1734,7 @@ ppr_mono_ty (XHsType t) = ppr t
 --------------------------
 ppr_fun_ty
   :: ( OutputableBndrId (GhcPass p)
-     , OutputableNeedsOfConfig (IdP (GhcPass p)) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
      , HasPprConfig r
      , HasNameSuppress r
      , HasTypeSuppress r

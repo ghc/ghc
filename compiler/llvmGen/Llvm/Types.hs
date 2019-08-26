@@ -66,7 +66,7 @@ data LlvmType
   deriving (Eq)
 
 instance Outputable LlvmType where
-  type OutputableNeedsOfConfig LlvmType = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmType = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (LMInt size     ) = char 'i' <> ppr size
   ppr (LMFloat        ) = text "float"
   ppr (LMDouble       ) = text "double"
@@ -119,7 +119,7 @@ data LlvmVar
   deriving (Eq)
 
 instance Outputable LlvmVar where
-  type OutputableNeedsOfConfig LlvmVar = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmVar = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (LMLitVar x)  = ppr x
   ppr (x         )  = ppr (getVarType x) <+> ppName x
 
@@ -141,7 +141,7 @@ data LlvmLit
   deriving (Eq)
 
 instance Outputable LlvmLit where
-  type OutputableNeedsOfConfig LlvmLit = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmLit = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr l@(LMVectorLit {}) = ppLit l
   ppr l                  = ppr (getLitType l) <+> ppLit l
 
@@ -168,7 +168,7 @@ data LlvmStatic
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
 
 instance Outputable LlvmStatic where
-  type OutputableNeedsOfConfig LlvmStatic = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmStatic = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (LMComment       s) = text "; " <> ftext s
   ppr (LMStaticLit   l  ) = ppr l
   ppr (LMUninitType    t) = ppr t <> text " undef"
@@ -433,7 +433,7 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
   deriving (Eq)
 
 instance Outputable LlvmFunctionDecl where
-  type OutputableNeedsOfConfig LlvmFunctionDecl = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmFunctionDecl = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (LlvmFunctionDecl n l c r varg p a)
     = let align = case a of
                        Just a' -> text " align " <> ppr a'
@@ -481,7 +481,7 @@ data LlvmParamAttr
   deriving (Eq)
 
 instance Outputable LlvmParamAttr where
-  type OutputableNeedsOfConfig LlvmParamAttr = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmParamAttr = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr ZeroExt   = text "zeroext"
   ppr SignExt   = text "signext"
   ppr InReg     = text "inreg"
@@ -570,7 +570,7 @@ data LlvmFuncAttr
   deriving (Eq)
 
 instance Outputable LlvmFuncAttr where
-  type OutputableNeedsOfConfig LlvmFuncAttr = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmFuncAttr = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr AlwaysInline       = text "alwaysinline"
   ppr InlineHint         = text "inlinehint"
   ppr NoInline           = text "noinline"
@@ -631,7 +631,7 @@ data LlvmCallConvention
   deriving (Eq)
 
 instance Outputable LlvmCallConvention where
-  type OutputableNeedsOfConfig LlvmCallConvention = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCallConvention = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr CC_Ccc       = text "ccc"
   ppr CC_Fastcc    = text "fastcc"
   ppr CC_Coldcc    = text "coldcc"
@@ -696,7 +696,7 @@ data LlvmLinkageType
   deriving (Eq)
 
 instance Outputable LlvmLinkageType where
-  type OutputableNeedsOfConfig LlvmLinkageType = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmLinkageType = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr Internal          = text "internal"
   ppr LinkOnce          = text "linkonce"
   ppr Weak              = text "weak"
@@ -745,7 +745,7 @@ data LlvmMachOp
   deriving (Eq)
 
 instance Outputable LlvmMachOp where
-  type OutputableNeedsOfConfig LlvmMachOp = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmMachOp = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr LM_MO_Add  = text "add"
   ppr LM_MO_Sub  = text "sub"
   ppr LM_MO_Mul  = text "mul"
@@ -790,7 +790,7 @@ data LlvmCmpOp
   deriving (Eq)
 
 instance Outputable LlvmCmpOp where
-  type OutputableNeedsOfConfig LlvmCmpOp = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCmpOp = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr LM_CMP_Eq  = text "eq"
   ppr LM_CMP_Ne  = text "ne"
   ppr LM_CMP_Ugt = text "ugt"
@@ -826,7 +826,7 @@ data LlvmCastOp
   deriving (Eq)
 
 instance Outputable LlvmCastOp where
-  type OutputableNeedsOfConfig LlvmCastOp= (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCastOp= PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr LM_Trunc    = text "trunc"
   ppr LM_Zext     = text "zext"
   ppr LM_Sext     = text "sext"

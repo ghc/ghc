@@ -217,7 +217,7 @@ instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
 instance Outputable ClsInst where
-   type OutputableNeedsOfConfig ClsInst = (~) DynFlags -- TODO 
+   type OutputableNeedsOfConfig ClsInst = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress) 
    ppr = pprInstance
 
 pprInstance :: ClsInst -> SDoc
@@ -416,7 +416,7 @@ newtype ClsInstEnv
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
-  type OutputableNeedsOfConfig ClsInstEnv = (~) DynFlags -- TODO 
+  type OutputableNeedsOfConfig ClsInstEnv = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress) 
   ppr (ClsIE is) = pprInstances is
 
 -- INVARIANTS:

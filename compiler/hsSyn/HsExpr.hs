@@ -142,7 +142,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (SyntaxExpr p) where
   type OutputableNeedsOfConfig (SyntaxExpr p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (SyntaxExpr { syn_expr      = expr
                   , syn_arg_wraps = arg_wraps
                   , syn_res_wrap  = res_wrap })
@@ -854,7 +854,7 @@ RenamedSource, so this allows a simple mapping to be used based on the location.
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p) where
     type OutputableNeedsOfConfig (HsExpr p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr expr = pprExpr expr
 
 -----------------------
@@ -1399,7 +1399,7 @@ type instance XXCmdTop (GhcPass _) = NoExtCon
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p) where
     type OutputableNeedsOfConfig (HsCmd p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr cmd = pprCmd cmd
 
 -----------------------
@@ -1516,7 +1516,7 @@ pprCmdArg (XCmdTop x) = ppr x
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmdTop p) where
     type OutputableNeedsOfConfig (HsCmdTop p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr = pprCmdArg
 
 {-
@@ -1598,7 +1598,7 @@ instance (idR ~ GhcPass pr, OutputableBndrId idR, Outputable body)
     (PairConstraint
       (OutputableBndrIdNeedsOfConfig idR)
       (OutputableNeedsOfConfig body))
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprMatch
 
 {-
@@ -2623,7 +2623,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsSplicedThing p) where
   type OutputableNeedsOfConfig (HsSplicedThing p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsSplicedExpr e) = ppr_expr e
   ppr (HsSplicedTy   t) = ppr t
   ppr (HsSplicedPat  p) = ppr p
@@ -2631,7 +2631,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
   type OutputableNeedsOfConfig (HsSplice p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr s = pprSplice s
 
 pprPendingSplice
@@ -2726,7 +2726,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
           => Outputable (HsBracket p) where
   type OutputableNeedsOfConfig (HsBracket p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprHsBracket
 
 
@@ -2755,11 +2755,11 @@ thTyBrackets :: SDoc -> SDoc
 thTyBrackets pp_body = text "[||" <+> pp_body <+> ptext (sLit "||]")
 
 instance Outputable PendingRnSplice where
-  type OutputableNeedsOfConfig PendingRnSplice = (~) DynFlags -- TODO generalize
+  type OutputableNeedsOfConfig PendingRnSplice = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (PendingRnSplice _ n e) = pprPendingSplice n e
 
 instance Outputable PendingTcSplice where
-  type OutputableNeedsOfConfig PendingTcSplice = (~) DynFlags -- TODO generalize
+  type OutputableNeedsOfConfig PendingTcSplice = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (PendingTcSplice n e) = pprPendingSplice n e
 
 {-
@@ -2786,7 +2786,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
          => Outputable (ArithSeqInfo p) where
     type OutputableNeedsOfConfig (ArithSeqInfo p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr (From e1)             = hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
     ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
@@ -2841,7 +2841,7 @@ deriving instance (Data id) => Data (HsMatchContext id)
 instance (OutputableBndr id) => Outputable (HsMatchContext id) where
   type OutputableNeedsOfConfig (HsMatchContext id) = PairConstraint
     (OutputableBndrNeedsOfConfig' id)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr m@(FunRhs{})          = text "FunRhs" <+> ppr (mc_fun m) <+> ppr (mc_fixity m)
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
@@ -2999,7 +2999,7 @@ instance (Outputable id, Outputable (NameOrRdrName id))
            (PairConstraint
              (OutputableNeedsOfConfig id)
              (OutputableNeedsOfConfig (NameOrRdrName id)))
-           ((~) DynFlags) -- TODO generalize
+           (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
