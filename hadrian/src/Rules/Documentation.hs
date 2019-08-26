@@ -34,6 +34,9 @@ htmlRoot = docRoot -/- "html"
 pdfRoot :: FilePath
 pdfRoot = docRoot -/- "pdfs"
 
+infoRoot :: FilePath
+infoRoot = docRoot -/- "info"
+
 archiveRoot :: FilePath
 archiveRoot = docRoot -/- "archives"
 
@@ -58,6 +61,7 @@ pathArchive path = archiveRoot -/- path <.> "html.tar.xz"
 
 -- TODO: Get rid of this hack.
 pathPath :: FilePath -> FilePath
+pathPath "GHCUsersGuide" = "docs/users_guide"
 pathPath "users_guide" = "docs/users_guide"
 pathPath "Haddock" = "utils/haddock/doc"
 pathPath _ = ""
@@ -69,6 +73,7 @@ documentationRules = do
     buildHtmlDocumentation
     buildManPage
     buildPdfDocumentation
+    buildSphinxInfoGuide
 
     -- a phony rule that runs Haddock for "Haskell Hierarchical Libraries" and
     -- the "GHC-API"
@@ -256,6 +261,21 @@ buildSphinxPdf path = do
             build $ target docContext (Sphinx Latex) [pathPath path] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
+
+------------------------------------ Info -- -----------------------------------
+
+buildSphinxInfoGuide :: Rules ()
+buildSphinxInfoGuide = do
+  root <- buildRootRules
+  let path = "GHCUsersGuide"
+  root -/- infoRoot -/- path <.> "info" %> \ file -> do
+        withTempDir $ \dir -> do
+            let rstFilesDir = pathPath path
+            rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
+            need (map (rstFilesDir -/-) rstFiles)
+            build $ target docContext (Sphinx Info) [pathPath path] [dir]
+            cmd_ "make -C " [dir]
+            copyFileUntracked (dir -/- path <.> "info") file
 
 ------------------------------------ Archive -----------------------------------
 

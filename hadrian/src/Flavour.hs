@@ -58,7 +58,7 @@ type DocTargets = Set DocTarget
 --   for e.g @sphinx-build@ or @xelatex@ and associated packages
 --   while still being able to build a(n almost) complete binary
 --   distribution.
-data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan
+data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
   deriving (Eq, Ord, Show, Bounded, Enum)
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
