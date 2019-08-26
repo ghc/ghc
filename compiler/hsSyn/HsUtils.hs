@@ -650,7 +650,7 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType GhcPs
-    go ty@(FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+    go ty@(Type' (FunTyF { ft_af = af, ft_arg = arg, ft_res = res }))
       = case af of
           VisArg   -> nlHsFunTy (go arg) (go res)
           InvisArg | (theta, tau) <- tcSplitPhiTy ty

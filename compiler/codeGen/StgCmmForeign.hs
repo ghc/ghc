@@ -601,7 +601,7 @@ collectStgFArgTypes = go []
     go bs (TyVarTy{}) = reverse bs
     go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
     go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
-    go bs (FunTy {ft_arg = arg, ft_res=res}) =
+    go bs (Type' (FunTyF {ft_arg = arg, ft_res=res})) =
       go (typeToStgFArgType arg:bs) res
 
 -- Choose the offset based on the type. For anything other
