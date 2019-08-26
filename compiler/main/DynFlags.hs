@@ -23,7 +23,7 @@ module DynFlags (
         GeneralFlag(..),
         WarningFlag(..), WarnReason(..),
         Language(..),
-        PlatformConstants(..),
+        module PlatformConstants,
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
@@ -206,7 +206,6 @@ module DynFlags (
         rtsIsProfiled,
         dynamicGhc,
 
-#include "GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
         wORD_SIZE_IN_BITS,
         wordAlignment,
@@ -1269,6 +1268,10 @@ data DynFlags = DynFlags {
   -- | Temporary: CFG Edge weights for fast iterations
   cfgWeightInfo         :: CfgWeights
 }
+
+instance HasPlatformConstants DynFlags where
+  {-# INLINE getPlatformConstants #-}
+  getPlatformConstants = platformConstants
 
 -- | Edge weights to use when generating a CFG from CMM
 data CfgWeights
@@ -5569,9 +5572,6 @@ compilerInfo dflags
     isWindows = platformOS (targetPlatform dflags) == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
-
--- Produced by deriveConstants
-#include "GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
 bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
