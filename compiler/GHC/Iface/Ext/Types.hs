@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -11,11 +12,11 @@ Types for the .hie file format are defined here.
 
 For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 -}
-
 module GHC.Iface.Ext.Types where
 
 import GHC.Prelude
 
+import GHC.Core.TyCo.Rep.Open
 import GHC.Settings.Config
 import GHC.Utils.Binary
 import GHC.Data.FastString
@@ -27,6 +28,7 @@ import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc
 import GHC.Types.Avail
 import GHC.Types.Unique
+import GHC.Types.Var.Binder
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -34,13 +36,18 @@ import GHC.Utils.Panic
 import qualified Data.Array as A
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Bifunctor
+import Data.Bitraversable
 import Data.ByteString            ( ByteString )
 import Data.Data                  ( Typeable, Data )
 import Data.Semigroup             ( Semigroup(..) )
 import Data.Word                  ( Word8 )
+import Data.Traversable           ( foldMapDefault )
 import Control.Applicative        ( (<|>) )
-import Data.Coerce                ( coerce  )
+import Data.Coerce                ( coerce )
 import Data.Function              ( on )
+
+import Language.Haskell.Syntax.Extension ( NoExtField(..) )
 
 type Span = RealSrcSpan
 
@@ -136,20 +143,74 @@ form with sharing of subtrees.
 
 type TypeIndex = Int
 
+type HieType0 a = TypeF
+  Name (Name, a) IfaceTyCon IfaceTyLit NoExtField NoExtField
+  (HieArgs a) (HieArgs a) a
+
 -- | A flattened version of 'Type'.
 --
 -- See Note [Efficient serialization of redundant type info]
-data HieType a
-  = HTyVarTy Name
-  | HAppTy a (HieArgs a)
-  | HTyConApp IfaceTyCon (HieArgs a)
-  | HForAllTy ((Name, a),ArgFlag) a
-  | HFunTy a a a
-  | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
-  | HLitTy IfaceTyLit
-  | HCastTy a
-  | HCoercionTy
-    deriving (Functor, Foldable, Traversable, Eq)
+newtype HieType a = HieType {
+    unHieType :: HieType0 a
+  } deriving Eq
+
+{-# COMPLETE HTyVarTy, HAppTy, HTyConApp, HForAllTy, HFunTy', HLitTy, HCastTy, HCoercionTy #-}
+{-# COMPLETE HTyVarTy, HAppTy, HTyConApp, HForAllTy, HFunTy, HQualTy, HLitTy, HCastTy, HCoercionTy #-}
+
+pattern HTyVarTy :: Name -> HieType a
+pattern HTyVarTy v = HieType (TyVarTyF v)
+
+pattern HAppTy :: a -> HieArgs a -> HieType a
+pattern HAppTy f a = HieType (AppTyF f a)
+
+pattern HTyConApp:: IfaceTyCon -> HieArgs a -> HieType a
+pattern HTyConApp f as = HieType (TyConAppF f as)
+
+pattern HForAllTy :: VarBndr (Name, a) ArgFlag -> a -> HieType a
+pattern HForAllTy b t = HieType (ForAllTyF b t)
+
+pattern HFunTy' :: AnonArgFlag -> a -> a -> a -> HieType a
+pattern HFunTy' f m a r = HieType (FunTyF f m a r)
+
+pattern HFunTy :: a -> a -> a -> HieType a
+pattern HFunTy w a r = HFunTy' VisArg w a r
+
+pattern HQualTy :: a -> a -> a -> HieType a
+pattern HQualTy w a r = HFunTy' InvisArg w a r
+
+pattern HLitTy :: IfaceTyLit -> HieType a
+pattern HLitTy l = HieType (LitTyF l)
+
+pattern HCastTy :: a -> HieType a
+pattern HCastTy t = HieType (CastTyF t NoExtField)
+
+pattern HCoercionTy :: HieType a
+pattern HCoercionTy = HieType (CoercionTyF NoExtField)
+
+instance Functor HieType where
+  fmap f = \case
+    HTyVarTy n -> HTyVarTy n
+    HAppTy a xs -> HAppTy (f a) (fmap f xs)
+    HTyConApp n xs -> HTyConApp n $ fmap f xs
+    HForAllTy bndr a -> HForAllTy ((first . second) f bndr) $ f a
+    HFunTy' isConstraint m a b -> HFunTy' isConstraint (f m) (f a) (f b)
+    HLitTy l -> HLitTy l
+    HCastTy a -> HCastTy $ f a
+    HCoercionTy -> HCoercionTy
+
+instance Foldable HieType where
+  foldMap = foldMapDefault
+
+instance Traversable HieType where
+  traverse f = \case
+    HTyVarTy n -> pure $ HTyVarTy n
+    HAppTy a xs -> HAppTy <$> f a <*> traverse f xs
+    HTyConApp n xs -> HTyConApp n <$> traverse f xs
+    HForAllTy bndr a -> HForAllTy <$> (flip bitraverse pure . traverse) f bndr <*> f a
+    HFunTy' isConstraint m a b -> HFunTy' isConstraint <$> f a <*> f m <*> f b
+    HLitTy l -> pure $ HLitTy l
+    HCastTy a -> HCastTy <$> f a
+    HCoercionTy -> pure $ HCoercionTy
 
 type HieTypeFlat = HieType TypeIndex
 
@@ -158,56 +219,53 @@ newtype HieTypeFix = Roll (HieType (HieTypeFix))
   deriving Eq
 
 instance Binary (HieType TypeIndex) where
-  put_ bh (HTyVarTy n) = do
-    putByte bh 0
-    put_ bh n
-  put_ bh (HAppTy a b) = do
-    putByte bh 1
-    put_ bh a
-    put_ bh b
-  put_ bh (HTyConApp n xs) = do
-    putByte bh 2
-    put_ bh n
-    put_ bh xs
-  put_ bh (HForAllTy bndr a) = do
-    putByte bh 3
-    put_ bh bndr
-    put_ bh a
-  put_ bh (HFunTy w a b) = do
-    putByte bh 4
-    put_ bh w
-    put_ bh a
-    put_ bh b
-  put_ bh (HQualTy a b) = do
-    putByte bh 5
-    put_ bh a
-    put_ bh b
-  put_ bh (HLitTy l) = do
-    putByte bh 6
-    put_ bh l
-  put_ bh (HCastTy a) = do
-    putByte bh 7
-    put_ bh a
-  put_ bh (HCoercionTy) = putByte bh 8
+  put_ bh = (coerce :: forall a x. (HieType0 a -> x) -> (HieType a -> x)) $ \case
+    TyVarTyF n -> do
+      putByte bh 0
+      put_ bh n
+    AppTyF a b -> do
+      putByte bh 1
+      put_ bh a
+      put_ bh b
+    TyConAppF n xs -> do
+      putByte bh 2
+      put_ bh n
+      put_ bh xs
+    ForAllTyF bndr a -> do
+      putByte bh 3
+      put_ bh bndr
+      put_ bh a
+    FunTyF flag mult a b -> do
+      putByte bh 4
+      put_ bh flag
+      put_ bh mult
+      put_ bh a
+      put_ bh b
+    LitTyF l -> do
+      putByte bh 5
+      put_ bh l
+    CastTyF a NoExtField -> do
+      putByte bh 6
+      put_ bh a
+    CoercionTyF NoExtField -> putByte bh 7
 
-  get bh = do
+  get bh = fmap HieType $ do
     (t :: Word8) <- get bh
     case t of
-      0 -> HTyVarTy <$> get bh
-      1 -> HAppTy <$> get bh <*> get bh
-      2 -> HTyConApp <$> get bh <*> get bh
-      3 -> HForAllTy <$> get bh <*> get bh
-      4 -> HFunTy <$> get bh <*> get bh <*> get bh
-      5 -> HQualTy <$> get bh <*> get bh
-      6 -> HLitTy <$> get bh
-      7 -> HCastTy <$> get bh
-      8 -> return HCoercionTy
+      0 -> TyVarTyF <$> get bh
+      1 -> AppTyF <$> get bh <*> get bh
+      2 -> TyConAppF <$> get bh <*> get bh
+      3 -> ForAllTyF <$> get bh <*> get bh
+      4 -> FunTyF <$> get bh <*> get bh <*> get bh <*> get bh
+      5 -> LitTyF <$> get bh
+      6 -> flip CastTyF NoExtField <$> get bh
+      7 -> return $ CoercionTyF NoExtField
       _ -> panic "Binary (HieArgs Int): invalid tag"
 
 
 -- | A list of type arguments along with their respective visibilities (ie. is
 -- this an argument that would return 'True' for 'isVisibleArgFlag'?).
-newtype HieArgs a = HieArgs [(Bool,a)]
+newtype HieArgs a = HieArgs { unHieArgs :: [(ArgFlag, a)] }
   deriving (Functor, Foldable, Traversable, Eq)
 
 instance Binary (HieArgs TypeIndex) where

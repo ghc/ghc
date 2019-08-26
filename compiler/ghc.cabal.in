@@ -330,6 +330,7 @@ Library
         GHC.Core.TyCon.Set
         GHC.Core.TyCo.Ppr
         GHC.Core.TyCo.Rep
+        GHC.Core.TyCo.Rep.Open
         GHC.Core.TyCo.Subst
         GHC.Core.TyCo.Tidy
         GHC.Core.Type

@@ -1,5 +1,5 @@
-
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -26,7 +26,19 @@ Note [The Type-related module hierarchy]
 module GHC.Core.TyCo.Rep (
 
         -- * Types
-        Type(..),
+        module GHC.Core.TyCo.Rep.Open,
+        Type0,
+        Type
+          ( Type'
+          , TyVarTy
+          , AppTy
+          , TyConApp
+          , ForAllTy
+          , FunTy, ft_af, ft_mult, ft_arg, ft_res
+          , LitTy
+          , CastTy
+          , CoercionTy
+          ),
 
         TyLit(..),
         KindOrType, Kind,
@@ -80,6 +92,9 @@ import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
+-- open abstract:
+import GHC.Core.TyCo.Rep.Open
+
 -- friends:
 import GHC.Iface.Type
 import GHC.Types.Var
@@ -113,71 +128,54 @@ type KindOrType = Type -- See Note [Arguments to type constructors]
 -- | The key type representing kinds in the compiler.
 type Kind = Type
 
--- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in GHC.Core.Lint
-data Type
-  -- See Note [Non-trivial definitional equality]
-  = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
+-- | Haskell Type abstract syntax layer
+--
+-- The "mostly saturated" tycon is useful in a few places.
+type Type0 t = TypeF Var TyCoVar TyCon TyLit Coercion KindCoercion t [t] t
 
-  | AppTy
-        Type
-        Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
-                        --
-                        --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
-                        --     must be another 'AppTy', or 'TyVarTy'
-                        --     See Note [Respecting definitional equality] \(EQ1) about the
-                        --     no 'CastTy' requirement
-                        --
-                        --  2) Argument type
-
-  | TyConApp
-        TyCon
-        [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
-                        -- Invariant: saturated applications of 'FunTyCon' must
-                        -- use 'FunTy' and saturated synonyms must use their own
-                        -- constructors. However, /unsaturated/ 'FunTyCon's
-                        -- do appear as 'TyConApp's.
-                        -- Parameters:
-                        --
-                        -- 1) Type constructor being applied to.
-                        --
-                        -- 2) Type arguments. Might not have enough type arguments
-                        --    here to saturate the constructor.
-                        --    Even type synonyms are not necessarily saturated;
-                        --    for example unsaturated type synonyms
-                        --    can appear as the right hand side of a type synonym.
-
-  | ForAllTy
-        {-# UNPACK #-} !TyCoVarBinder
-        Type            -- ^ A Π type.
-             -- INVARIANT: If the binder is a coercion variable, it must
-             -- be mentioned in the Type. See
-             -- Note [Unused coercion variable in ForAllTy]
-
-  | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
-                -- See Note [Function types]
-     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
-     , ft_mult :: Mult          -- Multiplicity
-     , ft_arg :: Type           -- Argument type
-     , ft_res :: Type }         -- Result type
-
-  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
-
-  | CastTy
-        Type
-        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
-                      -- INVARIANT: The cast is never reflexive \(EQ2)
-                      -- INVARIANT: The Type is not a CastTy (use TransCo instead) \(EQ3)
-                      -- INVARIANT: The Type is not a ForAllTy over a tyvar \(EQ4)
-                      -- See Note [Respecting definitional equality]
-
-  | CoercionTy
-        Coercion    -- ^ Injection of a Coercion into a type
-                    -- This should only ever be used in the RHS of an AppTy,
-                    -- in the list of a TyConApp, when applying a promoted
-                    -- GADT data constructor
-
+-- | Haskell Type abstract syntax
+-- TODO rename "Type'", a crude way to get around core conflict
+newtype Type = Type' (Type0 Type)
   deriving Data.Data
+
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTy, FunTy, LitTy, CastTy, CoercionTy #-}
+
+pattern TyVarTy :: Var -> Type
+pattern TyVarTy v = Type' (TyVarTyF v)
+
+pattern AppTy :: Type -> Type -> Type
+pattern AppTy f a = Type' (AppTyF f a)
+
+pattern TyConApp:: TyCon -> [Type] -> Type
+pattern TyConApp f as = Type' (TyConAppF f as)
+
+pattern ForAllTy :: TyCoVarBinder -> Type -> Type
+pattern ForAllTy b t = Type' (ForAllTyF b t)
+
+pattern FunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
+-- | Is this (->) or (=>)?
+ft_af :: _
+-- | Multiplicity
+ft_mult :: _
+-- | Argument type
+ft_arg :: _
+-- | Result type
+ft_res :: _
+pattern FunTy { ft_af, ft_mult, ft_arg, ft_res } = Type'
+  (FunTyF { ftf_af = ft_af
+          , ftf_mult = ft_mult
+          , ftf_arg = ft_arg
+          , ftf_res = ft_res
+          }) 
+
+pattern LitTy :: TyLit -> Type
+pattern LitTy l = Type' (LitTyF l)
+
+pattern CastTy :: Type -> Coercion -> Type
+pattern CastTy t c = Type' (CastTyF t c)
+
+pattern CoercionTy :: KindCoercion -> Type
+pattern CoercionTy kc = Type' (CoercionTyF kc)
 
 instance Outputable Type where
   ppr = pprType
@@ -1047,6 +1045,7 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
+
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
