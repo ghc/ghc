@@ -686,7 +686,7 @@ compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
 
 -- Output stuff:
 
-pprPrimOp  :: (HasNameSuppress r, HasPackageState r) => PrimOp -> SDoc' r
+pprPrimOp :: HasNameSuppress r  => PrimOp -> SDoc' r
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
 
 {-

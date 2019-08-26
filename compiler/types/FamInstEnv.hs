@@ -46,7 +46,6 @@ module FamInstEnv (
 
 import GhcPrelude
 
-import DynFlags (DynFlags)
 import Unify
 import Type
 import TyCoRep
@@ -59,7 +58,8 @@ import Name
 import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
-import Outputable.DynFlags (SDoc, assertPprPanic, pprPanic)
+import Outputable.DynFlags (assertPprPanic, pprPanic)
+import Packages (HasPackageState)
 import PlainPanic (assertPanic, panic)
 import Maybes
 import CoreMap
@@ -69,6 +69,7 @@ import Var
 import Pair
 import SrcLoc
 import FastString
+import TypeSuppress ( HasTypeSuppress )
 
 import Control.Monad
 import Data.List( mapAccumL )
@@ -224,10 +225,16 @@ instance NamedThing FamInst where
    getName = coAxiomName . fi_axiom
 
 instance Outputable FamInst where
-   type OutputableNeedsOfConfig FamInst = (~) DynFlags --TODO
+   type OutputableNeedsOfConfig FamInst = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
    ppr = pprFamInst
 
-pprFamInst :: FamInst -> SDoc
+pprFamInst
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => FamInst -> SDoc' r
 -- Prints the FamInst as a family instance declaration
 -- NB: This function, FamInstEnv.pprFamInst, is used only for internal,
 --     debug printing. See PprTyThing.pprFamInst for printing for the user
@@ -250,7 +257,13 @@ pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
                        , text "LHS:" <+> ppr tys
                        , text "RHS:" <+> ppr rhs ]
 
-pprFamInsts :: [FamInst] -> SDoc
+pprFamInsts
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasTypeSuppress r
+     )
+  => [FamInst] -> SDoc' r
 pprFamInsts finsts = vcat (map pprFamInst finsts)
 
 {-
@@ -371,7 +384,7 @@ newtype FamilyInstEnv
   = FamIE [FamInst]     -- The instances for a particular family, in any order
 
 instance Outputable FamilyInstEnv where
-  type OutputableNeedsOfConfig FamilyInstEnv = (~) DynFlags --TODO
+  type OutputableNeedsOfConfig FamilyInstEnv = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
 
 -- INVARIANTS:
@@ -764,7 +777,7 @@ data FamInstMatch = FamInstMatch { fim_instance :: FamInst
   -- See Note [Over-saturated matches]
 
 instance Outputable FamInstMatch where
-  type OutputableNeedsOfConfig FamInstMatch = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig FamInstMatch = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (FamInstMatch { fim_instance = inst
                     , fim_tys      = tys
                     , fim_cos      = cos })

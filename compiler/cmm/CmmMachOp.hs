@@ -29,8 +29,8 @@ where
 import GhcPrelude
 
 import CmmType
+import PlatformConstants
 import Outputable
-import DynFlags
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -170,7 +170,7 @@ mo_wordAdd, mo_wordSub, mo_wordEq, mo_wordNe,mo_wordMul, mo_wordSQuot
     , mo_wordAnd, mo_wordOr, mo_wordXor, mo_wordNot, mo_wordShl, mo_wordSShr, mo_wordUShr
     , mo_u_8ToWord, mo_s_8ToWord, mo_u_16ToWord, mo_s_16ToWord, mo_u_32ToWord, mo_s_32ToWord
     , mo_WordTo8, mo_WordTo16, mo_WordTo32, mo_WordTo64
-    :: DynFlags -> MachOp
+    :: HasPlatformConstants cfg => cfg -> MachOp
 
 mo_u_8To32, mo_s_8To32, mo_u_16To32, mo_s_16To32
     , mo_32To8, mo_32To16
@@ -363,7 +363,7 @@ maybeInvertComparison op
 {- |
 Returns the MachRep of the result of a MachOp.
 -}
-machOpResultType :: DynFlags -> MachOp -> [CmmType] -> CmmType
+machOpResultType :: HasPlatformConstants cfg => cfg -> MachOp -> [CmmType] -> CmmType
 machOpResultType dflags mop tys =
   case mop of
     MO_Add {}           -> ty1  -- Preserve GC-ptr-hood
@@ -443,7 +443,7 @@ machOpResultType dflags mop tys =
   where
     (ty1:_) = tys
 
-comparisonResultRep :: DynFlags -> CmmType
+comparisonResultRep :: HasPlatformConstants cfg => cfg -> CmmType
 comparisonResultRep = bWord  -- is it?
 
 
@@ -455,7 +455,7 @@ comparisonResultRep = bWord  -- is it?
 -- its arguments are the same as the MachOp expects.  This is used when
 -- linting a CmmExpr.
 
-machOpArgReps :: DynFlags -> MachOp -> [Width]
+machOpArgReps :: HasPlatformConstants cfg => cfg -> MachOp -> [Width]
 machOpArgReps dflags op =
   case op of
     MO_Add    r         -> [r,r]

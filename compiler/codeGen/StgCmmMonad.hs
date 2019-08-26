@@ -180,7 +180,7 @@ data CgIdInfo
         }
 
 instance Outputable CgIdInfo where
-  type OutputableNeedsOfConfig CgIdInfo = (~) DynFlags --TODO
+  --type OutputableNeedsOfConfig CgIdInfo = (~) DynFlags --TODO
   ppr (CgIdInfo { cg_id = id, cg_loc = loc })
     = ppr id <+> text "-->" <+> ppr loc
 
@@ -199,7 +199,7 @@ data Sequel
                         -- allocating primOp)
 
 instance Outputable Sequel where
-    type OutputableNeedsOfConfig Sequel = (~) DynFlags --TODO
+    --type OutputableNeedsOfConfig Sequel = (~) DynFlags --TODO
     ppr Return = text "Return"
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 

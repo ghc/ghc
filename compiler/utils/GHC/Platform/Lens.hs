@@ -1,5 +1,6 @@
 module GHC.Platform.Lens
   ( HasPlatform (..)
+  , HasPlatformMisc (..)
   ) where
 
 import GhcPrelude
@@ -13,3 +14,9 @@ class HasPlatform c where
 
 instance HasPlatform Platform where
   platform = id
+
+class HasPlatformMisc c where
+  platformMisc :: Lens' c PlatformMisc
+
+instance HasPlatformMisc PlatformMisc where
+  platformMisc = id

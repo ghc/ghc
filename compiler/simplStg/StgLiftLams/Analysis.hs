@@ -161,7 +161,7 @@ binderInfoOccursAsArg BoringBinder{}     = Nothing
 binderInfoOccursAsArg (BindsClosure _ b) = Just b
 
 instance Outputable Skeleton where
-  type OutputableNeedsOfConfig Skeleton = (~) DynFlags --TODO
+  --type OutputableNeedsOfConfig Skeleton = (~) DynFlags --TODO
   ppr NilSk = text ""
   ppr (AltSk l r) = vcat
     [ text "{ " <+> ppr l
@@ -189,7 +189,7 @@ instance Outputable Skeleton where
         | otherwise = 'ω'
 
 instance Outputable BinderInfo where
-  type OutputableNeedsOfConfig BinderInfo = (~) DynFlags --TODO
+  --type OutputableNeedsOfConfig BinderInfo = (~) DynFlags --TODO
   ppr = ppr . binderInfoBndr
 
 instance OutputableBndr BinderInfo where

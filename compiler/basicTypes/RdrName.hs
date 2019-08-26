@@ -1324,7 +1324,7 @@ pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
 ppr_defn_site
-  :: (HasNameSuppress r, HasPackageState r, HasPprConfig r)
+  :: (HasPackageState r, HasPprConfig r)
   => ImportSpec -> Name -> SDoc' r
 ppr_defn_site imp_spec name
   | same_module && not (isGoodSrcSpan loc)

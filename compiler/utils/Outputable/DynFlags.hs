@@ -79,10 +79,10 @@ module Outputable.DynFlags (
 import GhcPrelude
 
 
-import {-# SOURCE #-} DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
-                                pprUserLength, pprCols,
+import {-# SOURCE #-} DynFlags( DynFlags, pprCols,
                                 unsafeGlobalDynFlags )
 
+import OutputOptions
 import qualified Pretty
 import Util
 import qualified PprColour as Col
@@ -95,32 +95,12 @@ import System.IO        ( Handle )
 import Control.Monad.IO.Class
 import Exception
 
-defaultUserStyle :: DynFlags -> PprStyle
-defaultUserStyle = defaultUserStyle' . hasPprDebug
-
-defaultDumpStyle :: DynFlags -> PprStyle
- -- Print without qualifiers to reduce verbosity, unless -dppr-debug
-defaultDumpStyle = defaultDumpStyle' . hasPprDebug
-
-mkDumpStyle :: DynFlags -> PrintUnqualified -> PprStyle
-mkDumpStyle dflags print_unqual = mkDumpStyle' (hasPprDebug dflags) print_unqual
-
 defaultErrStyle :: DynFlags -> PprStyle
 -- | Default style for error messages, when we don't know PrintUnqualified
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
 -- NB that -dppr-debug will still get into PprDebug style
 defaultErrStyle dflags = mkErrStyle dflags neverQualify
-
--- | Style for printing error messages
-mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
-mkErrStyle dflags qual = mkErrStyle' (hasPprDebug dflags) (pprUserLength dflags) qual
-
-mkUserStyle :: DynFlags -> PrintUnqualified -> Depth -> PprStyle
-mkUserStyle dflags unqual depth = mkUserStyle' (hasPprDebug dflags) unqual depth
-
-cmdlineParserStyle :: DynFlags -> PprStyle
-cmdlineParserStyle dflags = cmdlineParserStyle' $ hasPprDebug dflags
 
 type SDoc = SDoc' DynFlags
 
@@ -174,12 +154,6 @@ printForUserPartWay dflags handle d unqual doc
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
   printSDocLn LeftMode dflags handle pprCodeCStyle doc
-
--- Can't make SDoc an instance of Show because SDoc is just a function type
--- However, Doc *is* an instance of Show
--- showSDoc just blasts it out as a string
-showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags sdoc = renderWithStyle dflags sdoc (defaultUserStyle dflags)
 
 -- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
 -- initialised yet.
@@ -244,7 +218,7 @@ pprTraceM str doc = pprTrace str doc (pure ())
 -- | @pprTraceWith desc f x@ is equivalent to @pprTrace desc (f x) x@.
 -- This allows you to print details from the returned value as well as from
 -- ambient variables.
-pprTraceWith :: Outputable a => String -> (a -> SDoc) -> a -> a
+pprTraceWith :: String -> (a -> SDoc) -> a -> a
 pprTraceWith desc f x = pprTrace desc (f x) x
 
 -- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@

@@ -44,9 +44,12 @@ import GhcPrelude
 
 import CmmExpr
 
+import NameSuppress
+import Packages ( HasPackageState )
 import Outputable
-import Outputable.DynFlags (SDoc, pprTrace)
+import Outputable.DynFlags ( pprTrace )
 import DynFlags
+import GHC.Platform.Lens
 
 import Data.Maybe
 import Numeric ( fromRat )
@@ -54,34 +57,46 @@ import Numeric ( fromRat )
 -----------------------------------------------------------------------------
 
 instance Outputable CmmExpr where
-    type OutputableNeedsOfConfig CmmExpr = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmExpr = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr e = pprExpr e
 
 instance Outputable CmmReg where
-    type OutputableNeedsOfConfig CmmReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmReg = PairConstraint HasPprConfig HasNameSuppress
     ppr e = pprReg e
 
 instance Outputable CmmLit where
-    type OutputableNeedsOfConfig CmmLit = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig CmmLit = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr l = pprLit l
 
 instance Outputable LocalReg where
-    type OutputableNeedsOfConfig LocalReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig LocalReg = PairConstraint HasPprConfig HasNameSuppress
     ppr e = pprLocalReg e
 
 instance Outputable Area where
-    type OutputableNeedsOfConfig Area = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig Area = NoConstraint
     ppr e = pprArea e
 
 instance Outputable GlobalReg where
-    type OutputableNeedsOfConfig GlobalReg = (~) DynFlags -- TODO generalize
+    type OutputableNeedsOfConfig GlobalReg = NoConstraint
     ppr e = pprGlobalReg e
 
 -- --------------------------------------------------------------------------
 -- Expressions
 --
 
-pprExpr :: CmmExpr -> SDoc
+pprExpr
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmExpr -> SDoc' r
 pprExpr e
     = sdocWithDynFlags $ \dflags ->
       case e of
@@ -106,12 +121,20 @@ pprExpr e
 -- a default conservative behaviour.
 
 -- %nonassoc '>=' '>' '<=' '<' '!=' '=='
-pprExpr1, pprExpr7, pprExpr8 :: CmmExpr -> SDoc
+pprExpr1, pprExpr7, pprExpr8
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmExpr -> SDoc' r
 pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
    = pprExpr7 x <+> doc <+> pprExpr7 y
 pprExpr1 e = pprExpr7 e
 
-infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
+infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe (SDoc' r)
 
 infixMachOp1 (MO_Eq     _) = Just (text "==")
 infixMachOp1 (MO_Ne     _) = Just (text "!=")
@@ -144,7 +167,15 @@ infixMachOp8 (MO_Mul _)    = Just (char '*')
 infixMachOp8 (MO_U_Rem _)  = Just (char '%')
 infixMachOp8 _             = Nothing
 
-pprExpr9 :: CmmExpr -> SDoc
+pprExpr9
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmExpr -> SDoc' r
 pprExpr9 e =
    case e of
         CmmLit    lit       -> pprLit1 lit
@@ -154,7 +185,15 @@ pprExpr9 e =
         CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
         CmmMachOp mop args  -> genMachOp mop args
 
-genMachOp :: MachOp -> [CmmExpr] -> SDoc
+genMachOp
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => MachOp -> [CmmExpr] -> SDoc' r
 genMachOp mop args
    | Just doc <- infixMachOp mop = case args of
         -- dyadic
@@ -181,7 +220,7 @@ genMachOp mop args
 -- Unsigned ops on the word size of the machine get nice symbols.
 -- All else get dumped in their ugly format.
 --
-infixMachOp :: MachOp -> Maybe SDoc
+infixMachOp :: MachOp -> Maybe (SDoc' r)
 infixMachOp mop
         = case mop of
             MO_And    _ -> Just $ char '&'
@@ -196,7 +235,15 @@ infixMachOp mop
 --  To minimise line noise we adopt the convention that if the literal
 --  has the natural machine word size, we do not append the type
 --
-pprLit :: CmmLit -> SDoc
+pprLit
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmLit -> SDoc' r
 pprLit lit = sdocWithDynFlags $ \dflags ->
              case lit of
     CmmInt i rep ->
@@ -213,11 +260,19 @@ pprLit lit = sdocWithDynFlags $ \dflags ->
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"
 
-pprLit1 :: CmmLit -> SDoc
+pprLit1 
+  :: ( HasPprConfig r
+     , HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => CmmLit -> SDoc' r
 pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
 pprLit1 lit                  = pprLit lit
 
-ppr_offset :: Int -> SDoc
+ppr_offset :: Int -> SDoc' r
 ppr_offset i
     | i==0      = empty
     | i>=0      = char '+' <> int i
@@ -226,7 +281,8 @@ ppr_offset i
 -- --------------------------------------------------------------------------
 -- Registers, whether local (temps) or global
 --
-pprReg :: CmmReg -> SDoc
+pprReg 
+  :: (HasPprConfig r, HasNameSuppress r) => CmmReg -> SDoc' r
 pprReg r
     = case r of
         CmmLocal  local  -> pprLocalReg  local
@@ -235,7 +291,7 @@ pprReg r
 --
 -- We only print the type of the local reg if it isn't wordRep
 --
-pprLocalReg :: LocalReg -> SDoc
+pprLocalReg :: (HasPprConfig r, HasNameSuppress r) => LocalReg -> SDoc' r
 pprLocalReg (LocalReg uniq rep) = sdocWithDynFlags $ \dflags ->
 --   = ppr rep <> char '_' <> ppr uniq
 -- Temp Jan08
@@ -245,7 +301,7 @@ pprLocalReg (LocalReg uniq rep) = sdocWithDynFlags $ \dflags ->
                     else dcolon <> ptr <> ppr rep)
    where
      pprUnique dflags unique =
-        if gopt Opt_SuppressUniques dflags
+        if nameSuppress_uniques $ getNameSuppress dflags
             then text "_locVar_"
             else ppr unique
      ptr = empty
@@ -254,13 +310,13 @@ pprLocalReg (LocalReg uniq rep) = sdocWithDynFlags $ \dflags ->
          --      else empty
 
 -- Stack areas
-pprArea :: Area -> SDoc
+pprArea :: Area -> SDoc' r
 pprArea Old        = text "old"
 pprArea (Young id) = hcat [ text "young<", ppr id, text ">" ]
 
 -- needs to be kept in syn with CmmExpr.hs.GlobalReg
 --
-pprGlobalReg :: GlobalReg -> SDoc
+pprGlobalReg :: GlobalReg -> SDoc' r
 pprGlobalReg gr
     = case gr of
         VanillaReg n _ -> char 'R' <> int n
@@ -291,5 +347,5 @@ pprGlobalReg gr
 
 -----------------------------------------------------------------------------
 
-commafy :: [SDoc] -> SDoc
+commafy :: [SDoc' r] -> SDoc' r
 commafy xs = fsep $ punctuate comma xs

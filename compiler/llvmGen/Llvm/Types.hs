@@ -16,12 +16,13 @@ import Data.Char
 import Data.Int
 import Numeric
 
-import DynFlags
 import FastString
 import Outputable
-import Outputable.DynFlags (SDoc, pprPanic, showSDoc)
+import Outputable.DynFlags (pprPanic)
 import PlainPanic (panic)
+import PlatformConstants
 import Unique
+import Llvm.Options
 
 -- from NCG
 import PprBase
@@ -66,7 +67,7 @@ data LlvmType
   deriving (Eq)
 
 instance Outputable LlvmType where
-  type OutputableNeedsOfConfig LlvmType = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmType = NoConstraint
   ppr (LMInt size     ) = char 'i' <> ppr size
   ppr (LMFloat        ) = text "float"
   ppr (LMDouble       ) = text "double"
@@ -86,7 +87,7 @@ instance Outputable LlvmType where
 
   ppr (LMAlias (s,_)) = char '%' <> ftext s
 
-ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc
+ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc' r
 ppParams varg p
   = let varg' = case varg of
           VarArgs | null args -> sLit "..."
@@ -119,7 +120,7 @@ data LlvmVar
   deriving (Eq)
 
 instance Outputable LlvmVar where
-  type OutputableNeedsOfConfig LlvmVar = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmVar = HasLlvmOptions
   ppr (LMLitVar x)  = ppr x
   ppr (x         )  = ppr (getVarType x) <+> ppName x
 
@@ -141,7 +142,7 @@ data LlvmLit
   deriving (Eq)
 
 instance Outputable LlvmLit where
-  type OutputableNeedsOfConfig LlvmLit = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmLit = HasLlvmOptions
   ppr l@(LMVectorLit {}) = ppLit l
   ppr l                  = ppr (getLitType l) <+> ppLit l
 
@@ -168,7 +169,7 @@ data LlvmStatic
   | LMSub LlvmStatic LlvmStatic        -- ^ Constant subtraction operation
 
 instance Outputable LlvmStatic where
-  type OutputableNeedsOfConfig LlvmStatic = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmStatic = HasLlvmOptions
   ppr (LMComment       s) = text "; " <> ftext s
   ppr (LMStaticLit   l  ) = ppr l
   ppr (LMUninitType    t) = ppr t <> text " undef"
@@ -189,7 +190,7 @@ instance Outputable LlvmStatic where
       = pprStaticArith s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
 
 
-pprSpecialStatic :: LlvmStatic -> SDoc
+pprSpecialStatic :: HasLlvmOptions r => LlvmStatic -> SDoc' r
 pprSpecialStatic (LMBitc v t) =
     ppr (pLower t) <> text ", bitcast (" <> ppr v <> text " to " <> ppr t
         <> char ')'
@@ -197,16 +198,17 @@ pprSpecialStatic v@(LMStaticPointer x) = ppr (pLower $ getVarType x) <> comma <+
 pprSpecialStatic stat = ppr stat
 
 
-pprStaticArith :: LlvmStatic -> LlvmStatic -> PtrString -> PtrString
-                  -> String -> SDoc
+pprStaticArith
+  :: HasLlvmOptions r
+  => LlvmStatic -> LlvmStatic -> PtrString -> PtrString
+  -> String -> SDoc' r
 pprStaticArith s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
       op  = if isFloat ty1 then float_op else int_op
   in if ty1 == getStatType s2
      then ppr ty1 <+> ptext op <+> lparen <> ppr s1 <> comma <> ppr s2 <> rparen
-     else sdocWithDynFlags $ \dflags ->
-            error $ op_name ++ " with different types! s1: "
-                    ++ showSDoc dflags (ppr s1) ++ ", s2: " ++ showSDoc dflags (ppr s2)
+     else pprPanic (op_name ++ " with different types!") $
+       text "s1:" <+> ppr s1 $$ text "s2:" <+> ppr s2
 
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
@@ -214,7 +216,7 @@ pprStaticArith s1 s2 int_op float_op op_name =
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
-ppName :: LlvmVar -> SDoc
+ppName :: HasLlvmOptions r => LlvmVar -> SDoc' r
 ppName v@(LMGlobalVar {}) = char '@' <> ppPlainName v
 ppName v@(LMLocalVar  {}) = char '%' <> ppPlainName v
 ppName v@(LMNLocalVar {}) = char '%' <> ppPlainName v
@@ -222,7 +224,7 @@ ppName v@(LMLitVar    {}) =             ppPlainName v
 
 -- | Return the variable name or value of the 'LlvmVar'
 -- in a plain textual representation (e.g. @x@, @y@ or @42@).
-ppPlainName :: LlvmVar -> SDoc
+ppPlainName :: HasLlvmOptions r => LlvmVar -> SDoc' r
 ppPlainName (LMGlobalVar x _ _ _ _ _) = ftext x
 ppPlainName (LMLocalVar  x LMLabel  ) = text (show x)
 ppPlainName (LMLocalVar  x _        ) = text ('l' : show x)
@@ -230,14 +232,14 @@ ppPlainName (LMNLocalVar x _        ) = ftext x
 ppPlainName (LMLitVar    x          ) = ppLit x
 
 -- | Print a literal value. No type.
-ppLit :: LlvmLit -> SDoc
+ppLit :: HasLlvmOptions r => LlvmLit -> SDoc' r
 ppLit (LMIntLit i (LMInt 32))  = ppr (fromInteger i :: Int32)
 ppLit (LMIntLit i (LMInt 64))  = ppr (fromInteger i :: Int64)
 ppLit (LMIntLit   i _       )  = ppr ((fromInteger i)::Int)
 ppLit (LMFloatLit r LMFloat )  = ppFloat $ narrowFp r
 ppLit (LMFloatLit r LMDouble)  = ppDouble r
-ppLit f@(LMFloatLit _ _)       = sdocWithDynFlags (\dflags ->
-                                   error $ "Can't print this float literal!" ++ showSDoc dflags (ppr f))
+ppLit f@(LMFloatLit _ _)       = pprPanic "Can't print this float literal!" $
+  ppr f
 ppLit (LMVectorLit ls  )       = char '<' <+> ppCommaJoin ls <+> char '>'
 ppLit (LMNullLit _     )       = text "null"
 -- #11487 was an issue where we passed undef for some arguments
@@ -249,8 +251,8 @@ ppLit (LMNullLit _     )       = text "null"
 -- failure.
 ppLit (LMUndefLit t    )       = sdocWithDynFlags f
   where f dflags
-          | gopt Opt_LlvmFillUndefWithGarbage dflags,
-            Just lit <- garbageLit t   = ppLit lit
+          | llvmOptions_fillUndefWithGarbage $ getLlvmOptions dflags
+          , Just lit <- garbageLit t   = ppLit lit
           | otherwise                  = text "undef"
 
 garbageLit :: LlvmType -> Maybe LlvmLit
@@ -360,7 +362,7 @@ isGlobal (LMGlobalVar _ _ _ _ _ _) = True
 isGlobal _                         = False
 
 -- | Width in bits of an 'LlvmType', returns 0 if not applicable
-llvmWidthInBits :: DynFlags -> LlvmType -> Int
+llvmWidthInBits :: HasPlatformConstants cfg => cfg -> LlvmType -> Int
 llvmWidthInBits _      (LMInt n)       = n
 llvmWidthInBits _      (LMFloat)       = 32
 llvmWidthInBits _      (LMDouble)      = 64
@@ -405,7 +407,7 @@ i1    = LMInt   1
 i8Ptr = pLift i8
 
 -- | The target architectures word size
-llvmWord, llvmWordPtr :: DynFlags -> LlvmType
+llvmWord, llvmWordPtr :: HasPlatformConstants cfg => cfg -> LlvmType
 llvmWord    dflags = LMInt (wORD_SIZE dflags * 8)
 llvmWordPtr dflags = pLift (llvmWord dflags)
 
@@ -433,7 +435,7 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
   deriving (Eq)
 
 instance Outputable LlvmFunctionDecl where
-  type OutputableNeedsOfConfig LlvmFunctionDecl = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmFunctionDecl = NoConstraint
   ppr (LlvmFunctionDecl n l c r varg p a)
     = let align = case a of
                        Just a' -> text " align " <> ppr a'
@@ -481,7 +483,7 @@ data LlvmParamAttr
   deriving (Eq)
 
 instance Outputable LlvmParamAttr where
-  type OutputableNeedsOfConfig LlvmParamAttr = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmParamAttr = NoConstraint
   ppr ZeroExt   = text "zeroext"
   ppr SignExt   = text "signext"
   ppr InReg     = text "inreg"
@@ -570,7 +572,7 @@ data LlvmFuncAttr
   deriving (Eq)
 
 instance Outputable LlvmFuncAttr where
-  type OutputableNeedsOfConfig LlvmFuncAttr = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmFuncAttr = NoConstraint
   ppr AlwaysInline       = text "alwaysinline"
   ppr InlineHint         = text "inlinehint"
   ppr NoInline           = text "noinline"
@@ -631,7 +633,7 @@ data LlvmCallConvention
   deriving (Eq)
 
 instance Outputable LlvmCallConvention where
-  type OutputableNeedsOfConfig LlvmCallConvention = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCallConvention = NoConstraint
   ppr CC_Ccc       = text "ccc"
   ppr CC_Fastcc    = text "fastcc"
   ppr CC_Coldcc    = text "coldcc"
@@ -696,7 +698,7 @@ data LlvmLinkageType
   deriving (Eq)
 
 instance Outputable LlvmLinkageType where
-  type OutputableNeedsOfConfig LlvmLinkageType = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmLinkageType = NoConstraint
   ppr Internal          = text "internal"
   ppr LinkOnce          = text "linkonce"
   ppr Weak              = text "weak"
@@ -745,7 +747,7 @@ data LlvmMachOp
   deriving (Eq)
 
 instance Outputable LlvmMachOp where
-  type OutputableNeedsOfConfig LlvmMachOp = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmMachOp = NoConstraint
   ppr LM_MO_Add  = text "add"
   ppr LM_MO_Sub  = text "sub"
   ppr LM_MO_Mul  = text "mul"
@@ -790,7 +792,7 @@ data LlvmCmpOp
   deriving (Eq)
 
 instance Outputable LlvmCmpOp where
-  type OutputableNeedsOfConfig LlvmCmpOp = (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCmpOp = NoConstraint
   ppr LM_CMP_Eq  = text "eq"
   ppr LM_CMP_Ne  = text "ne"
   ppr LM_CMP_Ugt = text "ugt"
@@ -826,7 +828,7 @@ data LlvmCastOp
   deriving (Eq)
 
 instance Outputable LlvmCastOp where
-  type OutputableNeedsOfConfig LlvmCastOp= (~) DynFlags -- TODO
+  type OutputableNeedsOfConfig LlvmCastOp = NoConstraint
   ppr LM_Trunc    = text "trunc"
   ppr LM_Zext     = text "zext"
   ppr LM_Sext     = text "sext"
@@ -850,7 +852,7 @@ instance Outputable LlvmCastOp where
 -- regardless of underlying architecture.
 --
 -- See Note [LLVM Float Types].
-ppDouble :: Double -> SDoc
+ppDouble :: Double -> SDoc' r
 ppDouble d
   = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
@@ -887,7 +889,7 @@ widenFp :: Float -> Double
 {-# NOINLINE widenFp #-}
 widenFp = float2Double
 
-ppFloat :: Float -> SDoc
+ppFloat :: Float -> SDoc' r
 ppFloat = ppDouble . widenFp
 
 -- | Reverse or leave byte data alone to fix endianness on this target.
@@ -904,11 +906,11 @@ fixEndian = reverse
 --------------------------------------------------------------------------------
 
 ppCommaJoin
-  :: (Outputable a, OutputableNeedsOfConfig a DynFlags)
-  => [a] -> SDoc
+  :: (Outputable a, OutputableNeedsOfConfig a r)
+  => [a] -> SDoc' r
 ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
 
 ppSpaceJoin
-  :: (Outputable a, OutputableNeedsOfConfig a DynFlags)
-  => [a] -> SDoc
+  :: (Outputable a, OutputableNeedsOfConfig a r)
+  => [a] -> SDoc' r
 ppSpaceJoin strs = hsep (map ppr strs)

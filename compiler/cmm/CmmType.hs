@@ -32,8 +32,8 @@ where
 
 import GhcPrelude
 
-import DynFlags
 import FastString
+import PlatformConstants
 import Outputable
 import Outputable.DynFlags (pprPanic)
 import PlainPanic
@@ -125,17 +125,17 @@ f32    = cmmFloat W32
 f64    = cmmFloat W64
 
 -- CmmTypes of native word widths
-bWord :: DynFlags -> CmmType
-bWord dflags = cmmBits (wordWidth dflags)
+bWord :: HasPlatformConstants a => a -> CmmType
+bWord cfg = cmmBits (wordWidth cfg)
 
-bHalfWord :: DynFlags -> CmmType
-bHalfWord dflags = cmmBits (halfWordWidth dflags)
+bHalfWord :: HasPlatformConstants a => a -> CmmType
+bHalfWord cfg = cmmBits (halfWordWidth cfg)
 
-gcWord :: DynFlags -> CmmType
-gcWord dflags = CmmType GcPtrCat (wordWidth dflags)
+gcWord :: HasPlatformConstants a => a -> CmmType
+gcWord cfg = CmmType GcPtrCat (wordWidth cfg)
 
-cInt :: DynFlags -> CmmType
-cInt dflags = cmmBits (cIntWidth  dflags)
+cInt :: HasPlatformConstants a => a -> CmmType
+cInt cfg = cmmBits (cIntWidth  cfg)
 
 ------------ Predicates ----------------
 isFloatType, isGcPtrType, isBitsType :: CmmType -> Bool
@@ -192,27 +192,27 @@ mrStr W512 = sLit("W512")
 
 
 -------- Common Widths  ------------
-wordWidth :: DynFlags -> Width
-wordWidth dflags
- | wORD_SIZE dflags == 4 = W32
- | wORD_SIZE dflags == 8 = W64
+wordWidth :: HasPlatformConstants a => a -> Width
+wordWidth cfg
+ | wORD_SIZE cfg == 4 = W32
+ | wORD_SIZE cfg == 8 = W64
  | otherwise             = panic "MachOp.wordRep: Unknown word size"
 
-halfWordWidth :: DynFlags -> Width
-halfWordWidth dflags
- | wORD_SIZE dflags == 4 = W16
- | wORD_SIZE dflags == 8 = W32
+halfWordWidth :: HasPlatformConstants a => a -> Width
+halfWordWidth cfg
+ | wORD_SIZE cfg == 4 = W16
+ | wORD_SIZE cfg == 8 = W32
  | otherwise             = panic "MachOp.halfWordRep: Unknown word size"
 
-halfWordMask :: DynFlags -> Integer
-halfWordMask dflags
- | wORD_SIZE dflags == 4 = 0xFFFF
- | wORD_SIZE dflags == 8 = 0xFFFFFFFF
+halfWordMask :: HasPlatformConstants a => a -> Integer
+halfWordMask cfg
+ | wORD_SIZE cfg == 4 = 0xFFFF
+ | wORD_SIZE cfg == 8 = 0xFFFFFFFF
  | otherwise             = panic "MachOp.halfWordMask: Unknown word size"
 
 -- cIntRep is the Width for a C-language 'int'
-cIntWidth :: DynFlags -> Width
-cIntWidth dflags = case cINT_SIZE dflags of
+cIntWidth :: HasPlatformConstants a => a -> Width
+cIntWidth cfg = case cINT_SIZE cfg of
                    4 -> W32
                    8 -> W64
                    s -> panic ("cIntWidth: Unknown cINT_SIZE: " ++ show s)
@@ -338,25 +338,25 @@ data ForeignHint
 -- These don't really belong here, but I don't know where is best to
 -- put them.
 
-rEP_CostCentreStack_mem_alloc :: DynFlags -> CmmType
-rEP_CostCentreStack_mem_alloc dflags
+rEP_CostCentreStack_mem_alloc :: HasPlatformConstants a => a -> CmmType
+rEP_CostCentreStack_mem_alloc cfg
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_mem_alloc pc))
-    where pc = platformConstants dflags
+    where pc = getPlatformConstants cfg
 
-rEP_CostCentreStack_scc_count :: DynFlags -> CmmType
-rEP_CostCentreStack_scc_count dflags
+rEP_CostCentreStack_scc_count :: HasPlatformConstants a => a -> CmmType
+rEP_CostCentreStack_scc_count cfg
     = cmmBits (widthFromBytes (pc_REP_CostCentreStack_scc_count pc))
-    where pc = platformConstants dflags
+    where pc = getPlatformConstants cfg
 
-rEP_StgEntCounter_allocs :: DynFlags -> CmmType
-rEP_StgEntCounter_allocs dflags
+rEP_StgEntCounter_allocs :: HasPlatformConstants a => a -> CmmType
+rEP_StgEntCounter_allocs cfg
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocs pc))
-    where pc = platformConstants dflags
+    where pc = getPlatformConstants cfg
 
-rEP_StgEntCounter_allocd :: DynFlags -> CmmType
-rEP_StgEntCounter_allocd dflags
+rEP_StgEntCounter_allocd :: HasPlatformConstants a => a -> CmmType
+rEP_StgEntCounter_allocd cfg
     = cmmBits (widthFromBytes (pc_REP_StgEntCounter_allocd pc))
-    where pc = platformConstants dflags
+    where pc = getPlatformConstants cfg
 
 -------------------------------------------------------------------------
 {-      Note [Signed vs unsigned]
