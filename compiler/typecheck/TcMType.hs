@@ -2200,8 +2200,8 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy _ arg res)
-      = ty { ft_arg = tidyType env arg, ft_res = tidy_ty env res }
+    tidy_ty env (Type' ty@(FunTyF _ arg res))
+      = Type' $ ty { ft_arg = tidyType env arg, ft_res = tidy_ty env res }
 
     tidy_ty env ty = tidyType env ty
 
