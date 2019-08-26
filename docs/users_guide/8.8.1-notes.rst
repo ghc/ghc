@@ -13,7 +13,7 @@ Highlights
 
 The highlights, since the 8.6.1 release, are:
 
-- GHC now supports :ref:`visible type applications <visible-type-application>`.
+- GHC now supports :ref:`visible type applications <visible-type-application>` at the type level.
 - Type variables in type family instances and rewrite rules can now be explicitly ``forall``-bound.
 - A new code layout algorithm for x86.
 - The final phase of the ``MonadFail`` proposal has been implemented.
