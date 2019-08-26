@@ -1841,8 +1841,8 @@ reifyType ty@(AppTy {})     = do
     filter_out_invisible_args ty_head ty_args =
       filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
+reifyType ty@(Type' (FunTyF { ft_af = af, ft_arg = t1, ft_res = t2 }))
+  | InvisArg <- af = reify_for_all Inferred ty -- Types like ((?x::Int) => Char -> Char)
   | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)

@@ -369,7 +369,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
 
     go co ty | Just ty' <- tcView ty = go co ty'
     go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
-    go co (FunTy { ft_arg = x, ft_res = y, ft_af = af })
+    go co (Type' (FunTyF { ft_arg = x, ft_res = y, ft_af = af }))
        | InvisArg <- af = go co y
        | xc || yc       = (caseFun xr yr,True)
        where (xr,xc) = go (not co) x

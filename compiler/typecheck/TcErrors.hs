@@ -2211,11 +2211,11 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
           (t1_2', t2_2') = go t1_2 t2_2
        in (mkAppTy t1_1' t1_2', mkAppTy t2_1' t2_2')
 
-    go ty1@(FunTy _ t1_1 t1_2) ty2@(FunTy _ t2_1 t2_2) =
+    go (Type' ty1@(FunTyF _ t1_1 t1_2)) (Type' ty2@(FunTyF _ t2_1 t2_2)) =
       let (t1_1', t2_1') = go t1_1 t2_1
           (t1_2', t2_2') = go t1_2 t2_2
-       in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
-          , ty2 { ft_arg = t2_1', ft_res = t2_2' })
+       in ( Type' $ ty1 { ft_arg = t1_1', ft_res = t1_2' }
+          , Type' $ ty2 { ft_arg = t2_1', ft_res = t2_2' })
 
     go (ForAllTy b1 t1) (ForAllTy b2 t2) =
       -- NOTE: We may have a bug here, but we just can't reproduce it easily.

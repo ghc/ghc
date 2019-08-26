@@ -93,6 +93,7 @@ import Binary
 import DynFlags
 import FastString
 import Outputable
+import Var.Open
 
 import Control.DeepSeq
 import Data.Data
@@ -699,3 +700,6 @@ pprPrefixName :: NamedThing a => a -> SDoc
 pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
  where
    name = getName thing
+
+instance NamedThing tv => NamedThing (VarBndr tv flag) where
+  getName (Bndr tv _) = getName tv

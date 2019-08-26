@@ -716,10 +716,10 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go ty@(FunTy { ft_arg = arg, ft_res = res })
+    go (Type' ty@(FunTyF { ft_arg = arg, ft_res = res }))
       = let !arg' = go arg
             !res' = go res
-        in ty { ft_arg = arg', ft_res = res' }
+        in Type' $ ty { ft_arg = arg', ft_res = res' }
     go (ForAllTy (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->

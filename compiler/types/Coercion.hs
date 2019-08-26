@@ -2383,8 +2383,8 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                   ; _           -> False      } )
         mkNomReflCo ty1
 
-    go (FunTy { ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_arg = arg2, ft_res = res2 })
+    go (Type' (FunTyF { ft_arg = arg1, ft_res = res1 }))
+       (Type' (FunTyF { ft_arg = arg2, ft_res = res2 }))
       = mkFunCo Nominal (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)

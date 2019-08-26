@@ -943,7 +943,7 @@ getTyDescription ty
       CoercionTy co          -> pprPanic "getTyDescription" (ppr co)
     }
   where
-    fun_result (FunTy { ft_res = res }) = '>' : fun_result res
+    fun_result (Type' (FunTyF { ft_res = res })) = '>' : fun_result res
     fun_result other                    = getTyDescription other
 
 getTyLitDescription :: TyLit -> String

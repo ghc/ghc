@@ -155,7 +155,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go acc_arg_tys n (Type' (FunTyF { ft_af = af, ft_arg = arg_ty, ft_res = res_ty }))
       = ASSERT( af == VisArg )
         do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
                                       (n-1) res_ty
@@ -284,7 +284,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args ty
       | Just ty' <- tcView ty = go n acc_args ty'
 
-    go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go n acc_args (Type' (FunTyF { ft_af = af, ft_arg = arg_ty, ft_res = res_ty }))
       = ASSERT( af == VisArg )
         do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
            ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
@@ -756,8 +756,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
-       (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
+    go (Type' (FunTyF { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res }))
+       (Type' (FunTyF { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res }))
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
@@ -2230,7 +2230,7 @@ preCheck dflags ty_fam_ok tv ty
       | bad_tc tc              = MTVU_Bad
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
-    fast_check (FunTy{ft_af = af, ft_arg = a, ft_res = r})
+    fast_check (Type' (FunTyF{ft_af = af, ft_arg = a, ft_res = r}))
       | InvisArg <- af
       , not impredicative_ok   = MTVU_Bad
       | otherwise              = fast_check a   >> fast_check r

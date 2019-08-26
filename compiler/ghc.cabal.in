@@ -252,6 +252,7 @@ Library
         UniqSupply
         Unique
         Var
+        Var.Open
         VarEnv
         VarSet
         UnVarGraph
@@ -547,6 +548,7 @@ Library
         Kind
         Type
         TyCoRep
+        TyCoRep.Open
         TyCoFVs
         TyCoSubst
         TyCoPpr
