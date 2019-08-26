@@ -253,6 +253,7 @@ defaultBuilderArgs = mconcat
     , builder (Sphinx Html ) ? Hadrian.Builder.Sphinx.args Html
     , builder (Sphinx Latex) ? Hadrian.Builder.Sphinx.args Latex
     , builder (Sphinx Man  ) ? Hadrian.Builder.Sphinx.args Man
+    , builder (Sphinx Info ) ? Hadrian.Builder.Sphinx.args Info
     , builder (Tar Create  ) ? Hadrian.Builder.Tar.args Create
     , builder (Tar Extract ) ? Hadrian.Builder.Tar.args Extract ]
 
