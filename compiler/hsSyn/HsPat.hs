@@ -509,7 +509,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p) where
   type OutputableNeedsOfConfig (Pat p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr = pprPat
 
 pprPatBndr
@@ -615,7 +615,7 @@ instance (Outputable arg)
       => Outputable (HsRecFields p arg) where
   type OutputableNeedsOfConfig (HsRecFields p arg) = PairConstraint
     (OutputableNeedsOfConfig arg)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
         = braces (fsep (punctuate comma (map ppr flds)))
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just (unLoc -> n) })
@@ -629,7 +629,7 @@ instance (Outputable lbl, Outputable arg)
     (PairConstraint
      (OutputableNeedsOfConfig lbl)
      (OutputableNeedsOfConfig arg))
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)

@@ -234,7 +234,7 @@ data StackMap = StackMap
  }
 
 instance Outputable StackMap where
-  type OutputableNeedsOfConfig StackMap = (~) DynFlags -- TODO
+  --type OutputableNeedsOfConfig StackMap = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr StackMap{..} =
      text "Sp = " <> int sm_sp $$
      text "sm_args = " <> int sm_args $$

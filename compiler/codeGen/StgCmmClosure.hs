@@ -116,7 +116,7 @@ data CgLoc
         -- and branch to the block id
 
 instance Outputable CgLoc where
-  type OutputableNeedsOfConfig CgLoc = (~) DynFlags -- TODO
+  --type OutputableNeedsOfConfig CgLoc = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (CmmLoc e)    = text "cmm" <+> ppr e
   ppr (LneLoc b rs) = text "lne" <+> ppr b <+> ppr rs
 

@@ -29,7 +29,7 @@ import GhcPrelude hiding (succ)
 import CodeGen.Platform
 import CmmExpr
 import CmmSwitch
-import DynFlags
+import GHC.Platform.Lens
 import FastString
 import ForeignCall
 import Outputable
@@ -45,6 +45,7 @@ import Data.Maybe
 import Data.List (tails,sortBy)
 import Unique (nonDetCmpUnique)
 import Util
+import Lens
 
 
 ------------------------
@@ -372,9 +373,9 @@ instance DefinerOfRegs GlobalReg (CmmNode e x) where
                => (b -> GlobalReg -> b) -> b -> a -> b
           fold f z n = foldRegsDefd dflags f z n
 
-          platform = targetPlatform dflags
-          activeRegs = activeStgRegs platform
-          activeCallerSavesRegs = filter (callerSaves platform) activeRegs
+          targetPlatform = view platform dflags
+          activeRegs = activeStgRegs targetPlatform
+          activeCallerSavesRegs = filter (callerSaves targetPlatform) activeRegs
 
           foreignTargetRegs (ForeignTarget _ (ForeignConvention _ _ _ CmmNeverReturns)) = []
           foreignTargetRegs _ = activeCallerSavesRegs

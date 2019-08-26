@@ -35,7 +35,7 @@ import Type
 import NameSet
 import BasicTypes
 import Outputable
-import Outputable.DynFlags (SDoc)
+import Packages ( HasPackageState )
 import PlainPanic (panic)
 import SrcLoc
 import Var
@@ -43,6 +43,8 @@ import Bag
 import FastString
 import BooleanFormula (LBooleanFormula)
 import DynFlags
+import NameSuppress ( HasNameSuppress )
+import TypeSuppress ( HasTypeSuppress )
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
@@ -622,16 +624,13 @@ Specifically,
 
 instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
          , OutputableBndrId idL, OutputableBndrId idR
-         , OutputableNeedsOfConfig (LPat idL) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat idR) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat (GhcPass 'Renamed)) DynFlags -- TODO type families in hs-boot
          )
         => Outputable (HsLocalBindsLR idL idR) where
   type OutputableNeedsOfConfig (HsLocalBindsLR idL idR) = PairConstraint
     (PairConstraint
       (OutputableBndrIdNeedsOfConfig idL)
       (OutputableBndrIdNeedsOfConfig idR))
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (HsValBinds _ bs)   = ppr bs
   ppr (HsIPBinds _ bs)    = ppr bs
   ppr (EmptyLocalBinds _) = empty
@@ -639,15 +638,12 @@ instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
 
 instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
          , OutputableBndrId idL, OutputableBndrId idR
-         , OutputableNeedsOfConfig (LPat idL) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat idR) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat (GhcPass 'Renamed)) DynFlags -- TODO type families in hs-boot
          ) => Outputable (HsValBindsLR idL idR) where
   type OutputableNeedsOfConfig (HsValBindsLR idL idR) = PairConstraint
     (PairConstraint
       (OutputableBndrIdNeedsOfConfig idL)
       (OutputableBndrIdNeedsOfConfig idR))
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
@@ -665,10 +661,8 @@ instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
 pprLHsBinds
   :: ( OutputableBndrId (GhcPass idL), OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags
      , OutputableBndrId (GhcPass idR), OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags
-     , OutputableNeedsOfConfig (LPat (GhcPass idL)) DynFlags -- TODO type families in hs-boot
-     , OutputableNeedsOfConfig (LPat (GhcPass idR)) DynFlags -- TODO type families in hs-boot
      )
-  => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
+  => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc' r
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
@@ -677,11 +671,8 @@ pprLHsBindsForUser
   :: ( OutputableBndrId (GhcPass idL), OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags
      , OutputableBndrId (GhcPass idR), OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags
      , OutputableBndrId (GhcPass id2), OutputableBndrIdNeedsOfConfig (GhcPass id2) DynFlags
-     , OutputableNeedsOfConfig (LPat (GhcPass idL)) DynFlags -- TODO type families in hs-boot
-     , OutputableNeedsOfConfig (LPat (GhcPass idR)) DynFlags -- TODO type families in hs-boot
-     , OutputableNeedsOfConfig (LPat (GhcPass id2)) DynFlags -- TODO type families in hs-boot
      )
-  => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc]
+  => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc' r]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
 --     and we don't want several groups of bindings each
@@ -692,13 +683,13 @@ pprLHsBindsForUser binds sigs
   = map snd (sort_by_loc decls)
   where
 
-    decls :: [(SrcSpan, SDoc)]
+    decls :: [(SrcSpan, SDoc' r)]
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
             [(loc, ppr bind) | L loc bind <- bagToList binds]
 
     sort_by_loc decls = sortBy (comparing fst) decls
 
-pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
+pprDeclList :: [SDoc' r] -> SDoc' r   -- Braces with a space
 -- Print a bunch of declarations
 -- One could choose  { d1; d2; ... }, using 'sep'
 -- or      d1
@@ -757,8 +748,6 @@ plusHsValBinds _ _
 
 instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
          , OutputableBndrId idL, OutputableBndrId idR
-         , OutputableNeedsOfConfig (LPat idL) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat idR) DynFlags -- TODO type families in hs-boot
          ) => Outputable (HsBindLR idL idR) where
   type OutputableNeedsOfConfig (HsBindLR idL idR) = PairConstraint
     (PairConstraint
@@ -766,16 +755,14 @@ instance ( idL ~ GhcPass pl, idR ~ GhcPass pr
      (OutputableBndrIdNeedsOfConfig idR))
     (PairConstraint
      (OutputableNeedsOfConfig (XXPatSynBind idL idR))
-     ((~) DynFlags)) -- TODO generalize
+     (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)))
   ppr mbind = ppr_monobind mbind
 
 ppr_monobind
   :: ( OutputableBndrId (GhcPass idL), OutputableBndrIdNeedsOfConfig (GhcPass idL) DynFlags
      , OutputableBndrId (GhcPass idR), OutputableBndrIdNeedsOfConfig (GhcPass idR) DynFlags
-     , OutputableNeedsOfConfig (LPat (GhcPass idL)) DynFlags -- TODO type families in hs-boot
-     , OutputableNeedsOfConfig (LPat (GhcPass idR)) DynFlags -- TODO type families in hs-boot
      )
-  => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
+  => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc' r
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
@@ -813,7 +800,7 @@ ppr_monobind (XHsBindsLR x) = ppr x
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ABExport p) where
   type OutputableNeedsOfConfig (ABExport p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
@@ -822,8 +809,6 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ABExport p) where
 
 instance ( idR ~ GhcPass pr, OutputableBndrId idL, OutputableBndrId idR
          , Outputable (XXPatSynBind idL idR)
-         , OutputableNeedsOfConfig (LPat idL) DynFlags -- TODO type families in hs-boot
-         , OutputableNeedsOfConfig (LPat idR) DynFlags -- TODO type families in hs-boot
          ) => Outputable (PatSynBind idL idR) where
   type OutputableNeedsOfConfig (PatSynBind idL idR) = PairConstraint
     (PairConstraint
@@ -831,7 +816,7 @@ instance ( idR ~ GhcPass pr, OutputableBndrId idL, OutputableBndrId idR
      (OutputableBndrIdNeedsOfConfig idR))
     (PairConstraint
      (OutputableNeedsOfConfig (XXPatSynBind idL idR))
-     ((~) DynFlags)) -- TODO generalize
+     (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)))
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
@@ -852,7 +837,7 @@ instance ( idR ~ GhcPass pr, OutputableBndrId idL, OutputableBndrId idR
                                       (nest 2 $ pprFunBind mg)
   ppr (XPatSynBind x) = ppr x
 
-pprTicks :: SDoc -> SDoc -> SDoc
+pprTicks :: SDoc' r -> SDoc' r -> SDoc' r
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
 -- them appearing in error messages (from the desugarer); see # 3263
 -- Also print ticks in dumpStyle, so that -ddump-hpc actually does
@@ -926,7 +911,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
   type OutputableNeedsOfConfig (HsIPBinds p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
   ppr (XHsIPBinds x) = ppr x
@@ -934,7 +919,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
   type OutputableNeedsOfConfig (IPBind p) = PairConstraint
     (OutputableBndrIdNeedsOfConfig p)
-    ((~) DynFlags) -- TODO generalize
+    (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
   ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -1208,7 +1193,7 @@ isCompleteMatchSig :: LSig name -> Bool
 isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
 isCompleteMatchSig _                            = False
 
-hsSigDoc :: Sig name -> SDoc
+hsSigDoc :: Sig name -> SDoc' r
 hsSigDoc (TypeSig {})           = text "type signature"
 hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
 hsSigDoc (ClassOpSig _ is_deflt _ _)
@@ -1233,12 +1218,12 @@ equality is not enough -- we have to check if they overlap.
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
     type OutputableNeedsOfConfig (Sig p) = PairConstraint
       (OutputableBndrIdNeedsOfConfig p)
-      ((~) DynFlags) -- TODO generalize
+      (PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress))
     ppr sig = ppr_sig sig
 
 ppr_sig
   :: (OutputableBndrId (GhcPass p), OutputableBndrIdNeedsOfConfig (GhcPass p) DynFlags)
-  => Sig (GhcPass p) -> SDoc
+  => Sig (GhcPass p) -> SDoc' r
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
@@ -1292,25 +1277,25 @@ pragSrcBrackets NoSourceText     alt doc = text alt <+> doc <+> text "#-}"
 
 pprVarSig
   :: (OutputableBndr id, OutputableNeedsOfConfig id DynFlags)
-  => [id] -> SDoc -> SDoc
+  => [id] -> SDoc' r -> SDoc' r
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
   where
     pprvars = hsep $ punctuate comma (map pprPrefixOcc vars)
 
 pprSpec
   :: (OutputableBndr id, OutputableNeedsOfConfig id DynFlags)
-  => id -> SDoc -> InlinePragma -> SDoc
+  => id -> SDoc' r -> InlinePragma -> SDoc' r
 pprSpec var pp_ty inl = pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = pprInline inl
 
-pprTcSpecPrags :: TcSpecPrags -> SDoc
+pprTcSpecPrags :: TcSpecPrags -> SDoc' r
 pprTcSpecPrags IsDefaultMethod = text "<default method>"
 pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 
 instance Outputable TcSpecPrag where
-  type OutputableNeedsOfConfig TcSpecPrag = (~) DynFlags -- TODO generalize
+  --type OutputableNeedsOfConfig TcSpecPrag = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (SpecPrag var _ inl)
     = text "SPECIALIZE" <+> pprSpec var (text "<type>") inl
 

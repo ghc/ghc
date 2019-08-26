@@ -30,7 +30,7 @@ module DynFlags (
         ProfAuto(..),
         glasgowExtsFlags,
         warningGroups, warningHierarchies,
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasNoStateHack, hasNoOptCoercion,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
@@ -266,6 +266,7 @@ import CmdLineParser hiding (WarnReason(..))
 import qualified CmdLineParser as Cmd
 import Constants
 import CoreDebugSuppress
+import DebugOutputOptions
 import GhcNameVersion
 import Panic
 import qualified PprColour as Col
@@ -971,7 +972,7 @@ data DynFlags = DynFlags {
   fileSettings      :: {-# UNPACK #-} !FileSettings,
   targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
-  platformMisc      :: {-# UNPACK #-} !PlatformMisc,
+  targetPlatformMisc :: {-# UNPACK #-} !PlatformMisc,
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
@@ -1281,9 +1282,17 @@ data DynFlags = DynFlags {
   cfgWeightInfo         :: CfgWeights
 }
 
+instance HasPlatform DynFlags where
+  {-# INLINE platform #-}
+  platform f dflags = (\x -> dflags { targetPlatform = x }) <$> f (targetPlatform dflags)
+
 instance HasPlatformConstants DynFlags where
   {-# INLINE getPlatformConstants #-}
   getPlatformConstants = platformConstants
+
+instance HasPlatformMisc DynFlags where
+  {-# INLINE platformMisc #-}
+  platformMisc f dflags = (\x -> dflags { targetPlatformMisc = x }) <$> f (targetPlatformMisc dflags)
 
 instance HasPprConfig DynFlags where
   getPprConfig dflags = PprConfig
@@ -1327,14 +1336,15 @@ instance HasTypeSuppress DynFlags where
 instance HasPackageState DynFlags where
   getPackageState = pkgState
 
+instance HasDebugOutputOptions DynFlags where
+  hasPprDebug = dopt Opt_D_ppr_debug
+  hasNoDebugOutput = dopt Opt_D_no_debug_output
+
 instance HasCoreDebugSuppress DynFlags where
   --getCoreDebugSuppress
 
 instance HasStgDebugSuppress DynFlags where
   --getStgDebugSuppress
-
-instance HasPlatform DynFlags where
-  platform f dflags = (\x -> dflags { targetPlatform = x }) <$> f (targetPlatform dflags)
 
 -- | Edge weights to use when generating a CFG from CMM
 data CfgWeights
@@ -1467,7 +1477,7 @@ settings dflags = Settings
   , sFileSettings = fileSettings dflags
   , sTargetPlatform = targetPlatform dflags
   , sToolSettings = toolSettings dflags
-  , sPlatformMisc = platformMisc dflags
+  , sPlatformMisc = targetPlatformMisc dflags
   , sPlatformConstants = platformConstants dflags
   , sRawSettings = rawSettings dflags
   }
@@ -1560,7 +1570,7 @@ opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
 tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
+tablesNextToCode = platformMisc_tablesNextToCode . targetPlatformMisc
 
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
@@ -1735,7 +1745,7 @@ defaultHscTarget platform pMisc
 defaultObjectTarget :: DynFlags -> HscTarget
 defaultObjectTarget dflags = defaultHscTarget
   (targetPlatform dflags)
-  (platformMisc dflags)
+  (targetPlatformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -2091,7 +2101,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         fileSettings = sFileSettings mySettings,
         toolSettings = sToolSettings mySettings,
         targetPlatform = sTargetPlatform mySettings,
-        platformMisc = sPlatformMisc mySettings,
+        targetPlatformMisc = sPlatformMisc mySettings,
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
@@ -2398,12 +2408,6 @@ languageExtensions (Just Haskell2010)
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
        LangExt.RelaxedPolyRec]
-
-hasPprDebug :: DynFlags -> Bool
-hasPprDebug = dopt Opt_D_ppr_debug
-
-hasNoDebugOutput :: DynFlags -> Bool
-hasNoDebugOutput = dopt Opt_D_no_debug_output
 
 hasNoStateHack :: DynFlags -> Bool
 hasNoStateHack = gopt Opt_G_NoStateHack
@@ -5605,10 +5609,10 @@ compilerInfo dflags
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
-       ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
-       ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
+       ("Target platform",             platformMisc_targetPlatformString $ targetPlatformMisc dflags),
+       ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ targetPlatformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
+       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5719,7 +5723,7 @@ makeDynFlagsConsistent dflags
       in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+    = if platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
            in loop dflags' warn
@@ -5735,7 +5739,7 @@ makeDynFlagsConsistent dflags
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"
  | hscTarget dflags == HscAsm &&
-   not (platformMisc_ghcWithNativeCodeGen $ platformMisc dflags)
+   not (platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags)
       = let dflags' = dflags { hscTarget = HscLlvm }
             warn = "No native code generator, so using LLVM"
         in loop dflags' warn

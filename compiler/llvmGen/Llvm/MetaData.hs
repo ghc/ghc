@@ -77,7 +77,7 @@ data MetaExpr = MetaStr !LMString
               deriving (Eq)
 
 instance Outputable MetaExpr where
-  type OutputableNeedsOfConfig MetaExpr = (~) DynFlags -- TODO
+  --type OutputableNeedsOfConfig MetaExpr = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
   ppr (MetaStr    s ) = char '!' <> doubleQuotes (ftext s)
   ppr (MetaNode   n ) = ppr n

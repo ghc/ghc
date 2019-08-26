@@ -66,53 +66,53 @@ import Hoopl.Graph
 -- Outputable instances
 
 instance Outputable CmmStackInfo where
-    type OutputableNeedsOfConfig CmmStackInfo = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig CmmStackInfo = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprStackInfo
 
 instance Outputable CmmTopInfo where
-    type OutputableNeedsOfConfig CmmTopInfo = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig CmmTopInfo = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprTopInfo
 
 
 instance Outputable (CmmNode e x) where
-    type OutputableNeedsOfConfig (CmmNode e x) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (CmmNode e x) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprNode
 
 instance Outputable Convention where
-    type OutputableNeedsOfConfig Convention = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig Convention = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprConvention
 
 instance Outputable ForeignConvention where
-    type OutputableNeedsOfConfig ForeignConvention = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig ForeignConvention = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprForeignConvention
 
 instance Outputable ForeignTarget where
-    type OutputableNeedsOfConfig ForeignTarget = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig ForeignTarget = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprForeignTarget
 
 instance Outputable CmmReturnInfo where
-    type OutputableNeedsOfConfig CmmReturnInfo = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig CmmReturnInfo = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprReturnInfo
 
 instance Outputable (Block CmmNode C C) where
-    type OutputableNeedsOfConfig (Block CmmNode C C) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (Block CmmNode C C) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprBlock
 instance Outputable (Block CmmNode C O) where
-    type OutputableNeedsOfConfig (Block CmmNode C O) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (Block CmmNode C O) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprBlock
 instance Outputable (Block CmmNode O C) where
-    type OutputableNeedsOfConfig (Block CmmNode O C) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (Block CmmNode O C) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprBlock
 instance Outputable (Block CmmNode O O) where
-    type OutputableNeedsOfConfig (Block CmmNode O O) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (Block CmmNode O O) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprBlock
 
 instance Outputable (Graph CmmNode e x) where
-    type OutputableNeedsOfConfig (Graph CmmNode e x) = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig (Graph CmmNode e x) = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprGraph
 
 instance Outputable CmmGraph where
-    type OutputableNeedsOfConfig CmmGraph = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig CmmGraph = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr = pprCmmGraph
 
 ----------------------------------------------------------

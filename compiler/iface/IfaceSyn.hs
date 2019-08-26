@@ -756,10 +756,8 @@ isIfaceDataInstance IfNoParent = False
 isIfaceDataInstance _          = True
 
 pprClassRoles
-  :: ( HasPprConfig r
-     , HasNameSuppress r
+  :: ( HasNameSuppress r
      , HasTypeSuppress r
-     , HasPackageState r
      )
   => ShowSub r -> IfaceTopBndr -> [IfaceTyConBinder] -> [Role] -> SDoc' r
 pprClassRoles ss clas binders roles =
@@ -986,11 +984,7 @@ pprCType (Just cType) = text "C type:" <+> ppr cType
 -- if, for each role, suppress_if role is True, then suppress the role
 -- output
 pprRoles
-  :: ( HasPprConfig r
-     , HasNameSuppress r
-     , HasTypeSuppress r
-     , HasPackageState r
-     )
+  :: HasTypeSuppress r 
   => (Role -> Bool) -> SDoc' r -> [IfaceTyConBinder]
   -> [Role] -> SDoc' r
 pprRoles suppress_if tyCon bndrs roles
@@ -1000,9 +994,7 @@ pprRoles suppress_if tyCon bndrs roles
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
 pprInfixIfDeclBndr
-  :: ( HasPprConfig r
-     , HasNameSuppress r
-     )
+  :: HasNameSuppress r
   => ShowHowMuch r -> OccName -> SDoc' r
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
   = pprInfixVar (isSymOcc name) (ppr_bndr name)
@@ -1010,9 +1002,7 @@ pprInfixIfDeclBndr _ name
   = pprInfixVar (isSymOcc name) (ppr name)
 
 pprPrefixIfDeclBndr
-  :: ( HasPprConfig r
-     , HasNameSuppress r
-     )
+  :: HasNameSuppress r
   => ShowHowMuch r -> OccName -> SDoc' r
 pprPrefixIfDeclBndr (ShowHeader (AltPpr (Just ppr_bndr))) name
   = parenSymOcc name (ppr_bndr name)
@@ -1298,9 +1288,7 @@ instance Outputable IfaceFamInst where
          2 (equals <+> ppr tycon_ax)
 
 ppr_rough
-  :: ( HasPprConfig r
-     , HasNameSuppress r
-     , HasTypeSuppress r
+  :: ( HasNameSuppress r
      , HasPackageState r
      )
   => Maybe IfaceTyCon -> SDoc' r
@@ -1449,11 +1437,7 @@ ppr_bind (IfLetBndr b ty info ji, rhs)
 
 ------------------
 pprIfaceTickish
-  :: ( HasPprConfig r
-     , HasNameSuppress r
-     , HasTypeSuppress r
-     , HasPackageState r
-     )
+  :: HasPackageState r
   => IfaceTickish -> SDoc' r
 pprIfaceTickish (IfaceHpcTick m ix)
   = braces (text "tick" <+> ppr m <+> ppr ix)

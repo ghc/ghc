@@ -160,7 +160,6 @@ instance NamedThing TyThing where       -- Can't put this with the type
 pprShortTyThing
   :: ( HasPprConfig r
      , HasNameSuppress r
-     , HasTypeSuppress r
      , HasPackageState r
      )
   => TyThing -> SDoc' r

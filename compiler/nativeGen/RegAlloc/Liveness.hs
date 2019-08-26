@@ -240,7 +240,7 @@ instance Outputable instr
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
 instance Outputable LiveInfo where
-    type OutputableNeedsOfConfig LiveInfo = (~) DynFlags -- TODO
+    --type OutputableNeedsOfConfig LiveInfo = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
     ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
         =  (ppr mb_static)
         $$ text "# entryIds         = " <> ppr entryIds

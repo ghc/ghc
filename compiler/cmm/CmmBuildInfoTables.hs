@@ -376,7 +376,7 @@ newtype CAFLabel = CAFLabel CLabel
   deriving (Eq, Ord)
 
 instance Outputable CAFLabel where
-  type OutputableNeedsOfConfig CAFLabel = (~) DynFlags -- TODO generalize
+  --type OutputableNeedsOfConfig CAFLabel = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (CAFLabel cl) = ppr cl
 
 type CAFSet = Set CAFLabel
@@ -391,7 +391,7 @@ newtype SRTEntry = SRTEntry CLabel
   deriving (Eq, Ord)
 
 instance Outputable SRTEntry where
-  type OutputableNeedsOfConfig SRTEntry = (~) DynFlags -- TODO generalize
+  --type OutputableNeedsOfConfig SRTEntry = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr (SRTEntry cl) = ppr cl
 
 -- ---------------------------------------------------------------------
@@ -477,7 +477,7 @@ data ModuleSRTInfo = ModuleSRTInfo
     -- Used to implement the [Filter] optimisation.
   }
 instance Outputable ModuleSRTInfo where
-  type OutputableNeedsOfConfig ModuleSRTInfo = (~) DynFlags -- TODO generalize
+  --type OutputableNeedsOfConfig ModuleSRTInfo = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr ModuleSRTInfo{..} =
     text "ModuleSRTInfo:" <+> ppr dedupSRTs <+> ppr flatSRTs
 

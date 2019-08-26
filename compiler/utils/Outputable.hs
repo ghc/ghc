@@ -83,8 +83,8 @@ module Outputable (
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
         qualName, qualModule, qualPackage,
-        mkErrStyle', defaultDumpStyle', mkDumpStyle', defaultUserStyle',
-        mkUserStyle', cmdlineParserStyle', Depth(..),
+        mkErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
+        mkUserStyle, cmdlineParserStyle, Depth(..),
 
         ifPprDebug, whenPprDebug, getPprDebug,
 
@@ -98,6 +98,7 @@ import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
 import BufWrite (BufHandle)
+import DebugOutputOptions
 import FastString
 import qualified Pretty
 import Util
@@ -245,28 +246,28 @@ neverQualify  = QueryQualify neverQualifyNames
                              neverQualifyModules
                              neverQualifyPackages
 
-defaultUserStyle' :: Bool -> PprStyle
-defaultUserStyle' hasPprDebug = mkUserStyle' hasPprDebug neverQualify AllTheWay
+defaultUserStyle :: HasDebugOutputOptions cfg => cfg -> PprStyle
+defaultUserStyle cfg = mkUserStyle cfg neverQualify AllTheWay
 
-defaultDumpStyle' :: Bool -> PprStyle
+defaultDumpStyle :: HasDebugOutputOptions cfg => cfg -> PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
-defaultDumpStyle' hasPprDebug = mkDumpStyle' hasPprDebug neverQualify
+defaultDumpStyle cfg = mkDumpStyle cfg neverQualify
 
-mkDumpStyle' :: Bool -> PrintUnqualified -> PprStyle
-mkDumpStyle' hasPprDebug print_unqual = if hasPprDebug
+mkDumpStyle :: HasDebugOutputOptions cfg => cfg -> PrintUnqualified -> PprStyle
+mkDumpStyle cfg print_unqual = if hasPprDebug cfg
   then PprDebug
   else PprDump print_unqual
 
 -- | Style for printing error messages
-mkErrStyle' :: Bool -> Int -> PrintUnqualified -> PprStyle
-mkErrStyle' hasPprDebug pprUserLength qual =
-   mkUserStyle' hasPprDebug qual (PartWay pprUserLength)
+mkErrStyle :: HasDebugOutputOptions cfg => cfg -> Int -> PrintUnqualified -> PprStyle
+mkErrStyle cfg pprUserLength qual =
+   mkUserStyle cfg qual (PartWay pprUserLength)
 
-cmdlineParserStyle' :: Bool -> PprStyle
-cmdlineParserStyle' hasPprDebug = mkUserStyle' hasPprDebug alwaysQualify AllTheWay
+cmdlineParserStyle :: HasDebugOutputOptions cfg => cfg -> PprStyle
+cmdlineParserStyle cfg = mkUserStyle cfg alwaysQualify AllTheWay
 
-mkUserStyle' :: Bool -> PrintUnqualified -> Depth -> PprStyle
-mkUserStyle' hasPprDebug unqual depth = if hasPprDebug
+mkUserStyle :: HasDebugOutputOptions cfg => cfg -> PrintUnqualified -> Depth -> PprStyle
+mkUserStyle cfg unqual depth = if hasPprDebug cfg
   then PprDebug
   else PprUser unqual depth Uncoloured
 

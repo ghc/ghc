@@ -10,10 +10,13 @@
 module HsExpr where
 
 import SrcLoc     ( Located )
-import Outputable ( SDoc', Outputable )
+import Outputable ( Outputable, OutputableNeedsOfConfig, SDoc' )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import HsExtension ( OutputableBndrId, GhcPass )
+import HsExtension
+  ( OutputableBndrId, OutputableBndrIdNeedsOfConfig
+  , GhcPass
+  )
 
 type role HsExpr nominal
 type role HsCmd nominal
@@ -33,20 +36,38 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p)
 
 type LHsExpr a = Located (HsExpr a)
 
-pprLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc' r
+pprLExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     )
+  => LHsExpr (GhcPass p) -> SDoc' r
 
-pprExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc' r
+pprExpr
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     )
+  => HsExpr (GhcPass p) -> SDoc' r
 
-pprSplice :: (OutputableBndrId (GhcPass p)) => HsSplice (GhcPass p) -> SDoc' r
+pprSplice
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     )
+  => HsSplice (GhcPass p) -> SDoc' r
 
-pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
-          => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc' r
+pprSpliceDecl
+  :: ( OutputableBndrId (GhcPass p)
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     )
+  => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc' r
 
 pprPatBind
   :: forall bndr p body r
   .  ( OutputableBndrId (GhcPass bndr)
      , OutputableBndrId (GhcPass p)
      , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass bndr) r
+     , OutputableBndrIdNeedsOfConfig (GhcPass p) r
+     , OutputableNeedsOfConfig body r
      )
   => LPat (GhcPass bndr)
   -> GRHSs (GhcPass p) body
@@ -55,6 +76,8 @@ pprPatBind
 pprFunBind
   :: ( OutputableBndrId (GhcPass idR)
      , Outputable body
+     , OutputableBndrIdNeedsOfConfig (GhcPass idR) r
+     , OutputableNeedsOfConfig body r
      )
   => MatchGroup (GhcPass idR) body
   -> SDoc' r

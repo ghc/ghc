@@ -1,6 +1,8 @@
 module DynFlags where
 
 import GhcPrelude
+
+import DebugOutputOptions
 import GHC.Platform
 import NameSuppress
 import TypeSuppress
@@ -20,9 +22,8 @@ useUnicodeSyntax         :: DynFlags -> Bool
 useStarIsType            :: DynFlags -> Bool
 shouldUseColor           :: DynFlags -> Bool
 shouldUseHexWordLiterals :: DynFlags -> Bool
-hasPprDebug              :: DynFlags -> Bool
-hasNoDebugOutput         :: DynFlags -> Bool
 
+instance HasDebugOutputOptions DynFlags
 instance HasPprConfig DynFlags
 instance HasNameSuppress DynFlags
 instance HasTypeSuppress DynFlags

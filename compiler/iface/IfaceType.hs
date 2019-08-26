@@ -1243,7 +1243,7 @@ pprUserIfaceForAll
      , HasTypeSuppress r
      , HasPackageState r
      )
-  => HasTypeSuppress r => [IfaceForAllBndr] -> SDoc' r
+  => [IfaceForAllBndr] -> SDoc' r
 pprUserIfaceForAll tvs
    = sdocWithDynFlags $ \cfg ->
      -- See Note [When to print foralls] in this module.
