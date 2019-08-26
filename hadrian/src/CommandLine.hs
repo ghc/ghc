@@ -202,9 +202,11 @@ readDocsArg ms = maybe (Left "Cannot parse docs argument") (Right . set) (go =<<
     go "no-sphinx-html" = Just (Set.delete SphinxHTML)
     go "no-sphinx-pdfs" = Just (Set.delete SphinxPDFs)
     go "no-sphinx-man"  = Just (Set.delete SphinxMan)
+    go "no-sphinx-info" = Just (Set.delete SphinxInfo)
     go "no-sphinx"      = Just (Set.delete SphinxHTML
                               . Set.delete SphinxPDFs
-                              . Set.delete SphinxMan)
+                              . Set.delete SphinxMan
+                              . Set.delete SphinxInfo)
     go _                = Nothing
 
     set :: (DocTargets -> DocTargets) -> CommandLineArgs -> CommandLineArgs
