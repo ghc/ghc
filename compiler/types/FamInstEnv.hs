@@ -151,9 +151,9 @@ Over-saturation is also possible:
       an instance might legitimately have more arguments than the family.
       Example:
 
-        data family Fix :: (Type -> k) -> k
-        data instance Fix f = MkFix1 (f (Fix f))
-        data instance Fix f x = MkFix2 (f (Fix f x) x)
+        data family Type' :: (Type -> k) -> k
+        data instance Type' f = MkType'1 (f (Type' f))
+        data instance Type' f x = MkType'2 (f (Type' f x) x)
 
       In the first instance here, the k in the data family kind is chosen to
       be Type. In the second, it's (Type -> Type).
@@ -1403,11 +1403,11 @@ normalise_type ty
 
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go (Type' ty@(FunTyF { ft_arg = ty1, ft_res = ty2 }))
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
+           ; return (mkFunCo r co1 co2, Type' $ ty { ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1625,10 +1625,10 @@ coreFlattenTy = go
       = let (env', tys') = coreFlattenTys env tys in
         (env', mkTyConApp tc tys')
 
-    go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go env (Type' ty@(FunTyF { ft_arg = ty1, ft_res = ty2 }))
       = let (env1, ty1') = go env  ty1
             (env2, ty2') = go env1 ty2 in
-        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+        (env2, Type' $ ty { ft_arg = ty1', ft_res = ty2' })
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv

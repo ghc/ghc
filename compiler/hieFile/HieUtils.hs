@@ -47,7 +47,7 @@ renderHieType :: DynFlags -> HieTypeFix -> String
 renderHieType df ht = renderWithStyle df (ppr $ hieTypeToIface ht) sty
   where sty = defaultUserStyle df
 
-resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
+resolveVisibility :: Type -> [Type] -> [(ArgFlag, Type)]
 resolveVisibility kind ty_args
   = go (mkEmptyTCvSubst in_scope) kind ty_args
   where
@@ -57,18 +57,16 @@ resolveVisibility kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
-    go env (ForAllTy (Bndr tv vis) res) (t:ts)
-      | isVisibleArgFlag vis = (True , t) : ts'
-      | otherwise            = (False, t) : ts'
+    go env (ForAllTy (Bndr tv vis) res) (t:ts) = (vis , t) : ts'
       where
         ts' = go (extendTvSubst env tv t) res ts
 
-    go env (FunTy { ft_res = res }) (t:ts) -- No type-class args in tycon apps
-      = (True,t) : (go env res ts)
+    go env (Type' (FunTyF { ft_res = res })) (t:ts) -- No type-class args in tycon apps
+      = (Required, t) : (go env res ts)
 
     go env (TyVarTy tv) ts
       | Just ki <- lookupTyVar env tv = go env ki ts
-    go env kind (t:ts) = (True, t) : (go env kind ts) -- Ill-kinded
+    go env kind (t:ts) = (Required, t) : (go env kind ts) -- Ill-kinded
 
 foldType :: (HieType a -> a) -> HieTypeFix -> a
 foldType f (Roll t) = f $ fmap (foldType f) t
@@ -79,21 +77,17 @@ hieTypeToIface = foldType go
     go (HTyVarTy n) = IfaceTyVar $ occNameFS $ getOccName n
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
-    go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
-                                  in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy a b)     = IfaceFunTy VisArg   a    b
-    go (HQualTy pred b) = IfaceFunTy InvisArg pred b
+    go (HForAllTy (Bndr (n, k) af) t) =
+      IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
+      where b = (occNameFS $ getOccName n, k)
+    go (HFunTy' isConstraint a b) = IfaceFunTy isConstraint a b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
 
     -- This isn't fully faithful - we can't produce the 'Inferred' case
     hieToIfaceArgs :: HieArgs IfaceType -> IfaceAppArgs
-    hieToIfaceArgs (HieArgs xs) = go' xs
-      where
-        go' [] = IA_Nil
-        go' ((True ,x):xs) = IA_Arg x Required $ go' xs
-        go' ((False,x):xs) = IA_Arg x Specified $ go' xs
+    hieToIfaceArgs = foldr (\(flag, x) rest -> IA_Arg x flag rest) IA_Nil . unHieArgs
 
 data HieTypeState
   = HTS
@@ -157,8 +151,8 @@ getTypeIndex t
     go (ForAllTy (Bndr v a) t) = do
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
-      return $ HForAllTy ((varName v,k),a) i
-    go (FunTy { ft_af = af, ft_arg = a, ft_res = b }) = do
+      return $ HForAllTy (Bndr (varName v, k) a) i
+    go (Type' (FunTyF { ft_af = af, ft_arg = a, ft_res = b })) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b
       return $ case af of

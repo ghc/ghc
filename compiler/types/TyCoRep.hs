@@ -20,17 +20,32 @@ Note [The Type-related module hierarchy]
 -}
 
 -- We expose the relevant stuff from this module via the Type module
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
 
 module TyCoRep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
-        Type( TyVarTy, AppTy, TyConApp, ForAllTy
-            , LitTy, CastTy, CoercionTy
-            , FunTy, ft_arg, ft_res, ft_af
-            ),  -- Export the type synonym FunTy too
+        module TyCoRep.Open,
+        Type0,
+        Type
+          ( Type'
+          , TyVarTy
+          , AppTy
+          , TyConApp
+          , ForAllTy
+          , FunTy
+          , LitTy
+          , CastTy
+          , CoercionTy
+          ),
 
         TyLit(..),
         KindOrType, Kind,
@@ -83,6 +98,9 @@ import {-# SOURCE #-} TyCoPpr ( pprType, pprCo, pprTyLit )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
+
+-- open abstract:
+import TyCoRep.Open
 
 -- friends:
 import IfaceType
@@ -163,7 +181,7 @@ tyThingCategory (AConLike (RealDataCon _)) = "data constructor"
 tyThingCategory (AConLike (PatSynCon _))  = "pattern synonym"
 
 
-{- **********************************************************************
+{- *****************s*****************************************************
 *                                                                       *
                         Type
 *                                                                       *
@@ -176,66 +194,41 @@ type KindOrType = Type -- See Note [Arguments to type constructors]
 -- | The key type representing kinds in the compiler.
 type Kind = Type
 
--- If you edit this type, you may need to update the GHC formalism
--- See Note [GHC Formalism] in coreSyn/CoreLint.hs
-data Type
-  -- See Note [Non-trivial definitional equality]
-  = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
+-- | Haskell Type abstract syntax layer
+--
+-- The "mostly saturated" tycon is useful in a few places.
+type Type0 t = TypeF Var TyCoVar TyCon TyLit Coercion KindCoercion t [t] t
 
-  | AppTy
-        Type
-        Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
-                        --
-                        --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
-                        --     must be another 'AppTy', or 'TyVarTy'
-                        --     See Note [Respecting definitional equality] (EQ1) about the
-                        --     no 'CastTy' requirement
-                        --
-                        --  2) Argument type
-
-  | TyConApp
-        TyCon
-        [KindOrType]    -- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
-                        -- Invariant: saturated applications of 'FunTyCon' must
-                        -- use 'FunTy' and saturated synonyms must use their own
-                        -- constructors. However, /unsaturated/ 'FunTyCon's
-                        -- do appear as 'TyConApp's.
-                        -- Parameters:
-                        --
-                        -- 1) Type constructor being applied to.
-                        --
-                        -- 2) Type arguments. Might not have enough type arguments
-                        --    here to saturate the constructor.
-                        --    Even type synonyms are not necessarily saturated;
-                        --    for example unsaturated type synonyms
-                        --    can appear as the right hand side of a type synonym.
-
-  | ForAllTy
-        {-# UNPACK #-} !TyCoVarBinder
-        Type            -- ^ A Π type.
-
-  | FunTy      -- ^ t1 -> t2   Very common, so an important special case
-                -- See Note [Function types]
-     { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
-     , ft_arg :: Type           -- Argument type
-     , ft_res :: Type }         -- Result type
-
-  | LitTy TyLit     -- ^ Type literals are similar to type constructors.
-
-  | CastTy
-        Type
-        KindCoercion  -- ^ A kind cast. The coercion is always nominal.
-                      -- INVARIANT: The cast is never refl.
-                      -- INVARIANT: The Type is not a CastTy (use TransCo instead)
-                      -- See Note [Respecting definitional equality] (EQ2) and (EQ3)
-
-  | CoercionTy
-        Coercion    -- ^ Injection of a Coercion into a type
-                    -- This should only ever be used in the RHS of an AppTy,
-                    -- in the list of a TyConApp, when applying a promoted
-                    -- GADT data constructor
-
+-- | Haskell Type abstract syntax
+-- TODO rename "Type'", a crude way to get around core conflict
+newtype Type = Type' (Type0 Type)
   deriving Data.Data
+
+{-# COMPLETE TyVarTy, AppTy, TyConApp, ForAllTy, FunTy, LitTy, CastTy, CoercionTy #-}
+
+pattern TyVarTy :: Var -> Type
+pattern TyVarTy v = Type' (TyVarTyF v)
+
+pattern AppTy :: Type -> Type -> Type
+pattern AppTy f a = Type' (AppTyF f a)
+
+pattern TyConApp:: TyCon -> [Type] -> Type
+pattern TyConApp f as = Type' (TyConAppF f as)
+
+pattern ForAllTy :: TyCoVarBinder -> Type -> Type
+pattern ForAllTy b t = Type' (ForAllTyF b t)
+
+pattern FunTy :: AnonArgFlag -> Type -> Type -> Type
+pattern FunTy f a r = Type' (FunTyF f a r)
+
+pattern LitTy :: TyLit -> Type
+pattern LitTy l = Type' (LitTyF l)
+
+pattern CastTy :: Type -> Coercion -> Type
+pattern CastTy t c = Type' (CastTyF t c)
+
+pattern CoercionTy :: KindCoercion -> Type
+pattern CoercionTy kc = Type' (CoercionTyF kc)
 
 instance Outputable Type where
   ppr = pprType
@@ -929,7 +922,7 @@ mkTyCoVarTys = map mkTyCoVarTy
 infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`      -- Associates to the right
 
 mkFunTy :: AnonArgFlag -> Type -> Type -> Type
-mkFunTy af arg res = FunTy { ft_af = af, ft_arg = arg, ft_res = res }
+mkFunTy af arg res = Type' $ FunTyF { ft_af = af, ft_arg = arg, ft_res = res }
 
 mkVisFunTy, mkInvisFunTy :: Type -> Type -> Type
 mkVisFunTy   = mkFunTy VisArg
@@ -947,10 +940,11 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
+
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 mkPiTy:: TyCoBinder -> Type -> Type
-mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
+mkPiTy (Anon af ty1) ty2        = Type' $ FunTyF { ft_af = af, ft_arg = ty1, ft_res = ty2 }
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkPiTys :: [TyCoBinder] -> Type -> Type
