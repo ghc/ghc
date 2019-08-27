@@ -254,9 +254,10 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      to expose in the interface
 
   = do
-    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+    let semantic_mod = canonicalizeHomeModule dflags (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl mb_caf_infos entity
+        omit_prags = gopt Opt_OmitInterfacePragmas dflags
+        decls  = [ tyThingToIfaceDecl (guard (not omit_prags) >> mb_caf_infos) entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -1789,8 +1790,9 @@ idToIfaceDecl mb_caf_env id
     caf_info =
       case mb_caf_env of
         Nothing ->
-          -- CAF env not available, not generating code; probably compiling a
-          -- boot file, or we're in interpreter; assume CAFFY.
+          -- CAF env not available, we're either not generating code (e.g.
+          -- compiling a boot file, or in interpreter),
+          -- or -domit-interface-pragmas is enabled (with -O0, or explicitly).
           True
         Just caf_env ->
           case lookupNameEnv caf_env (getName id) of
