@@ -51,6 +51,7 @@ import BasicTypes
 import VarSet ( isEmptyDVarSet )
 import UniqFM
 
+import FastString
 import OrdList
 import MkGraph
 
@@ -117,14 +118,17 @@ codeGen dflags this_mod data_tycons
         -- So they are the only ones we care about. `exportLF` filters
         -- a few more we can recompute easily via their types.
         ; let extractInfo info
-                | not (isExternalName $ idName id)
+                | not (isExternalName name)
                 = Nothing
                 | not (exportLF lf)
                 = Nothing
+                | isTypeableBindOcc (occName name)
+                = Nothing
                 | otherwise
-                = lf `seq` Just (idName id,lf)
+                = lf `seq` Just (name,lf)
                 where
                   id = cg_id info
+                  !name = idName id
                   lf = cg_lf info
         ; let generatedInfo = mapMaybe extractInfo $ eltsUFM $ cgs_binds st
 
