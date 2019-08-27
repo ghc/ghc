@@ -873,12 +873,20 @@ FP_PROG_GHC_PKG
 dnl ** check for installed happy binary + version
 
 AC_ARG_VAR(HAPPY,[Use as the path to happy [default=autodetect]])
-FPTOOLS_HAPPY
+if [ ! -f compiler/parser/Lexer.hs ]; then
+  dnl Don't depend upon alex/happy if building from source distribution, where
+  dnl the files that they generate should already exist (#16860)
+  FPTOOLS_HAPPY;
+fi
 
 dnl ** check for installed alex binary + version
 
 AC_ARG_VAR(ALEX,[Use as the path to alex [default=autodetect]])
-FPTOOLS_ALEX
+if [ ! -f compiler/parser/Parser.hs ]; then
+  dnl Don't depend upon alex/happy if building from source distribution, where
+  dnl the files that they generate should already exist (#16860)
+  FPTOOLS_ALEX;
+fi
 
 dnl --------------------------------------------------
 dnl ### program checking section ends here ###
