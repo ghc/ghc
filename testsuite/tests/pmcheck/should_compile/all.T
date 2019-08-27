@@ -76,6 +76,8 @@ test('T15884', expect_broken(15884), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T16289', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17112', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
