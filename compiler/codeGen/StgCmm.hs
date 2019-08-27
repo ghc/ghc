@@ -26,7 +26,7 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
-import CgTypes ( CgIfaceInfo, exportLF )
+import CgTypes ( exportLF )
 
 import Cmm
 import CmmUtils
