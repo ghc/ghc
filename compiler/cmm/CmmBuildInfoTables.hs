@@ -914,7 +914,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     [] -> do
       srtTrace2 "oneSRT: empty" (ppr caf_lbls <+> ppr haskell_names) $ return ()
       updateSRTMap Nothing
-      return (([], [], []), [])
+      return (([], [], []), if isCAF then haskell_names else [])
 
     -- [Inline] - when we have only one entry there is no need to
     -- build an SRT object at all, instead we put the singleton SRT
