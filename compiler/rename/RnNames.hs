@@ -9,6 +9,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns #-}
 
 module RnNames (
         rnImports, getLocalNonValBinders, newRecordSelector,
@@ -902,7 +903,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     imp_occ_env :: OccEnv (Name,    -- the name
                            AvailInfo,   -- the export item providing the name
                            Maybe Name)  -- the parent of associated types
-    imp_occ_env = mkOccEnv_C combine [ (occ, (n, a, Nothing))
+    !imp_occ_env = mkOccEnv_C combine [ (occ, (n, a, Nothing))
                                      | a <- all_avails
                                      , (n, occ) <- availNamesWithOccs a]
       where
