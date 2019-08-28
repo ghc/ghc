@@ -25,8 +25,8 @@ Language
 
 - Kind variables are no longer implicitly quantified in constructor declarations: ::
 
-    data T a        = T1 (S (a :: k) | forall (b::k). T2 (S b)  -- no longer accepted
-    data T (a :: k) = T1 (S (a :: k) | forall (b::k). T2 (S b)  -- still accepted
+    data T a        = T1 (S (a :: k)) | forall (b::k). T2 (S b)  -- no longer accepted
+    data T (a :: k) = T1 (S (a :: k)) | forall (b::k). T2 (S b)  -- still accepted
 
 - Implicitly quantified kind variables are no longer put in front of other variables: ::
 
@@ -89,7 +89,7 @@ Language
   around what kinds of types can appear inside of the data constructor
   for a `newtype`. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
-             
+
 Compiler
 ~~~~~~~~
 
