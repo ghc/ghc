@@ -508,7 +508,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
 
         -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups = stronglyConnCompFromEdgedVerticesFS edges
+       groups = stronglyConnCompFromEdgedVerticesOccName edges
 
        global_hash_fn = mkHashFun hsc_env eps
 

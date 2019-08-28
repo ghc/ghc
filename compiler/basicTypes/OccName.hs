@@ -88,9 +88,8 @@ module OccName (
         -- * The 'OccSet' type
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
         extendOccSetList,
-        unionOccSets, unionManyOccSets, minusOccSet, elemOccSet,
-        isEmptyOccSet, intersectOccSet, intersectsOccSet,
-        filterOccSet, nonDetOccEnvElts, nonDetFoldOccEnv,
+        unionOccSets,  elemOccSet,
+        nonDetOccEnvElts, nonDetFoldOccEnv,
 
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
@@ -384,14 +383,12 @@ where 'ns' is a Char representing the name space.  This in turn makes it
 easy to build an OccEnv.
 -}
 
-instance HasFastString OccName where
-      -- See Note [The Unique of an OccName]
-  getFastString (OccName VarName   fs) = "v" `appendFS`  fs
-  getFastString (OccName DataName  fs) = "d" `appendFS` fs
-  getFastString (OccName TvName    fs) = "tv" `appendFS` fs
-  getFastString (OccName TcClsName fs) = "tc" `appendFS` fs
-
-newtype OccEnv a = A (FastStringEnv a)
+data OccEnv a = OccEnv {
+                  varOccEnv :: FastStringEnv a
+                  , dataOccEnv :: FastStringEnv a
+                  , tvOccEnv   :: FastStringEnv a
+                  , tyOccEnv   :: FastStringEnv a
+                  }
   deriving Data
 
 emptyOccEnv :: OccEnv a
@@ -414,33 +411,102 @@ delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
 filterOccEnv       :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
 alterOccEnv        :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
 
-emptyOccEnv      = A emptyFsEnv
-unitOccEnv x y = A $ unitFsEnv x y
-extendOccEnv (A x) y z = A $ extendFsEnv x y z
-extendOccEnvList (A x) l = A $ extendFsEnvList x l
-lookupOccEnv (A x) y = lookupFsEnv x y
-mkOccEnv     l    = A $ mkFsEnv l
-elemOccEnv x (A y)       = elemFsEnv x y
-nonDetFoldOccEnv a b (A c)     = nonDetFoldUniqMap a b c
-nonDetOccEnvElts (A x)         = nonDetEltsUniqMap x
-plusOccEnv (A x) (A y)   = A $ plusFsEnv x y
-plusOccEnv_C f (A x) (A y)       = A $ plusFsEnv_C f x y
-extendOccEnv_C f (A x) y z   = A $ extendFsEnv_C f x y z
-extendOccEnv_Acc f g (A x) y z   = A $ extendFsEnv_Acc f g x y z
-mapOccEnv f (A x)        = A $ mapFsEnv f x
-mkOccEnv_C comb l = A $ extendFsEnvList_C comb emptyFsEnv l
-delFromOccEnv (A x) y    = A $ delFromFsEnv x y
-delListFromOccEnv (A x) y  = A $ delListFromFsEnv x y
-filterOccEnv x (A y)       = A $ filterFsEnv x y
-alterOccEnv fn (A y) k     = A $ alterFsEnv fn y k
+liftOp2 :: (FastString -> FastStringEnv a -> FastStringEnv a) -> (OccName -> OccEnv a -> OccEnv a)
+liftOp2 f o oe = case occNameSpace o of
+                  VarName   -> oe { varOccEnv = f fs (varOccEnv oe) }
+                  DataName  -> oe { dataOccEnv = f fs (dataOccEnv oe) }
+                  TvName    -> oe { tvOccEnv = f fs (tvOccEnv oe) }
+                  TcClsName -> oe {  tyOccEnv = f fs (tyOccEnv oe) }
+  where
+    fs = occNameFS o
+
+liftOp :: (FastString -> a -> FastStringEnv a) -> (OccName -> a -> OccEnv a)
+liftOp f o v = case occNameSpace o of
+                  VarName   -> emptyOccEnv { varOccEnv = f fs v }
+                  DataName  -> emptyOccEnv { dataOccEnv = f fs v }
+                  TvName    -> emptyOccEnv { tvOccEnv = f fs v }
+                  TcClsName -> emptyOccEnv {  tyOccEnv = f fs v }
+  where
+    fs = occNameFS o
+
+liftOp3 :: (FastStringEnv a -> FastString -> FastStringEnv a)
+        -> (OccEnv a -> OccName ->  OccEnv a)
+liftOp3 f oe o = case occNameSpace o of
+                    VarName   -> oe { varOccEnv = f (varOccEnv oe) fs }
+                    DataName  -> oe { dataOccEnv = f (dataOccEnv oe) fs }
+                    TvName    -> oe { tvOccEnv = f (tvOccEnv oe) fs  }
+                    TcClsName -> oe {  tyOccEnv = f (tyOccEnv oe) fs }
+  where
+    fs = occNameFS o
+
+
+liftOp4 :: (FastStringEnv a -> FastString -> v)
+        -> (OccEnv a -> OccName -> v)
+liftOp4 f oe o  = case occNameSpace o of
+                    VarName   -> f (varOccEnv oe) fs
+                    DataName  -> f (dataOccEnv oe) fs
+                    TvName    -> f (tvOccEnv oe) fs
+                    TcClsName -> f (tyOccEnv oe) fs
+  where
+    fs = occNameFS o
+
+liftOp5 :: (v -> b -> FastStringEnv a -> b)
+        -> (v -> b -> OccEnv a -> b)
+liftOp5 f v b oe =
+  let b1 = f v b (varOccEnv oe)
+      b2 = f v b1 (dataOccEnv oe)
+      b3 = f v b2 (tvOccEnv oe)
+  in  f v b3 (tyOccEnv oe)
+
+liftOp6 :: (FastStringEnv a -> FastStringEnv a -> FastStringEnv a)
+        -> (OccEnv a -> OccEnv a -> OccEnv a)
+liftOp6 f oe1 oe2 = OccEnv
+                      { varOccEnv = f (varOccEnv oe1) (varOccEnv oe2)
+                      , dataOccEnv = f (dataOccEnv oe1) (dataOccEnv oe2)
+                      , tvOccEnv = f (tvOccEnv oe1) (tvOccEnv oe2)
+                      ,  tyOccEnv = f (tyOccEnv oe1) (tyOccEnv oe2) }
+
+liftOp7 :: (FastStringEnv b -> FastString -> a -> FastStringEnv b)
+        -> (OccEnv b -> OccName -> a -> OccEnv b)
+liftOp7 f oe on v = undefined
+
+liftOp8 :: (FastStringEnv b -> FastStringEnv c)
+        -> (OccEnv b -> OccEnv c)
+liftOp8 f oe1 =  OccEnv
+                      { varOccEnv = f (varOccEnv oe1)
+                      , dataOccEnv = f (dataOccEnv oe1)
+                      , tvOccEnv = f (tvOccEnv oe1)
+                      ,  tyOccEnv = f (tyOccEnv oe1)}
+
+data A = A
+
+emptyOccEnv      = OccEnv emptyFsEnv emptyFsEnv emptyFsEnv emptyFsEnv
+unitOccEnv x y = liftOp unitFsEnv x y
+extendOccEnv oe y z = liftOp3 (\a b -> extendFsEnv a b z) oe y
+extendOccEnvList oe l = foldr (\(k, v) m -> extendOccEnv m k v) oe l
+lookupOccEnv oe y = liftOp4 lookupFsEnv oe y
+mkOccEnv     l    = extendOccEnvList emptyOccEnv l
+elemOccEnv x y    = liftOp4 (flip elemFsEnv) y x
+nonDetFoldOccEnv a b oe     = liftOp5 nonDetFoldUniqMap a b oe
+nonDetOccEnvElts oe         = nonDetFoldOccEnv (:) [] oe
+plusOccEnv oe oe1   = liftOp6 plusFsEnv oe oe1
+plusOccEnv_C f oe1 oe2       = liftOp6 (plusFsEnv_C f) oe1 oe2
+extendOccEnv_C f oe y z   = liftOp3 (\a b -> extendFsEnv_C f a b z) oe y
+extendOccEnv_Acc f g oe y z   = liftOp7 (extendFsEnv_Acc f g) oe y z
+mapOccEnv f oe             = liftOp8 (mapFsEnv f) oe
+delFromOccEnv oe y      = liftOp3 delFromFsEnv oe y
+delListFromOccEnv oe y  = foldr (\k m -> delFromOccEnv m k) oe y
+filterOccEnv x oe       = liftOp8 (filterFsEnv x) oe
+alterOccEnv fn y k      = liftOp3 (alterFsEnv fn) y k
+mkOccEnv_C comb l = foldr (\(k, v) m -> extendOccEnv_C comb m k v) emptyOccEnv l
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x
 
 pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
-pprOccEnv ppr_elt (A env) = pprUniqMap ppr_elt env
+pprOccEnv ppr_elt (OccEnv env _ _ _) = pprUniqMap ppr_elt env
 
-type OccSet = FsSet OccName
+type OccSet = OccEnv OccName
 
 emptyOccSet       :: OccSet
 unitOccSet        :: OccName -> OccSet
@@ -448,27 +514,15 @@ mkOccSet          :: [OccName] -> OccSet
 extendOccSet      :: OccSet -> OccName -> OccSet
 extendOccSetList  :: OccSet -> [OccName] -> OccSet
 unionOccSets      :: OccSet -> OccSet -> OccSet
-unionManyOccSets  :: [OccSet] -> OccSet
-minusOccSet       :: OccSet -> OccSet -> OccSet
 elemOccSet        :: OccName -> OccSet -> Bool
-isEmptyOccSet     :: OccSet -> Bool
-intersectOccSet   :: OccSet -> OccSet -> OccSet
-intersectsOccSet  :: OccSet -> OccSet -> Bool
-filterOccSet      :: (OccName -> Bool) -> OccSet -> OccSet
 
-emptyOccSet       = emptyFsSet
-unitOccSet        = unitFsSet
-mkOccSet          = mkFsSet
-extendOccSet      = addOneToFsSet
-extendOccSetList  = addListToFsSet
-unionOccSets      = unionFsSets
-unionManyOccSets  = unionManyFsSets
-minusOccSet       = minusFsSet
-elemOccSet        = elementOfFsSet
-isEmptyOccSet     = isEmptyFsSet
-intersectOccSet   = intersectFsSets
-intersectsOccSet s1 s2 = not (isEmptyOccSet (s1 `intersectOccSet` s2))
-filterOccSet      = filterFsSet
+emptyOccSet       = emptyOccEnv
+unitOccSet        = \x -> unitOccEnv x x
+mkOccSet          = mkOccEnv . map (\x -> (x, x))
+extendOccSet    oe o = extendOccEnv oe o o
+extendOccSetList oe os = extendOccEnvList oe (map (\x -> (x, x)) os)
+unionOccSets      = plusOccEnv
+elemOccSet        = elemOccEnv
 
 {-
 ************************************************************************

@@ -355,7 +355,7 @@ instance Outputable LocalRdrEnv where
                     <+> pprUFM (getUniqSet ns) (braces . pprWithCommas ppr)
                  ] <+> char '}')
     where
-      ppr_elt name = parens (ppr (uniqueOfFS (getFastString (nameOccName name))) <+> ppr name)
+      ppr_elt name = parens (ppr (uniqueOfFS (getFastString (occNameFS (nameOccName name)))) <+> ppr name)
                      -- So we can see if the keys line up correctly
 
 emptyLocalRdrEnv :: LocalRdrEnv
@@ -772,7 +772,7 @@ pprGlobalRdrEnv locals_only env
                        | otherwise   = gres
     pp []   = empty
     pp gres = hang (ppr occ
-                     <+> parens (text "unique" <+> ppr (uniqueOfFS (getFastString occ)))
+                     <+> parens (text "unique" <+> ppr (uniqueOfFS (getFastString (occNameFS occ))))
                      <> colon)
                  2 (vcat (map ppr gres))
       where

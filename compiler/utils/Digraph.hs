@@ -22,6 +22,7 @@ module Digraph(
         stronglyConnCompFromEdgedVerticesUniqR,
         stronglyConnCompFromEdgedVerticesFS,
         stronglyConnCompFromEdgedVerticesFSR,
+        stronglyConnCompFromEdgedVerticesOccName,
 
         -- Simple way to classify edges
         EdgeType(..), classifyEdges
@@ -51,6 +52,7 @@ import Outputable
 import Maybes      ( expectJust )
 import FastString
 import FastStringEnv
+import OccName
 
 -- std interfaces
 import Data.Maybe
@@ -206,6 +208,9 @@ reduceNodesIntoVerticesUniq = reduceNodesIntoVertices listToUFM (flip lookupUFM)
 reduceNodesIntoVerticesFS :: (Outputable key, HasFastString key) => ReduceFn key payload
 reduceNodesIntoVerticesFS = reduceNodesIntoVertices mkFsEnv (\k v -> lookupFsEnv v k)
 
+reduceNodesIntoVerticesOccName :: ReduceFn OccName payload
+reduceNodesIntoVerticesOccName = reduceNodesIntoVertices mkOccEnv (\k v -> lookupOccEnv v k)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -336,6 +341,15 @@ stronglyConnCompFromEdgedVerticesFS
 stronglyConnCompFromEdgedVerticesFS
   = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesFSR
 
+-- The following two versions are provided for backwards compatibility:
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesOccName ::
+           [Node OccName payload]
+        -> [SCC payload]
+stronglyConnCompFromEdgedVerticesOccName
+  = map (fmap node_payload) . stronglyConnCompFromEdgedVerticesOccNameR
+
 -- The "R" interface is used when you expect to apply SCC to
 -- (some of) the result of SCC, so you don't want to lose the dependency info
 -- See Note [Deterministic SCC]
@@ -368,6 +382,16 @@ stronglyConnCompFromEdgedVerticesFSR
         -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesFSR =
   stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesFS
+
+-- The "R" interface is used when you expect to apply SCC to
+-- (some of) the result of SCC, so you don't want to lose the dependency info
+-- See Note [Deterministic SCC]
+-- See Note [reduceNodesIntoVertices implementations]
+stronglyConnCompFromEdgedVerticesOccNameR ::
+           [Node OccName payload]
+        -> [SCC (Node OccName payload)]
+stronglyConnCompFromEdgedVerticesOccNameR =
+  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesOccName
 
 {-
 ************************************************************************
