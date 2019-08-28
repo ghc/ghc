@@ -1,0 +1,17 @@
+Unexpected failures:
+   deriving/should_compile/T11148.run         T11148 [bad exit code (2)] (normal)
+   indexed-types/should_compile/T11361.run    T11361 [exit code non-0] (normal)
+   polykinds/T11362.run                       T11362 [exit code non-0] (normal)
+   stranal/should_compile/T9208.run           T9208 [exit code non-0] (optasm)
+   typecheck/should_fail/TcCoercibleFail.run  TcCoercibleFail [stderr mismatch] (normal)
+
+Fragile tests:
+   libraries/base/tests/CPUTime001.run   CPUTime001 [fragile pass] (normal)
+   profiling/should_run/heapprof001.run  heapprof001 [fragile fail] (ghci-ext-prof)
+   profiling/should_run/heapprof001.run  heapprof001 [fragile fail] (prof)
+   profiling/should_run/T15897.run       T15897 [fragile fail] (profasm)
+   ghci/should_run/T3171.run             T3171 [fragile pass] (normal)
+   profiling/should_run/T5559.run        T5559 [fragile fail] (ghci-ext-prof)
+   profiling/should_run/T5559.run        T5559 [fragile fail] (prof)
+   concurrent/should_run/T5611.run       T5611 [fragile pass] (normal)
+   concurrent/should_run/T5611a.run      T5611a [fragile pass] (normal)
