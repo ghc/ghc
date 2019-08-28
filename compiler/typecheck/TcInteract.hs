@@ -559,9 +559,10 @@ solveOneFromTheOther ev_i ev_w
      ev_id_w = ctEvEvId ev_w
 
      different_level_strategy  -- Both Given
-       | isIPPred pred, lvl_w > lvl_i = KeepWork
-       | lvl_w < lvl_i                = KeepWork
-       | otherwise                    = KeepInert
+       | isIPPred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
+       | otherwise     = if lvl_w > lvl_i then KeepInert else KeepWork
+       -- See Note [Replacement vs keeping] (the different-level bullet)
+       -- For the isIPPred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy binds -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
@@ -1245,6 +1246,9 @@ This should probably be well typed, with
    g :: Bool -> (Int, Bool)
 
 So the inner binding for ?x::Bool *overrides* the outer one.
+
+See ticket #17104 for a rather tricky example of this overriding
+behaviour.
 
 All this works for the normal cases but it has an odd side effect in
 some pathological programs like this:

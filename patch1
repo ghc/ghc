@@ -1,0 +1,95 @@
+diff --git a/compiler/typecheck/TcCanonical.hs b/compiler/typecheck/TcCanonical.hs
+index 47c4cc807c..caa25fbb2e 100644
+--- a/compiler/typecheck/TcCanonical.hs
++++ b/compiler/typecheck/TcCanonical.hs
+@@ -2285,8 +2285,9 @@ rewriteEvidence ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc }) new_pred c
+                                                        (mkTcSymCo co))
+ 
+ rewriteEvidence ev@(CtWanted { ctev_dest = dest
++                             , ctev_nosh = si
+                              , ctev_loc = loc }) new_pred co
+-  = do { mb_new_ev <- newWanted loc new_pred
++  = do { mb_new_ev <- newWanted_SI si loc new_pred
+        ; MASSERT( tcCoercionRole co == ctEvRole ev )
+        ; setWantedEvTerm dest
+             (mkEvCast (getEvExpr mb_new_ev)
+@@ -2334,8 +2335,8 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
+                                   `mkTcTransCo` mkTcSymCo rhs_co)
+        ; newGivenEvVar loc' (new_pred, new_tm) }
+ 
+-  | CtWanted { ctev_dest = dest } <- old_ev
+-  = do { (new_ev, hole_co) <- newWantedEq loc' (ctEvRole old_ev) nlhs nrhs
++  | CtWanted { ctev_dest = dest, ctev_nosh = si } <- old_ev
++  = do { (new_ev, hole_co) <- newWantedEq_SI si loc' (ctEvRole old_ev) nlhs nrhs
+        ; let co = maybeSym swapped $
+                   mkSymCo lhs_co
+                   `mkTransCo` hole_co
+diff --git a/compiler/typecheck/TcSMonad.hs b/compiler/typecheck/TcSMonad.hs
+index c52e624d8d..5e937bc26e 100644
+--- a/compiler/typecheck/TcSMonad.hs
++++ b/compiler/typecheck/TcSMonad.hs
+@@ -3404,26 +3404,35 @@ emitNewWantedEq loc role ty1 ty2
+        ; return co }
+ 
+ -- | Make a new equality CtEvidence
+-newWantedEq :: CtLoc -> Role -> TcType -> TcType -> TcS (CtEvidence, Coercion)
+-newWantedEq loc role ty1 ty2
++newWantedEq :: Role -> TcType -> TcType
++            -> TcS (CtEvidence, Coercion)
++newWantedEq = newWantedEq_SI WDeriv
++
++newWantedEq_SI :: ShadowInfo -> Role
++               -> TcType -> TcType
++               -> TcS (CtEvidence, Coercion)
++newWantedEq_SI si loc role ty1 ty2
+   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
+        ; traceTcS "Emitting new coercion hole" (ppr hole <+> dcolon <+> ppr pty)
+        ; return ( CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
+-                           , ctev_nosh = WDeriv
++                           , ctev_nosh = si
+                            , ctev_loc = loc}
+                 , mkHoleCo hole ) }
+   where
+     pty = mkPrimEqPredRole role ty1 ty2
+ 
+ -- no equalities here. Use newWantedEq instead
+-newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
++newWantedEvVarNC :: CtLoc -> ShadowInfo -> TcPredType -> TcS CtEvidence
++newWantedEvVarNC = newWantedEvVarNC WDeriv
++
++newWantedEvVarNC_SI :: ShadowInfo -> CtLoc -> TcPredType -> TcS CtEvidence
+ -- Don't look up in the solved/inerts; we know it's not there
+-newWantedEvVarNC loc pty
++newWantedEvVarNC si loc pty
+   = do { new_ev <- newEvVar pty
+        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
+                                          pprCtLoc loc)
+        ; return (CtWanted { ctev_pred = pty, ctev_dest = EvVarDest new_ev
+-                          , ctev_nosh = WDeriv
++                          , ctev_nosh = si
+                           , ctev_loc = loc })}
+ 
+ newWantedEvVar :: CtLoc -> TcPredType -> TcS MaybeNew
+@@ -3438,14 +3447,17 @@ newWantedEvVar loc pty
+             _ -> do { ctev <- newWantedEvVarNC loc pty
+                     ; return (Fresh ctev) } }
+ 
+--- deals with both equalities and non equalities. Tries to look
+--- up non-equalities in the cache
+ newWanted :: CtLoc -> PredType -> TcS MaybeNew
+-newWanted loc pty
++-- Deals with both equalities and non equalities. Tries to look
++-- up non-equalities in the cache
++newWanted = newWanted_SI WDeriv
++
++newWanted_SI :: ShadowInfo -> CtLoc -> PredType -> TcS MaybeNew
++newWanted_SI loc si pty
+   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
+-  = Fresh . fst <$> newWantedEq loc role ty1 ty2
++  = Fresh . fst <$> newWantedEq_SI si loc role ty1 ty2
+   | otherwise
+-  = newWantedEvVar loc pty
++  = newWantedEvVar_SI si loc pty
+ 
+ -- deals with both equalities and non equalities. Doesn't do any cache lookups.
+ newWantedNC :: CtLoc -> PredType -> TcS CtEvidence
