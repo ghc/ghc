@@ -1,4 +1,3 @@
-{-# options_ghc -Woverlapping-patterns -Wincomplete-patterns -fforce-recomp #-}
 {-# language PatternSynonyms #-}
 -- Taken from the Dhall library
 module T17096 where
