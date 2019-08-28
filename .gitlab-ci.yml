@@ -202,6 +202,7 @@ validate-x86_64-darwin:
     - x86_64-darwin
   variables:
     GHC_VERSION: 8.6.3
+    CABAL_INSTALL_VERSION: 2.4.1.0
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
