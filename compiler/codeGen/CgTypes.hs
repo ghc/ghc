@@ -5,8 +5,8 @@
 {-# LANGUAGE BangPatterns #-}
 
 -- | Code generation related types used in other parts of the compiler.
-
--- In particular we define here any information which might be written to or
+--
+-- In particular we export here any information which might be written to or
 -- read from interface files.
 
 module CgTypes
@@ -152,8 +152,6 @@ pprUpdateable :: Bool -> SDoc
 pprUpdateable True = text "updateable"
 pprUpdateable False = text "oneshot"
 
-
-
 instance Outputable LambdaFormInfo where
     ppr (LFReEntrant top oneshot rep fvs argdesc) =
         text "LFReEntrant" <> brackets (ppr top <+> ppr oneshot <+>
@@ -193,28 +191,7 @@ data StandardFormInfo
         !RepArity                -- Arity, n
    deriving (Eq)
 
--- TODO: We can save a byte by using the 3 high
--- bits to encode the tag.
--- Unless we have a function/constructor with tens
--- of millions of arguments (which is broken for all kinds of
--- other reasons) this is perfectly safe.
-instance Binary StandardFormInfo where
-  put_ bh NonStandardThunk  = putByte bh 0
-  put_ bh (SelectorThunk w) = putByte bh 1 >> put_ bh w
-  put_ bh (ApThunk n)       = putByte bh 2 >> put_ bh n
-  get  bh = do
-    con <- getByte bh
-    case con of
-        0 -> pure NonStandardThunk
-        1 -> pure SelectorThunk <*> get bh
-        2 -> pure ApThunk       <*> get bh
-        _ -> panic "Invalid Byte"
-
 instance Outputable StandardFormInfo where
   ppr NonStandardThunk = text "RegThunk"
   ppr (SelectorThunk w) = text "SelThunk:" <> ppr w
   ppr (ApThunk n) = text "ApThunk:" <> ppr n
-
--- -----------------------------------------------------------------------------
--- Representation inside interface files.
-

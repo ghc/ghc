@@ -171,7 +171,6 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                    warns hpc_info self_trust
                    safe_mode usages
                    doc_hdr decl_docs arg_docs
-                   --TODO: Currently we just stub it out here.
                    mod_details cg_details
 
 -- | make an interface from the results of typechecking only.  Useful

@@ -80,7 +80,6 @@ import Data.Maybe ( catMaybes )
 
 import Data.Bits
 import Data.Word
--- import PackedFlags
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
@@ -693,15 +692,11 @@ toIfStandardFormInfo sf =
 
 toIfLFInfo :: LambdaFormInfo -> IfLFInfo
 toIfLFInfo (LFReEntrant TopLevel oneshot rep fvs_flag _argdesc) =
-    -- ASSERT(rep <= (2 ^ (14 :: Int) - 1) && fromEnum oneshot <= 1 && fromEnum fvs <= 1)
-    -- let rep' = fromIntegral rep :: SizedInt 14
-    -- in
      ILFReEntrant oneshot rep fvs_flag
-
 toIfLFInfo (LFThunk TopLevel hasfv updateable sfi m_function) =
+    --Assert arity fits in 14 bits
     ASSERT(fromEnum hasfv <= 1 && fromEnum updateable <= 1 && fromEnum m_function <= 1)
     ILFThunk (hasfv, updateable, m_function) (toIfStandardFormInfo sfi)
-
 toIfLFInfo (LFUnlifted) = ILFUnlifted
 toIfLFInfo (LFCon con) = ILFCon (dataConName con)
 -- All other cases are not possible at the top level.

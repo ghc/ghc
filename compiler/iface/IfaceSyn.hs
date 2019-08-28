@@ -588,35 +588,22 @@ data IfLFInfo =
     ILFReEntrant
         OneShotInfo
         RepArity
-        Bool
-
-        -- TopLevelFlag => Implied true
-        -- !OneShotInfo    -- => Not currently used by codegen, but we store it just in case
-        -- !RepArity       -- Arity. Very useful!  Invariant: always > 0
-        -- !Bool           -- no fvs <=> Used to determine nodePointsTo, True
-        -- ArgDescr        -- Argument descriptor - not encoded
+        Bool -- True <=> no free fvs
 
   -- | We encode some fields bitwise:
     --    bit 0: no fvs
     --    bit 1: updateable
     --    bit 2: might be function
   | ILFThunk             -- Thunk (zero arity)
-        (Bool,Bool,Bool)
-        -- TopLevelFlag => Implied True
-        -- !Bool           -- True <=> no free vars
-        -- !Bool           -- True <=> updatable (i.e., *not* single-entry)
+        (Bool,Bool,Bool) -- fvs, updtable, maybe a function
         !IfStandardFormInfo
-        -- !Bool           -- True <=> *might* be a function type
+
 
   | ILFCon               -- A saturated constructor application
         !Name            -- The constructor Name
 
   | ILFUnlifted          -- A value of unboxed type;
                         -- always a value, needs evaluation
-
-
-
-
 
 {-
 Note [Empty case alternatives]
@@ -1458,17 +1445,8 @@ instance Outputable IfaceUnfolding where
 instance Outputable IfLFInfo where
     ppr (ILFReEntrant oneshot rep fvs_flag) =
         text "LFReEntrant" <+> ppr (oneshot, rep, fvs_flag)
-        -- text "LFReEntrant" <> brackets (ppr oneshot <+>
-        --                                 ppr rep <+> ppr fvs_flag) -- <+> ppr argdesc)
-      where
-          -- oneshot   = toEnum $ fromIntegral  (fields .&. 1)                   :: OneShotInfo
-          -- fvs_flag  = toEnum $ fromIntegral ((fields .&. 2) `unsafeShiftR` 1) :: Bool
-          -- rep       =          fromIntegral ( fields        `unsafeShiftR` 2) :: RepArity
     ppr (ILFThunk fields sfi) =
         text "LFThunk" <+> ppr fields <+> ppr (tcStandardFormInfo sfi)
-                                -- brackets (ppr fvs_flag <+> ppr upd_flag <+>
-                                    -- ppr sfi <+> ppr fun_flag)
-
     ppr (ILFCon con) = text "LFCon" <> brackets (ppr con)
     ppr (ILFUnlifted) = text "LFUnlifted"
 
@@ -2504,5 +2482,3 @@ instance Binary IfLFInfo where
             2 -> pure ILFCon <*> get bh
             3 -> pure ILFUnlifted
             _ -> panic "Invalid byte"
-
-
