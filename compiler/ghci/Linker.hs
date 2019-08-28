@@ -1178,6 +1178,13 @@ data LibrarySpec
 
    | Framework String   -- Only used for darwin, but does no harm
 
+instance Outputable LibrarySpec where
+  ppr (Objects objs) = text "Objects" <+> ppr objs
+  ppr (Archive a) = text "Archive" <+> text a
+  ppr (DLL s) = text "DLL" <+> text s
+  ppr (DLLPath f) = text "DLLPath" <+> text f
+  ppr (Framework s) = text "Framework" <+> text s
+
 -- If this package is already part of the GHCi binary, we'll already
 -- have the right DLLs for this package loaded, so don't try to
 -- load them again.
@@ -1524,10 +1531,25 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                         in apply (map implib import_libs)
                        _         -> return Nothing
 
-     assumeDll   = return (DLL lib)
+     -- TH Makes use of the interpreter so this failure is not obvious.
+     -- So we are nice and warn/inform users why we fail before we do.
+     -- But only for haskell libraries, as C libraries don't have a
+     -- profiling/non-profiling distinction to begin with.
+     assumeDll
+      | is_hs
+      , not loading_dynamic_hs_libs
+      , interpreterProfiled dflags
+      = do
+          warningMsg dflags
+            (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
+              text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
+              text "libraries with profiling support.")
+          return (DLL lib)
+      | otherwise = return (DLL lib)
      infixr `orElse`
      f `orElse` g = f >>= maybe g return
 
+     apply :: [IO (Maybe a)] -> IO (Maybe a)
      apply []     = return Nothing
      apply (x:xs) = do x' <- x
                        if isJust x'
