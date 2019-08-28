@@ -23,7 +23,7 @@ import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)
 
-import Check (genCaseTmCs2)
+import Check (addTyCsDs, genCaseTmCs2)
 import DsMonad
 import DsUtils
 import Type   ( Type )
@@ -123,7 +123,7 @@ matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
         dicts = collectEvVarsPat upat
     match_var <- selectMatchVar upat
 
-    match_result <- addDictsDs dicts $
+    match_result <- addTyCsDs dicts $
                     genCaseTmCs2 (Just bind_rhs) [upat] [match_var] $
                       -- See Note [Type and Term Equality Propagation] in Check
                     matchGuards stmts ctx rhs rhs_ty

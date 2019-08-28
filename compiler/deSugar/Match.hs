@@ -745,7 +745,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = collectEvVarsPats upats
-           ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
+           ; match_result <- addTyCsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              genCaseTmCs2 mb_scr upats vars $ -- See Note [Type and Term Equality Propagation]
                              dsGRHSs ctxt grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats

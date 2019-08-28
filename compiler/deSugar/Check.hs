@@ -18,7 +18,7 @@ module Check (
         checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
 
         -- See Note [Type and Term Equality Propagation]
-        genCaseTmCs1, genCaseTmCs2
+        addTyCsDs, genCaseTmCs1, genCaseTmCs2
     ) where
 
 #include "HsVersions.h"
@@ -51,6 +51,7 @@ import DataCon
 import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
+import Var (EvVar)
 
 import {-# SOURCE #-} DsExpr (dsExpr)
 import MatchLit (dsLit, dsOverLit)
@@ -59,7 +60,7 @@ import Bag
 import TyCoRep
 import Type
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (isJust, expectJust)
+import Maybes        (isJust, expectJust, fromMaybe)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
@@ -268,7 +269,7 @@ checkSingle' locn var p = do
   resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
   translatePat fam_insts p $ \clause -> do
-    missing   <- pmInitialTmTyCs
+    missing   <- getPmDelta
     tracePm "checkSingle': missing" (ppr missing)
     PartialResult cs us ds <- pmcheckI clause [] [var] 1 missing
     dflags <- getDynFlags
@@ -322,7 +323,7 @@ checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
       resetPmIterDs -- set the iter-no to zero
-      missing    <- pmInitialTmTyCs
+      missing    <- getPmDelta
       tracePm "checkMatches': missing" (ppr missing)
       (rs,us,ds) <- go matches [missing]
       dflags <- getDynFlags
@@ -363,7 +364,7 @@ checkMatches' vars matches
 --   in "PmOracle" for details.
 checkEmptyCase' :: Id -> PmM PmResult
 checkEmptyCase' x = do
-  delta         <- pmInitialTmTyCs
+  delta         <- getPmDelta
   us <- inhabitants delta (idType x) >>= \case
     -- Inhabitation checking failed / the type is trivially inhabited
     Left ty            -> pure (TypeOfUncovered ty)
@@ -862,7 +863,7 @@ coreExprAsPmLit e = case collectArgs e of
 bindPmExprToId :: Type -> PmExpr -> ContT r DsM Id
 bindPmExprToId ty expr = ContT $ \k -> do
   x <- mkPmId ty
-  addTmCsDs (unitBag (TVC x expr)) (k x)
+  addTmCsDs [TVC x expr] (k x)
 
 {- Note [Guards and Approximation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1487,6 +1488,31 @@ Functions `genCaseTmCs1' and `genCaseTmCs2' are responsible for generating
 these constraints.
 -}
 
+-- | Add in-scope type constraints
+addTyCsDs :: Bag EvVar -> DsM a -> DsM a
+addTyCsDs ev_vars k = do
+  delta <- getPmDelta
+  -- If adding a constraint would lead to a contradiction, don't add it.
+  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
+  -- for why this is done.
+  delta' <- fromMaybe delta <$> addTypeEvidence delta ev_vars
+  updPmDelta delta' k
+
+-- | Add in-scope term constraints
+addTmCsDs :: [TmVarCt] -> DsM a -> DsM a
+addTmCsDs tm_cs k = do
+  delta <- getPmDelta
+  -- If adding a constraint would lead to a contradiction, don't add it.
+  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
+  -- for why this is done.
+  delta' <- foldlMSkipNothing addTermEquality delta tm_cs
+  updPmDelta delta' k
+
+-- | Like 'foldlM', but continues with the old accumulator whenever the action
+-- returns 'Nothing'.
+foldlMSkipNothing :: Monad m => (a -> b -> m (Maybe a)) -> a -> [b] -> m a
+foldlMSkipNothing f = foldlM (\acc x -> fromMaybe acc <$> f acc x)
+
 -- | Add equalities to the local 'DsM' environment when checking a case
 -- expression:
 --     case x of { p1 -> e1; ... pn -> en }
@@ -1504,7 +1530,7 @@ genCaseTmCs2 (Just scr) [p] [var] k = flip runContT (const k) $ do
   pv <- ContT (translatePat fam_insts p)
   [(e, _)] <- ContT (patVecToPmExprs pv)
   scr_e <- ContT (hsExprToPmExpr (unLoc scr))
-  ContT (\k -> addTmCsDs (listToBag [TVC var e, TVC var scr_e]) (k ()))
+  ContT (\k -> addTmCsDs [TVC var e, TVC var scr_e] (k ()))
 genCaseTmCs2 _ _ _ _ = panic "genCaseTmCs2: HsCase"
 
 -- | Add a simple equality to the local 'DsM' environment when checking a case
@@ -1516,7 +1542,7 @@ genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
 genCaseTmCs1 Nothing     _    k = k
 genCaseTmCs1 (Just scr) [var] k = flip runContT (const k) $ do
   scr_e <- ContT (hsExprToPmExpr (unLoc scr))
-  ContT (\k -> addTmCsDs (unitBag (TVC var scr_e)) (k ()))
+  ContT (\k -> addTmCsDs [TVC var scr_e] (k ()))
 genCaseTmCs1 _          _     _ = panic "genCaseTmCs1: HsCase"
 
 {- Note [Literals in PmPat]

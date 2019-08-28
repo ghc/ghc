@@ -29,8 +29,8 @@ module DsMonad (
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
-        -- Getting and setting EvVars and term constraints in local environment
-        getDictsDs, addDictsDs, getTmCsDs, addTmCsDs,
+        -- Getting and setting pattern match oracle states
+        getPmDelta, updPmDelta,
 
         -- Iterations for pm checking
         incrCheckPmIterDs, resetPmIterDs, dsGetCompleteMatches,
@@ -70,7 +70,7 @@ import BasicTypes ( Origin )
 import DataCon
 import ConLike
 import TyCon
-import PmExpr
+import {-# SOURCE #-} PmOracle
 import Id
 import Module
 import Outputable
@@ -82,7 +82,6 @@ import NameEnv
 import DynFlags
 import ErrUtils
 import FastString
-import Var (EvVar)
 import UniqFM ( lookupWithDefaultUFM )
 import Literal ( mkLitString )
 import CostCentreState
@@ -285,8 +284,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
-                           , dsl_dicts   = emptyBag
-                           , dsl_tm_cs   = emptyBag
+                           , dsl_delta   = initDelta
                            , dsl_pm_iter = pmvar
                            }
     in (gbl_env, lcl_env)
@@ -386,23 +384,14 @@ the @SrcSpan@ being carried around.
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
--- | Get in-scope type constraints (pm check)
-getDictsDs :: DsM (Bag EvVar)
-getDictsDs = do { env <- getLclEnv; return (dsl_dicts env) }
+-- | Get the current pattern match oracle state. See 'dsl_delta'.
+getPmDelta :: DsM Delta
+getPmDelta = do { env <- getLclEnv; return (dsl_delta env) }
 
--- | Add in-scope type constraints (pm check)
-addDictsDs :: Bag EvVar -> DsM a -> DsM a
-addDictsDs ev_vars
-  = updLclEnv (\env -> env { dsl_dicts = unionBags ev_vars (dsl_dicts env) })
-
--- | Get in-scope term constraints (pm check)
-getTmCsDs :: DsM (Bag TmVarCt)
-getTmCsDs = do { env <- getLclEnv; return (dsl_tm_cs env) }
-
--- | Add in-scope term constraints (pm check)
-addTmCsDs :: Bag TmVarCt -> DsM a -> DsM a
-addTmCsDs tm_cs
-  = updLclEnv (\env -> env { dsl_tm_cs = unionBags tm_cs (dsl_tm_cs env) })
+-- | Set the pattern match oracle state within the scope of the given action.
+-- See 'dsl_delta'.
+updPmDelta :: Delta -> DsM a -> DsM a
+updPmDelta delta = updLclEnv (\env -> env { dsl_delta = delta })
 
 -- | Increase the counter for elapsed pattern match check iterations.
 -- If the current counter is already over the limit, fail

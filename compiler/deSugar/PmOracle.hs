@@ -14,13 +14,15 @@ module PmOracle (
 
         PmM, tracePm, mkPmId,
 
-        Delta, pmInitialTmTyCs, canDiverge, lookupRefuts, lookupSolution,
+        Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
         lookupNumberOfRefinements,
 
         inhabitants,
+        addTypeEvidence,       -- Add type equalities
         tryAddRefutableAltCon, -- Add a negative equality
         refineToAltCon,        -- Add a positive equality x ~ K _ _
         addTermEquality,       -- Add a positive equality x ~ e
+        tmOracle,              -- Add multiple positive term equalities
         provideEvidenceForEquation,
     ) where
 
@@ -327,6 +329,10 @@ A couple of side notes:
 data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
                      , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
 
+-- | An initial delta that is always satisfiable
+initDelta :: Delta
+initDelta = MkDelta emptyBag initTmState
+
 instance Outputable Delta where
   ppr delta = vcat [
       -- intentionally formatted this way enable the dev to comment in only
@@ -336,20 +342,6 @@ instance Outputable Delta where
       --ppr (delta_ty_cs delta)
     ]
 
--- | Determine suitable constraints to use at the beginning of pattern-match
--- coverage checking by consulting the sets of term and type constraints
--- currently in scope. If one of these sets of constraints is unsatisfiable,
--- use an empty set in its place. (See
--- @Note [Recovering from unsatisfiable pattern-matching constraints]@
--- for why this is done.)
-pmInitialTmTyCs :: PmM Delta
-pmInitialTmTyCs = do
-  ty_cs  <- getDictsDs
-  tm_cs  <- bagToList <$> getTmCsDs
-  sat_ty <- tyOracle ty_cs
-  let initTyCs = if sat_ty then ty_cs else emptyBag
-  let initDelta = MkDelta initTyCs initialTmState
-  fromMaybe initDelta <$> tmOracle initDelta tm_cs
 
 {- Note [Recovering from unsatisfiable pattern-matching constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -806,7 +798,7 @@ data VarInfo
   -- Sadly, we can't store this info in the Check module, as it's tightly couple
   -- to the particular 'Delta' and also is per *representative*, not per
   -- syntactic variable. Note that this number does not always correspond to the
-  -- length of solutions: 'pmInitialTmTyCs' might add a solution without
+  -- length of solutions: 'trySolve' might add a solution without
   -- incurring the potential exponential blowup by ConVar.
   }
 
@@ -885,8 +877,8 @@ instance Outputable VarInfo where
     = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
 
 -- | Initial state of the oracle.
-initialTmState :: TmState
-initialTmState = TS emptySDIE
+initTmState :: TmState
+initTmState = TS emptySDIE
 
 -- | A 'SatisfiabilityCheck' based on new term-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing
@@ -977,6 +969,11 @@ lookupNumberOfRefinements delta x
 
 -------------------------------
 -- * Adding facts to the oracle
+
+-- | Add type equalities to 'Delta'.
+addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
+addTypeEvidence delta dicts
+  = runSatisfiabilityCheck delta (tyIsSatisfiable True dicts)
 
 -- | Add a positive term equality ('TmVarCt') to 'Delta'.
 -- See Note [TmState invariants].
