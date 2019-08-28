@@ -56,7 +56,7 @@ module HsUtils(
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
-  mkHsAppTy, mkHsAppKindTy, userHsTyVarBndrs, userHsLTyVarBndrs,
+  mkHsAppTy, mkHsAppKindTy,
   mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
@@ -367,17 +367,6 @@ mkHsString s = HsString NoSourceText (mkFastString s)
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
-
--------------
-userHsLTyVarBndrs :: SrcSpan -> [Located (IdP (GhcPass p))]
-                  -> [LHsTyVarBndr (GhcPass p)]
--- Caller sets location
-userHsLTyVarBndrs loc bndrs = [ cL loc (UserTyVar noExtField v) | v <- bndrs ]
-
-userHsTyVarBndrs :: SrcSpan -> [IdP (GhcPass p)] -> [LHsTyVarBndr (GhcPass p)]
--- Caller sets location
-userHsTyVarBndrs loc bndrs = [ cL loc (UserTyVar noExtField (cL loc v))
-                             | v <- bndrs ]
 
 
 {-
