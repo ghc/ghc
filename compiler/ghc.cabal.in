@@ -80,6 +80,7 @@ Library
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
+                   ghc-prim   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
