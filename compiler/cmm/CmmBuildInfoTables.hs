@@ -187,6 +187,63 @@ and the only SRT closure we generate is
 
   g_srt = SRT_2 [c2_closure, c1_closure]
 
+Algorithm
+^^^^^^^^^
+
+0. let srtMap :: Map CAFLabel (Maybe SRTEntry) = {}
+   Maps closures to their SRT entries (i.e. how they appear in a SRT payload)
+
+1. Start with decls :: [CmmDecl]. This corresponds to an SCC of bindings in STG
+   after code-generation.
+
+2. CPS-convert each CmmDecl (cpsTop), resulting in a list [CmmDecl]. There might
+   be multiple CmmDecls in the result, due to proc-point splitting.
+
+3. In cpsTop, *before* proc-point splitting, when we still have a single
+   CmmDecl, we do cafAnal for procs:
+
+   * cafAnal performs a backwards analysis on the code blocks
+
+   * For each labelled block, the analysis produces a CAFSet (= Set CAFLabel),
+     representing all the CAFLabels reachable from this label.
+
+   * A label is added to the set if it refers to a FUN, THUNK, or RET,
+     and its CafInfo /= NoCafRefs.
+     (NB. all CafInfo for Ids in the current module should be initialised to
+     MayHaveCafRefs)
+
+   * The result is CAFEnv = LabelMap CAFSet
+
+   (Why *before* proc-point splitting? Because the analysis needs to propagate
+   information across branches, and proc-point splitting turns branches into
+   CmmCalls to top-level CmmDecls.  The analysis would fail to find all the
+   references to CAFFY labels if we did it after proc-point splitting.)
+
+   For static data, cafAnalData simply returns set of all labels that refer to a
+   FUN, THUNK, and RET whose CafInfos /= NoCafRefs.
+
+4. The result of cpsTop is (CAFEnv, [CmmDecl]) for procs and (CAFSet, CmmDecl)
+   for static data. So after `mapM cpsTop decls` we have
+   [Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl)]
+
+5. For procs concat the decls and union the CAFEnvs to get (CAFEnv, [CmmDecl])
+
+6. For static data generate a Map CLabel CAFSet (maps static data to their CAFSets)
+
+7. Dependency-analyse the decls using CAFEnv and CAFSets, giving us SCC CAFLabel
+
+8. For each SCC in dependency order
+   - Let lbls :: [CAFLabel] be the labels in this SCC
+   - Apply CAFEnv to each label and concat the result :: [CAFLabel]
+   - For each CAFLabel in the set:
+      - If the CAFLabel for a static data return it as SRTEntry to directly
+        refer to it in the final SRT
+      - Otherwise apply srtMap (and ignore Nothing) to get srt :: [SRTEntry]
+   - Make a label for this SRT, call it l
+   - Add to srtMap: lbls -> if null srt then Nothing else Just l
+
+9. At the end, for every top-level binding x, if srtMap x == Nothing, then the
+   binding is non-CAFFY, otherwise it is CAFFY.
 
 Optimisations
 ^^^^^^^^^^^^^
