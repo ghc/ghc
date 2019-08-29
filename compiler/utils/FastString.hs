@@ -598,15 +598,15 @@ mkFastStringBytes !ptr !len =
 -- between this and 'mkFastStringBytes' is that we don't have to copy
 -- the bytes if the string is new to the table.
 mkFastStringByteString :: ByteString -> FastString
-mkFastStringByteString bs = inlinePerformIO $ mkFastStringWith (toShort bs)
+mkFastStringByteString bs = unsafeDupablePerformIO $ mkFastStringWith (toShort bs)
 
 -- Need to convert to a pinned array
 mkFastStringShortByteString :: ShortByteString -> FastString
-mkFastStringShortByteString sbs = inlinePerformIO $ mkFastStringWith (toShort $ BSS.fromShort sbs)
+mkFastStringShortByteString sbs = unsafeDupablePerformIO $ mkFastStringWith (toShort $ BSS.fromShort sbs)
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
-mkFastString str = inlinePerformIO $ mkFastStringWith (toShort $ BSC.pack str)
+mkFastString str = unsafeDupablePerformIO $ mkFastStringWith (toShort $ BSC.pack str)
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString

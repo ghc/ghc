@@ -478,8 +478,6 @@ liftOp8 f oe1 =  OccEnv
                       , tvOccEnv = f (tvOccEnv oe1)
                       ,  tyOccEnv = f (tyOccEnv oe1)}
 
-data A = A
-
 emptyOccEnv      = OccEnv emptyFsEnv emptyFsEnv emptyFsEnv emptyFsEnv
 unitOccEnv x y = liftOp unitFsEnv x y
 extendOccEnv oe y z = liftOp3 (\a b -> extendFsEnv a b z) oe y
@@ -492,7 +490,8 @@ nonDetOccEnvElts oe         = nonDetFoldOccEnv (:) [] oe
 plusOccEnv oe oe1   = liftOp6 plusFsEnv oe oe1
 plusOccEnv_C f oe1 oe2       = liftOp6 (plusFsEnv_C f) oe1 oe2
 extendOccEnv_C f oe y z   = liftOp3 (\a b -> extendFsEnv_C f a b z) oe y
-extendOccEnv_Acc f g oe y z   = liftOp7 (extendFsEnv_Acc f g) oe y z
+-- extendFsEnv_acc
+extendOccEnv_Acc f g oe y z   = liftOp3 (\oe' a -> extendFsEnv_Acc f g oe' a z) oe y
 mapOccEnv f oe             = liftOp8 (mapFsEnv f) oe
 delFromOccEnv oe y      = liftOp3 delFromFsEnv oe y
 delListFromOccEnv oe y  = foldr (\k m -> delFromOccEnv m k) oe y
