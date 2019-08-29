@@ -531,7 +531,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         barf("allocAlignedGroupOnNode: allocating megablocks is not supported\n"
              "    requested blocks: %" FMT_Word "\n"
              "    required for alignment: %" FMT_Word "\n"
-             "    megablock size (in blocks): %lu",
+             "    megablock size (in blocks): %llu",
              n, num_blocks, BLOCKS_PER_MBLOCK);
     }
 
