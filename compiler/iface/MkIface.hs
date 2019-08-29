@@ -13,6 +13,10 @@ module MkIface (
         mkIface,        -- Build a ModIface from a ModGuts,
                         -- including computing version information
 
+        -- * Staged iface generation.
+        mkIfacePartial,
+        mkIfaceFinal,
+
         mkIfaceTc,
 
         writeIfaceFile, -- Write the interface file
@@ -135,6 +139,25 @@ import qualified Data.Semigroup
 ************************************************************************
 -}
 
+{- Note [Stage Iface generation]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Interface files contain a variety of things derived from core representation.
+Some of which can easily be computed before code generation even when we only
+compute the final interface file after.
+
+In order to avoid keeping large parts of these inputs alive all throughout code
+generation we explicitly stage the evaluation/creation of interface files.
+
+First we create a partial interface file, which only contains a subset of
+fields which the code generator output won't affect. This is done by `mkIfacePartial`.
+
+Then we run code generation, add the new information, hash the resulting
+interface file and write it to disk. This is done by `mkIfaceFinal`
+
+This is sadly the only way we can avoid capturing optimized core.
+-}
+
 mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
@@ -160,12 +183,49 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_decl_docs    = decl_docs,
                       mg_arg_docs     = arg_docs
                     }
-        = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod hsc_src used_th deps rdr_env fix_env
-                   warns hpc_info self_trust
-                   safe_mode usages
-                   doc_hdr decl_docs arg_docs
-                   mod_details
+        = do
+            tmp_iface <- mkIfacePartial' hsc_env
+                            this_mod hsc_src used_th deps rdr_env fix_env
+                            warns hpc_info self_trust
+                            safe_mode usages
+                            doc_hdr decl_docs arg_docs
+                            mod_details
+            mkIfaceFinal hsc_env maybe_old_fingerprint
+                    this_mod rdr_env
+                    mod_details tmp_iface
+
+-- | Creates a ModIface filling in information not dependent
+-- on code generation. This includes most things except hashes
+-- and IfaceDecls. See Note [Stage Iface generation]
+mkIfacePartial :: HscEnv
+        -> ModDetails           -- The trimmed, tidied interface
+        -> ModGuts              -- Usages, deprecations, etc
+        -> IO ModIface -- The new one
+
+mkIfacePartial hsc_env mod_details
+         ModGuts{     mg_module       = this_mod,
+                      mg_hsc_src      = hsc_src,
+                      mg_usages       = usages,
+                      mg_used_th      = used_th,
+                      mg_deps         = deps,
+                      mg_rdr_env      = rdr_env,
+                      mg_fix_env      = fix_env,
+                      mg_warns        = warns,
+                      mg_hpc_info     = hpc_info,
+                      mg_safe_haskell = safe_mode,
+                      mg_trust_pkg    = self_trust,
+                      mg_doc_hdr      = doc_hdr,
+                      mg_decl_docs    = decl_docs,
+                      mg_arg_docs     = arg_docs
+                    }
+        = do
+            mkIfacePartial' hsc_env
+                            this_mod hsc_src used_th deps rdr_env fix_env
+                            warns hpc_info self_trust
+                            safe_mode usages
+                            doc_hdr decl_docs arg_docs
+                            mod_details
+
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -210,17 +270,20 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
 
           let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
 
-          mkIface_ hsc_env maybe_old_fingerprint
+          tmp_iface <- mkIfacePartial' hsc_env
                    this_mod hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
                    mod_details
+          mkIfaceFinal hsc_env maybe_old_fingerprint
+                   this_mod rdr_env
+
+                   mod_details tmp_iface
 
 
-
-mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
+mkIfacePartial' :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> Bool
@@ -230,8 +293,8 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
-         -> IO (ModIface, Bool)
-mkIface_ hsc_env maybe_old_fingerprint
+         -> IO ModIface
+mkIfacePartial' hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          doc_hdr decl_docs arg_docs
@@ -239,7 +302,6 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
                       md_anns      = anns,
-                      md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
 -- NB:  notice that mkIface does not look at the bindings
@@ -249,21 +311,6 @@ mkIface_ hsc_env maybe_old_fingerprint
 
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
-        entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl entity
-                 | entity <- entities,
-                   let name = getName entity,
-                   not (isImplicitTyThing entity),
-                      -- No implicit Ids and class tycons in the interface file
-                   not (isWiredInName name),
-                      -- Nor wired-in things; the compiler knows about them anyhow
-                   nameIsLocalOrFrom semantic_mod name  ]
-                      -- Sigh: see Note [Root-main Id] in TcRnDriver
-                      -- NB: ABSOLUTELY need to check against semantic_mod,
-                      -- because all of the names in an hsig p[H=<H>]:H
-                      -- are going to be for <H>, not the former id!
-                      -- See Note [Identity versus semantic module]
-
         fixities    = sortBy (comparing fst)
           [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
           -- The order of fixities returned from nameEnvElts is not
@@ -327,22 +374,8 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_decl_docs   = decl_docs,
               mi_arg_docs    = arg_docs }
 
-    (new_iface, no_change_at_all)
-          <- {-# SCC "versioninfo" #-}
-                   addFingerprints hsc_env maybe_old_fingerprint
-                                   intermediate_iface decls
+    return $! intermediate_iface
 
-    -- Debug printing
-    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
-                  (pprModIface new_iface)
-
-    -- bug #1617: on reload we weren't updating the PrintUnqualified
-    -- correctly.  This stems from the fact that the interface had
-    -- not changed, so addFingerprints returns the old ModIface
-    -- with the old GlobalRdrEnv (mi_globals).
-    let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
-
-    return (final_iface, no_change_at_all)
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -367,6 +400,70 @@ mkIface_ hsc_env maybe_old_fingerprint
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
      ifFamInstTcName = ifFamInstFam
+
+
+-- | Finish iface generation based on a iface generated by
+-- mkIfacePartial. See Note [Stage Iface generation]
+mkIfaceFinal :: HscEnv -> Maybe Fingerprint -> Module -> GlobalRdrEnv
+         -> ModDetails
+         -> ModIface
+         -> IO (ModIface, Bool)
+mkIfaceFinal
+         hsc_env maybe_old_fingerprint
+         this_mod rdr_env
+         ModDetails{  md_types     = type_env }
+        intermediate_iface
+-- NB:  notice that mkIface does not look at the bindings
+--      only at the TypeEnv.  The previous Tidy phase has
+--      put exactly the info into the TypeEnv that we want
+--      to expose in the interface
+
+  = do
+    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+        entities = typeEnvElts type_env
+        decls  = [ tyThingToIfaceDecl entity
+                 | entity <- entities,
+                   let name = getName entity,
+                   not (isImplicitTyThing entity),
+                      -- No implicit Ids and class tycons in the interface file
+                   not (isWiredInName name),
+                      -- Nor wired-in things; the compiler knows about them anyhow
+                   nameIsLocalOrFrom semantic_mod name  ]
+                      -- Sigh: see Note [Root-main Id] in TcRnDriver
+                      -- NB: ABSOLUTELY need to check against semantic_mod,
+                      -- because all of the names in an hsig p[H=<H>]:H
+                      -- are going to be for <H>, not the former id!
+                      -- See Note [Identity versus semantic module]
+
+    (new_iface, no_change_at_all)
+          <- {-# SCC "versioninfo" #-}
+                   addFingerprints hsc_env maybe_old_fingerprint
+                                   intermediate_iface decls
+
+    -- Debug printing
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                  (pprModIface new_iface)
+
+    -- bug #1617: on reload we weren't updating the PrintUnqualified
+    -- correctly.  This stems from the fact that the interface had
+    -- not changed, so addFingerprints returns the old ModIface
+    -- with the old GlobalRdrEnv (mi_globals).
+    let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
+
+    return (final_iface, no_change_at_all)
+  where
+     dflags = hsc_dflags hsc_env
+
+     -- We only fill in mi_globals if the module was compiled to byte
+     -- code.  Otherwise, the compiler may not have retained all the
+     -- top-level bindings and they won't be in the TypeEnv (see
+     -- Desugar.addExportFlagsAndRules).  The mi_globals field is used
+     -- by GHCi to decide whether the module has its full top-level
+     -- scope available. (#5534)
+     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
+     maybeGlobalRdrEnv rdr_env
+         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
+         | otherwise                                   = Nothing
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()

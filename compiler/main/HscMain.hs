@@ -828,14 +828,24 @@ finish summary tc_result mb_old_hash = do
         -- We are not generating code, so we can skip simplification
         -- and generate a simple interface.
         then mk_simple_iface
+
         else do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-          desugared_guts <- hscSimplify' plugins desugared_guts0
+          simplified_guts <- hscSimplify' plugins desugared_guts0
 
-          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-              liftIO $ tidyProgram hsc_env desugared_guts
+          (!cg_guts, !details) <- {-# SCC "CoreTidy" #-}
+              liftIO $ tidyProgram hsc_env simplified_guts
 
-          let iface_gen :: IO (ModIface, Bool)
+          -- See Note [Stage Iface generation] in MkIface
+          !partialIface <-  {-# SCC "MkIfacePartial" #-}
+                  liftIO $ mkIfacePartial hsc_env details simplified_guts
+
+          -- Extract parts needed for finalizing iface here
+          -- to avoid keeping simplified_guts alive.
+          let !this_mod = mg_module simplified_guts
+              !rdr_env = mg_rdr_env simplified_guts
+
+              iface_gen :: IO (ModIface, Bool)
               iface_gen = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
                   -- core if necessary.
@@ -845,8 +855,9 @@ finish summary tc_result mb_old_hash = do
                   -- This captures hsc_env, we might get away with keeping
                   -- less of the environment alive here but don't do so
                   -- currently.
-                  res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts
+                  res <-  {-# SCC "MkIfaceFinal" #-}
+                          mkIfaceFinal hsc_env mb_old_hash this_mod rdr_env
+                                       details partialIface
                   dumpIfaceStats hsc_env
                   return res
 
