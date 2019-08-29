@@ -1384,7 +1384,8 @@ pmcheck (PmVar x : ps) guards (y : vva) n delta = do
   pmcheckI ps guards vva n delta'
 
 -- ConVar
-pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : ps)
+pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
+                , pm_con_arg_tys = arg_tys, pm_con_tvs = ex_tvs } : ps)
         guards (x : vva) n delta = do
   -- E.g   f (K p q) = <rhs>
   --       <next equation>
@@ -1393,7 +1394,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args, pm_con_tvs = ex_tvs } : 
   --    * one for <next equation>, recording that x is /not/ (K _ _)
 
   -- Stuff for <rhs>
-  pr_pos <- refineToAltCon delta x con ex_tvs >>= \case
+  pr_pos <- refineToAltCon delta x con arg_tys ex_tvs >>= \case
     Nothing -> pure mempty
     Just (delta', arg_vas) ->
       pmcheckI (args ++ ps) guards (arg_vas ++ vva) n delta'

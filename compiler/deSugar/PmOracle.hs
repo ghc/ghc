@@ -51,6 +51,7 @@ import ListSetOps (unionLists)
 import Maybes
 import ConLike
 import DataCon
+import PatSyn
 import TyCon
 import TysWiredIn
 import TysPrim (tYPETyCon)
@@ -140,7 +141,7 @@ ensureInhabited :: Monad m
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
-ensureInhabited _        NoPM = pure (Just NoPM)
+ensureInhabited _        NoPM       = pure (Just NoPM)
 ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
   where
     one_set cs = find_one_inh cs (uniqDSetToList cs)
@@ -192,72 +193,52 @@ nameType name ty = do
       idname  = mkInternalName unique occname noSrcSpan
   return (newEvVar idname ty)
 
--- | Pretend to match on a 'ConLike' in a given 'Type' context. Instantiates
+-- | Instantiate a 'ConLike' given its universal type arguments. Instantiates
 -- existential and term binders with fresh variables of appropriate type.
 -- Also returns instantiated evidence variables from the match and the types of
 -- strict constructor fields.
-mkOneConFull :: Type -> ConLike -> PmM ([Id], [EvVar], [Type], [TyVar])
---  *  res_ty = T tys, where T is an algebraic data type or
---                           T tys is a (saturated) data family application
+mkOneConFull :: [Type] -> ConLike -> PmM ([Id], [EvVar], [Type], [TyVar])
+--  * 'con' K is a ConLike
+--       - In the case of DataCons and most PatSynCons, these
+--         are associated with a particular TyCon T
+--       - But there are PatSynCons for this is not the case! See #11336, #17112
 --
---  * 'con' K is a conlike of data type U tyvars
---     NB: In case T is a data family, mkOneConFull will lookup T's
---         representation type at tys, to get TRep rep_tys.
---         U must be equal to TRep!
+--  * 'arg_tys' tys are the types K's universally quantified type
+--     variables should be instantiated to.
+--       - For DataCons and most PatSyns these are the arguments of their TyCon
+--       - For cases like in #11336, #17112, the univ_ts include the type
+--         constructor, so tys will have to come from the type checker.
+--         They can't easily be recovered from the result type.
 --
---         After instantiating the universal tyvars of K we get
---             K rep_tys :: forall e1 .. en. Q => s1 .. sn -> TRep rep_tys
+-- After instantiating the universal tyvars of K to tys we get
+--          K @tys :: forall bs. Q => s1 .. sn -> T tys
+-- Note that if K is a PatSynCon, depending on arg_tys, T might not necessarily
+-- be a concrete TyCon.
 --
 -- Suppose y1 is a strict field. Then we get
 -- Results: [y1,..,yn]
 --          Q
 --          [s1]
 --          [e1,..,en]
-mkOneConFull res_ty con = do
-  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
+mkOneConFull arg_tys con = do
+  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, con_res_ty)
         = conLikeFullSig con
   -- Substitute universals for type arguments
   env <- dsGetFamInstEnvs
-  let subst_univ = case con of
-        RealDataCon {} -> case splitTyConApp_maybe res_ty of
-          Just (tc, tc_args)
-            -- tc might be a data family, but univ_tvs above is relative to the
-            -- representation data type. We need to "translate" tc_args
-            -- accordingly.
-            | (_rep_tc, tc_args', _) <- tcLookupDataFamInst env tc tc_args
-            -> zipTvSubst univ_tvs tc_args'
-          Nothing
-            -- This hits for e.g. T11336b, where we have an app like @s a@.
-            -- I hope this does the right thing. Since s can't be data family
-            -- partial application, it probably does. At least splitAppTys
-            -- probably won't crash after type checking and if this was
-            -- ill-formed, the type oracle would reject anyway.
-            | (_var, tc_args) <- splitAppTys res_ty
-            -- HACK: See Note [Ignoring required thetas seems suspicious]
-            , (univ_tvs', tc_args') <- unzip (zip (reverse univ_tvs) (reverse tc_args))
-            -> zipTvSubst univ_tvs' tc_args'
-        -- Note that PatSyn's are always associated to the data family
-        -- TyCon, not the representation TyCon! Hence match with
-        -- un-normalised res_ty.
-        -- See Note [Pattern synonym result type] in PatSyn
-        PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
-                            -- T11336b has a universal tyvar 's' not mentioned
-                            -- in the PatSyn's con_res_ty, so we need to make
-                            -- sure all univ_tvs are in scope.
-                            `extendTCvInScopeList` univ_tvs
+  let subst_univ = zipTvSubst univ_tvs arg_tys
   -- Instantiate fresh existentials as arguments to the contructor
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
-  let arg_tys' = substTys subst arg_tys
+  let field_tys' = substTys subst field_tys
   -- Instantiate fresh term variables (VAs) as arguments to the constructor
   -- See Note [Ignoring required thetas seems suspicious]
-  vars <- mapM mkPmId arg_tys'
+  vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle
   let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   theta_ev_vars <- mapM (nameType "pm") theta_cs
   -- Figure out the types of strict constructor fields
   let arg_is_banged = map isBanged $ conLikeImplBangs con
-      strict_arg_tys = filterByList arg_is_banged arg_tys'
+      strict_arg_tys = filterByList arg_is_banged field_tys'
   return (vars, theta_ev_vars, strict_arg_tys, ex_tvs')
 
 equateTyVars :: [TyVar] -> [TyVar] -> PmM [EvVar]
@@ -270,54 +251,6 @@ equateTyVars ex_tvs1 ex_tvs2
       | otherwise  = Just <$> to_evvar tv1 tv2
     to_evvar tv1 tv2 = nameType "pmConCon" $
                        mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
-
-{- Note [Ignoring required thetas seems suspicious]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently we ignore the required thetas of a pattern synonym in mkOneConFull.
-I find that dubious, and it leads to a brittle hack for T11336b, where we
-generate questionable field types. Consider a uni-directional pattern synonym
-
-    instance C Proxy
-    pattern PProxy :: C s => s a -> Proxy a
-    pattern PProxy s <- ...
-    f :: Proxy a -> ()
-    f (PProxy Proxy) = ()
-
-When we call @mkOneConFull "Proxy a" PProxy@, we ultimately instantiate
-'PProxy's field to a fresh @x :: s a@, where we don't know anything about @s@.
-This seems wrong; we might want to record a Wanted constraint for @C s@,
-'PProxy's required theta, in @x :: forall s. C s => s a@.
-
-In the inner match on 'Proxy' we call @mkOneConFull "s a" Proxy@, which will
-ultimately match the type @s a@ against @Proxy {k} t@ by calling
-@zipTcSubst [k, t] [a]@, which is utterly wrong. Not only is there a mismatch
-in the length of the lists, but also in kinding if we ignored it (k ~ a).
-With knowledge of the required theta and the 'C' instance for @Proxy {*}@ we
-could instantiate (I believe) @s ~ Proxy {*}@ and see that
-@(t :: k) ~ (a :: *)@.
-
-Lacking proper handling of the required theta, we have to live with the ugly
-hack that will just drop the first element of 'Proxy's @univ_tvs@ to unify @t@
-with @a@, hopefully deducing @k ~ *@ on the way. Though not very principled on
-first thought, it actually makes a lot of sense, since most (tm) class instances
-will be on partial applications of a particular type constructor.
-
-A couple of side notes:
-
-* The "correct" typing @x :: forall s. C s => s a@ is also weird in that the
-  *type* oracle now decides over the 'PossibleMatches' of @x@, at least in the
-  sense that it's the union of the 'PossibleMatches' all possible instantiations
-  of @s@ (those with a @C s@ instance) the type oracle suggests.
-
-* Note how this also applies to equality constraints like (a ~ Int) in
-
-    pattern Just42 :: (a ~ Int) => Maybe a
-    pattern Just42 = Just 42
-
-  So if mkOneConFull was to handle required thetas correctly, we could drop the
-  'isValidCompleteMatch' check in 'Check.allCompleteMatches', for example,
-  because mkOneConFull would generate an unsatisfiable Wanted constraint anyway.
--}
 
 -------------------------
 -- * Pattern match oracle
@@ -1001,6 +934,27 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $
     _               -> pure pm
   pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm' n)) }
 
+-- | Guess the universal argument types of a ConLike from an instantiation of
+-- its result type. Rather easy for DataCons, but not so much for PatSynCons.
+-- See Note [Pattern synonym result type] in PatSyn.hs.
+guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> Type -> ConLike -> Maybe [Type]
+guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = do
+  (tc, tc_args) <- splitTyConApp_maybe res_ty
+  -- Consider data families: In case of a DataCon, we need to translate to
+  -- the representation TyCon. For PatSyns, they are relative to the data
+  -- family TyCon, so we don't need to translate them.
+  let (_, tc_args', _) = tcLookupDataFamInst env tc tc_args
+  Just tc_args'
+guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
+  -- We were successful if we managed to instantiate *every* univ_tv of con.
+  -- This is difficult and bound to fail in some cases, see
+  -- Note [Pattern synonym result type] in PatSyn.hs. So we just try our best
+  -- here and be sure to return an instantiation when we can substitute every
+  -- universally quantified type variable.
+  let (univ_tvs,_,_,_,_,con_res_ty) = patSynSig ps
+  subst <- tcMatchTy con_res_ty res_ty
+  traverse (lookupTyVar subst) univ_tvs
+
 testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 -- @testInhabited delta ty K@ Returns False if
 -- a non-bottom value @v::ty@ cannot possibly be of form @K _ _ _@
@@ -1008,18 +962,20 @@ testInhabited :: Delta -> Type -> ConLike -> DsM Bool
 --
 -- It's like 'DataCon.dataConCannotMatch', but more clever because it
 -- takes the facts in Delta into account
---
--- NB: Assumes that res_ty is the *representation* type in case of data family
 testInhabited delta res_ty con = do
-  (_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull res_ty con
-  -- No need to run the term oracle compared to pmIsSatisfiable
-  fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
-    -- Important to pass False to tyIsSatisfiable here, so that we won't
-    -- recursively call ensureAllPossibleMatchesInhabited, leading to an endless
-    -- recursion.
-    [ tyIsSatisfiable False (listToBag ev_vars)
-    , tysAreNonVoid initRecTc strict_arg_tys
-    ]
+  env <- dsGetFamInstEnvs
+  case guessConLikeUnivTyArgsFromResTy env res_ty con of
+    Nothing -> pure True -- be conservative about this
+    Just arg_tys -> do
+      (_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
+      -- No need to run the term oracle compared to pmIsSatisfiable
+      fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
+        -- Important to pass False to tyIsSatisfiable here, so that we won't
+        -- recursively call ensureAllPossibleMatchesInhabited, leading to an
+        -- endless recursion.
+        [ tyIsSatisfiable False (listToBag ev_vars)
+        , tysAreNonVoid initRecTc strict_arg_tys
+        ]
 
 -- | Checks if every 'VarInfo' in the term oracle has still an inhabited
 -- 'vi_cache', considering the current type information in 'Delta'.
@@ -1034,18 +990,18 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
       pm' <- MaybeT (ensureInhabited (testInhabited delta ty) pm)
       pure vi{ vi_cache = pm' }
 
--- | @refineToAltCon delta x con ex_tyvars@ instantiates @con@ at @x@'s type
--- with fresh variables (equating existentials to @ex_tyvars@).
+-- | @refineToAltCon delta x con arg_tys ex_tyvars@ instantiates @con@ at
+-- @arg_tys@ with fresh variables (equating existentials to @ex_tyvars@).
 -- It adds a new term equality equating @x@ is to the resulting 'PmExprCon' and
 -- new type equalities arising from GADT matches.
 -- If successful, returns the new @delta@ and the fresh term variables, or
 -- @Nothing@ otherwise.
-refineToAltCon :: Delta -> Id -> PmAltCon -> [TyVar] -> PmM (Maybe (Delta, [Id]))
-refineToAltCon delta x l@PmAltLit{}       _ex_tvs1 =
+refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> PmM (Maybe (Delta, [Id]))
+refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 =
   addTermEquality delta (TVC x (PmExprCon l [])) >>= \case
     Nothing     -> pure Nothing
     Just delta' -> pure (Just (markRefined delta' x, []))
-refineToAltCon delta x alt@(PmAltConLike con) ex_tvs1  = do
+refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   -- The plan for ConLikes:
   -- Suppose K :: forall a b y z. (y,b) -> z -> T a b
   --   where the y,z are the existentials
@@ -1056,11 +1012,7 @@ refineToAltCon delta x alt@(PmAltConLike con) ex_tvs1  = do
   --   [ex1, ex2].
   -- Return Nothing if such a match is contradictory with delta.
 
-  -- mkOneConFull doesn't cope with type families, so we have to normalise
-  -- x's result type first
-  res <- pmTopNormaliseType (delta_ty_cs delta) (idType x)
-  let norm_ty = normalisedSourceType res
-  (arg_vars, theta_ev_vars, strict_arg_tys, ex_tvs2) <- mkOneConFull norm_ty con
+  (arg_vars, theta_ev_vars, strict_arg_tys, ex_tvs2) <- mkOneConFull arg_tys con
 
   -- If we have identical constructors but different existential
   -- tyvars, then generate extra equality constraints to ensure the
@@ -1112,11 +1064,11 @@ Where:
   u_1, ..., u_p are the universally quantified type variables.
 
 In the ConVar case, the coverage algorithm will have in hand the constructor
-K as well as a pattern variable (pv :: T PV_1 ... PV_p), where PV_1, ..., PV_p
-are some types that instantiate u_1, ... u_p. The idea is that we should
-substitute PV_1 for u_1, ..., and PV_p for u_p when forming a PmCon (the
-mkOneConFull function accomplishes this) and then hand this PmCon off to the
-ConCon case.
+K as well as a list of type arguments [t_1, ..., t_n] to substitute T's
+universally quantified type variables u_1, ..., u_n for. It's crucial to take
+these in as arguments, as it is non-trivial to derive them just from the result
+type of a pattern synonym and the ambient type of the match (#11336, #17112).
+The type checker already did the hard work, so we should just make use of it.
 
 The presence of existentially quantified type variables adds a significant
 wrinkle. We always grab e_1, ..., e_m from the definition of K to begin with,
@@ -1326,8 +1278,10 @@ instance Outputable InhabitationCandidate where
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
 mkInhabitationCandidate :: Id -> ConLike -> PmM InhabitationCandidate
+-- Precondition: idType x is a TyConApp, so that tyConAppArgs in here is safe.
 mkInhabitationCandidate x con = do
-  (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull (idType x) con
+  let tc_args = tyConAppArgs (idType x)
+  (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args con
   pure InhabitationCandidate
         { ic_tm_cs = unitBag (TVC x (PmExprCon (PmAltConLike con) arg_vars))
         , ic_ty_cs = listToBag ev_vars
@@ -1367,7 +1321,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     alts_to_check :: Type -> Type -> [(Type, DataCon)]
                   -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
-      Just (tc, _)
+      Just (tc, tc_args)
         |  tc `elem` trivially_inhabited
         -> case dcs of
              []    -> return (Left src_ty)
@@ -1726,28 +1680,31 @@ provideEvidenceForEquation = go init_ts
       -- This will be really similar to the ConVar case
       let (_,ex_tvs,_,_,_,_,_) = conLikeFullSig cl
           -- we might need to freshen ex_tvs. Not sure
+      env <- dsGetFamInstEnvs
+      case guessConLikeUnivTyArgsFromResTy env (idType x) cl of
+        Nothing      -> pure [delta] -- We can't split this one, so assume it's inhabited
+        Just arg_tys -> do
+          ev_pos <- refineToAltCon delta x (PmAltConLike cl) arg_tys ex_tvs >>= \case
+            Nothing                -> pure []
+            Just (delta', arg_vas) ->
+              go rec_ts (arg_vas ++ xs) n delta'
 
-      ev_pos <- refineToAltCon delta x (PmAltConLike cl) ex_tvs >>= \case
-        Nothing                -> pure []
-        Just (delta', arg_vas) ->
-          go rec_ts (arg_vas ++ xs) n delta'
+          -- Only n' more equations to go...
+          let n' = n - length ev_pos
+          ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
+            Nothing                          -> pure []
+            Just delta'                      -> go rec_ts (x:xs) n' delta'
 
-      -- Only n' more equations to go...
-      let n' = n - length ev_pos
-      ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
-        Nothing                          -> pure []
-        Just delta'                      -> go rec_ts (x:xs) n' delta'
-
-      -- Actually there was no need to split if we see that both branches were
-      -- inhabited and we had no negative information on the variable!
-      -- So only refine delta if we find that one branch was indeed
-      -- uninhabited.
-      let neg = lookupRefuts delta x
-      case (ev_pos, ev_neg) of
-        ([], _)       -> pure ev_neg
-        (_, [])       -> pure ev_pos
-        _ | null neg  -> pure [delta]
-          | otherwise -> pure (ev_pos ++ ev_neg)
+          -- Actually there was no need to split if we see that both branches
+          -- were inhabited and we had no negative information on the variable!
+          -- So only refine delta if we find that one branch was indeed
+          -- uninhabited.
+          let neg = lookupRefuts delta x
+          case (ev_pos, ev_neg) of
+            ([], _)       -> pure ev_neg
+            (_, [])       -> pure ev_pos
+            _ | null neg  -> pure [delta]
+              | otherwise -> pure (ev_pos ++ ev_neg)
 
 -- | Checks if every data con of the type 'isVanillaDataCon'.
 isVanillaDataType :: Type -> Bool
