@@ -1106,8 +1106,8 @@ build_sig_from_cusk hsq_bndrs@HsQTvs{ hsq_ext = implicit_vars
     -- Delete dependent free variable. 'Nothing' if it's not a dependent variable.
     delete_dep_fv :: Name -> FreeVars -> Maybe FreeVars
     delete_dep_fv name fvs
-      | elemNameSet name fvs = Nothing
-      | otherwise = Just (delFV name fvs)
+      | elemNameSet name fvs = Just (delFV name fvs)
+      | otherwise = Nothing
 
     mkHsFunTy :: LHsKind GhcRn -> LHsKind GhcRn -> LHsKind GhcRn
     mkHsFunTy a b = cL (combineLocs a b) (HsFunTy noExtField a b)
