@@ -107,7 +107,6 @@ import DynFlags
 import UniqMap
 import FastString
 import FastStringEnv
-import FsSet
 import Outputable
 import Lexeme
 import Binary
@@ -411,15 +410,6 @@ delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
 filterOccEnv       :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
 alterOccEnv        :: (Maybe elt -> Maybe elt) -> OccEnv elt -> OccName -> OccEnv elt
 
-liftOp2 :: (FastString -> FastStringEnv a -> FastStringEnv a) -> (OccName -> OccEnv a -> OccEnv a)
-liftOp2 f o oe = case occNameSpace o of
-                  VarName   -> oe { varOccEnv = f fs (varOccEnv oe) }
-                  DataName  -> oe { dataOccEnv = f fs (dataOccEnv oe) }
-                  TvName    -> oe { tvOccEnv = f fs (tvOccEnv oe) }
-                  TcClsName -> oe {  tyOccEnv = f fs (tyOccEnv oe) }
-  where
-    fs = occNameFS o
-
 liftOp :: (FastString -> a -> FastStringEnv a) -> (OccName -> a -> OccEnv a)
 liftOp f o v = case occNameSpace o of
                   VarName   -> emptyOccEnv { varOccEnv = f fs v }
@@ -464,11 +454,7 @@ liftOp6 f oe1 oe2 = OccEnv
                       { varOccEnv = f (varOccEnv oe1) (varOccEnv oe2)
                       , dataOccEnv = f (dataOccEnv oe1) (dataOccEnv oe2)
                       , tvOccEnv = f (tvOccEnv oe1) (tvOccEnv oe2)
-                      ,  tyOccEnv = f (tyOccEnv oe1) (tyOccEnv oe2) }
-
-liftOp7 :: (FastStringEnv b -> FastString -> a -> FastStringEnv b)
-        -> (OccEnv b -> OccName -> a -> OccEnv b)
-liftOp7 f oe on v = undefined
+                      , tyOccEnv = f (tyOccEnv oe1) (tyOccEnv oe2) }
 
 liftOp8 :: (FastStringEnv b -> FastStringEnv c)
         -> (OccEnv b -> OccEnv c)
@@ -476,7 +462,7 @@ liftOp8 f oe1 =  OccEnv
                       { varOccEnv = f (varOccEnv oe1)
                       , dataOccEnv = f (dataOccEnv oe1)
                       , tvOccEnv = f (tvOccEnv oe1)
-                      ,  tyOccEnv = f (tyOccEnv oe1)}
+                      , tyOccEnv = f (tyOccEnv oe1)}
 
 emptyOccEnv      = OccEnv emptyFsEnv emptyFsEnv emptyFsEnv emptyFsEnv
 unitOccEnv x y = liftOp unitFsEnv x y
@@ -503,7 +489,11 @@ instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x
 
 pprOccEnv :: (a -> SDoc) -> OccEnv a -> SDoc
-pprOccEnv ppr_elt (OccEnv env _ _ _) = pprUniqMap ppr_elt env
+pprOccEnv ppr_elt (OccEnv env1 env2 env3 env4) =
+      vcat (map (uncurry row)
+        [ ("Var", env1), ("Data", env2), ("TyVar", env3), ("Type", env4) ])
+  where
+    row mapName m = text mapName $$ (nest 2 $ pprUniqMap ppr_elt m)
 
 type OccSet = OccEnv OccName
 

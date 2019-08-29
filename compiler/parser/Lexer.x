@@ -78,6 +78,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
+import Debug.Trace
 
 import EnumSet (EnumSet)
 import qualified EnumSet
@@ -1616,7 +1617,7 @@ lex_string_tok span buf _len = do
   let
     tok' = case tok of
             ITprimstring _ bs -> ITprimstring (SourceText src) bs
-            ITstring _ s -> ITstring (SourceText src) s
+            ITstring _ s -> (ITstring (SourceText src) s)
             _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
   return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')

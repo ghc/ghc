@@ -112,7 +112,6 @@ import PlainPanic
 import Util
 import GHC.Prim
 import GHC.ST
-import Debug.Trace
 
 import Control.Concurrent.MVar
 import Control.DeepSeq
@@ -124,7 +123,6 @@ import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import qualified Data.ByteString.Short    as BSS
-import qualified Data.ByteString.Short.Internal    as BSS
 import Foreign.C
 import GHC.Exts
 import System.IO
@@ -147,7 +145,6 @@ import GHC.Base         ( unpackCString#, unpackNBytes# )
 import GHC.ForeignPtr
 import GHC.Weak
 import System.Mem
-import Control.Concurrent
 import MonadUtils
 
 
@@ -205,7 +202,7 @@ Z-encoding used by the compiler internally.
 'FastString's support a memoized conversion to the Z-encoding via zEncodeFS.
 -}
 
-data FastString = FastString {
+newtype FastString = FastString {
       -- A pinned ByteArray#
       fs_bs   :: ShortByteString
   }
@@ -213,10 +210,11 @@ data FastString = FastString {
 -- It is sufficient to test pointer equality as we guarantee that
 -- each string is uniquely allocated.
 instance Eq FastString where
-  ff1@(FastString s1@(SBS ba)) == ff2@(FastString s2@(SBS ba'))  =
+  (FastString (SBS ba)) == (FastString (SBS ba'))  =
     case reallyUnsafePtrEquality# (unsafeCoerce# ba) (unsafeCoerce# ba') of
       0# -> False
       1# -> True
+      _  -> panic "FastString Eq"
   {-# NOINLINE (==) #-}
 
 
@@ -256,9 +254,6 @@ cmpFS :: FastString -> FastString -> Ordering
 cmpFS f1@(FastString u1) f2@(FastString u2) =
   if f1 == f2 then EQ else
   compare u1 u2
-
-foreign import ccall unsafe "memcmp"
-  memcmp :: Ptr a -> Ptr b -> Int -> IO Int
 
 -- -----------------------------------------------------------------------------
 -- Construction
@@ -341,7 +336,7 @@ gcTable = do
 
 gcSegment :: IORef FastStringTableSegment -> IO ()
 gcSegment segmentRef = do
-  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
+  (FastStringTableSegment _lock _counter old#) <- readIORef segmentRef
   let size# = sizeofMutableArray# old#
   forM_ [0 .. (I# size#) - 1] $ \(I# i#) -> do
     fsList <- IO $ readArray# old# i#
@@ -351,7 +346,7 @@ gcSegment segmentRef = do
 
 collectSegment :: IORef FastStringTableSegment -> IO ()
 collectSegment segmentRef = do
-  segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
+  (FastStringTableSegment _lock _counter old#) <- readIORef segmentRef
   let size# = sizeofMutableArray# old#
   forM_ [0 .. (I# size#) - 1] $ \(I# i#) -> do
     fsList <- IO $ readArray# old# i#
@@ -519,7 +514,6 @@ mkFastStringWith sbs = do
         Nothing -> do
 --          print $ "NOT FOUND:" <> (show fs)
 --          let !(BS.PS (ForeignPtr fptr _) _ _) = fs_bs fs
-          let !bs = fs_bs fs
           v <- mkWeakFS fs
           IO $ \s1# ->
             case writeArray# buckets# idx# (Right v: bucket) s1# of
@@ -580,7 +574,7 @@ copyAddrToByteArray (Ptr src#) (MBA dst#) (I# dst_off#) (I# len#) =
 createFromPtr :: Ptr a   -- ^ source data
               -> Int     -- ^ number of bytes to copy
               -> IO ShortByteString
-createFromPtr !ptr len =
+createFromPtr !ptr len = do
     stToIO $ do
       m@(MBA mba) <- newPinnedByteArray len
       copyAddrToByteArray ptr m 0 len
@@ -615,33 +609,6 @@ mkFastStringByteList str = mkFastStringByteString (BS.pack str)
 -- | Creates a Z-encoded 'FastString' from a 'String'
 mkZFastString :: String -> FastZString
 mkZFastString = mkFastZStringString
-
---mkNewFastString :: ForeignPtr Word8 -> Int
---                -> IO FastString
---mkNewFastString fp len = do
---  return (FastString (BS.fromForeignPtr fp 0 len))
-
-mkNewFastStringByteString :: ByteString
-                          -> IO FastString
-mkNewFastStringByteString bs = do
-  return (FastString (toShort bs))
-
-copyNewFastString :: Ptr Word8 -> Int -> IO FastString
-copyNewFastString ptr len = do
-  bss <- createFromPtr ptr len
-  return (FastString bss)
-
-copyBytesToForeignPtr :: Ptr Word8 -> Int -> IO (ForeignPtr Word8)
-copyBytesToForeignPtr ptr len = do
-  fp <- mallocForeignPtrBytes len
-  withForeignPtr fp $ \ptr' -> copyBytes ptr' ptr len
-  return fp
-
-cmpStringPrefix :: Ptr Word8 -> Ptr Word8 -> Int -> IO Bool
-cmpStringPrefix ptr1 ptr2 len =
- do r <- memcmp ptr1 ptr2 len
-    return (r == 0)
-
 
 hashStr  :: ShortByteString -> Int -> Int
  -- use the Addr to produce a hash value between 0 & m (inclusive)
@@ -691,7 +658,7 @@ consFS c fs = mkFastString (c : unpackFS fs)
 -- the start position + (length * words) space, so adding the offset will
 -- still be a memory position within the bytestring
 uniqueOfFS :: FastString -> Int
-uniqueOfFS (FastString s@(SBS ba#)) =
+uniqueOfFS (FastString (SBS ba#)) =
   (I# (addr2Int# (byteArrayContents# ba#)))
 
 nilFS :: FastString
