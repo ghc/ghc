@@ -68,7 +68,6 @@ import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import DataCon
 import DynFlags
-import FastString
 import ForeignCall ( ForeignCall )
 import Id
 import IdInfo      ( mayHaveCafRefs )
@@ -859,15 +858,6 @@ instance Outputable AltType where
 
 pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 
--- special case
-pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp func []))
-  = sdocWithDynFlags $ \dflags ->
-    hsep [ ppr cc,
-           if not $ gopt Opt_SuppressStgExts dflags
-             then ppr ext else empty,
-           text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
-
--- general case
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
