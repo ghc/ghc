@@ -67,11 +67,6 @@ cmmPipeline hsc_env srtInfo0 prog = withTiming (return dflags) (text "Cmm pipeli
 
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-{-
-     pprTrace "doSRTs" (text "names:" <+> ppr all_names $$
-                        text "new cafs:" <+> ppr new_cafs $$
-                        text "caf infos:" <+> ppr caf_infos') $
--}
      return (srtInfo1, cmms)
 
   where forceRes (info, group) =
@@ -83,8 +78,6 @@ cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (Either (CAFEnv, [CmmD
 cpsTop _ caf_infos p@(CmmData _ statics) = return (Right (cafAnalData caf_infos statics, p))
 cpsTop hsc_env caf_infos proc =
     do
-       -- pprTrace "cpsTop" (text "top_info:" <+> ppr top_info) (return ())
-
        ----------- Control-flow optimisations ----------------------------------
 
        -- The first round of control-flow optimisation speeds up the
@@ -115,7 +108,6 @@ cpsTop hsc_env caf_infos proc =
        let
          call_pps :: ProcPointSet -- LabelMap
          call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
-       -- pprTrace "call_pps" (ppr g $$ ppr call_pps) (return ())
        proc_points <-
           if splitting_proc_points
              then do

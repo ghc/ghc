@@ -381,6 +381,7 @@ writeIfaceFile dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
 
+
 -- -----------------------------------------------------------------------------
 -- Look up parents and versions of Names
 

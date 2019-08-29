@@ -235,6 +235,8 @@ data HscStatus
         , hscs_iface_gen  :: Maybe (NameEnv (Name, Bool)) -> IO (ModIface, Bool)
                             -- ^ Function to generate iface after codegen.
         }
+-- Should HscStatus contain the HomeModInfo?
+-- All places where we return a status we also return a HomeModInfo.
 
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
