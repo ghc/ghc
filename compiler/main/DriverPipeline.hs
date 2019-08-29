@@ -174,9 +174,9 @@ compileOne' m_tc_result mHscMessage
         (HscUpToDate, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust maybe_old_linkable || isNoLink (ghcLink dflags) )
-            return (expectHm hmi0) { hm_linkable = maybe_old_linkable }
+            return $! (expectHm hmi0) { hm_linkable = maybe_old_linkable }
         (HscNotGeneratingCode, HscNothing) ->
-            let mb_linkable = if isHsBootOrSig src_flavour
+            let !mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
@@ -184,13 +184,13 @@ compileOne' m_tc_result mHscMessage
         (HscNotGeneratingCode, _) -> panic "compileOne HscNotGeneratingCode"
         (_, HscNothing) -> panic "compileOne HscNothing"
         (HscUpdateBoot, HscInterpreted) -> do
-            return (expectHm hmi0)
+            return $! (expectHm hmi0)
         (HscUpdateBoot, _) -> do
             touchObjectFile dflags object_filename
-            return (expectHm hmi0)
+            return $! (expectHm hmi0)
         (HscUpdateSig, HscInterpreted) ->
-            let linkable = LM (ms_hs_date summary) this_mod []
-            in return (expectHm hmi0) { hm_linkable = Just linkable }
+            let !linkable = LM (ms_hs_date summary) this_mod []
+            in return $! (expectHm hmi0) { hm_linkable = Just linkable }
         (HscUpdateSig, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule) basename dflags
@@ -209,12 +209,12 @@ compileOne' m_tc_result mHscMessage
                               (Just location)
                               []
             o_time <- getModificationUTCTime object_filename
-            let linkable = LM o_time this_mod [DotO object_filename]
+            let !linkable = LM o_time this_mod [DotO object_filename]
             return (expectHm hmi0) { hm_linkable = Just linkable }
         (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run
             -- so we generate a interface without codeGen info.
-            (iface, no_change) <- iface_gen
+            (!iface, !no_change) <- iface_gen
             -- If we interpret the code, then we can write the interface file here.
             liftIO $ hscMaybeWriteIface dflags iface no_change
                                 (ms_location summary)
@@ -238,7 +238,7 @@ compileOne' m_tc_result mHscMessage
               -- be out of date.
             let linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
+            return $! (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
         (HscRecomp cgguts summary iface_gen, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
@@ -246,9 +246,9 @@ compileOne' m_tc_result mHscMessage
             -- We're in --make mode: finish the compilation pipeline.
             if_ref <- newIORef Nothing :: IO (IORef (Maybe ModIface))
             let iface_gen' = do
-                    res@(iface, _no_change) <- iface_gen
+                    res@(!iface, _no_change) <- iface_gen
                     writeIORef if_ref $ Just iface
-                    return res
+                    return $! res
 
             _ <- runPipeline StopLn hsc_env
                               (output_fn,
@@ -263,17 +263,17 @@ compileOne' m_tc_result mHscMessage
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
-            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
+            return $! (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
 
  where dflags0     = ms_hspp_opts summary
 
        expectHm :: Either HomeModInfo (ModIface -> HomeModInfo) -> HomeModInfo
-       expectHm (Left x) = x
+       expectHm (Left !x) = x
        expectHm (Right _) =
          panic "hscIncrementalCompile should return a HomeMod for this status"
 
        expectHmBuilder :: ModIface -> Either HomeModInfo (ModIface -> HomeModInfo) -> HomeModInfo
-       expectHmBuilder iface (Right f) = f iface
+       expectHmBuilder iface (Right f) = let !hmi = f iface in hmi
        expectHmBuilder _ (Left _) =
          panic "hscIncrementalCompile should return a function for this status"
 
@@ -774,7 +774,7 @@ pipeLoop phase input_fn = do
                           setDynFlags $ dynamicTooMkDynamicDynFlags dflags
                           -- TODO shouldn't ignore result:
                           _ <- pipeLoop phase input_fn
-                          return r
+                          return $! r
                    ifGeneratingDynamicToo dflags dynToo noDynToo
                _ -> pipeLoop next_phase output_fn
 
@@ -1143,7 +1143,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+        (!result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
         return (HscOut src_flavour mod_name result,
@@ -1189,7 +1189,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
 
 
-                    (iface, no_change) <- liftIO iface_gen
+                    (!iface, !no_change) <- liftIO iface_gen
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo

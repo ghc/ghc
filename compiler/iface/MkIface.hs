@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
@@ -12,6 +13,10 @@
 module MkIface (
         mkIface,        -- Build a ModIface from a ModGuts,
                         -- including computing version information
+
+        -- * Staged iface generation.
+        mkIfacePartial,
+        mkIfaceFinal,
 
         mkIfaceTc,
 
@@ -135,6 +140,25 @@ import qualified Data.Semigroup
 ************************************************************************
 -}
 
+{- Note [Stage Iface generation]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Interface files contain a variety of things derived from core representation.
+Some of which can easily be computed before code generation even when we only
+compute the final interface file after.
+
+In order to avoid keeping large parts of these inputs alive all throughout code
+generation we explicitly stage the evaluation/creation of interface files.
+
+First we create a partial interface file, which only contains a subset of
+fields which the code generator output won't affect. This is done by `mkIfacePartial`.
+
+Then we run code generation, add the new information, hash the resulting
+interface file and write it to disk. This is done by `mkIfaceFinal`
+
+This is sadly the only way we can avoid capturing optimized core.
+-}
+
 mkIface :: HscEnv
         -> Maybe Fingerprint    -- The old fingerprint, if we have it
         -> ModDetails           -- The trimmed, tidied interface
@@ -160,12 +184,47 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_decl_docs    = decl_docs,
                       mg_arg_docs     = arg_docs
                     }
-        = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod hsc_src used_th deps rdr_env fix_env
-                   warns hpc_info self_trust
-                   safe_mode usages
-                   doc_hdr decl_docs arg_docs
-                   mod_details
+        = do
+            let tmp_iface = mkIfacePartial' hsc_env
+                              this_mod hsc_src used_th deps rdr_env fix_env
+                              warns hpc_info self_trust
+                              safe_mode usages
+                              doc_hdr decl_docs arg_docs
+                              mod_details
+            mkIfaceFinal hsc_env maybe_old_fingerprint
+                    tmp_iface
+
+-- | Creates a ModIface filling in information not dependent
+-- on code generation. This includes most things except hashes
+-- and IfaceDecls. See Note [Stage Iface generation]
+mkIfacePartial :: HscEnv
+        -> ModDetails           -- The trimmed, tidied interface
+        -> ModGuts              -- Usages, deprecations, etc
+        -> ModCoreIface -- The new one
+
+mkIfacePartial hsc_env mod_details
+         ModGuts{     mg_module       = this_mod,
+                      mg_hsc_src      = hsc_src,
+                      mg_usages       = usages,
+                      mg_used_th      = used_th,
+                      mg_deps         = deps,
+                      mg_rdr_env      = rdr_env,
+                      mg_fix_env      = fix_env,
+                      mg_warns        = warns,
+                      mg_hpc_info     = hpc_info,
+                      mg_safe_haskell = safe_mode,
+                      mg_trust_pkg    = self_trust,
+                      mg_doc_hdr      = doc_hdr,
+                      mg_decl_docs    = decl_docs,
+                      mg_arg_docs     = arg_docs
+                    }
+        =   mkIfacePartial' hsc_env
+                            this_mod hsc_src used_th deps rdr_env fix_env
+                            warns hpc_info self_trust
+                            safe_mode usages
+                            doc_hdr decl_docs arg_docs
+                            mod_details
+
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -210,17 +269,18 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
 
           let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
 
-          mkIface_ hsc_env maybe_old_fingerprint
+          let !tmp_iface = mkIfacePartial' hsc_env
                    this_mod hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
                    mod_details
+          mkIfaceFinal hsc_env maybe_old_fingerprint
+                   tmp_iface
 
 
-
-mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
+mkIfacePartial' :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> Bool
@@ -230,16 +290,16 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> HscSource
          -> DeclDocMap
          -> ArgDocMap
          -> ModDetails
-         -> IO (ModIface, Bool)
-mkIface_ hsc_env maybe_old_fingerprint
+         -> ModCoreIface
+mkIfacePartial' hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          doc_hdr decl_docs arg_docs
          ModDetails{  md_insts     = insts,
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
-                      md_anns      = anns,
                       md_types     = type_env,
+                      md_anns      = anns,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
 -- NB:  notice that mkIface does not look at the bindings
@@ -247,9 +307,24 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      put exactly the info into the TypeEnv that we want
 --      to expose in the interface
 
-  = do
-    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+  = {-# SCC "mkIfacePartial" #-}
+    let !semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+        iface_exports = mkIfaceExports exports
+        fixities    = sortBy (comparing fst)
+          [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
+          -- The order of fixities returned from nameEnvElts is not
+          -- deterministic, so we sort by OccName to canonicalize it.
+          -- See Note [Deterministic UniqFM] in UniqDFM for more details.
+        warns       = src_warns
+        iface_rules = sortBy cmp_rule $ map coreRuleToIfaceRule rules
+        iface_insts = sortBy cmp_inst $ map instanceToIfaceInst $ fixSafeInstances safe_mode insts
+        iface_fam_insts = sortBy cmp_fam_inst $ map famInstToIfaceFamInst fam_insts
+        !trust_info  = setSafeMode safe_mode
+        annotations = map mkIfaceAnnotation anns
+        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+
         entities = typeEnvElts type_env
+        decls :: [IfaceDecl]
         decls  = [ tyThingToIfaceDecl entity
                  | entity <- entities,
                    let name = getName entity,
@@ -264,85 +339,62 @@ mkIface_ hsc_env maybe_old_fingerprint
                       -- are going to be for <H>, not the former id!
                       -- See Note [Identity versus semantic module]
 
-        fixities    = sortBy (comparing fst)
-          [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-          -- The order of fixities returned from nameEnvElts is not
-          -- deterministic, so we sort by OccName to canonicalize it.
-          -- See Note [Deterministic UniqFM] in UniqDFM for more details.
-        warns       = src_warns
-        iface_rules = map coreRuleToIfaceRule rules
-        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
-        iface_fam_insts = map famInstToIfaceFamInst fam_insts
-        trust_info  = setSafeMode safe_mode
-        annotations = map mkIfaceAnnotation anns
-        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
-
-        intermediate_iface = ModIface {
-              mi_module      = this_mod,
+        intermediate_iface = ModCoreIface {
+              mic_module      = this_mod,
               -- Need to record this because it depends on the -instantiated-with flag
               -- which could change
-              mi_sig_of      = if semantic_mod == this_mod
+              mic_sig_of      = if semantic_mod == this_mod
                                 then Nothing
                                 else Just semantic_mod,
-              mi_hsc_src     = hsc_src,
-              mi_deps        = deps,
-              mi_usages      = usages,
-              mi_exports     = mkIfaceExports exports,
+              mic_hsc_src     = hsc_src,
+              mic_deps        = deps,
+              mic_usages      = usages,
+              mic_exports     = iface_exports,
 
               -- Sort these lexicographically, so that
               -- the result is stable across compilations
-              mi_insts       = sortBy cmp_inst     iface_insts,
-              mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-              mi_rules       = sortBy cmp_rule     iface_rules,
+              mic_insts       = iface_insts,
+              mic_fam_insts   = iface_fam_insts,
+              mic_rules       = iface_rules,
 
-              mi_fixities    = fixities,
-              mi_warns       = warns,
-              mi_anns        = annotations,
-              mi_globals     = maybeGlobalRdrEnv rdr_env,
+              mic_fixities    = fixities,
+              mic_warns       = warns,
+              mic_anns        = annotations,
+              mic_globals     = maybeGlobalRdrEnv rdr_env,
 
-              -- Left out deliberately: filled in by addFingerprints
-              mi_iface_hash  = fingerprint0,
-              mi_mod_hash    = fingerprint0,
-              mi_flag_hash   = fingerprint0,
-              mi_opt_hash    = fingerprint0,
-              mi_hpc_hash    = fingerprint0,
-              mi_exp_hash    = fingerprint0,
-              mi_plugin_hash = fingerprint0,
-              mi_used_th     = used_th,
-              mi_orphan_hash = fingerprint0,
-              mi_orphan      = False, -- Always set by addFingerprints, but
-                                      -- it's a strict field, so we can't omit it.
-              mi_finsts      = False, -- Ditto
-              mi_decls       = deliberatelyOmitted "decls",
-              mi_hash_fn     = deliberatelyOmitted "hash_fn",
-              mi_hpc         = isHpcUsed hpc_info,
-              mi_trust       = trust_info,
-              mi_trust_pkg   = pkg_trust_req,
+              mic_used_th     = used_th,
+              mic_decls       = decls,
+              mic_hpc         = isHpcUsed hpc_info,
+              mic_trust       = trust_info,
+              mic_trust_pkg   = pkg_trust_req,
 
-              -- And build the cached values
-              mi_warn_fn     = mkIfaceWarnCache warns,
-              mi_fix_fn      = mkIfaceFixCache fixities,
-              mi_complete_sigs = icomplete_sigs,
-              mi_doc_hdr     = doc_hdr,
-              mi_decl_docs   = decl_docs,
-              mi_arg_docs    = arg_docs }
+              mic_complete_sigs = icomplete_sigs,
+              mic_doc_hdr     = doc_hdr,
+              mic_decl_docs   = decl_docs,
+              mic_arg_docs    = arg_docs }
 
-    (new_iface, no_change_at_all)
-          <- {-# SCC "versioninfo" #-}
-                   addFingerprints hsc_env maybe_old_fingerprint
-                                   intermediate_iface decls
+    in decls `seqList`
+          fixities `seqList`
+          iface_rules `seqList`
+          iface_insts `seqList`
+          iface_fam_insts `seqList`
+          usages `seqList`
+          annotations `seqList`
+          icomplete_sigs `seqList`
+          iface_exports `seqList`
+          intermediate_iface
 
-    -- Debug printing
-    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
-                  (pprModIface new_iface)
+    -- TODO: Force these
+    -- seqList fixities (return ())
+    -- -- seqList warns (return ())
+    -- seqList iface_rules (return ())
+    -- seqList iface_insts (return ())
+    -- seqList iface_fam_insts (return ())
+    -- -- seqList trust_info (return ())
+    -- seqList annotations (return ())
+    -- seqList icomplete_sigs (return ())
+    -- seqList decls (return ())
 
-    -- bug #1617: on reload we weren't updating the PrintUnqualified
-    -- correctly.  This stems from the fact that the interface had
-    -- not changed, so addFingerprints returns the old ModIface
-    -- with the old GlobalRdrEnv (mi_globals).
-    let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
-
-    return (final_iface, no_change_at_all)
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -352,6 +404,11 @@ mkIface_ hsc_env maybe_old_fingerprint
 
      dflags = hsc_dflags hsc_env
 
+    -- bug #1617: on reload we weren't updating the PrintUnqualified
+    -- correctly.  This stems from the fact that the interface had
+    -- not changed, so addFingerprints returns the old ModIface
+    -- with the old GlobalRdrEnv (mi_globals).
+
      -- We only fill in mi_globals if the module was compiled to byte
      -- code.  Otherwise, the compiler may not have retained all the
      -- top-level bindings and they won't be in the TypeEnv (see
@@ -360,13 +417,34 @@ mkIface_ hsc_env maybe_old_fingerprint
      -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
+         | targetRetainsAllBindings (hscTarget dflags) = Just $! rdr_env
          | otherwise                                   = Nothing
 
-     deliberatelyOmitted :: String -> a
-     deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
-
      ifFamInstTcName = ifFamInstFam
+
+
+-- | Finish iface generation based on a iface generated by
+-- mkIfacePartial. See Note [Stage Iface generation]
+mkIfaceFinal :: HscEnv -> Maybe Fingerprint
+         -> ModCoreIface
+         -> IO (ModIface, Bool)
+mkIfaceFinal
+         hsc_env maybe_old_fingerprint
+         !intermediate_iface
+  = do
+    (new_iface, no_change_at_all)
+          <- {-# SCC "versioninfo" #-}
+                   addFingerprints hsc_env maybe_old_fingerprint
+                                   (coreIface2Iface intermediate_iface)
+                                   (mic_decls intermediate_iface)
+
+    -- Debug printing
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE"
+                  (pprModIface new_iface)
+
+    return (new_iface, no_change_at_all)
+  where
+     dflags = hsc_dflags hsc_env
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -444,13 +522,13 @@ thing that we are currently fingerprinting.
 addFingerprints
         :: HscEnv
         -> Maybe Fingerprint -- the old fingerprint, if any
-        -> ModIface          -- The new interface (lacking decls)
-        -> [IfaceDecl]       -- The new decls
+        -> ModIface          -- The new interface
+        -> [IfaceDecl]
         -> IO (ModIface,     -- Updated interface
                Bool)         -- True <=> no changes at all;
                              -- no need to write Iface
 
-addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
+addFingerprints hsc_env mb_old_fingerprint !iface0 decls
  = do
    eps <- hscEPS hsc_env
    let
@@ -464,11 +542,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
                                   non_orph_fis top_lvl_name_env decl
 
+      --  decls = map snd $ mi_decls iface0
        -- This is used for looking up the Name of a default method
        -- from its OccName. See Note [default method Name]
        top_lvl_name_env =
          mkOccEnv [ (nameOccName nm, nm)
-                  | IfaceId { ifName = nm } <- new_decls ]
+                  | IfaceId { ifName = nm } <- decls ]
 
        -- Dependency edges between declarations in the current module.
        -- This is computed by finding the free external names of each
@@ -476,7 +555,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        -- declaration implicitly depends on).
        edges :: [ Node Unique IfaceDeclABI ]
        edges = [ DigraphNode abi (getUnique (getOccName decl)) out
-               | decl <- new_decls
+               | decl <- decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
                ]
@@ -501,7 +580,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         -- e.g. a reference to a constructor must be turned into a reference
         -- to the TyCon for the purposes of calculating dependencies.
        parent_map :: OccEnv OccName
-       parent_map = foldl' extend emptyOccEnv new_decls
+       parent_map = foldl' extend emptyOccEnv decls
           where extend env d =
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = getOccName d
@@ -1084,7 +1163,7 @@ mkOrphMap get_key decls
 -}
 
 mkIfaceCompleteSig :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
+mkIfaceCompleteSig (CompleteMatch !cls !tc) = IfaceCompleteMatch cls tc
 
 
 {-
@@ -1097,22 +1176,28 @@ mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
 
 
 mkIfaceAnnotation :: Annotation -> IfaceAnnotation
-mkIfaceAnnotation (Annotation { ann_target = target, ann_value = payload })
-  = IfaceAnnotation {
-        ifAnnotatedTarget = fmap nameOccName target,
-        ifAnnotatedValue = payload
-    }
+mkIfaceAnnotation (Annotation { ann_target = target, ann_value = !payload })
+  = let !if_target = fmap nameOccName target
+    in  IfaceAnnotation {
+            ifAnnotatedTarget = if_target,
+            ifAnnotatedValue = payload
+        }
 
 mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
 mkIfaceExports exports
   = sortBy stableAvailCmp (map sort_subs exports)
   where
     sort_subs :: AvailInfo -> AvailInfo
-    sort_subs (Avail n) = Avail n
-    sort_subs (AvailTC n [] fs) = AvailTC n [] (sort_flds fs)
-    sort_subs (AvailTC n (m:ms) fs)
-       | n==m      = AvailTC n (m:sortBy stableNameCmp ms) (sort_flds fs)
-       | otherwise = AvailTC n (sortBy stableNameCmp (m:ms)) (sort_flds fs)
+    sort_subs (Avail !n) = Avail n
+    sort_subs (AvailTC !n [] fs) = AvailTC n [] (sort_flds fs)
+    sort_subs (AvailTC !n (m:ms) fs)
+       | n==m
+       = let names = (m:sortBy stableNameCmp ms)
+         in names `seqList` AvailTC n names (sort_flds fs)
+       | otherwise
+       = let names = (sortBy stableNameCmp (m:ms))
+             fields = sort_flds fs
+         in names `seqList` fields `seqList` AvailTC n names fields
        -- Maintain the AvailTC Invariant
 
     sort_flds = sortBy (stableNameCmp `on` flSelector)
@@ -1763,23 +1848,13 @@ checkList (check:checks) = do recompile <- check
 
 tyThingToIfaceDecl :: TyThing -> IfaceDecl
 tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl (ATyCon tycon) =
+  let !if_tc = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+  in   if_tc
 tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
 tyThingToIfaceDecl (AConLike cl)  = case cl of
     RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
-
---------------------------
-idToIfaceDecl :: Id -> IfaceDecl
--- The Id is already tidied, so that locally-bound names
--- (lambdas, for-alls) already have non-clashing OccNames
--- We can't tidy it here, locally, because it may have
--- free variables in its type or IdInfo
-idToIfaceDecl id
-  = IfaceId { ifName      = getName id,
-              ifType      = toIfaceType (idType id),
-              ifIdDetails = toIfaceIdDetails (idDetails id),
-              ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
 dataConToIfaceDecl :: DataCon -> IfaceDecl
@@ -1839,8 +1914,8 @@ tyConToIfaceDecl env tycon
 
   | Just syn_rhs <- synTyConRhs_maybe tycon
   = ( tc_env1
-    , IfaceSynonym { ifName    = getName tycon,
-                     ifRoles   = tyConRoles tycon,
+    , IfaceSynonym { ifName    = if_name,
+                     ifRoles   = if_roles,
                      ifSynRhs  = if_syn_type syn_rhs,
                      ifBinders = if_binders,
                      ifResKind = if_res_kind
@@ -1848,7 +1923,7 @@ tyConToIfaceDecl env tycon
 
   | Just fam_flav <- famTyConFlav_maybe tycon
   = ( tc_env1
-    , IfaceFamily { ifName    = getName tycon,
+    , IfaceFamily { ifName    = if_name,
                     ifResVar  = if_res_var,
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
@@ -1858,11 +1933,11 @@ tyConToIfaceDecl env tycon
 
   | isAlgTyCon tycon
   = ( tc_env1
-    , IfaceData { ifName    = getName tycon,
+    , IfaceData { ifName    = if_name,
                   ifBinders = if_binders,
                   ifResKind = if_res_kind,
                   ifCType   = tyConCType tycon,
-                  ifRoles   = tyConRoles tycon,
+                  ifRoles   = if_roles,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
                   ifCons    = ifaceConDecls (algTyConRhs tycon),
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
@@ -1873,16 +1948,18 @@ tyConToIfaceDecl env tycon
   -- just about to pretty-print them, not because we are going
   -- to put them into interface files
   = ( env
-    , IfaceData { ifName       = getName tycon,
+    , IfaceData { ifName       = if_name,
                   ifBinders    = if_binders,
                   ifResKind    = if_res_kind,
                   ifCType      = Nothing,
-                  ifRoles      = tyConRoles tycon,
+                  ifRoles      = if_roles,
                   ifCtxt       = [],
                   ifCons       = IfDataTyCon [],
                   ifGadtSyntax = False,
                   ifParent     = IfNoParent })
   where
+    !if_name = getName tycon
+    if_roles = tyConRoles tycon
     -- NOTE: Not all TyCons have `tyConTyVars` field. Forcing this when `tycon`
     -- is one of these TyCons (FunTyCon, PrimTyCon, PromotedDataCon) will cause
     -- an error.
@@ -2038,47 +2115,53 @@ tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
 
 --------------------------
 instanceToIfaceInst :: ClsInst -> IfaceClsInst
-instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
-                             , is_cls_nm = cls_name, is_cls = cls
+instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = !oflag
+                             , is_cls_nm = !cls_name, is_cls = cls
                              , is_tcs = mb_tcs
-                             , is_orphan = orph })
+                             , is_orphan = !orph })
   = ASSERT( cls_name == className cls )
-    IfaceClsInst { ifDFun    = dfun_name,
-                ifOFlag   = oflag,
-                ifInstCls = cls_name,
-                ifInstTys = map do_rough mb_tcs,
-                ifInstOrph = orph }
+    if_instTys `seqList`
+      IfaceClsInst { ifDFun    = dfun_name,
+                  ifOFlag   = oflag,
+                  ifInstCls = cls_name,
+                  ifInstTys = if_instTys,
+                  ifInstOrph = orph }
   where
+    if_instTys = map do_rough mb_tcs
     do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
+    do_rough (Just n) = Just $! (toIfaceTyCon_name n)
 
-    dfun_name = idName dfun_id
+    !dfun_name = idName dfun_id
 
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
 famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
-                                 fi_fam      = fam,
+                                 fi_fam      = !fam,
                                  fi_tcs      = roughs })
-  = IfaceFamInst { ifFamInstAxiom    = coAxiomName axiom
-                 , ifFamInstFam      = fam
-                 , ifFamInstTys      = map do_rough roughs
-                 , ifFamInstOrph     = orph }
+  = if_instTys `seqList`
+      IfaceFamInst  { ifFamInstAxiom    = if_axiomName
+                    , ifFamInstFam      = fam
+                    , ifFamInstTys      = if_instTys
+                    , ifFamInstOrph     = orph }
   where
+    !if_axiomName = coAxiomName axiom
+    if_instTys = map do_rough roughs
+
     do_rough Nothing  = Nothing
-    do_rough (Just n) = Just (toIfaceTyCon_name n)
+    do_rough (Just n) = Just $! (toIfaceTyCon_name n)
 
     fam_decl = tyConName $ coAxiomTyCon axiom
-    mod = ASSERT( isExternalName (coAxiomName axiom) )
-          nameModule (coAxiomName axiom)
+    mod = ASSERT( isExternalName if_axiomName )
+          nameModule if_axiomName
     is_local name = nameIsLocalOrFrom mod name
 
     lhs_names = filterNameSet is_local (orphNamesOfCoCon axiom)
 
-    orph | is_local fam_decl
-         = NotOrphan (nameOccName fam_decl)
-         | otherwise
-         = chooseOrphanAnchor lhs_names
+    !orph | is_local fam_decl
+          = NotOrphan (nameOccName fam_decl)
+          | otherwise
+          = chooseOrphanAnchor lhs_names
 
 --------------------------
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
@@ -2086,24 +2169,29 @@ coreRuleToIfaceRule (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
     bogusIfaceRule fn
 
-coreRuleToIfaceRule (Rule { ru_name = name, ru_fn = fn,
-                            ru_act = act, ru_bndrs = bndrs,
+coreRuleToIfaceRule (Rule { ru_name = !name, ru_fn = fn,
+                            ru_act = !act, ru_bndrs = bndrs,
                             ru_args = args, ru_rhs = rhs,
-                            ru_orphan = orph, ru_auto = auto })
-  = IfaceRule { ifRuleName  = name, ifActivation = act,
-                ifRuleBndrs = map toIfaceBndr bndrs,
-                ifRuleHead  = fn,
-                ifRuleArgs  = map do_arg args,
-                ifRuleRhs   = toIfaceExpr rhs,
-                ifRuleAuto  = auto,
-                ifRuleOrph  = orph }
+                            ru_orphan = !orph, ru_auto = !auto })
+  = if_bndrs `seqList`
+      if_args `seqList`
+      IfaceRule { ifRuleName  = name, ifActivation = act,
+                  ifRuleBndrs = if_bndrs,
+                  ifRuleHead  = fn,
+                  ifRuleArgs  = if_args,
+                  ifRuleRhs   = if_rhs,
+                  ifRuleAuto  = auto,
+                  ifRuleOrph  = orph }
   where
+    if_bndrs = map toIfaceBndr bndrs
+    if_args = map do_arg args
+    !if_rhs = toIfaceExpr rhs
         -- For type args we must remove synonyms from the outermost
         -- level.  Reason: so that when we read it back in we'll
         -- construct the same ru_rough field as we have right now;
         -- see tcIfaceRule
-    do_arg (Type ty)     = IfaceType (toIfaceType (deNoteType ty))
-    do_arg (Coercion co) = IfaceCo   (toIfaceCoercion co)
+    do_arg (Type ty)     = IfaceType $! (toIfaceType (deNoteType ty))
+    do_arg (Coercion co) = IfaceCo   $! (toIfaceCoercion co)
     do_arg arg           = toIfaceExpr arg
 
 bogusIfaceRule :: Name -> IfaceRule

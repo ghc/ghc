@@ -49,6 +49,8 @@ import System.FilePath
 import Binary
 import Util
 
+import Control.DeepSeq
+
 -----------------------------------------------------------------------------
 -- Phases
 
@@ -101,6 +103,9 @@ data HscSource
    = HsSrcFile | HsBootFile | HsigFile
      deriving( Eq, Ord, Show )
         -- Ord needed for the finite maps we build in CompManager
+
+instance NFData HscSource where
+  rnf x = seq x ()
 
 instance Binary HscSource where
     put_ bh HsSrcFile = putByte bh 0

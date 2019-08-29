@@ -24,7 +24,7 @@ module Util (
 
         unzipWith,
 
-        mapFst, mapSnd, chkAppend,
+        map', mapFst, mapSnd, chkAppend,
         mapAndUnzip, mapAndUnzip3, mapAccumL2,
         filterOut, partitionWith,
 
@@ -407,6 +407,13 @@ stretchZipWith p z f (x:xs) ys
   | otherwise = case ys of
                 []     -> []
                 (y:ys) -> f x y : stretchZipWith p z f xs ys
+
+-- | Strict map
+map' :: (a->b) -> [a] -> [b]
+map' _ [] = []
+map' f (x:xs) =
+  let    !x' = f x
+  in  x' : map' f xs
 
 mapFst :: (a->c) -> [(a,b)] -> [(c,b)]
 mapSnd :: (b->c) -> [(a,b)] -> [(a,c)]

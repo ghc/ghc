@@ -9,6 +9,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
+
 -- | Types for the per-module compiler
 module HscTypes (
         -- * compilation state
@@ -85,6 +86,8 @@ module HscTypes (
         mi_semantic_module,
         mi_free_holes,
         renameFreeHoles,
+
+        ModCoreIface(..), coreIface2Iface,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -1236,6 +1239,180 @@ mkIfaceHashCache pairs
 
 emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
 emptyIfaceHashCache _occ = Nothing
+
+-- | A ModIface only containing information reliably produced from
+-- core input only.
+data ModCoreIface
+  = ModCoreIface {
+        mic_module     :: !Module,             -- ^ Name of the module we are for
+        mic_sig_of     :: !(Maybe Module),     -- ^ Are we a sig of another mod?
+
+        mic_hsc_src    :: !HscSource,          -- ^ Boot? Signature?
+
+        mic_deps     :: Dependencies,
+                -- ^ The dependencies of the module.  This is
+                -- consulted for directly-imported modules, but not
+                -- for anything else (hence lazy)
+
+        mic_usages   :: [Usage],
+                -- ^ Usages; kept sorted so that it's easy to decide
+                -- whether to write a new iface file (changing usages
+                -- doesn't affect the hash of this module)
+                -- NOT STRICT!  we read this field lazily from the interface file
+                -- It is *only* consulted by the recompilation checker
+
+        mic_exports  :: ![IfaceExport],
+                -- ^ Exports
+                -- Kept sorted by (mod,occ), to make version comparisons easier
+                -- Records the modules that are the declaration points for things
+                -- exported by this module, and the 'OccName's of those things
+
+        mic_used_th  :: !Bool,
+                -- ^ Module required TH splices when it was compiled.
+                -- This disables recompilation avoidance (see #481).
+
+        mic_fixities :: [(OccName,Fixity)],
+                -- ^ Fixities
+                -- NOT STRICT!  we read this field lazily from the interface file
+
+        mic_warns    :: !Warnings,
+                -- ^ Warnings
+                -- NOT STRICT!  we read this field lazily from the interface file
+
+        mic_anns     :: [IfaceAnnotation],
+                -- ^ Annotations
+                -- NOT STRICT!  we read this field lazily from the interface file
+
+
+        mic_decls    :: [IfaceDecl],
+                -- ^ Type, class and variable declarations
+                -- The hash of an Id changes if its fixity or deprecations change
+                --      (as well as its type of course)
+                -- Ditto data constructors, class operations, except that
+                -- the hash of the parent class/tycon changes
+
+        mic_globals  :: !(Maybe GlobalRdrEnv),
+                -- ^ Binds all the things defined at the top level in
+                -- the /original source/ code for this module. which
+                -- is NOT the same as mic_exports, nor mic_decls (which
+                -- may contains declarations for things not actually
+                -- defined by the user).  Used for GHCi and for inspecting
+                -- the contents of modules via the GHC API only.
+                --
+                -- (We need the source file to figure out the
+                -- top-level environment, if we didn't compile this module
+                -- from source then this field contains @Nothing@).
+                --
+                -- Strictly speaking this field should live in the
+                -- 'HomeModInfo', but that leads to more plumbing.
+
+                -- Instance declarations and rules
+        mic_insts       :: ![IfaceClsInst],     -- ^ Sorted class instance
+        mic_fam_insts   :: ![IfaceFamInst],  -- ^ Sorted family instances
+        mic_rules       :: ![IfaceRule],     -- ^ Sorted rules
+
+        mic_hpc       :: !AnyHpcUsage,
+                -- ^ True if this program uses Hpc at any point in the program.
+
+        mic_trust     :: !IfaceTrustInfo,
+                -- ^ Safe Haskell Trust information for this module.
+
+        mic_trust_pkg :: !Bool,
+                -- ^ Do we require the package this module resides in be trusted
+                -- to trust this module? This is used for the situation where a
+                -- module is Safe (so doesn't require the package be trusted
+                -- itself) but imports some trustworthy modules from its own
+                -- package (which does require its own package be trusted).
+                -- See Note [RnNames . Trust Own Package]
+        mic_complete_sigs :: [IfaceCompleteMatch],
+
+        mic_doc_hdr :: !(Maybe HsDocString),
+                -- ^ Module header.
+
+        mic_decl_docs :: !DeclDocMap,
+                -- ^ Docs on declarations.
+
+        mic_arg_docs :: !ArgDocMap
+                -- ^ Docs on arguments.
+     }
+
+coreIface2Iface :: ModCoreIface -> ModIface
+coreIface2Iface (ModCoreIface {
+              mic_module      = this_mod,
+              mic_sig_of      = sig_of,
+              mic_hsc_src     = hsc_src,
+              mic_deps        = deps,
+              mic_usages      = usages,
+              mic_exports     = exports,
+
+              mic_insts       = insts,
+              mic_fam_insts   = fam_insts,
+              mic_rules       = rules,
+
+              mic_fixities    = fixities,
+              mic_warns       = warns,
+              mic_anns        = annotations,
+              mic_globals     = rdr_env,
+
+              mic_used_th     = used_th,
+              mic_decls       = decls,
+
+              mic_hpc         = hpc,
+              mic_trust       = trust_info,
+              mic_trust_pkg   = pkg_trust_req,
+
+              mic_complete_sigs = icomplete_sigs,
+              mic_doc_hdr     = doc_hdr,
+              mic_decl_docs   = decl_docs,
+              mic_arg_docs    = arg_docs })
+  = ModIface {
+      mi_module      = this_mod,
+      mi_sig_of      = sig_of,
+      mi_hsc_src     = hsc_src,
+      mi_deps        = deps,
+      mi_usages      = usages,
+      mi_exports     = exports,
+
+      mi_insts       = insts,
+      mi_fam_insts   = fam_insts,
+      mi_rules       = rules,
+
+      mi_fixities    = fixities,
+      mi_warns       = warns,
+      mi_anns        = annotations,
+      mi_globals     = rdr_env,
+
+      -- Left out deliberately: filled in by addFingerprints
+      mi_iface_hash  = fingerprint0,
+      mi_mod_hash    = fingerprint0,
+      mi_flag_hash   = fingerprint0,
+      mi_opt_hash    = fingerprint0,
+      mi_hpc_hash    = fingerprint0,
+      mi_exp_hash    = fingerprint0,
+      mi_plugin_hash = fingerprint0,
+      mi_used_th     = used_th,
+      mi_orphan_hash = fingerprint0,
+      mi_orphan      = False, -- Always set by addFingerprints, but
+                              -- it's a strict field, so we can't omit it.
+      mi_finsts      = False, -- Ditto
+      mi_decls       = zip (repeat $ deliberatelyOmitted "declHash") decls,
+      mi_hash_fn     = deliberatelyOmitted "hash_fn",
+      mi_hpc         = hpc,
+      mi_trust       = trust_info,
+      mi_trust_pkg   = pkg_trust_req,
+
+      -- And build the cached values
+      mi_warn_fn     = mkIfaceWarnCache warns,
+      mi_fix_fn      = mkIfaceFixCache fixities,
+      mi_complete_sigs = icomplete_sigs,
+      mi_doc_hdr     = doc_hdr,
+      mi_decl_docs   = decl_docs,
+      mi_arg_docs    = arg_docs }
+
+    where
+      deliberatelyOmitted :: String -> a
+      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
+      -- undefined
 
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'

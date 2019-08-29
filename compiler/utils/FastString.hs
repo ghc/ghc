@@ -223,6 +223,9 @@ instance Data FastString where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "FastString"
 
+instance NFData FastString where
+  rnf (FastString bs _ _ _ ) = rnf bs
+
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS f1@(FastString u1 _ _ _) f2@(FastString u2 _ _ _) =
   if u1 == u2 then EQ else

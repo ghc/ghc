@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+-- See Note [Strict iface generation]
+{-# LANGUAGE Strict #-}
 
 -- | Functions for converting Core things to interface file things.
 module ToIface
@@ -40,6 +43,8 @@ module ToIface
     , toIfaceCon
     , toIfaceApp
     , toIfaceVar
+
+    , idToIfaceDecl
     ) where
 
 #include "HsVersions.h"
@@ -73,41 +78,81 @@ import Demand ( isTopSig )
 
 import Data.Maybe ( catMaybes )
 
+{-  Note [Strict iface generation]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  When *creating* a interface file there is zero reason to be lazy.
+  After all the whole thing will be written to disk eventually and
+  at latest then we will force thunks hiding in the deepest corners
+  of these types.
+
+  So we try to avoid allocating thunks to begin with, or where not
+  feasible make them as short lived as we can.
+
+  For this reason we:
+  * Use -XStrict: It makes sure any stray bindings we forgot to bang
+    is forced.
+  * Use evalList whenever we map over things:
+      map is lazy so we clean up this thunks immediatly after.
+  * Use $! liberally:
+    -XStrict does NOT force the `x` in the expression `Just x`,
+    so we do so manually.
+  * Use ! on nested patterns:
+    -XStrict does NOT cause `x` to be forced in a definition like
+    (!x,!y)
+
+  While it's generally good to avoid thunking things we are going to need
+  anway, in particular this is important when we generate interface file
+  components before codeGen, as this can lead to a lot of GC pressure
+  if these thunks keep parts of the Core AST alive.
+
+-}
+
+-- See Note [Strict iface generation]
+evalList :: [a] -> [a]
+evalList xs = xs `seqList` xs
+
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
 toIfaceTvBndr = toIfaceTvBndrX emptyVarSet
 
 toIfaceTvBndrX :: VarSet -> TyVar -> IfaceTvBndr
-toIfaceTvBndrX fr tyvar = ( occNameFS (getOccName tyvar)
-                          , toIfaceTypeX fr (tyVarKind tyvar)
-                          )
+toIfaceTvBndrX fr tyvar =
+  let !if_name = occNameFS (getOccName tyvar)
+      !if_type = toIfaceTypeX fr (tyVarKind tyvar)
+  in  ( if_name, if_type )
 
 toIfaceTvBndrs :: [TyVar] -> [IfaceTvBndr]
-toIfaceTvBndrs = map toIfaceTvBndr
+toIfaceTvBndrs xs =
+  let xs' = map toIfaceTvBndr xs
+  in xs' `seqList` xs'
 
 toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( occNameFS (getOccName covar)
-                          , toIfaceTypeX fr (varType covar)
-                          )
+toIfaceIdBndrX fr covar =
+  let !if_name = occNameFS (getOccName covar)
+      !if_type = toIfaceTypeX fr (varType covar)
+  in  ( if_name, if_type )
 
 toIfaceBndr :: Var -> IfaceBndr
 toIfaceBndr var
-  | isId var  = IfaceIdBndr (toIfaceIdBndr var)
-  | otherwise = IfaceTvBndr (toIfaceTvBndr var)
+  | isId var  = IfaceIdBndr $! (toIfaceIdBndr var)
+  | otherwise = IfaceTvBndr $! (toIfaceTvBndr var)
 
 toIfaceBndrX :: VarSet -> Var -> IfaceBndr
 toIfaceBndrX fr var
-  | isId var  = IfaceIdBndr (toIfaceIdBndrX fr var)
-  | otherwise = IfaceTvBndr (toIfaceTvBndrX fr var)
+  | isId var  = IfaceIdBndr $! (toIfaceIdBndrX fr var)
+  | otherwise = IfaceTvBndr $! (toIfaceTvBndrX fr var)
 
 toIfaceTyCoVarBinder :: VarBndr Var vis -> VarBndr IfaceBndr vis
-toIfaceTyCoVarBinder (Bndr tv vis) = Bndr (toIfaceBndr tv) vis
+toIfaceTyCoVarBinder (Bndr tv vis) = (Bndr $! (toIfaceBndr tv)) $! vis
 
 toIfaceTyCoVarBinders :: [VarBndr Var vis] -> [VarBndr IfaceBndr vis]
-toIfaceTyCoVarBinders = map toIfaceTyCoVarBinder
+toIfaceTyCoVarBinders bnds =
+  let if_bnds = map toIfaceTyCoVarBinder bnds
+  in if_bnds `seqList` if_bnds
 
 {-
 ************************************************************************
@@ -131,42 +176,42 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 -- Synonyms are retained in the interface type
 toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
-  | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+  | otherwise                  = IfaceTyVar $! (toIfaceTyVar tv)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.
   -- See Note [Suppressing invisible arguments] in IfaceType.
-  let (head, args) = splitAppTys ty
-  in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head args)
-toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
-toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
+  let (!head, !args) = splitAppTys ty
+  in (IfaceAppTy $! (toIfaceTypeX fr head)) $! (toIfaceAppTyArgsX fr head args)
+toIfaceTypeX _  (LitTy n)      = IfaceLitTy $! (toIfaceTyLit n)
+toIfaceTypeX fr (ForAllTy b t) = (IfaceForAllTy $! (toIfaceForAllBndrX fr b)) $!
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_res = t2, ft_af = af })
-  = IfaceFunTy af (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
-toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
-toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_res = t2, ft_af = !af })
+  = (IfaceFunTy af $! (toIfaceTypeX fr t1)) $! (toIfaceTypeX fr t2)
+toIfaceTypeX fr (CastTy ty co)  = (IfaceCastTy $! (toIfaceTypeX fr ty)) $! (toIfaceCoercionX fr co)
+toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy $! (toIfaceCoercionX fr co)
 
 toIfaceTypeX fr (TyConApp tc tys)
     -- tuples
-  | Just sort <- tyConTuple_maybe tc
+  | Just !sort <- tyConTuple_maybe tc
   , n_tys == arity
-  = IfaceTupleTy sort NotPromoted (toIfaceTcArgsX fr tc tys)
+  = IfaceTupleTy sort NotPromoted $! (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
   , isTupleDataCon dc
   , n_tys == 2*arity
-  = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
+  = IfaceTupleTy BoxedTuple IsPromoted $! (toIfaceTcArgsX fr tc (drop arity tys))
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
   , (k1:k2:_) <- tys
   = let info = IfaceTyConInfo NotPromoted sort
         sort | k1 `eqType` k2 = IfaceEqualityTyCon
              | otherwise      = IfaceNormalTyCon
-    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
+    in IfaceTyConApp ((IfaceTyCon $! (tyConName tc)) info) $! (toIfaceTcArgsX fr tc tys)
 
     -- other applications
   | otherwise
-  = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgsX fr tc tys)
+  = (IfaceTyConApp $! (toIfaceTyCon tc)) $! (toIfaceTcArgsX fr tc tys)
   where
     arity = tyConArity tc
     n_tys = length tys
@@ -181,24 +226,24 @@ toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
-toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
+toIfaceForAllBndrX fr (Bndr v vis) = (Bndr $! (toIfaceBndrX fr v)) $! vis
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTyCon tc
   = IfaceTyCon tc_name info
   where
-    tc_name = tyConName tc
-    info    = IfaceTyConInfo promoted sort
+    !tc_name = tyConName tc
+    !info    = IfaceTyConInfo promoted sort
     promoted | isPromotedDataCon tc = IsPromoted
              | otherwise            = NotPromoted
 
     tupleSort :: TyCon -> Maybe IfaceTyConSort
     tupleSort tc' =
         case tyConTuple_maybe tc' of
-          Just UnboxedTuple -> let arity = tyConArity tc' `div` 2
+          Just UnboxedTuple -> let !arity = tyConArity tc' `div` 2
                                in Just $ IfaceTupleTyCon arity UnboxedTuple
-          Just sort         -> let arity = tyConArity tc'
+          Just sort         -> let !arity = tyConArity tc'
                                in Just $ IfaceTupleTyCon arity sort
           Nothing           -> Nothing
 
@@ -210,14 +255,14 @@ toIfaceTyCon tc
       , Just tsort <- tupleSort tc'          = tsort
 
       | isUnboxedSumTyCon tc
-      , Just cons <- isDataSumTyCon_maybe tc = IfaceSumTyCon (length cons)
+      , Just cons <- isDataSumTyCon_maybe tc = IfaceSumTyCon $! (length cons)
 
       | otherwise                            = IfaceNormalTyCon
 
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
 toIfaceTyCon_name n = IfaceTyCon n info
-  where info = IfaceTyConInfo NotPromoted IfaceNormalTyCon
+  where !info = IfaceTyConInfo NotPromoted IfaceNormalTyCon
   -- Used for the "rough-match" tycon stuff,
   -- where pretty-printing is not an issue
 
@@ -236,45 +281,45 @@ toIfaceCoercionX fr co
   = go co
   where
     go_mco MRefl     = IfaceMRefl
-    go_mco (MCo co)  = IfaceMCo $ go co
+    go_mco (MCo co)  = IfaceMCo $! go co
 
-    go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
-    go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
+    go (Refl ty)            = IfaceReflCo $! (toIfaceTypeX fr ty)
+    go (GRefl r ty mco)     = (IfaceGReflCo r $! (toIfaceTypeX fr ty)) $! (go_mco mco)
     go (CoVarCo cv)
       -- See [TcTyVars in IfaceType] in IfaceType
       | cv `elemVarSet` fr  = IfaceFreeCoVar cv
-      | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
-    go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)
+      | otherwise           = IfaceCoVarCo $! (toIfaceCoVar cv)
+    go (HoleCo h)           = IfaceHoleCo  $! (coHoleCoVar h)
 
-    go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
-    go (SymCo co)           = IfaceSymCo (go co)
-    go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (NthCo _r d co)      = IfaceNthCo d (go co)
-    go (LRCo lr co)         = IfaceLRCo lr (go co)
-    go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
-    go (KindCo c)           = IfaceKindCo (go c)
-    go (SubCo co)           = IfaceSubCo (go co)
-    go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
-    go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
-    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
-                                          (toIfaceTypeX fr t1)
-                                          (toIfaceTypeX fr t2)
+    go (AppCo co1 co2)      = (IfaceAppCo $! (go co1)) $! (go co2)
+    go (SymCo co)           = IfaceSymCo $! (go co)
+    go (TransCo co1 co2)    = (IfaceTransCo $! (go co1)) $! (go co2)
+    go (NthCo _r d co)      = IfaceNthCo d $! (go co)
+    go (LRCo lr co)         = IfaceLRCo lr $! (go co)
+    go (InstCo co arg)      = (IfaceInstCo $! (go co)) $! (go arg)
+    go (KindCo c)           = IfaceKindCo $! (go c)
+    go (SubCo co)           = IfaceSubCo $! (go co)
+    go (AxiomRuleCo co cs)  = (IfaceAxiomRuleCo $! (coaxrName co)) $! (evalList $ map go cs)
+    go (AxiomInstCo c i cs) = (IfaceAxiomInstCo $! (coAxiomName c)) i (evalList $ map go cs)
+    go (UnivCo p r t1 t2)   = (((IfaceUnivCo $! (go_prov p)) r)
+                                          $! (toIfaceTypeX fr t1))
+                                          $! (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
       , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
-      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r co1 co2)   = IfaceFunCo r (go co1) (go co2)
+      | otherwise                = (IfaceTyConAppCo r $! (toIfaceTyCon tc)) $! (evalList $ map go cos)
+    go (FunCo r co1 co2)   = (IfaceFunCo r $! (go co1)) $! (go co2)
 
-    go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
-                                          (toIfaceCoercionX fr' k)
-                                          (toIfaceCoercionX fr' co)
+    go (ForAllCo tv k co) = ((IfaceForAllCo $! (toIfaceBndr tv))
+                                          $! (toIfaceCoercionX fr' k))
+                                          $! (toIfaceCoercionX fr' co)
                           where
                             fr' = fr `delVarSet` tv
 
     go_prov :: UnivCoProvenance -> IfaceUnivCoProv
     go_prov UnsafeCoerceProv    = IfaceUnsafeCoerceProv
-    go_prov (PhantomProv co)    = IfacePhantomProv (go co)
-    go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
+    go_prov (PhantomProv co)    = IfacePhantomProv $! (go co)
+    go_prov (ProofIrrelProv co) = IfaceProofIrrelProv $! (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
@@ -311,7 +356,7 @@ toIfaceAppArgsX fr kind ty_args
         ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
-      = IA_Arg (toIfaceTypeX fr t) argf (go env res ts)
+      = (IA_Arg $! (toIfaceTypeX fr t)) argf $! (go env res ts)
       where
         argf = case af of
                  VisArg   -> Required
@@ -331,7 +376,7 @@ toIfaceAppArgsX fr kind ty_args
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (#15473)
         WARN( True, ppr kind $$ ppr ty_args )
-        IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
+        (IA_Arg $! (toIfaceTypeX fr t1)) Required $! (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
@@ -340,7 +385,7 @@ tidyToIfaceTcArgs :: TidyEnv -> TyCon -> [Type] -> IfaceAppArgs
 tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 
 tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
-tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
+tidyToIfaceContext env theta = evalList $ map (tidyToIfaceType env) theta
 
 {-
 ************************************************************************
@@ -352,24 +397,36 @@ tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
 
 patSynToIfaceDecl :: PatSyn -> IfaceDecl
 patSynToIfaceDecl ps
-  = IfacePatSyn { ifName          = getName $ ps
-                , ifPatMatcher    = to_if_pr (patSynMatcher ps)
-                , ifPatBuilder    = fmap to_if_pr (patSynBuilder ps)
-                , ifPatIsInfix    = patSynIsInfix ps
-                , ifPatUnivBndrs  = map toIfaceForAllBndr univ_bndrs'
-                , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
-                , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
-                , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2) args
-                , ifPatTy         = tidyToIfaceType env2 rhs_ty
-                , ifFieldLabels   = (patSynFieldLabels ps)
+  = IfacePatSyn { ifName          = if_name
+                , ifPatMatcher    = if_patMatcher
+                , ifPatBuilder    = if_patBuilder
+                , ifPatIsInfix    = if_patIsInfix
+                , ifPatUnivBndrs  = if_patUnivBndrs
+                , ifPatExBndrs    = if_patExBndrs
+                , ifPatProvCtxt   = if_patProvCtxt
+                , ifPatReqCtxt    = if_patReqCtxt
+                , ifPatArgs       = if_patArgs
+                , ifPatTy         = if_patTy
+                , ifFieldLabels   = if_fieldLabels
                 }
   where
-    (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
+    if_name = getName ps
+    if_patMatcher    = to_if_pr (patSynMatcher ps)
+    if_patBuilder    = fmap to_if_pr (patSynBuilder ps)
+    if_patIsInfix    = patSynIsInfix ps
+    if_patUnivBndrs  = evalList $ map toIfaceForAllBndr univ_bndrs'
+    if_patExBndrs    = evalList $ map toIfaceForAllBndr ex_bndrs'
+    if_patProvCtxt   = tidyToIfaceContext env2 prov_theta
+    if_patReqCtxt    = tidyToIfaceContext env2 req_theta
+    if_patArgs       = evalList $ map (tidyToIfaceType env2) args
+    if_patTy         = tidyToIfaceType env2 rhs_ty
+    if_fieldLabels   = (patSynFieldLabels ps)
+
+    (_univ_tvs, !req_theta, _ex_tvs, !prov_theta, !args, !rhs_ty) = patSynSig ps
     univ_bndrs = patSynUnivTyVarBinders ps
     ex_bndrs   = patSynExTyVarBinders ps
-    (env1, univ_bndrs') = tidyTyCoVarBinders emptyTidyEnv univ_bndrs
-    (env2, ex_bndrs')   = tidyTyCoVarBinders env1 ex_bndrs
+    (!env1, !univ_bndrs') = tidyTyCoVarBinders emptyTidyEnv univ_bndrs
+    (!env2, !ex_bndrs')   = tidyTyCoVarBinders env1 ex_bndrs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 {-
@@ -383,26 +440,29 @@ patSynToIfaceDecl ps
 toIfaceBang :: TidyEnv -> HsImplBang -> IfaceBang
 toIfaceBang _    HsLazy              = IfNoBang
 toIfaceBang _   (HsUnpack Nothing)   = IfUnpack
-toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo (toIfaceCoercion (tidyCo env co))
+toIfaceBang env (HsUnpack (Just co)) = IfUnpackCo $! (toIfaceCoercion $! (tidyCo env co))
 toIfaceBang _   HsStrict             = IfStrict
 
 toIfaceSrcBang :: HsSrcBang -> IfaceSrcBang
 toIfaceSrcBang (HsSrcBang _ unpk bang) = IfSrcBang unpk bang
 
 toIfaceLetBndr :: Id -> IfaceLetBndr
-toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
-                               (toIfaceType (idType id))
-                               (toIfaceIdInfo (idInfo id))
-                               (toIfaceJoinInfo (isJoinId_maybe id))
+toIfaceLetBndr id  =
+  let !name = (occNameFS (getOccName id))
+      !ty = (toIfaceType $! (idType id))
+      !info = (toIfaceIdInfo $! (idInfo id))
+      !join_info = (toIfaceJoinInfo $! (isJoinId_maybe id))
+  in IfLetBndr name ty info join_info
+
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
 toIfaceIdDetails (DFunId {})                    = IfDFunId
-toIfaceIdDetails (RecSelId { sel_naughty = n
+toIfaceIdDetails (RecSelId { sel_naughty = !n
                            , sel_tycon = tc })  =
-  let iface = case tc of
+  let !iface = case tc of
                 RecSelData ty_con -> Left (toIfaceTyCon ty_con)
                 RecSelPatSyn pat_syn -> Right (patSynToIfaceDecl pat_syn)
   in IfRecSelId iface n
@@ -415,16 +475,16 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
   = case catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo,
-                    inline_hsinfo,  unfold_hsinfo, levity_hsinfo] of
+                    inline_hsinfo, unfold_hsinfo, levity_hsinfo] of
        []    -> NoInfo
-       infos -> HasInfo infos
+       infos -> infos `seqList` HasInfo infos
                -- NB: strictness and arity must appear in the list before unfolding
                -- See TcIface.tcUnfolding
   where
     ------------  Arity  --------------
     arity_info = arityInfo id_info
-    arity_hsinfo | arity_info == 0 = Nothing
-                 | otherwise       = Just (HsArity arity_info)
+    !arity_hsinfo | arity_info == 0 = Nothing
+                  | otherwise       = Just (HsArity arity_info)
 
     ------------ Caf Info --------------
     caf_info   = cafInfo id_info
@@ -457,14 +517,14 @@ toIfaceJoinInfo Nothing   = IfaceNotJoinPoint
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
-toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
+toIfUnfolding !lb (CoreUnfolding { uf_tmpl = rhs
                                 , uf_src = src
                                 , uf_guidance = guidance })
-  = Just $ HsUnfold lb $
+  = Just $! HsUnfold lb $!
     case src of
         InlineStable
           -> case guidance of
-               UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
+               UnfWhen {ug_arity = !arity, ug_unsat_ok = !unsat_ok, ug_boring_ok =  !boring_ok }
                       -> IfInlineRule arity unsat_ok boring_ok if_rhs
                _other -> IfCoreUnfold True if_rhs
         InlineCompulsory -> IfCompulsory if_rhs
@@ -474,12 +534,16 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
         -- have stuck in NoUnfolding.  For supercompilation we want
         -- to see that unfolding!
   where
-    if_rhs = toIfaceExpr rhs
+    !if_rhs = toIfaceExpr rhs
 
-toIfUnfolding lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
-  = Just (HsUnfold lb (IfDFunUnfold (map toIfaceBndr bndrs) (map toIfaceExpr args)))
+toIfUnfolding !lb (DFunUnfolding { df_bndrs = bndrs, df_args = args })
+  = if_args `seqList` if_bndrs `seqList`
+      Just (HsUnfold lb (IfDFunUnfold if_bndrs if_args))
       -- No need to serialise the data constructor;
       -- we can recover it from the type of the dfun
+  where
+    if_args = evalList $ map toIfaceExpr args
+    if_bndrs = evalList $ map toIfaceBndr bndrs
 
 toIfUnfolding _ (OtherCon {}) = Nothing
   -- The binding site of an Id doesn't have OtherCon, except perhaps
@@ -502,22 +566,27 @@ toIfUnfolding _ NoUnfolding = Nothing
 toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
 toIfaceExpr (Lit l)         = IfaceLit l
-toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
-toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
-toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x, toIfaceOneShot x) (toIfaceExpr b)
+toIfaceExpr (Type ty)       = IfaceType $! (toIfaceType ty)
+toIfaceExpr (Coercion co)   = IfaceCo   $! (toIfaceCoercion co)
+toIfaceExpr (Lam x b)       = let if_lam_args@(!_if_bndr, !_if_os) = (toIfaceBndr x, toIfaceOneShot x)
+                              in IfaceLam if_lam_args $! (toIfaceExpr b)
 toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x ty as)
-  | null as                 = IfaceECase (toIfaceExpr s) (toIfaceType ty)
-  | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
-toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
+  | null as                 = IfaceECase if_s $! (toIfaceType ty)
+  | otherwise               = let !x_fs = getOccFS x
+                              in  if_alts `seqList` IfaceCase if_s x_fs if_alts
+  where
+    !if_s = toIfaceExpr s
+    if_alts = map toIfaceAlt as
+toIfaceExpr (Let b e)       = (IfaceLet $! (toIfaceBind b)) $! (toIfaceExpr e)
+toIfaceExpr (Cast e co)     = (IfaceCast $! (toIfaceExpr e)) $! (toIfaceCoercion co)
 toIfaceExpr (Tick t e)
-  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
+  | Just t' <- toIfaceTickish t = IfaceTick t' $! (toIfaceExpr e)
   | otherwise                   = toIfaceExpr e
 
 toIfaceOneShot :: Id -> IfaceOneShot
 toIfaceOneShot id | isId id
-                  , OneShotLam <- oneShotInfo (idInfo id)
+                  , OneShotLam <- oneShotInfo $! (idInfo id)
                   = IfaceOneShot
                   | otherwise
                   = IfaceNoOneShot
@@ -533,17 +602,25 @@ toIfaceTickish (Breakpoint {})         = Nothing
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding
-toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceLetBndr b) (toIfaceExpr r)
-toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <- prs]
-
+toIfaceBind (NonRec b r) = (IfaceNonRec $! (toIfaceLetBndr b)) $! (toIfaceExpr r)
+toIfaceBind (Rec prs)    = IfaceRec $! evalList [mkBind b r | (b,r) <- prs]
+  where
+    mkBind b r =
+      let !if_b = toIfaceLetBndr b
+          !if_r = toIfaceExpr r
+      in (if_b,if_r)
 ---------------------
 toIfaceAlt :: (AltCon, [Var], CoreExpr)
            -> (IfaceConAlt, [FastString], IfaceExpr)
-toIfaceAlt (c,bs,r) = (toIfaceCon c, map getOccFS bs, toIfaceExpr r)
+toIfaceAlt (c,bs,r) =
+  let !if_c = toIfaceCon c
+      !if_fss = evalList $ map getOccFS bs
+      !if_rhs = toIfaceExpr r
+  in (if_c, if_fss, if_rhs)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
-toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
+toIfaceCon (DataAlt dc) = IfaceDataAlt $! (getName dc)
 toIfaceCon (LitAlt l)   = IfaceLitAlt l
 toIfaceCon DEFAULT      = IfaceDefault
 
@@ -554,20 +631,20 @@ toIfaceApp (Var v) as
   = case isDataConWorkId_maybe v of
         -- We convert the *worker* for tuples into IfaceTuples
         Just dc |  saturated
-                ,  Just tup_sort <- tyConTuple_maybe tc
+                ,  Just !tup_sort <- tyConTuple_maybe tc
                 -> IfaceTuple tup_sort tup_args
           where
             val_args  = dropWhile isTypeArg as
             saturated = val_args `lengthIs` idArity v
-            tup_args  = map toIfaceExpr val_args
+            tup_args  = evalList $ map toIfaceExpr val_args
             tc        = dataConTyCon dc
 
-        _ -> mkIfaceApps (toIfaceVar v) as
+        _ -> (mkIfaceApps $! (toIfaceVar v)) as
 
-toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
+toIfaceApp e as = (mkIfaceApps $! (toIfaceExpr e)) as
 
 mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
-mkIfaceApps f as = foldl' (\f a -> IfaceApp f (toIfaceExpr a)) f as
+mkIfaceApps f as = foldl' (\f a -> IfaceApp f $! (toIfaceExpr a)) f as
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr
@@ -584,6 +661,29 @@ toIfaceVar v
     | isExternalName name             = IfaceExt name
     | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
+
+--------------------------
+idToIfaceDecl :: Id -> IfaceDecl
+-- The Id is already tidied, so that locally-bound names
+-- (lambdas, for-alls) already have non-clashing OccNames
+-- We can't tidy it here, locally, because it may have
+-- free variables in its type or IdInfo
+idToIfaceDecl id
+  = let !name = getName id
+        id_ty = idType id
+        !ty = toIfaceType $! (id_ty)
+        !details = toIfaceIdDetails $! (idDetails id)
+        !info = toIfaceIdInfo $! (idInfo id)
+    in
+    -- pprTrace "idThings" (ppr (info))
+    -- pprTrace "idThings" (ppr (ty, details,info))
+    -- pprTrace "idThings" (ppr (ty, details,info))
+
+      IfaceId { ifName      = name,
+                ifType      = ty,
+                ifIdDetails = details,
+                ifIdInfo    = info }
+
 
 
 {- Note [Inlining and hs-boot files]

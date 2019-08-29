@@ -179,6 +179,8 @@ import HieTypes         ( getAsts, hie_asts, hie_module )
 import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
+import Control.DeepSeq
+import IfaceSyn
 #include "HsVersions.h"
 
 
@@ -795,7 +797,7 @@ finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
        -> Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
-finish summary tc_result mb_old_hash = do
+finish summary tc_result mb_old_hash = {-# SCC "Hsc.finish" #-} do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
       target = hscTarget dflags
@@ -828,12 +830,19 @@ finish summary tc_result mb_old_hash = do
         -- We are not generating code, so we can skip simplification
         -- and generate a simple interface.
         then mk_simple_iface
+
         else do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-          desugared_guts <- hscSimplify' plugins desugared_guts0
+          !simplified_guts <- {-# SCC "hscSimpl" #-} hscSimplify' plugins desugared_guts0
 
-          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-              liftIO $ tidyProgram hsc_env desugared_guts
+          (!cg_guts, !details) <- {-# SCC "CoreTidy" #-}
+              liftIO $ tidyProgram hsc_env simplified_guts
+
+          -- See Note [Stage Iface generation] in MkIface
+          let !partialIface =  {-# SCC "MkIfacePartial" #-}
+                  mkIfacePartial hsc_env details simplified_guts
+
+          -- pprTraceM "fpp" $ ppr $ mic_decls partialIface
 
           let iface_gen :: IO (ModIface, Bool)
               iface_gen = do
@@ -845,8 +854,9 @@ finish summary tc_result mb_old_hash = do
                   -- This captures hsc_env, we might get away with keeping
                   -- less of the environment alive here but don't do so
                   -- currently.
-                  res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts
+                  !res <-  {-# SCC "MkIfaceFinal" #-}
+                          mkIfaceFinal hsc_env mb_old_hash
+                                       partialIface
                   dumpIfaceStats hsc_env
                   return res
 
