@@ -92,6 +92,7 @@ import Outputable
 import FastString
 import Maybes( isJust )
 import Util ( count, debugIsOn )
+import NameSet ( NameSet )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -504,7 +505,11 @@ data HsTyVarBndr pass
       (XXTyVarBndr pass)
 
 type instance XUserTyVar    (GhcPass _) = NoExtField
-type instance XKindedTyVar  (GhcPass _) = NoExtField
+
+type instance XKindedTyVar  GhcPs = NoExtField
+type instance XKindedTyVar  GhcRn = NameSet        -- variables free in the kind signature
+type instance XKindedTyVar  GhcTc = NoExtField
+
 type instance XXTyVarBndr   (GhcPass _) = NoExtCon
 
 -- | Does this 'HsTyVarBndr' come with an explicit kind annotation?
@@ -717,7 +722,10 @@ type instance XOpTy            (GhcPass _) = NoExtField
 type instance XParTy           (GhcPass _) = NoExtField
 type instance XIParamTy        (GhcPass _) = NoExtField
 type instance XStarTy          (GhcPass _) = NoExtField
-type instance XKindSig         (GhcPass _) = NoExtField
+
+type instance XKindSig GhcPs = NoExtField
+type instance XKindSig GhcRn = NameSet     -- variables free in the signature
+type instance XKindSig GhcTc = NoExtField
 
 type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
 
@@ -1062,17 +1070,21 @@ hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
-hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
+hsLTyVarBndrToType
+  :: XKindedTyVar (GhcPass p) ~ XKindSig (GhcPass p)
+  => LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
 hsLTyVarBndrToType = onHasSrcSpan cvt
   where cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
-        cvt (KindedTyVar _ (L name_loc n) kind)
-          = HsKindSig noExtField
+        cvt (KindedTyVar sig_fvs (L name_loc n) kind)
+          = HsKindSig sig_fvs
                    (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
         cvt (XTyVarBndr nec) = noExtCon nec
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
-hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
+hsLTyVarBndrsToTypes
+  :: XKindedTyVar (GhcPass p) ~ XKindSig (GhcPass p)
+  => LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
 hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
 

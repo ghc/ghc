@@ -1691,7 +1691,7 @@ rnLTyClDeclWithCusk (dL->L loc pdecl) =
      ; m_tlks_with_fvs <-
        if cusks_enabled && cusk
           then do
-            (tlks, tlks_fvs) <- extractTopKindSigFromCusk name pdecl
+            (tlks, tlks_fvs) <- extractTopKindSigFromCusk name decl
             return (Just (cL loc tlks, tlks_fvs))
           else return Nothing
      ; return (decl_with_fvs, m_tlks_with_fvs) }
@@ -1792,7 +1792,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
-        ; return ( HsDataDefn { dd_ext = noExtField
+        ; return ( HsDataDefn { dd_ext = sig_fvs
                               , dd_ND = new_or_data, dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'
@@ -1972,7 +1972,7 @@ rnFamResultSig _ (NoSig _)
    = return (NoSig noExtField, emptyFVs)
 rnFamResultSig doc (KindSig _ kind)
    = do { (rndKind, ftvs) <- rnLHsKind doc kind
-        ;  return (KindSig noExtField rndKind, ftvs) }
+        ;  return (KindSig ftvs rndKind, ftvs) }
 rnFamResultSig doc (TyVarSig _ tvbndr)
    = do { -- `TyVarSig` tells us that user named the result of a type family by
           -- writing `= tyvar` or `= (tyvar :: kind)`. In such case we want to

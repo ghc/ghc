@@ -1002,7 +1002,11 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
   -- For details on above see note [Api annotations] in ApiAnnotation
 
 type instance XNoSig            (GhcPass _) = NoExtField
-type instance XCKindSig         (GhcPass _) = NoExtField
+
+type instance XCKindSig GhcPs = NoExtField
+type instance XCKindSig GhcRn = NameSet     -- variables free in the kind signature
+type instance XCKindSig GhcTc = NoExtField
+
 type instance XTyVarSig         (GhcPass _) = NoExtField
 type instance XXFamilyResultSig (GhcPass _) = NoExtCon
 
@@ -1164,7 +1168,10 @@ data HsDataDefn pass   -- The payload of a data type defn
    }
   | XHsDataDefn (XXHsDataDefn pass)
 
-type instance XCHsDataDefn    (GhcPass _) = NoExtField
+type instance XCHsDataDefn GhcPs = NoExtField
+type instance XCHsDataDefn GhcRn = NameSet     -- variables free in the signature (for GADTs)
+type instance XCHsDataDefn GhcTc = NoExtField
+
 type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 -- | Haskell Deriving clause
