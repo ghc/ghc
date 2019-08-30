@@ -1311,6 +1311,7 @@ otherwise               =  True
 -- | A 'String' is a list of characters.  String constants in Haskell are values
 -- of type 'String'.
 --
+-- See "Data.List" for operations on lists.
 type String = [Char]
 
 unsafeChr :: Int -> Char
