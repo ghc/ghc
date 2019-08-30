@@ -137,6 +137,7 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
+             | Makeinfo
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -279,6 +280,9 @@ instance H.Builder Builder where
                     Exit _ <- cmd echo [path] (buildArgs ++ [input])
                     return ()
 
+                Makeinfo -> do
+                  cmd echo [path] "--no-split" [ "-o", output] [input]
+
                 _  -> cmd echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
@@ -316,6 +320,7 @@ systemBuilderPath builder = case builder of
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
     Xelatex         -> fromKey "xelatex"
+    Makeinfo        -> fromKey "makeinfo"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."

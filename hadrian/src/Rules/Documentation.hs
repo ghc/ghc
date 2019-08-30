@@ -262,7 +262,7 @@ buildSphinxPdf path = do
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
 
------------------------------------- Info -- -----------------------------------
+------------------------------------ Info --------------------------------------
 
 -- | Build the user guide as an Info hypertext
 buildSphinxInfoGuide :: Rules ()
@@ -276,10 +276,12 @@ buildSphinxInfoGuide = do
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Info) [pathPath path] [dir]
             -- Sphinx outputs texinfo source and a makefile, the
-            -- default target actually produces the target for this
-            -- build rule.
-            build $ target docContext (Make dir) ["Makefile"] [dir]
-            copyFileUntracked (dir -/- path <.> "info") file
+            -- default target of which actually produces the target
+            -- for this build rule.
+            let p = dir -/- path
+            let [texipath, infopath] = map (p <.>) ["texi", "info"]
+            build $ target docContext (Makeinfo) [texipath] [infopath]
+            copyFileUntracked infopath file
 
 ------------------------------------ Archive -----------------------------------
 
