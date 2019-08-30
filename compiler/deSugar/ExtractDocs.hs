@@ -130,7 +130,7 @@ sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
 sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
 sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
 sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
-sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
+sigNameNoLoc (InlineSig  _   ns _)         = map unLoc ns
 sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
 sigNameNoLoc _                             = []
 

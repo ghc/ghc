@@ -1001,9 +1001,9 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
-renameSig ctxt sig@(InlineSig _ v s)
-  = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (InlineSig noExtField new_v s, emptyFVs) }
+renameSig ctxt sig@(InlineSig _ vs s)
+  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
+        ; return (InlineSig noExtField new_vs s, emptyFVs) }
 
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
@@ -1128,7 +1128,7 @@ findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
     expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
-    expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
+    expand_sig sig@(InlineSig _ ns _)            = [(n,sig) | n <- ns]
     expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig _ ns  _ )          = [(n,sig) | n <- ns]
