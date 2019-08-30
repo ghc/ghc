@@ -712,7 +712,7 @@ cvtPragmaD (InlineP nm inline rm phases)
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
                                  , inl_sat    = Nothing }
-       ; returnJustL $ Hs.SigD noExtField $ InlineSig noExtField nm' ip }
+       ; returnJustL $ Hs.SigD noExtField $ InlineSig noExtField [nm'] ip }
 
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameL nm
