@@ -223,7 +223,7 @@ mkOneConFull :: [Type] -> ConLike -> PmM ([Id], [EvVar], [Type], [TyVar])
 mkOneConFull arg_tys con = do
   let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, con_res_ty)
         = conLikeFullSig con
-  pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr con_res_ty) (return ())
+  -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
   -- Instantiate fresh existentials as arguments to the contructor
@@ -938,14 +938,14 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $
 -- its result type. Rather easy for DataCons, but not so much for PatSynCons.
 -- See Note [Pattern synonym result type] in PatSyn.hs.
 guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> Type -> ConLike -> Maybe [Type]
-guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = pprTraceWith "guess DataCon" (\it -> ppr res_ty <+> ppr it) $ do
+guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = do
   (tc, tc_args) <- splitTyConApp_maybe res_ty
   -- Consider data families: In case of a DataCon, we need to translate to
   -- the representation TyCon. For PatSyns, they are relative to the data
   -- family TyCon, so we don't need to translate them.
   let (_, tc_args', _) = tcLookupDataFamInst env tc tc_args
   Just tc_args'
-guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = pprTraceWith "guess PatSyn" (\it -> ppr res_ty <+> ppr it) $ do
+guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   -- We were successful if we managed to instantiate *every* univ_tv of con.
   -- This is difficult and bound to fail in some cases, see
   -- Note [Pattern synonym result type] in PatSyn.hs. So we just try our best
