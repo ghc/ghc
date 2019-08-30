@@ -243,8 +243,7 @@ wrapBind new old body   -- NB: this function must deal with term
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = Case (Var var) var (exprType body)
-                        [(DEFAULT, [], body)]
+seqVar var body = mkDefaultCase (Var var) var body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)

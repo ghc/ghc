@@ -7,6 +7,7 @@ module MkCore (
         mkCoreApp, mkCoreApps, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
+        mkSingleAltCase,
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
@@ -57,7 +58,7 @@ import Id
 import Var      ( EvVar, setTyVarUnique )
 
 import CoreSyn
-import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
+import CoreUtils        ( exprType, needsCaseBinding, mkSingleAltCase, bindNonRec )
 import Literal
 import HscTypes
 
@@ -111,37 +112,22 @@ mkCoreLet (NonRec bndr rhs) body        -- See Note [CoreSyn let/app invariant]
 mkCoreLet bind body
   = Let bind body
 
+-- | Create a lambda where the given expression has a number of variables
+-- bound over it. The leftmost binder is that bound by the outermost
+-- lambda in the result
+mkCoreLams :: [CoreBndr] -> CoreExpr -> CoreExpr
+mkCoreLams = mkLams
+
 -- | Bind a list of binding groups over an expression. The leftmost binding
 -- group becomes the outermost group in the resulting expression
 mkCoreLets :: [CoreBind] -> CoreExpr -> CoreExpr
 mkCoreLets binds body = foldr mkCoreLet body binds
 
--- | Construct an expression which represents the application of one expression
--- paired with its type to an argument. The result is paired with its type. This
--- function is not exported and used in the definition of 'mkCoreApp' and
--- 'mkCoreApps'.
--- Respects the let/app invariant by building a case expression where necessary
---   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
-mkCoreAppTyped _ (fun, fun_ty) (Type ty)
-  = (App fun (Type ty), piResultTy fun_ty ty)
-mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
-  = (App fun (Coercion co), res_ty)
-  where
-    (_, res_ty) = splitFunTy fun_ty
-mkCoreAppTyped d (fun, fun_ty) arg
-  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-    (mk_val_app fun arg arg_ty res_ty, res_ty)
-  where
-    (arg_ty, res_ty) = splitFunTy fun_ty
-
--- | Construct an expression which represents the application of one expression
--- to the other
--- Respects the let/app invariant by building a case expression where necessary
---   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreApp s fun arg
-  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
+-- | Construct an expression which represents the application of a number of
+-- expressions to that of a data constructor expression. The leftmost expression
+-- in the list is applied first
+mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
+mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
@@ -155,35 +141,48 @@ mkCoreApps fun args
     doc_string = ppr fun_ty $$ ppr fun $$ ppr args
     fun_ty = exprType fun
 
--- | Construct an expression which represents the application of a number of
--- expressions to that of a data constructor expression. The leftmost expression
--- in the list is applied first
-mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
-mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
+-- | Construct an expression which represents the application of one expression
+-- to the other
+-- Respects the let/app invariant by building a case expression where necessary
+--   See CoreSyn Note [CoreSyn let/app invariant]
+mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp s fun arg
+  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
-mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+-- | Construct an expression which represents the application of one expression
+-- paired with its type to an argument. The result is paired with its type. This
+-- function is not exported and used in the definition of 'mkCoreApp' and
+-- 'mkCoreApps'.
+-- Respects the let/app invariant by building a case expression where necessary
+--   See CoreSyn Note [CoreSyn let/app invariant]
+mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped _ (fun, fun_ty) (Type ty)
+  = (App fun (Type ty), piResultTy fun_ty ty)
+mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
+  = (App fun (Coercion co), funResultTy fun_ty)
+mkCoreAppTyped d (fun, fun_ty) arg
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+    (mkValApp fun arg arg_ty res_ty, res_ty)
+  where
+    (arg_ty, res_ty) = splitFunTy fun_ty
+
+mkValApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [CoreSyn let/app invariant]
-mk_val_app fun arg arg_ty res_ty
+mkValApp fun arg arg_ty res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
-
   | otherwise
-  = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
-  where
-    arg_id = mkWildValBinder arg_ty
-        -- Lots of shadowing, but it doesn't matter,
-        -- because 'fun ' should not have a free wild-id
-        --
-        -- This is Dangerous.  But this is the only place we play this
-        -- game, mk_val_app returns an expression that does not have
-        -- a free wild-id.  So the only thing that can go wrong
-        -- is if you take apart this case expression, and pass a
-        -- fragment of it as the fun part of a 'mk_val_app'.
+  = mkStrictApp fun arg arg_ty res_ty
 
------------
+{- *********************************************************************
+*                                                                      *
+              Building case expressions
+*                                                                      *
+********************************************************************* -}
+
 mkWildEvBinder :: PredType -> EvVar
 mkWildEvBinder pred = mkWildValBinder pred
 
@@ -197,9 +196,28 @@ mkWildValBinder ty = mkLocalIdOrCoVar wildCardName ty
 
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
--- The alts should not have any occurrences of WildId
+-- The alts and res_ty should not have any occurrences of WildId
 mkWildCase scrut scrut_ty res_ty alts
   = Case scrut (mkWildValBinder scrut_ty) res_ty alts
+
+mkStrictApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+-- Build a strict application (case e2 of x -> e1 x)
+mkStrictApp fun arg arg_ty res_ty
+  = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
+       -- mkDefaultCase looks attractive here, and would be sound.
+       -- But it uses (exprType alt_rhs) to compute the result type,
+       -- whereas here we already know that the result type is res_ty
+  where
+    arg_id = mkWildValBinder arg_ty
+        -- Lots of shadowing, but it doesn't matter,
+        -- because 'fun' and 'res_ty' should not have a free wild-id
+        --
+        -- This is Dangerous.  But this is the only place we play this
+        -- game, mkStrictApp returns an expression that does not have
+        -- a free wild-id.  So the only way 'fun' could get a free wild-id
+        -- would be if you take apart this case expression (or some other
+        -- expression that uses mkWildValBinder, of which there are not
+        -- many), and pass a fragment of it as the fun part of a 'mkStrictApp'.
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
@@ -217,17 +235,6 @@ castBottomExpr e res_ty
   | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
   where
     e_ty = exprType e
-
-{-
-The functions from this point don't really do anything cleverer than
-their counterparts in CoreSyn, but they are here for consistency
--}
-
--- | Create a lambda where the given expression has a number of variables
--- bound over it. The leftmost binder is that bound by the outermost
--- lambda in the result
-mkCoreLams :: [CoreBndr] -> CoreExpr -> CoreExpr
-mkCoreLams = mkLams
 
 {-
 ************************************************************************
@@ -558,7 +565,7 @@ instance Outputable FloatBind where
 
 wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
-wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
+wrapFloat (FloatCase e b con bs) body = mkSingleAltCase e b con bs body
 
 -- | Applies the floats from right to left. That is @wrapFloats [b1, b2, …, bn]
 -- u = let b1 in let b2 in … in let bn in u@

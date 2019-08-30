@@ -3,7 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
 
 
-A ``lint'' pass to check for Core correctness
+A ``lint'' pass to check for Core correctness.
+See Note [Core Lint guarantee].
 -}
 
 {-# LANGUAGE CPP #-}
@@ -78,6 +79,23 @@ import Pair
 import qualified GHC.LanguageExtensions as LangExt
 
 {-
+Note [Core Lint guarantee]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Core Lint is the type-checker for Core. Using it, we get the following guarantee:
+
+If all of:
+1. Core Lint passes,
+2. there are no unsafe coercions (i.e. UnsafeCoerceProv),
+3. all plugin-supplied coercions (i.e. PluginProv) are valid, and
+4. all case-matches are complete
+then running the compiled program will not seg-fault, assuming no bugs downstream
+(e.g. in the code generator). This guarantee is quite powerful, in that it allows us
+to decouple the safety of the resulting program from the type inference algorithm.
+
+However, do note point (4) above. Core Lint does not check for incomplete case-matches;
+see Note [Case expression invariants] in CoreSyn, invariant (4). As explained there,
+an incomplete case-match might slip by Core Lint and cause trouble at runtime.
+
 Note [GHC Formalism]
 ~~~~~~~~~~~~~~~~~~~~
 This file implements the type-checking algorithm for System FC, the "official"
@@ -392,6 +410,7 @@ interactiveInScope hsc_env
               --   f :: [t] -> [t]
               -- where t is a RuntimeUnk (see TcType)
 
+-- | Type-check a 'CoreProgram'. See Note [Core Lint guarantee].
 lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc, Bag MsgDoc)
 --   Returns (warnings, errors)
 -- If you edit this function, you may need to update the GHC formalism
@@ -786,50 +805,8 @@ lintCoreExpr (Lam var expr)
     do { body_ty <- lintCoreExpr expr
        ; return $ mkLamType var' body_ty }
 
-lintCoreExpr e@(Case scrut var alt_ty alts) =
-       -- Check the scrutinee
-  do { scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
-          -- See Note [Join points are less general than the paper]
-          -- in CoreSyn
-
-     ; (alt_ty, _) <- lintInTy alt_ty
-     ; (var_ty, _) <- lintInTy (idType var)
-
-     -- We used to try to check whether a case expression with no
-     -- alternatives was legitimate, but this didn't work.
-     -- See Note [No alternatives lint check] for details.
-
-     -- See Note [Rules for floating-point comparisons] in PrelRules
-     ; let isLitPat (LitAlt _, _ , _) = True
-           isLitPat _                 = False
-     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
-         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
-                        "expression with literal pattern in case " ++
-                        "analysis (see #9238).")
-          $$ text "scrut" <+> ppr scrut)
-
-     ; case tyConAppTyCon_maybe (idType var) of
-         Just tycon
-              | debugIsOn
-              , isAlgTyCon tycon
-              , not (isAbstractTyCon tycon)
-              , null (tyConDataCons tycon)
-              , not (exprIsBottom scrut)
-              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
-                        -- This can legitimately happen for type families
-                      $ return ()
-         _otherwise -> return ()
-
-        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
-
-     ; subst <- getTCvSubst
-     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
-
-     ; lintBinder CaseBind var $ \_ ->
-       do { -- Check the alternatives
-            mapM_ (lintCoreAlt scrut_ty alt_ty) alts
-          ; checkCaseAlts e scrut_ty alts
-          ; return alt_ty } }
+lintCoreExpr (Case scrut var alt_ty alts)
+  = lintCaseExpr scrut var alt_ty alts
 
 -- This case can't happen; linting types in expressions gets routed through
 -- lintCoreArgs
@@ -1095,6 +1072,60 @@ lintTyKind tyvar arg_ty
 ************************************************************************
 -}
 
+lintCaseExpr :: CoreExpr -> Id -> Type -> [CoreAlt] -> LintM OutType
+lintCaseExpr scrut var alt_ty alts =
+  do { let e = Case scrut var alt_ty alts   -- Just for error messages
+
+     -- Check the scrutinee
+     ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
+          -- See Note [Join points are less general than the paper]
+          -- in CoreSyn
+
+     ; (alt_ty, _) <- addLoc (CaseTy scrut) $
+                      lintInTy alt_ty
+     ; (var_ty, _) <- addLoc (IdTy var) $
+                      lintInTy (idType var)
+
+     -- We used to try to check whether a case expression with no
+     -- alternatives was legitimate, but this didn't work.
+     -- See Note [No alternatives lint check] for details.
+
+     -- Check that the scrutinee is not a floating-point type
+     -- if there are any literal alternatives
+     -- See CoreSyn Note [Case expression invariants] item (5)
+     -- See Note [Rules for floating-point comparisons] in PrelRules
+     ; let isLitPat (LitAlt _, _ , _) = True
+           isLitPat _                 = False
+     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
+         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
+                        "expression with literal pattern in case " ++
+                        "analysis (see #9238).")
+          $$ text "scrut" <+> ppr scrut)
+
+     ; case tyConAppTyCon_maybe (idType var) of
+         Just tycon
+              | debugIsOn
+              , isAlgTyCon tycon
+              , not (isAbstractTyCon tycon)
+              , null (tyConDataCons tycon)
+              , not (exprIsBottom scrut)
+              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
+                        -- This can legitimately happen for type families
+                      $ return ()
+         _otherwise -> return ()
+
+        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
+
+     ; subst <- getTCvSubst
+     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
+       -- See CoreSyn Note [Case expression invariants] item (7)
+
+     ; lintBinder CaseBind var $ \_ ->
+       do { -- Check the alternatives
+            mapM_ (lintCoreAlt scrut_ty alt_ty) alts
+          ; checkCaseAlts e scrut_ty alts
+          ; return alt_ty } }
+
 checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
 -- b1) Check that the DEFAULT comes first, if it exists
@@ -1106,7 +1137,10 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 
 checkCaseAlts e ty alts =
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
+         -- See CoreSyn Note [Case expression invariants] item (2)
+
      ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
+         -- See CoreSyn Note [Case expression invariants] item (3)
 
           -- For types Int#, Word# with an infinite (well, large!) number of
           -- possible values, there should usually be a DEFAULT case
@@ -1136,6 +1170,7 @@ lintAltExpr :: CoreExpr -> OutType -> LintM ()
 lintAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr
        ; ensureEqTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
+         -- See CoreSyn Note [Case expression invariants] item (6)
 
 lintCoreAlt :: OutType          -- Type of scrutinee
             -> OutType          -- Type of the alternative
@@ -1246,7 +1281,8 @@ lintIdBndr top_lvl bind_site id linterF
        ; checkL (not (isExternalName (Var.varName id)) || is_top_lvl)
            (mkNonTopExternalNameMsg id)
 
-       ; (ty, k) <- lintInTy (idType id)
+       ; (ty, k) <- addLoc (IdTy id) $
+                    lintInTy (idType id)
 
           -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (isJoinId id || not (isKindLevPoly k))
@@ -2180,6 +2216,9 @@ data LintLocInfo
   | BodyOfLetRec [Id]   -- One of the binders
   | CaseAlt CoreAlt     -- Case alternative
   | CasePat CoreAlt     -- The *pattern* of the case alternative
+  | CaseTy CoreExpr     -- The type field of a case expression
+                        -- with this scrutinee
+  | IdTy Id             -- The type field of an Id binder
   | AnExpr CoreExpr     -- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
@@ -2237,17 +2276,23 @@ addWarnL msg = LintM $ \ env (warns,errs) ->
 
 addMsg :: LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
 addMsg env msgs msg
-  = ASSERT( notNull locs )
+  = ASSERT( notNull loc_msgs )
     msgs `snocBag` mk_msg msg
   where
-   locs = le_loc env
-   (loc, cxt1) = dumpLoc (head locs)
-   cxts        = [snd (dumpLoc loc) | loc <- locs]
-   context     = ifPprDebug (vcat (reverse cxts) $$ cxt1 $$
-                             text "Substitution:" <+> ppr (le_subst env))
-                            cxt1
+   loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first
+   loc_msgs = map dumpLoc (le_loc env)
 
-   mk_msg msg = mkLocMessage SevWarning (mkSrcSpan loc loc) (context $$ msg)
+   cxt_doc = vcat $ reverse $ map snd loc_msgs
+   context = cxt_doc $$ whenPprDebug extra
+   extra   = text "Substitution:" <+> ppr (le_subst env)
+
+   msg_span = case [ span | (loc,_) <- loc_msgs
+                          , let span = srcLocSpan loc
+                          , isGoodSrcSpan span ] of
+               []    -> noSrcSpan
+               (s:_) -> s
+   mk_msg msg = mkLocMessage SevWarning msg_span
+                             (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m
@@ -2345,7 +2390,8 @@ lintTyCoVarInScope :: TyCoVar -> LintM ()
 lintTyCoVarInScope var
   = do { subst <- getTCvSubst
        ; lintL (var `isInScope` subst)
-               (pprBndr LetBind var <+> text "is out of scope") }
+               (hang (text "The variable" <+> pprBndr LetBind var)
+                   2 (text "is out of scope")) }
 
 ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
@@ -2375,19 +2421,19 @@ lintRole co r1 r2
 dumpLoc :: LintLocInfo -> (SrcLoc, SDoc)
 
 dumpLoc (RhsOf v)
-  = (getSrcLoc v, brackets (text "RHS of" <+> pp_binders [v]))
+  = (getSrcLoc v, text "In the RHS of" <+> pp_binders [v])
 
 dumpLoc (LambdaBodyOf b)
-  = (getSrcLoc b, brackets (text "in body of lambda with binder" <+> pp_binder b))
+  = (getSrcLoc b, text "In the body of lambda with binder" <+> pp_binder b)
 
 dumpLoc (UnfoldingOf b)
-  = (getSrcLoc b, brackets (text "in the unfolding of" <+> pp_binder b))
+  = (getSrcLoc b, text "In the unfolding of" <+> pp_binder b)
 
 dumpLoc (BodyOfLetRec [])
-  = (noSrcLoc, brackets (text "In body of a letrec with no binders"))
+  = (noSrcLoc, text "In body of a letrec with no binders")
 
 dumpLoc (BodyOfLetRec bs@(_:_))
-  = ( getSrcLoc (head bs), brackets (text "in body of letrec with binders" <+> pp_binders bs))
+  = ( getSrcLoc (head bs), text "In the body of letrec with binders" <+> pp_binders bs)
 
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
@@ -2398,8 +2444,15 @@ dumpLoc (CaseAlt (con, args, _))
 dumpLoc (CasePat (con, args, _))
   = (noSrcLoc, text "In the pattern of a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
+dumpLoc (CaseTy scrut)
+  = (noSrcLoc, hang (text "In the result-type of a case with scrutinee:")
+                  2 (ppr scrut))
+
+dumpLoc (IdTy b)
+  = (getSrcLoc b, text "In the type of a binder:" <+> ppr b)
+
 dumpLoc (ImportedUnfolding locn)
-  = (locn, brackets (text "in an imported unfolding"))
+  = (locn, text "In an imported unfolding")
 dumpLoc TopLevelBindings
   = (noSrcLoc, Outputable.empty)
 dumpLoc (InType ty)
