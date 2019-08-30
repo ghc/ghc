@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -------------------------------------------------------------------------------
 --
@@ -95,6 +96,7 @@ data WarnReason
   deriving (Eq, Show)
 
 instance Outputable WarnReason where
+  type OutputableNeedsOfConfig WarnReason = NoConstraint
   ppr = text . show
 
 instance ToJson WarnReason where

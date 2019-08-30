@@ -9,6 +9,8 @@ import RegClass
 import Reg
 
 import Outputable
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import GHC.Platform
 
 import Data.Word

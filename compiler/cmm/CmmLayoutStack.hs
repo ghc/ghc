@@ -1,4 +1,7 @@
-{-# LANGUAGE BangPatterns, RecordWildCards, GADTs #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -33,6 +36,8 @@ import Util
 import DynFlags
 import FastString
 import Outputable hiding ( isEmpty )
+import Outputable.DynFlags (pprPanic)
+import PlainPanic (panic)
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
@@ -229,6 +234,7 @@ data StackMap = StackMap
  }
 
 instance Outputable StackMap where
+  --type OutputableNeedsOfConfig StackMap = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress)
   ppr StackMap{..} =
      text "Sp = " <> int sm_sp $$
      text "sm_args = " <> int sm_args $$
@@ -1209,6 +1215,7 @@ data StackSlot = Occupied | Empty
      -- Occupied: a return address or part of an update frame
 
 instance Outputable StackSlot where
+  type OutputableNeedsOfConfig StackSlot = NoConstraint
   ppr Occupied = text "XXX"
   ppr Empty    = text "---"
 

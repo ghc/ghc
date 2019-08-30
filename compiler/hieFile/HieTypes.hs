@@ -8,6 +8,7 @@ For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module HieTypes where
 
 import GhcPrelude
@@ -19,6 +20,7 @@ import IfaceType
 import Module                     ( ModuleName, Module )
 import Name                       ( Name )
 import Outputable hiding ( (<>) )
+import PlainPanic                 ( panic )
 import SrcLoc                     ( RealSrcSpan )
 import Avail
 
@@ -269,6 +271,7 @@ data IdentifierDetails a = IdentifierDetails
   } deriving (Eq, Functor, Foldable, Traversable)
 
 instance Outputable a => Outputable (IdentifierDetails a) where
+  type OutputableNeedsOfConfig (IdentifierDetails a) = OutputableNeedsOfConfig a
   ppr x = text "IdentifierDetails" <+> ppr (identType x) <+> ppr (identInfo x)
 
 instance Semigroup (IdentifierDetails a) where
@@ -333,6 +336,7 @@ data ContextInfo
     deriving (Eq, Ord, Show)
 
 instance Outputable ContextInfo where
+  type OutputableNeedsOfConfig ContextInfo = NoConstraint
   ppr = text . show
 
 instance Binary ContextInfo where
@@ -441,6 +445,7 @@ data Scope
     deriving (Eq, Ord, Show, Typeable, Data)
 
 instance Outputable Scope where
+  type OutputableNeedsOfConfig Scope = NoConstraint
   ppr NoScope = text "NoScope"
   ppr (LocalScope sp) = text "LocalScope" <+> ppr sp
   ppr ModuleScope = text "ModuleScope"

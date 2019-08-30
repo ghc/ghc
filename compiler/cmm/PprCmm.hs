@@ -1,4 +1,10 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ----------------------------------------------------------------------------
@@ -53,58 +59,83 @@ import PprCmmExpr
 import Util
 
 import BasicTypes
+import CoreDebugSuppress
+import GHC.Platform.Lens
 import Hoopl.Block
 import Hoopl.Graph
+import NameSuppress
+import Packages (HasPackageState)
 
 -------------------------------------------------
 -- Outputable instances
 
 instance Outputable CmmStackInfo where
+    --type OutputableNeedsOfConfig CmmStackInfo = NoConstraint
     ppr = pprStackInfo
 
 instance Outputable CmmTopInfo where
+    type OutputableNeedsOfConfig CmmTopInfo = HasPlatform
     ppr = pprTopInfo
 
 
 instance Outputable (CmmNode e x) where
+    type OutputableNeedsOfConfig (CmmNode e x) = PairConstraint
+      (PairConstraint
+        (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+        (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState)))
+      HasCoreDebugSuppress
     ppr = pprNode
 
 instance Outputable Convention where
+    --type OutputableNeedsOfConfig Convention = NoConstraint
     ppr = pprConvention
 
 instance Outputable ForeignConvention where
+    type OutputableNeedsOfConfig ForeignConvention = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr = pprForeignConvention
 
 instance Outputable ForeignTarget where
+    type OutputableNeedsOfConfig ForeignTarget = PairConstraint
+      (PairConstraint (PairConstraint HasPlatform HasPlatformConstants) HasPlatformMisc)
+      (PairConstraint HasPprConfig (PairConstraint HasNameSuppress HasPackageState))
     ppr = pprForeignTarget
 
 instance Outputable CmmReturnInfo where
+    type OutputableNeedsOfConfig CmmReturnInfo = NoConstraint
     ppr = pprReturnInfo
 
 instance Outputable (Block CmmNode C C) where
+    --type OutputableNeedsOfConfig (Block CmmNode C C) = NoConstraint
     ppr = pprBlock
 instance Outputable (Block CmmNode C O) where
+    --type OutputableNeedsOfConfig (Block CmmNode C O) = NoConstraint
     ppr = pprBlock
 instance Outputable (Block CmmNode O C) where
+    --type OutputableNeedsOfConfig (Block CmmNode O C) = NoConstraint
     ppr = pprBlock
 instance Outputable (Block CmmNode O O) where
+    --type OutputableNeedsOfConfig (Block CmmNode O O) = NoConstraint
     ppr = pprBlock
 
 instance Outputable (Graph CmmNode e x) where
+    --type OutputableNeedsOfConfig (Graph CmmNode e x) = NoConstraint
     ppr = pprGraph
 
 instance Outputable CmmGraph where
+    --type OutputableNeedsOfConfig CmmGraph = NoConstraint
     ppr = pprCmmGraph
 
 ----------------------------------------------------------
 -- Outputting types Cmm contains
 
-pprStackInfo :: CmmStackInfo -> SDoc
+pprStackInfo :: CmmStackInfo -> SDoc' r
 pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
   text "arg_space: " <> ppr arg_space <+>
   text "updfr_space: " <> ppr updfr_space
 
-pprTopInfo :: CmmTopInfo -> SDoc
+pprTopInfo :: HasPlatform r => CmmTopInfo -> SDoc' r
 pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
   vcat [text "info_tbls: " <> ppr info_tbl,
         text "stack_info: " <> ppr stack_info]
@@ -112,29 +143,36 @@ pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
 ----------------------------------------------------------
 -- Outputting blocks and graphs
 
-pprBlock :: IndexedCO x SDoc SDoc ~ SDoc
-         => Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock
+  :: forall e x r
+  .  IndexedCO x (SDoc' r) (SDoc' r) ~ SDoc' r
+  => Block CmmNode e x -> SDoc' r
 pprBlock block
-    = foldBlockNodesB3 ( ($$) . ppr
+    = foldBlockNodesB3 @CmmNode @(SDoc' r) @(SDoc' r) @(SDoc' r)
+                       ( ($$) . ppr
                        , ($$) . (nest 4) . ppr
                        , ($$) . (nest 4) . ppr
                        )
                        block
                        empty
 
-pprGraph :: Graph CmmNode e x -> SDoc
+pprGraph
+  :: Graph CmmNode e x -> SDoc' r
 pprGraph GNil = empty
 pprGraph (GUnit block) = ppr block
 pprGraph (GMany entry body exit)
    = text "{"
   $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
   $$ text "}"
-  where pprMaybeO :: Outputable (Block CmmNode e x)
-                  => MaybeO ex (Block CmmNode e x) -> SDoc
+  where pprMaybeO
+          :: ( Outputable (Block CmmNode e x)
+             , OutputableNeedsOfConfig (Block CmmNode e x) DynFlags
+             )
+          => MaybeO ex (Block CmmNode e x) -> SDoc' r
         pprMaybeO NothingO = empty
         pprMaybeO (JustO block) = ppr block
 
-pprCmmGraph :: CmmGraph -> SDoc
+pprCmmGraph :: CmmGraph -> SDoc' r
 pprCmmGraph g
    = text "{" <> text "offset"
   $$ nest 2 (vcat $ map ppr blocks)
@@ -147,25 +185,43 @@ pprCmmGraph g
 ---------------------------------------------
 -- Outputting CmmNode and types which it contains
 
-pprConvention :: Convention -> SDoc
+pprConvention :: Convention -> SDoc' r
 pprConvention (NativeNodeCall   {}) = text "<native-node-call-convention>"
 pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
 pprConvention (NativeReturn {})     = text "<native-ret-convention>"
 pprConvention  Slow                 = text "<slow-convention>"
 pprConvention  GC                   = text "<gc-convention>"
 
-pprForeignConvention :: ForeignConvention -> SDoc
+pprForeignConvention
+  :: forall r
+  .  ( HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => ForeignConvention -> SDoc' r
 pprForeignConvention (ForeignConvention c args res ret) =
           doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res <+> ppr ret
 
-pprReturnInfo :: CmmReturnInfo -> SDoc
+pprReturnInfo :: CmmReturnInfo -> SDoc' r
 pprReturnInfo CmmMayReturn = empty
 pprReturnInfo CmmNeverReturns = text "never returns"
 
-pprForeignTarget :: ForeignTarget -> SDoc
+pprForeignTarget
+  :: forall r
+  .  ( HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     )
+  => ForeignTarget -> SDoc' r
 pprForeignTarget (ForeignTarget fn c) = ppr c <+> ppr_target fn
   where
-        ppr_target :: CmmExpr -> SDoc
+        ppr_target :: CmmExpr -> SDoc' r
         ppr_target t@(CmmLit _) = ppr t
         ppr_target fn'          = parens (ppr fn')
 
@@ -177,17 +233,27 @@ pprForeignTarget (PrimTarget op)
                          (mkFastString (show op))
                          Nothing ForeignLabelInThisPackage IsFunction))
 
-pprNode :: CmmNode e x -> SDoc
+pprNode
+  :: forall r e x
+  .  ( HasPlatform r
+     , HasPlatformConstants r
+     , HasPlatformMisc r
+     , HasPprConfig r
+     , HasNameSuppress r
+     , HasPackageState r
+     , HasCoreDebugSuppress r
+     )
+  => CmmNode e x -> SDoc' r
 pprNode node = pp_node <+> pp_debug
   where
-    pp_node :: SDoc
+    pp_node :: SDoc' r
     pp_node = sdocWithDynFlags $ \dflags -> case node of
       -- label:
       CmmEntry id tscope -> lbl <> colon <+>
          (sdocWithDynFlags $ \dflags ->
-           ppUnless (gopt Opt_SuppressTicks dflags) (text "//" <+> ppr tscope))
+           ppUnless (coreDebugSuppress_suppressTicks $ getCoreDebugSuppress dflags) (text "//" <+> ppr tscope))
           where
-            lbl = if gopt Opt_SuppressUniques dflags
+            lbl = if nameSuppress_uniques $ getNameSuppress dflags
                 then text "_lbl_"
                 else ppr id
 
@@ -195,7 +261,7 @@ pprNode node = pp_node <+> pp_debug
       CmmComment s -> text "//" <+> ftext s
 
       -- //tick bla<...>
-      CmmTick t -> ppUnless (gopt Opt_SuppressTicks dflags) $
+      CmmTick t -> ppUnless (coreDebugSuppress_suppressTicks $ getCoreDebugSuppress dflags) $
                    text "//tick" <+> ppr t
 
       -- unwind reg = expr;
@@ -288,7 +354,7 @@ pprNode node = pp_node <+> pp_debug
                , text "ret_off:" <+> ppr u
                , semi ]
 
-    pp_debug :: SDoc
+    pp_debug :: SDoc' r
     pp_debug =
       if not debugIsOn then empty
       else case node of
@@ -305,5 +371,5 @@ pprNode node = pp_node <+> pp_debug
              CmmCall {}              -> text "  // CmmCall"
              CmmForeignCall {}       -> text "  // CmmForeignCall"
 
-    commafy :: [SDoc] -> SDoc
+    commafy :: [SDoc' r] -> SDoc' r
     commafy xs = hsep $ punctuate comma xs

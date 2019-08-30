@@ -1,7 +1,14 @@
 -- (c) The University of Glasgow 2012
 
-{-# LANGUAGE CPP, DataKinds, DeriveDataTypeable, GADTs, KindSignatures,
-             ScopedTypeVariables, StandaloneDeriving, RoleAnnotations #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Module for coercion axioms, used to represent type family instances
 -- and newtypes
@@ -35,6 +42,8 @@ import {-# SOURCE #-} TyCoRep ( Type )
 import {-# SOURCE #-} TyCoPpr ( pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
+import Panic (assertPanic, panic)
+import Packages (HasPackageState )
 import FastString
 import Name
 import Unique
@@ -43,11 +52,13 @@ import Util
 import Binary
 import Pair
 import BasicTypes
-import Data.Typeable ( Typeable )
 import SrcLoc
+import TypeSuppress
+
 import qualified Data.Data as Data
 import Data.Array
 import Data.List ( mapAccumL )
+import Data.Typeable ( Typeable )
 
 #include "HsVersions.h"
 
@@ -444,6 +455,9 @@ instance Uniquable (CoAxiom br) where
     getUnique = co_ax_unique
 
 instance Outputable (CoAxiom br) where
+    type OutputableNeedsOfConfig (CoAxiom br) = PairConstraint
+      HasNameSuppress
+      HasPackageState
     ppr = ppr . getName
 
 instance NamedThing (CoAxiom br) where
@@ -456,6 +470,9 @@ instance Typeable br => Data.Data (CoAxiom br) where
     dataTypeOf _ = mkNoRepType "CoAxiom"
 
 instance Outputable CoAxBranch where
+  type OutputableNeedsOfConfig CoAxBranch = PairConstraint
+    (PairConstraint HasPprConfig HasNameSuppress)
+    (PairConstraint HasTypeSuppress HasPackageState)
   ppr (CoAxBranch { cab_loc = loc
                   , cab_lhs = lhs
                   , cab_rhs = rhs }) =
@@ -491,6 +508,7 @@ fsFromRole Representational = fsLit "representational"
 fsFromRole Phantom          = fsLit "phantom"
 
 instance Outputable Role where
+  type OutputableNeedsOfConfig Role = NoConstraint
   ppr = ftext . fsFromRole
 
 instance Binary Role where
@@ -553,6 +571,7 @@ instance Ord CoAxiomRule where
   compare x y = compare (coaxrName x) (coaxrName y)
 
 instance Outputable CoAxiomRule where
+  type OutputableNeedsOfConfig CoAxiomRule = NoConstraint
   ppr = ppr . coaxrName
 
 

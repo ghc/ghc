@@ -1,6 +1,6 @@
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Put common type definitions here to break recursive module dependencies.
-
 module RegAlloc.Linear.Base (
         BlockAssignment,
 
@@ -65,6 +65,7 @@ data Loc
         deriving (Eq, Show, Ord)
 
 instance Outputable Loc where
+        type OutputableNeedsOfConfig Loc = NoConstraint
         ppr l = text (show l)
 
 

@@ -14,6 +14,8 @@ It does not normalize the graphs. This means that g `unionUnVarGraph` g is
 equal to g, but twice as expensive and large.
 
 -}
+
+{-# LANGUAGE TypeFamilies #-}
 module UnVarGraph
     ( UnVarSet
     , emptyUnVarSet, mkUnVarSet, varEnvDom, unionUnVarSet, unionUnVarSets
@@ -77,6 +79,7 @@ unionUnVarSets :: [UnVarSet] -> UnVarSet
 unionUnVarSets = foldr unionUnVarSet emptyUnVarSet
 
 instance Outputable UnVarSet where
+    type OutputableNeedsOfConfig UnVarSet = NoConstraint
     ppr (UnVarSet s) = braces $
         hcat $ punctuate comma [ ppr (getUnique i) | i <- S.toList s]
 
@@ -139,7 +142,9 @@ prune (UnVarGraph g) = UnVarGraph $ filterBag go g
         go (CBPG s1 s2) = not (isEmptyUnVarSet s1) && not (isEmptyUnVarSet s2)
 
 instance Outputable Gen where
+    type OutputableNeedsOfConfig Gen = NoConstraint
     ppr (CG s)       = ppr s  <> char '²'
     ppr (CBPG s1 s2) = ppr s1 <+> char 'x' <+> ppr s2
 instance Outputable UnVarGraph where
+    type OutputableNeedsOfConfig UnVarGraph = NoConstraint
     ppr (UnVarGraph g) = ppr g

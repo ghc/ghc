@@ -17,7 +17,10 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 -}
 
-{-# LANGUAGE CPP, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Unique (
         -- * Main data types
@@ -75,6 +78,7 @@ import GhcPrelude
 import BasicTypes
 import FastString
 import Outputable
+import Outputable.DynFlags (assertPanic)
 import Util
 
 -- just for implementing a fast [0,61) -> Char function
@@ -292,7 +296,7 @@ finish_show 't' u _pp_u | u < 26
     [chr (ord 'a' + u)]
 finish_show tag _ pp_u = tag : pp_u
 
-pprUniqueAlways :: Unique -> SDoc
+pprUniqueAlways :: Unique -> SDoc' r
 -- The "always" means regardless of -dsuppress-uniques
 -- It replaces the old pprUnique to remind callers that
 -- they should consider whether they want to consult
@@ -301,6 +305,7 @@ pprUniqueAlways u
   = text (showUnique u)
 
 instance Outputable Unique where
+    type OutputableNeedsOfConfig Unique = NoConstraint
     ppr = pprUniqueAlways
 
 instance Show Unique where

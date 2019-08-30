@@ -67,6 +67,7 @@ data NoExtField = NoExtField
   deriving (Data,Eq,Ord)
 
 instance Outputable NoExtField where
+  type OutputableNeedsOfConfig NoExtField = NoConstraint
   ppr _ = text "NoExtField"
 
 -- | Used when constructing a term with an unused extension point.
@@ -86,6 +87,7 @@ data NoExtCon
   deriving (Data,Eq,Ord)
 
 instance Outputable NoExtCon where
+  type OutputableNeedsOfConfig NoExtCon = NoConstraint
   ppr = noExtCon
 
 -- | Eliminate a 'NoExtCon'. Much like 'Data.Void.absurd'.
@@ -1153,6 +1155,13 @@ type OutputableX p = -- See Note [OutputableX]
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
+type OutputableXNeedsOfConfig p = -- See Note [OutputableX]
+  PairConstraint
+    (OutputableNeedsOfConfig (XIPBinds    p))
+    (PairConstraint
+      (OutputableNeedsOfConfig (XViaStrategy p))
+      (OutputableNeedsOfConfig (XViaStrategy GhcRn)))
+
 -- ----------------------------------------------------------------------
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
@@ -1166,3 +1175,15 @@ type OutputableBndrId id =
   , OutputableX id
   , OutputableX (NoGhcTc id)
   )
+
+type OutputableBndrIdNeedsOfConfig id = PairConstraint
+  (PairConstraint
+    (PairConstraint
+      (OutputableBndrNeedsOfConfig' (NameOrRdrName (IdP id)))
+      (OutputableBndrNeedsOfConfig' (IdP id)))
+    (PairConstraint
+      (OutputableBndrNeedsOfConfig' (NameOrRdrName (IdP (NoGhcTc id))))
+      (OutputableBndrNeedsOfConfig' (IdP (NoGhcTc id)))))
+  (PairConstraint
+    (OutputableXNeedsOfConfig id)
+    (OutputableXNeedsOfConfig (NoGhcTc id)))

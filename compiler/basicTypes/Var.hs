@@ -5,7 +5,12 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- #name_types#
@@ -100,8 +105,11 @@ import Unique ( Uniquable, Unique, getKey, getUnique
               , mkUniqueGrimily, nonDetCmpUnique )
 import Util
 import Binary
-import DynFlags
 import Outputable
+import Outputable.DynFlags ( pprPanic, assertPanic )
+import Packages (HasPackageState)
+import TypeSuppress
+import Lens
 
 import Data.Data
 
@@ -298,15 +306,22 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 -}
 
 instance Outputable Var where
-  ppr var = sdocWithDynFlags $ \dflags ->
+  type OutputableNeedsOfConfig Var = PairConstraint
+    (PairConstraint
+     HasPprConfig
+     HasPackageState)
+    (PairConstraint
+     HasNameSuppress
+     HasTypeSuppress)
+  ppr var = sdocWithDynFlags $ \cfg ->
             getPprStyle $ \ppr_style ->
-            if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
+            if |  debugStyle ppr_style && (not $ typeSuppress_suppressVarKinds $ view typeSuppress cfg)
                  -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
                  -> ppr (varName var) <> ppr_debug var ppr_style
 
-ppr_debug :: Var -> PprStyle -> SDoc
+ppr_debug :: Var -> PprStyle -> SDoc' r
 ppr_debug (TyVar {}) sty
   | debugStyle sty = brackets (text "tv")
 ppr_debug (TcTyVar {tc_tv_details = d}) sty
@@ -315,7 +330,7 @@ ppr_debug (Id { idScope = s, id_details = d }) sty
   | debugStyle sty = brackets (ppr_id_scope s <> pprIdDetails d)
 ppr_debug _ _ = empty
 
-ppr_id_scope :: IdScope -> SDoc
+ppr_id_scope :: IdScope -> SDoc' r
 ppr_id_scope GlobalId              = text "gid"
 ppr_id_scope (LocalId Exported)    = text "lidx"
 ppr_id_scope (LocalId NotExported) = text "lid"
@@ -410,6 +425,7 @@ sameVis _        Required = False
 sameVis _        _        = True
 
 instance Outputable ArgFlag where
+  type OutputableNeedsOfConfig ArgFlag = NoConstraint
   ppr Required  = text "[req]"
   ppr Specified = text "[spec]"
   ppr Inferred  = text "[infrd]"
@@ -440,6 +456,7 @@ data AnonArgFlag
   deriving (Eq, Ord, Data)
 
 instance Outputable AnonArgFlag where
+  type OutputableNeedsOfConfig AnonArgFlag = NoConstraint
   ppr VisArg   = text "[vis]"
   ppr InvisArg = text "[invis]"
 
@@ -463,6 +480,7 @@ data ForallVisFlag
   deriving (Eq, Ord, Data)
 
 instance Outputable ForallVisFlag where
+  type OutputableNeedsOfConfig ForallVisFlag = NoConstraint
   ppr f = text $ case f of
                    ForallVis   -> "ForallVis"
                    ForallInvis -> "ForallInvis"
@@ -559,6 +577,7 @@ isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
 
 instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
+  type (OutputableNeedsOfConfig (VarBndr tv ArgFlag)) = OutputableNeedsOfConfig tv
   ppr (Bndr v Required)  = ppr v
   ppr (Bndr v Specified) = char '@' <> ppr v
   ppr (Bndr v Inferred)  = braces (ppr v)

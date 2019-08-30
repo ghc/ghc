@@ -11,6 +11,7 @@ import Reg
 
 import CodeGen.Platform
 import Outputable
+import Outputable.DynFlags (pprPanic)
 import GHC.Platform
 
 import Data.Word

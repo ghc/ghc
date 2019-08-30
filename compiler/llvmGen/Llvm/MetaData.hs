@@ -1,10 +1,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Llvm.MetaData where
 
 import GhcPrelude
 
+import DynFlags (DynFlags) -- TODO
 import Llvm.Types
+import Llvm.Options
 import Outputable
 
 -- The LLVM Metadata System.
@@ -64,6 +67,7 @@ newtype MetaId = MetaId Int
                deriving (Eq, Ord, Enum)
 
 instance Outputable MetaId where
+    type OutputableNeedsOfConfig MetaId = NoConstraint
     ppr (MetaId n) = char '!' <> int n
 
 -- | LLVM metadata expressions
@@ -74,6 +78,7 @@ data MetaExpr = MetaStr !LMString
               deriving (Eq)
 
 instance Outputable MetaExpr where
+  type OutputableNeedsOfConfig MetaExpr = HasLlvmOptions
   ppr (MetaVar (LMLitVar (LMNullLit _))) = text "null"
   ppr (MetaStr    s ) = char '!' <> doubleQuotes (ftext s)
   ppr (MetaNode   n ) = ppr n

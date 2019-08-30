@@ -7,7 +7,9 @@
 The bits common to TcInstDcls and TcDeriv.
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
@@ -36,6 +38,7 @@ import GhcPrelude
 import TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
 import CoreSyn ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
+import DynFlags (DynFlags)
 import Module
 import Class
 import Var
@@ -44,11 +47,14 @@ import Name
 import NameSet
 import Unify
 import Outputable
+import Outputable.DynFlags (SDoc, assertPprPanic)
+import PlainPanic (assertPanic)
 import ErrUtils
 import BasicTypes
 import UniqDFM
 import Util
 import Id
+
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
 
@@ -211,6 +217,7 @@ instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
 instance Outputable ClsInst where
+   --type OutputableNeedsOfConfig ClsInst = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress) 
    ppr = pprInstance
 
 pprInstance :: ClsInst -> SDoc
@@ -409,6 +416,7 @@ newtype ClsInstEnv
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
+  --type OutputableNeedsOfConfig ClsInstEnv = PairConstraint (PairConstraint HasPprConfig HasNameSuppress) (PairConstraint HasPackageState HasTypeSuppress) 
   ppr (ClsIE is) = pprInstances is
 
 -- INVARIANTS:

@@ -3,7 +3,10 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -272,13 +275,18 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
 import Util
 import FV
 import Outputable
+import PlainPanic (assertPanic, panic)
+import Outputable.DynFlags (assertPprPanic, pprPanic)
 import FastString
 import Pair
-import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Unique ( nonDetCmpUnique )
-
+import Lens
 import Maybes           ( orElse )
+import Packages (HasPackageState)
+import NameSuppress
+import TypeSuppress
+
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
 
@@ -892,7 +900,13 @@ userTypeError_maybe t
        ; return msg }
 
 -- | Render a type corresponding to a user type error into a SDoc.
-pprUserTypeErrorTy :: Type -> SDoc
+pprUserTypeErrorTy
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  =>  Type -> SDoc' r
 pprUserTypeErrorTy ty =
   case splitTyConApp_maybe ty of
 
@@ -2035,6 +2049,7 @@ data EqRel = NomEq | ReprEq
   deriving (Eq, Ord)
 
 instance Outputable EqRel where
+  type OutputableNeedsOfConfig EqRel = NoConstraint
   ppr NomEq  = text "nominal equality"
   ppr ReprEq = text "representational equality"
 
@@ -2175,7 +2190,13 @@ coAxNthLHS ax ind =
 -- > data T [a] = ...
 --
 -- In that case we want to print @T [a]@, where @T@ is the family 'TyCon'
-pprSourceTyCon :: TyCon -> SDoc
+pprSourceTyCon
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => TyCon -> SDoc' r
 pprSourceTyCon tycon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
   = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
@@ -3063,10 +3084,16 @@ Most pretty-printing is either in TyCoRep or IfaceType.
 
 -- | This variant preserves any use of TYPE in a type, effectively
 -- locally setting -fprint-explicit-runtime-reps.
-pprWithTYPE :: Type -> SDoc
-pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
-                 ppr ty
-
+pprWithTYPE
+  :: ( HasPprConfig r
+     , HasNameSuppress r
+     , HasTypeSuppress r
+     , HasPackageState r
+     )
+  => Type -> SDoc' r
+pprWithTYPE ty = updSDocDynFlags
+  (set (typeSuppress . _typeSuppress_printExplicitRuntimeReps) True)
+  (ppr ty)
 
 -- | Does a 'TyCon' (that is applied to some number of arguments) need to be
 -- ascribed with an explicit kind signature to resolve ambiguity if rendered as

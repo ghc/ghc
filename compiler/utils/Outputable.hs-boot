@@ -1,12 +1,9 @@
 module Outputable where
 
 import GhcPrelude
-import GHC.Stack( HasCallStack )
 
-data SDoc
+data SDoc' r
 
-showSDocUnsafe :: SDoc -> String
+class HasPprConfig r
 
-warnPprTrace :: HasCallStack => Bool -> String -> Int -> SDoc -> a -> a
-
-text :: String -> SDoc
+text :: String -> SDoc' r

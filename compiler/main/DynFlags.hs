@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -------------------------------------------------------------------------------
 --
@@ -23,12 +25,12 @@ module DynFlags (
         GeneralFlag(..),
         WarningFlag(..), WarnReason(..),
         Language(..),
-        PlatformConstants(..),
+        module PlatformConstants,
         FatalMessager, LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         warningGroups, warningHierarchies,
-        hasPprDebug, hasNoDebugOutput, hasNoStateHack, hasNoOptCoercion,
+        hasNoStateHack, hasNoOptCoercion,
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
@@ -206,7 +208,6 @@ module DynFlags (
         rtsIsProfiled,
         dynamicGhc,
 
-#include "GHCConstantsHaskellExports.hs"
         bLOCK_SIZE_W,
         wORD_SIZE_IN_BITS,
         wordAlignment,
@@ -249,6 +250,7 @@ module DynFlags (
 import GhcPrelude
 
 import GHC.Platform
+import GHC.Platform.Lens
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
@@ -256,14 +258,16 @@ import PackageConfig
 import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
+import {-# SOURCE #-} Packages (PackageState, HasPackageState(..), emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CliOption
 import CmdLineParser hiding (WarnReason(..))
 import qualified CmdLineParser as Cmd
 import Constants
+import CoreDebugSuppress
 import GhcNameVersion
+import OutputOptions
 import Panic
 import qualified PprColour as Col
 import Util
@@ -275,9 +279,15 @@ import BasicTypes       ( Alignment, alignmentOf, IntWithInf, treatZeroAsInf )
 import FastString
 import Fingerprint
 import FileSettings
+import NameSuppress
 import Outputable
+import Outputable.DynFlags
 import Settings
+import StgDebugSuppress
 import ToolSettings
+import TypeSuppress
+import Llvm.Options
+import Lens
 
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
@@ -828,6 +838,7 @@ flattenIncludes :: IncludeSpecs -> [String]
 flattenIncludes specs = includePathsQuote specs ++ includePathsGlobal specs
 
 instance Outputable WarnReason where
+  type OutputableNeedsOfConfig WarnReason = NoConstraint
   ppr = text . show
 
 instance ToJson WarnReason where
@@ -924,6 +935,7 @@ data Language = Haskell98 | Haskell2010
    deriving (Eq, Enum, Show)
 
 instance Outputable Language where
+    type OutputableNeedsOfConfig Language = NoConstraint
     ppr = text . show
 
 -- | The various Safe Haskell modes
@@ -945,6 +957,7 @@ instance Show SafeHaskellMode where
     show Sf_Ignore       = "Ignore"
 
 instance Outputable SafeHaskellMode where
+    type OutputableNeedsOfConfig SafeHaskellMode = NoConstraint
     ppr = text . show
 
 -- | Contains not only a collection of 'GeneralFlag's but also a plethora of
@@ -959,7 +972,7 @@ data DynFlags = DynFlags {
   fileSettings      :: {-# UNPACK #-} !FileSettings,
   targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
-  platformMisc      :: {-# UNPACK #-} !PlatformMisc,
+  targetPlatformMisc :: {-# UNPACK #-} !PlatformMisc,
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
@@ -1269,6 +1282,83 @@ data DynFlags = DynFlags {
   cfgWeightInfo         :: CfgWeights
 }
 
+instance HasPlatform DynFlags where
+  {-# INLINE platform #-}
+  platform f dflags = (\x -> dflags { targetPlatform = x }) <$> f (targetPlatform dflags)
+
+instance HasPlatformConstants DynFlags where
+  {-# INLINE getPlatformConstants #-}
+  getPlatformConstants = platformConstants
+
+instance HasPlatformMisc DynFlags where
+  {-# INLINE platformMisc #-}
+  platformMisc f dflags = (\x -> dflags { targetPlatformMisc = x }) <$> f (targetPlatformMisc dflags)
+
+instance HasPprConfig DynFlags where
+  getPprConfig dflags = PprConfig
+    { pprConfig_shouldUseColor = shouldUseColor dflags
+    , pprConfig_useUnicode = useUnicode dflags
+    , pprConfig_useUnicodeSyntax = useUnicodeSyntax dflags
+    , pprConfig_useStarIsType = useStarIsType dflags
+    , pprConfig_shouldUseHexWordLiterals = shouldUseHexWordLiterals dflags
+    , pprConfig_numColumns = pprCols dflags
+    }
+
+instance HasNameSuppress DynFlags where
+  getNameSuppress dflags = NameSuppress
+    { nameSuppress_modulePrefixes = gopt Opt_SuppressModulePrefixes dflags
+    , nameSuppress_uniques = gopt Opt_SuppressUniques dflags
+    }
+
+instance HasTypeSuppress DynFlags where
+  typeSuppress = lens
+    (\dflags -> TypeSuppress
+      { typeSuppress_printEqualityRelations = gopt Opt_PrintEqualityRelations dflags
+      , typeSuppress_printExplicitKinds = gopt Opt_PrintExplicitKinds dflags
+      , typeSuppress_printExplicitCoercions = gopt Opt_PrintExplicitCoercions dflags
+      , typeSuppress_printExplicitRuntimeReps = gopt Opt_PrintExplicitRuntimeReps dflags
+      , typeSuppress_printExplicitForalls = gopt Opt_PrintExplicitForalls dflags
+      , typeSuppress_suppressTypeApplications = gopt Opt_SuppressTypeApplications dflags
+      , typeSuppress_suppressTypeSignatures = gopt Opt_SuppressTypeSignatures dflags
+      , typeSuppress_suppressVarKinds = gopt Opt_SuppressVarKinds dflags
+      })
+    (\dflags ts -> dflags
+      & set (_gopt Opt_PrintEqualityRelations) (typeSuppress_printEqualityRelations ts)
+      & set (_gopt Opt_PrintExplicitKinds) (typeSuppress_printExplicitKinds ts)
+      & set (_gopt Opt_PrintExplicitCoercions) (typeSuppress_printExplicitCoercions ts)
+      & set (_gopt Opt_PrintExplicitRuntimeReps) (typeSuppress_printExplicitRuntimeReps ts)
+      & set (_gopt Opt_PrintExplicitForalls) (typeSuppress_printExplicitForalls ts)
+      & set (_gopt Opt_SuppressTypeApplications) (typeSuppress_suppressTypeApplications ts)
+      & set (_gopt Opt_SuppressTypeSignatures) (typeSuppress_suppressTypeSignatures ts)
+      & set (_gopt Opt_SuppressVarKinds) (typeSuppress_suppressVarKinds ts)
+    )
+
+instance HasPackageState DynFlags where
+  getPackageState = pkgState
+
+instance HasOutputOptions DynFlags where
+  getOutputOptions dflags = OutputOptions
+    { outputOptions_pprUserLength = pprUserLength dflags
+    , outputOptions_pprCols = pprCols dflags
+    , outputOptions_useUnicode = useUnicode dflags
+    , outputOptions_useColor = useColor dflags
+    , outputOptions_canUseColor = canUseColor dflags
+    , outputOptions_colScheme = colScheme dflags
+    , outputOptions_hasPprDebug = dopt Opt_D_ppr_debug dflags
+    , outputOptions_hasNoDebugOutput = dopt Opt_D_no_debug_output dflags
+    }
+
+instance HasCoreDebugSuppress DynFlags where
+  --getCoreDebugSuppress
+
+instance HasStgDebugSuppress DynFlags where
+  --getStgDebugSuppress
+
+instance HasLlvmOptions DynFlags where
+  getLlvmOptions dflags = LlvmOptions
+    { llvmOptions_fillUndefWithGarbage = gopt Opt_LlvmFillUndefWithGarbage dflags
+    }
+
 -- | Edge weights to use when generating a CFG from CMM
 data CfgWeights
     = CFGWeights
@@ -1400,7 +1490,7 @@ settings dflags = Settings
   , sFileSettings = fileSettings dflags
   , sTargetPlatform = targetPlatform dflags
   , sToolSettings = toolSettings dflags
-  , sPlatformMisc = platformMisc dflags
+  , sPlatformMisc = targetPlatformMisc dflags
   , sPlatformConstants = platformConstants dflags
   , sRawSettings = rawSettings dflags
   }
@@ -1493,7 +1583,7 @@ opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
 tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
+tablesNextToCode = platformMisc_tablesNextToCode . targetPlatformMisc
 
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
@@ -1559,6 +1649,7 @@ data GhcMode
   deriving Eq
 
 instance Outputable GhcMode where
+  type OutputableNeedsOfConfig GhcMode = NoConstraint
   ppr CompManager = text "CompManager"
   ppr OneShot     = text "OneShot"
   ppr MkDepend    = text "MkDepend"
@@ -1589,6 +1680,7 @@ data PackageArg =
     | UnitIdArg UnitId     -- ^ @-package-id@, by 'UnitId'
   deriving (Eq, Show)
 instance Outputable PackageArg where
+    type OutputableNeedsOfConfig PackageArg = HasPackageState
     ppr (PackageArg pn) = text "package" <+> text pn
     ppr (UnitIdArg uid) = text "unit" <+> ppr uid
 
@@ -1609,6 +1701,7 @@ data ModRenaming = ModRenaming {
                                                --   under name @n@.
   } deriving (Eq)
 instance Outputable ModRenaming where
+    type OutputableNeedsOfConfig ModRenaming = NoConstraint
     ppr (ModRenaming b rns) = ppr b <+> parens (ppr rns)
 
 -- | Flags for manipulating the set of non-broken packages.
@@ -1649,6 +1742,7 @@ packageFlagsChanged idflags1 idflags0 =
      , Opt_AutoLinkPackages ]
 
 instance Outputable PackageFlag where
+    type OutputableNeedsOfConfig PackageFlag = HasPackageState
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
 
@@ -1664,7 +1758,7 @@ defaultHscTarget platform pMisc
 defaultObjectTarget :: DynFlags -> HscTarget
 defaultObjectTarget dflags = defaultHscTarget
   (targetPlatform dflags)
-  (platformMisc dflags)
+  (targetPlatformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -2020,7 +2114,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         fileSettings = sFileSettings mySettings,
         toolSettings = sToolSettings mySettings,
         targetPlatform = sTargetPlatform mySettings,
-        platformMisc = sPlatformMisc mySettings,
+        targetPlatformMisc = sPlatformMisc mySettings,
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
@@ -2272,6 +2366,7 @@ data OnOff a = On a
   deriving (Eq, Show)
 
 instance Outputable a => Outputable (OnOff a) where
+  type OutputableNeedsOfConfig (OnOff a) = OutputableNeedsOfConfig a
   ppr (On x)  = text "On" <+> ppr x
   ppr (Off x) = text "Off" <+> ppr x
 
@@ -2327,12 +2422,6 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.RelaxedPolyRec]
 
-hasPprDebug :: DynFlags -> Bool
-hasPprDebug = dopt Opt_D_ppr_debug
-
-hasNoDebugOutput :: DynFlags -> Bool
-hasNoDebugOutput = dopt Opt_D_no_debug_output
-
 hasNoStateHack :: DynFlags -> Bool
 hasNoStateHack = gopt Opt_G_NoStateHack
 
@@ -2384,6 +2473,12 @@ dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 -- | Test whether a 'GeneralFlag' is set
 gopt :: GeneralFlag -> DynFlags -> Bool
 gopt f dflags  = f `EnumSet.member` generalFlags dflags
+
+_generalFlags :: Lens' DynFlags (EnumSet GeneralFlag)
+_generalFlags f dfs = (\x -> dfs { generalFlags = x }) <$> f (generalFlags dfs)
+
+_gopt :: GeneralFlag -> Lens' DynFlags Bool
+_gopt f = _generalFlags . flip EnumSet.alterF f
 
 -- | Set a 'GeneralFlag'
 gopt_set :: DynFlags -> GeneralFlag -> DynFlags
@@ -5524,10 +5619,10 @@ compilerInfo dflags
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),
        ("Host platform",               cHostPlatformString),
-       ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
-       ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
+       ("Target platform",             platformMisc_targetPlatformString $ targetPlatformMisc dflags),
+       ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ targetPlatformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
+       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5565,9 +5660,6 @@ compilerInfo dflags
     isWindows = platformOS (targetPlatform dflags) == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
-
--- Produced by deriveConstants
-#include "GHCConstantsHaskellWrappers.hs"
 
 bLOCK_SIZE_W :: DynFlags -> Int
 bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` wORD_SIZE dflags
@@ -5641,7 +5733,7 @@ makeDynFlagsConsistent dflags
       in loop dflags' warn
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+    = if platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags
       then let dflags' = dflags { hscTarget = HscAsm }
                warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
            in loop dflags' warn
@@ -5657,7 +5749,7 @@ makeDynFlagsConsistent dflags
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"
  | hscTarget dflags == HscAsm &&
-   not (platformMisc_ghcWithNativeCodeGen $ platformMisc dflags)
+   not (platformMisc_ghcWithNativeCodeGen $ targetPlatformMisc dflags)
       = let dflags' = dflags { hscTarget = HscLlvm }
             warn = "No native code generator, so using LLVM"
         in loop dflags' warn

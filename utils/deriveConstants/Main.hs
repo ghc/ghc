@@ -879,8 +879,13 @@ writeHaskellType fn ws = writeFile fn xs
                      -- Now a kludge that allows the real entries to
                      -- all start with a comma, which makes life a
                      -- little easier
-                    ,"    pc_platformConstants :: ()"]
-          footers = ["  } deriving Read"]
+                    ,"    pc_platformConstants :: ()"
+                    ]
+          footers = ["  } deriving Read"
+                    ,""
+                    ,"class HasPlatformConstants a where"
+                    ,"  getPlatformConstants :: a -> PlatformConstants"
+                    ]
           body = concatMap doWhat ws
           doWhat (GetClosureSize name _) = ["    , pc_" ++ name ++ " :: Int"]
           doWhat (GetFieldType   name _) = ["    , pc_" ++ name ++ " :: Int"]
@@ -917,14 +922,14 @@ writeHaskellWrappers fn ws = writeFile fn xs
           body = concatMap doWhat ws
           doWhat (GetFieldType {}) = []
           doWhat (GetClosureSize {}) = []
-          doWhat (GetWord name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                    haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
-          doWhat (GetInt name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                   haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
-          doWhat (GetNatural name _) = [haskellise name ++ " :: DynFlags -> Integer",
-                                        haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
-          doWhat (GetBool name _) = [haskellise name ++ " :: DynFlags -> Bool",
-                                     haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
+          doWhat (GetWord name _) = [haskellise name ++ " :: HasPlatformConstants a => a -> Int",
+                                    haskellise name ++ " = pc_" ++ name ++ " . getPlatformConstants"]
+          doWhat (GetInt name _) = [haskellise name ++ " :: HasPlatformConstants a => a -> Int",
+                                   haskellise name ++ " = pc_" ++ name ++ " . getPlatformConstants"]
+          doWhat (GetNatural name _) = [haskellise name ++" :: HasPlatformConstants a => a -> Integer",
+                                        haskellise name ++ " = pc_" ++ name ++ " . getPlatformConstants"]
+          doWhat (GetBool name _) = [haskellise name ++ " :: HasPlatformConstants a => a -> Bool",
+                                     haskellise name ++ " = pc_" ++ name ++ " . getPlatformConstants"]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
@@ -936,10 +941,10 @@ writeHaskellExports fn ws = writeFile fn xs
           body = concatMap doWhat ws
           doWhat (GetFieldType {}) = []
           doWhat (GetClosureSize {}) = []
-          doWhat (GetWord    name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetInt     name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetNatural name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetBool    name _) = ["    " ++ haskellise name ++ ","]
+          doWhat (GetWord    name _) = ["  , " ++ haskellise name]
+          doWhat (GetInt     name _) = ["  , " ++ haskellise name]
+          doWhat (GetNatural name _) = ["  , " ++ haskellise name]
+          doWhat (GetBool    name _) = ["  , " ++ haskellise name]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []

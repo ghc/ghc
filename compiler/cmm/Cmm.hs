@@ -1,5 +1,6 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Cmm (
      -- * Cmm top-level datatypes
@@ -218,12 +219,17 @@ blockId (BasicBlock blk_id _ ) = blk_id
 newtype ListGraph i = ListGraph [GenBasicBlock i]
 
 instance Outputable instr => Outputable (ListGraph instr) where
+    type OutputableNeedsOfConfig (ListGraph instr) = OutputableNeedsOfConfig instr
     ppr (ListGraph blocks) = vcat (map ppr blocks)
 
 instance Outputable instr => Outputable (GenBasicBlock instr) where
+    type OutputableNeedsOfConfig (GenBasicBlock instr) = OutputableNeedsOfConfig instr
     ppr = pprBBlock
 
-pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
+pprBBlock
+  :: ( Outputable stmt
+     , OutputableNeedsOfConfig stmt r
+     )
+  => GenBasicBlock stmt -> SDoc' r
 pprBBlock (BasicBlock ident stmts) =
     hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
-
