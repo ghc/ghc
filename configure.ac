@@ -867,6 +867,9 @@ FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
 
+dnl ** check for makeinfo
+AC_PATH_PROG(MAKEINFO,makeinfo)
+
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
@@ -1299,10 +1302,16 @@ if test -n "$SPHINXBUILD"; then
     else
         BUILD_SPHINX_PDF=NO
     fi
+    if test -n "$MAKEINFO"; then
+        BUILD_SPHINX_INFO=YES
+    else
+        BUILD_SPHINX_INFO=NO
+    fi
 else
     BUILD_MAN=NO
     BUILD_SPHINX_HTML=NO
     BUILD_SPHINX_PDF=NO
+    BUILD_SPHINX_INFO=NO
 fi
 AC_SUBST(BUILD_MAN)
 AC_SUBST(BUILD_SPHINX_HTML)
@@ -1406,6 +1415,7 @@ echo "\
    Alex         : $AlexCmd ($AlexVersion)
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
+   makeinfo     : $MAKEINFO
 
    Using LLVM tools
       clang : $ClangCmd
@@ -1424,7 +1434,8 @@ fi
 
 echo "\
    Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
-   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF
+   Tools to build Sphinx INFO documentation available: $BUILD_SPHINX_INFO"
 
 echo "----------------------------------------------------------------------
 "
