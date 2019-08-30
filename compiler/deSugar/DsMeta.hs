@@ -853,7 +853,7 @@ rep_sig (dL->L loc (ClassOpSig _ is_deflt nms ty))
   | otherwise    = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig d@(dL->L _ (IdSig {}))           = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (dL->L _   (FixSig {}))          = return [] -- fixity sigs at top level
-rep_sig (dL->L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
+rep_sig (dL->L loc (InlineSig _ nms ispec))= concatMapM (\nm -> rep_inline nm ispec loc) nms
 rep_sig (dL->L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
 rep_sig (dL->L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc

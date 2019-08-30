@@ -552,16 +552,18 @@ mkPragEnv :: [LSig GhcRn] -> LHsBinds GhcRn -> TcPragEnv
 mkPragEnv sigs binds
   = foldl' extendPragEnv emptyNameEnv prs
   where
-    prs = mapMaybe get_sig sigs
+    prs :: [(Name, LSig GhcRn)]
+    prs = concatMap get_sig sigs
 
-    get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
+    get_sig :: LSig GhcRn -> [(Name, LSig GhcRn)]
     get_sig (L l (SpecSig x lnm@(L _ nm) ty inl))
-      = Just (nm, L l $ SpecSig   x lnm ty (add_arity nm inl))
-    get_sig (L l (InlineSig x lnm@(L _ nm) inl))
-      = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
+      = [(nm, L l $ SpecSig   x lnm ty (add_arity nm inl))]
+    get_sig (L l (InlineSig x lnms {- @(L _ nm) -} inl))
+      = map (\lnm@(L _ nm) -> (nm, L l (InlineSig x [lnm] (add_arity nm inl)))) lnms
     get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
-      = Just (nm, L l $ SCCFunSig x st lnm str)
-    get_sig _ = Nothing
+      = [(nm, L l $ SCCFunSig x st lnm str)]
+    get_sig _
+      = []
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Inline <- inl_inline inl_prag

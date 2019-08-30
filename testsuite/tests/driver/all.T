@@ -269,6 +269,8 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
+test('multiple-noinlines', only_ways(['normal']), compile, ['-dinline-check foo -ddebug-output'])
+
 test('T14452', [], makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',

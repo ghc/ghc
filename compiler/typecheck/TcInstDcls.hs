@@ -1903,7 +1903,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLoc (InlineSig noExtField fn inline_prag)]
+                           = [noLoc (InlineSig noExtField [fn] inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method

@@ -1356,8 +1356,8 @@ instance ToHie (SigContext (LSig GhcRn)) where
       FixSig _ fsig ->
         [ toHie $ L sp fsig
         ]
-      InlineSig _ name _ ->
-        [ toHie $ (C Use) name
+      InlineSig _ names _ ->
+        [ toHie $ map (C Use) names
         ]
       SpecSig _ name typs _ ->
         [ toHie $ (C Use) name

@@ -2494,8 +2494,8 @@ sigdecl :: { LHsDecl GhcPs }
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
-        | '{-# INLINE' activation qvar '#-}'
-                {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
+        | '{-# INLINE' activation qvars '#-}'
+                {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField (fromOL $3)
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
@@ -3593,6 +3593,10 @@ qvar    :: { Located RdrName }
 -- We've inlined qvarsym here so that the decision about
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
+
+qvars :: { OrdList (Located RdrName) }
+      : qvars ',' qvar { $1 `appOL` unitOL $3 }
+      | qvar           { unitOL $1 }
 
 qvarid :: { Located RdrName }
         : varid               { $1 }
