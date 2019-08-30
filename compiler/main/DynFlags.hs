@@ -4739,20 +4739,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --   Static Argument Transformation needs investigation. See #9374
     ]
 
-{- Note [Eta-reduction in -O0]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#11562 showed an example which tripped an ASSERT in CoreToStg; a
-function was marked as MayHaveCafRefs when in fact it obviously
-didn't.  Reason was:
- * Eta reduction wasn't happening in the simplifier, but it was
-   happening in CorePrep, on
-        $fBla = MkDict (/\a. K a)
- * Result: rhsIsStatic told TidyPgm that $fBla might have CAF refs
-   but the eta-reduced version (MkDict K) obviously doesn't
-Simple solution: just let the simplifier do eta-reduction even in -O0.
-After all, CorePrep does it unconditionally!  Not a big deal, but
-removes an assertion failure. -}
-
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
