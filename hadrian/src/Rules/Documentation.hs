@@ -264,6 +264,7 @@ buildSphinxPdf path = do
 
 ------------------------------------ Info -- -----------------------------------
 
+-- | Build the user guide as an Info hypertext
 buildSphinxInfoGuide :: Rules ()
 buildSphinxInfoGuide = do
   root <- buildRootRules
@@ -274,7 +275,10 @@ buildSphinxInfoGuide = do
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Info) [pathPath path] [dir]
-            cmd_ "make -C " [dir]
+            -- Sphinx outputs texinfo source and a makefile, the
+            -- default target actually produces the target for this
+            -- build rule.
+            build $ target docContext (Make dir) ["Makefile"] [dir]
             copyFileUntracked (dir -/- path <.> "info") file
 
 ------------------------------------ Archive -----------------------------------
