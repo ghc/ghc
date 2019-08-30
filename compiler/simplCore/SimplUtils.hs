@@ -2212,8 +2212,10 @@ mkCase2 dflags scrut bndr alts_ty alts
            ; return (ex_tvs ++ arg_ids) }
     mk_new_bndrs _ _ = return []
 
-    re_sort :: [CoreAlt] -> [CoreAlt]  -- Re-sort the alternatives to
-    re_sort alts = sortBy cmpAlt alts  -- preserve the #case_invariants#
+    re_sort :: [CoreAlt] -> [CoreAlt]
+    -- Sort the alternatives to re-establish
+    -- CoreSyn Note [Case expression invariants]
+    re_sort alts = sortBy cmpAlt alts
 
     add_default :: [CoreAlt] -> [CoreAlt]
     -- See Note [Literal cases]
