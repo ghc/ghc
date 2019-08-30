@@ -600,7 +600,13 @@ mkFastStringShortByteString sbs = unsafeDupablePerformIO $ mkFastStringWith (toS
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
-mkFastString str = unsafeDupablePerformIO $ mkFastStringWith (toShort $ BSC.pack str)
+mkFastString str =
+  unsafeDupablePerformIO $ do
+    let l = utf8EncodedLength str
+    buf <- mallocForeignPtrBytes l
+    withForeignPtr buf $ \ptr -> do
+      utf8EncodeString ptr str
+      return $ mkFastStringBytes ptr l
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString
