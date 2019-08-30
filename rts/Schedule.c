@@ -318,19 +318,12 @@ schedule (Capability *initialCapability, Task *task)
 
 #if !defined(THREADED_RTS)
     if ( emptyRunQueue(cap) ) {
-        /* On the non-threaded RTS if the queue is empty and the last action was
-            blocked on an I/O completion port, then just wait till we're woken
-            up by the RTS with more work.  */
-        if (t && t->why_blocked == BlockedOnIOCompletion)
-            {
-                fprintf (stderr, "waiting: %d.\n", t->why_blocked);
-                awaitEvent (emptyRunQueue(cap));
-                fprintf (stderr, "running: %d.\n", t->why_blocked);
-                continue;
-            }
-        continue;
-
-#if !defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+        /* Notify the I/O manager that we have nothing to do.  If there are
+           any outstanding I/O requests we'll block here.  If there are not
+           then this is a user error and we will abort soon.  */
+        awaitEvent (emptyRunQueue(cap));
+#else
         ASSERT(sched_state >= SCHED_INTERRUPTING);
 #endif
     }
