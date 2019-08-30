@@ -508,8 +508,9 @@ data GeneralFlag
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
-   | Opt_NoLlvmMangler                 -- hidden flag
-   | Opt_FastLlvm                      -- hidden flag
+   | Opt_NoLlvmMangler                  -- hidden flag
+   | Opt_FastLlvm                       -- hidden flag
+   | Opt_NoTypeableBinds
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
@@ -3474,6 +3475,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "fast-llvm"
         (NoArg (setGeneralFlag Opt_FastLlvm)) -- hidden flag
+  , make_ord_flag defGhcFlag "dno-typeable-binds"
+        (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
   , make_ord_flag defGhcFlag "ddump-json"
