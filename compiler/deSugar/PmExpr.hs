@@ -11,7 +11,7 @@ module PmExpr (
         PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..),
         pmAltConType, PmEquality(..), eqPmAltCon,
         pmLitType, literalToPmLit, negatePmLit, overloadPmLit,
-        pmLitAsStringLit, hsOverLitAsHsLit,
+        pmLitAsStringLit, hsOverLitAsHsLit, coreExprAsPmLit,
         mkPmExprData, pmExprToDataConApp
     ) where
 
@@ -25,16 +25,24 @@ import BasicTypes (IntegralLit(..), negateIntegralLit)
 import FastString
 import HsSyn
 import Id
+import Name
 import DataCon
 import ConLike
 import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
-import TysPrim
 import Outputable
-import Literal
 import Maybes
+import Type
+import TyCon
+import Literal
+import CoreSyn
+import CoreUtils (exprType)
+import PrelNames
+import TysWiredIn
+import TysPrim
 
 import Numeric (fromRat)
 import Data.Foldable (find)
+import Data.Ratio
 
 {-
 %************************************************************************
@@ -307,6 +315,58 @@ hsOverLitAsHsLit dflags (OverLit (OverLitTc False ty) val _) negated outer_ty
       | negated   = negateIntegralLit
       | otherwise = id
 hsOverLitAsHsLit _ _ _ _ = Nothing
+
+coreExprAsPmLit :: CoreExpr -> Maybe PmLit
+-- coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
+coreExprAsPmLit (Tick _t e) = coreExprAsPmLit e
+coreExprAsPmLit (Lit l) = literalToPmLit (literalType l) l
+coreExprAsPmLit e = case collectArgs e of
+  (Var x, [Lit l])
+    | Just dc <- isDataConWorkId_maybe x
+    , dc `elem` [intDataCon, wordDataCon, charDataCon, floatDataCon, doubleDataCon]
+    -> literalToPmLit (exprType e) l
+  (Var x, [_ty, Lit n, Lit d])
+    | Just dc <- isDataConWorkId_maybe x
+    , dataConName dc == ratioDataConName
+    -- HACK: just assume we have a literal double. This case only occurs for
+    --       overloaded lits anyway, so we immediately override type information
+    -> literalToPmLit (exprType e) (mkLitDouble (litValue n % litValue d))
+  (Var x, args)
+    -- Take care of -XRebindableSyntax. The last argument should be the (only)
+    -- integer literal, otherwise we can't really do much about it.
+    | [Lit l] <- dropWhile (not . is_lit) args
+    -- getOccFS because of -XRebindableSyntax
+    , getOccFS (idName x) == getOccFS fromIntegerName
+    -> literalToPmLit (literalType l) l >>= overloadPmLit (exprType e)
+  (Var x, args)
+    -- Similar to fromInteger case
+    | [r] <- dropWhile (not . is_ratio) args
+    , getOccFS (idName x) == getOccFS fromRationalName
+    -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
+  (Var x, [Type _ty, _dict, s])
+    | idName x == fromStringName
+    -- NB: Calls coreExprAsPmLit, so that we return PmLitOverStrings
+    -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
+  -- These last two cases handle String literals, which will be desugared to
+  -- lists by representCoreExpr. See Note [Literals in PmPat]
+  (Var x, [Type ty])
+    | Just dc <- isDataConWorkId_maybe x
+    , dc == nilDataCon
+    , ty `eqType` charTy
+    -> literalToPmLit stringTy (mkLitString "")
+  (Var x, [Lit l])
+    | idName x `elem` [unpackCStringName, unpackCStringUtf8Name]
+    -> literalToPmLit stringTy l
+  _ -> Nothing
+  where
+    is_lit Lit{} = True
+    is_lit _     = False
+    is_ratio (Type _) = False
+    is_ratio r
+      | Just (tc, _) <- splitTyConApp_maybe (exprType r)
+      = tyConName tc == ratioTyConName
+      | otherwise
+      = False
 
 {- Note [Translate Overloaded Literals for Exhaustiveness Checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

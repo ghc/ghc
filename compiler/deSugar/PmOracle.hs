@@ -18,9 +18,10 @@ module PmOracle (
         lookupNumberOfRefinements,
 
         inhabitants,
+        representCoreExpr,     -- Takes apart a CoreExpr and represents it in the Oracle
         addTypeEvidence,       -- Add type equalities
         tryAddRefutableAltCon, -- Add a negative equality
-        refineToAltCon,        -- Add a positive equality x ~ K _ _
+        refineToAltCon,        -- Add a positive refinement x ~ K _ _
         addTermEquality,       -- Add a positive equality x ~ e
         tmOracle,              -- Add multiple positive term equalities
         provideEvidenceForEquation,
@@ -44,6 +45,10 @@ import VarEnv
 import UniqDFM
 import Var           (EvVar)
 import Name
+import Literal
+import CoreSyn
+import CoreUtils (exprType)
+import MkCore (mkListExpr, mkCharExpr)
 import UniqSupply
 import FastString
 import SrcLoc
@@ -53,6 +58,7 @@ import ConLike
 import DataCon
 import PatSyn
 import TyCon
+import PrelNames
 import TysWiredIn
 import TysPrim (tYPETyCon)
 import TyCoRep
@@ -63,16 +69,20 @@ import TcRnTypes     (pprEvVarWithType, completeMatchConLikes)
 import Coercion
 import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
+import FamInst
+import FamInstEnv
+
 import Control.Monad (zipWithM, guard, mzero)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
 import Data.Foldable (foldlM)
 import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
-import FamInst
-import FamInstEnv
+import Data.Ratio
+import Data.Tuple
 
 type PmM = DsM
 
@@ -821,7 +831,9 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> tmOracle delta new_tm_cs
 
 -- | External interface to the term oracle.
 tmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)
-tmOracle = (runMaybeT .) . foldlM ((MaybeT .) . addTermEquality)
+tmOracle delta = runMaybeT . foldlM go delta
+  where
+    go delta ct = MaybeT (addTermEquality delta ct)
 
 -----------------------
 -- * Looking up VarInfo
@@ -908,10 +920,12 @@ addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
 addTypeEvidence delta dicts
   = runSatisfiabilityCheck delta (tyIsSatisfiable True dicts)
 
--- | Add a positive term equality ('TmVarCt') to 'Delta'.
+-- | Tries to equate two representatives in 'Delta'.
 -- See Note [TmState invariants].
 addTermEquality :: Delta -> TmVarCt -> DsM (Maybe Delta)
-addTermEquality delta (TVC x e) = runMaybeT (unify delta (PmExprVar x, e))
+addTermEquality delta (TVC x e) = runMaybeT $ case e of
+  PmExprVar y        -> unify delta (x, y)
+  PmExprCon con args -> trySolve delta x con args
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
@@ -997,10 +1011,9 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
 -- If successful, returns the new @delta@ and the fresh term variables, or
 -- @Nothing@ otherwise.
 refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> PmM (Maybe (Delta, [Id]))
-refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 =
-  addTermEquality delta (TVC x (PmExprCon l [])) >>= \case
-    Nothing     -> pure Nothing
-    Just delta' -> pure (Just (markRefined delta' x, []))
+refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 = runMaybeT $ do
+  delta' <- trySolve delta x l []
+  pure (markRefined delta' x, [])
 refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   -- The plan for ConLikes:
   -- Suppose K :: forall a b y z. (y,b) -> z -> T a b
@@ -1161,35 +1174,21 @@ arises in the first place!
 --------------------------------------
 -- * Term oracle unification procedure
 
--- | Try to unify two 'PmExpr's and record the gained knowledge in the
--- 'TmState'.
+-- | Try to unify two 'Id's and record the gained knowledge in 'Delta'.
 --
--- Returns @Nothing@ when there's a contradiction. Returns @Just ts@
--- when the constraint was compatible with prior facts, in which case @ts@ has
--- integrated the knowledge from the equality constraint.
+-- Returns @Nothing@ when there's a contradiction. Returns @Just delta@
+-- when the constraint was compatible with prior facts, in which case @delta@
+-- has integrated the knowledge from the equality constraint.
 --
 -- See Note [TmState invariants].
-unify :: Delta -> (PmExpr, PmExpr) -> MaybeT DsM Delta
-unify delta@MkDelta{ delta_tm_cs = TS env } eq = case eq of
-  (PmExprCon c1 ts1, PmExprCon c2 ts2) -> case eqPmAltCon c1 c2 of
-    -- See Note [Undecidable Equality for PmAltCons]
-    Equal           -> foldlM unify_vars delta (zip ts1 ts2)
-    Disjoint        -> unsat
-    PossiblyOverlap -> boring
-
+unify :: Delta -> (Id, Id) -> MaybeT DsM Delta
+unify delta@MkDelta{ delta_tm_cs = TS env } (x, y)
   -- It's important that we never @equate@ two variables of the same equivalence
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
   -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
-  (PmExprVar x, PmExprVar y)
-    | sameRepresentative env x y -> boring
-    | otherwise                  -> equate delta x y
-  (PmExprVar x, PmExprCon c args)  -> trySolve delta x c args
-  (PmExprCon c args, PmExprVar y)  -> trySolve delta y c args
-  where
-    boring                  = pure delta
-    unsat                   = mzero
-    unify_vars delta (x, y) = unify delta (PmExprVar x, PmExprVar y)
+  | sameRepresentative env x y = pure delta
+  | otherwise                  = equate delta x y
 
 -- | @equate ts@(TS env) x y@ merges the equivalence classes of @x@ and @y@ by
 -- adding an indirection to the environment.
@@ -1229,8 +1228,6 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
 -- solution, reject (@Nothing@) otherwise.
 --
--- Precondition: @x@ is flexible (cf. 'isFlexible'/'isRigid').
---
 -- See Note [TmState invariants].
 trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
 trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
@@ -1245,8 +1242,7 @@ trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
   -- existing one
   case find ((== Equal) . eqPmAltCon alt . fst) pos of
     Just (_, other_args) -> do
-      let unify_vars delta (x, y) = unify delta (PmExprVar x, PmExprVar y)
-      foldlM unify_vars delta (zip args other_args)
+      foldlM unify delta (zip args other_args)
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
       -- the new solution)
@@ -1715,3 +1711,71 @@ isVanillaDataType ty = fromMaybe False $ do
   (tc, _) <- splitTyConApp_maybe ty
   dcs <- tyConDataCons_maybe tc
   pure (all isVanillaDataCon dcs)
+
+-- | Tries to peel off as many nested 'PmExprCon's from the given 'CoreExpr' as
+-- possible, falling back to allocating fresh 'PmExprVar's representing
+-- unhandled expressions.
+-- Turns (vanilla) String literals into list expressions, see
+-- Note [Literals in PmPat].
+representCoreExpr :: Delta -> CoreExpr -> PmM (Delta, Id)
+representCoreExpr delta e = swap <$> runStateT (core_expr e) delta
+  where
+    -- | Takes apart a 'CoreExpr' and tries to extract as much information about
+    -- literals and constructor applications as possible.
+    core_expr :: CoreExpr -> StateT Delta PmM Id
+    -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
+    core_expr (Cast e _co) = core_expr e
+    core_expr (Tick _t e) = core_expr e
+    core_expr e
+      | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
+      , expr_ty `eqType` stringTy
+      -- See Note [Literals in PmPat]
+      = case unpackFS s of
+          -- We need this special case to break a loop with coreExprAsPmLit
+          -- Otherwise we alternate endlessly between [] and ""
+          [] -> data_con_app expr_ty nilDataCon []
+          s' -> core_expr (mkListExpr charTy (map mkCharExpr s'))
+      | Just lit <- coreExprAsPmLit e
+      = pm_lit expr_ty lit
+      | Just (dc, args) <- splitDataConApp_maybe e
+      = traverse core_expr args >>= data_con_app expr_ty dc
+      -- TODO: Think about how to recognize PatSyns
+      | Var x <- e, not (isDataConWorkId x)
+      = pure x
+      | otherwise
+      -- We currently have no mechanism of proving equivalence of two HsExprs, so
+      -- generate a fresh representative each time. This is morally wrong, but
+      -- is the conservative thing to do.
+      -- We have to core_expr through Core because we need the type. Might be useful later
+      -- on, since we have infrastructure for deciding alpha equivalence of Core
+      -- terms.
+      = lift (mkPmId expr_ty)
+      where
+        expr_ty = exprType e
+
+    data_con_app :: Type -> DataCon -> [Id] -> StateT Delta PmM Id
+    data_con_app ty dc args = pm_alt_con_app ty (PmAltConLike (RealDataCon dc)) args
+
+    pm_lit :: Type -> PmLit -> StateT Delta PmM Id
+    pm_lit ty lit = pm_alt_con_app ty (PmAltLit lit) []
+
+    -- | Binds the given constructor application to a fresh 'Id' in the 'Delta'
+    -- and returns the fresh id and extended Delta.
+    pm_alt_con_app :: Type -> PmAltCon -> [Id] -> StateT Delta PmM Id
+    pm_alt_con_app ty con args = StateT $ \delta -> do
+      x <- mkPmId ty
+      mb_delta' <- runMaybeT (trySolve delta x con args)
+      pure (x, expectJust "x was fresh" mb_delta')
+
+-- | Try to peel off the topmost 'DataCon' application.
+splitDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
+splitDataConApp_maybe (collectArgs -> (Var x, args))
+  | Just dc <- isDataConWorkId_maybe x
+  , let args' = last_n_term_args (dataConSourceArity dc) args
+  , lengthIs args' (dataConSourceArity dc)
+  = Just (dc, args')
+  where
+    is_not_type (Type _) = False
+    is_not_type _        = True
+    last_n_term_args n = reverse . take n . reverse . filter is_not_type
+splitDataConApp_maybe _ = Nothing
