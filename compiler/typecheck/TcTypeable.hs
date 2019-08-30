@@ -148,7 +148,9 @@ There are many wrinkles:
 -- See Note [Grand plan for Typeable] in TcTypeable.
 mkTypeableBinds :: TcM TcGblEnv
 mkTypeableBinds
-  = do { -- Create a binding for $trModule.
+  = do { dflags <- getDynFlags
+       ; if gopt Opt_NoTypeableBinds dflags then getGblEnv else do
+       { -- Create a binding for $trModule.
          -- Do this before processing any data type declarations,
          -- which need tcg_tr_module to be initialised
        ; tcg_env <- mkModIdBindings
@@ -166,7 +168,7 @@ mkTypeableBinds
        ; traceTc "mkTypeableBinds" (ppr tycons)
        ; this_mod_todos <- todoForTyCons mod mod_id tycons
        ; mkTypeRepTodoBinds (this_mod_todos : prim_todos)
-       } }
+       } } }
   where
     needs_typeable_binds tc
       | tc `elem` [runtimeRepTyCon, vecCountTyCon, vecElemTyCon]
