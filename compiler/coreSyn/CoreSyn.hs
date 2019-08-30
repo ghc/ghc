@@ -201,40 +201,7 @@ These data types are the heart of the compiler
 --    The binder gets bound to the value of the scrutinee,
 --    and the 'Type' must be that of all the case alternatives
 --
---    #case_invariants#
---    This is one of the more complicated elements of the Core language,
---    and comes with a number of restrictions:
---
---    1. The list of alternatives may be empty;
---       See Note [Empty case alternatives]
---
---    2. The 'DEFAULT' case alternative must be first in the list,
---       if it occurs at all.
---
---    3. The remaining cases are in order of increasing
---         tag  (for 'DataAlts') or
---         lit  (for 'LitAlts').
---       This makes finding the relevant constructor easy,
---       and makes comparison easier too.
---
---    4. The list of alternatives must be exhaustive. An /exhaustive/ case
---       does not necessarily mention all constructors:
---
---       @
---            data Foo = Red | Green | Blue
---       ... case x of
---            Red   -> True
---            other -> f (case x of
---                            Green -> ...
---                            Blue  -> ... ) ...
---       @
---
---       The inner case does not need a @Red@ alternative, because @x@
---       can't be @Red@ at that program point.
---
---    5. Floating-point values must not be scrutinised against literals.
---       See #9238 and Note [Rules for floating-point comparisons]
---       in PrelRules for rationale.
+--    IMPORTANT: see Note [Case expression invariants]
 --
 -- *  Cast an expression to a particular type.
 --    This is used to implement @newtype@s (a @newtype@ constructor or
@@ -247,6 +214,75 @@ These data types are the heart of the compiler
 --
 -- *  A coercion
 
+{- Note [Case expression invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions are one of the more complicated elements of the Core
+language, and come with a number of invariants.  All of them should be
+checked by Core Lint.
+
+1. The list of alternatives may be empty;
+   See Note [Empty case alternatives]
+
+2. The 'DEFAULT' case alternative must be first in the list,
+   if it occurs at all.
+
+3. The remaining cases are in order of increasing
+     tag  (for 'DataAlts') or
+     lit  (for 'LitAlts').
+   This makes finding the relevant constructor easy,
+   and makes comparison easier too.
+
+4. The list of alternatives must be exhaustive. An /exhaustive/ case
+   does not necessarily mention all constructors:
+
+   @
+        data Foo = Red | Green | Blue
+   ... case x of
+        Red   -> True
+        other -> f (case x of
+                        Green -> ...
+                        Blue  -> ... ) ...
+   @
+
+   The inner case does not need a @Red@ alternative, because @x@
+   can't be @Red@ at that program point.
+
+5. Floating-point values must not be scrutinised against literals.
+   See #9238 and Note [Rules for floating-point comparisons]
+   in PrelRules for rationale.
+
+6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
+   /entire/ case expression.
+
+Note [Why does Case have a 'Type' field?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The obvious alternative is
+   exprType (Case scrut bndr alts)
+     | (_,_,rhs1):_ <- alts
+     = exprType rhs1
+
+But caching the type in the Case constructor
+  exprType (Case scrut bndr ty alts) = ty
+is better for at least three reasons:
+
+* It works when there are no alternatives (see case invarant 1 above)
+
+* It might be faster in deeply-nested situations.
+
+* It might not be quite the same as (exprType rhs) for one
+  of the RHSs in alts. Consider a phantom type synonym
+       type S a = Int
+   and we want to form the case expression
+        case x of { K (a::*) -> (e :: S a) }
+   Then exprType of the RHS is (S a), but we cannot make that be
+   the 'ty' in the Case constructor because 'a' is simply not in
+   scope there. Instead we must expand the synonym to Int before
+   putting it in the Case constructor.  See CoreUtils.mkSingleAltCase.
+
+   So we'd have to do synonym expansion in exprType which would
+   be inefficient.
+-}
+
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Expr b
@@ -255,7 +291,7 @@ data Expr b
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]       -- See #case_invariants#
+  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
   | Cast  (Expr b) Coercion
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
@@ -1748,8 +1784,8 @@ ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
 -- ^ Compares 'AltCon's within a single list of alternatives
--- DEFAULT comes out smallest, so that sorting by AltCon
--- puts alternatives in the order required by #case_invariants#
+-- DEFAULT comes out smallest, so that sorting by AltCon puts
+-- alternatives in the order required: see Note [Case expression invariants]
 cmpAltCon DEFAULT      DEFAULT     = EQ
 cmpAltCon DEFAULT      _           = LT
 

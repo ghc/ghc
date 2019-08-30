@@ -792,8 +792,10 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
           -- See Note [Join points are less general than the paper]
           -- in CoreSyn
 
-     ; (alt_ty, _) <- lintInTy alt_ty
-     ; (var_ty, _) <- lintInTy (idType var)
+     ; (alt_ty, _) <- addLoc (CaseTy scrut) $
+                      lintInTy alt_ty
+     ; (var_ty, _) <- addLoc (IdTy var) $
+                      lintInTy (idType var)
 
      -- We used to try to check whether a case expression with no
      -- alternatives was legitimate, but this didn't work.
@@ -1246,7 +1248,8 @@ lintIdBndr top_lvl bind_site id linterF
        ; checkL (not (isExternalName (Var.varName id)) || is_top_lvl)
            (mkNonTopExternalNameMsg id)
 
-       ; (ty, k) <- lintInTy (idType id)
+       ; (ty, k) <- addLoc (IdTy id) $
+                    lintInTy (idType id)
 
           -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (isJoinId id || not (isKindLevPoly k))
@@ -2180,6 +2183,9 @@ data LintLocInfo
   | BodyOfLetRec [Id]   -- One of the binders
   | CaseAlt CoreAlt     -- Case alternative
   | CasePat CoreAlt     -- The *pattern* of the case alternative
+  | CaseTy CoreExpr     -- The type field of a case expression
+                        -- with this scrutinee
+  | IdTy Id             -- The type field of an Id binder
   | AnExpr CoreExpr     -- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
   | TopLevelBindings
@@ -2237,17 +2243,23 @@ addWarnL msg = LintM $ \ env (warns,errs) ->
 
 addMsg :: LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
 addMsg env msgs msg
-  = ASSERT( notNull locs )
+  = ASSERT( notNull loc_msgs )
     msgs `snocBag` mk_msg msg
   where
-   locs = le_loc env
-   (loc, cxt1) = dumpLoc (head locs)
-   cxts        = [snd (dumpLoc loc) | loc <- locs]
-   context     = ifPprDebug (vcat (reverse cxts) $$ cxt1 $$
-                             text "Substitution:" <+> ppr (le_subst env))
-                            cxt1
+   loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first
+   loc_msgs = map dumpLoc (le_loc env)
 
-   mk_msg msg = mkLocMessage SevWarning (mkSrcSpan loc loc) (context $$ msg)
+   cxt_doc = vcat $ reverse $ map snd loc_msgs
+   context = cxt_doc $$ whenPprDebug extra
+   extra   = text "Substitution:" <+> ppr (le_subst env)
+
+   msg_span = case [ span | (loc,_) <- loc_msgs
+                          , let span = srcLocSpan loc
+                          , isGoodSrcSpan span ] of
+               []    -> noSrcSpan
+               (s:_) -> s
+   mk_msg msg = mkLocMessage SevWarning msg_span
+                             (msg $$ context)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
 addLoc extra_loc m
@@ -2345,7 +2357,8 @@ lintTyCoVarInScope :: TyCoVar -> LintM ()
 lintTyCoVarInScope var
   = do { subst <- getTCvSubst
        ; lintL (var `isInScope` subst)
-               (pprBndr LetBind var <+> text "is out of scope") }
+               (hang (text "The variable" <+> pprBndr LetBind var)
+                   2 (text "is out of scope")) }
 
 ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
@@ -2375,19 +2388,19 @@ lintRole co r1 r2
 dumpLoc :: LintLocInfo -> (SrcLoc, SDoc)
 
 dumpLoc (RhsOf v)
-  = (getSrcLoc v, brackets (text "RHS of" <+> pp_binders [v]))
+  = (getSrcLoc v, text "In the RHS of" <+> pp_binders [v])
 
 dumpLoc (LambdaBodyOf b)
-  = (getSrcLoc b, brackets (text "in body of lambda with binder" <+> pp_binder b))
+  = (getSrcLoc b, text "In the body of lambda with binder" <+> pp_binder b)
 
 dumpLoc (UnfoldingOf b)
-  = (getSrcLoc b, brackets (text "in the unfolding of" <+> pp_binder b))
+  = (getSrcLoc b, text "In the unfolding of" <+> pp_binder b)
 
 dumpLoc (BodyOfLetRec [])
-  = (noSrcLoc, brackets (text "In body of a letrec with no binders"))
+  = (noSrcLoc, text "In body of a letrec with no binders")
 
 dumpLoc (BodyOfLetRec bs@(_:_))
-  = ( getSrcLoc (head bs), brackets (text "in body of letrec with binders" <+> pp_binders bs))
+  = ( getSrcLoc (head bs), text "In the body of letrec with binders" <+> pp_binders bs)
 
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
@@ -2398,8 +2411,15 @@ dumpLoc (CaseAlt (con, args, _))
 dumpLoc (CasePat (con, args, _))
   = (noSrcLoc, text "In the pattern of a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
+dumpLoc (CaseTy scrut)
+  = (noSrcLoc, hang (text "In the result-type of a case with scrutinee:")
+                  2 (ppr scrut))
+
+dumpLoc (IdTy b)
+  = (getSrcLoc b, text "In the type of a binder:" <+> ppr b)
+
 dumpLoc (ImportedUnfolding locn)
-  = (locn, brackets (text "in an imported unfolding"))
+  = (locn, text "In an imported unfolding")
 dumpLoc TopLevelBindings
   = (noSrcLoc, Outputable.empty)
 dumpLoc (InType ty)
