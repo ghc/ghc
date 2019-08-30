@@ -278,8 +278,10 @@ buildSphinxInfoGuide = do
             -- Sphinx outputs texinfo source and a makefile, the
             -- default target actually produces the target for this
             -- build rule.
-            build $ target docContext (Make dir) ["Makefile"] [dir]
-            copyFileUntracked (dir -/- path <.> "info") file
+            let p = dir -/- path
+            let [texipath, infopath] = map (p <.>) ["texi", "info"]
+            build $ target docContext (Makeinfo) [texipath] [infopath]
+            copyFileUntracked infopath file
 
 ------------------------------------ Archive -----------------------------------
 
