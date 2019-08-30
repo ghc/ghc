@@ -432,12 +432,12 @@ toIfaceIdInfo id is_caffy
     ------------ Caf Info --------------
     caf_info
       | is_caffy
-      = WARN( not (mayHaveCafRefs (cafInfo id_info)),
-              text "Turning non-CAFFY Id into CAFFY:" <+> ppr id )
+      = -- WARN( not (mayHaveCafRefs (cafInfo id_info)),
+        --       text "Turning non-CAFFY Id into CAFFY:" <+> ppr id )
         Nothing
       | otherwise
-      = WARN( mayHaveCafRefs (cafInfo id_info),
-              text "Turning CAFFY Id into non-CAFFY:" <+> ppr id )
+      = -- WARN( mayHaveCafRefs (cafInfo id_info),
+        --       text "Turning CAFFY Id into non-CAFFY:" <+> ppr id )
         Just HsNoCafRefs
 
     ------------  Strictness  --------------
