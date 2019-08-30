@@ -412,7 +412,8 @@ stringTable = unsafePerformIO $ do
 #if STAGE < 2
   return tab
 #else
-  sharedCAF tab getOrSetLibHSghcFastStringTable
+  return tab
+--  sharedCAF tab getOrSetLibHSghcFastStringTable
 
 -- from the RTS; thus we cannot use this mechanism when STAGE<2; the previous
 -- RTS might not have this symbol
