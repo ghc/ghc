@@ -1308,8 +1308,8 @@ otherwise               =  True
 -- Type Char and String
 ----------------------------------------------
 
--- | A 'String' is a list of characters.  String constants in Haskell are values
--- of type 'String'.
+-- | A 'String' is a 'Data.List' of 'Data.Char'.  String constants in Haskell
+-- are values of type 'String'.
 --
 type String = [Char]
 
