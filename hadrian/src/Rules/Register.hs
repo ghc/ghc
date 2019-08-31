@@ -10,7 +10,7 @@ import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Oracles.Setting
-import Oracles.Flag (platformSupportsSharedLibs)
+-- import Oracles.Flag (platformSupportsSharedLibs)
 import Packages
 import Rules.Gmp
 import Rules.Rts
@@ -111,14 +111,14 @@ buildConf _ context@Context {..} conf = do
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    libWays <- interpretInContext context getLibraryWays
+    -- libWays <- interpretInContext context getLibraryWays
 
-    supportsSharedLibs <- platformSupportsSharedLibs
-    let hasVanilla = vanilla `elem` libWays
-        hasDynamic = any (wayUnit Dynamic) libWays
-        p = supportsSharedLibs && hasVanilla && hasDynamic && package /= rts
+    -- supportsSharedLibs <- platformSupportsSharedLibs
+    -- let hasVanilla = vanilla `elem` libWays
+    --     hasDynamic = any (wayUnit Dynamic) libWays
+    --     p = supportsSharedLibs && hasVanilla && hasDynamic && package /= rts
 
-    need =<< concatMapM (libraryTargets True) [ context { way = w' } | w <- ways, let w' = if p then removeWayUnit Dynamic w else w ]
+    need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- ways ]--, let w' = if p then removeWayUnit Dynamic w else w ]
 
     -- We might need some package-db resource to limit read/write, see packageRules.
     path <- buildPath context
