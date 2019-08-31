@@ -1,30 +1,59 @@
-let custom c s e = let cmd = c ++ " " ++ s ++ maybe "" (" " ++) e; in (putStrLn ("input: " ++ cmd) >> return cmd)
+:{
+annotate :: [String] -> Int -> Int -> Int -> String
+annotate content row startcol endcol =
+    let
+        (toDrop, toTake) = calcRows row
+        startRows = drop toDrop content
+        markFile = map ("> " ++)
+        rows = markFile (take toTake startRows) ++ ["% " ++ annotateRow] ++ markFile (take 1 (drop toTake startRows))
+    in unlines rows
+  where
+    calcRows 1 = (0, 1)
+    calcRows c = (c-2, 2)
+    annotateRow
+      | startcol == endcol = replicate (startcol - 1) ' ' ++ "^"
+      | otherwise = replicate (startcol - 1) ' ' ++ "^" ++ replicate (endcol - startcol - 1) '~' ++ "^"
+
+annotateFile :: [(String, [String])] -> String -> String
+annotateFile fileStore args = do
+  case words args of
+    [filename,row,startcol,_,endcol] ->
+        let
+            file = snd . head . filter ((filename ==) . fst) $ fileStore
+        in annotate file (read row) (read startcol) (read endcol)
+    _ -> "malformed args"
+:}
+
+t1 <- readFile "T16804a.hs"
+t2 <- readFile "T16804b.hs"
+t3 <- readFile "T16804c.hs"
+
+let fileStore = [("T16804a.hs", lines t1), ("T16804b.hs", lines t2), ("T16804c.hs", lines t3)]
+
+:{
+custom c s e =
+    let
+        cmd = c ++ " " ++ s ++ maybe "" (" " ++) e
+    in do
+          putStrLn ""
+          putStrLn ("% executing: \"" ++ cmd ++ "\"")
+          putStrLn ("% file snippet:")
+          putStr (annotateFile fileStore s)
+          putStrLn "% output:"
+          return cmd
+:}
 
 let tp s = custom ":type-at" s (Just "undefined")
 let up s = custom ":uses" s Nothing
-let cp s = putStrLn s >> return ""
-
-let ruler p n = putStrLn $ replicate p ' ' ++ replicate (n * 10) ' ' ++ "1234567890"
-let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 
 :def tp tp
 :def up up
-:def cp cp
-:def putruler1 (putruler 2)
-:def putruler2 (putruler 3)
 
 :set +c
-:l T16804a.hs T16804b.hs
-
-:cp  1 module T16804a where
-:putruler1
+:l T16804a.hs T16804b.hs T16804c.hs
 
 :tp T16804a.hs  1  8  1 14
 :up T16804a.hs  1  8  1 14
-
-:cp  2 
-:cp  3 import Data.Monoid
-:putruler1
 
 :tp T16804a.hs  3  8  3 11
 :tp T16804a.hs  3  8  3 18
@@ -33,11 +62,6 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs  3  8  3 11
 :up T16804a.hs  3  8  3 18
 :up T16804a.hs  3 13  3 18
-
-:cp  4 
-:cp  5 data Test = A | B
-:cp  6   deriving (Show)
-:putruler1
 
 :tp T16804a.hs  5  6  5  9
 :tp T16804a.hs  5 13  5 13
@@ -51,11 +75,6 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs  5 17  5 17
 :up T16804a.hs  6 13  6 16
 
-:cp  7 instance Monoid Test where
-:cp  8   mempty = A
-:cp  9   -- gone 
-:cp 10   -- gone
-:putruler1
 :tp T16804a.hs  7 10  7 15 
 :tp T16804a.hs  7 17  7 20
 :tp T16804a.hs  7 10  7 20
@@ -68,12 +87,6 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs  8  3  8  8
 :up T16804a.hs  8 12  8 12
 
-:cp 11  
-:cp 12 testFunction :: Test -> Test -> Bool
-:cp 13 testFunction A B = True
-:cp 14 testFunction B A = True
-:cp 15 testFunction _ _ = False
-:putruler2
 :tp T16804a.hs 12  1 12 12
 :tp T16804a.hs 13  1 13 12
 :tp T16804a.hs 13 14 13 14
@@ -88,21 +101,12 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs 15 16 15 16
 :up T16804a.hs 15 20 15 24
 
-:cp 16  
-:cp 17 testFunction2 :: Bool -> Test
-:cp 18 testFunction2 True = A
-:cp 19 testFunction2 False = B
-:putruler2
 :tp T16804a.hs 18 15 18 18
 :tp T16804a.hs 18 22 18 22
 
 :up T16804a.hs 18 15 18 18
 :up T16804a.hs 18 22 18 22
 
-:cp 20  
-:cp 21 niceValue :: Int
-:cp 22 niceValue = getSum (Sum 1 <> Sum 2 <> mempty)
-:putruler2
 :tp T16804a.hs 22 13 22 18
 :tp T16804a.hs 22 21 22 23
 :tp T16804a.hs 22 25 22 25
@@ -115,10 +119,6 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs 22 21 22 25
 :up T16804a.hs 22 27 22 28
 
-:cp 23  
-:cp 24 niceValue2 :: Test
-:cp 25 niceValue2 = A <> A <> A <> B <> A <> mempty
-:putruler2
 :tp T16804a.hs 25 14 25 14
 :tp T16804a.hs 25 16 25 17
 :tp T16804a.hs 25 39 25 44
@@ -127,11 +127,6 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs 25 16 25 17
 :up T16804a.hs 25 39 25 44
 
-:cp 26
-:cp 27 instance Semigroup Test where
-:cp 28   A <> val = val
-:cp 29   B <> _   = B
-:putruler2
 :tp T16804a.hs 28  3 28  3
 :tp T16804a.hs 28  5 28  6
 :tp T16804a.hs 28  8 28 10
@@ -149,3 +144,31 @@ let putruler p s = ruler p 0 >> ruler p 1 >> ruler p 2 >> ruler p 3 >> return ""
 :up T16804a.hs 29  5 29  6
 :up T16804a.hs 29  8 29  8
 :up T16804a.hs 29 14 29 14
+
+:tp T16804b.hs 7 10 7 21
+:tp T16804b.hs 7 10 7 23
+:tp T16804b.hs 7 10 7 25
+:tp T16804b.hs 7 23 7 23
+
+:up T16804b.hs 7 10 7 21
+:up T16804b.hs 7 10 7 25
+:up T16804b.hs 7 23 7 23
+
+:tp T16804b.hs 8 10 8 22
+:tp T16804b.hs 8 10 8 27
+
+:tp T16804b.hs 10 9 10 17
+:up T16804b.hs 10 9 10 17
+
+:up T16804c.hs 5 1 5 1
+:up T16804c.hs 6 1 6 1
+
+:up T16804c.hs 9 12 9 14
+:up T16804c.hs 9 31 9 31
+:up T16804c.hs 9 33 9 35
+
+:up T16804c.hs 12 13 12 13
+:up T16804c.hs 12 32 12 32
+
+:up T16804c.hs 15 13 15 13
+:up T16804c.hs 15 30 15 30

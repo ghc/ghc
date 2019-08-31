@@ -302,5 +302,9 @@ test('T16569', normal, ghci_script, ['T16569.script'])
 test('T16767', normal, ghci_script, ['T16767.script'])
 test('T16575', normal, ghci_script, ['T16575.script'])
 test('T16509', normal, ghci_script, ['T16509.script'])
-test('T16804', extra_files(['T16804a.hs', 'T16804b.hs']), ghci_script, ['T16804.script'])
+# Tests :type-at and :uses
+# historical note: introduced to see the changes in the behaviour
+#   when the implementation of :type-at and :uses will be/was changed
+#   to use hie files
+test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_script, ['T16804.script'])
 test('T15546', normal, ghci_script, ['T15546.script'])
