@@ -585,6 +585,7 @@ Library
         State
         Stream
         StringBuffer
+        StringBufferNew
         UniqDFM
         UniqDSet
         UniqFM

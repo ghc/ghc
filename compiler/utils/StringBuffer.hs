@@ -65,6 +65,8 @@ import GHC.Exts
 
 import Foreign
 
+import qualified StringBufferNew as N
+
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
 
