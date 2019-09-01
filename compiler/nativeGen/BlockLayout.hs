@@ -2,7 +2,10 @@
 -- Copyright (c) 2018 Andreas Klebinger
 --
 
-{-# LANGUAGE TypeFamilies, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module BlockLayout
     ( sequenceTop )
@@ -512,7 +515,7 @@ buildChains succWeights blocks
 
 
 -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
-newtype BlockNode e x = BN (BlockId,[BlockId])
+newtype BlockNode (e :: Extensibility) (x :: Extensibility) = BN (BlockId,[BlockId])
 instance NonLocal (BlockNode) where
   entryLabel (BN (lbl,_))   = lbl
   successors (BN (_,succs)) = succs

@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 module Main where
 
 import Hoopl.Block
@@ -7,7 +9,7 @@ import Hoopl.Label
 
 import Data.Maybe
 
-data TestBlock e x = TB { label_ :: Label, successors_ :: [Label] }
+data TestBlock (e :: Extensibility) (x :: Extensibility) = TB { label_ :: Label, successors_ :: [Label] }
     deriving (Eq, Show)
 
 instance NonLocal TestBlock where

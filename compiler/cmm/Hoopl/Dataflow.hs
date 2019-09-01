@@ -1,9 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 --
@@ -49,7 +51,7 @@ import Hoopl.Graph
 import Hoopl.Collections
 import Hoopl.Label
 
-type family   Fact x f :: *
+type family   Fact (x :: Extensibility) f :: *
 type instance Fact C f = FactBase f
 type instance Fact O f = f
 
