@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -11,7 +12,7 @@
 
 module Debug (
 
-  DebugBlock(..), dblIsEntry,
+  DebugBlock(..),
   cmmDebugGen,
   cmmDebugLabels,
   cmmDebugLink,
@@ -58,8 +59,7 @@ data DebugBlock =
   , dblParent     :: !(Maybe DebugBlock)
     -- ^ The parent of this proc. See Note [Splitting DebugBlocks]
   , dblTicks      :: ![CmmTickish] -- ^ Ticks defined in this block
-  , dblSourceTick
-            :: !(Maybe CmmTickish) -- ^ Best source tick covering block
+  , dblSourceTick :: !(Maybe CmmTickish) -- ^ Best source tick covering block
   , dblPosition   :: !(Maybe Int)  -- ^ Output position relative to
                                    -- other blocks. @Nothing@ means
                                    -- the block was optimized out
@@ -67,22 +67,19 @@ data DebugBlock =
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
--- | Is this the entry block?
-dblIsEntry :: DebugBlock -> Bool
-dblIsEntry blk = dblProcedure blk == dblLabel blk
-
 instance Outputable DebugBlock where
-  ppr blk = (if dblProcedure blk == dblLabel blk
-             then text "proc "
-             else if dblHasInfoTbl blk
-                  then text "pp-blk "
-                  else text "blk ") <>
+  ppr blk = (if | dblProcedure blk == dblLabel blk
+                -> text "proc"
+                | dblHasInfoTbl blk
+                -> text "pp-blk"
+                | otherwise
+                -> text "blk") <+>
             ppr (dblLabel blk) <+> parens (ppr (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            (ppr (dblUnwind blk)) <+>
-            (if null (dblBlocks blk) then empty else ppr (dblBlocks blk))
+            (ppr (dblUnwind blk)) $+$
+            (if null (dblBlocks blk) then empty else nest 4 (ppr (dblBlocks blk)))
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
