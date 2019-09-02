@@ -21,7 +21,7 @@ module CoreUnfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types
 
         noUnfolding, mkImplicitUnfolding,
-        mkUnfolding, mkCoreUnfolding,
+        mkUnfolding, mkJoinUnfolding, mkCoreUnfolding,
         mkTopUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
         mkInlineUnfolding, mkInlineUnfoldingWithArity,
         mkInlinableUnfolding, mkWwInlineRule,
@@ -345,6 +345,24 @@ mkUnfolding dflags src is_top_lvl is_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
+mkJoinUnfolding :: DynFlags
+            -> CoreExpr
+            -> Unfolding
+-- Calculates unfolding guidance
+-- Occurrence-analyses the expression before capturing it
+mkJoinUnfolding dflags expr
+  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
+                      -- See Note [Occurrence analysis of unfoldings]
+                    uf_src          = InlineRhs,
+                    uf_is_top       = False,
+                    uf_is_value     = exprIsHNF        expr,
+                    uf_is_conlike   = exprIsConLike    expr,
+                    uf_expandable   = exprIsExpandable expr,
+                    uf_is_work_free = True, -- See Note [Unfoldings for join points]
+                    uf_guidance     = guidance }
+  where
+    guidance = calcUnfoldingGuidance dflags False expr
+
 {-
 Note [Occurrence analysis of unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -425,6 +443,7 @@ calcUnfoldingGuidance
 calcUnfoldingGuidance dflags is_top_bottoming (Tick t expr)
   | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
   = calcUnfoldingGuidance dflags is_top_bottoming expr
+
 calcUnfoldingGuidance dflags is_top_bottoming expr
   = case sizeExpr dflags bOMB_OUT_SIZE val_bndrs body of
       TooBig -> UnfNever
@@ -1077,8 +1096,11 @@ couldBeSmallEnoughToInline dflags threshold rhs
 
 ----------------
 smallEnoughToInline :: DynFlags -> Unfolding -> Bool
-smallEnoughToInline dflags (CoreUnfolding {uf_guidance = UnfIfGoodArgs {ug_size = size}})
-  = size <= ufUseThreshold dflags
+smallEnoughToInline dflags (CoreUnfolding {uf_guidance = guidance})
+  = case guidance of
+      UnfIfGoodArgs {ug_size = size} -> size <= ufUseThreshold dflags
+      UnfWhen {}                     -> True
+      UnfNever {}                    -> False
 smallEnoughToInline _ _
   = False
 
@@ -1267,15 +1289,22 @@ tryUnfolding dflags id lone_variable
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
         | ufVeryAggressive dflags
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+
+--        | is_join && join_small_enough
+--        -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+
         | is_wf && some_benefit && small_enough
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
+
         | otherwise
         -> traceInline dflags id str (mk_doc some_benefit extra_doc False) Nothing
         where
-          some_benefit = calc_some_benefit (length arg_discounts)
-          extra_doc = text "discounted size =" <+> int discounted_size
+          uf_arity        = length arg_discounts
+          some_benefit    = calc_some_benefit uf_arity
+          extra_doc       = text "discounted size =" <+> int discounted_size
           discounted_size = size - discount
-          small_enough = discounted_size <= ufUseThreshold dflags
+          use_threshold   = ufUseThreshold dflags
+          small_enough    = discounted_size <= use_threshold
           discount = computeDiscount dflags arg_discounts
                                      res_discount arg_infos cont_info
 
@@ -1292,6 +1321,7 @@ tryUnfolding dflags id lone_variable
 
     str = "Considering inlining: " ++ showSDocDump dflags (ppr id)
     n_val_args = length arg_infos
+    is_join    = isJoinId id
 
            -- some_benefit is used when the RHS is small enough
            -- and the call has enough (or too many) value
@@ -1313,18 +1343,20 @@ tryUnfolding dflags id lone_variable
                 -- over-saturated args too which is "wrong";
                 -- but if over-saturated we inline anyway.
 
+        work_safe = uf_arity > 0
         interesting_call
+          | is_join
+          = False
           | over_saturated
           = True
           | otherwise
           = case cont_info of
-              CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
-              ValAppCtxt -> True                           -- Note [Cast then apply]
-              RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
-              DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
-              RhsCtxt     -> uf_arity > 0  --
-              _other      -> False         -- See Note [Nested functions]
-
+              CaseCtxt    -> not (lone_variable && is_exp)  -- Note [Lone variables]
+              ValAppCtxt  -> True                           -- Note [Cast then apply]
+              RuleArgCtxt -> work_safe  -- See Note [Unfold into lazy contexts]
+              DiscArgCtxt -> work_safe  -- See Note [Inlining in ArgCtxt]
+              RhsCtxt     -> work_safe  --
+              _           -> False      -- Note [Nested functions]
 
 {-
 Note [Unfold into lazy contexts], Note [RHS of lets]

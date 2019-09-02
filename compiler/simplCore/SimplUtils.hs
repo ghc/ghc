@@ -1271,6 +1271,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
   | exprIsTrivial rhs           = True
   | otherwise
   = case occ_info of
+{-
         -- The point of examining occ_info here is that for *non-values*
         -- that occur outside a lambda, the call-site inliner won't have
         -- a chance (because it doesn't know that the thing
@@ -1285,7 +1286,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
         -- in allocation if you miss this out
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt }
                -- OneOcc => no code-duplication issue
-        ->     smallEnoughToInline dflags unfolding     -- Small enough to dup
+        ->   not (isJoinId bndr)  -- NEW!
+          && smallEnoughToInline dflags unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
                         -- NB: Do NOT inline arbitrarily big things, even if one_br is True
@@ -1310,6 +1312,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
                         -- int_cxt to prevent us inlining inside a lambda without some
                         -- good reason.  See the notes on int_cxt in preInlineUnconditionally
 
+-}
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
                         -- Here x isn't mentioned in the RHS, so we don't want to
@@ -1331,7 +1334,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
 
   where
     unfolding = idUnfolding bndr
-    dflags    = seDynFlags env
+    _dflags    = seDynFlags env
     active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 

@@ -45,7 +45,7 @@ import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
 import Var              ( isTyCoVar )
-import Maybes           (  orElse )
+import Maybes           (  isJust, orElse )
 import Control.Monad
 import Outputable
 import FastString
@@ -326,6 +326,7 @@ simplNonRecX :: SimplEnv
 -- simplified, notably in knownCon.  It uses case-binding where necessary.
 --
 -- Precondition: rhs satisfies the let/app invariant
+-- Not used for JoinIds
 
 simplNonRecX env bndr new_rhs
   | ASSERT2( not (isJoinId bndr), ppr bndr )
@@ -350,6 +351,7 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
                 -> SimplM (SimplFloats, SimplEnv)    -- The new binding is in the floats
 -- Precondition: rhs satisfies the let/app invariant
 --               See Note [CoreSyn let/app invariant] in CoreSyn
+-- Not used for JoinIds
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = ASSERT2( not (isJoinId new_bndr), ppr new_bndr )
@@ -549,7 +551,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
         ; (arity, is_bot, expr2) <- tryEtaExpandRhs mode var expr1
-        ; unf <- mkLetUnfolding (sm_dflags mode) top_lvl InlineRhs var expr2
+        ; unf <- simplVanillaUnfolding (sm_dflags mode) top_lvl InlineRhs var expr2
 
         ; let final_id = addLetBndrInfo var arity is_bot unf
               bind     = NonRec final_id expr2
@@ -3390,15 +3392,25 @@ simplLetUnfolding :: SimplEnv-> TopLevelFlag
 simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty unf
   | isStableUnfolding unf
   = simplStableUnfolding env top_lvl cont_mb id unf rhs_ty
-  | isExitJoinId id
-  = return noUnfolding -- See Note [Do not inline exit join points] in Exitify
+
+  | isJust cont_mb  -- A join point
+  = simplJoinUnfolding env id new_rhs
+
   | otherwise
-  = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
+  = simplVanillaUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
 
 -------------------
-mkLetUnfolding :: DynFlags -> TopLevelFlag -> UnfoldingSource
-               -> InId -> OutExpr -> SimplM Unfolding
-mkLetUnfolding dflags top_lvl src id new_rhs
+simplJoinUnfolding :: SimplEnv -> InId -> OutExpr -> SimplM Unfolding
+simplJoinUnfolding env join_id new_rhs
+  | isExitJoinId join_id
+  = return noUnfolding -- See Note [Do not inline exit join points] in Exitify
+  | otherwise
+  = return (mkJoinUnfolding (seDynFlags env) new_rhs)
+
+-------------------
+simplVanillaUnfolding :: DynFlags -> TopLevelFlag -> UnfoldingSource
+                      -> InId -> OutExpr -> SimplM Unfolding
+simplVanillaUnfolding dflags top_lvl src id new_rhs
   = is_bottoming `seq`  -- See Note [Force bottoming field]
     return (mkUnfolding dflags src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
@@ -3456,7 +3468,7 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
                             -- See Note [Top-level flag on inline rules] in CoreUnfold
 
                   _other              -- Happens for INLINABLE things
-                     -> mkLetUnfolding dflags top_lvl src id expr' }
+                     -> simplVanillaUnfolding dflags top_lvl src id expr' }
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.

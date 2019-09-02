@@ -24,10 +24,13 @@
 --
 -----------------------------------------------------------------------------
 
+
 module GHC.IO.Encoding.UTF8 (
   utf8, mkUTF8,
   utf8_bom, mkUTF8_bom
   ) where
+
+-- module GHC.IO.Encoding.UTF8 where
 
 import GHC.Base
 import GHC.Real
@@ -39,6 +42,156 @@ import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.Word
 import Data.Bits
+
+{-
+utf8_decode :: DecodeBuffer
+utf8_decode 
+  input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
+  output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+ = let 
+       loop !ir !ow
+         | ow >= os = done OutputUnderflow ir ow
+         | ir >= iw = done InputUnderflow ir ow
+         | otherwise = do
+              c0 <- readWord8Buf iraw ir
+              case c0 of
+                _ | c0 <= 0x7f -> do 
+                           ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
+                           loop (ir+1) ow'
+                  | c0 >= 0xc0 && c0 <= 0xc1 -> invalid -- Overlong forms
+                  | c0 >= 0xc2 && c0 <= 0xdf ->
+                           if iw - ir < 2 then done InputUnderflow ir ow else do
+                           c1 <- readWord8Buf iraw (ir+1)
+                           if (c1 < 0x80 || c1 >= 0xc0) then invalid else do
+                           ow' <- writeCharBuf oraw ow (chr2 c0 c1)
+                           loop (ir+2) ow'
+                  | c0 >= 0xe0 && c0 <= 0xef ->
+                      case iw - ir of
+                        1 -> done InputUnderflow ir ow
+                        2 -> do -- check for an error even when we don't have
+                                -- the full sequence yet (#3341)
+                           c1 <- readWord8Buf iraw (ir+1)
+                           if not (validate3 c0 c1 0x80) 
+                              then invalid else done InputUnderflow ir ow
+                        _ -> do
+                           c1 <- readWord8Buf iraw (ir+1)
+                           c2 <- readWord8Buf iraw (ir+2)
+                           if not (validate3 c0 c1 c2) then invalid else do
+                           ow' <- writeCharBuf oraw ow (chr3 c0 c1 c2)
+                           loop (ir+3) ow'
+                  | c0 >= 0xf0 ->
+                      case iw - ir of
+                        1 -> done InputUnderflow ir ow
+                        2 -> do -- check for an error even when we don't have
+                                -- the full sequence yet (#3341)
+                           c1 <- readWord8Buf iraw (ir+1)
+                           if not (validate4 c0 c1 0x80 0x80)
+                              then invalid else done InputUnderflow ir ow
+                        3 -> do
+                           c1 <- readWord8Buf iraw (ir+1)
+                           c2 <- readWord8Buf iraw (ir+2)
+                           if not (validate4 c0 c1 c2 0x80)
+                              then invalid else done InputUnderflow ir ow
+                        _ -> do
+                           c1 <- readWord8Buf iraw (ir+1)
+                           c2 <- readWord8Buf iraw (ir+2)
+                           c3 <- readWord8Buf iraw (ir+3)
+                           if not (validate4 c0 c1 c2 c3) then invalid else do
+                           ow' <- writeCharBuf oraw ow (chr4 c0 c1 c2 c3)
+                           loop (ir+4) ow'
+                  | otherwise ->
+                           invalid
+         where
+           invalid = done InvalidSequence ir ow
+
+       -- lambda-lifted, to avoid thunks being built in the inner-loop:
+       done why !ir !ow = return (why,
+                                  if ir == iw then input{ bufL=0, bufR=0 }
+                                              else input{ bufL=ir },
+                                  output{ bufR=ow })
+   in
+   loop ir0 ow0
+
+validate4             :: Word8 -> Word8 -> Word8 -> Word8 -> Bool
+{-# INLINE validate4 #-}
+validate4 x1 x2 x3 x4 = validate4_1 ||
+                        validate4_2 ||
+                        validate4_3
+  where 
+    validate4_1 = x1 == 0xF0 &&
+                  between x2 0x90 0xBF &&
+                  between x3 0x80 0xBF &&
+                  between x4 0x80 0xBF
+    validate4_2 = between x1 0xF1 0xF3 &&
+                  between x2 0x80 0xBF &&
+                  between x3 0x80 0xBF &&
+                  between x4 0x80 0xBF
+    validate4_3 = x1 == 0xF4 &&
+                  between x2 0x80 0x8F &&
+                  between x3 0x80 0xBF &&
+                  between x4 0x80 0xBF
+
+validate3          :: Word8 -> Word8 -> Word8 -> Bool
+{-# INLINE validate3 #-}
+validate3 x1 x2 x3 = validate3_1 ||
+                     validate3_2 ||
+                     validate3_3 ||
+                     validate3_4
+  where
+    validate3_1 = (x1 == 0xE0) &&
+                  between x2 0xA0 0xBF &&
+                  between x3 0x80 0xBF
+    validate3_2 = between x1 0xE1 0xEC &&
+                  between x2 0x80 0xBF &&
+                  between x3 0x80 0xBF
+    validate3_3 = x1 == 0xED &&
+                  between x2 0x80 0x9F &&
+                  between x3 0x80 0xBF
+    validate3_4 = between x1 0xEE 0xEF &&
+                  between x2 0x80 0xBF &&
+                  between x3 0x80 0xBF
+
+between :: Word8                -- ^ byte to check
+        -> Word8                -- ^ lower bound
+        -> Word8                -- ^ upper bound
+        -> Bool
+between x y z = x >= y && x <= z
+{-# INLINE between #-}
+
+chr2       :: Word8 -> Word8 -> Char
+chr2 (W8# x1#) (W8# x2#) = C# (chr# (z1# +# z2#))
+    where
+      !y1# = word2Int# x1#
+      !y2# = word2Int# x2#
+      !z1# = uncheckedIShiftL# (y1# -# 0xC0#) 6#
+      !z2# = y2# -# 0x80#
+{-# INLINE chr2 #-}
+
+chr3          :: Word8 -> Word8 -> Word8 -> Char
+chr3 (W8# x1#) (W8# x2#) (W8# x3#) = C# (chr# (z1# +# z2# +# z3#))
+    where
+      !y1# = word2Int# x1#
+      !y2# = word2Int# x2#
+      !y3# = word2Int# x3#
+      !z1# = uncheckedIShiftL# (y1# -# 0xE0#) 12#
+      !z2# = uncheckedIShiftL# (y2# -# 0x80#) 6#
+      !z3# = y3# -# 0x80#
+{-# INLINE chr3 #-}
+
+chr4             :: Word8 -> Word8 -> Word8 -> Word8 -> Char
+chr4 (W8# x1#) (W8# x2#) (W8# x3#) (W8# x4#) =
+    C# (chr# (z1# +# z2# +# z3# +# z4#))
+    where
+      !y1# = word2Int# x1#
+      !y2# = word2Int# x2#
+      !y3# = word2Int# x3#
+      !y4# = word2Int# x4#
+      !z1# = uncheckedIShiftL# (y1# -# 0xF0#) 18#
+      !z2# = uncheckedIShiftL# (y2# -# 0x80#) 12#
+      !z3# = uncheckedIShiftL# (y3# -# 0x80#) 6#
+      !z4# = y4# -# 0x80#
+{-# INLINE chr4 #-}
+-}
 
 utf8 :: TextEncoding
 utf8 = mkUTF8 ErrorOnCodingFailure
@@ -359,4 +512,3 @@ validate4 x1 x2 x3 x4 = validate4_1 ||
                   between x2 0x80 0x8F &&
                   between x3 0x80 0xBF &&
                   between x4 0x80 0xBF
-
