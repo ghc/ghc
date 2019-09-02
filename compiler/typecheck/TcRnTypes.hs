@@ -1752,12 +1752,17 @@ data Ct
 ------------
 data QCInst  -- A much simplified version of ClsInst
              -- See Note [Quantified constraints] in TcCanonical
-  = QCI { qci_ev   :: CtEvidence -- Always of type forall tvs. context => ty
-                                 -- Always Given
-        , qci_tvs  :: [TcTyVar]  -- The tvs
-        , qci_pred :: TcPredType -- The ty
+  = QCI { qci_ev :: CtEvidence  -- Always Given
+             -- Always of type forall tvs. ctxt => qci_pred
+
+        , qci_bndrs  :: [TcTcVar]  -- Binders for tvs1, ctxt2, tvs2, etc
+             -- The tyvars among them scope over qci_pred
+
+        , qci_pred :: TcPredType -- The predicate in the body
+             -- Can be ClassPred or IrredPred, but not ForAllPred
+
         , qci_pend_sc :: Bool    -- Same as cc_pend_sc flag in CDictCan
-                                 -- Invariant: True => qci_pred is a ClassPred
+             -- Invariant: True => qci_pred is a ClassPred
     }
 
 instance Outputable QCInst where

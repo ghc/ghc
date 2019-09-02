@@ -2280,46 +2280,44 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 
+----------------------
 chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
-chooseInstance work_item
-               (OneInst { cir_new_theta = theta
-                        , cir_what      = what
-                        , cir_mk_ev     = mk_ev })
-  = do { traceTcS "doTopReact/found instance for" $ ppr ev
-       ; deeper_loc <- checkInstanceOK loc what pred
-       ; if isDerived ev then finish_derived deeper_loc theta
-                         else finish_wanted  deeper_loc theta mk_ev }
+-- Precondition: the ClsInstResult is always OneInst
+chooseInstance work_item (OneInst { cir_new_theta = theta
+                                  , cir_what      = what
+                                  , cir_mk_ev     = mk_ev })
+  | isDerived ev
+  = -- Use type-class instances for Deriveds, in the hope
+    -- of generating some improvements
+    -- C.f. Example 3 of Note [The improvement story]
+    -- It's easy because no evidence is involved
+    do { deeper_loc <- checkInstanceOK loc what pred
+       ; emitNewDeriveds deeper_loc theta
+       ; traceTcS "finish_derived" (ppr (ctl_depth loc) $$ ppr ev)
+       ; stopWith ev "Dict/Top (solved derived)" }
+
+  | otherwise -- Wanted
+  = do { traceTcS "doTopReact/found wanted instance for" $ ppr ev
+       ; evb <- getTcEvBindsVar
+       ; if isCoEvBindsVar evb
+         then -- See Note [Instances in no-evidence implications]
+              continueWith work_item
+         else
+    do { deeper_loc <- checkInstanceOK loc what pred
+       ; evc_vars <- mapM (newWanted deeper_loc) theta
+       ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
+       ; emitWorkNC (freshGoals evc_vars)
+       ; stopWith ev "Dict/Top (solved wanted)" } }
+
   where
-     ev         = ctEvidence work_item
-     pred       = ctEvPred ev
-     loc        = ctEvLoc ev
-
-     finish_wanted :: CtLoc -> [TcPredType]
-                   -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
-      -- Precondition: evidence term matches the predicate workItem
-     finish_wanted loc theta mk_ev
-        = do { evb <- getTcEvBindsVar
-             ; if isCoEvBindsVar evb
-               then -- See Note [Instances in no-evidence implications]
-                    continueWith work_item
-               else
-          do { evc_vars <- mapM (newWanted loc) theta
-             ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
-             ; emitWorkNC (freshGoals evc_vars)
-             ; stopWith ev "Dict/Top (solved wanted)" } }
-
-     finish_derived loc theta
-       = -- Use type-class instances for Deriveds, in the hope
-         -- of generating some improvements
-         -- C.f. Example 3 of Note [The improvement story]
-         -- It's easy because no evidence is involved
-         do { emitNewDeriveds loc theta
-            ; traceTcS "finish_derived" (ppr (ctl_depth loc))
-            ; stopWith ev "Dict/Top (solved derived)" }
+     ev   = ctEvidence work_item
+     pred = ctEvPred ev
+     loc  = ctEvLoc ev
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
 
+----------------------
 checkInstanceOK :: CtLoc -> InstanceWhat -> TcPredType -> TcS CtLoc
 -- Check that it's OK to use this insstance:
 --    (a) the use is well staged in the Template Haskell sense

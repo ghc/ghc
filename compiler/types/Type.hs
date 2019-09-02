@@ -1998,7 +1998,7 @@ data PredTree
   = ClassPred Class [Type]
   | EqPred EqRel Type Type
   | IrredPred PredType
-  | ForAllPred [TyCoVarBinder] [PredType] PredType
+  | ForAllPred [TyVar] [PredType] PredType
      -- ForAllPred: see Note [Quantified constraints] in TcCanonical
   -- NB: There is no TuplePred case
   --     Tuple predicates like (Eq a, Ord b) are just treated
@@ -2015,7 +2015,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
       | Just clas <- tyConClass_maybe tc
       -> ClassPred clas tys
 
-    _ | (tvs, rho) <- splitForAllVarBndrs ev_ty
+    _ | (tvs, rho) <- splitForAllTys ev_ty
       , (theta, pred) <- splitFunTys rho
       , not (null tvs && null theta)
       -> ForAllPred tvs theta pred

@@ -541,12 +541,17 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
 mk_superclasses :: NameSet -> CtEvidence
                 -> [TyVar] -> ThetaType -> PredType -> TcS [Ct]
 -- Return this constraint, plus its superclasses, if any
+-- Precondition:   ev :: forall tvs. theta => pred
 mk_superclasses rec_clss ev tvs theta pred
-  | ClassPred cls tys <- classifyPredType pred
-  = mk_superclasses_of rec_clss ev tvs theta cls tys
+  = case classifyPredType pred of
+      ClassPred cls tys -> mk_superclasses_of rec_clss ev tvs theta cls tys
+      ForAllPred tvs2 theta2 pred2
+        -> do { given_ev <- newGivenEvVar (ctEvLoc ev) $
+                            (given_ty, mk_sc_sel evar sel_id)  -- ***** workingf erhe ***
 
-  | otherwise   -- Superclass is not a class predicate
-  = return [mkNonCanonical ev]
+
+      _ -> -- Superclass is not a class predicate
+           return [mkNonCanonical ev]
 
 mk_superclasses_of :: NameSet -> CtEvidence
                    -> [TyVar] -> ThetaType -> Class -> [Type]
@@ -575,7 +580,8 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
                  -- NB: If there is a loop, we cut off, so we have not
                  --     added the superclasses, hence cc_pend_sc = True
             | otherwise
-            = CQuantCan (QCI { qci_tvs = tvs, qci_pred = mkClassPred cls tys
+            = CQuantCan (QCI { qci_tvs = tvs
+                             , qci_pred = mkClassPred cls tys
                              , qci_ev = ev
                              , qci_pend_sc = loop_found })
 
@@ -737,30 +743,20 @@ canForAll ev pend_sc
          let pred = ctEvPred ev
        ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+         solveForAll new_ev pend_sc }
 
-    do { -- Now decompose into its pieces and solve it
-         -- (It takes a lot less code to flatten before decomposing.)
-       ; case classifyPredType (ctEvPred new_ev) of
-           ForAllPred tv_bndrs theta pred
-              -> solveForAll new_ev tv_bndrs theta pred pend_sc
-           _  -> pprPanic "canForAll" (ppr new_ev)
-    } }
-
-solveForAll :: CtEvidence -> [TyVarBinder] -> TcThetaType -> PredType -> Bool
+solveForAll :: CtEvidence -> Bool
             -> TcS (StopOrContinue Ct)
-solveForAll ev tv_bndrs theta pred pend_sc
+solveForAll ev pend_sc
   | CtWanted { ctev_dest = dest } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
-    do { let skol_info = QuantCtxtSkol
-             empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
-                           tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
-       ; (subst, skol_tvs) <- tcInstSkolTyVarsX empty_subst tvs
-       ; given_ev_vars <- mapM newEvVar (substTheta subst theta)
+    do { let (tvs, theta, pred) = tcSplitSigmaTy (ctEvPred ev)
+       ; (skol_tvs, skol_theta, skol_pred) <- skolemiseQC tvs theta pred
+       ; given_ev_vars <- mapM newEvVar skol_theta
 
        ; (w_id, ev_binds)
              <- checkConstraintsTcS skol_info skol_tvs given_ev_vars $
-                do { wanted_ev <- newWantedEvVarNC loc $
-                                  substTy subst pred
+                do { wanted_ev <- newWantedEvVarNC loc skol_pred
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
 
@@ -771,16 +767,41 @@ solveForAll ev tv_bndrs theta pred pend_sc
       ; stopWith ev "Wanted forall-constraint" }
 
   | isGiven ev   -- See Note [Solving a Given forall-constraint]
-  = do { addInertForAll qci
+  = do { qci <- mkQCI ev pend_sc
+       ; addInertForAll qci
        ; stopWith ev "Given forall-constraint" }
 
   | otherwise
   = stopWith ev "Derived forall-constraint"
   where
     loc = ctEvLoc ev
-    tvs = binderVars tv_bndrs
-    qci = QCI { qci_ev = ev, qci_tvs = tvs
-              , qci_pred = pred, qci_pend_sc = pend_sc }
+
+mkQCI :: CtEvidence -> Bool -> TcS Ct
+-- Unwrap the predicate to expose the head
+-- e.g.  from  (forall a. Eq a => forall b. Show b => C a b)
+--       we expose the head (C a b)
+mkQCI ev pend_sc
+  = go [] (ctEvPred ev)
+  where
+    go acc_tvs pred
+      | ForAllPred tvs theta body_pred <- classifyPredType pred
+      = do { (tvs', _, pred') <- skolemiseQC tvs theta body_pred
+           ; go (acc_tvs ++ tvs') pred' }
+      | otherwise
+      = return (QCI { qci_ev      = ev
+                    , qci_bndrs   = acc_tvs
+                    , qci_pred    = pred
+                    , qci_pend_sc = pend_sc }
+
+skolemiseQC :: [TcTyVar] -> TcThetaType -> TcPredType
+            -> TcS ([TcTyVar], ThetaType, TcPredType)
+skolemiseQC tvs theta pred
+  = do { let skol_info = QuantCtxtSkol
+             empty_subst = mkEmptyTCvSubst $ mkInScopeSet $
+                           tyCoVarsOfTypes (pred:theta) `delVarSetList` tvs
+       ; (subst, skol_tvs) <- tcInstSkolTyVarsX empty_subst tvs
+       ; return (skol_tvs, substTheta subst theta, substTy subst pred) }
+
 
 {- Note [Solving a Wanted forall-constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
