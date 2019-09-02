@@ -347,7 +347,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
 
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
-        when (not (null stats)) $ do
+        unless (null stats) $ do
 
           -- build the global register conflict graph
           let graphGlobal
@@ -370,7 +370,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
 
         -- dump global NCG stats for linear allocator
         let linearStats = concat (ngs_linearStats ngs)
-        when (not (null linearStats)) $
+        unless (null linearStats) $
           dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
@@ -419,8 +419,9 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
               -- Link native code information into debug blocks
               -- See Note [What is this unwinding business?] in Debug.
               let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
-              dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
-                (vcat $ map ppr ldbgs)
+              unless (null ldbgs) $
+                dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
+                  (vcat $ map ppr ldbgs)
 
               -- Accumulate debug information for emission in finishNativeGen.
               let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
@@ -477,7 +478,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
           map (pprNatCmmDecl ncgImpl) native
 
         -- force evaluation all this stuff to avoid space leaks
-        {-# SCC "seqString" #-} evaluate $ seqString (showSDoc dflags $ vcat $ map ppr imports)
+        {-# SCC "seqString" #-} evaluate $ seqList (showSDoc dflags $ vcat $ map ppr imports) ()
 
         let !labels' = if debugLevel dflags > 0
                        then cmmDebugLabels isMetaInstr native else []
@@ -494,9 +495,6 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
                       , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
                       }
         go us' cmms ngs' (count + 1)
-
-    seqString []            = ()
-    seqString (x:xs)        = x `seq` seqString xs
 
 
 emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
