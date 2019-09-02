@@ -1124,8 +1124,8 @@ in terms (say, in `length []`) because terms are never re-examined before
 the final zonk (which zaps any lingering metavariables to Any).
 
 We do this eager zapping in candidateQTyVars, which always precedes
-generalisation, because at that moment we have a clear picture of
-what skolems are in scope.
+generalisation, because at that moment we have a clear picture of what
+skolems are in scope within the type itself (e.g. that 'forall arg').
 
 Wrinkle:
 
