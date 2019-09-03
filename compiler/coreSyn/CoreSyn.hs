@@ -214,48 +214,8 @@ These data types are the heart of the compiler
 --
 -- *  A coercion
 
-{- Note [Case expression invariants]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case expressions are one of the more complicated elements of the Core
-language, and come with a number of invariants.  All of them should be
-checked by Core Lint.
-
-1. The list of alternatives may be empty;
-   See Note [Empty case alternatives]
-
-2. The 'DEFAULT' case alternative must be first in the list,
-   if it occurs at all.
-
-3. The remaining cases are in order of increasing
-     tag  (for 'DataAlts') or
-     lit  (for 'LitAlts').
-   This makes finding the relevant constructor easy,
-   and makes comparison easier too.
-
-4. The list of alternatives must be exhaustive. An /exhaustive/ case
-   does not necessarily mention all constructors:
-
-   @
-        data Foo = Red | Green | Blue
-   ... case x of
-        Red   -> True
-        other -> f (case x of
-                        Green -> ...
-                        Blue  -> ... ) ...
-   @
-
-   The inner case does not need a @Red@ alternative, because @x@
-   can't be @Red@ at that program point.
-
-5. Floating-point values must not be scrutinised against literals.
-   See #9238 and Note [Rules for floating-point comparisons]
-   in PrelRules for rationale.
-
-6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
-   /entire/ case expression.
-
-Note [Why does Case have a 'Type' field?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Why does Case have a 'Type' field?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The obvious alternative is
    exprType (Case scrut bndr alts)
      | (_,_,rhs1):_ <- alts
@@ -292,6 +252,7 @@ data Expr b
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+                                    -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) Coercion
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
@@ -483,6 +444,68 @@ coreSyn/MkCore.
 
 For discussion of some implications of the let/app invariant primops see
 Note [Checking versus non-checking primops] in PrimOp.
+
+Note [Case expression invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions are one of the more complicated elements of the Core
+language, and come with a number of invariants.  All of them should be
+checked by Core Lint.
+
+1. The list of alternatives may be empty;
+   See Note [Empty case alternatives]
+
+2. The 'DEFAULT' case alternative must be first in the list,
+   if it occurs at all.  Checked in CoreLint.checkCaseAlts.
+
+3. The remaining cases are in order of (strictly) increasing
+     tag  (for 'DataAlts') or
+     lit  (for 'LitAlts').
+   This makes finding the relevant constructor easy, and makes
+   comparison easier too.   Checked in CoreLint.checkCaseAlts.
+
+4. The list of alternatives must be exhaustive. An /exhaustive/ case
+   does not necessarily mention all constructors:
+
+   @
+        data Foo = Red | Green | Blue
+        ... case x of
+              Red   -> True
+              other -> f (case x of
+                              Green -> ...
+                              Blue  -> ... ) ...
+   @
+
+   The inner case does not need a @Red@ alternative, because @x@
+   can't be @Red@ at that program point.
+
+   This is not checked by Core Lint -- it's very hard to do so.
+   E.g. suppose that inner case was floated out, thus:
+         let a = case x of
+                   Green -> ...
+                   Blue  -> ... )
+         case x of
+           Red   -> True
+           other -> f a
+   Now it's really hard to see that the Green/Blue case is
+   exhaustive.  But it is.
+
+   If you have a case-expression that really /isn't/ exhaustive,
+   we may generate seg-faults.  Consider the Green/Blue case
+   above.  Since there are only two branches we may generate
+   code that tests for Green, and if not Green simply /assumes/
+   Blue (since, if the case is exhaustive, that's all that
+   remains).  Of course, if it's not Blue and we start fetching
+   fields that should be in a Blue constructor, we may die
+   horribly.
+
+5. Floating-point values must not be scrutinised against literals.
+   See #9238 and Note [Rules for floating-point comparisons]
+   in PrelRules for rationale.  Checked in lintCaseExpr;
+   see the call to isFloatingTy.
+
+6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
+   /entire/ case expression.  Checked in lintCaseExpr.
+   See also Note [Why does Case have a 'Type' field?].
 
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

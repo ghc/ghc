@@ -786,52 +786,8 @@ lintCoreExpr (Lam var expr)
     do { body_ty <- lintCoreExpr expr
        ; return $ mkLamType var' body_ty }
 
-lintCoreExpr e@(Case scrut var alt_ty alts) =
-       -- Check the scrutinee
-  do { scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
-          -- See Note [Join points are less general than the paper]
-          -- in CoreSyn
-
-     ; (alt_ty, _) <- addLoc (CaseTy scrut) $
-                      lintInTy alt_ty
-     ; (var_ty, _) <- addLoc (IdTy var) $
-                      lintInTy (idType var)
-
-     -- We used to try to check whether a case expression with no
-     -- alternatives was legitimate, but this didn't work.
-     -- See Note [No alternatives lint check] for details.
-
-     -- See Note [Rules for floating-point comparisons] in PrelRules
-     ; let isLitPat (LitAlt _, _ , _) = True
-           isLitPat _                 = False
-     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
-         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
-                        "expression with literal pattern in case " ++
-                        "analysis (see #9238).")
-          $$ text "scrut" <+> ppr scrut)
-
-     ; case tyConAppTyCon_maybe (idType var) of
-         Just tycon
-              | debugIsOn
-              , isAlgTyCon tycon
-              , not (isAbstractTyCon tycon)
-              , null (tyConDataCons tycon)
-              , not (exprIsBottom scrut)
-              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
-                        -- This can legitimately happen for type families
-                      $ return ()
-         _otherwise -> return ()
-
-        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
-
-     ; subst <- getTCvSubst
-     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
-
-     ; lintBinder CaseBind var $ \_ ->
-       do { -- Check the alternatives
-            mapM_ (lintCoreAlt scrut_ty alt_ty) alts
-          ; checkCaseAlts e scrut_ty alts
-          ; return alt_ty } }
+lintCoreExpr (Case scrut var alt_ty alts)
+  = lintCaseExpr scrut var alt_ty alts
 
 -- This case can't happen; linting types in expressions gets routed through
 -- lintCoreArgs
@@ -1096,6 +1052,56 @@ lintTyKind tyvar arg_ty
 *                                                                      *
 ************************************************************************
 -}
+
+lintCaseExpr :: CoreExpr -> Id -> Type -> [CoreAlt] -> LintM OutType
+lintCaseExpr scrut var alt_ty alts =
+  do { let e = Case scrut var alt_ty alts   -- Just for error messages
+
+     -- Check the scrutinee
+     ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
+          -- See Note [Join points are less general than the paper]
+          -- in CoreSyn
+
+     ; (alt_ty, _) <- addLoc (CaseTy scrut) $
+                      lintInTy alt_ty
+     ; (var_ty, _) <- addLoc (IdTy var) $
+                      lintInTy (idType var)
+
+     -- We used to try to check whether a case expression with no
+     -- alternatives was legitimate, but this didn't work.
+     -- See Note [No alternatives lint check] for details.
+
+     -- See Note [Rules for floating-point comparisons] in PrelRules
+     ; let isLitPat (LitAlt _, _ , _) = True
+           isLitPat _                 = False
+     ; checkL (not $ isFloatingTy scrut_ty && any isLitPat alts)
+         (ptext (sLit $ "Lint warning: Scrutinising floating-point " ++
+                        "expression with literal pattern in case " ++
+                        "analysis (see #9238).")
+          $$ text "scrut" <+> ppr scrut)
+
+     ; case tyConAppTyCon_maybe (idType var) of
+         Just tycon
+              | debugIsOn
+              , isAlgTyCon tycon
+              , not (isAbstractTyCon tycon)
+              , null (tyConDataCons tycon)
+              , not (exprIsBottom scrut)
+              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
+                        -- This can legitimately happen for type families
+                      $ return ()
+         _otherwise -> return ()
+
+        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
+
+     ; subst <- getTCvSubst
+     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
+
+     ; lintBinder CaseBind var $ \_ ->
+       do { -- Check the alternatives
+            mapM_ (lintCoreAlt scrut_ty alt_ty) alts
+          ; checkCaseAlts e scrut_ty alts
+          ; return alt_ty } }
 
 checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty

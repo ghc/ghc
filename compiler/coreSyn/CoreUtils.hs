@@ -526,11 +526,11 @@ mkSingleAltCase scrut case_bndr con bndrs body
   = Case scrut case_bndr case_ty [(con,bndrs,body)]
   where
     body_ty = exprType body
+
     case_ty -- See Note [Care with the type of a case expression]
-      | null bndrs
-      = body_ty
       | Just body_ty' <- occCheckExpand bndrs body_ty
       = body_ty'
+
       | otherwise
       = pprPanic "mkSingleAltCase" (ppr scrut $$ ppr bndrs $$ ppr body_ty)
 

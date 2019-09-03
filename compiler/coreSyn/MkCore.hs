@@ -204,19 +204,20 @@ mkStrictApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build a strict application (case e2 of x -> e1 x)
 mkStrictApp fun arg arg_ty res_ty
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
-       -- mkDefaultCase looks attractive here, it uses (exprType alt_rhs)
-       -- to compute the result type, whereas here we already know
-       -- that the result type is res_ty
+       -- mkDefaultCase looks attractive here, and would be sound.
+       -- But it uses (exprType alt_rhs) to compute the result type,
+       -- whereas here we already know that the result type is res_ty
   where
     arg_id = mkWildValBinder arg_ty
         -- Lots of shadowing, but it doesn't matter,
         -- because 'fun' and 'res_ty' should not have a free wild-id
         --
         -- This is Dangerous.  But this is the only place we play this
-        -- game, mk_val_app returns an expression that does not have
-        -- a free wild-id.  So the only thing that can go wrong
-        -- is if you take apart this case expression, and pass a
-        -- fragment of it as the fun part of a 'mk_val_app'.
+        -- game, mkStrictApp returns an expression that does not have
+        -- a free wild-id.  So the only way 'fun' could get a free wild-id
+        -- would be if you take apart this case expression (or some other
+        -- expression that uses mkWildValBinder, of which there are not
+        -- many), and pass a fragment of it as the fun part of a 'mkStrictApp'.
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
