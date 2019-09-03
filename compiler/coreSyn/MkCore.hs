@@ -204,6 +204,9 @@ mkStrictApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build a strict application (case e2 of x -> e1 x)
 mkStrictApp fun arg arg_ty res_ty
   = Case arg arg_id res_ty [(DEFAULT,[],App fun (Var arg_id))]
+       -- mkDefaultCase looks attractive here, it uses (exprType alt_rhs)
+       -- to compute the result type, whereas here we already know
+       -- that the result type is res_ty
   where
     arg_id = mkWildValBinder arg_ty
         -- Lots of shadowing, but it doesn't matter,

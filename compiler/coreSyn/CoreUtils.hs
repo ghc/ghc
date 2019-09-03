@@ -545,6 +545,10 @@ We must not make the type field of the case-expression (S a) because
 'a' isn't in scope.  Hence the call to occCheckExpand.  This caused
 issue #17056.
 
+NB: this situation can only arise with type synonyms, which can
+falsely "mention" type variables that aren't "really there", and which
+can be eliminated by expanding the synonym.
+
 Note [Binding coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Consider binding a CoVar, c = e.  Then, we must atisfy
