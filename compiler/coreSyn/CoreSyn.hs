@@ -241,6 +241,12 @@ is better for at least three reasons:
 
    So we'd have to do synonym expansion in exprType which would
    be inefficient.
+
+* The type stored in the case is checked with lintInTy. This checks
+  (among other things) that it does not mention any variables that are
+  not in scope. If we did not have the type there, it would be a bit
+  harder for Core Lint to reject case blah of Ex x -> x where
+      data Ex = forall a. Ex a.
 -}
 
 -- If you edit this type, you may need to update the GHC formalism
@@ -504,8 +510,11 @@ checked by Core Lint.
    see the call to isFloatingTy.
 
 6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
-   /entire/ case expression.  Checked in lintCaseExpr.
+   /entire/ case expression.  Checked in lintAltExpr.
    See also Note [Why does Case have a 'Type' field?].
+
+7. The type of the scrutinee must be the same as the type
+   of the case binder, obviously.  Checked in lintCaseExpr.
 
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

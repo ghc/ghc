@@ -1071,6 +1071,9 @@ lintCaseExpr scrut var alt_ty alts =
      -- alternatives was legitimate, but this didn't work.
      -- See Note [No alternatives lint check] for details.
 
+     -- Check that the scrutinee is not a floating-point type
+     -- if there are any literal alternatives
+     -- See CoreSyn Note [Case expression invariants] item (5)
      -- See Note [Rules for floating-point comparisons] in PrelRules
      ; let isLitPat (LitAlt _, _ , _) = True
            isLitPat _                 = False
@@ -1096,6 +1099,7 @@ lintCaseExpr scrut var alt_ty alts =
 
      ; subst <- getTCvSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
+       -- See CoreSyn Note [Case expression invariants] item (7)
 
      ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
@@ -1114,7 +1118,10 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 
 checkCaseAlts e ty alts =
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
+         -- See CoreSyn Note [Case expression invariants] item (2)
+
      ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
+         -- See CoreSyn Note [Case expression invariants] item (3)
 
           -- For types Int#, Word# with an infinite (well, large!) number of
           -- possible values, there should usually be a DEFAULT case
@@ -1144,6 +1151,7 @@ lintAltExpr :: CoreExpr -> OutType -> LintM ()
 lintAltExpr expr ann_ty
   = do { actual_ty <- lintCoreExpr expr
        ; ensureEqTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty) }
+         -- See CoreSyn Note [Case expression invariants] item (6)
 
 lintCoreAlt :: OutType          -- Type of scrutinee
             -> OutType          -- Type of the alternative
