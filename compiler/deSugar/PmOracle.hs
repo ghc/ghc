@@ -631,8 +631,13 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
         | recheck_complete_sets -> ensureAllPossibleMatchesInhabited delta'
         | otherwise             -> pure (Just delta')
 
-------------------------
--- * DIdEnv with sharing
+
+{- *********************************************************************
+*                                                                      *
+                 SharedIdEnv
+              DIdEnv with sharing
+*                                                                      *
+********************************************************************* -}
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
 -- an @Entry@ containing containing the actual value it represents.
@@ -691,8 +696,13 @@ instance Outputable a => Outputable (Shared a) where
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
-----------------------
--- * Term oracle state
+
+{- *********************************************************************
+*                                                                      *
+                 TmState
+          What we know about terms
+*                                                                      *
+********************************************************************* -}
 
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be
@@ -714,10 +724,15 @@ data VarInfo
   { vi_ty  :: !Type
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
+
   , vi_pos :: [(PmAltCon, [Id])]
-  -- ^ Positive info: 'PmExprCon's it is (i.e. @x ~ [Just y, PatSyn 42]@), all
-  -- at the same time (i.e. conjunctive). Therefore no more than one
-  -- RealDataCon, otherwise contradiction because of generativity.
+  -- ^ Positive info: 'PmExprCon's it is (i.e. @x ~ [Just y, PatSyn z]@), all
+  -- at the same time (i.e. conjunctive).  We need a list because of nested
+  -- pattern matches involving pattern synonym
+  --    case x of { Just y -> case x of PatSyn z -> ... }
+  -- However, no more than one RealDataCon in the list, otherwise contradiction
+  -- because of generativity.
+
   , vi_neg :: ![PmAltCon]
   -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
   -- Example, assuming
@@ -730,15 +745,19 @@ data VarInfo
   -- and hence can only match @Branch@. Is orthogonal to anything from 'vi_pos',
   -- in the sense that 'eqPmAltCon' returns @PossiblyOverlap@ for any pairing
   -- between 'vi_pos' and 'vi_neg'.
+
+  -- See Note [Why record both positive and negative info?]
+
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
   -- to recognise completion of a COMPLETE set efficiently for large enums.
+
   , vi_n_refines :: !Int
   -- ^ Purely for Check performance reasons. The number of times this
   -- representative was refined ('refineToAltCon') in the Check's ConVar split.
-  -- Sadly, we can't store this info in the Check module, as it's tightly couple
+  -- Sadly, we can't store this info in the Check module, as it's tightly coupled
   -- to the particular 'Delta' and also is per *representative*, not per
   -- syntactic variable. Note that this number does not always correspond to the
   -- length of solutions: 'trySolve' might add a solution without
@@ -774,6 +793,20 @@ strictly necessary since vi_cache is just a cache, so doesn't need to be
 accurate: Every suggestion of a possible ConLike from vi_cache might be
 refutable by the type oracle anyway. But it helps to maintain sanity while
 debugging traces.
+
+Note [Why record both positive and negative info?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that knowing positive info (like x ~ Just y) would render
+negative info irrelevant, but not so because of pattern synonyms.  E.g
+we might know that x cannot match (Foo 4), where
+    pattern Foo p = Just p
+
+Also overloaded literals themselves behave like pattern synonyms.
+E.g if postively we know that (x ~ I# y), we might also negatively
+want to record that x does not match 45
+  f 45       = e2
+  f (I# 22#) = e3
+  f 45       = e4  -- Overlapped
 
 Note [TmState invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

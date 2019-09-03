@@ -95,9 +95,13 @@ data PmPat where
             , pm_con_arg_tys :: [Type]
             , pm_con_tvs     :: [TyVar]
             , pm_con_args    :: [PmPat] } -> PmPat
+
   PmVar  :: { pm_var_id   :: Id } -> PmPat
+
   PmGrd  :: { pm_grd_pv   :: PatVec -- ^ Always has 'patVecArity' 1.
             , pm_grd_expr :: CoreExpr } -> PmPat
+     -- (PmGrd pat expr) matches expr against pat, binding the variables in pat
+
   -- | A fake guard pattern (True <- _) used to represent cases we cannot handle.
   PmFake :: PmPat
 
@@ -169,7 +173,7 @@ instance Monoid Diverged where
 
 -- | A triple <C,U,D> of covered, uncovered, and divergent sets.
 data PartialResult = PartialResult {
-                        presultCovered :: Covered
+                        presultCovered   :: Covered
                       , presultUncovered :: Uncovered
                       , presultDivergent :: Diverged }
 
@@ -464,7 +468,12 @@ mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
 {-# INLINE mkPmLitPattern #-}
 
 -- -----------------------------------------------------------------------
--- * Transform (Pat Id) into of (PmPat Id)
+-- * Transform (Pat Id) into [PmPat]
+-- The arity of the [PmPat] is always 1, but it may be a combination
+-- of a vanilla pattern and a guard pattern.
+-- Example: view pattern  (f y -> Just x)
+--          becomes       [PmVar z, PmGrd [PmPat (Just x), f y]]
+--          where z is fresh
 
 translatePat :: FamInstEnvs -> Pat GhcTc -> PmM PatVec
 translatePat fam_insts pat = do
