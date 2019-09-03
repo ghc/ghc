@@ -1367,10 +1367,9 @@ foldlMSkipNothing f = foldlM (\acc x -> fromMaybe acc <$> f acc x)
 
 -- | Add equalities to the local 'DsM' environment when checking a case
 -- expression:
---     case x of { p1 -> e1; ... pn -> en }
+--     case e of x { p1 -> e1; ... pn -> en }
 -- When we go deeper to check e.g. e1 we record two equalities:
--- (x ~ y), where y is the initial uncovered when checking (p1; .. ; pn)
--- and (x ~ p1).
+-- (x ~ e) and (x ~ p1).
 genCaseTmCs2 :: Maybe (LHsExpr GhcTc) -- Scrutinee
              -> [Pat GhcTc]           -- LHS       (should have length 1)
              -> [Id]                  -- MatchVars (should have length 1)
