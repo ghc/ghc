@@ -675,10 +675,6 @@ idToIfaceDecl id
         !details = toIfaceIdDetails $! (idDetails id)
         !info = toIfaceIdInfo $! (idInfo id)
     in
-    -- pprTrace "idThings" (ppr (info))
-    -- pprTrace "idThings" (ppr (ty, details,info))
-    -- pprTrace "idThings" (ppr (ty, details,info))
-
       IfaceId { ifName      = name,
                 ifType      = ty,
                 ifIdDetails = details,

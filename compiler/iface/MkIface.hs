@@ -196,7 +196,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
 
 -- | Creates a ModIface filling in information not dependent
 -- on code generation. This includes most things except hashes
--- and IfaceDecls. See Note [Stage Iface generation]
+-- and code generator output. See Note [Stage Iface generation]
 mkIfacePartial :: HscEnv
         -> ModDetails           -- The trimmed, tidied interface
         -> ModGuts              -- Usages, deprecations, etc
@@ -384,17 +384,6 @@ mkIfacePartial' hsc_env
           iface_exports `seqList`
           intermediate_iface
 
-    -- TODO: Force these
-    -- seqList fixities (return ())
-    -- -- seqList warns (return ())
-    -- seqList iface_rules (return ())
-    -- seqList iface_insts (return ())
-    -- seqList iface_fam_insts (return ())
-    -- -- seqList trust_info (return ())
-    -- seqList annotations (return ())
-    -- seqList icomplete_sigs (return ())
-    -- seqList decls (return ())
-
   where
      cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -542,7 +531,6 @@ addFingerprints hsc_env mb_old_fingerprint !iface0 decls
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
                                   non_orph_fis top_lvl_name_env decl
 
-      --  decls = map snd $ mi_decls iface0
        -- This is used for looking up the Name of a default method
        -- from its OccName. See Note [default method Name]
        top_lvl_name_env =

@@ -179,8 +179,6 @@ import HieTypes         ( getAsts, hie_asts, hie_module )
 import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
-import Control.DeepSeq
-import IfaceSyn
 #include "HsVersions.h"
 
 
@@ -841,8 +839,6 @@ finish summary tc_result mb_old_hash = {-# SCC "Hsc.finish" #-} do
           -- See Note [Stage Iface generation] in MkIface
           let !partialIface =  {-# SCC "MkIfacePartial" #-}
                   mkIfacePartial hsc_env details simplified_guts
-
-          -- pprTraceM "fpp" $ ppr $ mic_decls partialIface
 
           let iface_gen :: IO (ModIface, Bool)
               iface_gen = do
