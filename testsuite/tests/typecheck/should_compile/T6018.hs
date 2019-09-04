@@ -175,7 +175,7 @@ barapp2 :: Int
 barapp2 = bar 1
 
 -- Declarations below test more liberal RHSs of injectivity annotations:
--- permiting variables to appear in different order than the one in which they
+-- permitting variables to appear in different order than the one in which they
 -- were declared.
 type family H a b = r | r -> b a
 type family Hc a b = r | r -> b a where
