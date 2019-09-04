@@ -1288,10 +1288,10 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 -- to an irreducible constraint; see typecheck/should_compile/T10494
 -- See Note [Decomposing equality], note {4}
 can_eq_app ev s1 t1 s2 t2
-  | CtDerived { ctev_loc = loc } <- ev
+  | CtDerived {} <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }
-  | CtWanted { ctev_dest = dest, ctev_loc = loc } <- ev
+  | CtWanted { ctev_dest = dest } <- ev
   = do { co_s <- unifyWanted loc Nominal s1 s2
        ; let arg_loc
                | isNextArgVisible s1 = loc
@@ -1309,7 +1309,7 @@ can_eq_app ev s1 t1 s2 t2
   | s1k `mismatches` s2k
   = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
 
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  | CtGiven { ctev_evar = evar } <- ev
   = do { let co   = mkTcCoVarCo evar
              co_s = mkTcLRCo CLeft  co
              co_t = mkTcLRCo CRight co
@@ -1321,6 +1321,9 @@ can_eq_app ev s1 t1 s2 t2
        ; canEqNC evar_s NomEq s1 s2 }
 
   where
+    -- See Note [Bump depth when decomposing]
+    loc = bumpCtLocDepth (ctEvLoc ev)
+
     s1k = tcTypeKind s1
     s2k = tcTypeKind s2
 
@@ -1571,6 +1574,46 @@ constraints: see Note [Instance and Given overlap] in TcInteract.
 Conclusion:
   * Decompose [W] N s ~R N t  iff there no given constraint that could
     later solve it.
+
+Note [Bump depth when decomposing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have the following scenario (#16512):
+
+type family LV (as :: [Type]) (b :: Type) = (r :: Type) | r -> as b where
+  LV (a ': as) b = a -> LV as b
+
+[WD] w1 :: LV as0 (a -> b) ~ (a -> fmv)
+[WD] w2 :: LV as0 b ~ fmv
+
+We start with w1. The injectivity condition on LV and the fact that the RHS
+of w1 matches the RHS of the equation mean that we can improve as0. However,
+because the RHS of w1 can't see through the fmv, we invent a new unification
+variable here. We thus get (as0 := a : as1). Rewriting:
+
+[WD] w1 :: LV (a : as1) (a -> b) ~ (a -> fmv)
+[WD] w2 :: LV (a : as1) b ~ fmv
+
+We can now reduce both of these, using the equation for LV. We get
+
+[WD] w1 :: a -> LV as1 (a -> b) ~ (a -> fmv)
+[WD] w2 :: a -> LV as1 b ~ fmv
+
+Then we can unify fmv := a -> LV as1 b:
+
+[WD] w1 :: a -> LV as1 (a -> b) ~ (a -> a -> LV as1 b)
+
+Now we decompose (and flatten) to
+
+[WD] w3 :: LV as1 (a -> b) ~ (a -> fmv1)
+[WD] w4 :: LV as1 b ~ fmv1
+
+which is exactly where we started. These goals really are insoluble, but
+we would prefer not to loop. Conclusion: bump the sub-goal depth when
+decomposing, and all is happy.
+
+I don't have a test case where this is necessary for AppTys, but what's
+good for TyConApps has to be good for AppTys.
+
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -1600,7 +1643,9 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                              , not (isCoercionTy ty1) && not (isCoercionTy ty2) ]
               ; emitWorkNC given_evs }
   where
-    loc        = ctEvLoc ev
+      -- any decomposition is a sub-goal, so bump the depth
+      -- See also Note [Bump depth when decomposing]
+    loc        = bumpCtLocDepth (ctEvLoc ev)
     role       = eqRelRole eq_rel
 
       -- infinite, as tyConRolesX returns an infinite tail of Nominal
@@ -1834,9 +1879,9 @@ canEqTyVar :: CtEvidence          -- ev :: lhs ~ rhs
            -> TcType                -- lhs: pretty lhs, already flat
            -> TcType -> TcType      -- rhs: already flat
            -> TcS (StopOrContinue Ct)
-canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
+canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
   | k1 `tcEqType` k2
-  = canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
+  = canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
 
   -- So the LHS and RHS don't have equal kinds
   -- Note [Flattening] in TcFlatten gives us (F2), which says that
@@ -1875,7 +1920,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
                                                (mkTcReflCo role xi1) rhs_co
                        -- NB: rewriteEqEvidence executes a swap, if any, so we're
                        -- NotSwapped now.
-                 ; canEqTyVarHomo new_ev eq_rel NotSwapped tv1 ps_ty1 new_rhs ps_rhs }
+                 ; canEqTyVarHomo new_ev eq_rel NotSwapped tv1 ps_xi1 new_rhs ps_rhs }
          else
     do { let sym_k1_co = mkTcSymCo k1_co  -- :: kind(xi1) ~N flat_k1
              sym_k2_co = mkTcSymCo k2_co  -- :: kind(xi2) ~N flat_k2
@@ -1891,7 +1936,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
 
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
          -- no longer swapped, due to rewriteEqEvidence
-       ; canEqTyVarHetero new_ev eq_rel tv1 sym_k1_co flat_k1 ps_ty1
+       ; canEqTyVarHetero new_ev eq_rel tv1 sym_k1_co flat_k1 ps_xi1
                                         new_rhs flat_k2 ps_rhs } }
   where
     xi1 = mkTyVarTy tv1
@@ -1955,16 +2000,16 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
 canEqTyVarHomo :: CtEvidence
                -> EqRel -> SwapFlag
                -> TcTyVar                -- lhs: tv1
-               -> TcType                 -- pretty lhs
-               -> TcType -> TcType       -- rhs (might not be flat)
+               -> TcType                 -- pretty lhs, flat
+               -> TcType -> TcType       -- rhs, flat
                -> TcS (StopOrContinue Ct)
-canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
-  | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
+canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
+  | Just (tv2, _) <- tcGetCastedTyVar_maybe xi2
   , tv1 == tv2
   = canEqReflexive ev eq_rel (mkTyVarTy tv1)
     -- we don't need to check co because it must be reflexive
 
-  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
+  | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
   , swapOverTyVars tv1 tv2
   = do { traceTcS "canEqTyVar swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
          -- FM_Avoid commented out: see Note [Lazy flattening] in TcFlatten
@@ -1984,11 +2029,11 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
 
        ; dflags <- getDynFlags
-       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_ty1 `mkCastTy` sym_co2) }
+       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_xi1 `mkCastTy` sym_co2) }
 
-canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_ty2
+canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_xi2
   = do { dflags <- getDynFlags
-       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_ty2 }
+       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_xi2 }
 
 -- The RHS here is either not a casted tyvar, or it's a tyvar but we want
 -- to rewrite the LHS to the RHS (as per swapOverTyVars)
@@ -1997,7 +2042,7 @@ canEqTyVar2 :: DynFlags
             -> EqRel
             -> SwapFlag
             -> TcTyVar                  -- lhs = tv, flat
-            -> TcType                   -- rhs
+            -> TcType                   -- rhs, flat
             -> TcS (StopOrContinue Ct)
 -- LHS is an inert type variable,
 -- and RHS is fully rewritten, but with type synonyms
@@ -2172,7 +2217,7 @@ However, if we encounter an equality constraint with a type synonym
 application on one side and a variable on the other side, we should
 NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
-as possible.  Hence the ps_ty1, ps_ty2 argument passed to canEqTyVar.
+as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqTyVar.
 
 -}
 
