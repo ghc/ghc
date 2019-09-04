@@ -39,28 +39,30 @@
 
 <interactive>:55:41: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k1’
+    cannot be inferred from the right-hand side.
     In the type family equation:
       PolyKindVarsF @{[k1]} @[k2] ('[] @k1) = '[] @k2
         -- Defined at <interactive>:55:41
 
 <interactive>:60:15: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k1’
+    cannot be inferred from the right-hand side.
     In the type family equation:
       PolyKindVars @[k1] @[k2] ('[] @k1) = '[] @k2
         -- Defined at <interactive>:60:15
 
 <interactive>:64:15: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k’ cannot be inferred from the right-hand side.
     In the type family equation:
       forall k (a :: k) (b :: k).
         Fc @k a b = Int -- Defined at <interactive>:64:15
 
 <interactive>:68:15: error:
     Type family equation violates injectivity annotation.
-    Type and kind variables ‘k’, ‘a’, ‘b’
+    Type/kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     In the type family equation:
       forall k (a :: k) (b :: k).
