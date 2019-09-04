@@ -970,6 +970,7 @@ hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
   where
     (_,_,_,_,req_theta,_,_) = conLikeFullSig cl
+hasRequiredTheta _                 = False
 
 {- Note [Completeness checking with required Thetas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
