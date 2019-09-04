@@ -7,7 +7,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
--- 'addTermFactCon', 'refineToAltCon' and 'tryAddRefutableAltCon' for adding
+-- 'addTermFact', 'refineToAltCon' and 'addRefutableAltCon' for adding
 -- facts to the oracle, and 'provideEvidenceForEquation' to turn a 'Delta' into
 -- a concrete evidence for an equation.
 module PmOracle (
@@ -18,12 +18,12 @@ module PmOracle (
 
         TmCt(..),
         inhabitants,
-        representCoreExpr,     -- Takes apart a CoreExpr and represents it in the Oracle
-        addTypeEvidence,       -- Add type equalities
-        tryAddRefutableAltCon, -- Add a negative equality
-        refineToAltCon,        -- Add a positive refinement x ~ K _ _
-        addTermFactCon,       -- Add a positive equality x ~ e
-        tmOracle,              -- Add multiple positive term equalities
+        representCoreExpr,  -- Takes apart a CoreExpr and represents it in the Oracle
+        addTypeEvidence,    -- Add type equalities
+        addRefutableAltCon, -- Add a negative term equality
+        addTermFact,        -- Add a positive term equality x ~ e
+        refineToAltCon,     -- Add a positive refinement x ~ K _ _
+        tmOracle,           -- Add multiple positive term equalities
         provideEvidenceForEquation,
     ) where
 
@@ -790,7 +790,7 @@ oracle) contradictory. This implies a few invariants:
   time, if it weren't for performance.
 
 Maintaining these invariants in 'unify' (the core of the term oracle) and
-'tryAddRefutableAltCon' is subtle.
+'addRefutableAltCon' is subtle.
 * Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
   - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
     @x /~ [True,False]@. This is vacuous by matter of comparing to the vanilla
@@ -801,7 +801,7 @@ Maintaining these invariants in 'unify' (the core of the term oracle) and
   - (Pos) If we had @x ~ K2@, and that contradicts the new solution according to
     'eqPmAltCon' (ex. K2 is [] and K is (:)), then refute.
   - (Refine) If we had @x /~ K zs@, unify each y with each z in turn.
-* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'tryAddRefutableAltCon')
+* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'addRefutableAltCon')
   - (Refut) If we have @x ~ K ys@, refute.
   - (Redundant) If we have @x ~ K2@ and @eqPmAltCon K K2 == Disjoint@
     (ex. Just and Nothing), the info is redundant and can be
@@ -811,7 +811,7 @@ Maintaining these invariants in 'unify' (the core of the term oracle) and
     COMPLETE set, so should refute.
 
 Note that merging VarInfo in equate can be done by calling out to 'trySolve' and
-'tryAddRefutableAltCon' for each of the facts individually.
+'addRefutableAltCon' for each of the facts individually.
 -}
 
 -- | Not user-facing.
@@ -837,7 +837,7 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> tmOracle delta new_tm_cs
 tmOracle :: Foldable f => Delta -> f TmCt -> DsM (Maybe Delta)
 tmOracle delta = runMaybeT . foldlM go delta
   where
-    go delta ct = MaybeT (addTermFactCon delta ct)
+    go delta ct = MaybeT (addTermFact delta ct)
 
 -----------------------
 -- * Looking up VarInfo
@@ -936,16 +936,16 @@ addTypeEvidence delta dicts
 
 -- | Tries to equate two representatives in 'Delta'.
 -- See Note [TmState invariants].
-addTermFactCon :: Delta -> TmCt -> DsM (Maybe Delta)
-addTermFactCon delta ct = runMaybeT $ case ct of
+addTermFact :: Delta -> TmCt -> DsM (Maybe Delta)
+addTermFact delta ct = runMaybeT $ case ct of
   TmVarVar x y        -> unify delta (x, y)
   TmVarCon x con args -> trySolve delta x con args
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
 -- See Note [TmState invariants].
-tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $ do
+addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
+addRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $ do
   vi@(VI _ pos neg pm _) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
@@ -989,7 +989,7 @@ deemed redundant? The answer is, of course, No! The required theta is like a
 hidden parameter which must be supplied at the pattern match site, so PRead
 is much more like a view pattern (where behavior depends on the particular value
 passed in).
-The simple solution here is to forget in 'tryAddRefutableAltCon' that we matched
+The simple solution here is to forget in 'addRefutableAltCon' that we matched
 on synonyms with a required Theta like @PRead@, so that subsequent matches on
 the same constructor are never flagged as redundant. The consequence is that
 we no longer detect the actually redundant match in
@@ -1301,9 +1301,9 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
         let add_fact delta (cl, args) = trySolve delta y cl args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
-        let add_refut delta nalt = MaybeT (tryAddRefutableAltCon delta y nalt)
+        let add_refut delta nalt = MaybeT (addRefutableAltCon delta y nalt)
         delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
-        -- vi_cache will be updated in tryAddRefutableAltCon, so we are good to
+        -- vi_cache will be updated in addRefutableAltCon, so we are good to
         -- go!
         pure delta_neg
 
@@ -1774,7 +1774,7 @@ provideEvidenceForEquation = go init_ts
 
           -- Only n' more equations to go...
           let n' = n - length ev_pos
-          ev_neg <- tryAddRefutableAltCon delta x (PmAltConLike cl) >>= \case
+          ev_neg <- addRefutableAltCon delta x (PmAltConLike cl) >>= \case
             Nothing                          -> pure []
             Just delta'                      -> go rec_ts (x:xs) n' delta'
 

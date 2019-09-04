@@ -385,7 +385,7 @@ mAX_REFINEMENTS :: Int
 -- reasonable performance. If this is set to below 2, ds022 will start to fail.
 -- Although that is probably due to the fact that we always increase the
 -- refinement counter instead of just increasing it when the contraposition
--- is satisfiable (when the not taken case 'tryAddRefutableAltCon' is
+-- is satisfiable (when the not taken case 'addRefutableAltCon' is
 -- satisfiable, that is). That would be the first thing I'd try if we have
 -- performance problems on one test while decreasing the threshold leads to
 -- other tests being broken like ds022 above.
@@ -1231,7 +1231,7 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
 
 -- Var: Add x :-> y to the oracle and recurse
 pmcheck (PmVar x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> addTermFactCon delta (TmVarVar x y)
+  delta' <- expectJust "x is fresh" <$> addTermFact delta (TmVarVar x y)
   pmcheckI ps guards vva n delta'
 
 -- ConVar
@@ -1253,7 +1253,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
   -- Stuff for <next equation>
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
-  pr_neg <- tryAddRefutableAltCon delta x con >>= \case
+  pr_neg <- addRefutableAltCon delta x con >>= \case
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
 
@@ -1357,7 +1357,7 @@ addTmVarCsDs tm_cs k = do
   -- If adding a constraint would lead to a contradiction, don't add it.
   -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
   -- for why this is done.
-  delta' <- foldlMSkipNothing addTermFactCon delta tm_cs
+  delta' <- foldlMSkipNothing addTermFact delta tm_cs
   updPmDelta delta' k
 
 -- | Like 'foldlM', but continues with the old accumulator whenever the action
