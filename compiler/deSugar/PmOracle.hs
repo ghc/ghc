@@ -45,7 +45,6 @@ import VarEnv
 import UniqDFM
 import Var           (EvVar)
 import Name
-import Literal
 import CoreSyn
 import CoreUtils (exprType)
 import MkCore (mkListExpr, mkCharExpr)
@@ -58,7 +57,6 @@ import ConLike
 import DataCon
 import PatSyn
 import TyCon
-import PrelNames
 import TysWiredIn
 import TysPrim (tYPETyCon)
 import TyCoRep
@@ -81,7 +79,6 @@ import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
-import Data.Ratio
 import Data.Tuple
 
 type PmM = DsM
@@ -140,31 +137,6 @@ initIM ty = case splitTyConApp_maybe ty of
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
 markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqDSet` con) ms)
 markMatched _   NoPM = NoPM
-
-ensureInhabited :: Monad m
-                => (ConLike -> m Bool)   -- Oracle: True <=> this ConLike is inhabited
-                -> PossibleMatches
-                -> m (Maybe PossibleMatches)
-   -- Returns (Just im) guarantees that at least one member
-   -- of each ConLikeSet satisfies the oracle
-   --
-   -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
-   --     remain that do not statisfy it.  This lazy approach just
-   --     avoids doing unnecessary work.
-ensureInhabited _        NoPM       = pure (Just NoPM)
-ensureInhabited inh_test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
-  where
-    one_set cs = find_one_inh cs (uniqDSetToList cs)
-
-    -- find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT m ConLikeSet
-    -- (find_one_inh cs cls) iterates over cls, deleting from cs
-    -- any uninhabited elements of cls.  Stop (returning Just cs)
-    -- when you see an inhabited element; return Nothing if all
-    -- are uninhabited
-    find_one_inh _  [] = mzero
-    find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
-      True  -> pure cs
-      False -> find_one_inh (delOneFromUniqDSet cs con) cons
 
 -- | Satisfiability decisions as a data type. The @proof@ can carry a witness
 -- for satisfiability and might even be instantiated to 'Data.Void.Void' to
@@ -965,7 +937,7 @@ addTermEquality delta (TVC x e) = runMaybeT $ case e of
 -- See Note [TmState invariants].
 tryAddRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $ do
-  VI ty pos neg pm n <- lift (initLookupVarInfo delta x)
+  vi@(VI _ pos neg pm _) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -975,11 +947,13 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $
   let neg'
         | any (implies nalt) pos = neg
         | otherwise              = unionLists neg [nalt]
+  let vi_ext = vi{ vi_neg = neg' }
   -- 3. Make sure there's at least one other possible constructor
-  pm' <- case nalt of
-    PmAltConLike cl -> MaybeT (ensureInhabited (testInhabited delta ty) (markMatched cl pm))
-    _               -> pure pm
-  pure delta{ delta_tm_cs = TS (setEntrySDIE env x (VI ty pos neg' pm' n)) }
+  vi' <- case nalt of
+    PmAltConLike cl
+      -> MaybeT (ensureInhabited delta vi_ext{ vi_cache = markMatched cl pm })
+    _ -> pure vi_ext
+  pure delta{ delta_tm_cs = TS (setEntrySDIE env x vi') }
 
 -- | Guess the universal argument types of a ConLike from an instantiation of
 -- its result type. Rather easy for DataCons, but not so much for PatSynCons.
@@ -1002,27 +976,54 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
 
-testInhabited :: Delta -> Type -> ConLike -> DsM Bool
--- @testInhabited delta ty K@ Returns False if
--- a non-bottom value @v::ty@ cannot possibly be of form @K _ _ _@
--- Returning True is always sound
---
--- It's like 'DataCon.dataConCannotMatch', but more clever because it
--- takes the facts in Delta into account
-testInhabited delta res_ty con = do
-  env <- dsGetFamInstEnvs
-  case guessConLikeUnivTyArgsFromResTy env res_ty con of
-    Nothing -> pure True -- be conservative about this
-    Just arg_tys -> do
-      (_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
-      -- No need to run the term oracle compared to pmIsSatisfiable
-      fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
-        -- Important to pass False to tyIsSatisfiable here, so that we won't
-        -- recursively call ensureAllPossibleMatchesInhabited, leading to an
-        -- endless recursion.
-        [ tyIsSatisfiable False (listToBag ev_vars)
-        , tysAreNonVoid initRecTc strict_arg_tys
-        ]
+ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
+   -- Returns (Just vi) guarantees that at least one member
+   -- of each ConLike in the COMPLETE set satisfies the oracle
+   --
+   -- Internally uses and updates the ConLikeSets in vi_cache.
+   --
+   -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
+   --     remain that do not statisfy it.  This lazy approach just
+   --     avoids doing unnecessary work.
+ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This would be much less tedious with lenses
+  where
+    set_cache vi cache = vi { vi_cache = cache }
+
+    test NoPM       = pure (Just NoPM)
+    test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
+
+    one_set cs = find_one_inh cs (uniqDSetToList cs)
+
+    find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT DsM ConLikeSet
+    -- (find_one_inh cs cls) iterates over cls, deleting from cs
+    -- any uninhabited elements of cls.  Stop (returning Just cs)
+    -- when you see an inhabited element; return Nothing if all
+    -- are uninhabited
+    find_one_inh _  [] = mzero
+    find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
+      True  -> pure cs
+      False -> find_one_inh (delOneFromUniqDSet cs con) cons
+
+    inh_test :: ConLike -> DsM Bool
+    -- @inh_test K@ Returns False if a non-bottom value @v::ty@ cannot possibly
+    -- be of form @K _ _ _@. Returning True is always sound.
+    --
+    -- It's like 'DataCon.dataConCannotMatch', but more clever because it takes
+    -- the facts in Delta into account.
+    inh_test con = do
+      env <- dsGetFamInstEnvs
+      case guessConLikeUnivTyArgsFromResTy env (vi_ty vi) con of
+        Nothing -> pure True -- be conservative about this
+        Just arg_tys -> do
+          (_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
+          -- No need to run the term oracle compared to pmIsSatisfiable
+          fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
+            -- Important to pass False to tyIsSatisfiable here, so that we won't
+            -- recursively call ensureAllPossibleMatchesInhabited, leading to an
+            -- endless recursion.
+            [ tyIsSatisfiable False (listToBag ev_vars)
+            , tysAreNonVoid initRecTc strict_arg_tys
+            ]
 
 -- | Checks if every 'VarInfo' in the term oracle has still an inhabited
 -- 'vi_cache', considering the current type information in 'Delta'.
@@ -1033,9 +1034,7 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
   = runMaybeT (set_tm_cs_env delta <$> traverseSharedIdEnv go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_cs = TS env }
-    go vi@VI{ vi_ty = ty, vi_cache = pm } = do
-      pm' <- MaybeT (ensureInhabited (testInhabited delta ty) pm)
-      pure vi{ vi_cache = pm' }
+    go vi = MaybeT (ensureInhabited delta vi)
 
 -- | @refineToAltCon delta x con arg_tys ex_tyvars@ instantiates @con@ at
 -- @arg_tys@ with fresh variables (equating existentials to @ex_tyvars@).
