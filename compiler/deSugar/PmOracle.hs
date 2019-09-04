@@ -7,7 +7,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
--- 'addTermFact', 'refineToAltCon' and 'addRefutableAltCon' for adding
+-- 'addTmCt', 'refineToAltCon' and 'addRefutableAltCon' for adding
 -- facts to the oracle, and 'provideEvidenceForEquation' to turn a 'Delta' into
 -- a concrete evidence for an equation.
 module PmOracle (
@@ -18,10 +18,10 @@ module PmOracle (
 
         TmCt(..),
         inhabitants,
-        representCoreExpr,  -- Takes apart a CoreExpr and represents it in the Oracle
         addTypeEvidence,    -- Add type equalities
         addRefutableAltCon, -- Add a negative term equality
-        addTermFact,        -- Add a positive term equality x ~ e
+        addTmCt,            -- Add a positive term equality x ~ e
+        addVarCoreCt,       -- Add a positive term equality x ~ core_expr
         refineToAltCon,     -- Add a positive refinement x ~ K _ _
         tmOracle,           -- Add multiple positive term equalities
         provideEvidenceForEquation,
@@ -837,7 +837,7 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> tmOracle delta new_tm_cs
 tmOracle :: Foldable f => Delta -> f TmCt -> DsM (Maybe Delta)
 tmOracle delta = runMaybeT . foldlM go delta
   where
-    go delta ct = MaybeT (addTermFact delta ct)
+    go delta ct = MaybeT (addTmCt delta ct)
 
 -----------------------
 -- * Looking up VarInfo
@@ -936,8 +936,8 @@ addTypeEvidence delta dicts
 
 -- | Tries to equate two representatives in 'Delta'.
 -- See Note [TmState invariants].
-addTermFact :: Delta -> TmCt -> DsM (Maybe Delta)
-addTermFact delta ct = runMaybeT $ case ct of
+addTmCt :: Delta -> TmCt -> DsM (Maybe Delta)
+addTmCt delta ct = runMaybeT $ case ct of
   TmVarVar x y        -> unify delta (x, y)
   TmVarCon x con args -> trySolve delta x con args
 
@@ -1801,8 +1801,8 @@ isVanillaDataType ty = fromMaybe False $ do
 -- unhandled expressions.
 -- Turns (vanilla) String literals into list expressions, see
 -- Note [Literals in PmPat].
-representCoreExpr :: Delta -> CoreExpr -> DsM (Delta, Id)
-representCoreExpr delta e = swap <$> runStateT (core_expr e) delta
+addVarCoreCt :: Delta -> CoreExpr -> DsM (Delta, Id)
+addVarCoreCt delta e = swap <$> runStateT (core_expr e) delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.

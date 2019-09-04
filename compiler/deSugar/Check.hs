@@ -1226,12 +1226,12 @@ pmcheck (PmFake : ps) guards vva n delta =
   forces . mkCons delta <$> pmcheckI ps guards vva n delta
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
   tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
-  (delta', x) <- representCoreExpr delta e
+  (delta', x) <- addVarCoreCt delta e
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
 pmcheck (PmVar x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> addTermFact delta (TmVarVar x y)
+  delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
   pmcheckI ps guards vva n delta'
 
 -- ConVar
@@ -1357,7 +1357,7 @@ addTmVarCsDs tm_cs k = do
   -- If adding a constraint would lead to a contradiction, don't add it.
   -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
   -- for why this is done.
-  delta' <- foldlMSkipNothing addTermFact delta tm_cs
+  delta' <- foldlMSkipNothing addTmCt delta tm_cs
   updPmDelta delta' k
 
 -- | Like 'foldlM', but continues with the old accumulator whenever the action
@@ -1382,7 +1382,7 @@ genCaseTmCs2 (Just scr) [p] [x] k = do
   [(y, cts)] <- patVecToPmExprs pv
   delta <- getPmDelta
   scr_e <- dsLExpr scr
-  (delta', z) <- representCoreExpr delta scr_e
+  (delta', z) <- addVarCoreCt delta scr_e
   let cts' = (TmVarVar x y : TmVarVar x z : bagToList cts)
   updPmDelta delta' $ addTmVarCsDs cts' k
 genCaseTmCs2 _ _ _ _ = panic "genCaseTmCs2: HsCase"
@@ -1397,7 +1397,7 @@ genCaseTmCs1 Nothing     _  k = k
 genCaseTmCs1 (Just scr) [x] k = do
   delta <- getPmDelta
   scr_e <- dsLExpr scr
-  (delta', y) <- representCoreExpr delta scr_e
+  (delta', y) <- addVarCoreCt delta scr_e
   updPmDelta delta' $ addTmVarCsDs [TmVarVar x y] k
 genCaseTmCs1 _          _     _ = panic "genCaseTmCs1: HsCase"
 

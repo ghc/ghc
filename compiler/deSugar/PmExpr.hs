@@ -334,7 +334,7 @@ coreExprAsPmLit e = case collectArgs e of
     -- NB: Calls coreExprAsPmLit, so that we return PmLitOverStrings
     -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
   -- These last two cases handle String literals, which will be desugared to
-  -- lists by representCoreExpr. See Note [Literals in PmPat]
+  -- lists by addVarCoreCt. See Note [Literals in PmPat]
   (Var x, [Type ty])
     | Just dc <- isDataConWorkId_maybe x
     , dc == nilDataCon
