@@ -389,13 +389,23 @@ tcUnifyTyWithTFs twoWay t1 t2
   = case tc_unify_tys (const BindMe) twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
-      Unifiable  (subst, _) -> Just $ niFixTCvSubst subst
-      MaybeApart (subst, _) -> Just $ niFixTCvSubst subst
+      Unifiable  (subst, _) -> Just $ maybe_fix subst
+      MaybeApart (subst, _) -> Just $ maybe_fix subst
       -- we want to *succeed* in questionable cases. This is a
       -- pre-unification algorithm.
       SurelyApart      -> Nothing
   where
     rn_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [t1, t2]
+
+    maybe_fix | twoWay    = niFixTCvSubst
+              | otherwise = mk_subst -- when matching, don't confuse
+                                     -- domain with range
+
+    mk_subst env = mkTvSubst in_scope env
+      where
+        in_scope = mkInScopeSet $ tyCoVarsOfTypes $ nonDetEltsUFM env
+           -- non-determinism is OK here because we're producing a
+           -- known non-deterministic result (an InScopeSet)
 
 -----------------
 tcUnifyTys :: (TyCoVar -> BindFlag)
