@@ -2,6 +2,6 @@
 
 module T11313 where
 
-x = fmap @ (*)
+x = fmap @(*)
 
 -- test error message output, which was quite silly before
