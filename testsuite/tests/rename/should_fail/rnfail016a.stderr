@@ -1,2 +1,2 @@
 
-rnfail016a.hs:6:7: error: Pattern syntax in expression context: ~x
+rnfail016a.hs:6:7: error: parse error on input ‘~’

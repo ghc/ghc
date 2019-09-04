@@ -4,7 +4,7 @@
 
 module ShouldFail where
 
-data S = S { x::Int, y:: ! Int }
+data S = S { x::Int, y:: !Int }
 data T = T Int !Int
 data U = U Int  Int
 

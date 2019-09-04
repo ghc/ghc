@@ -1,3 +1,3 @@
 
 strictnessDataCon_A.hs:1:27: error:
-    Strictness annotation cannot appear in this position.
+    Operator applied to too few arguments: !

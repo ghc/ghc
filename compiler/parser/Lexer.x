@@ -214,7 +214,7 @@ $tab          { warnTab }
 -- are). We also rule out nested Haddock comments, if the -haddock flag is
 -- set.
 
-"{-" / { isNormalComment } { nested_comment lexToken }
+"{-" / { isNormalComment } { nested_comment }
 
 -- Single-line comments are a bit tricky.  Haskell 98 says that two or
 -- more dashes followed by a symbol should be parsed as a varsym, so we
@@ -347,12 +347,12 @@ $tab          { warnTab }
 <0> {
   -- In the "0" mode we ignore these pragmas
   "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
-                     { nested_comment lexToken }
+                     { nested_comment }
 }
 
 <0,option_prags> {
   "{-#"  { warnThen Opt_WarnUnrecognisedPragmas (text "Unrecognised pragma")
-                    (nested_comment lexToken) }
+                    nested_comment }
 }
 
 -- '0' state: ordinary lexemes
@@ -396,14 +396,6 @@ $tab          { warnTab }
         ifExtension UnicodeSyntaxBit `alexAndPred`
         ifExtension ThQuotesBit }
     { token (ITcloseQuote UnicodeSyntax) }
-}
-
-  -- See Note [Lexing type applications]
-<0> {
-    [^ $idchar \) ] ^
-  "@"
-    / { ifExtension TypeApplicationsBit `alexAndPred` notFollowedBySymbol }
-    { token ITtypeApp }
 }
 
 <0> {
@@ -560,13 +552,6 @@ $tab          { warnTab }
 -- This, of course, conflicts with as-patterns. The conflict arises because
 -- expressions and patterns use the same parser, and also because we want
 -- to allow type patterns within expression patterns.
---
--- Disambiguation is accomplished by requiring *something* to appear between
--- type application and the preceding token. This something must end with
--- a character that cannot be the end of the variable bound in an as-pattern.
--- Currently (June 2015), this means that the something cannot end with a
--- $idchar or a close-paren. (The close-paren is necessary if the as-bound
--- identifier is symbolic.)
 --
 -- Note that looking for whitespace before the '@' is insufficient, because
 -- of this pathological case:
@@ -860,6 +845,94 @@ reservedWordsFM = listToUFM $
          ( "proc",           ITproc,          xbit ArrowsBit)
      ]
 
+data TokenSort =
+  TokenSort {
+    tok_sort_opening :: Bool,
+    tok_sort_closing :: Bool
+  } deriving (Show)
+
+opening_token_sort, closing_token_sort,
+  opening_closing_token_sort, default_token_sort :: TokenSort
+default_token_sort = TokenSort False False
+opening_token_sort = default_token_sort { tok_sort_opening = True }
+closing_token_sort = default_token_sort { tok_sort_closing = True }
+opening_closing_token_sort = TokenSort True True
+
+get_token_sort :: Token -> TokenSort
+
+-- Opening tokens:
+--   ( [ { [: (# (| [| [p| [t| [d| [||
+get_token_sort IToparen             = opening_token_sort
+get_token_sort ITobrack             = opening_token_sort
+get_token_sort ITocurly             = opening_token_sort
+get_token_sort ITopabrack           = opening_token_sort
+get_token_sort IToubxparen          = opening_token_sort
+get_token_sort (IToparenbar _)      = opening_token_sort
+get_token_sort (ITopenExpQuote _ _) = opening_token_sort
+get_token_sort ITopenPatQuote       = opening_token_sort
+get_token_sort ITopenTypQuote       = opening_token_sort
+get_token_sort ITopenDecQuote       = opening_token_sort
+get_token_sort (ITopenTExpQuote _)  = opening_token_sort
+
+-- Closing tokens:
+--   ) ] } :] #) |) |] ||]
+--   ?ipvar #lbl
+get_token_sort ITcparen             = closing_token_sort
+get_token_sort ITcbrack             = closing_token_sort
+get_token_sort ITccurly             = closing_token_sort
+get_token_sort ITcpabrack           = closing_token_sort
+get_token_sort ITcubxparen          = closing_token_sort
+get_token_sort (ITcparenbar _)      = closing_token_sort
+get_token_sort (ITcloseQuote _)     = closing_token_sort
+get_token_sort ITcloseTExpQuote     = closing_token_sort
+get_token_sort (ITdupipvarid _)     = closing_token_sort
+get_token_sort (ITlabelvarid _)     = closing_token_sort
+
+-- Opening and closing at the same time:
+--   varid ConId % :% Q.varid Q.ConId Q.% Q.:% _ ' '' `
+--   'x' "str" 55 0.3 'x'# "str"# 5# 5## 0.3# 0.3##
+get_token_sort (ITvarid  _)       = opening_closing_token_sort
+get_token_sort (ITconid  _)       = opening_closing_token_sort
+get_token_sort (ITvarsym _)       = opening_closing_token_sort
+get_token_sort (ITconsym _)       = opening_closing_token_sort
+get_token_sort (ITqvarid _)       = opening_closing_token_sort
+get_token_sort (ITqconid _)       = opening_closing_token_sort
+get_token_sort (ITqvarsym _)      = opening_closing_token_sort
+get_token_sort (ITqconsym _)      = opening_closing_token_sort
+get_token_sort ITunderscore       = opening_closing_token_sort
+get_token_sort ITsimpleQuote      = opening_closing_token_sort
+get_token_sort ITtyQuote          = opening_closing_token_sort
+get_token_sort ITbackquote        = opening_closing_token_sort
+get_token_sort (ITchar _ _)       = opening_closing_token_sort
+get_token_sort (ITstring _ _)     = opening_closing_token_sort
+get_token_sort (ITinteger _)      = opening_closing_token_sort
+get_token_sort (ITrational _)     = opening_closing_token_sort
+get_token_sort (ITprimchar _ _)   = opening_closing_token_sort
+get_token_sort (ITprimstring _ _) = opening_closing_token_sort
+get_token_sort (ITprimint _ _)    = opening_closing_token_sort
+get_token_sort (ITprimword _ _)   = opening_closing_token_sort
+get_token_sort (ITprimfloat _)    = opening_closing_token_sort
+get_token_sort (ITprimdouble _)   = opening_closing_token_sort
+
+-- pseudo-keywords
+get_token_sort ITas         = opening_closing_token_sort
+get_token_sort IThiding     = opening_closing_token_sort
+get_token_sort ITqualified  = opening_closing_token_sort
+get_token_sort ITfamily     = opening_closing_token_sort
+get_token_sort ITrole       = opening_closing_token_sort
+get_token_sort ITstock      = opening_closing_token_sort
+get_token_sort ITanyclass   = opening_closing_token_sort
+get_token_sort ITvia        = opening_closing_token_sort
+get_token_sort ITunit       = opening_closing_token_sort
+get_token_sort ITdependency = opening_closing_token_sort
+get_token_sort ITsignature  = opening_closing_token_sort
+
+-- in patterns, we can write:  forall@(HsForAllTy ...)
+get_token_sort (ITforall NormalSyntax) = opening_closing_token_sort
+
+-- Neither opening nor closing
+get_token_sort _ = default_token_sort
+
 {-----------------------------------
 Note [Lexing type pseudo-keywords]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -889,11 +962,8 @@ reservedSymsFM = listToUFM $
        ,("|",   ITvbar,                     NormalSyntax,  0 )
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("@",   ITat,                       NormalSyntax,  0 )
-       ,("~",   ITtilde,                    NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
        ,("-",   ITminus,                    NormalSyntax,  0 )
-       ,("!",   ITbang,                     NormalSyntax,  0 )
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -926,50 +996,53 @@ reservedSymsFM = listToUFM $
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = RealSrcSpan -> StringBuffer -> Int -> P (RealLocated Token)
+type Action = RealSrcSpan -> StringBuffer -> Int -> P ActionResult
+
+data ActionResult = ActResToken !RealSrcSpan !Token | ActNoRes
 
 special :: Token -> Action
-special tok span _buf _len = return (L span tok)
+special tok span _buf _len = return (ActResToken span tok)
 
 token, layout_token :: Token -> Action
-token t span _buf _len = return (L span t)
-layout_token t span _buf _len = pushLexState layout >> return (L span t)
+token t span _buf _len = return (ActResToken span t)
+layout_token t span _buf _len = pushLexState layout >> return (ActResToken span t)
 
 idtoken :: (StringBuffer -> Int -> Token) -> Action
-idtoken f span buf len = return (L span $! (f buf len))
+idtoken f span buf len = return (ActResToken span $! f buf len)
 
 skip_one_varid :: (FastString -> Token) -> Action
 skip_one_varid f span buf len
-  = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
+  = return (ActResToken span $! f (lexemeToFastString (stepOn buf) (len-1)))
 
 skip_two_varid :: (FastString -> Token) -> Action
 skip_two_varid f span buf len
-  = return (L span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
+  = return (ActResToken span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
 
 strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
-  return (L span $! (f $! lexemeToString buf len))
+  return (ActResToken span $! (f $! lexemeToString buf len))
 
 begin :: Int -> Action
-begin code _span _str _len = do pushLexState code; lexToken
+begin code _span _str _len = do pushLexState code
+                                return ActNoRes
 
 pop :: Action
 pop _span _buf _len = do _ <- popLexState
-                         lexToken
+                         return ActNoRes
 -- See Note [Nested comment line pragmas]
 failLinePrag1 :: Action
 failLinePrag1 span _buf _len = do
   b <- getBit InNestedCommentBit
-  if b then return (L span ITcomment_line_prag)
+  if b then return (ActResToken span ITcomment_line_prag)
        else lexError "lexical error in pragma"
 
 -- See Note [Nested comment line pragmas]
 popLinePrag1 :: Action
 popLinePrag1 span _buf _len = do
   b <- getBit InNestedCommentBit
-  if b then return (L span ITcomment_line_prag) else do
+  if b then return (ActResToken span ITcomment_line_prag) else do
     _ <- popLexState
-    lexToken
+    return ActNoRes
 
 hopefully_open_brace :: Action
 hopefully_open_brace span buf len
@@ -1085,14 +1158,14 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
 lineCommentToken :: Action
 lineCommentToken span buf len = do
   b <- getBit RawTokenStreamBit
-  if b then strtoken ITlineComment span buf len else lexToken
+  if b then strtoken ITlineComment span buf len else return ActNoRes
 
 {-
   nested comments require traversing by hand, they can't be parsed
   using regular expressions.
 -}
-nested_comment :: P (RealLocated Token) -> Action
-nested_comment cont span buf len = do
+nested_comment :: Action
+nested_comment span buf len = do
   input <- getInput
   go (reverse $ lexemeToString buf len) (1::Int) input
   where
@@ -1101,7 +1174,7 @@ nested_comment cont span buf len = do
       b <- getBit RawTokenStreamBit
       if b
         then docCommentEnd input commentAcc ITblockComment buf span
-        else cont
+        else return ActNoRes
     go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input span
       Just ('-',input) -> case alexGetChar' input of
@@ -1134,8 +1207,9 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
         Nothing  -> errBrace input span
         Just ('-',input) -> do
           setInput input
-          let cont = do input <- getInput; go commentAcc input docType False
-          nested_comment cont span buf _len
+          _ <- nested_comment span buf _len
+          input <- getInput
+          go commentAcc input docType False
         Just (_,_) -> go ('\123':commentAcc) input docType False
       -- See Note [Nested comment line pragmas]
       Just ('\n',input) -> case alexGetChar' input of
@@ -1191,8 +1265,8 @@ return control to parseNestedPragma by returning the ITcomment_line_prag token.
 See #314 for more background on the bug this fixes.
 -}
 
-withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (RealLocated Token))
-                 -> P (RealLocated Token)
+withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P ActionResult)
+                 -> P ActionResult
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
   case prevChar buf ' ' of
@@ -1207,7 +1281,7 @@ withLexedDocType lexDocComment = do
     lexDocSection n input = case alexGetChar' input of
       Just ('*', input) -> lexDocSection (n+1) input
       Just (_,   _)     -> lexDocComment input (ITdocSection n) False
-      Nothing -> do setInput input; lexToken -- eof reached, lex it normally
+      Nothing -> do setInput input; return ActNoRes -- eof reached, lex it normally
 
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
@@ -1215,7 +1289,7 @@ rulePrag :: Action
 rulePrag span buf len = do
   setExts (.|. xbit InRulePragBit)
   let !src = lexemeToString buf len
-  return (L span (ITrules_prag (SourceText src)))
+  return (ActResToken span (ITrules_prag (SourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -1225,7 +1299,7 @@ linePrag span buf len = do
   if usePosPrags
     then begin line_prag2 span buf len
     else let !src = lexemeToString buf len
-         in return (L span (ITline_prag (SourceText src)))
+         in return (ActResToken span (ITline_prag (SourceText src)))
 
 -- When 'UsePosPragsBit' is not set, it is expected that we emit a token instead
 -- of updating the position in 'PState'
@@ -1236,12 +1310,12 @@ columnPrag span buf len = do
   if usePosPrags
     then begin column_prag span buf len
     else let !src = lexemeToString buf len
-         in return (L span (ITcolumn_prag (SourceText src)))
+         in return (ActResToken span (ITcolumn_prag (SourceText src)))
 
 endPrag :: Action
 endPrag span _buf _len = do
   setExts (.&. complement (xbit InRulePragBit))
-  return (L span ITclose_prag)
+  return (ActResToken span ITclose_prag)
 
 -- docCommentEnd
 -------------------------------------------------------------------------------
@@ -1252,7 +1326,7 @@ endPrag span _buf _len = do
 -- called afterwards, so it can just update the state.
 
 docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
-                 RealSrcSpan -> P (RealLocated Token)
+                 RealSrcSpan -> P ActionResult
 docCommentEnd input commentAcc docType buf span = do
   setInput input
   let (AI loc nextBuf) = input
@@ -1261,7 +1335,7 @@ docCommentEnd input commentAcc docType buf span = do
       last_len = byteDiff buf nextBuf
 
   span `seq` setLastToken span' last_len
-  return (L span' (docType comment))
+  return (ActResToken span' (docType comment))
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
 errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) end "unterminated `{-'"
@@ -1270,10 +1344,10 @@ open_brace, close_brace :: Action
 open_brace span _str _len = do
   ctx <- getContext
   setContext (NoLayout:ctx)
-  return (L span ITocurly)
+  return (ActResToken span ITocurly)
 close_brace span _str _len = do
   popContext
-  return (L span ITccurly)
+  return (ActResToken span ITccurly)
 
 qvarid, qconid :: StringBuffer -> Int -> Token
 qvarid buf len = ITqvarid $! splitQualName buf len False
@@ -1324,20 +1398,20 @@ varid span buf len =
           return ITlcase
         _ -> return ITcase
       maybe_layout keyword
-      return $ L span keyword
+      return $ ActResToken span keyword
     Just (keyword, 0) -> do
       maybe_layout keyword
-      return $ L span keyword
+      return $ ActResToken span keyword
     Just (keyword, i) -> do
       exts <- getExts
       if exts .&. i /= 0
         then do
           maybe_layout keyword
-          return $ L span keyword
+          return $ ActResToken span keyword
         else
-          return $ L span $ ITvarid fs
+          return $ ActResToken span $ ITvarid fs
     Nothing ->
-      return $ L span $ ITvarid fs
+      return $ ActResToken span $ ITvarid fs
   where
     !fs = lexemeToFastString buf len
 
@@ -1356,24 +1430,24 @@ sym :: (FastString -> Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
-      return $ L span keyword
+      return $ ActResToken span keyword
     Just (keyword, NormalSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0
-        then return $ L span keyword
-        else return $ L span (con fs)
+        then return $ ActResToken span keyword
+        else return $ ActResToken span (con fs)
     Just (keyword, UnicodeSyntax, 0) -> do
       exts <- getExts
       if xtest UnicodeSyntaxBit exts
-        then return $ L span keyword
-        else return $ L span (con fs)
+        then return $ ActResToken span keyword
+        else return $ ActResToken span (con fs)
     Just (keyword, UnicodeSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0 && xtest UnicodeSyntaxBit exts
-        then return $ L span keyword
-        else return $ L span (con fs)
+        then return $ ActResToken span keyword
+        else return $ ActResToken span (con fs)
     Nothing ->
-      return $ L span $! con fs
+      return $ ActResToken span $! con fs
   where
     !fs = lexemeToFastString buf len
 
@@ -1390,7 +1464,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
     pState <- getPState
     addError (RealSrcSpan (last_loc pState)) $ text
              "Use NumericUnderscores to allow underscores in integer literals"
-  return $ L span $ itint (SourceText src)
+  return $ ActResToken span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
@@ -1432,7 +1506,7 @@ tok_frac drop f span buf len = do
     pState <- getPState
     addError (RealSrcSpan (last_loc pState)) $ text
              "Use NumericUnderscores to allow underscores in floating literals"
-  return (L span $! (f $! src))
+  return (ActResToken span $! (f $! src))
 
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
 tok_float        str = ITrational   $! readFractionalLit str
@@ -1461,21 +1535,21 @@ do_bol :: Action
 do_bol span _str _len = do
         -- See Note [Nested comment line pragmas]
         b <- getBit InNestedCommentBit
-        if b then return (L span ITcomment_line_prag) else do
+        if b then return (ActResToken span ITcomment_line_prag) else do
           (pos, gen_semic) <- getOffside
           case pos of
               LT -> do
                   --trace "layout: inserting '}'" $ do
                   popContext
                   -- do NOT pop the lex state, we might have a ';' to insert
-                  return (L span ITvccurly)
+                  return (ActResToken span ITvccurly)
               EQ | gen_semic -> do
                   --trace "layout: inserting ';'" $ do
                   _ <- popLexState
-                  return (L span ITsemi)
+                  return (ActResToken span ITsemi)
               _ -> do
                   _ <- popLexState
-                  lexToken
+                  return ActNoRes
 
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
@@ -1522,15 +1596,15 @@ new_layout_context strict gen_semic tok span _buf len = do
                 -- token is indented to the left of the previous context.
                 -- we must generate a {} sequence now.
                 pushLexState layout_left
-                return (L span tok)
+                return (ActResToken span tok)
         _ -> do setContext (Layout offset gen_semic : ctx)
-                return (L span tok)
+                return (ActResToken span tok)
 
 do_layout_left :: Action
 do_layout_left span _buf _len = do
     _ <- popLexState
     pushLexState bol  -- we must be at the start of a line
-    return (L span ITvccurly)
+    return (ActResToken span ITvccurly)
 
 -- -----------------------------------------------------------------------------
 -- LINE pragmas
@@ -1560,7 +1634,7 @@ setLineAndFile code span buf len = do
   addSrcFile file
   _ <- popLexState
   pushLexState code
-  lexToken
+  return ActNoRes
 
 setColumn :: Action
 setColumn span buf len = do
@@ -1571,7 +1645,7 @@ setColumn span buf len = do
   setSrcLoc (mkRealSrcLoc (srcSpanFile span) (srcSpanEndLine span)
                           (fromIntegral (column :: Integer)))
   _ <- popLexState
-  lexToken
+  return ActNoRes
 
 alrInitialLoc :: FastString -> RealSrcSpan
 alrInitialLoc file = mkRealSrcSpan loc loc
@@ -1588,7 +1662,7 @@ lex_string_prag mkTok span _buf _len
          start <- getRealSrcLoc
          tok <- go [] input
          end <- getRealSrcLoc
-         return (L (mkRealSrcSpan start end) tok)
+         return (ActResToken (mkRealSrcSpan start end) tok)
     where go acc input
               = if isString input "#-}"
                    then do setInput input
@@ -1619,7 +1693,7 @@ lex_string_tok span buf _len = do
             ITstring _ s -> ITstring (SourceText src) s
             _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
+  return (ActResToken (mkRealSrcSpan (realSrcSpanStart span) end) tok')
 
 lex_string :: String -> P Token
 lex_string s = do
@@ -1687,7 +1761,7 @@ lex_char_tok span buf _len = do        -- We've seen '
 
         Just ('\'', i2@(AI end2 _)) -> do       -- We've seen ''
                    setInput i2
-                   return (L (mkRealSrcSpan loc end2)  ITtyQuote)
+                   return (ActResToken (mkRealSrcSpan loc end2)  ITtyQuote)
 
         Just ('\\', i2@(AI _end2 _)) -> do      -- We've seen 'backslash
                   setInput i2
@@ -1711,9 +1785,9 @@ lex_char_tok span buf _len = do        -- We've seen '
                                         -- (including the possibility of EOF)
                                         -- Just parse the quote only
                         let (AI end _) = i1
-                        return (L (mkRealSrcSpan loc end) ITsimpleQuote)
+                        return (ActResToken (mkRealSrcSpan loc end) ITsimpleQuote)
 
-finish_char_tok :: StringBuffer -> RealSrcLoc -> Char -> P (RealLocated Token)
+finish_char_tok :: StringBuffer -> RealSrcLoc -> Char -> P ActionResult
 finish_char_tok buf loc ch  -- We've already seen the closing quote
                         -- Just need to check for trailing #
   = do  magicHash <- getBit MagicHashBit
@@ -1723,13 +1797,13 @@ finish_char_tok buf loc ch  -- We've already seen the closing quote
             case alexGetChar' i of
               Just ('#',i@(AI end _)) -> do
                 setInput i
-                return (L (mkRealSrcSpan loc end)
+                return (ActResToken (mkRealSrcSpan loc end)
                           (ITprimchar (SourceText src) ch))
               _other ->
-                return (L (mkRealSrcSpan loc end)
+                return (ActResToken (mkRealSrcSpan loc end)
                           (ITchar (SourceText src) ch))
             else do
-              return (L (mkRealSrcSpan loc end) (ITchar (SourceText src) ch))
+              return (ActResToken (mkRealSrcSpan loc end) (ITchar (SourceText src) ch))
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
@@ -1862,7 +1936,7 @@ lex_qquasiquote_tok span buf len = do
   quoteStart <- getRealSrcLoc
   quote <- lex_quasiquote quoteStart ""
   end <- getRealSrcLoc
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end)
+  return (ActResToken (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITqQuasiQuote (qual,
                            quoter,
                            mkFastString (reverse quote),
@@ -1876,7 +1950,7 @@ lex_quasiquote_tok span buf len = do
   quoteStart <- getRealSrcLoc
   quote <- lex_quasiquote quoteStart ""
   end <- getRealSrcLoc
-  return (L (mkRealSrcSpan (realSrcSpanStart span) end)
+  return (ActResToken (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
                           mkRealSrcSpan quoteStart end)))
@@ -1909,7 +1983,7 @@ quasiquote_error start = do
 warnTab :: Action
 warnTab srcspan _buf _len = do
     addTabWarning srcspan
-    lexToken
+    return ActNoRes
 
 warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
@@ -1967,6 +2041,7 @@ data PState = PState {
         messages   :: DynFlags -> Messages,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
+        last_tk_sort :: TokenSort,
         last_tk    :: Maybe Token,
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
@@ -2088,6 +2163,13 @@ setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
 
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
+
+setLastTokenSort :: TokenSort -> P ()
+setLastTokenSort tk_sort =
+ P $ \s -> POk s { last_tk_sort = tk_sort } ()
+
+getLastTokenSort :: P TokenSort
+getLastTokenSort = P $ \s -> POk s (last_tk_sort s)
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
@@ -2458,6 +2540,7 @@ mkPStatePure options buf loc =
       messages      = const emptyMessages,
       tab_first     = Nothing,
       tab_count     = 0,
+      last_tk_sort  = default_token_sort,
       last_tk       = Nothing,
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
@@ -2924,8 +3007,11 @@ topNoLayoutContainsCommas [] = False
 topNoLayoutContainsCommas (ALRLayout _ _ : ls) = topNoLayoutContainsCommas ls
 topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 
-lexToken :: P (RealLocated Token)
-lexToken = do
+lexTokenWith
+  :: P a  -- on skip
+  -> (RealLocated Token -> P a) -- on token
+  -> P a
+lexTokenWith no_token ret_token = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   exts <- getExts
@@ -2933,24 +3019,86 @@ lexToken = do
     AlexEOF -> do
         let span = mkRealSrcSpan loc1 loc1
         setLastToken span 0
-        return (L span ITeof)
+        setLastTokenSort default_token_sort
+        ret_token (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError loc1 loc2 buf "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
-        lexToken
+        setLastTokenSort default_token_sort
+        no_token
     AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
         let span = mkRealSrcSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
-        lt <- t span buf bytes
-        case unRealSrcSpan lt of
-          ITlineComment _  -> return lt
-          ITblockComment _ -> return lt
-          lt' -> do
-            setLastTk lt'
-            return lt
+        mlt <- t span buf bytes
+        case mlt of
+          ActNoRes -> do
+            setLastTokenSort default_token_sort
+            no_token
+          ActResToken l t' -> do
+            setLastTokenSort (get_token_sort t')
+            unless (isComment t') (setLastTk t')
+            ret_token (L l t')
+
+lexToken :: P (RealLocated Token)
+lexToken = do
+  (ltk_sort, L span tk) <- lex_token
+  case tk of
+    ITvarsym varsymStr -> do
+      exts <- getExts
+      P $ \sBeforeLookahead ->
+        case unP lex_pending_token sBeforeLookahead of
+          PFailed sFailed -> PFailed sFailed
+          POk sAfterLookahead _ntk ->
+            let ntk_sort = last_tk_sort sAfterLookahead
+                varsym_occ_sort = varsym_occurrence_sort ltk_sort ntk_sort
+                tk' = L span $! varsym_override exts varsym_occ_sort varsymStr
+            in POk sBeforeLookahead tk'
+    x -> return (L span $! x)
+  where
+    lex_pending_token :: P (Maybe (RealLocated Token))
+    lex_pending_token = lexTokenWith (return Nothing) (return . Just)
+
+    -- lex a token, remembing the TokenSort of the immediately preceding token
+    lex_token :: P (TokenSort, RealLocated Token)
+    lex_token = do
+      ltk_sort <- getLastTokenSort
+      lexTokenWith lex_token (\tok -> return (ltk_sort, tok))
+
+data VarsymOccurrenceSort
+  = VarsymPrefix
+  | VarsymSuffix
+  | VarsymTightInfix
+  | VarsymLooseInfix
+  deriving (Eq, Show)
+
+varsym_occurrence_sort :: TokenSort -> TokenSort -> VarsymOccurrenceSort
+varsym_occurrence_sort prev_tok next_tok =
+    check (tok_sort_closing prev_tok) (tok_sort_opening next_tok)
+  where
+    check False True  = VarsymPrefix
+    check True  False = VarsymSuffix
+    check True  True  = VarsymTightInfix
+    check False False = VarsymLooseInfix
+
+varsym_override :: ExtsBitmap -> VarsymOccurrenceSort -> FastString -> Token
+varsym_override _ occ_sort s | s == fsLit "@" =
+  case occ_sort of
+    VarsymPrefix -> ITtypeApp -- Note [Lexing type applications]
+    VarsymSuffix -> ITat
+    VarsymTightInfix -> ITat
+    VarsymLooseInfix -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "!" =
+  case occ_sort of
+    VarsymPrefix -> ITbang
+    _ -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "~" =
+  case occ_sort of
+    VarsymPrefix -> ITtilde
+    _ -> ITvarsym s
+varsym_override _ _ s = ITvarsym s
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
@@ -2981,7 +3129,7 @@ fileHeaderPrags = Map.fromList([("options", lex_string_prag IToptions_prag),
                                  ("include", lex_string_prag ITinclude_prag)])
 
 ignoredPrags = Map.fromList (map ignored pragmas)
-               where ignored opt = (opt, nested_comment lexToken)
+               where ignored opt = (opt, nested_comment)
                      impls = ["hugs", "nhc98", "jhc", "yhc", "catch", "derive"]
                      options_pragmas = map ("options_" ++) impls
                      -- CFILES is a hugs-only thing.
