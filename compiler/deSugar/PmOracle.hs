@@ -186,8 +186,8 @@ mkOneConFull :: [Type] -> ConLike -> DsM ([Id], [EvVar], [Type], [TyVar])
 --  * 'arg_tys' tys are the types K's universally quantified type
 --     variables should be instantiated to.
 --       - For DataCons and most PatSyns these are the arguments of their TyCon
---       - For cases like in #11336, #17112, the univ_ts include the type
---         constructor, so tys will have to come from the type checker.
+--       - For cases like in #11336, #17112, the univ_ts include those variables
+--         from the view pattern, so tys will have to come from the type checker.
 --         They can't easily be recovered from the result type.
 --
 -- After instantiating the universal tyvars of K to tys we get
@@ -203,9 +203,10 @@ mkOneConFull :: [Type] -> ConLike -> DsM ([Id], [EvVar], [Type], [TyVar])
 mkOneConFull arg_tys con = do
   let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, _con_res_ty)
         = conLikeFullSig con
-  -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
+  pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
+  subst_univ `seq` return ()
   -- Instantiate fresh existentials as arguments to the contructor
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let field_tys' = substTys subst field_tys
@@ -980,6 +981,9 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   -- Note [Pattern synonym result type] in PatSyn.hs. So we just try our best
   -- here and be sure to return an instantiation when we can substitute every
   -- universally quantified type variable.
+  -- We *could* instantiate all the other univ_tvs just to fresh variables, I
+  -- suppose, but that means we get weird field types for which we don't know
+  -- anything. So we prefer to keep it simple here.
   let (univ_tvs,_,_,_,_,con_res_ty) = patSynSig ps
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
@@ -1313,13 +1317,14 @@ instance Outputable InhabitationCandidate where
            , text "ic_ty_cs          =" <+> ppr ty_cs
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
-mkInhabitationCandidate :: Id -> ConLike -> DsM InhabitationCandidate
+mkInhabitationCandidate :: Id -> RealDataCon -> DsM InhabitationCandidate
 -- Precondition: idType x is a TyConApp, so that tyConAppArgs in here is safe.
-mkInhabitationCandidate x con = do
+mkInhabitationCandidate x dc = do
+  let cl = RealDataCon dc
   let tc_args = tyConAppArgs (idType x)
-  (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args con
+  (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args cl
   pure InhabitationCandidate
-        { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike con) arg_vars)
+        { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
         , ic_ty_cs = listToBag ev_vars
         , ic_strict_arg_tys = strict_arg_tys
         }
@@ -1373,7 +1378,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
            -- them extremely misleading.
         -> do
              inner <- mkPmId core_ty -- it would be wrong to unify inner
-             alts <- mapM (mkInhabitationCandidate inner . RealDataCon) (tyConDataCons tc)
+             alts <- mapM (mkInhabitationCandidate inner) (tyConDataCons tc)
              (outer, new_tm_cts) <- build_newtypes inner dcs
              let wrap_dcs alt = alt{ ic_tm_cs = listToBag new_tm_cts `unionBags` ic_tm_cs alt}
              return $ Right (tc, outer, map wrap_dcs alts)
