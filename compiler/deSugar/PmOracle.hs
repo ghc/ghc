@@ -955,6 +955,8 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $
   let implies nalt (cl, _args) = eqPmAltCon cl nalt == Disjoint
   let neg'
         | any (implies nalt) pos = neg
+        -- See Note [Completeness checking with required Thetas]
+        | hasRequiredTheta nalt  = neg
         | otherwise              = unionLists neg [nalt]
   let vi_ext = vi{ vi_neg = neg' }
   -- 3. Make sure there's at least one other possible constructor
@@ -963,6 +965,42 @@ tryAddRefutableAltCon delta@MkDelta{ delta_tm_cs = TS env } x nalt = runMaybeT $
       -> MaybeT (ensureInhabited delta vi_ext{ vi_cache = markMatched cl pm })
     _ -> pure vi_ext
   pure delta{ delta_tm_cs = TS (setEntrySDIE env x vi') }
+
+hasRequiredTheta :: PmAltCon -> Bool
+hasRequiredTheta (PmAltConLike cl) = notNull req_theta
+  where
+    (_,_,_,_,req_theta,_,_) = conLikeFullSig cl
+
+{- Note [Completeness checking with required Thetas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the situation in #11224
+
+    import Text.Read (readMaybe)
+    pattern PRead :: Read a => () => a -> String
+    pattern PRead x <- (readMaybe -> Just x)
+    f :: String -> Int
+    f (PRead x)  = x
+    f (PRead xs) = length xs
+    f _          = 0
+
+Is the first match exhaustive on the PRead synonym? Should the second line thus
+deemed redundant? The answer is, of course, No! The required theta is like a
+hidden parameter which must be supplied at the pattern match site, so PRead
+is much more like a view pattern (where behavior depends on the particular value
+passed in).
+The simple solution here is to forget in 'tryAddRefutableAltCon' that we matched
+on synonyms with a required Theta like @PRead@, so that subsequent matches on
+the same constructor are never flagged as redundant. The consequence is that
+we no longer detect the actually redundant match in
+
+    g :: String -> Int
+    g (PRead x) = x
+    g (PRead y) = y -- redundant!
+    g _         = 0
+
+But that's a small price to pay, compared to the proper solution here involving
+storing required arguments along with the PmAltConLike in 'vi_neg'.
+-}
 
 -- | Guess the universal argument types of a ConLike from an instantiation of
 -- its result type. Rather easy for DataCons, but not so much for PatSynCons.
@@ -1317,7 +1355,7 @@ instance Outputable InhabitationCandidate where
            , text "ic_ty_cs          =" <+> ppr ty_cs
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
-mkInhabitationCandidate :: Id -> RealDataCon -> DsM InhabitationCandidate
+mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
 -- Precondition: idType x is a TyConApp, so that tyConAppArgs in here is safe.
 mkInhabitationCandidate x dc = do
   let cl = RealDataCon dc
