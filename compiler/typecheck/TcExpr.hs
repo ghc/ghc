@@ -1291,6 +1291,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     -- See Note [Herald for matchExpectedFunTys] in TcUnify.
     orig_expr_args_arity = count isHsValArg orig_args
 
+    fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
+      = case fun of
+          L _ (HsUnboundVar {}) -> True
+          _                     -> False
+
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
     go acc_args n fun_ty (HsArgPar sp : args)
@@ -1299,6 +1304,9 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            }
 
     go acc_args n fun_ty (HsTypeArg l hs_ty_arg : args)
+      | fun_is_out_of_scope   -- See Note [VTA for out-of-scope functions]
+      = go acc_args n fun_ty args
+      | otherwise
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -1373,6 +1381,42 @@ GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
 in TyCoRep.
+
+Note [VTA for out-of-scope functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose 'wurble' is not in scope, and we have
+   (wurble @Int @Bool True 'x')
+
+Then the renamer will make (HsUnboundVar "wurble) for 'wurble',
+and the typechecker will typecheck it with tcUnboundId, giving it
+a type 'alpha', and emitting a deferred CHoleCan constraint, to
+be reported later.
+
+But then comes the visible type application. If we do nothing, we'll
+generate an immediate failure, saying that a function of type 'alpha'
+can't be applied to Bool.  That's insane!  And indeed users complain
+(#13834, #17150.)
+
+The right error is the CHoleCan, which reports 'wurble' as out of
+scope, and tries to give its type.
+
+Fortnuately in tcArgs we still have acces to the function, so
+we can check if it is a HsUnboundVar.  If so, we simply ignore
+the type appplication.  It's a bit cheap-and-cheerful, but we
+get the out-of-scope variable reported as we should.
+
+Shortcomings of this approach:
+
+  - The type argument is not looked at, and might have kind
+    errors, which won't be reported.  Too bad.
+
+  - We'll report 'wurble' as out of scope with type
+       Bool -> Char -> <something>
+    which isn't really right because it needs two foralls
+    (because of the two visible type args).
+
+So it's not perfect -- but it fixes a serious problem with only
+two lines of code, leaving behind a much less serious one.
 
 Note [Visible type application zonk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1845,8 +1889,8 @@ tcUnboundId rn_expr unbound res_ty
       ; let ev = mkLocalId name ty
       ; can <- newHoleCt (ExprHole unbound) ev ty
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExtField (noLoc ev))
-                                                                          ty res_ty }
+      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
+          (HsVar noExtField (noLoc ev)) ty res_ty }
 
 
 {-
