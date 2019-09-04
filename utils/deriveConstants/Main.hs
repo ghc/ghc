@@ -28,10 +28,10 @@ needing to run the program, by inspecting the object file using 'nm'.
 import Control.Monad (when, unless)
 import Data.Bits (shiftL)
 import Data.Char (toLower)
-import Data.List (stripPrefix)
+import Data.List (stripPrefix, intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe, fromMaybe)
 import Numeric (readHex)
 import System.Environment (getArgs)
 import System.Exit (ExitCode(ExitSuccess), exitFailure)
@@ -697,7 +697,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
          let ls = lines xs
              m = Map.fromList $ case os of
                  "aix" -> parseAixObjdump ls
-                 _     -> catMaybes $ map parseNmLine ls
+                 _     -> mapMaybe parseNmLine ls
 
          case Map.lookup "CONTROL_GROUP_CONST_291" m of
              Just 292   -> return () -- OK
@@ -709,8 +709,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                               ++ "to 'configure'.\n"
              Just x     -> die ("unexpected value round-tripped for CONTROL_GROUP_CONST_291: " ++ show x)
 
-         rs <- mapM (lookupResult m) (wanteds os)
-         return rs
+         mapM (lookupResult m) (wanteds os)
     where headers = ["#define IN_STG_CODE 0",
                      "",
                      "/*",
@@ -739,7 +738,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "#pragma GCC poison sizeof"
                      ]
 
-          objdumpProgam = maybe (error "no objdump program given") id mobjdumpProgram
+          objdumpProgam = fromMaybe (error "no objdump program given") mobjdumpProgram
 
           prefix = "derivedConstant"
           mkFullName name = prefix ++ name
@@ -874,20 +873,17 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
 
 writeHaskellType :: FilePath -> [What Fst] -> IO ()
 writeHaskellType fn ws = writeFile fn xs
-    where xs = unlines (headers ++ body ++ footers)
-          headers = ["data PlatformConstants = PlatformConstants {"
-                     -- Now a kludge that allows the real entries to
-                     -- all start with a comma, which makes life a
-                     -- little easier
-                    ,"    pc_platformConstants :: ()"]
-          footers = ["  } deriving Read"]
-          body = concatMap doWhat ws
-          doWhat (GetClosureSize name _) = ["    , pc_" ++ name ++ " :: Int"]
-          doWhat (GetFieldType   name _) = ["    , pc_" ++ name ++ " :: Int"]
-          doWhat (GetWord        name _) = ["    , pc_" ++ name ++ " :: Int"]
-          doWhat (GetInt         name _) = ["    , pc_" ++ name ++ " :: Int"]
-          doWhat (GetNatural     name _) = ["    , pc_" ++ name ++ " :: Integer"]
-          doWhat (GetBool        name _) = ["    , pc_" ++ name ++ " :: Bool"]
+    where xs = unlines [header, body, footer]
+          header = "data PlatformConstants = PlatformConstants {"
+          footer = "  } deriving Read"
+          body = intercalate ",\n" (concatMap doWhat ws)
+
+          doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: Int"]
+          doWhat (GetFieldType   name _) = ["      pc_" ++ name ++ " :: Int"]
+          doWhat (GetWord        name _) = ["      pc_" ++ name ++ " :: Int"]
+          doWhat (GetInt         name _) = ["      pc_" ++ name ++ " :: Int"]
+          doWhat (GetNatural     name _) = ["      pc_" ++ name ++ " :: Integer"]
+          doWhat (GetBool        name _) = ["      pc_" ++ name ++ " :: Bool"]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
@@ -895,17 +891,16 @@ writeHaskellType fn ws = writeFile fn xs
 
 writeHaskellValue :: FilePath -> [What Snd] -> IO ()
 writeHaskellValue fn rs = writeFile fn xs
-    where xs = unlines (headers ++ body ++ footers)
-          headers = ["PlatformConstants {"
-                    ,"    pc_platformConstants = ()"]
-          footers = ["  }"]
-          body = concatMap doWhat rs
-          doWhat (GetClosureSize name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
-          doWhat (GetFieldType   name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
-          doWhat (GetWord        name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
-          doWhat (GetInt         name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
-          doWhat (GetNatural     name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
-          doWhat (GetBool        name (Snd v)) = ["    , pc_" ++ name ++ " = " ++ show v]
+    where xs = unlines [header, body, footer]
+          header = "PlatformConstants {"
+          footer = "  }"
+          body = intercalate ",\n" (concatMap doWhat rs)
+          doWhat (GetClosureSize name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetFieldType   name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetWord        name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetInt         name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetNatural     name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
+          doWhat (GetBool        name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
@@ -949,21 +944,21 @@ writeHeader :: FilePath -> [What Snd] -> IO ()
 writeHeader fn rs = writeFile fn xs
     where xs = unlines (headers ++ body)
           headers = ["/* This file is created automatically.  Do not edit by hand.*/", ""]
-          body = concatMap doWhat rs
-          doWhat (GetFieldType   name (Snd v)) = ["#define " ++ name ++ " b" ++ show (v * 8)]
-          doWhat (GetClosureSize name (Snd v)) = ["#define " ++ name ++ " (SIZEOF_StgHeader+" ++ show v ++ ")"]
-          doWhat (GetWord        name (Snd v)) = ["#define " ++ name ++ " " ++ show v]
-          doWhat (GetInt         name (Snd v)) = ["#define " ++ name ++ " " ++ show v]
-          doWhat (GetNatural     name (Snd v)) = ["#define " ++ name ++ " " ++ show v]
-          doWhat (GetBool        name (Snd v)) = ["#define " ++ name ++ " " ++ show (fromEnum v)]
+          body = map doWhat rs
+          doWhat (GetFieldType   name (Snd v)) = "#define " ++ name ++ " b" ++ show (v * 8)
+          doWhat (GetClosureSize name (Snd v)) = "#define " ++ name ++ " (SIZEOF_StgHeader+" ++ show v ++ ")"
+          doWhat (GetWord        name (Snd v)) = "#define " ++ name ++ " " ++ show v
+          doWhat (GetInt         name (Snd v)) = "#define " ++ name ++ " " ++ show v
+          doWhat (GetNatural     name (Snd v)) = "#define " ++ name ++ " " ++ show v
+          doWhat (GetBool        name (Snd v)) = "#define " ++ name ++ " " ++ show (fromEnum v)
           doWhat (StructFieldMacro nameBase) =
-                     ["#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+OFFSET_" ++ nameBase ++ "]"]
+                     "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+OFFSET_" ++ nameBase ++ "]"
           doWhat (ClosureFieldMacro nameBase) =
-                     ["#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ "]"]
+                     "#define " ++ nameBase ++ "(__ptr__) REP_" ++ nameBase ++ "[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ "]"
           doWhat (ClosurePayloadMacro nameBase) =
-                     ["#define " ++ nameBase ++ "(__ptr__,__ix__) W_[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ " + WDS(__ix__)]"]
+                     "#define " ++ nameBase ++ "(__ptr__,__ix__) W_[__ptr__+SIZEOF_StgHeader+OFFSET_" ++ nameBase ++ " + WDS(__ix__)]"
           doWhat (FieldTypeGcptrMacro nameBase) =
-                     ["#define REP_" ++ nameBase ++ " gcptr"]
+                     "#define REP_" ++ nameBase ++ " gcptr"
 
 die :: String -> IO a
 die err = do hPutStrLn stderr err
