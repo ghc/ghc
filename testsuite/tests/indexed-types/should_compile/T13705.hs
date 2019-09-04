@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module T13705 where
 
@@ -12,4 +13,3 @@ f _ = ()
 
 g :: D (F t) -> ()
 g x = f x
-
