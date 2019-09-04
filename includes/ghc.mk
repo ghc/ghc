@@ -196,11 +196,11 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
 	@echo ',("target arch", "$(HaskellTargetArch)")' >> $@
 	@echo ',("target word size", "$(TargetWordSize)")' >> $@
-	@echo ',("target has GNU nonexec stack", "$(HaskellHaveGnuNonexecStack)")' >> $@
-	@echo ',("target has .ident directive", "$(HaskellHaveIdentDirective)")' >> $@
-	@echo ',("target has subsections via symbols", "$(HaskellHaveSubsectionsViaSymbols)")' >> $@
-	@echo ',("target has RTS linker", "$(HaskellHaveRTSLinker)")' >> $@
-	@echo ',("Unregisterised", "$(Unregisterised)")' >> $@
+	@echo ',("target has GNU nonexec stack", "$(TargetHasGnuNonexecStack)")' >> $@
+	@echo ',("target has .ident directive", "$(TargetHasIdentDirective)")' >> $@
+	@echo ',("target has subsections via symbols", "$(TargetHasSubsectionsViaSymbols)")' >> $@
+	@echo ',("target has RTS linker", "$(TargetHasRTSLinker)")' >> $@
+	@echo ',("Unregisterised", "$(GhcUnregisterised)")' >> $@
 	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@

@@ -18,8 +18,8 @@ FP_GMP
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
-HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
-AC_SUBST(HaskellHaveRTSLinker)
+HaveRTSLinker=@HaveRTSLinker@
+AC_SUBST(HaveRTSLinker)
 
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
@@ -46,9 +46,6 @@ TargetPlatformFull="${target}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
-
-Unregisterised="@Unregisterised@"
-AC_SUBST(Unregisterised)
 
 #
 dnl ** figure out how to do a BSD-ish install **

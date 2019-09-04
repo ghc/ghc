@@ -145,10 +145,10 @@ settings-opt-command = @SettingsOptCommand@
 haskell-target-os = @HaskellTargetOs@
 haskell-target-arch = @HaskellTargetArch@
 target-word-size = @TargetWordSize@
-haskell-have-gnu-nonexec-stack = @HaskellHaveGnuNonexecStack@
-haskell-have-ident-directive = @HaskellHaveIdentDirective@
-haskell-have-subsections-via-symbols = @HaskellHaveSubsectionsViaSymbols@
-haskell-have-rts-linker = @HaskellHaveRTSLinker@
+target-has-gnu-nonexec-stack = @TargetHasGnuNonexecStack@
+target-has-ident-directive = @TargetHasIdentDirective@
+target-has-subsections-via-symbols = @TargetHasSubsectionsViaSymbols@
+target-has-rts-linker = @TargetHasRTSLinker@
 
 # Include and library directories:
 #=================================
