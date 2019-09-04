@@ -8,11 +8,10 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
-        PmExpr(..), PmLit(..), PmAltCon(..), TmVarCt(..),
+        PmLit(..), PmAltCon(..),
         pmAltConType, PmEquality(..), eqPmAltCon,
         pmLitType, literalToPmLit, negatePmLit, overloadPmLit,
-        pmLitAsStringLit, hsOverLitAsHsLit, coreExprAsPmLit,
-        mkPmExprData, pmExprToDataConApp
+        pmLitAsStringLit, hsOverLitAsHsLit, coreExprAsPmLit
     ) where
 
 #include "HsVersions.h"
@@ -28,7 +27,7 @@ import Id
 import Name
 import DataCon
 import ConLike
-import TcType (Type, eqType, isStringTy, isIntTy, isIntegerTy, isWordTy)
+import TcType (isStringTy, isIntTy, isIntegerTy, isWordTy)
 import Outputable
 import Maybes
 import Type
@@ -54,10 +53,6 @@ import Data.Ratio
 
 -- ----------------------------------------------------------------------------
 -- ** Types
-
--- | Lifted expressions for pattern match checking.
-data PmExpr = PmExprVar   Id
-            | PmExprCon   PmAltCon [Id]
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -243,9 +238,6 @@ which are generative, constraints like F a ~ G b for two different pattern
 synonyms F and G aren't immediately unsatisfiable. We assume F a ~ F a, though.
 -}
 
-mkPmExprData :: DataCon -> [Id] -> PmExpr
-mkPmExprData dc args = PmExprCon (PmAltConLike (RealDataCon dc)) args
-
 literalToPmLit :: Type -> Literal -> Maybe PmLit
 literalToPmLit ty l = PmLit ty <$> go l
   where
@@ -276,12 +268,6 @@ overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
 pmLitAsStringLit :: PmLit -> Maybe FastString
 pmLitAsStringLit (PmLit _ (PmLitString s)) = Just s
 pmLitAsStringLit _                         = Nothing
-
--- | A term constraint. @TVC x e@ encodes that @x@ is equal to @e@.
-data TmVarCt = TVC !Id !PmExpr
-
-instance Outputable TmVarCt where
-  ppr (TVC x e) = ppr x <+> char '~' <+> ppr e
 
 -- ----------------------------------------------------------------------------
 -- ** Predicates on PmExpr
@@ -434,11 +420,6 @@ consistently and try to turn them into plain literals as often as possible:
             "baz" -> putStrLn "C"
 -}
 
--- | Return @Just@ a 'DataCon' application or @Nothing@, otherwise.
-pmExprToDataConApp :: PmExpr -> Maybe (DataCon, [Id])
-pmExprToDataConApp (PmExprCon (PmAltConLike (RealDataCon c)) es) = Just (c, es)
-pmExprToDataConApp _                                             = Nothing
-
 {-
 %************************************************************************
 %*                                                                      *
@@ -476,15 +457,6 @@ instance Outputable PmLit where
 instance Outputable PmAltCon where
   ppr (PmAltConLike cl) = ppr cl
   ppr (PmAltLit l)      = ppr l
-
-instance Outputable PmExpr where
-  ppr (PmExprVar v) = ppr v
-  ppr (pmExprToDataConApp -> Just (dc, args))
-    | isUnboxedTupleCon dc
-    = text "(#" <+> (fsep $ punctuate comma $ map ppr args) <+> text "#)"
-    | isTupleDataCon dc
-    = parens $ fsep $ punctuate comma $ map ppr args
-  ppr (PmExprCon cl args) = hsep (ppr cl:map ppr args)
 
 instance Outputable PmEquality where
   ppr = text . show

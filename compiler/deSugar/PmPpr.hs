@@ -143,7 +143,7 @@ pprPmExprCon prec  (PmAltConLike cl) args = do
 
 pprConLike :: Delta -> Int -> ConLike -> [Id] -> PmPprM SDoc
 pprConLike delta _prec cl args
-  | Just pm_expr_list <- pmExprAsList delta (PmExprCon (PmAltConLike cl) args)
+  | Just pm_expr_list <- pmExprAsList delta (PmAltConLike cl) args
   = case pm_expr_list of
       NilTerminated list ->
         brackets . fsep . punctuate comma <$> mapM (pprPmExprVar 0) list
@@ -180,19 +180,22 @@ data PmExprList
 --   ending in a wildcard variable x (of list type). Should be pretty-printed as
 --   (1:2:_).
 -- * @pmExprAsList [] == Just ('NilTerminated' [])@
-pmExprAsList :: Delta -> PmExpr -> Maybe PmExprList
-pmExprAsList delta = go []
+pmExprAsList :: Delta -> PmAltCon -> [Id] -> Maybe PmExprList
+pmExprAsList delta = go_con []
   where
-    go rev_pref (PmExprVar x)
+    go_var rev_pref x
       | Just (alt, args) <- lookupSolution delta x
-      = go rev_pref (PmExprCon alt args)
-    go rev_pref (PmExprVar x)
+      = go_con rev_pref alt args
+    go_var rev_pref x
       | Just pref <- nonEmpty (reverse rev_pref)
       = Just (WcVarTerminated pref x)
-    go rev_pref (pmExprToDataConApp -> Just (c, es))
+    go_var _ _
+      = Nothing
+
+    go_con rev_pref (PmAltConLike (RealDataCon c)) es
       | c == nilDataCon
       = ASSERT( null es ) Just (NilTerminated (reverse rev_pref))
       | c == consDataCon
-      = ASSERT( length es == 2 ) go (es !! 0 : rev_pref) (PmExprVar (es !! 1))
-    go _ _
+      = ASSERT( length es == 2 ) go_var (es !! 0 : rev_pref) (es !! 1)
+    go_con _ _ _
       = Nothing

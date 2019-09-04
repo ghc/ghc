@@ -7,22 +7,22 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
--- 'addTermEquality', 'refineToAltCon' and 'tryAddRefutableAltCon' for adding
+-- 'addTermFactCon', 'refineToAltCon' and 'tryAddRefutableAltCon' for adding
 -- facts to the oracle, and 'provideEvidenceForEquation' to turn a 'Delta' into
 -- a concrete evidence for an equation.
 module PmOracle (
 
         DsM, tracePm, mkPmId,
-
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
         lookupNumberOfRefinements,
 
+        TmCt(..),
         inhabitants,
         representCoreExpr,     -- Takes apart a CoreExpr and represents it in the Oracle
         addTypeEvidence,       -- Add type equalities
         tryAddRefutableAltCon, -- Add a negative equality
         refineToAltCon,        -- Add a positive refinement x ~ K _ _
-        addTermEquality,       -- Add a positive equality x ~ e
+        addTermFactCon,       -- Add a positive equality x ~ e
         tmOracle,              -- Add multiple positive term equalities
         provideEvidenceForEquation,
     ) where
@@ -324,7 +324,7 @@ instance Monoid SatisfiabilityCheck where
 pmIsSatisfiable
   :: Delta       -- ^ The ambient term and type constraints
                  --   (known to be satisfiable).
-  -> Bag TmVarCt -- ^ The new term constraints.
+  -> Bag TmCt -- ^ The new term constraints.
   -> Bag EvVar   -- ^ The new type constraints.
   -> [Type]      -- ^ The strict argument types.
   -> DsM (Maybe Delta)
@@ -829,14 +829,14 @@ initTmState = TS emptySDIE
 -- | A 'SatisfiabilityCheck' based on new term-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing
 -- ones.
-tmIsSatisfiable :: Bag TmVarCt -> SatisfiabilityCheck
+tmIsSatisfiable :: Bag TmCt -> SatisfiabilityCheck
 tmIsSatisfiable new_tm_cs = SC $ \delta -> tmOracle delta new_tm_cs
 
 -- | External interface to the term oracle.
-tmOracle :: Foldable f => Delta -> f TmVarCt -> DsM (Maybe Delta)
+tmOracle :: Foldable f => Delta -> f TmCt -> DsM (Maybe Delta)
 tmOracle delta = runMaybeT . foldlM go delta
   where
-    go delta ct = MaybeT (addTermEquality delta ct)
+    go delta ct = MaybeT (addTermFactCon delta ct)
 
 -----------------------
 -- * Looking up VarInfo
@@ -918,6 +918,16 @@ lookupNumberOfRefinements delta x
 -------------------------------
 -- * Adding facts to the oracle
 
+-- | A term constraint. Either equates two variables or a variable with a
+-- 'PmAltCon' application.
+data TmCt
+  = TmVarVar !Id !Id
+  | TmVarCon !Id !PmAltCon ![Id]
+
+instance Outputable TmCt where
+  ppr (TmVarVar x y)        = ppr x <+> char '~' <+> ppr y
+  ppr (TmVarCon x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
+
 -- | Add type equalities to 'Delta'.
 addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
 addTypeEvidence delta dicts
@@ -925,10 +935,10 @@ addTypeEvidence delta dicts
 
 -- | Tries to equate two representatives in 'Delta'.
 -- See Note [TmState invariants].
-addTermEquality :: Delta -> TmVarCt -> DsM (Maybe Delta)
-addTermEquality delta (TVC x e) = runMaybeT $ case e of
-  PmExprVar y        -> unify delta (x, y)
-  PmExprCon con args -> trySolve delta x con args
+addTermFactCon :: Delta -> TmCt -> DsM (Maybe Delta)
+addTermFactCon delta ct = runMaybeT $ case ct of
+  TmVarVar x y        -> unify delta (x, y)
+  TmVarCon x con args -> trySolve delta x con args
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
@@ -1064,7 +1074,7 @@ refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   ex_ev_vars <- equateTyVars ex_tvs1 ex_tvs2
 
   let new_ty_cs = listToBag theta_ev_vars `unionBags` listToBag ex_ev_vars
-  let new_tm_cs = unitBag (TVC x (PmExprCon alt arg_vars))
+  let new_tm_cs = unitBag (TmVarCon x alt arg_vars)
 
   -- Now check satifiability
   mb_delta <- pmIsSatisfiable delta new_tm_cs new_ty_cs strict_arg_tys
@@ -1291,7 +1301,7 @@ trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
 -- See @Note [Strict argument type constraints]@.
 data InhabitationCandidate =
   InhabitationCandidate
-  { ic_tm_cs          :: Bag TmVarCt
+  { ic_tm_cs          :: Bag TmCt
   , ic_ty_cs          :: Bag EvVar
   , ic_strict_arg_tys :: [Type]
   }
@@ -1309,7 +1319,7 @@ mkInhabitationCandidate x con = do
   let tc_args = tyConAppArgs (idType x)
   (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args con
   pure InhabitationCandidate
-        { ic_tm_cs = unitBag (TVC x (PmExprCon (PmAltConLike con) arg_vars))
+        { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike con) arg_vars)
         , ic_ty_cs = listToBag ev_vars
         , ic_strict_arg_tys = strict_arg_tys
         }
@@ -1332,13 +1342,13 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
                           , intTyCon, wordTyCon, word8TyCon ]
 
-    build_newtype :: (Type, DataCon) -> Id -> DsM (Id, TmVarCt)
+    build_newtype :: (Type, DataCon) -> Id -> DsM (Id, TmCt)
     build_newtype (ty, dc) x = do
       -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
       y <- mkPmId ty
-      pure (y, TVC y (mkPmExprData dc [x]))
+      pure (y, TmVarCon y (PmAltConLike (RealDataCon dc)) [x])
 
-    build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmVarCt])
+    build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmCt])
     build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
       where
         go dc x cts = second (:cts) <$> build_newtype dc x

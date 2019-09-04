@@ -1231,7 +1231,7 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
 
 -- Var: Add x :-> y to the oracle and recurse
 pmcheck (PmVar x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> addTermEquality delta (TVC x (PmExprVar y))
+  delta' <- expectJust "x is fresh" <$> addTermFactCon delta (TmVarVar x y)
   pmcheckI ps guards vva n delta'
 
 -- ConVar
@@ -1351,13 +1351,13 @@ addTyCsDs ev_vars k = do
   updPmDelta delta' k
 
 -- | Add in-scope term constraints
-addTmVarCsDs :: [TmVarCt] -> DsM a -> DsM a
+addTmVarCsDs :: [TmCt] -> DsM a -> DsM a
 addTmVarCsDs tm_cs k = do
   delta <- getPmDelta
   -- If adding a constraint would lead to a contradiction, don't add it.
   -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
   -- for why this is done.
-  delta' <- foldlMSkipNothing addTermEquality delta tm_cs
+  delta' <- foldlMSkipNothing addTermFactCon delta tm_cs
   updPmDelta delta' k
 
 -- | Like 'foldlM', but continues with the old accumulator whenever the action
@@ -1383,7 +1383,7 @@ genCaseTmCs2 (Just scr) [p] [x] k = do
   delta <- getPmDelta
   scr_e <- dsLExpr scr
   (delta', z) <- representCoreExpr delta scr_e
-  let cts' = (TVC x (PmExprVar y) : TVC x (PmExprVar z) : bagToList cts)
+  let cts' = (TmVarVar x y : TmVarVar x z : bagToList cts)
   updPmDelta delta' $ addTmVarCsDs cts' k
 genCaseTmCs2 _ _ _ _ = panic "genCaseTmCs2: HsCase"
 
@@ -1398,14 +1398,14 @@ genCaseTmCs1 (Just scr) [x] k = do
   delta <- getPmDelta
   scr_e <- dsLExpr scr
   (delta', y) <- representCoreExpr delta scr_e
-  updPmDelta delta' $ addTmVarCsDs [TVC x (PmExprVar y)] k
+  updPmDelta delta' $ addTmVarCsDs [TmVarVar x y] k
 genCaseTmCs1 _          _     _ = panic "genCaseTmCs1: HsCase"
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr
 
 -- | Convert a pattern vector to a list of 'PmExpr's by dropping the guards
-patVecToPmExprs :: PatVec -> DsM [(Id, Bag TmVarCt)]
+patVecToPmExprs :: PatVec -> DsM [(Id, Bag TmCt)]
 -- This is just a simple version of pmcheck to compute the Covered Delta
 -- (which pmcheck doesn't even attempt to keep).
 patVecToPmExprs = mapMaybeM pmPatToPmExpr
@@ -1413,12 +1413,12 @@ patVecToPmExprs = mapMaybeM pmPatToPmExpr
 -- | Convert a pattern to a 'PmExpr' (will be either 'Nothing' if the pattern is
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards
-pmPatToPmExpr :: PmPat -> DsM (Maybe (Id, Bag TmVarCt))
+pmPatToPmExpr :: PmPat -> DsM (Maybe (Id, Bag TmCt))
 pmPatToPmExpr   (PmVar { pm_var_id  = x }) = pure (Just (x, emptyBag))
 pmPatToPmExpr p@(PmCon { pm_con_con = con, pm_con_args = args }) = do
   x <- mkPmId (pmPatType p)
   (ids, cts) <- unzip <$> patVecToPmExprs args
-  let cts' = TVC x (PmExprCon con ids) `consBag` unionManyBags cts
+  let cts' = TmVarCon x con ids `consBag` unionManyBags cts
   pure (Just (x, cts'))
 pmPatToPmExpr _ = pure Nothing -- drop the guards
 
