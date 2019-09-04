@@ -203,7 +203,7 @@ mkOneConFull :: [Type] -> ConLike -> DsM ([Id], [EvVar], [Type], [TyVar])
 mkOneConFull arg_tys con = do
   let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, _con_res_ty)
         = conLikeFullSig con
-  pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
+  -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
   subst_univ `seq` return ()
