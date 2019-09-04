@@ -2859,9 +2859,11 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
     injective_vars_of_binder :: TyConBinder -> FV
     injective_vars_of_binder (Bndr tv vis) =
       case vis of
-        AnonTCB VisArg -> injectiveVarsOfType (varType tv)
+        AnonTCB VisArg -> injectiveVarsOfType False -- conservative choice
+                                              (varType tv)
         NamedTCB argf  | source_of_injectivity argf
-                       -> unitFV tv `unionFV` injectiveVarsOfType (varType tv)
+                       -> unitFV tv `unionFV`
+                          injectiveVarsOfType False (varType tv)
         _              -> emptyFV
 
     source_of_injectivity Required  = True

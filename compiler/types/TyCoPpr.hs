@@ -299,10 +299,9 @@ pprTypeApp tc tys
 ------------------
 -- | Display all kind information (with @-fprint-explicit-kinds@) when the
 -- provided 'Bool' argument is 'True'.
--- See @Note [Kind arguments in error messages]@ in "TcErrors".
+-- See @Note [Kind arguments in error messages]@ in TcErrors.
 pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
 pprWithExplicitKindsWhen b
   = updSDocDynFlags $ \dflags ->
       if b then gopt_set dflags Opt_PrintExplicitKinds
            else dflags
-

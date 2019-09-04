@@ -3,6 +3,7 @@
 module TcFlatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
+   rewriteTyVar,
 
    unflattenWanteds
  ) where
@@ -456,7 +457,8 @@ type FlatWorkListRef = TcRef [Ct]  -- See Note [The flattening work list]
 
 data FlattenEnv
   = FE { fe_mode    :: !FlattenMode
-       , fe_loc     :: !CtLoc             -- See Note [Flattener CtLoc]
+       , fe_loc     :: CtLoc              -- See Note [Flattener CtLoc]
+                      -- unbanged because it's bogus in rewriteTyVar
        , fe_flavour :: !CtFlavour
        , fe_eq_rel  :: !EqRel             -- See Note [Flattener EqRels]
        , fe_work    :: !FlatWorkListRef } -- See Note [The flattening work list]
@@ -520,7 +522,8 @@ runFlatten :: FlattenMode -> CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
 runFlatten mode loc flav eq_rel thing_inside
   = do { flat_ref <- newTcRef []
        ; let fmode = FE { fe_mode = mode
-                        , fe_loc  = loc
+                        , fe_loc  = bumpCtLocDepth loc
+                            -- See Note [Flatten when discharging CFunEqCan]
                         , fe_flavour = flav
                         , fe_eq_rel = eq_rel
                         , fe_work = flat_ref }
@@ -743,8 +746,27 @@ changes the flavour from Derived just for this purpose.
 *  They are all wrapped in runFlatten, so their                        *
 *  flattening work gets put into the work list                         *
 *                                                                      *
-********************************************************************* -}
+*********************************************************************
 
+Note [rewriteTyVar]
+~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have an injective function F and
+  inert_funeqs:   F t1 ~ fsk1
+                  F t2 ~ fsk2
+  inert_eqs:      fsk1 ~ [a]
+                  a ~ Int
+                  fsk2 ~ [Int]
+
+We never rewrite the RHS (cc_fsk) of a CFunEqCan. But we /do/ want to get the
+[D] t1 ~ t2 from the injectiveness of F. So we flatten cc_fsk of CFunEqCans
+when trying to find derived equalities arising from injectivity.
+-}
+
+-- | See Note [Flattening].
+-- If (xi, co) <- flatten mode ev ty, then co :: xi ~r ty
+-- where r is the role in @ev@. If @mode@ is 'FM_FlattenAll',
+-- then 'xi' is almost function-free (Note [Almost function-free]
+-- in TcRnTypes).
 flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
@@ -753,8 +775,27 @@ flatten mode ev ty
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }
 
+-- Apply the inert set as an *inert generalised substitution* to
+-- a variable, zonking along the way.
+-- See Note [inert_eqs: the inert equalities] in TcSMonad.
+-- Equivalently, this flattens the variable with respect to NomEq
+-- in a Derived constraint. (Why Derived? Because Derived allows the
+-- most about of rewriting.) Returns no coercion, because we're
+-- using Derived constraints.
+-- See Note [rewriteTyVar]
+rewriteTyVar :: TcTyVar -> TcS TcType
+rewriteTyVar tv
+  = do { traceTcS "rewriteTyVar {" (ppr tv)
+       ; (ty, _) <- runFlatten FM_SubstOnly fake_loc Derived NomEq $
+                    flattenTyVar tv
+       ; traceTcS "rewriteTyVar }" (ppr ty)
+       ; return ty }
+  where
+    fake_loc = pprPanic "rewriteTyVar used a CtLoc" (ppr tv)
+
 -- specialized to flattening kinds: never Derived, always Nominal
 -- See Note [No derived kind equalities]
+-- See Note [Flattening]
 flattenKind :: CtLoc -> CtFlavour -> TcType -> TcS (Xi, TcCoercionN)
 flattenKind loc flav ty
   = do { traceTcS "flattenKind {" (ppr flav <+> ppr ty)
@@ -765,6 +806,7 @@ flattenKind loc flav ty
        ; traceTcS "flattenKind }" (ppr ty' $$ ppr co) -- co is never a panic
        ; return (ty', co) }
 
+-- See Note [Flattening]
 flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], TcCoercionN)
 -- Externally-callable, hence runFlatten
 -- Flatten a vector of types all at once; in fact they are
@@ -810,6 +852,9 @@ flatten is only called on *arguments* to type functions, by canEqGiven.
 Flattening also:
   * zonks, removing any metavariables, and
   * applies the substitution embodied in the inert set
+
+The result of flattening is *almost function-free*. See
+Note [Almost function-free] in TcRnTypes.
 
 Because flattening zonks and the returned coercion ("co" above) is also
 zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
@@ -1575,7 +1620,7 @@ flatten_tyvar2 tv fr@(_, eq_rel)
                         , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
              , let ct_fr = (ctEvFlavour ctev, ct_eq_rel)
              , ct_fr `eqCanRewriteFR` fr  -- This is THE key call of eqCanRewriteFR
-             ->  do { traceFlat "Following inert tyvar"
+             -> do { traceFlat "Following inert tyvar"
                         (ppr mode <+>
                          ppr tv <+>
                          equals <+>

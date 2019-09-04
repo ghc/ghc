@@ -14,6 +14,7 @@ module TyCoFVs
         tyCoVarsOfCoList, tyCoVarsOfProv,
         almostDevoidCoVarOfCo,
         injectiveVarsOfType, injectiveVarsOfTypes,
+        invisibleVarsOfType, invisibleVarsOfTypes,
 
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
@@ -26,7 +27,7 @@ module TyCoFVs
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type (coreView, tcView)
+import {-# SOURCE #-} Type (coreView, tcView, partitionInvisibleTypes)
 
 import TyCoRep
 import TyCon
@@ -632,8 +633,11 @@ almost_devoid_co_var_of_types (ty:tys) cv
 -- where @S1@ and @S2@ are arbitrary substitutions.
 --
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
-injectiveVarsOfType :: Type -> FV
-injectiveVarsOfType = go
+injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
+                              -- See Note [Coverage condition for injective type families]
+                              -- in FamInst.
+                    -> Type -> FV
+injectiveVarsOfType look_under_tfs = go
   where
     go ty                 | Just ty' <- coreView ty
                           = go ty'
@@ -642,15 +646,17 @@ injectiveVarsOfType = go
     go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
     go (TyConApp tc tys)  =
       case tyConInjectivityInfo tc of
-        NotInjective  -> emptyFV
-        Injective inj -> mapUnionFV go $
-                         filterByList (inj ++ repeat True) tys
+        Injective inj
+          |  look_under_tfs || not (isTypeFamilyTyCon tc)
+          -> mapUnionFV go $
+             filterByList (inj ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go ty
-    go LitTy{}           = emptyFV
-    go (CastTy ty _)     = go ty
-    go CoercionTy{}      = emptyFV
+        _ -> emptyFV
+    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `unionFV` delFV tv (go ty)
+    go LitTy{}                   = emptyFV
+    go (CastTy ty _)             = go ty
+    go CoercionTy{}              = emptyFV
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:
@@ -662,8 +668,42 @@ injectiveVarsOfType = go
 -- * Ignoring the non-injective fields of a 'TyConApp'
 --
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
-injectiveVarsOfTypes :: [Type] -> FV
-injectiveVarsOfTypes tys = mapUnionFV injectiveVarsOfType tys
+injectiveVarsOfTypes :: Bool -- ^ look under injective type families?
+                             -- See Note [Coverage condition for injective type families]
+                             -- in FamInst.
+                     -> [Type] -> FV
+injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under_tfs)
+
+
+------------- Invisible vars -----------------
+-- | Returns the set of variables that are used invisibly anywhere within
+-- the given type. A variable will be included even if it is used both visibly
+-- and invisibly. An invisible use site includes:
+--   * In the kind of a variable
+--   * In the kind of a bound variable in a forall
+--   * In a coercion
+--   * In a Specified or Inferred argument to a function
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
+invisibleVarsOfType :: Type -> FV
+invisibleVarsOfType = go
+  where
+    go ty                 | Just ty' <- coreView ty
+                          = go ty'
+    go (TyVarTy v)        = go (tyVarKind v)
+    go (AppTy f a)        = go f `unionFV` go a
+    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
+                            invisibleVarsOfTypes visibles
+      where (invisibles, visibles) = partitionInvisibleTypes tc tys
+    go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
+    go LitTy{}            = emptyFV
+    go (CastTy ty co)     = tyCoFVsOfCo co `unionFV` go ty
+    go (CoercionTy co)    = tyCoFVsOfCo co
+
+-- | Like 'invisibleVarsOfType', but for many types.
+invisibleVarsOfTypes :: [Type] -> FV
+invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
+
 
 ------------- No free vars -----------------
 

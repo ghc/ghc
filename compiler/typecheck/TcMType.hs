@@ -1990,12 +1990,9 @@ zonkWCRec (WC { wc_simple = simple, wc_impl = implic })
        ; return (WC { wc_simple = simple', wc_impl = implic' }) }
 
 zonkSimples :: Cts -> TcM Cts
-zonkSimples cts = do { cts' <- mapBagM zonkCt' cts
+zonkSimples cts = do { cts' <- mapBagM zonkCt cts
                      ; traceTc "zonkSimples done:" (ppr cts')
                      ; return cts' }
-
-zonkCt' :: Ct -> TcM Ct
-zonkCt' ct = zonkCt ct
 
 {- Note [zonkCt behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2035,15 +2032,12 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
        ; args' <- mapM zonkTcType args
        ; return $ ct { cc_ev = ev', cc_tyargs = args' } }
 
-zonkCt ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs })
-  = do { ev'    <- zonkCtEvidence ev
-       ; tv_ty' <- zonkTcTyVar tv
-       ; case getTyVar_maybe tv_ty' of
-           Just tv' -> do { rhs' <- zonkTcType rhs
-                          ; return ct { cc_ev    = ev'
-                                      , cc_tyvar = tv'
-                                      , cc_rhs   = rhs' } }
-           Nothing  -> return (mkNonCanonical ev') }
+zonkCt (CTyEqCan { cc_ev = ev })
+  = mkNonCanonical <$> zonkCtEvidence ev
+  -- CTyEqCan has some delicate invariants that may be violated by
+  -- zonking (documented with the Ct type) , so we don't want to create
+  -- a CTyEqCan here. Besides, this will be canonicalized again anyway,
+  -- so there is very little benefit in keeping the CTyEqCan constructor.
 
 zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_insol flag
   = do { ev' <- zonkCtEvidence ev

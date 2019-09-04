@@ -1,0 +1,12 @@
+
+T16512a.hs:41:25: error:
+    • Reduction stack overflow; size = 201
+      When simplifying the following type: ListVariadic as b
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
+    • In the first argument of ‘AnApplication’, namely ‘g’
+      In the expression: AnApplication g (a `ConsAST` as)
+      In a case alternative:
+          AnApplication g as -> AnApplication g (a `ConsAST` as)

@@ -816,11 +816,11 @@ lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Injectivity means that the RHS of a type family uniquely determines the LHS (see
-Note [Type inference for type families with injectivity]).  User informs about
+Note [Type inference for type families with injectivity]).  The user informs us about
 injectivity using an injectivity annotation and it is GHC's task to verify that
-that annotation is correct wrt. to type family equations. Whenever we see a new
-equation of a type family we need to make sure that adding this equation to
-already known equations of a type family does not violate injectivity annotation
+this annotation is correct w.r.t. type family equations. Whenever we see a new
+equation of a type family we need to make sure that adding this equation to the
+already known equations of a type family does not violate the injectivity annotation
 supplied by the user (see Note [Injectivity annotation]).  Of course if the type
 family has no injectivity annotation then no check is required.  But if a type
 family has injectivity annotation we need to make sure that the following
@@ -888,11 +888,12 @@ conditions hold:
 3. If the RHS of a type family equation is a type family application then the type
    family is rejected as not injective. This is checked by FamInst.isTFHeaded.
 
-4. If a LHS type variable that is declared as injective is not mentioned on
+4. If a LHS type variable that is declared as injective is not mentioned in an
    injective position in the RHS then the type family is rejected as not
    injective.  "Injective position" means either an argument to a type
    constructor or argument to a type family on injective position.
-   This is checked by FamInst.unusedInjTvsInRHS.
+   There are subtleties here. See Note [Coverage condition for injective type families]
+   in FamInst.
 
 See also Note [Injective type families] in TyCon
 -}

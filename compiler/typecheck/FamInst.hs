@@ -1,6 +1,6 @@
 -- The @FamInst@ type: family instance heads
 
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, GADTs, ViewPatterns #-}
 
 module FamInst (
         FamInstEnvs, tcGetFamInstEnvs,
@@ -10,7 +10,7 @@ module FamInst (
         newFamInst,
 
         -- * Injectivity
-        makeInjectivityErrors, injTyVarsOfType, injTyVarsOfTypes
+        makeInjectivityErrors
     ) where
 
 import GhcPrelude
@@ -36,13 +36,16 @@ import DataCon ( dataConName )
 import Maybes
 import Type
 import TyCoRep
+import TyCoFVs
 import TcMType
 import Name
-import Pair
 import Panic
 import VarSet
+import FV
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad
+
+import qualified GHC.LanguageExtensions  as LangExt
 
 #include "HsVersions.h"
 
@@ -719,10 +722,11 @@ checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
     , Injective inj <- tyConInjectivityInfo tycon = do
-    { let axiom = coAxiomSingleBranch fi_ax
+    { dflags <- getDynFlags
+    ; let axiom = coAxiomSingleBranch fi_ax
           conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
           -- see Note [Verifying injectivity annotation] in FamInstEnv
-          errs = makeInjectivityErrors fi_ax axiom inj conflicts
+          errs = makeInjectivityErrors dflags fi_ax axiom inj conflicts
     ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs
     ; return (null errs)
     }
@@ -735,19 +739,21 @@ checkForInjectivityConflicts instEnvs famInst
 
 -- | Build a list of injectivity errors together with their source locations.
 makeInjectivityErrors
-   :: CoAxiom br   -- ^ Type family for which we generate errors
+   :: DynFlags
+   -> CoAxiom br   -- ^ Type family for which we generate errors
    -> CoAxBranch   -- ^ Currently checked equation (represented by axiom)
    -> [Bool]       -- ^ Injectivity annotation
    -> [CoAxBranch] -- ^ List of injectivity conflicts
    -> [(SDoc, SrcSpan)]
-makeInjectivityErrors fi_ax axiom inj conflicts
+makeInjectivityErrors dflags fi_ax axiom inj conflicts
   = ASSERT2( any id inj, text "No injective type variables" )
     let lhs             = coAxBranchLHS axiom
         rhs             = coAxBranchRHS axiom
         fam_tc          = coAxiomTyCon fi_ax
         are_conflicts   = not $ null conflicts
-        unused_inj_tvs  = unusedInjTvsInRHS fam_tc inj lhs rhs
-        inj_tvs_unused  = not $ and (isEmptyVarSet <$> unused_inj_tvs)
+        (unused_inj_tvs, unused_vis, undec_inst_flag)
+                        = unusedInjTvsInRHS dflags fam_tc lhs rhs
+        inj_tvs_unused  = not $ isEmptyVarSet unused_inj_tvs
         tf_headed       = isTFHeaded rhs
         bare_variables  = bareTvInRHSViolated lhs rhs
         wrong_bare_rhs  = not $ null bare_variables
@@ -758,80 +764,10 @@ makeInjectivityErrors fi_ax axiom inj conflicts
                           , coAxBranchSpan (head eqns) )
         errorIf p f     = if p then [f err_builder axiom] else []
      in    errorIf are_conflicts  (conflictInjInstErr     conflicts     )
-        ++ errorIf inj_tvs_unused (unusedInjectiveVarsErr unused_inj_tvs)
+        ++ errorIf inj_tvs_unused (unusedInjectiveVarsErr unused_inj_tvs
+                                     unused_vis undec_inst_flag)
         ++ errorIf tf_headed       tfHeadedErr
         ++ errorIf wrong_bare_rhs (bareVariableInRHSErr   bare_variables)
-
-
--- | Return a list of type variables that the function is injective in and that
--- do not appear on injective positions in the RHS of a family instance
--- declaration. The returned Pair includes invisible vars followed by visible ones
-unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
--- INVARIANT: [Bool] list contains at least one True value
--- See Note [Verifying injectivity annotation] in FamInstEnv.
--- This function implements check (4) described there.
--- In theory, instead of implementing this whole check in this way, we could
--- attempt to unify equation with itself.  We would reject exactly the same
--- equations but this method gives us more precise error messages by returning
--- precise names of variables that are not mentioned in the RHS.
-unusedInjTvsInRHS tycon injList lhs rhs =
-  (`minusVarSet` injRhsVars) <$> injLhsVars
-    where
-      inj_pairs :: [(Type, ArgFlag)]
-      -- All the injective arguments, paired with their visibility
-      inj_pairs = ASSERT2( injList `equalLength` lhs
-                         , ppr tycon $$ ppr injList $$ ppr lhs )
-                  filterByList injList (lhs `zip` tyConArgFlags tycon lhs)
-
-      -- set of type and kind variables in which type family is injective
-      invis_lhs, vis_lhs :: [Type]
-      (invis_lhs, vis_lhs) = partitionInvisibles inj_pairs
-
-      invis_vars = tyCoVarsOfTypes invis_lhs
-      Pair invis_vars' vis_vars = splitVisVarsOfTypes vis_lhs
-      injLhsVars
-        = Pair (invis_vars `minusVarSet` vis_vars `unionVarSet` invis_vars')
-               vis_vars
-
-      -- set of type variables appearing in the RHS on an injective position.
-      -- For all returned variables we assume their associated kind variables
-      -- also appear in the RHS.
-      injRhsVars = injTyVarsOfType rhs
-
-injTyVarsOfType :: TcTauType -> TcTyVarSet
--- Collect all type variables that are either arguments to a type
---   constructor or to /injective/ type families.
--- Determining the overall type determines thes variables
---
--- E.g.   Suppose F is injective in its second arg, but not its first
---        then injVarOfType (Either a (F [b] (a,c))) = {a,c}
---        Determining the overall type determines a,c but not b.
-injTyVarsOfType ty
-  | Just ty' <- coreView ty -- #12430
-  = injTyVarsOfType ty'
-injTyVarsOfType (TyVarTy v)
-  = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
-injTyVarsOfType (TyConApp tc tys)
-  | isTypeFamilyTyCon tc
-  = case tyConInjectivityInfo tc of
-        NotInjective  -> emptyVarSet
-        Injective inj -> injTyVarsOfTypes (filterByList inj tys)
-  | otherwise
-  = injTyVarsOfTypes tys
-injTyVarsOfType (LitTy {})
-  = emptyVarSet
-injTyVarsOfType (FunTy _ arg res)
-  = injTyVarsOfType arg `unionVarSet` injTyVarsOfType res
-injTyVarsOfType (AppTy fun arg)
-  = injTyVarsOfType fun `unionVarSet` injTyVarsOfType arg
--- No forall types in the RHS of a type family
-injTyVarsOfType (CastTy ty _)   = injTyVarsOfType ty
-injTyVarsOfType (CoercionTy {}) = emptyVarSet
-injTyVarsOfType (ForAllTy {})    =
-    panic "unusedInjTvsInRHS.injTyVarsOfType"
-
-injTyVarsOfTypes :: [Type] -> VarSet
-injTyVarsOfTypes tys = mapUnionVarSet injTyVarsOfType tys
 
 -- | Is type headed by a type family application?
 isTFHeaded :: Type -> Bool
@@ -852,6 +788,163 @@ bareTvInRHSViolated pats rhs | isTyVarTy rhs
    = filter (not . isTyVarTy) pats
 bareTvInRHSViolated _ _ = []
 
+------------------------------------------------------------------
+-- Checking for the coverage condition for injective type families
+------------------------------------------------------------------
+
+{-
+Note [Coverage condition for injective type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Injective Type Families paper describes how we can tell whether
+or not a type family equation upholds the injectivity condition.
+Briefly, consider the following:
+
+  type family F a b = r | r -> a      -- NB: b is not injective
+
+  type instance F ty1 ty2 = ty3
+
+We need to make sure that all variables mentioned in ty1 are mentioned in ty3
+-- that's how we know that knowing ty3 determines ty1. But they can't be
+mentioned just anywhere in ty3: they must be in *injective* positions in ty3.
+For example:
+
+  type instance F a Int = Maybe (G a)
+
+This is no good, if G is not injective. However, if G is indeed injective,
+then this would appear to meet our needs. There is a trap here, though: while
+knowing G a does indeed determine a, trying to compute a from G a might not
+terminate. This is precisely the same problem that we have with functional
+dependencies and their liberal coverage condition. Here is the test case:
+
+  type family G a = r | r -> a
+  type instance G [a] = [G a]
+  [W] G alpha ~ [alpha]
+
+We see that the equation given applies, because G alpha equals a list. So we
+learn that alpha must be [beta] for some beta. We then have
+
+  [W] G [beta] ~ [[beta]]
+
+This can reduce to
+
+  [W] [G beta] ~ [[beta]]
+
+which then decomposes to
+
+  [W] G beta ~ [beta]
+
+right where we started. The equation G [a] = [G a] thus is dangerous: while
+it does not violate the injectivity assumption, it might throw us into a loop,
+with a particularly dastardly Wanted.
+
+We thus do what functional dependencies do: require -XUndecidableInstances to
+accept this.
+
+Checking the coverage condition is not terribly hard, but we also want to produce
+a nice error message. A nice error message has at least two properties:
+
+1. If any of the variables involved are invisible or are used in an invisible context,
+we want to print invisible arguments (as -fprint-explicit-kinds does).
+
+2. If we fail to accept the equation because we're worried about non-termination,
+we want to suggest UndecidableInstances.
+
+To gather the right information, we can talk about the *usage* of a variable. Every
+variable is used either visibly or invisibly, and it is either not used at all,
+in a context where acceptance requires UndecidableInstances, or in a context that
+does not require UndecidableInstances. If a variable is used both visibly and
+invisibly, then we want to remember the fact that it was used invisibly: printing
+out invisibles will be helpful for the user to understand what is going on.
+If a variable is used where we need -XUndecidableInstances and where we don't,
+we can similarly just remember the latter.
+
+We thus define Visibility and NeedsUndecInstFlag below. These enumerations are
+*ordered*, and we used their Ord instances. We then define VarUsage, which is just a pair
+of a Visibility and a NeedsUndecInstFlag. (The visibility is irrelevant when a
+variable is NotPresent, but this extra slack in the representation causes no
+harm.) We finally define VarUsages as a mapping from variables to VarUsage.
+Its Monoid instance combines two maps, using the Semigroup instance of VarUsage
+to combine elements that are represented in both maps. In this way, we can
+compositionally analyze types (and portions thereof).
+
+To do the injectivity check:
+
+1. We build VarUsages that represent the LHS (rather, the portion of the LHS
+that is flagged as injective); each usage on the LHS is NotPresent, because we
+hvae not yet looked at the RHS.
+
+2. We also build a VarUsage for the RHS, done by injTyVarUsages.
+
+3. We then combine these maps. Now, every variable in the injective components of the LHS
+will be mapped to its correct usage (either NotPresent or perhaps needing
+-XUndecidableInstances in order to be seen as injective).
+
+4. We look up each var used in an injective argument on the LHS in
+the map, making a list of tvs that should be determined by the RHS
+but aren't.
+
+5. We then return the set of bad variables, whether any of the bad
+ones were used invisibly, and whether any bad ones need -XUndecidableInstances.
+If -XUndecidableInstances is enabled, than a var that needs the flag
+won't be bad, so it won't appear in this list.
+
+6. We use all this information to produce a nice error message, (a) switching
+on -fprint-explicit-kinds if appropriate and (b) telling the user about
+-XUndecidableInstances if appropriate.
+
+-}
+
+-- | Return the set of type variables that a type family equation is
+-- expected to be injective in but is not. Suppose we have @type family
+-- F a b = r | r -> a@. Then any variables that appear free in the first
+-- argument to F in an equation must be fixed by that equation's RHS.
+-- This function returns all such variables that are not indeed fixed.
+-- It also returns whether any of these variables appear invisibly
+-- and whether -XUndecidableInstances would help.
+-- See Note [Coverage condition for injective type families].
+unusedInjTvsInRHS :: DynFlags
+                  -> TyCon  -- type family
+                  -> [Type] -- LHS arguments
+                  -> Type   -- the RHS
+                  -> ( TyVarSet
+                     , Bool  -- True <=> one or more variable is used invisibly
+                     , Bool) -- True <=> suggest -XUndecidableInstances
+-- See Note [Verifying injectivity annotation] in FamInstEnv.
+-- This function implements check (4) described there, further
+-- described in Note [Coverage condition for injective type families].
+-- In theory (and modulo the -XUndecidableInstances wrinkle),
+-- instead of implementing this whole check in this way, we could
+-- attempt to unify equation with itself.  We would reject exactly the same
+-- equations but this method gives us more precise error messages by returning
+-- precise names of variables that are not mentioned in the RHS.
+unusedInjTvsInRHS dflags tycon@(tyConInjectivityInfo -> Injective inj_list) lhs rhs =
+  -- Note [Coverage condition for injective type families], step 5
+  (bad_vars, any_invisible, suggest_undec)
+    where
+      undec_inst = xopt LangExt.UndecidableInstances dflags
+
+      inj_lhs = filterByList inj_list lhs
+      lhs_vars = tyCoVarsOfTypes inj_lhs
+
+      rhs_inj_vars = fvVarSet $ injectiveVarsOfType undec_inst rhs
+
+      bad_vars = lhs_vars `minusVarSet` rhs_inj_vars
+
+      any_bad = not $ isEmptyVarSet bad_vars
+
+      invis_vars = fvVarSet $ invisibleVarsOfTypes [mkTyConApp tycon lhs, rhs]
+
+      any_invisible = any_bad && (bad_vars `intersectsVarSet` invis_vars)
+      suggest_undec = any_bad &&
+                      not undec_inst &&
+                      (lhs_vars `subVarSet` fvVarSet (injectiveVarsOfType True rhs))
+
+-- When the type family is not injective in any arguments
+unusedInjTvsInRHS _ _ _ _ = (emptyVarSet, False, False)
+
+---------------------------------------
+-- Producing injectivity error messages
+---------------------------------------
 
 -- | Type of functions that use error message and a list of axioms to build full
 -- error message (with a source location) for injective type families.
@@ -883,26 +976,28 @@ conflictInjInstErr conflictingEqns errorBuilder tyfamEqn
   = panic "conflictInjInstErr"
 
 -- | Build error message for equation with injective type variables unused in
--- the RHS.
-unusedInjectiveVarsErr :: Pair TyVarSet -> InjErrorBuilder -> CoAxBranch
+-- the RHS. Note [Coverage condition for injective type families], step 6
+unusedInjectiveVarsErr :: TyVarSet
+                       -> Bool   -- True <=> print invisible arguments
+                       -> Bool   -- True <=> suggest -XUndecidableInstances
+                       -> InjErrorBuilder -> CoAxBranch
                        -> (SDoc, SrcSpan)
-unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
+unusedInjectiveVarsErr tvs has_kinds undec_inst errorBuilder tyfamEqn
   = let (doc, loc) = errorBuilder (injectivityErrorHerald True $$ msg)
                                   [tyfamEqn]
     in (pprWithExplicitKindsWhen has_kinds doc, loc)
     where
-      tvs = invis_vars `unionVarSet` vis_vars
-      has_types = not $ isEmptyVarSet vis_vars
-      has_kinds = not $ isEmptyVarSet invis_vars
-
       doc = sep [ what <+> text "variable" <>
                   pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
                 , text "cannot be inferred from the right-hand side." ]
-      what = case (has_types, has_kinds) of
-               (True, True)   -> text "Type and kind"
-               (True, False)  -> text "Type"
-               (False, True)  -> text "Kind"
-               (False, False) -> pprPanic "mkUnusedInjectiveVarsErr" $ ppr tvs
+            $$ extra
+
+      what | has_kinds = text "Type/kind"
+           | otherwise = text "Type"
+
+      extra | undec_inst = text "Using UndecidableInstances might help"
+            | otherwise  = empty
+
       msg = doc $$ text "In the type family equation:"
 
 -- | Build error message for equation that has a type family call at the top

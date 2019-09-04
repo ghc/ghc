@@ -59,28 +59,30 @@ T6018fail.hs:53:15: error:
 
 T6018fail.hs:61:10: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k1’
+    cannot be inferred from the right-hand side.
     In the type family equation:
       PolyKindVarsF @{[k1]} @[k2] ('[] @k1) = '[] @k2
         -- Defined at T6018fail.hs:61:10
 
 T6018fail.hs:64:15: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k1’
+    cannot be inferred from the right-hand side.
     In the type family equation:
       PolyKindVars @[k1] @[k2] ('[] @k1) = '[] @k2
         -- Defined at T6018fail.hs:64:15
 
 T6018fail.hs:68:15: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k’ cannot be inferred from the right-hand side.
+    Type/kind variable ‘k’ cannot be inferred from the right-hand side.
     In the type family equation:
       forall k (a :: k) (b :: k).
         Fc @k a b = Int -- Defined at T6018fail.hs:68:15
 
 T6018fail.hs:72:15: error:
     Type family equation violates injectivity annotation.
-    Type and kind variables ‘k’, ‘a’, ‘b’
+    Type/kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     In the type family equation:
       forall k (a :: k) (b :: k).
@@ -136,7 +138,7 @@ T6018fail.hs:115:15: error:
 
 T6018fail.hs:120:15: error:
     Type family equation violates injectivity annotation.
-    Type and kind variables ‘k’, ‘c’
+    Type/kind variables ‘k’, ‘c’
     cannot be inferred from the right-hand side.
     In the type family equation:
       forall k a b (c :: k).

@@ -8713,16 +8713,16 @@ Haskell <http://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones
 Syntax of injectivity annotation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Injectivity annotation is added after type family head and consists of
+The injectivity annotation is added after the type family head and consists of
 two parts:
 
 -  a type variable that names the result of a type family. Syntax:
-   ``= tyvar`` or ``= (tyvar :: kind)``. Type variable must be fresh.
+   ``= tyvar`` or ``= (tyvar :: kind)``. The type variable must be fresh.
 
 -  an injectivity annotation of the form ``| A -> B``, where ``A`` is the
    result type variable (see previous bullet) and ``B`` is a list of
    argument type and kind variables in which type family is injective.
-   It is possible to omit some variables if type family is not injective
+   It is possible to omit some variables if the type family is not injective
    in them.
 
 Examples: ::
@@ -8738,15 +8738,15 @@ interpreted as associated type synonym default.
 
 .. _injective-ty-fams-typecheck:
 
-Verifying injectivity annotation against type family equations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Verifying the injectivity annotation against type family equations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the user declares type family to be injective GHC must verify that
-this declaration is correct, ie. type family equations don't violate the
+this declaration is correct, i.e., that type family equations don't violate the
 injectivity annotation. A general idea is that if at least one equation
 (bullets (1), (2) and (3) below) or a pair of equations (bullets (4) and
 (5) below) violates the injectivity annotation then a type family is not
-injective in a way user claims and an error is reported. In the bullets
+injective in a way the user claims and an error is reported. In the bullets
 below *RHS* refers to the right-hand side of the type family equation
 being checked for injectivity. *LHS* refers to the arguments of that
 type family equation. Below are the rules followed when checking
@@ -8765,7 +8765,10 @@ injectivity of a type family:
    on injective position
    in the RHS GHC reports that the type family is not injective.
    Injective position means either argument to a type constructor or
-   injective argument to a type family.
+   injective argument to a type family. Type inference can potentially
+   loop when looking under injective type families in the RHS, so this
+   requires :extension:`UndecidableInstances`; GHC suggests enabling
+   the flag when it is necessary.
 
 4. *Open type families* Open type families are typechecked
    incrementally. This means that when a module is imported type family

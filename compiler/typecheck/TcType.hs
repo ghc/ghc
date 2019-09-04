@@ -81,7 +81,7 @@ module TcType (
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidTy,
+  isRigidTy, isAlmostFunctionFree,
 
   ---------------------------------
   -- Misc type manipulators
@@ -2056,6 +2056,24 @@ isRigidTy ty
   | Just {} <- tcSplitAppTy_maybe ty        = True
   | isForAllTy ty                           = True
   | otherwise                               = False
+
+
+-- | Is this type *almost function-free*? See Note [Almost function-free]
+-- in TcRnTypes
+isAlmostFunctionFree :: TcType -> Bool
+isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
+isAlmostFunctionFree (TyVarTy {})    = True
+isAlmostFunctionFree (AppTy ty1 ty2) = isAlmostFunctionFree ty1 &&
+                                       isAlmostFunctionFree ty2
+isAlmostFunctionFree (TyConApp tc args)
+  | isTypeFamilyTyCon tc = False
+  | otherwise            = all isAlmostFunctionFree args
+isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
+isAlmostFunctionFree (FunTy _ ty1 ty2) = isAlmostFunctionFree ty1 &&
+                                         isAlmostFunctionFree ty2
+isAlmostFunctionFree (LitTy {})        = True
+isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
+isAlmostFunctionFree (CoercionTy {})   = True
 
 {-
 ************************************************************************

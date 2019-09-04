@@ -2027,11 +2027,12 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
      -- See Note [Verifying injectivity annotation] in FamInstEnv
     check_injectivity prev_branches cur_branch
       | Injective inj <- injectivity
-      = do { let conflicts =
+      = do { dflags <- getDynFlags
+           ; let conflicts =
                      fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
                                  ([], 0) prev_branches
            ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
-                   (makeInjectivityErrors ax cur_branch inj conflicts) }
+                   (makeInjectivityErrors dflags ax cur_branch inj conflicts) }
       | otherwise
       = return ()
 
@@ -2169,9 +2170,11 @@ checkFamPatBinders fam_tc qtvs pats rhs
        }
   where
     pat_tvs     = tyCoVarsOfTypes pats
-    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes pats
+    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
       -- See Note [Dodgy binding sites in type family instances]
+      -- NB: The False above is irrelevant, as we never have type families in
+      -- patterns.
       --
       -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
       -- since the order of `inj_pat_tvs` is never revealed in an error

@@ -29,10 +29,11 @@ import Type
 import TcType( transSuperClasses )
 import CoAxiom( TypeEqn )
 import Unify
-import FamInst( injTyVarsOfTypes )
 import InstEnv
 import VarSet
 import VarEnv
+import TyCoFVs
+import FV
 import Outputable
 import ErrUtils( Validity(..), allValid )
 import SrcLoc
@@ -550,7 +551,7 @@ oclose preds fixed_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
-    tv_fds  = [ (tyCoVarsOfTypes ls, injTyVarsOfTypes rs)
+    tv_fds  = [ (tyCoVarsOfTypes ls, fvVarSet $ injectiveVarsOfTypes True rs)
                   -- See Note [Care with type functions]
               | pred <- preds
               , pred' <- pred : transSuperClasses pred

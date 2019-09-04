@@ -160,16 +160,14 @@ data Ct
 
   | CTyEqCan {  -- tv ~ rhs
        -- Invariants:
-       --   * See Note [Applying the inert substitution] in TcFlatten
+       --   * See Note [inert_eqs: the inert equalities] in TcSMonad
        --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
        --   * rhs may have at most one top-level cast
-       --   * rhs (perhaps under the one cast) is not necessarily function-free,
-       --       but it has no top-level function.
-       --     E.g. a ~ [F b]  is fine
-       --     but  a ~ F b    is not
+       --   * rhs (perhaps under the one cast) is *almost function-free*,
+       --       See Note [Almost function-free]
        --   * If the equality is representational, rhs has no top-level newtype
        --     See Note [No top-level newtypes on RHS of representational
        --     equalities] in TcCanonical
@@ -288,6 +286,55 @@ CTyEqCan and CFunEqCan both require that the kind of the lhs matches the kind
 of the rhs. This is necessary because both constraints are used for substitutions
 during solving. If the kinds differed, then the substitution would take a well-kinded
 type to an ill-kinded one.
+
+Note [Almost function-free]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type is *almost function-free* if it has no type functions (something that
+responds True to isTypeFamilyTyCon), except (possibly)
+ * under a forall, or
+ * in a coercion (either in a CastTy or a CercionTy)
+
+The RHS of a CTyEqCan must be almost function-free. This is for two reasons:
+
+1. There cannot be a top-level function. If there were, the equality should
+   really be a CFunEqCan, not a CTyEqCan.
+
+2. Nested functions aren't too bad, on the other hand. However, consider this
+   scenario:
+
+     type family F a = r | r -> a
+
+     [D] F ty1 ~ fsk1
+     [D] F ty2 ~ fsk2
+     [D] fsk1 ~ [G Int]
+     [D] fsk2 ~ [G Bool]
+
+     type instance G Int = Char
+     type instance G Bool = Char
+
+   If it was the case that fsk1 = fsk2, then we could unifty ty1 and ty2 --
+   good! They don't look equal -- but if we aggressively reduce that G Int and
+   G Bool they would become equal. The "almost function free" makes sure that
+   these redexes are exposed.
+
+   Note that this equality does *not* depend on casts or coercions, and so
+   skipping these forms is OK. In addition, the result of a type family cannot
+   be a polytype, so skipping foralls is OK, too. We skip foralls because we
+   want the output of the flattener to be almost function-free. See Note
+   [Flattening under a forall] in TcFlatten.
+
+   As I (Richard E) write this, it is unclear if the scenario pictured above
+   can happen -- I would expect the G Int and G Bool to be reduced. But
+   perhaps it can arise somehow, and maintaining almost function-free is cheap.
+
+Historical note: CTyEqCans used to require only condition (1) above: that no
+type family was at the top of an RHS. But work on #16512 suggested that the
+injectivity checks were not complete, and adding the requirement that functions
+do not appear even in a nested fashion was easy (it was already true, but
+unenforced).
+
+The almost-function-free property is checked by isAlmostFunctionFree in TcType.
+The flattener (in TcFlatten) produces types that are almost function-free.
 
 -}
 
@@ -1637,8 +1684,7 @@ equality simplification, and type family reduction. (Why combine these? Because
 it's actually quite easy to mistake one for another, in sufficiently involved
 scenarios, like ConstraintKinds.)
 
-The flag -fcontext-stack=n (not very well named!) fixes the maximium
-level.
+The flag -freduction-depth=n fixes the maximium level.
 
 * The counter includes the depth of type class instance declarations.  Example:
      [W] d{7} : Eq [Int]

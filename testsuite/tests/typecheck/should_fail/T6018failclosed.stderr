@@ -24,7 +24,7 @@ T6018failclosed.hs:19:5: error:
 
 T6018failclosed.hs:25:5: error:
     • Type family equation violates injectivity annotation.
-      Type and kind variables ‘k1’, ‘b’
+      Type/kind variables ‘k1’, ‘b’
       cannot be inferred from the right-hand side.
       In the type family equation:
         forall k1 k2 (b :: k1) (c :: k2).
@@ -87,7 +87,7 @@ T6018failclosed.hs:61:3: error:
 
 T6018failclosed.hs:66:5: error:
     • Type family equation violates injectivity annotation.
-      Kind variable ‘k’ cannot be inferred from the right-hand side.
+      Type/kind variable ‘k’ cannot be inferred from the right-hand side.
       In the type family equation:
         forall k (a :: k) (b :: k).
           Gc @k a b = Int -- Defined at T6018failclosed.hs:66:5
