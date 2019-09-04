@@ -398,14 +398,6 @@ $tab          { warnTab }
     { token (ITcloseQuote UnicodeSyntax) }
 }
 
-  -- See Note [Lexing type applications]
-<0> {
-    [^ $idchar \) ] ^
-  "@"
-    / { ifExtension TypeApplicationsBit `alexAndPred` notFollowedBySymbol }
-    { token ITtypeApp }
-}
-
 <0> {
   "(|"
     / { ifExtension ArrowsBit `alexAndPred`
@@ -560,13 +552,6 @@ $tab          { warnTab }
 -- This, of course, conflicts with as-patterns. The conflict arises because
 -- expressions and patterns use the same parser, and also because we want
 -- to allow type patterns within expression patterns.
---
--- Disambiguation is accomplished by requiring *something* to appear between
--- type application and the preceding token. This something must end with
--- a character that cannot be the end of the variable bound in an as-pattern.
--- Currently (June 2015), this means that the something cannot end with a
--- $idchar or a close-paren. (The close-paren is necessary if the as-bound
--- identifier is symbolic.)
 --
 -- Note that looking for whitespace before the '@' is insufficient, because
 -- of this pathological case:
@@ -860,6 +845,91 @@ reservedWordsFM = listToUFM $
          ( "proc",           ITproc,          xbit ArrowsBit)
      ]
 
+data TokenSort =
+  TokenSort {
+    tok_sort_opening :: Bool,
+    tok_sort_closing :: Bool
+  } deriving (Show)
+
+opening_token_sort, closing_token_sort,
+  opening_closing_token_sort, default_token_sort :: TokenSort
+default_token_sort = TokenSort False False
+opening_token_sort = default_token_sort { tok_sort_opening = True }
+closing_token_sort = default_token_sort { tok_sort_closing = True }
+opening_closing_token_sort = TokenSort True True
+
+get_token_sort :: Token -> TokenSort
+
+-- Opening tokens:
+--   ( [ { [: (# (| [| [p| [t| [d| [||
+get_token_sort IToparen             = opening_token_sort
+get_token_sort ITobrack             = opening_token_sort
+get_token_sort ITocurly             = opening_token_sort
+get_token_sort ITopabrack           = opening_token_sort
+get_token_sort IToubxparen          = opening_token_sort
+get_token_sort (IToparenbar _)      = opening_token_sort
+get_token_sort (ITopenExpQuote _ _) = opening_token_sort
+get_token_sort ITopenPatQuote       = opening_token_sort
+get_token_sort ITopenTypQuote       = opening_token_sort
+get_token_sort ITopenDecQuote       = opening_token_sort
+get_token_sort (ITopenTExpQuote _)  = opening_token_sort
+
+-- Closing tokens:
+--   ) ] } :] #) |) |] ||]
+--   ?ipvar #lbl
+get_token_sort ITcparen             = closing_token_sort
+get_token_sort ITcbrack             = closing_token_sort
+get_token_sort ITccurly             = closing_token_sort
+get_token_sort ITcpabrack           = closing_token_sort
+get_token_sort ITcubxparen          = closing_token_sort
+get_token_sort (ITcparenbar _)      = closing_token_sort
+get_token_sort (ITcloseQuote _)     = closing_token_sort
+get_token_sort ITcloseTExpQuote     = closing_token_sort
+get_token_sort (ITdupipvarid _)     = closing_token_sort
+get_token_sort (ITlabelvarid _)     = closing_token_sort
+
+-- Opening and closing at the same time:
+--   varid ConId % :% Q.varid Q.ConId Q.% Q.:% _ ' '' `
+--   'x' "str" 55 0.3 'x'# "str"# 5# 5## 0.3# 0.3##
+get_token_sort (ITvarid  _)       = opening_closing_token_sort
+get_token_sort (ITconid  _)       = opening_closing_token_sort
+get_token_sort (ITvarsym _)       = opening_closing_token_sort
+get_token_sort (ITconsym _)       = opening_closing_token_sort
+get_token_sort (ITqvarid _)       = opening_closing_token_sort
+get_token_sort (ITqconid _)       = opening_closing_token_sort
+get_token_sort (ITqvarsym _)      = opening_closing_token_sort
+get_token_sort (ITqconsym _)      = opening_closing_token_sort
+get_token_sort ITunderscore       = opening_closing_token_sort
+get_token_sort ITsimpleQuote      = opening_closing_token_sort
+get_token_sort ITtyQuote          = opening_closing_token_sort
+get_token_sort ITbackquote        = opening_closing_token_sort
+get_token_sort (ITchar _ _)       = opening_closing_token_sort
+get_token_sort (ITstring _ _)     = opening_closing_token_sort
+get_token_sort (ITinteger _)      = opening_closing_token_sort
+get_token_sort (ITrational _)     = opening_closing_token_sort
+get_token_sort (ITprimchar _ _)   = opening_closing_token_sort
+get_token_sort (ITprimstring _ _) = opening_closing_token_sort
+get_token_sort (ITprimint _ _)    = opening_closing_token_sort
+get_token_sort (ITprimword _ _)   = opening_closing_token_sort
+get_token_sort (ITprimfloat _)    = opening_closing_token_sort
+get_token_sort (ITprimdouble _)   = opening_closing_token_sort
+
+-- pseudo-keywords
+get_token_sort ITas         = opening_closing_token_sort
+get_token_sort IThiding     = opening_closing_token_sort
+get_token_sort ITqualified  = opening_closing_token_sort
+get_token_sort ITfamily     = opening_closing_token_sort
+get_token_sort ITrole       = opening_closing_token_sort
+get_token_sort ITstock      = opening_closing_token_sort
+get_token_sort ITanyclass   = opening_closing_token_sort
+get_token_sort ITvia        = opening_closing_token_sort
+get_token_sort ITunit       = opening_closing_token_sort
+get_token_sort ITdependency = opening_closing_token_sort
+get_token_sort ITsignature  = opening_closing_token_sort
+
+-- Neither opening nor closing
+get_token_sort _ = default_token_sort
+
 {-----------------------------------
 Note [Lexing type pseudo-keywords]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -889,11 +959,8 @@ reservedSymsFM = listToUFM $
        ,("|",   ITvbar,                     NormalSyntax,  0 )
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("@",   ITat,                       NormalSyntax,  0 )
-       ,("~",   ITtilde,                    NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
        ,("-",   ITminus,                    NormalSyntax,  0 )
-       ,("!",   ITbang,                     NormalSyntax,  0 )
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -1959,6 +2026,9 @@ data ParserFlags = ParserFlags {
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
+data PendingState =
+  NoPendingState | PendingState (Maybe (RealLocated Token)) PState
+
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserFlags,
@@ -1967,7 +2037,9 @@ data PState = PState {
         messages   :: DynFlags -> Messages,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
+        last_tk_sort :: TokenSort,
         last_tk    :: Maybe Token,
+        pending_st :: PendingState,
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
         loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
@@ -2088,6 +2160,21 @@ setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
 
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
+
+setLastTokenSort :: TokenSort -> P ()
+setLastTokenSort tk_sort =
+ P $ \s -> POk s { last_tk_sort = tk_sort } ()
+
+getLastTokenSort :: P TokenSort
+getLastTokenSort = P $ \s -> POk s (last_tk_sort s)
+
+popPendingSt :: P (RealLocated Token) -> P (RealLocated Token)
+popPendingSt cont =
+  P $ \s ->
+    case pending_st s of
+      NoPendingState -> unP cont s
+      PendingState Nothing s' -> unP cont s'
+      PendingState (Just tk) s' -> POk s' tk
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
@@ -2458,7 +2545,9 @@ mkPStatePure options buf loc =
       messages      = const emptyMessages,
       tab_first     = Nothing,
       tab_count     = 0,
+      last_tk_sort  = default_token_sort,
       last_tk       = Nothing,
+      pending_st    = NoPendingState,
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
       loc           = loc,
@@ -2924,8 +3013,11 @@ topNoLayoutContainsCommas [] = False
 topNoLayoutContainsCommas (ALRLayout _ _ : ls) = topNoLayoutContainsCommas ls
 topNoLayoutContainsCommas (ALRNoLayout b _ : _) = b
 
-lexToken :: P (RealLocated Token)
-lexToken = do
+lexTokenWith
+  :: P a  -- on skip
+  -> (RealLocated Token -> P a) -- on token
+  -> P a
+lexTokenWith no_token ret_token = do
   inp@(AI loc1 buf) <- getInput
   sc <- getLexState
   exts <- getExts
@@ -2933,24 +3025,92 @@ lexToken = do
     AlexEOF -> do
         let span = mkRealSrcSpan loc1 loc1
         setLastToken span 0
-        return (L span ITeof)
+        setLastTokenSort default_token_sort
+        ret_token (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError loc1 loc2 buf "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
-        lexToken
+        setLastTokenSort default_token_sort
+        no_token
     AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
         let span = mkRealSrcSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        case unRealSrcSpan lt of
-          ITlineComment _  -> return lt
-          ITblockComment _ -> return lt
-          lt' -> do
-            setLastTk lt'
-            return lt
+        let t' = unRealSrcSpan lt
+        setLastTokenSort (get_token_sort t')
+        unless (isComment t') (setLastTk t')
+        ret_token lt
+
+lexToken :: P (RealLocated Token)
+lexToken =
+  popPendingSt $ do
+    (ltk_sort, L span tk) <- lex_token
+    case tk of
+      ITvarsym varsymStr -> do
+        exts <- getExts
+        P $ \sBeforeLookahead ->
+          case unP lex_pending_token sBeforeLookahead of
+            PFailed sFailed -> PFailed sFailed
+            POk sAfterLookahead ntk ->
+              let ntk_sort = last_tk_sort sAfterLookahead
+                  varsym_occ_sort = varsym_occurrence_sort ltk_sort ntk_sort
+                  tk' = L span $! varsym_override exts varsym_occ_sort varsymStr
+                  sRestored =
+                    const sBeforeLookahead $  -- FIXME (int-index)
+                                              -- turns out this caching is subtly incorrect,
+                                              -- needs invalidation elsewhere
+
+                    -- Restore the parsing state as it was before the lookahead,
+                    -- saving the post-lookahead state as pending to avoid recomputation.
+                    sBeforeLookahead { pending_st =
+                      PendingState ntk sAfterLookahead }
+              in POk sRestored tk'
+      x -> return (L span $! x)
+  where
+    lex_pending_token :: P (Maybe (RealLocated Token))
+    lex_pending_token = lexTokenWith (return Nothing) (return . Just)
+
+    -- lex a token, remembing the TokenSort of the immediately preceding token
+    lex_token :: P (TokenSort, RealLocated Token)
+    lex_token = do
+      ltk_sort <- getLastTokenSort
+      lexTokenWith lex_token (\tok -> return (ltk_sort, tok))
+
+data VarsymOccurrenceSort
+  = VarsymPrefix
+  | VarsymSuffix
+  | VarsymTightInfix
+  | VarsymLooseInfix
+  deriving (Eq, Show)
+
+varsym_occurrence_sort :: TokenSort -> TokenSort -> VarsymOccurrenceSort
+varsym_occurrence_sort prev_tok next_tok =
+    check (tok_sort_closing prev_tok) (tok_sort_opening next_tok)
+  where
+    check False True  = VarsymPrefix
+    check True  False = VarsymSuffix
+    check True  True  = VarsymTightInfix
+    check False False = VarsymLooseInfix
+
+varsym_override :: ExtsBitmap -> VarsymOccurrenceSort -> FastString -> Token
+varsym_override _ occ_sort s | s == fsLit "@" =
+  case occ_sort of
+    VarsymPrefix -> ITtypeApp -- Note [Lexing type applications]
+    VarsymSuffix -> ITat
+    VarsymTightInfix -> ITat
+    VarsymLooseInfix -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "!" =
+  case occ_sort of
+    VarsymPrefix -> ITbang
+    _ -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "~" =
+  case occ_sort of
+    VarsymPrefix -> ITtilde
+    _ -> ITvarsym s
+varsym_override _ _ s = ITvarsym s
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
