@@ -1104,6 +1104,10 @@ isHsValArg (HsValArg {})  = True
 isHsValArg (HsTypeArg {}) = False
 isHsValArg (HsArgPar {})  = False
 
+isHsTypeArg :: HsArg tm ty -> Bool
+isHsTypeArg (HsTypeArg {}) = True
+isHsTypeArg _              = False
+
 isArgPar :: HsArg tm ty -> Bool
 isArgPar (HsArgPar {})  = True
 isArgPar (HsValArg {})  = False
@@ -1283,6 +1287,14 @@ tcArgs :: LHsExpr GhcRn   -- ^ The function itself (for err msgs only)
        -> TcM (HsWrapper, [LHsExprArgOut], TcSigmaType)
           -- ^ (a wrapper for the function, the tc'd args, result type)
 tcArgs fun orig_fun_ty fun_orig orig_args herald
+  | fun_is_out_of_scope
+  , any isHsTypeArg orig_args
+  = failM  -- See Note [VTA for out-of-scope functions]
+    -- We have /already/ emitted a CHoleCan constraint (in tcInferFun),
+    -- which will later cough up a "Variable not in scope error", so
+    -- we can simply fail now, avoiding a confusing error cascade
+
+  | otherwise
   = go [] 1 orig_fun_ty orig_args
   where
     -- Don't count visible type arguments when determining how many arguments
@@ -1290,6 +1302,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     -- arguments reported as a part of the expression herald itself.
     -- See Note [Herald for matchExpectedFunTys] in TcUnify.
     orig_expr_args_arity = count isHsValArg orig_args
+
+    fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
+      = case fun of
+          L _ (HsUnboundVar {}) -> True
+          _                     -> False
 
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
@@ -1373,6 +1390,33 @@ GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
 in TyCoRep.
+
+Note [VTA for out-of-scope functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose 'wurble' is not in scope, and we have
+   (wurble @Int @Bool True 'x')
+
+Then the renamer will make (HsUnboundVar "wurble) for 'wurble',
+and the typechecker will typecheck it with tcUnboundId, giving it
+a type 'alpha', and emitting a deferred CHoleCan constraint, to
+be reported later.
+
+But then comes the visible type application. If we do nothing, we'll
+generate an immediate failure (in tc_app_err), saying that a function
+of type 'alpha' can't be applied to Bool.  That's insane!  And indeed
+users complain bitterly (#13834, #17150.)
+
+The right error is the CHoleCan, which reports 'wurble' as out of
+scope, and tries to give its type.
+
+Fortunately in tcArgs we still have acces to the function, so
+we can check if it is a HsUnboundVar.  If so, we simply fail
+immediately.  We've already inferred the type of the function,
+so we'll /already/ have emitted a CHoleCan constraint; failing
+preserves that constraint.
+
+A mild shortcoming of this approach is that we thereby
+don't typecheck any of the arguments, but so be it.
 
 Note [Visible type application zonk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1845,8 +1889,8 @@ tcUnboundId rn_expr unbound res_ty
       ; let ev = mkLocalId name ty
       ; can <- newHoleCt (ExprHole unbound) ev ty
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExtField (noLoc ev))
-                                                                          ty res_ty }
+      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
+          (HsVar noExtField (noLoc ev)) ty res_ty }
 
 
 {-
