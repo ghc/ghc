@@ -79,7 +79,7 @@ module TcSMonad (
 
     -- Inert CTyEqCans
     EqualCtList, findTyEqs, foldTyEqs, isInInertEqs,
-    lookupFlattenTyVar, lookupInertTyVar,
+    lookupInertTyVar,
 
     -- Inert solved dictionaries
     addSolvedDict, lookupSolvedDict,
@@ -230,7 +230,7 @@ It's very important to process equalities /first/:
 * (Kick-out) We want to apply this priority scheme to kicked-out
   constraints too (see the call to extendWorkListCt in kick_out_rewritable
   E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
-  homo-kinded when kicked out, and hence we want to priotitise it.
+  homo-kinded when kicked out, and hence we want to prioritise it.
 
 * (Derived equalities) Originally we tried to postpone processing
   Derived equalities, in the hope that we might never need to deal
@@ -254,6 +254,7 @@ So we arrange to put these particular class constraints in the wl_eqs.
   NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
+
 -}
 
 -- See Note [WorkList priorities]
@@ -703,8 +704,7 @@ The InertCans represents a collection of constraints with the following properti
     to the CTyEqCan equalities (modulo canRewrite of course;
     eg a wanted cannot rewrite a given)
 
-  * CTyEqCan equalities: see Note [Applying the inert substitution]
-                         in TcFlatten
+  * CTyEqCan equalities: see Note [inert_eqs: the inert equalities]
 
 Note [EqualCtList invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1459,25 +1459,6 @@ lookupInertTyVar ieqs tv
       Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq } : _ ) -> Just rhs
       _                                                        -> Nothing
 
-lookupFlattenTyVar :: InertEqs -> TcTyVar -> TcType
--- See Note [lookupFlattenTyVar]
-lookupFlattenTyVar ieqs ftv
-  = lookupInertTyVar ieqs ftv `orElse` mkTyVarTy ftv
-
-{- Note [lookupFlattenTyVar]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an injective function F and
-  inert_funeqs:   F t1 ~ fsk1
-                  F t2 ~ fsk2
-  inert_eqs:      fsk1 ~ fsk2
-
-We never rewrite the RHS (cc_fsk) of a CFunEqCan.  But we /do/ want to
-get the [D] t1 ~ t2 from the injectiveness of F.  So we look up the
-cc_fsk of CFunEqCans in the inert_eqs when trying to find derived
-equalities arising from injectivity.
--}
-
-
 {- *********************************************************************
 *                                                                      *
                    Inert instances: inert_insts
@@ -1663,7 +1644,7 @@ kick_out_rewritable new_fr new_tv
 
     kicked_out :: WorkList
     -- NB: use extendWorkList to ensure that kicked-out equalities get priority
-    -- See Note [Prioritise equality constraints] (Kick-out).
+    -- See Note [Prioritise equalities] (Kick-out).
     -- The irreds may include non-canonical (hetero-kinded) equality
     -- constraints, which perhaps may have become soluble after new_tv
     -- is substituted; ditto the dictionaries, which may include (a~b)

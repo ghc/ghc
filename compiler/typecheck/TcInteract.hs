@@ -1332,59 +1332,61 @@ improveLocalFunEqs work_ev inerts fam_tc args fsk
     || not (isImprovable work_ev)
   = return ()
 
-  | not (null improvement_eqns)
-  = do { traceTcS "interactFunEq improvements: " $
-         vcat [ text "Eqns:" <+> ppr improvement_eqns
-              , text "Candidates:" <+> ppr funeqs_for_tc
-              , text "Inert eqs:" <+> ppr ieqs ]
-       ; emitFunDepDeriveds improvement_eqns }
-
   | otherwise
-  = return ()
+  = do { eqns <- improvement_eqns
+       ; if not (null eqns)
+         then do { traceTcS "interactFunEq improvements: " $
+                   vcat [ text "Eqns:" <+> ppr eqns
+                        , text "Candidates:" <+> ppr funeqs_for_tc
+                        , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
+                 ; emitFunDepDeriveds eqns }
+         else return () }
 
   where
-    ieqs          = inert_eqs inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
-    rhs           = lookupFlattenTyVar ieqs fsk
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev
     fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
-    improvement_eqns :: [FunDepEqn CtLoc]
+    improvement_eqns :: TcS [FunDepEqn CtLoc]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmethic
-         concatMap (do_one_built_in ops) funeqs_for_tc
+        do { rhs <- rewriteTyVar fsk
+           ; concatMapM (do_one_built_in ops rhs) funeqs_for_tc }
 
       | Injective injective_args <- fam_inj_info
       =    -- Try improvement from type families with injectivity annotations
-        concatMap (do_one_injective injective_args) funeqs_for_tc
+        do { rhs <- rewriteTyVar fsk
+           ; concatMapM (do_one_injective injective_args rhs) funeqs_for_tc }
 
       | otherwise
-      = []
+      = return []
 
     --------------------
-    do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
-      = mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs
-                                             (lookupFlattenTyVar ieqs ifsk))
+    do_one_built_in ops rhs (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
+      = do { inert_rhs <- rewriteTyVar ifsk
+           ; return $ mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs inert_rhs) }
 
-    do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
+    do_one_built_in _ _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective inj_args (CFunEqCan { cc_tyargs = inert_args
-                                         , cc_fsk = ifsk, cc_ev = inert_ev })
+    do_one_injective inj_args rhs (CFunEqCan { cc_tyargs = inert_args
+                                             , cc_fsk = ifsk, cc_ev = inert_ev })
       | isImprovable inert_ev
-      , rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
-      = mk_fd_eqns inert_ev $
-            [ Pair arg iarg
-            | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+      = do { inert_rhs <- rewriteTyVar ifsk
+           ; return $ if rhs `tcEqType` inert_rhs
+                      then mk_fd_eqns inert_ev $
+                             [ Pair arg iarg
+                             | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+                      else [] }
       | otherwise
-      = []
+      = return []
 
-    do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
+    do_one_injective _ _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
     --------------------
     mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn CtLoc]
@@ -1915,16 +1917,16 @@ improveTopFunEqs ev fam_tc args fsk
   = return ()
 
   | otherwise
-  = do { ieqs <- getInertEqs
-       ; fam_envs <- getFamInstEnvs
-       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
-                                    (lookupFlattenTyVar ieqs fsk)
-       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr fsk
+  = do { fam_envs <- getFamInstEnvs
+       ; rhs <- rewriteTyVar fsk
+       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
+       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
        ; mapM_ (unifyDerived loc Nominal) eqns }
   where
-    loc = ctEvLoc ev  -- ToDo: this location is wrong; it should be FunDepOrigin2
-                      -- See #14778
+    loc = bumpCtLocDepth (ctEvLoc ev)
+        -- ToDo: this location is wrong; it should be FunDepOrigin2
+        -- See #14778
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType
@@ -2606,4 +2608,3 @@ matchLocalInst pred loc
         qtv_set = mkVarSet qtvs
         this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst qcis
-
