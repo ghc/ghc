@@ -12,7 +12,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 -- a concrete evidence for an equation.
 module PmOracle (
 
-        PmM, tracePm, mkPmId,
+        DsM, tracePm, mkPmId,
 
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
         lookupNumberOfRefinements,
@@ -81,11 +81,9 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
 import Data.Tuple
 
-type PmM = DsM
-
 -- Debugging Infrastructre
 
-tracePm :: String -> SDoc -> PmM ()
+tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
   dflags <- getDynFlags
   printer <- mkPrintUnqualifiedDs
@@ -93,7 +91,7 @@ tracePm herald doc = do
             Opt_D_dump_ec_trace (text herald $$ (nest 2 doc))
 
 -- | Generate a fresh `Id` of a given type
-mkPmId :: Type -> PmM Id
+mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
@@ -179,7 +177,7 @@ nameType name ty = do
 -- existential and term binders with fresh variables of appropriate type.
 -- Also returns instantiated evidence variables from the match and the types of
 -- strict constructor fields.
-mkOneConFull :: [Type] -> ConLike -> PmM ([Id], [EvVar], [Type], [TyVar])
+mkOneConFull :: [Type] -> ConLike -> DsM ([Id], [EvVar], [Type], [TyVar])
 --  * 'con' K is a ConLike
 --       - In the case of DataCons and most PatSynCons, these
 --         are associated with a particular TyCon T
@@ -223,7 +221,7 @@ mkOneConFull arg_tys con = do
       strict_arg_tys = filterByList arg_is_banged field_tys'
   return (vars, theta_ev_vars, strict_arg_tys, ex_tvs')
 
-equateTyVars :: [TyVar] -> [TyVar] -> PmM [EvVar]
+equateTyVars :: [TyVar] -> [TyVar] -> DsM [EvVar]
 equateTyVars ex_tvs1 ex_tvs2
   = ASSERT(ex_tvs1 `equalLength` ex_tvs2)
     catMaybes <$> zipWithM mb_to_evvar ex_tvs1 ex_tvs2
@@ -290,17 +288,17 @@ that we expect.
 --   3. 'tysAreNonVoid', checks if the given types have an inhabitant
 -- Functions like 'pmIsSatisfiable', 'nonVoid' and 'testInhabited' plug these
 -- together as they see fit.
-newtype SatisfiabilityCheck = SC (Delta -> PmM (Maybe Delta))
+newtype SatisfiabilityCheck = SC (Delta -> DsM (Maybe Delta))
 
 -- | Check the given 'Delta' for satisfiability by the the given
 -- 'SatisfiabilityCheck'. Return 'Just' a new, potentially extended, 'Delta' if
 -- successful, and 'Nothing' otherwise.
-runSatisfiabilityCheck :: Delta -> SatisfiabilityCheck -> PmM (Maybe Delta)
+runSatisfiabilityCheck :: Delta -> SatisfiabilityCheck -> DsM (Maybe Delta)
 runSatisfiabilityCheck delta (SC chk) = chk delta
 
 -- | Allowing easy composition of 'SatisfiabilityCheck's.
 instance Semigroup SatisfiabilityCheck where
-  -- This is @a >=> b@ from MaybeT PmM
+  -- This is @a >=> b@ from MaybeT DsM
   SC a <> SC b = SC c
     where
       c delta = a delta >>= \case
@@ -329,7 +327,7 @@ pmIsSatisfiable
   -> Bag TmVarCt -- ^ The new term constraints.
   -> Bag EvVar   -- ^ The new type constraints.
   -> [Type]      -- ^ The strict argument types.
-  -> PmM (Maybe Delta)
+  -> DsM (Maybe Delta)
                  -- ^ @'Just' delta@ if the constraints (@delta@) are
                  -- satisfiable, and each strict argument type is inhabitable.
                  -- 'Nothing' otherwise.
@@ -385,7 +383,7 @@ instance Outputable TopNormaliseTypeResult where
                                      , text "newtype_dcs =" <+> ppr ds
                                      , text "core_ty =" <+> ppr core_ty ])
 
-pmTopNormaliseType :: Bag EvVar -> Type -> PmM TopNormaliseTypeResult
+pmTopNormaliseType :: Bag EvVar -> Type -> DsM TopNormaliseTypeResult
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
 --      * data family redex
@@ -578,7 +576,7 @@ equalities (such as i ~ Int) that may be in scope.
 -- * Type oracle
 
 -- | Check whether a set of type constraints is satisfiable.
-tyOracle :: Bag EvVar -> PmM Bool
+tyOracle :: Bag EvVar -> DsM Bool
 tyOracle evs
   = do { ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability evs
        ; case res of
@@ -1029,7 +1027,7 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
 -- 'vi_cache', considering the current type information in 'Delta'.
 -- This check is necessary after having matched on a GADT con to weed out
 -- impossible matches.
-ensureAllPossibleMatchesInhabited :: Delta -> PmM (Maybe Delta)
+ensureAllPossibleMatchesInhabited :: Delta -> DsM (Maybe Delta)
 ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
   = runMaybeT (set_tm_cs_env delta <$> traverseSharedIdEnv go env)
   where
@@ -1042,7 +1040,7 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
 -- new type equalities arising from GADT matches.
 -- If successful, returns the new @delta@ and the fresh term variables, or
 -- @Nothing@ otherwise.
-refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> PmM (Maybe (Delta, [Id]))
+refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> DsM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 = runMaybeT $ do
   delta' <- trySolve delta x l []
   pure (markRefined delta' x, [])
@@ -1305,7 +1303,7 @@ instance Outputable InhabitationCandidate where
            , text "ic_ty_cs          =" <+> ppr ty_cs
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
-mkInhabitationCandidate :: Id -> ConLike -> PmM InhabitationCandidate
+mkInhabitationCandidate :: Id -> ConLike -> DsM InhabitationCandidate
 -- Precondition: idType x is a TyConApp, so that tyConAppArgs in here is safe.
 mkInhabitationCandidate x con = do
   let tc_args = tyConAppArgs (idType x)
@@ -1323,7 +1321,7 @@ mkInhabitationCandidate x con = do
 -- one accompanied by the term- and type- constraints it gives rise to.
 -- See also Note [Checking EmptyCase Expressions]
 inhabitationCandidates :: Delta -> Type
-                       -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
+                       -> DsM (Either Type (TyCon, Id, [InhabitationCandidate]))
 inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
   pmTopNormaliseType ty_cs ty >>= \case
     NoChange _                    -> alts_to_check ty     ty      []
@@ -1347,7 +1345,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType
     alts_to_check :: Type -> Type -> [(Type, DataCon)]
-                  -> PmM (Either Type (TyCon, Id, [InhabitationCandidate]))
+                  -> DsM (Either Type (TyCon, Id, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
       Just (tc, _)
         |  tc `elem` trivially_inhabited
@@ -1372,7 +1370,7 @@ inhabitationCandidates MkDelta{ delta_ty_cs = ty_cs } ty = do
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
 
-inhabitants :: Delta -> Type -> PmM (Either Type (Id, [Delta]))
+inhabitants :: Delta -> Type -> DsM (Either Type (Id, [Delta]))
 inhabitants delta ty = inhabitationCandidates delta ty >>= \case
   Left ty' -> pure (Left ty')
   Right (_, va, candidates) -> do
@@ -1435,7 +1433,7 @@ tysAreNonVoid rec_env strict_arg_tys = SC $ \delta -> do
 
 -- | Implements two performance optimizations, as described in
 -- @Note [Strict argument type constraints]@.
-checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> PmM Bool
+checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> DsM Bool
 checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
   let definitely_inhabited = definitelyInhabitedType (delta_ty_cs amb_cs)
   tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
@@ -1454,7 +1452,7 @@ nonVoid
   -> Delta        -- ^ The ambient term/type constraints (known to be
                   --   satisfiable).
   -> Type         -- ^ The strict argument type.
-  -> PmM Bool     -- ^ 'True' if the strict argument type might be inhabited by
+  -> DsM Bool     -- ^ 'True' if the strict argument type might be inhabited by
                   --   a terminating value (i.e., an 'InhabitationCandidate').
                   --   'False' if it is definitely uninhabitable by anything
                   --   (except bottom).
@@ -1479,7 +1477,7 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
     --
     -- See Note [Strict argument type constraints]
     cand_is_inhabitable :: RecTcChecker -> Delta
-                        -> InhabitationCandidate -> PmM Bool
+                        -> InhabitationCandidate -> DsM Bool
     cand_is_inhabitable rec_ts amb_cs
       (InhabitationCandidate{ ic_tm_cs          = new_tm_cs
                             , ic_ty_cs          = new_ty_cs
@@ -1497,7 +1495,7 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
 -- 2. @C@ has no strict argument types.
 --
 -- See the @Note [Strict argument type constraints]@.
-definitelyInhabitedType :: Bag EvVar -> Type -> PmM Bool
+definitelyInhabitedType :: Bag EvVar -> Type -> DsM Bool
 definitelyInhabitedType ty_cs ty = do
   res <- pmTopNormaliseType ty_cs ty
   pure $ case res of
@@ -1642,7 +1640,7 @@ on a list of strict argument types, we filter out all of the DI ones.
 -- @vs@ to compatible constructor applications or wildcards.
 -- Negative information is only retained if literals are involved or when
 -- for recursive GADTs.
-provideEvidenceForEquation :: [Id] -> Int -> Delta -> PmM [Delta]
+provideEvidenceForEquation :: [Id] -> Int -> Delta -> DsM [Delta]
 provideEvidenceForEquation = go init_ts
   where
     -- Choosing 1 here will not be enough for RedBlack, but any other bound
@@ -1703,7 +1701,7 @@ provideEvidenceForEquation = go init_ts
       -> Int          -- ^ The number of equations still to produce
       -> Id -> [Id]   -- ^ Head and tail of the value abstractions
       -> ConLike      -- ^ The ConLike over which to split
-      -> PmM [Delta]
+      -> DsM [Delta]
     split_at_con rec_ts delta n x xs cl = do
       -- This will be really similar to the ConVar case
       let (_,ex_tvs,_,_,_,_,_) = conLikeFullSig cl
@@ -1749,12 +1747,12 @@ isVanillaDataType ty = fromMaybe False $ do
 -- unhandled expressions.
 -- Turns (vanilla) String literals into list expressions, see
 -- Note [Literals in PmPat].
-representCoreExpr :: Delta -> CoreExpr -> PmM (Delta, Id)
+representCoreExpr :: Delta -> CoreExpr -> DsM (Delta, Id)
 representCoreExpr delta e = swap <$> runStateT (core_expr e) delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.
-    core_expr :: CoreExpr -> StateT Delta PmM Id
+    core_expr :: CoreExpr -> StateT Delta DsM Id
     -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
     core_expr (Cast e _co) = core_expr e
     core_expr (Tick _t e) = core_expr e
@@ -1785,15 +1783,15 @@ representCoreExpr delta e = swap <$> runStateT (core_expr e) delta
       where
         expr_ty = exprType e
 
-    data_con_app :: Type -> DataCon -> [Id] -> StateT Delta PmM Id
+    data_con_app :: Type -> DataCon -> [Id] -> StateT Delta DsM Id
     data_con_app ty dc args = pm_alt_con_app ty (PmAltConLike (RealDataCon dc)) args
 
-    pm_lit :: Type -> PmLit -> StateT Delta PmM Id
+    pm_lit :: Type -> PmLit -> StateT Delta DsM Id
     pm_lit ty lit = pm_alt_con_app ty (PmAltLit lit) []
 
     -- | Binds the given constructor application to a fresh 'Id' in the 'Delta'
     -- and returns the fresh id and extended Delta.
-    pm_alt_con_app :: Type -> PmAltCon -> [Id] -> StateT Delta PmM Id
+    pm_alt_con_app :: Type -> PmAltCon -> [Id] -> StateT Delta DsM Id
     pm_alt_con_app ty con args = StateT $ \delta -> do
       x <- mkPmId ty
       mb_delta' <- runMaybeT (trySolve delta x con args)

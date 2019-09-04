@@ -261,7 +261,7 @@ checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
     Right res -> dsPmWarn dflags ctxt res
 
 -- | Check a single pattern binding (let)
-checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> PmM PmResult
+checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
 checkSingle' locn var p = do
   resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
@@ -282,7 +282,7 @@ checkSingle' locn var p = do
 -- in @MultiIf@ expressions.
 checkGuardMatches :: HsMatchContext Name          -- Match context
                   -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
-                  -> PmM ()
+                  -> DsM ()
 checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
@@ -297,7 +297,7 @@ checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
 checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> PmM ()
+             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
 checkMatches dflags ctxt vars matches = do
   tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
@@ -315,7 +315,7 @@ checkMatches dflags ctxt vars matches = do
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
-checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> PmM PmResult
+checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
 checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
@@ -332,7 +332,7 @@ checkMatches' vars matches
                  , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
-       -> PmM ( [LMatch GhcTc (LHsExpr GhcTc)]
+       -> DsM ( [LMatch GhcTc (LHsExpr GhcTc)]
               , Uncovered
               , [LMatch GhcTc (LHsExpr GhcTc)])
     go []     missing = return ([], missing, [])
@@ -359,7 +359,7 @@ checkMatches' vars matches
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
 --   in "PmOracle" for details.
-checkEmptyCase' :: Id -> PmM PmResult
+checkEmptyCase' :: Id -> DsM PmResult
 checkEmptyCase' x = do
   delta         <- getPmDelta
   us <- inhabitants delta (idType x) >>= \case
@@ -370,7 +370,7 @@ checkEmptyCase' x = do
     Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
   pure (PmResult [] us [])
 
-getNFirstUncovered :: [Id] -> Int -> [Delta] -> PmM [Delta]
+getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
 getNFirstUncovered _    0 _              = pure []
 getNFirstUncovered _    _ []             = pure []
 getNFirstUncovered vars n (delta:deltas) = do
@@ -433,7 +433,7 @@ truePattern = nullaryConPattern (RealDataCon trueDataCon)
 {-# INLINE truePattern #-}
 
 -- | Generate a `canFail` pattern vector of a specific type
-mkCanFailPmPat :: Type -> PmM PatVec
+mkCanFailPmPat :: Type -> DsM PatVec
 mkCanFailPmPat ty = do
   var <- mkPmVar ty
   return [var, PmFake]
@@ -475,7 +475,7 @@ mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
 --          becomes       [PmVar z, PmGrd [PmPat (Just x), f y]]
 --          where z is fresh
 
-translatePat :: FamInstEnvs -> Pat GhcTc -> PmM PatVec
+translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = do
   dflags <- getDynFlags
   case pat of
@@ -612,13 +612,13 @@ translatePat fam_insts pat = do
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
-translatePatVec :: FamInstEnvs -> [Pat GhcTc] -> PmM [PatVec]
+translatePatVec :: FamInstEnvs -> [Pat GhcTc] -> DsM [PatVec]
 translatePatVec fam_insts pats = mapM (translatePat fam_insts) pats
 
 -- | Translate a constructor pattern
 translateConPatVec :: FamInstEnvs -> [Type] -> [TyVar]
                    -> ConLike -> HsConPatDetails GhcTc
-                   -> PmM PatVec
+                   -> DsM PatVec
 translateConPatVec fam_insts _univ_tys _ex_tvs _ (PrefixCon ps)
   = concat <$> translatePatVec fam_insts (map unLoc ps)
 translateConPatVec fam_insts _univ_tys _ex_tvs _ (InfixCon p1 p2)
@@ -674,7 +674,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
-               -> PmM (PatVec, [PatVec])
+               -> DsM (PatVec, [PatVec])
 translateMatch fam_insts (dL->L _ (Match { m_pats = lpats, m_grhss = grhss }))
   = do
       pats'   <- concat <$> translatePatVec fam_insts pats
@@ -694,12 +694,12 @@ translateMatch _ _ = panic "translateMatch"
 -- * Transform source guards (GuardStmt Id) to PmPats (Pattern)
 
 -- | Translate a list of guard statements to a pattern vector
-translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> PmM PatVec
+translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> DsM PatVec
 translateGuards fam_insts guards =
   concat <$> mapM (translateGuard fam_insts) guards
 
 -- | Check whether a pattern can fail to match
-cantFailPattern :: PmPat -> PmM Bool
+cantFailPattern :: PmPat -> DsM Bool
 cantFailPattern PmVar {}      = pure True
 cantFailPattern PmCon { pm_con_con = c, pm_con_arg_tys = tys, pm_con_args = ps}
   = (&&) <$> singleMatchConstructor c tys <*> allM cantFailPattern ps
@@ -707,7 +707,7 @@ cantFailPattern (PmGrd pv _e) = allM cantFailPattern pv
 cantFailPattern _             = pure False
 
 -- | Translate a guard statement to Pattern
-translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> PmM PatVec
+translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM PatVec
 translateGuard fam_insts guard = case guard of
   BodyStmt _   e _ _ -> translateBoolGuard e
   LetStmt  _   binds -> translateLet (unLoc binds)
@@ -720,18 +720,18 @@ translateGuard fam_insts guard = case guard of
   XStmtLR nec        -> noExtCon nec
 
 -- | Translate let-bindings
-translateLet :: HsLocalBinds GhcTc -> PmM PatVec
+translateLet :: HsLocalBinds GhcTc -> DsM PatVec
 translateLet _binds = return []
 
 -- | Translate a pattern guard
-translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> PmM PatVec
+translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM PatVec
 translateBind fam_insts (dL->L _ p) e = do
   ps <- translatePat fam_insts p
   g <- mkGuard ps (unLoc e)
   return [g]
 
 -- | Translate a boolean guard
-translateBoolGuard :: LHsExpr GhcTc -> PmM PatVec
+translateBoolGuard :: LHsExpr GhcTc -> DsM PatVec
 translateBoolGuard e
   | isJust (isTrueLHsExpr e) = return []
     -- The formal thing to do would be to generate (True <- True)
@@ -946,21 +946,21 @@ the paper. This Note serves as a reference for these new features.
 -- * More smart constructors and fresh variable generation
 
 -- | Create a guard pattern
-mkGuard :: PatVec -> HsExpr GhcTc -> PmM PmPat
+mkGuard :: PatVec -> HsExpr GhcTc -> DsM PmPat
 mkGuard pv e = PmGrd pv <$> dsExpr e
 
 -- | Generate a variable pattern of a given type
-mkPmVar :: Type -> PmM PmPat
+mkPmVar :: Type -> DsM PmPat
 mkPmVar ty = PmVar <$> mkPmId ty
 
 -- | Generate many variable patterns, given a list of types
-mkPmVars :: [Type] -> PmM PatVec
+mkPmVars :: [Type] -> DsM PatVec
 mkPmVars tys = mapM mkPmVar tys
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
 -- * A variable expression
-mkPmId2Forms :: Type -> PmM (PmPat, LHsExpr GhcTc)
+mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
   return (PmVar x, noLoc (HsVar noExtField (noLoc x)))
@@ -968,7 +968,7 @@ mkPmId2Forms ty = do
 -- | Check whether a 'PmAltCon' has the /single match/ property, i.e. whether
 -- it is the only possible match in the given context. See also
 -- 'allCompleteMatches' and Note [Single match constructors].
-singleMatchConstructor :: PmAltCon -> [Type] -> PmM Bool
+singleMatchConstructor :: PmAltCon -> [Type] -> DsM Bool
 singleMatchConstructor PmAltLit{}        _   = pure False
 singleMatchConstructor (PmAltConLike cl) tys =
   any isSingleton <$> allCompleteMatches (conLikeResTy cl tys)
@@ -1139,7 +1139,7 @@ patternArity _other_pat = 1
 
 Main functions are:
 
-* pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> PmM PartialResult
+* pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> DsM PartialResult
 
   This function implements functions `covered`, `uncovered` and
   `divergent` from the paper at once. Calls out to the auxilary function
@@ -1149,7 +1149,7 @@ Main functions are:
   clause covers SOMETHING or if it may forces ANY argument, we only store a
   boolean in both cases, for efficiency.
 
-* pmcheckGuards :: [PatVec] -> ValVec -> Delta -> PmM PartialResult
+* pmcheckGuards :: [PatVec] -> ValVec -> Delta -> DsM PartialResult
 
   Processes the guards.
 -}
@@ -1157,7 +1157,7 @@ Main functions are:
 -- | Lift a pattern matching action from a single value vector abstration to a
 -- value set abstraction, but calling it on every vector and combining the
 -- results.
-runMany :: (Delta -> PmM PartialResult) -> Uncovered -> PmM PartialResult
+runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
 runMany _  []     = return emptyPartialResult
 runMany pm (m:ms) = do
   res <- pm m
@@ -1165,7 +1165,7 @@ runMany pm (m:ms) = do
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`
-pmcheckI :: PatVec -> [PatVec] -> ValVec -> Int -> Delta -> PmM PartialResult
+pmcheckI :: PatVec -> [PatVec] -> ValVec -> Int -> Delta -> DsM PartialResult
 pmcheckI ps guards vva n delta = do
   m <- incrCheckPmIterDs
   tracePm "pmCheck" (ppr m <> colon
@@ -1180,12 +1180,12 @@ pmcheckI ps guards vva n delta = do
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> Int -> Delta -> PmM PartialResult
+pmcheckGuardsI :: [PatVec] -> Int -> Delta -> DsM PartialResult
 pmcheckGuardsI gvs n delta = incrCheckPmIterDs >> pmcheckGuards gvs n delta
 {-# INLINE pmcheckGuardsI #-}
 
 -- | Check the list of mutually exclusive guards
-pmcheckGuards :: [PatVec] -> Int -> Delta -> PmM PartialResult
+pmcheckGuards :: [PatVec] -> Int -> Delta -> DsM PartialResult
 pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
@@ -1208,7 +1208,7 @@ pmcheck
   -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
               --   See 6. in Note [Guards and Approximation]
   -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
-  -> PmM PartialResult
+  -> DsM PartialResult
 pmcheck [] guards [] n delta
   | null guards = return $ mempty { presultCovered = Covered }
   | otherwise   = pmcheckGuardsI guards n delta
@@ -1405,7 +1405,7 @@ genCaseTmCs1 _          _     _ = panic "genCaseTmCs1: HsCase"
 -- * Converting between Value Abstractions, Patterns and PmExpr
 
 -- | Convert a pattern vector to a list of 'PmExpr's by dropping the guards
-patVecToPmExprs :: PatVec -> PmM [(Id, Bag TmVarCt)]
+patVecToPmExprs :: PatVec -> DsM [(Id, Bag TmVarCt)]
 -- This is just a simple version of pmcheck to compute the Covered Delta
 -- (which pmcheck doesn't even attempt to keep).
 patVecToPmExprs = mapMaybeM pmPatToPmExpr
@@ -1413,7 +1413,7 @@ patVecToPmExprs = mapMaybeM pmPatToPmExpr
 -- | Convert a pattern to a 'PmExpr' (will be either 'Nothing' if the pattern is
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards
-pmPatToPmExpr :: PmPat -> PmM (Maybe (Id, Bag TmVarCt))
+pmPatToPmExpr :: PmPat -> DsM (Maybe (Id, Bag TmVarCt))
 pmPatToPmExpr   (PmVar { pm_var_id  = x }) = pure (Just (x, emptyBag))
 pmPatToPmExpr p@(PmCon { pm_con_con = con, pm_con_args = args }) = do
   x <- mkPmId (pmPatType p)
