@@ -1555,7 +1555,10 @@ dataTcOccs rdr_name
   = [rdr_name]
   where
     occ = rdrNameOcc rdr_name
-    rdr_name_tc = setRdrNameSpace rdr_name tcName
+    rdr_name_tc =
+      case rdr_name of
+        Unqual occ | occNameFS occ == fsLit "~" -> eqTyCon_RDR
+        _ -> setRdrNameSpace rdr_name tcName
 
 {-
 Note [dataTcOccs and Exact Names]

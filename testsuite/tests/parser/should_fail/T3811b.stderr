@@ -1,4 +1,4 @@
 
 T3811b.hs:4:14: error:
     Cannot parse data constructor in a data/newtype declaration:
-      ! B
+      !B
