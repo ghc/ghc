@@ -324,13 +324,13 @@ dnl ** Does target have runtime linker support?
 dnl --------------------------------------------------------------
 case "$target" in
     powerpc64-*|powerpc64le-*|powerpc-ibm-aix*)
-        HaskellHaveRTSLinker=NO
+        TargetHasRTSLinker=NO
         ;;
     *)
-        HaskellHaveRTSLinker=YES
+        TargetHasRTSLinker=YES
         ;;
 esac
-AC_SUBST(HaskellHaveRTSLinker)
+AC_SUBST(TargetHasRTSLinker)
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
 FP_FIND_ROOT

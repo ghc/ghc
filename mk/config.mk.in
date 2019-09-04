@@ -489,11 +489,10 @@ ArArgs = @ArArgs@
 HaskellTargetOs = @HaskellTargetOs@
 HaskellTargetArch = @HaskellTargetArch@
 TargetWordSize = @TargetWordSize@
-HaskellHaveGnuNonexecStack = @HaskellHaveGnuNonexecStack@
-HaskellHaveIdentDirective = @HaskellHaveIdentDirective@
-HaskellHaveSubsectionsViaSymbols = @HaskellHaveSubsectionsViaSymbols@
-HaskellHaveRTSLinker = @HaskellHaveRTSLinker@
-Unregisterised = @Unregisterised@
+TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
+TargetHasIdentDirective = @TargetHasIdentDirective@
+TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
+TargetHasRTSLinker = @TargetHasRTSLinker@
 TablesNextToCode = @TablesNextToCode@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@

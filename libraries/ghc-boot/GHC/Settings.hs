@@ -37,9 +37,9 @@ getTargetPlatform settingsFile mySettings = do
   targetOS <- readSetting "target os"
   targetWordSize <- readSetting "target word size"
   targetUnregisterised <- getBooleanSetting "Unregisterised"
-  targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
-  targetHasIdentDirective <- readSetting "target has .ident directive"
-  targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
+  targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
+  targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
+  targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
   crossCompiling <- getBooleanSetting "cross compiling"
 
   pure $ Platform
