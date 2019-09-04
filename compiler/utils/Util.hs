@@ -387,7 +387,7 @@ filterByLists _          _      _      = []
 -- to 'True' go to the left; elements corresponding to 'False' go to the right.
 -- For example, @partitionByList [True, False, True] [1,2,3] == ([1,3], [2])@
 -- This function does not check whether the lists have equal
--- length.
+-- length; when one list runs out, the function stops.
 partitionByList :: [Bool] -> [a] -> ([a], [a])
 partitionByList = go [] []
   where
