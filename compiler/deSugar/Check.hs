@@ -1396,6 +1396,10 @@ addPatTmCs ps xs k = do
 addVarPatVecCt :: Delta -> [Id] -> PatVec -> DsM (Maybe Delta)
 -- This is just a simple version of pmcheck to compute the Covered Delta
 -- (which pmcheck doesn't even attempt to keep).
+-- Also PmGrd, although having pattern arity 0, really stores important info.
+-- For example, as-patterns desugar to a plain variable match and an associated
+-- PmGrd for the RHS of the @. We don't currently look into that PmGrd and I'm
+-- not willing to duplicate any more of pmcheck.
 addVarPatVecCt delta (x:xs) (pat:pv)
   | patternArity pat == 1 -- PmVar or PmCon
   = runMaybeT $ do
