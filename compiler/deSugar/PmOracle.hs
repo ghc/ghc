@@ -46,6 +46,7 @@ import UniqDFM
 import Var           (EvVar)
 import Name
 import CoreSyn
+import CoreOpt (exprIsConApp_maybe)
 import CoreUtils (exprType)
 import MkCore (mkListExpr, mkCharExpr)
 import UniqSupply
@@ -1820,7 +1821,8 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
-      | Just (dc, args) <- splitDataConApp_maybe e -- TODO: exprIsConApp_maybe
+      | Just (_in_scope, _empty_floats@[], dc, _arg_tys, args)
+            <- exprIsConApp_maybe empty_in_scope e
       = traverse bind_expr args >>= data_con_app x dc
       -- TODO: Think about how to recognize PatSyns
       | Var y <- e, not (isDataConWorkId x)
@@ -1829,6 +1831,7 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
       = pure ()
       where
+        empty_in_scope = (emptyInScopeSet, const NoUnfolding)
         expr_ty = exprType e
         bind_expr e = do
           x <- lift (lift (mkPmId (exprType e)))
@@ -1848,16 +1851,3 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
 modifyT f = StateT $ fmap ((,) ()) . f
-
--- | Try to peel off the topmost 'DataCon' application.
-splitDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
-splitDataConApp_maybe (collectArgs -> (Var x, args))
-  | Just dc <- isDataConWorkId_maybe x
-  , let args' = last_n_term_args (dataConSourceArity dc) args
-  , lengthIs args' (dataConSourceArity dc)
-  = Just (dc, args')
-  where
-    is_not_type (Type _) = False
-    is_not_type _        = True
-    last_n_term_args n = reverse . take n . reverse . filter is_not_type
-splitDataConApp_maybe _ = Nothing
