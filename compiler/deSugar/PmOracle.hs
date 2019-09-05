@@ -1796,60 +1796,60 @@ isVanillaDataType ty = fromMaybe False $ do
   dcs <- tyConDataCons_maybe tc
   pure (all isVanillaDataCon dcs)
 
--- | Tries to peel off as many nested 'PmExprCon's from the given 'CoreExpr' as
--- possible, falling back to allocating fresh 'PmExprVar's representing
--- unhandled expressions.
--- Turns (vanilla) String literals into list expressions, see
--- Note [Literals in PmPat].
-addVarCoreCt :: Delta -> CoreExpr -> DsM (Delta, Id)
-addVarCoreCt delta e = swap <$> runStateT (core_expr e) delta
+-- | Most of our actions thread around a delta from one computation to the next,
+-- thereby potentially failing. This is expressed in the following Monad:
+type PmM a = StateT Delta (MaybeT DsM) a
+
+-- | Records that a variable @x@ is equal to a 'CoreExpr' @e@.
+addVarCoreCt :: Delta -> Id -> CoreExpr -> DsM (Maybe Delta)
+addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.
-    core_expr :: CoreExpr -> StateT Delta DsM Id
+    core_expr :: Id -> CoreExpr -> StateT Delta (MaybeT DsM) ()
     -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
-    core_expr (Cast e _co) = core_expr e
-    core_expr (Tick _t e) = core_expr e
-    core_expr e
+    core_expr x (Cast e _co) = core_expr x e
+    core_expr x (Tick _t e) = core_expr x e
+    core_expr x e
       | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
       , expr_ty `eqType` stringTy
       -- See Note [Literals in PmPat]
       = case unpackFS s of
           -- We need this special case to break a loop with coreExprAsPmLit
           -- Otherwise we alternate endlessly between [] and ""
-          [] -> data_con_app expr_ty nilDataCon []
-          s' -> core_expr (mkListExpr charTy (map mkCharExpr s'))
+          [] -> data_con_app x nilDataCon []
+          -- See Note [Literals in PmPat]
+          s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
-      = pm_lit expr_ty lit
-      | Just (dc, args) <- splitDataConApp_maybe e
-      = traverse core_expr args >>= data_con_app expr_ty dc
+      = pm_lit x lit
+      | Just (dc, args) <- splitDataConApp_maybe e -- TODO: exprIsConApp_maybe
+      = traverse bind_expr args >>= data_con_app x dc
       -- TODO: Think about how to recognize PatSyns
-      | Var x <- e, not (isDataConWorkId x)
-      = pure x
+      | Var y <- e, not (isDataConWorkId x)
+      = modifyT (\delta -> unify delta (x, y))
       | otherwise
-      -- We currently have no mechanism of proving equivalence of two HsExprs, so
-      -- generate a fresh representative each time. This is morally wrong, but
-      -- is the conservative thing to do.
-      -- We have to core_expr through Core because we need the type. Might be useful later
-      -- on, since we have infrastructure for deciding alpha equivalence of Core
-      -- terms.
-      = lift (mkPmId expr_ty)
+      -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
+      = pure ()
       where
         expr_ty = exprType e
+        bind_expr e = do
+          x <- lift (lift (mkPmId (exprType e)))
+          core_expr x e
+          pure x
 
-    data_con_app :: Type -> DataCon -> [Id] -> StateT Delta DsM Id
-    data_con_app ty dc args = pm_alt_con_app ty (PmAltConLike (RealDataCon dc)) args
+    data_con_app :: Id -> DataCon -> [Id] -> StateT Delta (MaybeT DsM) ()
+    data_con_app x dc args = pm_alt_con_app x (PmAltConLike (RealDataCon dc)) args
 
-    pm_lit :: Type -> PmLit -> StateT Delta DsM Id
-    pm_lit ty lit = pm_alt_con_app ty (PmAltLit lit) []
+    pm_lit :: Id -> PmLit -> StateT Delta (MaybeT DsM) ()
+    pm_lit x lit = pm_alt_con_app x (PmAltLit lit) []
 
-    -- | Binds the given constructor application to a fresh 'Id' in the 'Delta'
-    -- and returns the fresh id and extended Delta.
-    pm_alt_con_app :: Type -> PmAltCon -> [Id] -> StateT Delta DsM Id
-    pm_alt_con_app ty con args = StateT $ \delta -> do
-      x <- mkPmId ty
-      mb_delta' <- runMaybeT (trySolve delta x con args)
-      pure (x, expectJust "x was fresh" mb_delta')
+    -- | Adds the given constructor application as a solution for @x@.
+    pm_alt_con_app :: Id -> PmAltCon -> [Id] -> StateT Delta (MaybeT DsM) ()
+    pm_alt_con_app x con args = modifyT $ \delta -> trySolve delta x con args
+
+-- | Like 'modify', but with an effectful modifier action
+modifyT :: Monad m => (s -> m s) -> StateT s m ()
+modifyT f = StateT $ fmap ((,) ()) . f
 
 -- | Try to peel off the topmost 'DataCon' application.
 splitDataConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])

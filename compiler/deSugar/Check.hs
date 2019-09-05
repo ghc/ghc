@@ -18,7 +18,7 @@ module Check (
         checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
 
         -- See Note [Type and Term Equality Propagation]
-        addTyCsDs, genCaseTmCs1, genCaseTmCs2
+        addTyCsDs, addScrutTmCs, addPatTmCs
     ) where
 
 #include "HsVersions.h"
@@ -29,6 +29,7 @@ import PmExpr
 import PmOracle
 import PmPpr
 import CoreSyn (CoreExpr, Expr(Var))
+import CoreUtils (exprType)
 import FastString (unpackFS)
 import Unify( tcMatchTy )
 import DynFlags
@@ -61,6 +62,8 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
 import Control.Monad (forM, when, forM_)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Maybe
 import Coercion
 import TcEvidence
 import IOEnv
@@ -1226,7 +1229,8 @@ pmcheck (PmFake : ps) guards vva n delta =
   forces . mkCons delta <$> pmcheckI ps guards vva n delta
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
   tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
-  (delta', x) <- addVarCoreCt delta e
+  x <- mkPmId (exprType e)
+  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
@@ -1336,91 +1340,81 @@ f x = case x of
              (_:_) -> True
              []    -> False -- can't happen
 
-Functions `genCaseTmCs1' and `genCaseTmCs2' are responsible for generating
+Functions `addScrutTmCs' and `addPatTmCs' are responsible for generating
 these constraints.
 -}
 
+locallyExtendPmDelta :: (Delta -> DsM (Maybe Delta)) -> DsM a -> DsM a
+locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
+  -- If adding a constraint would lead to a contradiction, don't add it.
+  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
+  -- for why this is done.
+  Nothing     -> k
+  Just delta' -> updPmDelta delta' k
+
 -- | Add in-scope type constraints
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
-addTyCsDs ev_vars k = do
+addTyCsDs ev_vars =
+  locallyExtendPmDelta (\delta -> addTypeEvidence delta ev_vars)
+
+-- | Add equalities for the scrutinee to the local 'DsM' environment when
+-- checking a case expression:
+--     case e of x { matches }
+-- When checking matches we record that (x ~ e) where x is the initial
+-- uncovered. All matches will have to satisfy this equality.
+addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
+addScrutTmCs Nothing    [x] k = k
+addScrutTmCs (Just scr) [x] k = do
   delta <- getPmDelta
-  -- If adding a constraint would lead to a contradiction, don't add it.
-  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
-  -- for why this is done.
-  delta' <- fromMaybe delta <$> addTypeEvidence delta ev_vars
-  updPmDelta delta' k
+  scr_e <- dsLExpr scr
+  locallyExtendPmDelta (\delta -> addVarCoreCt delta x scr_e) k
+addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
 
--- | Add in-scope term constraints
-addTmVarCsDs :: [TmCt] -> DsM a -> DsM a
-addTmVarCsDs tm_cs k = do
-  delta <- getPmDelta
-  -- If adding a constraint would lead to a contradiction, don't add it.
-  -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
-  -- for why this is done.
-  delta' <- foldlMSkipNothing addTmCt delta tm_cs
-  updPmDelta delta' k
-
--- | Like 'foldlM', but continues with the old accumulator whenever the action
--- returns 'Nothing'.
-foldlMSkipNothing :: Monad m => (a -> b -> m (Maybe a)) -> a -> [b] -> m a
-foldlMSkipNothing f = foldlM (\acc x -> fromMaybe acc <$> f acc x)
-
--- | Add equalities to the local 'DsM' environment when checking a case
--- expression:
+-- | Add equalities to the local 'DsM' environment when checking the RHS of a
+-- case expression:
 --     case e of x { p1 -> e1; ... pn -> en }
--- When we go deeper to check e.g. e1 we record two equalities:
--- (x ~ e) and (x ~ p1).
-genCaseTmCs2 :: Maybe (LHsExpr GhcTc) -- Scrutinee
-             -> [Pat GhcTc]           -- LHS       (should have length 1)
-             -> [Id]                  -- MatchVars (should have length 1)
-             -> DsM a
-             -> DsM a
-genCaseTmCs2 Nothing _ _ k = k
-genCaseTmCs2 (Just scr) [p] [x] k = do
+-- When we go deeper to check e.g. e1 we record (x ~ p1).
+addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
+           -> [Id]                  -- MatchVars (should have length 1)
+           -> DsM a
+           -> DsM a
+-- Morally, this computes an approximation of the Covered set for p1
+-- (which pmcheck currently discards). TODO: Re-use pmcheck instead of calling
+-- out to awkard addVarPatVecCt.
+addPatTmCs [p] [x] k = do
   fam_insts <- dsGetFamInstEnvs
   pv <- translatePat fam_insts p
-  [(y, cts)] <- patVecToPmExprs pv
-  delta <- getPmDelta
-  scr_e <- dsLExpr scr
-  (delta', z) <- addVarCoreCt delta scr_e
-  let cts' = (TmVarVar x y : TmVarVar x z : bagToList cts)
-  updPmDelta delta' $ addTmVarCsDs cts' k
-genCaseTmCs2 _ _ _ _ = panic "genCaseTmCs2: HsCase"
-
--- | Add a simple equality to the local 'DsM' environment when checking a case
--- expression:
---     case x of { matches }
--- When checking matches we record that (x ~ y) where y is the initial
--- uncovered. All matches will have to satisfy this equality.
-genCaseTmCs1 :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
-genCaseTmCs1 Nothing     _  k = k
-genCaseTmCs1 (Just scr) [x] k = do
-  delta <- getPmDelta
-  scr_e <- dsLExpr scr
-  (delta', y) <- addVarCoreCt delta scr_e
-  updPmDelta delta' $ addTmVarCsDs [TmVarVar x y] k
-genCaseTmCs1 _          _     _ = panic "genCaseTmCs1: HsCase"
+  locallyExtendPmDelta (\delta -> addVarPatVecCt delta x pv) k
+addPatTmCs _ _ _ = panic "addPatTmCs: HsCase with pattern arity /= 1"
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr
 
--- | Convert a pattern vector to a list of 'PmExpr's by dropping the guards
-patVecToPmExprs :: PatVec -> DsM [(Id, Bag TmCt)]
+-- | Add a constraint equating a variable to a 'PatVec'. Picks out the single
+-- 'PmPat' of arity 1 and equates x to it. Returns the original Delta if that
+-- fails. Otherwise it returns Nothing when the resulting Delta would be
+-- unsatisfiable, or @Just delta'@ when the extended @delta'@ is still possibly
+-- satisfiable.
+addVarPatVecCt :: Delta -> Id -> PatVec -> DsM (Maybe Delta)
 -- This is just a simple version of pmcheck to compute the Covered Delta
 -- (which pmcheck doesn't even attempt to keep).
-patVecToPmExprs = mapMaybeM pmPatToPmExpr
+addVarPatVecCt delta x pv
+  | sum (map patternArity pv) == 1
+  , Just pat <- find ((== 1) . patternArity) pv
+  = addVarPatCt delta x pat -- pat is the single pattern with arity 1
+  | otherwise
+  = pure (Just delta)
 
 -- | Convert a pattern to a 'PmExpr' (will be either 'Nothing' if the pattern is
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards
-pmPatToPmExpr :: PmPat -> DsM (Maybe (Id, Bag TmCt))
-pmPatToPmExpr   (PmVar { pm_var_id  = x }) = pure (Just (x, emptyBag))
-pmPatToPmExpr p@(PmCon { pm_con_con = con, pm_con_args = args }) = do
-  x <- mkPmId (pmPatType p)
-  (ids, cts) <- unzip <$> patVecToPmExprs args
-  let cts' = TmVarCon x con ids `consBag` unionManyBags cts
-  pure (Just (x, cts'))
-pmPatToPmExpr _ = pure Nothing -- drop the guards
+addVarPatCt :: Delta -> Id -> PmPat -> DsM (Maybe Delta)
+addVarPatCt delta x   (PmVar { pm_var_id  = y }) = addTmCt delta (TmVarVar x y)
+addVarPatCt delta x p@(PmCon { pm_con_con = con, pm_con_args = args }) = runMaybeT $ do
+  arg_ids <- traverse (lift . mkPmId . pmPatType) args
+  delta' <- foldlM (\delta (y, arg) -> MaybeT (addVarPatCt delta y arg)) delta (zip arg_ids args)
+  MaybeT (addTmCt delta (TmVarCon x con arg_ids))
+addVarPatCt delta _ _pat = ASSERT( patternArity _pat == 0 ) pure (Just delta)
 
 {- Note [Literals in PmPat]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
