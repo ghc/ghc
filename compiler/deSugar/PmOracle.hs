@@ -211,7 +211,6 @@ mkOneConFull arg_tys con = do
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let field_tys' = substTys subst field_tys
   -- Instantiate fresh term variables (VAs) as arguments to the constructor
-  -- See Note [Ignoring required thetas seems suspicious]
   vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle

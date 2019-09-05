@@ -57,7 +57,7 @@ import Bag
 import TyCoRep
 import Type
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (isJust, expectJust, fromMaybe)
+import Maybes        (isJust, expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
@@ -1363,9 +1363,8 @@ addTyCsDs ev_vars =
 -- When checking matches we record that (x ~ e) where x is the initial
 -- uncovered. All matches will have to satisfy this equality.
 addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
-addScrutTmCs Nothing    [x] k = k
+addScrutTmCs Nothing    _   k = k
 addScrutTmCs (Just scr) [x] k = do
-  delta <- getPmDelta
   scr_e <- dsLExpr scr
   locallyExtendPmDelta (\delta -> addVarCoreCt delta x scr_e) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
@@ -1381,11 +1380,10 @@ addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
 -- Morally, this computes an approximation of the Covered set for p1
 -- (which pmcheck currently discards). TODO: Re-use pmcheck instead of calling
 -- out to awkard addVarPatVecCt.
-addPatTmCs [p] [x] k = do
+addPatTmCs ps xs k = do
   fam_insts <- dsGetFamInstEnvs
-  pv <- translatePat fam_insts p
-  locallyExtendPmDelta (\delta -> addVarPatVecCt delta x pv) k
-addPatTmCs _ _ _ = panic "addPatTmCs: HsCase with pattern arity /= 1"
+  pv <- concat <$> translatePatVec fam_insts ps
+  locallyExtendPmDelta (\delta -> addVarPatVecCt delta xs pv) k
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr
@@ -1395,25 +1393,28 @@ addPatTmCs _ _ _ = panic "addPatTmCs: HsCase with pattern arity /= 1"
 -- fails. Otherwise it returns Nothing when the resulting Delta would be
 -- unsatisfiable, or @Just delta'@ when the extended @delta'@ is still possibly
 -- satisfiable.
-addVarPatVecCt :: Delta -> Id -> PatVec -> DsM (Maybe Delta)
+addVarPatVecCt :: Delta -> [Id] -> PatVec -> DsM (Maybe Delta)
 -- This is just a simple version of pmcheck to compute the Covered Delta
 -- (which pmcheck doesn't even attempt to keep).
-addVarPatVecCt delta x pv
-  | sum (map patternArity pv) == 1
-  , Just pat <- find ((== 1) . patternArity) pv
-  = addVarPatCt delta x pat -- pat is the single pattern with arity 1
-  | otherwise
-  = pure (Just delta)
+addVarPatVecCt delta (x:xs) (pat:pv)
+  | patternArity pat == 1 -- PmVar or PmCon
+  = runMaybeT $ do
+      delta' <- MaybeT (addVarPatCt delta x pat)
+      MaybeT (addVarPatVecCt delta' xs pv)
+  | otherwise -- PmGrd or PmFake
+  = addVarPatVecCt delta (x:xs) pv
+addVarPatVecCt delta []     pv = ASSERT( patVecArity pv == 0 ) pure (Just delta)
+addVarPatVecCt _     (_:_)  [] = panic "More match vars than patterns"
 
 -- | Convert a pattern to a 'PmExpr' (will be either 'Nothing' if the pattern is
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards
 addVarPatCt :: Delta -> Id -> PmPat -> DsM (Maybe Delta)
-addVarPatCt delta x   (PmVar { pm_var_id  = y }) = addTmCt delta (TmVarVar x y)
-addVarPatCt delta x p@(PmCon { pm_con_con = con, pm_con_args = args }) = runMaybeT $ do
+addVarPatCt delta x (PmVar { pm_var_id  = y }) = addTmCt delta (TmVarVar x y)
+addVarPatCt delta x (PmCon { pm_con_con = con, pm_con_args = args }) = runMaybeT $ do
   arg_ids <- traverse (lift . mkPmId . pmPatType) args
   delta' <- foldlM (\delta (y, arg) -> MaybeT (addVarPatCt delta y arg)) delta (zip arg_ids args)
-  MaybeT (addTmCt delta (TmVarCon x con arg_ids))
+  MaybeT (addTmCt delta' (TmVarCon x con arg_ids))
 addVarPatCt delta _ _pat = ASSERT( patternArity _pat == 0 ) pure (Just delta)
 
 {- Note [Literals in PmPat]
