@@ -79,7 +79,6 @@ import Data.List     (find)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
-import Data.Tuple
 
 -- Debugging Infrastructre
 
@@ -1795,9 +1794,9 @@ isVanillaDataType ty = fromMaybe False $ do
   dcs <- tyConDataCons_maybe tc
   pure (all isVanillaDataCon dcs)
 
--- | Most of our actions thread around a delta from one computation to the next,
+-- Most of our actions thread around a delta from one computation to the next,
 -- thereby potentially failing. This is expressed in the following Monad:
-type PmM a = StateT Delta (MaybeT DsM) a
+-- type PmM a = StateT Delta (MaybeT DsM) a
 
 -- | Records that a variable @x@ is equal to a 'CoreExpr' @e@.
 addVarCoreCt :: Delta -> Id -> CoreExpr -> DsM (Maybe Delta)
