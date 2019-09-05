@@ -8,10 +8,16 @@
 --
 -------------------------------------------------------------------------------
 
-module PlatformConstants (PlatformConstants(..)) where
+module PlatformConstants
+  ( PlatformConstants(..)
+  , HasPlatformConstants(..)
+#include "GHCConstantsHaskellExports.hs"
+  ) where
 
 import GhcPrelude
 
 -- Produced by deriveConstants
 #include "GHCConstantsHaskellType.hs"
 
+-- Produced by deriveConstants
+#include "GHCConstantsHaskellWrappers.hs"
