@@ -23,6 +23,7 @@ import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)
 
+import BasicTypes (Origin(FromSource))
 import DynFlags
 import Check (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import DsMonad
@@ -127,7 +128,10 @@ matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     dflags <- getDynFlags
     match_result <-
       -- See Note [Type and Term Equality Propagation] in Check
-      applyWhen (needToRunPmCheck dflags)
+      applyWhen (needToRunPmCheck dflags FromSource)
+                -- FromSource might not be accurate, but at worst
+                -- we do superfluous calls to the pattern match
+                -- oracle.
                 (addTyCsDs dicts . addScrutTmCs (Just bind_rhs) [match_var] . addPatTmCs [upat] [match_var])
                 (matchGuards stmts ctx rhs rhs_ty)
     core_rhs <- dsLExpr bind_rhs

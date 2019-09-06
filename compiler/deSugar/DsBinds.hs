@@ -186,7 +186,10 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- applyWhen (needToRunPmCheck dflags)
+  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
+                               -- FromSource might not be accurate, but at worst
+                               -- we do superfluous calls to the pattern match
+                               -- oracle.
                                -- addTyCsDs: push type constraints deeper
                                --            for inner pattern match check
                                -- See Check, Note [Type and Term Equality Propagation]

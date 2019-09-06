@@ -737,8 +737,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         -- Pattern match check warnings for /this match-group/
-        ; unless (isGenerated origin) $
-          when (isMatchContextPmChecked dflags ctxt) $
+        ; when (isMatchContextPmChecked dflags origin ctxt) $
             addScrutTmCs mb_scr new_vars $
             -- See Note [Type and Term Equality Propagation]
             checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
@@ -757,7 +756,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
               -- Extend the environment with knowledge about
               -- the matches before desguaring the RHS
               -- See Note [Type and Term Equality Propagation]
-              applyWhen (needToRunPmCheck dflags)
+              applyWhen (needToRunPmCheck dflags origin)
                         (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
                         (dsGRHSs ctxt grhss rhs_ty)
 

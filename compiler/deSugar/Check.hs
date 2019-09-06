@@ -29,6 +29,7 @@ import GhcPrelude
 import PmExpr
 import PmOracle
 import PmPpr
+import BasicTypes (Origin, isGenerated)
 import CoreSyn (CoreExpr, Expr(Var))
 import CoreUtils (exprType)
 import FastString (unpackFS)
@@ -1456,14 +1457,21 @@ constructor we get the following:
 -- | Check whether any part of pattern match checking is enabled for this
 -- 'HsMatchContext' (does not matter whether it is the redundancy check or the
 -- exhaustiveness check).
-isMatchContextPmChecked :: DynFlags -> HsMatchContext id -> Bool
-isMatchContextPmChecked dflags kind
+isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
+isMatchContextPmChecked dflags origin kind
+  | isGenerated origin
+  = False
+  | otherwise
   = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
 
 -- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
 -- are enabled, in which case we need to run the pattern match checker.
-needToRunPmCheck :: DynFlags -> Bool
-needToRunPmCheck dflags = notNull (filter (`wopt` dflags) allPmCheckWarnings)
+needToRunPmCheck :: DynFlags -> Origin -> Bool
+needToRunPmCheck dflags origin
+  | isGenerated origin
+  = False
+  | otherwise
+  = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
