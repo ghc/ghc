@@ -44,6 +44,7 @@ module GHC.Unit.Types
    , stringToUnit
    , stableUnitCmp
    , unitIsDefinite
+   , wiredInUnitIds
 
      -- * Unit Ids
    , unitIdString
@@ -73,7 +74,6 @@ module GHC.Unit.Types
    , interactiveUnit
 
    , isInteractiveModule
-   , wiredInUnitIds
 
      -- * Boot modules
    , IsBootInterface (..)
