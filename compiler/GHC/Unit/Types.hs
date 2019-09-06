@@ -73,7 +73,6 @@ module GHC.Unit.Types
    , interactiveUnit
 
    , isInteractiveModule
-   , wiredInUnitIds
 
      -- * Boot modules
    , IsBootInterface (..)
