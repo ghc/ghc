@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-static const EventLogWriter *event_log_writer;
+static const EventLogWriter *event_log_writer = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
@@ -254,6 +254,7 @@ stopEventLogWriter(void)
     if (event_log_writer != NULL &&
             event_log_writer->stopEventLogWriter != NULL) {
         event_log_writer->stopEventLogWriter();
+        event_log_writer = NULL;
     }
 }
 
@@ -472,15 +473,21 @@ postHeaderEvents(void)
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
 }
 
-void
-initEventLogging(const EventLogWriter *ev_writer)
+static uint32_t
+get_n_capabilities(void)
 {
-    uint32_t n_caps;
+#if defined(THREADED_RTS)
+    // XXX n_capabilities may not have been initialized yet
+    return (n_capabilities != 0) ? n_capabilities : RtsFlags.ParFlags.nCapabilities;
+#else
+    return 1;
+#endif
+}
 
+void
+initEventLogging()
+{
     init_event_types();
-
-    event_log_writer = ev_writer;
-    initEventLogWriter();
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
@@ -496,18 +503,23 @@ initEventLogging(const EventLogWriter *ev_writer)
      * Use a single buffer to store the header with event types, then flush
      * the buffer so all buffers are empty for writing events.
      */
-#if defined(THREADED_RTS)
-    // XXX n_capabilities hasn't been initialized yet
-    n_caps = RtsFlags.ParFlags.nCapabilities;
-#else
-    n_caps = 1;
-#endif
-    moreCapEventBufs(0, n_caps);
+    moreCapEventBufs(0, get_n_capabilities());
 
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
 #if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
 #endif
+}
+
+bool
+startEventLogging(const EventLogWriter *ev_writer)
+{
+    if (event_log_writer) {
+        return false;
+    }
+
+    event_log_writer = ev_writer;
+    initEventLogWriter();
 
     postHeaderEvents();
 
@@ -518,9 +530,10 @@ initEventLogging(const EventLogWriter *ev_writer)
      */
     printAndClearEventBuf(&eventBuf);
 
-    for (uint32_t c = 0; c < n_caps; ++c) {
+    for (uint32_t c = 0; c < get_n_capabilities(); ++c) {
         postBlockMarker(&capEventBuf[c]);
     }
+    return true;
 }
 
 void
