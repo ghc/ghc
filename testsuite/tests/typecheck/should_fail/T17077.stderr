@@ -1,0 +1,5 @@
+
+T17077.hs:7:13: error:
+    • Expected kind ‘forall (k :: k1). a’, but ‘z’ has kind ‘k0’
+    • In the first argument of ‘Proxy’, namely ‘(z :: forall k. a)’
+      In the type signature: t :: Proxy (z :: forall k. a)
