@@ -393,3 +393,6 @@ test('keep-cafs',
 
 test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
+test('InitEventLogging',
+     [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
+     compile_and_run, ['-eventlog InitEventLogging_c.c'])
