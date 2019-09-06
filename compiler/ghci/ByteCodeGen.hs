@@ -1219,7 +1219,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes dflags a_reps_sizeW
          a_reps_pushed_RAW
-            | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidRep
+            | null a_reps_pushed_r_to_l || not (isVoidRep (head a_reps_pushed_r_to_l))
             = panic "ByteCodeGen.generateCCall: missing or invalid World token?"
             | otherwise
             = reverse (tail a_reps_pushed_r_to_l)
@@ -1904,7 +1904,8 @@ atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 -- #12128:
 -- A case expression can be an atom because empty cases evaluate to bottom.
 -- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
-atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == [LiftedRep]) LiftedRep
+atomPrimRep (AnnCase _ _ ty _)      =
+  ASSERT(case typePrimRep ty of [LiftedRep] -> True; _ -> False) LiftedRep
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate' other))
 
