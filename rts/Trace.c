@@ -40,21 +40,12 @@ int TRACE_cap;
 static Mutex trace_utx;
 #endif
 
-static bool eventlog_enabled;
-
 /* ---------------------------------------------------------------------------
    Starting up / shutting down the tracing facilities
  --------------------------------------------------------------------------- */
 
-static const EventLogWriter *getEventLogWriter(void)
-{
-    return rtsConfig.eventlog_writer;
-}
-
 void initTracing (void)
 {
-    const EventLogWriter *eventlog_writer = getEventLogWriter();
-
 #if defined(THREADED_RTS)
     initMutex(&trace_utx);
 #endif
@@ -95,15 +86,14 @@ void initTracing (void)
         TRACE_spark_full ||
         TRACE_user;
 
-    eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG &&
-                        eventlog_writer != NULL;
-
     /* Note: we can have any of the TRACE_* flags turned on even when
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
      */
+    initEventLogging();
 
-    if (eventlog_enabled) {
-        initEventLogging(eventlog_writer);
+    if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG
+            && rtsConfig.eventlog_writer != NULL) {
+        startEventLogging(rtsConfig.eventlog_writer);
     }
 }
 
@@ -121,17 +111,10 @@ void freeTracing (void)
     }
 }
 
+// Used to reset tracing in a forked child
 void resetTracing (void)
 {
-    const EventLogWriter *eventlog_writer;
-    eventlog_writer = getEventLogWriter();
-
-    if (eventlog_enabled) {
-        abortEventLogging(); // abort eventlog inherited from parent
-        if (eventlog_writer != NULL) {
-            initEventLogging(eventlog_writer); // child starts its own eventlog
-        }
-    }
+    restartEventLogging();
 }
 
 void flushTrace (void)
