@@ -190,7 +190,7 @@ written through a custom :c:type:`EventLogWriter`:
 
     .. c:member:: bool writeEventLog(void *eventlog, size_t eventlog_size)
 
-        Hands buffered event log data to your event log writer.
+        Hands buffered event log data to your event log writer. Return true on success.
         Required for a custom :c:type:`EventLogWriter`.
 
     .. c:member:: void flushEventLog(void)
@@ -201,6 +201,24 @@ written through a custom :c:type:`EventLogWriter`:
     .. c:member:: void stopEventLogWriter(void)
 
         Called when event logging is about to stop. This can be ``NULL``.
+
+To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
+
+.. c:func:: enum EventLogStatus eventLogStatus(void)
+
+   Query whether the current runtime system supports the eventlog (e.g. whether
+   the current executable was linked with :ghc-flag:`-eventlog`) and, if it
+   is supported, whether it is currently logging.
+
+.. c:func:: bool startEventLogging(const EventLogWriter *writer)
+
+   Start logging events to the given :c:type:`EventLogWriter`. Returns true on
+   success or false is another writer has already been configured.
+
+.. c:func:: void endEventLogging()
+
+   Tear down the active :c:type:`EventLogWriter`.
+
 
 .. _rts-options-misc:
 
