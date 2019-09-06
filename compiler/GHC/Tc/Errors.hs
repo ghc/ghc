@@ -2174,7 +2174,7 @@ sameOccExtra ty1 ty2
       | otherwise  -- Imported things have an UnhelpfulSrcSpan
       = hang (quotes (ppr nm))
            2 (sep [ text "is defined in" <+> quotes (ppr (moduleName mod))
-                  , ppUnless (same_pkg || pkg == mainUnitId) $
+                  , ppUnless (same_pkg || pkg == mainUnit) $
                     nest 4 $ text "in package" <+> quotes (ppr pkg) ])
        where
          pkg = moduleUnit mod
