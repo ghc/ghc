@@ -685,9 +685,9 @@ static void report_summary(const RTSSummaryStats* sum)
     showStgWord64(stats.max_slop_bytes, temp, true/*commas*/);
     statsPrintf("%16s bytes maximum slop\n", temp);
 
-    statsPrintf("%16" FMT_Word64 " MB total memory in use (%"
+    statsPrintf("%16" FMT_Word64 " MiB total memory in use (%"
                 FMT_Word64 " MB lost due to fragmentation)\n\n",
-                stats.max_live_bytes  / (1024 * 1024),
+                stats.max_mem_in_use_bytes  / (1024 * 1024),
                 sum->fragmentation_bytes / (1024 * 1024));
 
     /* Print garbage collections in each gen */
