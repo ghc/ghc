@@ -121,6 +121,8 @@ module TyCon(
         primRepSizeB,
         primElemRepSizeB,
         primRepIsFloat,
+        primRepsCoercible1,
+        primRepsCoercible,
 
         -- * Recursion breaking
         RecTcChecker, initRecTc, defaultRecTcMaxBound,
@@ -1422,7 +1424,7 @@ data PrimRep
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
-  deriving( Eq, Show )
+  deriving( Show )
 
 data PrimElemRep
   = Int8ElemRep
@@ -1451,6 +1453,21 @@ isGcPtrRep :: PrimRep -> Bool
 isGcPtrRep LiftedRep   = True
 isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
+
+-- See Note [bad unsafe coercion] in CoreLint
+primRepsCoercible1 :: DynFlags -> PrimRep -> PrimRep -> Bool
+primRepsCoercible1 dflags rep1 rep2 =
+    (isUnboxed rep1 == isUnboxed rep2) &&
+    (primRepSizeB dflags rep1 == primRepSizeB dflags rep2) &&
+    (primRepIsFloat rep1 == primRepIsFloat rep2)
+  where
+    isUnboxed = not . isGcPtrRep
+
+-- See Note [bad unsafe coercion] in CoreLint
+primRepsCoercible :: DynFlags -> [PrimRep] -> [PrimRep] -> Bool
+primRepsCoercible dflags reps1 reps2 =
+    length reps1 == length reps2 &&
+    and (zipWith (primRepsCoercible1 dflags) reps1 reps2)
 
 -- | The size of a 'PrimRep' in bytes.
 --
