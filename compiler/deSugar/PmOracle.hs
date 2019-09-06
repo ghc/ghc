@@ -206,7 +206,6 @@ mkOneConFull arg_tys con = do
   -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
-  subst_univ `seq` return ()
   -- Instantiate fresh existentials as arguments to the contructor
   (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let field_tys' = substTys subst field_tys
@@ -730,7 +729,7 @@ data VarInfo
   -- Sadly, we can't store this info in the Check module, as it's tightly coupled
   -- to the particular 'Delta' and also is per *representative*, not per
   -- syntactic variable. Note that this number does not always correspond to the
-  -- length of solutions: 'trySolve' might add a solution without
+  -- length of solutions: 'addVarConCt' might add a solution without
   -- incurring the potential exponential blowup by ConVar.
   }
 
@@ -788,14 +787,14 @@ oracle) contradictory. This implies a few invariants:
   detect this, but we could just compare whole COMPLETE sets to vi_neg every
   time, if it weren't for performance.
 
-Maintaining these invariants in 'unify' (the core of the term oracle) and
+Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
 'addRefutableAltCon' is subtle.
 * Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
   - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
     @x /~ [True,False]@. This is vacuous by matter of comparing to the vanilla
     COMPLETE set, so should refute.
   - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
-* Adding positive information. Example: Add the fact @x ~ K ys@ (see 'trySolve')
+* Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addVarConCt')
   - (Neg) If we had @x /~ K@, refute.
   - (Pos) If we had @x ~ K2@, and that contradicts the new solution according to
     'eqPmAltCon' (ex. K2 is [] and K is (:)), then refute.
@@ -809,7 +808,7 @@ Maintaining these invariants in 'unify' (the core of the term oracle) and
     @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the vanilla
     COMPLETE set, so should refute.
 
-Note that merging VarInfo in equate can be done by calling out to 'trySolve' and
+Note that merging VarInfo in equate can be done by calling out to 'addVarConCt' and
 'addRefutableAltCon' for each of the facts individually.
 -}
 
@@ -937,8 +936,8 @@ addTypeEvidence delta dicts
 -- See Note [TmState invariants].
 addTmCt :: Delta -> TmCt -> DsM (Maybe Delta)
 addTmCt delta ct = runMaybeT $ case ct of
-  TmVarVar x y        -> unify delta (x, y)
-  TmVarCon x con args -> trySolve delta x con args
+  TmVarVar x y        -> addVarVarCt delta (x, y)
+  TmVarCon x con args -> addVarConCt delta x con args
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
@@ -1094,7 +1093,7 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
 -- @Nothing@ otherwise.
 refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> DsM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 = runMaybeT $ do
-  delta' <- trySolve delta x l []
+  delta' <- addVarConCt delta x l []
   pure (markRefined delta' x, [])
 refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   -- The plan for ConLikes:
@@ -1263,8 +1262,8 @@ arises in the first place!
 -- has integrated the knowledge from the equality constraint.
 --
 -- See Note [TmState invariants].
-unify :: Delta -> (Id, Id) -> MaybeT DsM Delta
-unify delta@MkDelta{ delta_tm_cs = TS env } (x, y)
+addVarVarCt :: Delta -> (Id, Id) -> MaybeT DsM Delta
+addVarVarCt delta@MkDelta{ delta_tm_cs = TS env } (x, y)
   -- It's important that we never @equate@ two variables of the same equivalence
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
@@ -1297,7 +1296,7 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
         let env_refs = setEntrySDIE env_ind y vi_y'
         let delta_refs = delta{ delta_tm_cs = TS env_refs }
         -- and then gradually merge every positive fact we have on x into y
-        let add_fact delta (cl, args) = trySolve delta y cl args
+        let add_fact delta (cl, args) = addVarConCt delta y cl args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
         let add_refut delta nalt = MaybeT (addRefutableAltCon delta y nalt)
@@ -1306,13 +1305,13 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
         -- go!
         pure delta_neg
 
--- | @trySolve x alt args ts@ extends the substitution with a mapping @x: ->
+-- | @addVarConCt x alt args ts@ extends the substitution with a mapping @x: ->
 -- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
 -- solution, reject (@Nothing@) otherwise.
 --
 -- See Note [TmState invariants].
-trySolve :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
+addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
+addVarConCt delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
   VI ty pos neg cache n <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
@@ -1324,7 +1323,7 @@ trySolve delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
   -- existing one
   case find ((== Equal) . eqPmAltCon alt . fst) pos of
     Just (_, other_args) -> do
-      foldlM unify delta (zip args other_args)
+      foldlM addVarVarCt delta (zip args other_args)
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
       -- the new solution)
@@ -1823,16 +1822,19 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       = pm_lit x lit
       | Just (_in_scope, _empty_floats@[], dc, _arg_tys, args)
             <- exprIsConApp_maybe empty_in_scope e
-      = traverse bind_expr args >>= data_con_app x dc
+      = do { arg_ids <- traverse bind_expr args
+           ; data_con_app x dc arg_ids }
       -- TODO: Think about how to recognize PatSyns
       | Var y <- e, not (isDataConWorkId x)
-      = modifyT (\delta -> unify delta (x, y))
+      = modifyT (\delta -> addVarVarCt delta (x, y))
       | otherwise
       -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
       = pure ()
       where
         empty_in_scope = (emptyInScopeSet, const NoUnfolding)
         expr_ty = exprType e
+
+        bind_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
         bind_expr e = do
           x <- lift (lift (mkPmId (exprType e)))
           core_expr x e
@@ -1846,7 +1848,7 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
 
     -- | Adds the given constructor application as a solution for @x@.
     pm_alt_con_app :: Id -> PmAltCon -> [Id] -> StateT Delta (MaybeT DsM) ()
-    pm_alt_con_app x con args = modifyT $ \delta -> trySolve delta x con args
+    pm_alt_con_app x con args = modifyT $ \delta -> addVarConCt delta x con args
 
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
