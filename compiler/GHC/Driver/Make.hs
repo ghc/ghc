@@ -2358,7 +2358,7 @@ summariseFile
         :: HscEnv
         -> [ModSummary]                 -- old summaries
         -> FilePath                     -- source file name
-        -> Unit
+        -> UnitId
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
@@ -2431,7 +2431,7 @@ findSummaryBySourceFile summaries file
 checkSummaryTimestamp
     :: HscEnv -> DynFlags -> Bool -> IsBootInterface
     -> (UTCTime -> IO (Either e ModSummary))
-    -> ModSummary -> ModLocation -> Unit -> UTCTime
+    -> ModSummary -> ModLocation -> UnitId -> UTCTime
     -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
@@ -2472,7 +2472,7 @@ summariseModule
           -> NodeMap ModSummary -- Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
-          -> Unit
+          -> UnitId
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
@@ -2507,7 +2507,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = case M.lookup package $ hsc_internalUnitEnv hsc_env of
+    dflags = case M.lookup (package) $ hsc_internalUnitEnv hsc_env of
       Just unitEnv -> internalUnitEnv_dflags unitEnv
       Nothing -> pprPanic "packageNotFound" $ ppr package
 
