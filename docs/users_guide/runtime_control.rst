@@ -202,6 +202,18 @@ written through a custom :c:type:`EventLogWriter`:
 
         Called when event logging is about to stop. This can be ``NULL``.
 
+To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
+
+.. c:func:: bool startEventLogging(const EventLogWriter *writer))
+
+   Start logging events to the given :c:type:`EventLogWriter`. Returns true on
+   success or false is another writer has already been configured.
+
+.. c:func:: void endEventLogging()
+
+   Tear down the active :c:type:`EventLogWriter`.
+
+
 .. _rts-options-misc:
 
 Miscellaneous RTS options
