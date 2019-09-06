@@ -222,6 +222,10 @@ Runtime system
   out-of-the-box compatibility with OpenBSD and macOS Catalina (see
   :ghc-ticket:`17353`)
 
+- The RTS API now exposes :ref:`an interface <event_log_output_api>` to
+  configure ``EventLogWriters``, allowing eventlog data to fed to sinks other
+  than ``.eventlog`` files.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
