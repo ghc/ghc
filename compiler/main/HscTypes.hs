@@ -292,7 +292,7 @@ runHsc hsc_env (Hsc hsc) = do
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
 mkInteractiveHscEnv hsc_env = hsc_env
-    { hsc_internalUnitEnv = M.insert interactiveUnitId interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
+    { hsc_internalUnitEnv = M.insert interactiveInstalledUnitId interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
     }
   where
     interactiveInternalUnitEnv = InternalUnitEnv
@@ -452,11 +452,11 @@ data InternalUnitEnv = InternalUnitEnv
 data HscEnv
   = HscEnv {
 
-        hsc_internalUnitEnv :: M.Map UnitId InternalUnitEnv,
+        hsc_internalUnitEnv :: M.Map InstalledUnitId InternalUnitEnv,
                 -- ^ Information per package / unit, for "internal" (not already
                 -- installed) units.
 
-        hsc_currentPackage :: UnitId,
+        hsc_currentPackage :: InstalledUnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -1472,7 +1472,7 @@ as if they were defined in modules
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactiveUnitId, and
+common package 'interactive' (see Module.interactiveInstalledUnitId, and
 PrelNames.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:

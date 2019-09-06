@@ -1949,13 +1949,13 @@ lookupModuleWithSuggestions' :: DynFlags
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions' dflags mod_map m mb_pn
-  = case Map.lookup m mod_map of
+lookupModuleWithSuggestions' dflags mod_map mn mb_pn
+  = case Map.lookup mn mod_map of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (Map.toList xs) of
             ([], [], [], []) -> LookupNotFound suggestions
-            (_, _, _, [(m, _)])             -> LookupFound m (mod_pkg m)
+            (_, _, _, [(m', _)])            -> LookupFound m (mod_pkg m)
             (_, _, _, exposed@(_:_))        -> LookupMultiple exposed
             ([], [], unusable@(_:_), [])    -> LookupUnusable unusable
             (hidden_pkg, hidden_mod, _, []) ->
