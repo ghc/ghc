@@ -244,8 +244,8 @@ main' postLoadMode dflags0 args flagWarnings = do
     dflags5 = dflags4 { ldInputs = map (FileOption "") objs
                                    ++ ldInputs dflags4 }
 
-  -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
+  -- we've finished manipulating the DynFlags, update the session
   dflags6 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
 
