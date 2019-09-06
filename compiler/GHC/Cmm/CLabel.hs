@@ -794,7 +794,7 @@ needsCDecl (RtsLabel _)                 = False
 needsCDecl (CmmLabel pkgId _ _)
         -- Prototypes for labels defined in the runtime system are imported
         --      into HC files via includes/Stg.h.
-        | pkgId == rtsUnitId         = False
+        | pkgId == rtsUnitId            = False
 
         -- For other labels we inline one into the HC file directly.
         | otherwise                     = True
