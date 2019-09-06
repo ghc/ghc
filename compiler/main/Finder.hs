@@ -213,10 +213,8 @@ orIfNotFound this or_this = do
 -- been done.  Otherwise, do the lookup (with the IO action) and save
 -- the result in the finder cache and the module location cache (if it
 -- was successful.)
-homeSearchCache :: HscEnv -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
-homeSearchCache hsc_env mod_name do_this = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
-  modLocationCache hsc_env mod do_this
+homeSearchCache :: HscEnv -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
+homeSearchCache hsc_env mod do_this = modLocationCache hsc_env mod do_this
 
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
@@ -284,21 +282,16 @@ modLocationCache hsc_env mod do_this = do
         addToFinderCache (hsc_FC hsc_env) mod result
         return result
 
-mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
-mkHomeInstalledModule dflags mod_name =
-  let iuid = thisInstalledUnitId dflags
-  in InstalledModule iuid mod_name
-
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> UnitId -> IO Module
-addHomeModuleToFinder hsc_env mod_name loc package = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+addHomeModuleToFinder :: HscEnv -> InstalledUnitId -> ModuleName -> ModLocation -> UnitId -> IO Module
+addHomeModuleToFinder hsc_env iuid mod_name loc package = do
+  let mod = InstalledModule iuid mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
   return (mkModule package mod_name)
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
 uncacheModule hsc_env mod_name = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+  let mod = InstalledModule (hsc_dflags hsc_env) mod_name
   removeFromFinderCache (hsc_FC hsc_env) mod
 
 -- -----------------------------------------------------------------------------
@@ -338,14 +331,14 @@ findHomeModule hsc_env mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: HscEnv -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule hsc_env mod_name =
+findInstalledHomeModule :: HscEnv -> InstalledUnitId -> ModuleName -> IO InstalledFindResult
+findInstalledHomeModule hsc_env iuid mod_name =
    homeSearchCache hsc_env mod_name $
    let
      dflags = hsc_dflags hsc_env
      home_path = importPaths dflags
      hisuf = hiSuf dflags
-     mod = mkHomeInstalledModule dflags mod_name
+     mod = InstalledModule iuid mod_name
 
      source_exts =
       [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
