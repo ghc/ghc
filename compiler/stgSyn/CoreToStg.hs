@@ -263,7 +263,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
         how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, ccs') =
-            initCts env $
+            initCts dflags env $
               coreToTopStgRhs dflags ccs this_mod (id,rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
@@ -286,7 +286,7 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         -- generate StgTopBindings and CAF cost centres created for CAFs
         (ccs', stg_rhss)
-          = initCts env' $ do
+          = initCts dflags env' $ do
                mapAccumLM (\ccs rhs -> do
                             (rhs', ccs') <-
                               coreToTopStgRhs dflags ccs this_mod rhs
@@ -598,16 +598,12 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- This matters particularly when the function is a primop
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
+
+    dflags <- getDynFlags
     let
-        arg_ty = exprType arg
-        stg_arg_ty = stgArgType stg_arg
-        bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
-                || (typePrimRep arg_ty /= typePrimRep stg_arg_ty)
-        -- In GHCi we coerce an argument of type BCO# (unlifted) to HValue (lifted),
-        -- and pass it to a function expecting an HValue (arg_ty).  This is ok because
-        -- we can treat an unlifted value as lifted.  But the other way round
-        -- we complain.
-        -- We also want to check if a pointer is cast to a non-ptr etc
+        arg_rep = typePrimRep (exprType arg)
+        stg_arg_rep = typePrimRep (stgArgType stg_arg)
+        bad_args = not (primRepsCompatible dflags arg_rep stg_arg_rep)
 
     WARN( bad_args, text "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" $$ ppr arg )
      return (stg_arg : stg_args, ticks ++ aticks)
@@ -816,7 +812,8 @@ isPAP env _               = False
 -- *down*.
 
 newtype CtsM a = CtsM
-    { unCtsM :: IdEnv HowBound
+    { unCtsM :: DynFlags -- Needed for checking for bad coercions in coreToStgArgs
+             -> IdEnv HowBound
              -> a
     }
     deriving (Functor)
@@ -853,8 +850,8 @@ data LetInfo
 
 -- The std monad functions:
 
-initCts :: IdEnv HowBound -> CtsM a -> a
-initCts env m = unCtsM m env
+initCts :: DynFlags -> IdEnv HowBound -> CtsM a -> a
+initCts dflags env m = unCtsM m dflags env
 
 
 
@@ -862,11 +859,11 @@ initCts env m = unCtsM m env
 {-# INLINE returnCts #-}
 
 returnCts :: a -> CtsM a
-returnCts e = CtsM $ \_ -> e
+returnCts e = CtsM $ \_ _ -> e
 
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
-thenCts m k = CtsM $ \env
-  -> unCtsM (k (unCtsM m env)) env
+thenCts m k = CtsM $ \dflags env
+  -> unCtsM (k (unCtsM m dflags env)) dflags env
 
 instance Applicative CtsM where
     pure = returnCts
@@ -875,15 +872,18 @@ instance Applicative CtsM where
 instance Monad CtsM where
     (>>=)  = thenCts
 
+instance HasDynFlags CtsM where
+    getDynFlags = CtsM $ \dflags _ -> dflags
+
 -- Functions specific to this monad:
 
 extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
 extendVarEnvCts ids_w_howbound expr
-   =    CtsM $   \env
-   -> unCtsM expr (extendVarEnvList env ids_w_howbound)
+   =    CtsM $   \dflags env
+   -> unCtsM expr dflags (extendVarEnvList env ids_w_howbound)
 
 lookupVarCts :: Id -> CtsM HowBound
-lookupVarCts v = CtsM $ \env -> lookupBinding env v
+lookupVarCts v = CtsM $ \_ env -> lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
