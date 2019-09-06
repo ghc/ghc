@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-static const EventLogWriter *event_log_writer;
+static const EventLogWriter *event_log_writer = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
@@ -254,6 +254,7 @@ stopEventLogWriter(void)
     if (event_log_writer != NULL &&
             event_log_writer->stopEventLogWriter != NULL) {
         event_log_writer->stopEventLogWriter();
+        event_log_writer = NULL;
     }
 }
 
@@ -478,6 +479,11 @@ initEventLogging(const EventLogWriter *ev_writer)
     uint32_t n_caps;
 
     init_event_types();
+
+    if (event_log_writer) {
+      debugBelch("initEventLogging: Event logging already initialized");
+      return;
+    }
 
     event_log_writer = ev_writer;
     initEventLogWriter();

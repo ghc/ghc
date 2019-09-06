@@ -38,3 +38,10 @@ typedef struct {
  * a file `program.eventlog`.
  */
 extern const EventLogWriter FileEventLogWriter;
+
+// Initialize event logging using the given EventLogWriter.
+void initEventLogging(const EventLogWriter *writer);
+
+// Stop event logging.
+void endEventLogging(void);
+
