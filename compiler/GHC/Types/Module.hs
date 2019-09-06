@@ -74,16 +74,18 @@ module GHC.Types.Module
 
         -- * Wired-in UnitIds
         -- $wired_in_packages
-        primUnitId,
-        integerUnitId,
-        baseUnitId,
-        rtsUnitId,
-        thUnitId,
-        mainUnitId,
-        thisGhcUnitId,
+        primUnitId, primInstalledUnitId,
+        integerUnitId, integerInstalledUnitId,
+        baseUnitId, baseInstalledUnitId,
+        rtsUnitId, rtsInstalledUnitId,
+        thUnitId, thInstalledUnitId,
+        mainUnitId, mainInstalledUnitId,
+        thisGhcUnitId, thisGhcInstalledUnitId,
+        interactiveUnitId, interactiveInstalledUnitId,
+
+        wiredInUnitIds, wiredInInstalledUnitIds,
+        isInteractiveModule,
         isHoleModule,
-        interactiveUnitId, isInteractiveModule,
-        wiredInUnitIds,
 
         -- * The Module type
         Module(Module),
@@ -1106,20 +1108,38 @@ See Note [The integer library] in GHC.Builtin.Names.
 
 integerUnitId, primUnitId,
   baseUnitId, rtsUnitId,
-  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
-primUnitId        = fsToUnitId (fsLit "ghc-prim")
-integerUnitId     = fsToUnitId (fsLit "integer-wired-in")
+  thUnitId, mainUnitId,
+  thisGhcUnitId, interactiveUnitId
+  :: UnitId
+integerInstalledUnitId, primInstalledUnitId,
+  baseInstalledUnitId, rtsInstalledUnitId,
+  thInstalledUnitId, mainInstalledUnitId,
+  thisGhcInstalledUnitId, interactiveInstalledUnitId
+  :: InstalledUnitId
+
+primUnitId        = DefiniteUnitId $ DefUnitId $ primInstalledUnitId
+integerUnitId     = DefiniteUnitId $ DefUnitId $ integerInstalledUnitId
+baseUnitId        = DefiniteUnitId $ DefUnitId $ baseInstalledUnitId
+rtsUnitId         = DefiniteUnitId $ DefUnitId $ rtsInstalledUnitId
+thUnitId          = DefiniteUnitId $ DefUnitId $ thInstalledUnitId
+thisGhcUnitId     = DefiniteUnitId $ DefUnitId $ thisGhcInstalledUnitId
+interactiveUnitId = DefiniteUnitId $ DefUnitId $ interactiveInstalledUnitId
+
+primInstalledUnitId        = fsToInstalledUnitId (fsLit "ghc-prim")
+integerInstalledUnitId     = fsToInstalledUnitId (fsLit "integer-wired-in")
    -- See Note [The integer library] in GHC.Builtin.Names
-baseUnitId        = fsToUnitId (fsLit "base")
-rtsUnitId         = fsToUnitId (fsLit "rts")
-thUnitId          = fsToUnitId (fsLit "template-haskell")
-thisGhcUnitId     = fsToUnitId (fsLit "ghc")
-interactiveUnitId = fsToUnitId (fsLit "interactive")
+baseInstalledUnitId        = fsToInstalledUnitId (fsLit "base")
+rtsInstalledUnitId         = fsToInstalledUnitId (fsLit "rts")
+thInstalledUnitId          = fsToInstalledUnitId (fsLit "template-haskell")
+thisGhcInstalledUnitId     = fsToInstalledUnitId (fsLit "ghc")
+interactiveInstalledUnitId = fsToInstalledUnitId (fsLit "interactive")
+
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainUnitId      = fsToUnitId (fsLit "main")
+mainUnitId = DefiniteUnitId $ DefUnitId $ mainInstalledUnitId
+mainInstalledUnitId = fsToInstalledUnitId (fsLit "main")
 
 -- | This is a fake package id used to provide identities to any un-implemented
 -- signatures.  The set of hole identities is global over an entire compilation.
@@ -1155,12 +1175,24 @@ isHoleModule :: Module -> Bool
 isHoleModule mod = moduleUnitId mod == holeUnitId
 
 wiredInUnitIds :: [UnitId]
-wiredInUnitIds = [ primUnitId,
-                       integerUnitId,
-                       baseUnitId,
-                       rtsUnitId,
-                       thUnitId,
-                       thisGhcUnitId ]
+wiredInUnitIds =
+  [ primUnitId
+  , integerUnitId
+  , baseUnitId
+  , rtsUnitId
+  , thUnitId
+  , thisGhcUnitId
+  ]
+
+wiredInInstalledUnitIds :: [InstalledUnitId]
+wiredInInstalledUnitIds =
+  [ primInstalledUnitId
+  , integerInstalledUnitId
+  , baseInstalledUnitId
+  , rtsInstalledUnitId
+  , thInstalledUnitId
+  , thisGhcInstalledUnitId
+  ]
 
 {-
 ************************************************************************

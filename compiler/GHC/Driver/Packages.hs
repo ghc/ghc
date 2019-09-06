@@ -1967,8 +1967,8 @@ lookupModuleWithSuggestions' :: DynFlags
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions' dflags mod_map m mb_pn
-  = case Map.lookup m mod_map of
+lookupModuleWithSuggestions' dflags mod_map mn mb_pn
+  = case Map.lookup mn mod_map of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (Map.toList xs) of
@@ -1994,7 +1994,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
             | otherwise
             -> (x:hidden_pkg, hidden_mod, unusable, exposed)
 
-    unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
+    unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr mn)
     mod_unit = unit_lookup . moduleUnitId
 
     -- Filters out origins which are not associated with the given package
@@ -2021,7 +2021,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
 
     suggestions
       | gopt Opt_HelpfulErrors dflags =
-           fuzzyLookup (moduleNameString m) all_mods
+           fuzzyLookup (moduleNameString mn) all_mods
       | otherwise = []
 
     all_mods :: [(String, ModuleSuggestion)]     -- All modules

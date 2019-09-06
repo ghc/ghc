@@ -197,18 +197,22 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyDynLinker <- uninitializedLinker
-    return HscEnv {  hsc_internalUnitEnv = M.singleton (thisPackage dflags) $ InternalUnitEnv dflags emptyHomePackageTable
-                  ,  hsc_currentPackage = thisPackage dflags
-                  ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = emptyMG
-                  ,  hsc_IC           = emptyInteractiveContext dflags
-                  ,  hsc_EPS          = eps_var
-                  ,  hsc_NC           = nc_var
-                  ,  hsc_FC           = fc_var
-                  ,  hsc_type_env_var = Nothing
-                  ,  hsc_interp       = Nothing
-                  ,  hsc_dynLinker    = emptyDynLinker
-                  }
+    return HscEnv
+      { hsc_internalUnitEnv = M.singleton (thisInstalledUnitId dflags) $ InternalUnitEnv
+          { internalUnitEnv_dflags = dflags
+          , internalUnitEnv_homePackageTable = emptyHomePackageTable
+          }
+      , hsc_currentPackage  = thisInstalledUnitId dflags
+      , hsc_targets         = []
+      , hsc_mod_graph       = emptyMG
+      , hsc_IC              = emptyInteractiveContext dflags
+      , hsc_EPS             = eps_var
+      , hsc_NC              = nc_var
+      , hsc_FC              = fc_var
+      , hsc_type_env_var    = Nothing
+      , hsc_interp          = Nothing
+      , hsc_dynLinker       = emptyDynLinker
+      }
 
 -- -----------------------------------------------------------------------------
 
