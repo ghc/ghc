@@ -23,7 +23,7 @@ typedef struct {
     // Initialize an EventLogWriter (may be NULL)
     void (* initEventLogWriter) (void);
 
-    // Write a series of events
+    // Write a series of events returning true on success.
     bool (* writeEventLog) (void *eventlog, size_t eventlog_size);
 
     // Flush possibly existing buffers (may be NULL)
@@ -38,3 +38,29 @@ typedef struct {
  * a file `program.eventlog`.
  */
 extern const EventLogWriter FileEventLogWriter;
+
+enum EventLogStatus {
+  /* The runtime system wasn't compiled with eventlog support. */
+  EVENTLOG_NOT_SUPPORTED,
+  /* An EventLogWriter has not yet been configured */
+  EVENTLOG_NOT_CONFIGURED,
+  /* An EventLogWriter has been configured and is running. */
+  EVENTLOG_RUNNING,
+};
+
+/*
+ * Query whether the current runtime system supports eventlogging.
+ */
+enum EventLogStatus eventLogStatus(void);
+
+/*
+ * Initialize event logging using the given EventLogWriter.
+ * Returns true on success or false if an EventLogWriter is already configured
+ * or eventlogging isn't supported by the runtime.
+ */
+bool startEventLogging(const EventLogWriter *writer);
+
+/*
+ * Stop event logging and destroy the current EventLogWriter.
+ */
+void endEventLogging(void);
