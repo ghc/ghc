@@ -23,7 +23,8 @@ import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)
 
-import Check (addTyCsDs, addPatTmCs, addScrutTmCs)
+import DynFlags
+import Check (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import DsMonad
 import DsUtils
 import Type   ( Type )
@@ -123,11 +124,12 @@ matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
         dicts = collectEvVarsPat upat
     match_var <- selectMatchVar upat
 
-    match_result <- addTyCsDs dicts $
-                    addScrutTmCs (Just bind_rhs) [match_var] $
-                    addPatTmCs [upat] [match_var] $
-                      -- See Note [Type and Term Equality Propagation] in Check
-                    matchGuards stmts ctx rhs rhs_ty
+    dflags <- getDynFlags
+    match_result <-
+      -- See Note [Type and Term Equality Propagation] in Check
+      applyWhen (needToRunPmCheck dflags)
+                (addTyCsDs dicts . addScrutTmCs (Just bind_rhs) [match_var] . addPatTmCs [upat] [match_var])
+                (matchGuards stmts ctx rhs rhs_ty)
     core_rhs <- dsLExpr bind_rhs
     match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
                                        match_result

@@ -15,7 +15,8 @@ Pattern Matching Coverage Checking.
 
 module Check (
         -- Checking and printing
-        checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
+        checkSingle, checkMatches, checkGuardMatches,
+        needToRunPmCheck, isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
         addTyCsDs, addScrutTmCs, addPatTmCs
@@ -1452,11 +1453,17 @@ constructor we get the following:
 %************************************************************************
 -}
 
--- | Check whether any part of pattern match checking is enabled (does not
--- matter whether it is the redundancy check or the exhaustiveness check).
-isAnyPmCheckEnabled :: DynFlags -> DsMatchContext -> Bool
-isAnyPmCheckEnabled dflags (DsMatchContext kind _loc)
+-- | Check whether any part of pattern match checking is enabled for this
+-- 'HsMatchContext' (does not matter whether it is the redundancy check or the
+-- exhaustiveness check).
+isMatchContextPmChecked :: DynFlags -> HsMatchContext id -> Bool
+isMatchContextPmChecked dflags kind
   = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
+
+-- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
+-- are enabled, in which case we need to run the pattern match checker.
+needToRunPmCheck :: DynFlags -> Bool
+needToRunPmCheck dflags = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
@@ -1553,6 +1560,15 @@ dots :: Int -> [a] -> SDoc
 dots maxPatterns qs
     | qs `lengthExceeds` maxPatterns = text "..."
     | otherwise                      = empty
+
+-- | All warning flags that need to run the pattern match checker.
+allPmCheckWarnings :: [WarningFlag]
+allPmCheckWarnings =
+  [ Opt_WarnIncompletePatterns
+  , Opt_WarnIncompleteUniPatterns
+  , Opt_WarnIncompletePatternsRecUpd
+  , Opt_WarnOverlappingPatterns
+  ]
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool

@@ -738,7 +738,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
 
         -- Pattern match check warnings for /this match-group/
         ; unless (isGenerated origin) $
-          when (isAnyPmCheckEnabled dflags (DsMatchContext ctxt locn)) $
+          when (isMatchContextPmChecked dflags ctxt) $
             addScrutTmCs mb_scr new_vars $
             -- See Note [Type and Term Equality Propagation]
             checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
@@ -753,13 +753,13 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = collectEvVarsPats upats
 
-           ; match_result <- -- Extend the environment with knowledge about
-                             -- the matches before desguaring the RHS
-                             -- See Note [Type and Term Equality Propagation]
-                             addTyCsDs dicts                $
-                             addScrutTmCs mb_scr vars $
-                             addPatTmCs upats vars $
-                             dsGRHSs ctxt grhss rhs_ty
+           ; match_result <-
+              -- Extend the environment with knowledge about
+              -- the matches before desguaring the RHS
+              -- See Note [Type and Term Equality Propagation]
+              applyWhen (needToRunPmCheck dflags)
+                        (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
+                        (dsGRHSs ctxt grhss rhs_ty)
 
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource

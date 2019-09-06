@@ -29,7 +29,7 @@ import {-# SOURCE #-}   Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
-import Check ( addTyCsDs, checkGuardMatches )
+import Check ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
 import HsSyn            -- lots of things
 import CoreSyn          -- lots of things
@@ -186,11 +186,12 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addTyCsDs (listToBag dicts) $
-                     dsLHsBinds binds
-                         -- addTyCsDs: push type constraints deeper
-                         --            for inner pattern match check
-                         -- See Check, Note [Type and Term Equality Propagation]
+  = do { ds_binds <- applyWhen (needToRunPmCheck dflags)
+                               -- addTyCsDs: push type constraints deeper
+                               --            for inner pattern match check
+                               -- See Check, Note [Type and Term Equality Propagation]
+                               (addTyCsDs (listToBag dicts))
+                               (dsLHsBinds binds)
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
