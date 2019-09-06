@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-static const EventLogWriter *event_log_writer;
+static const EventLogWriter *event_log_writer = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
@@ -254,6 +254,7 @@ stopEventLogWriter(void)
     if (event_log_writer != NULL &&
             event_log_writer->stopEventLogWriter != NULL) {
         event_log_writer->stopEventLogWriter();
+        event_log_writer = NULL;
     }
 }
 
@@ -473,14 +474,11 @@ postHeaderEvents(void)
 }
 
 void
-initEventLogging(const EventLogWriter *ev_writer)
+initEventLogging()
 {
     uint32_t n_caps;
 
     init_event_types();
-
-    event_log_writer = ev_writer;
-    initEventLogWriter();
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
@@ -508,6 +506,17 @@ initEventLogging(const EventLogWriter *ev_writer)
 #if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
 #endif
+}
+
+bool
+startEventLogging(const EventLogWriter *ev_writer)
+{
+    if (event_log_writer) {
+        return false;
+    }
+
+    event_log_writer = ev_writer;
+    initEventLogWriter();
 
     postHeaderEvents();
 
@@ -521,6 +530,7 @@ initEventLogging(const EventLogWriter *ev_writer)
     for (uint32_t c = 0; c < n_caps; ++c) {
         postBlockMarker(&capEventBuf[c]);
     }
+    return true;
 }
 
 void
