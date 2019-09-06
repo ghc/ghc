@@ -630,7 +630,7 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> (set_hsc_dflags h dflags'')
+  modifySession $ \h -> (set_hsc_dflags h dflags''')
     { hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
     , hsc_interp = hsc_interp h <|> interp
       -- we only update the interpreter if there wasn't already one set up

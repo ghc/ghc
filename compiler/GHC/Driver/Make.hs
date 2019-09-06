@@ -2145,7 +2145,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
 
-        loop :: [(Located ModuleName, Unit, IsBoot)]
+        loop :: [(Located ModuleName, UnitId, IsBoot)]
                         -- Work list: process these modules
              -> NodeMap [Either ErrorMessages ModSummary]
                         -- Visited set; the range is a list because
@@ -2326,7 +2326,7 @@ summariseFile
         :: HscEnv
         -> [ModSummary]                 -- old summaries
         -> FilePath                     -- source file name
-        -> Unit
+        -> UnitId
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
@@ -2399,7 +2399,7 @@ findSummaryBySourceFile summaries file
 checkSummaryTimestamp
     :: HscEnv -> DynFlags -> Bool -> IsBoot
     -> (UTCTime -> IO (Either e ModSummary))
-    -> ModSummary -> ModLocation -> Unit -> UTCTime
+    -> ModSummary -> ModLocation -> UnitId -> UTCTime
     -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
@@ -2440,7 +2440,7 @@ summariseModule
           -> NodeMap ModSummary -- Map of old summaries
           -> IsBoot             -- IsBoot <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
-          -> Unit
+          -> UnitId
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
@@ -2473,7 +2473,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = case M.lookup package $ hsc_internalUnitEnv hsc_env of
+    dflags = case M.lookup (package) $ hsc_internalUnitEnv hsc_env of
       Just unitEnv -> internalUnitEnv_dflags unitEnv
       Nothing -> pprPanic "packageNotFound" $ ppr package
 

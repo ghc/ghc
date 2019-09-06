@@ -4206,7 +4206,7 @@ lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isHomeModule :: Module -> Bool
-isHomeModule m = GHC.moduleUnit m == mainUnitId
+isHomeModule m = GHC.moduleUnit m == mainUnit
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
