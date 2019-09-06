@@ -245,7 +245,7 @@ modLocationCache hsc_env mod do_this = do
 
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
-  let iuid = fst (splitUnitIdInsts (thisPackage dflags))
+  let iuid = thisInstalledUnitId dflags
   in InstalledModule iuid mod_name
 
 -- This returns a module because it's more convenient for users
