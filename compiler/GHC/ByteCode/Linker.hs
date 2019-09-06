@@ -169,7 +169,7 @@ nameToCLabel n suffix = mkFastString label
     occPart     = encodeZ (occNameFS (nameOccName n))
 
     label = concat
-        [ if pkgKey == mainUnitId then "" else packagePart ++ "_"
+        [ if pkgKey == mainUnit then "" else packagePart ++ "_"
         , modulePart
         , '_':occPart
         , '_':suffix

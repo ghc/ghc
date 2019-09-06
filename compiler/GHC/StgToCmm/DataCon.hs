@@ -301,7 +301,7 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , Just val <- getClosurePayload arg
   , inRange val
-  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
+  = let intlike_lbl   = mkCmmClosureLabel rtsUnit (fsLit label)
         val_int = fromIntegral val :: Int
         offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW dflags + 1)
                 -- INTLIKE/CHARLIKE closures consist of a header and one word payload

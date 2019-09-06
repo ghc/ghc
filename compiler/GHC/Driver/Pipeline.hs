@@ -1107,7 +1107,8 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
-        mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location $ hsc_currentPackage hsc_env'
+        mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location $
+            hsc_currentPackage hsc_env'
 
   -- Make the ModSummary to hand to hscMain
         let
@@ -1310,7 +1311,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
                        ++ (if platformOS platform == OSMinGW32 &&
-                              thisPackage dflags == baseUnitId
+                              thisPackage dflags == baseUnit
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
 
@@ -2220,7 +2221,7 @@ getGhcVersionPathName dflags = do
   candidates <- case ghcVersionFile dflags of
     Just path -> return [path]
     Nothing -> (map (</> "ghcversion.h")) <$>
-               (getPackageIncludePath dflags [toUnitId rtsUnitId])
+               (getPackageIncludePath dflags [toUnitId rtsUnit])
 
   found <- filterM doesFileExist candidates
   case found of

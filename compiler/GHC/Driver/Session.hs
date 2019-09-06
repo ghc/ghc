@@ -1323,7 +1323,7 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        thisUnitId     = toUnitId mainUnitId,
+        thisUnitId     = mainUnitId,
         thisUnitIdInsts_        = Nothing,
         thisComponentId_        = Nothing,
 
@@ -4639,10 +4639,10 @@ setMainIs arg
   | not (null main_fn) && isLower (head main_fn)
      -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d { mainFunIs = Just main_fn,
-                   mainModIs = mkModule mainUnitId (mkModuleName main_mod) }
+                   mainModIs = mkModule mainUnit (mkModuleName main_mod) }
 
   | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d { mainModIs = mkModule mainUnitId (mkModuleName arg) }
+  = upd $ \d -> d { mainModIs = mkModule mainUnit (mkModuleName arg) }
 
   | otherwise                   -- The arg looked like "baz"
   = upd $ \d -> d { mainFunIs = Just arg }

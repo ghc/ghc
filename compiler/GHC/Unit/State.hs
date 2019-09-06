@@ -949,7 +949,7 @@ type WiredInUnitId = String
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
 
 wired_in_unitids :: [WiredInUnitId]
-wired_in_unitids = map unitString wiredInUnitIds
+wired_in_unitids = map unitString wiredInUnits
 
 findWiredInPackages
    :: DynFlags
@@ -968,7 +968,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         matches :: UnitInfo -> WiredInUnitId -> Bool
         pc `matches` pid
             -- See Note [The integer library] in GHC.Builtin.Names
-            | pid == unitString integerUnitId
+            | pid == unitString integerUnit
             = unitPackageNameString pc `elem` ["integer-gmp", "integer-simple"]
         pc `matches` pid = unitPackageNameString pc == pid
 
@@ -1556,7 +1556,7 @@ mkPackageState dflags dbs preload0 = do
       basicLinkedPackages
        | gopt Opt_AutoLinkPackages dflags
           = filter (flip elemUDFM (unUnitInfoMap pkg_db))
-                [baseUnitId, rtsUnitId]
+                [baseUnit, rtsUnit]
        | otherwise = []
       -- but in any case remove the current package from the set of
       -- preloaded packages so that base/rts does not end up in the
@@ -1913,8 +1913,8 @@ lookupModuleWithSuggestions' :: DynFlags
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
-lookupModuleWithSuggestions' dflags mod_map m mb_pn
-  = case Map.lookup m mod_map of
+lookupModuleWithSuggestions' dflags mod_map mn mb_pn
+  = case Map.lookup mn mod_map of
         Nothing -> LookupNotFound suggestions
         Just xs ->
           case foldl' classify ([],[],[], []) (Map.toList xs) of
@@ -1940,7 +1940,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
             | otherwise
             -> (x:hidden_pkg, hidden_mod, unusable, exposed)
 
-    unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr m)
+    unit_lookup p = lookupUnit dflags p `orElse` pprPanic "lookupModuleWithSuggestions" (ppr p <+> ppr mn)
     mod_unit = unit_lookup . moduleUnit
 
     -- Filters out origins which are not associated with the given package
@@ -1967,7 +1967,7 @@ lookupModuleWithSuggestions' dflags mod_map m mb_pn
 
     suggestions
       | gopt Opt_HelpfulErrors dflags =
-           fuzzyLookup (moduleNameString m) all_mods
+           fuzzyLookup (moduleNameString mn) all_mods
       | otherwise = []
 
     all_mods :: [(String, ModuleSuggestion)]     -- All modules

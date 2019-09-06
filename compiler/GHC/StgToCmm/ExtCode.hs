@@ -205,7 +205,7 @@ lookupName name = do
      case lookupUFM env name of
         Just (VarN e)   -> e
         Just (FunN pkg) -> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
-        _other          -> CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId name))
+        _other          -> CmmLit (CmmLabel (mkCmmCodeLabel rtsUnit name))
 
 
 -- | Lift an FCode computation into the CmmParse monad

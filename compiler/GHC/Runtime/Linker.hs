@@ -141,7 +141,7 @@ emptyPLS = PersistentLinkerState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = map toUnitId [rtsUnitId]
+  where init_pkgs = [rtsUnitId]
 
 extendLoadedPkgs :: DynLinker -> [UnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
@@ -720,7 +720,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             mb_stuff <- findHomeModule hsc_env mod_name
+             mb_stuff <- findHomeModule hsc_env (hsc_dflags hsc_env) mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name

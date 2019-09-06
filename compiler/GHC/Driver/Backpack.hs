@@ -195,15 +195,15 @@ withBkpSession cid insts deps session_type do_this = do
                   (text "-unit-id" <+> ppr uid <+> ppr rn))
               (UnitIdArg uid) rn) deps
           }
-        unitId = thisPackage dflags
+        iUnitId = thisUnitId dflags
     modifySession $ \hsc_env -> hsc_env
-      { hsc_internalUnitEnv = hsc_internalUnitEnv hsc_env `mappend` Map.singleton unitId
+      { hsc_internalUnitEnv = hsc_internalUnitEnv hsc_env `mappend` Map.singleton iUnitId
         (InternalUnitEnv
           { internalUnitEnv_dflags = dflags
           , internalUnitEnv_homePackageTable = emptyHomePackageTable
           })
       }
-    withTempSession (\hsc_env -> hsc_env { hsc_currentPackage = unitId }) $ do
+    withTempSession (\hsc_env -> hsc_env { hsc_currentPackage = iUnitId }) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
         -- Calls initPackages
@@ -370,7 +370,7 @@ buildUnit session cid insts lunit = do
 
 compileExe :: LHsUnit HsComponentId -> BkpM ()
 compileExe lunit = do
-    msgUnitId mainUnitId
+    msgUnitId mainUnit
     let deps_w_rns = hsunitDeps False (unLoc lunit)
         deps = map fst deps_w_rns
         -- no renaming necessary
@@ -646,7 +646,7 @@ hsunitModuleGraph dflags unit = do
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
     let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) = do
-          Just `fmap` summariseDecl pn (thisPackage dflags) hsc_src lmodname mb_hsmod
+          Just `fmap` summariseDecl pn (thisUnitId dflags) hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 
@@ -711,13 +711,13 @@ summariseRequirement pn mod_name = do
         }
 
 summariseDecl :: PackageName
-              -> Unit
+              -> UnitId
               -> HscSource
               -> Located ModuleName
               -> Maybe (Located HsModule)
               -> BkpM ModSummary
-summariseDecl pn _myUnitId hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
-summariseDecl _pn myUnitId hsc_src lmodname@(L loc modname) Nothing
+summariseDecl pn _myIUnitId hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
+summariseDecl _pn myIUnitId hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
          let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
@@ -725,7 +725,7 @@ summariseDecl _pn myUnitId hsc_src lmodname@(L loc modname) Nothing
                          Map.empty -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
-                         myUnitId
+                         myIUnitId
                          True -- Target lets you disallow, but not here
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions

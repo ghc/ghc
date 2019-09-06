@@ -491,11 +491,11 @@ data InternalUnitEnv = InternalUnitEnv
 data HscEnv
   = HscEnv {
 
-        hsc_internalUnitEnv :: Map Unit InternalUnitEnv,
+        hsc_internalUnitEnv :: Map UnitId InternalUnitEnv,
                 -- ^ Information per package / unit, for "internal" (not already
                 -- installed) units.
 
-        hsc_currentPackage :: Unit,
+        hsc_currentPackage :: UnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -618,7 +618,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
-      targetPackage      :: Unit,     -- ^ target's package
+      targetPackage      :: UnitId,   -- ^ target's package
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
@@ -1609,7 +1609,7 @@ as if they were defined in modules
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactiveUnitId, and
+common package 'interactive' (see Module.interactiveInstalledUnitId, and
 GHC.Builtin.Names.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
@@ -2070,7 +2070,7 @@ mkQualModule dflags mod
 -- with a unit id if the package ID would be ambiguous.
 mkQualPackage :: DynFlags -> QueryQualifyPackage
 mkQualPackage dflags uid
-     | uid == mainUnitId || uid == interactiveUnitId
+     | uid == mainUnit || uid == interactiveUnit
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False

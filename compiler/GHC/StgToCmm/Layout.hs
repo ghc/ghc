@@ -374,10 +374,10 @@ slowArgs dflags args -- careful: reps contains voids (V), but args does not
     (arg_pat, n)            = slowCallPattern (map fst args)
     (call_args, rest_args)  = splitAt n args
 
-    stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
+    stg_ap_pat = mkCmmRetInfoLabel rtsUnit arg_pat
     this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
     save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just cccsExpr)]
-    save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
+    save_cccs_lbl = mkCmmRetInfoLabel rtsUnit (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
 ----        Laying out objects on the heap and stack

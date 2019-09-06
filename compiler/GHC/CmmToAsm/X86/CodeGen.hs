@@ -67,7 +67,7 @@ import GHC.Platform
 -- Our intermediate code:
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
-import GHC.Unit ( primUnitId )
+import GHC.Unit ( primUnit )
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Cmm
@@ -2364,7 +2364,7 @@ genCCall' config is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
+    lbl = mkCmmCodeLabel primUnit (fsLit (popCntLabel width))
 
 genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
          args@[src, mask] bid = do
@@ -2397,7 +2397,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
+    lbl = mkCmmCodeLabel primUnit (fsLit (pdepLabel width))
 
 genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
          args@[src, mask] bid = do
@@ -2430,7 +2430,7 @@ genCCall' config is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
             genCCall' config is32Bit target dest_regs args bid
   where
     format = intFormat width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
+    lbl = mkCmmCodeLabel primUnit (fsLit (pextLabel width))
 
 genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
   | is32Bit && width == W64 = do
@@ -2475,7 +2475,7 @@ genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
                          -- took care of implicitly clearing the upper bits
   where
     bw = widthInBits width
-    lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
+    lbl = mkCmmCodeLabel primUnit (fsLit (clzLabel width))
 
 genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference config
@@ -2485,7 +2485,7 @@ genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
                                            CmmMayReturn)
     genCCall' config is32Bit target dest_regs args bid
   where
-    lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
+    lbl = mkCmmCodeLabel primUnit (fsLit (word2FloatLabel width))
 
 genCCall' _ _ (PrimTarget (MO_AtomicRead width)) [dst] [addr] _ = do
   load_code <- intLoadCode (MOV (intFormat width)) addr
