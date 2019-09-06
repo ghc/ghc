@@ -209,8 +209,9 @@ emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
 ghcWrapper :: Stage -> Expr String
 ghcWrapper Stage0 = error "Stage0 GHC does not require a wrapper script to run."
 ghcWrapper stage  = do
-    dbPath  <- expr $ packageDbPath stage
-    ghcPath <- expr $ programPath (vanillaContext (pred stage) ghc)
+    dbPath  <- expr $ (</>) <$> topDirectory <*> packageDbPath stage
+    ghcPath <- expr $ (</>) <$> topDirectory
+                            <*> programPath (vanillaContext (pred stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
                                ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
                                ++ [ "$@" ]
