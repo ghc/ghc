@@ -147,7 +147,7 @@ mkBootModDetailsTc hsc_env
     -- the message is useful to locating oneself in the compilation process.
     Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr this_mod))
-                   (const ()) $
+                   (const ()) Err.PrintTimings $
     return (ModDetails { md_types         = type_env'
                        , md_insts         = insts'
                        , md_fam_insts     = fam_insts
@@ -343,7 +343,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
   = Err.withTiming (pure dflags)
                    (text "CoreTidy"<+>brackets (ppr mod))
-                   (const ()) $
+                   (const ()) Err.PrintTimings $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
               ; print_unqual = mkPrintUnqualified dflags rdr_env

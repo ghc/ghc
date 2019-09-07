@@ -50,7 +50,7 @@ module ErrUtils (
         errorMsg, warningMsg,
         fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
-        showPass, withTiming,
+        showPass, withTiming, PrintTimings(..),
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -619,11 +619,15 @@ showPass dflags what
   = ifVerbose dflags 2 $
     logInfo dflags (defaultUserStyle dflags) (text "***" <+> text what <> colon)
 
+data PrintTimings = PrintTimings | DontPrintTimings
+  deriving (Eq, Show)
+
 -- | Time a compilation phase.
 --
 -- When timings are enabled (e.g. with the @-v2@ flag), the allocations
 -- and CPU time used by the phase will be reported to stderr. Consider
--- a typical usage: @withTiming getDynFlags (text "simplify") force pass@.
+-- a typical usage:
+-- @withTiming getDynFlags (text "simplify") force PrintTimings pass@.
 -- When timings are enabled the following costs are included in the
 -- produced accounting,
 --
@@ -643,18 +647,20 @@ showPass dflags what
 --
 -- See Note [withTiming] for more.
 withTiming :: MonadIO m
-           => m DynFlags  -- ^ A means of getting a 'DynFlags' (often
-                          -- 'getDynFlags' will work here)
-           -> SDoc        -- ^ The name of the phase
-           -> (a -> ())   -- ^ A function to force the result
-                          -- (often either @const ()@ or 'rnf')
-           -> m a         -- ^ The body of the phase to be timed
+           => m DynFlags   -- ^ A means of getting a 'DynFlags' (often
+                           -- 'getDynFlags' will work here)
+           -> SDoc         -- ^ The name of the phase
+           -> (a -> ())    -- ^ A function to force the result
+                           -- (often either @const ()@ or 'rnf')
+           -> PrintTimings -- ^ Whether to print the timings
+           -> m a          -- ^ The body of the phase to be timed
            -> m a
-withTiming getDFlags what force_result action
+withTiming getDFlags what force_result prtimings action
   = do dflags <- getDFlags
        if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
-          then do liftIO $ logInfo dflags (defaultUserStyle dflags)
-                         $ text "***" <+> what <> colon
+          then do when (prtimings == PrintTimings) $ liftIO $
+                    logInfo dflags (defaultUserStyle dflags) $
+                      text "***" <+> what <> colon
                   liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:started:" <+> what
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
@@ -667,7 +673,7 @@ withTiming getDFlags what force_result action
                   let alloc = alloc0 - alloc1
                       time = realToFrac (end - start) * 1e-9
 
-                  when (verbosity dflags >= 2)
+                  when (verbosity dflags >= 2 && prtimings == PrintTimings)
                       $ liftIO $ logInfo dflags (defaultUserStyle dflags)
                           (text "!!!" <+> what <> colon <+> text "finished in"
                            <+> doublePrec 2 time
@@ -677,12 +683,13 @@ withTiming getDFlags what force_result action
                            <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
                            <+> text "megabytes")
 
-                  liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
-                      $ text $ showSDocOneLine dflags
-                      $ hsep [ what <> colon
-                             , text "alloc=" <> ppr alloc
-                             , text "time=" <> doublePrec 3 time
-                             ]
+                  liftIO $ when (prtimings == PrintTimings) $
+                      dumpIfSet_dyn dflags Opt_D_dump_timings ""
+                          $ text $ showSDocOneLine dflags
+                          $ hsep [ what <> colon
+                                 , text "alloc=" <> ppr alloc
+                                 , text "time=" <> doublePrec 3 time
+                                 ]
                   pure r
            else action
 
@@ -759,15 +766,18 @@ For reference:
 
   withTiming
     :: MonadIO
-    => m DynFlags -- how to get the DynFlags
-    -> SDoc       -- label for the computation we're timing
-    -> (a -> ())  -- how to evaluate the result
-    -> m a        -- computation we're timing
+    => m DynFlags   -- how to get the DynFlags
+    -> SDoc         -- label for the computation we're timing
+    -> (a -> ())    -- how to evaluate the result
+    -> PrintTimings -- whether to report the timings when passed
+                    -- -v2 or -ddump-timings
+    -> m a          -- computation we're timing
     -> m a
 
 withTiming lets you run an action while:
 
-(1) measuring the CPU time it took and reporting that on stderr,
+(1) measuring the CPU time it took and reporting that on stderr
+    (when PrintTimings is passed),
 (2) emitting start/stop events to GHC's event log, with the label
     given as an argument.
 

@@ -85,7 +85,7 @@ import CmdLineParser
 import System.Environment ( getEnv )
 import FastString
 import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn, compilationProgressMsg,
-                          withTiming )
+                          withTiming, PrintTimings(..) )
 import Exception
 
 import System.Directory
@@ -471,7 +471,7 @@ listPackageConfigMap dflags = eltsUDFM pkg_map
 initPackages :: DynFlags -> IO (DynFlags, [PreloadUnitId])
 initPackages dflags0 = withTiming (return dflags0)
                                   (text "initializing package database")
-                                  forcePkgDb $ do
+                                  forcePkgDb PrintTimings $ do
   dflags <- interpretPackageEnv dflags0
   pkg_db <-
     case pkgDatabase dflags of

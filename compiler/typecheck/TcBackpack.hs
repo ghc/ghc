@@ -331,7 +331,7 @@ tcRnCheckUnitId ::
 tcRnCheckUnitId hsc_env uid =
    withTiming (pure dflags)
               (text "Check unit id" <+> ppr uid)
-              (const ()) $
+              (const ()) PrintTimings $
    initTc hsc_env
           HsigFile -- bogus
           False
@@ -351,7 +351,7 @@ tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -}
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming (pure dflags)
              (text "Signature merging" <+> brackets (ppr this_mod))
-             (const ()) $
+             (const ()) PrintTimings $
   initTc hsc_env HsigFile False this_mod real_loc $
     mergeSignatures hpm orig_tcg_env iface
  where
@@ -880,7 +880,7 @@ tcRnInstantiateSignature ::
 tcRnInstantiateSignature hsc_env this_mod real_loc =
    withTiming (pure dflags)
               (text "Signature instantiation"<+>brackets (ppr this_mod))
-              (const ()) $
+              (const ()) PrintTimings $
    initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
   where
    dflags = hsc_dflags hsc_env

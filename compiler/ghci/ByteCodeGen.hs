@@ -88,7 +88,7 @@ byteCodeGen :: HscEnv
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
    = withTiming (pure dflags)
                 (text "ByteCodeGen"<+>brackets (ppr this_mod))
-                (const ()) $ do
+                (const ()) PrintTimings $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
         let (strings, flatBinds) = partitionEithers $ do  -- list monad
@@ -160,7 +160,7 @@ coreExprToBCOs :: HscEnv
 coreExprToBCOs hsc_env this_mod expr
  = withTiming (pure dflags)
               (text "ByteCodeGen"<+>brackets (ppr this_mod))
-              (const ()) $ do
+              (const ()) PrintTimings $ do
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")

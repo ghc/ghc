@@ -165,7 +165,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
  | RealSrcSpan real_loc <- loc
  = withTiming (pure dflags)
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
-              (const ()) $
+              (const ()) PrintTimings $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
           withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
 

@@ -367,4 +367,4 @@ touch dflags purpose arg = traceToolCommand dflags "touch" $
 --   to run GHC with @-v2@ or @-ddump-timings@.
 traceToolCommand :: DynFlags -> String -> IO a -> IO a
 traceToolCommand dflags tool = withTiming
-  (return dflags) (text $ "systool:" ++ tool) (const ())
+  (return dflags) (text $ "systool:" ++ tool) (const ()) PrintTimings

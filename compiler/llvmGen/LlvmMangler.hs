@@ -15,7 +15,7 @@ import GhcPrelude
 
 import DynFlags ( DynFlags, targetPlatform )
 import GHC.Platform ( platformArch, Arch(..) )
-import ErrUtils ( withTiming )
+import ErrUtils ( withTiming, PrintTimings(..) )
 import Outputable ( text )
 
 import Control.Exception
@@ -25,7 +25,7 @@ import System.IO
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
 llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-}
-    withTiming (pure dflags) (text "LLVM Mangler") id $
+    withTiming (pure dflags) (text "LLVM Mangler") id PrintTimings $
     withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
         go r w
         hClose r

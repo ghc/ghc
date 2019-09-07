@@ -1419,7 +1419,7 @@ initEnv dflags = listToUFM [
   ]
 
 parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
-parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
+parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) PrintTimings $ do
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1

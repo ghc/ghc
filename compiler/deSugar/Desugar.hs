@@ -116,7 +116,7 @@ deSugar hsc_env
              print_unqual = mkPrintUnqualified dflags rdr_env
         ; withTiming (pure dflags)
                      (text "Desugar"<+>brackets (ppr mod))
-                     (const ()) $
+                     (const ()) PrintTimings $
      do { -- Desugar the program
         ; let export_set = availsToNameSet exports
               target     = hscTarget dflags

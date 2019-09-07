@@ -331,7 +331,7 @@ hscParse' mod_summary
  | otherwise = {-# SCC "Parser" #-}
     withTiming getDynFlags
                (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
-               (const ()) $ do
+               (const ()) PrintTimings $ do
     dflags <- getDynFlags
     let src_filename  = ms_hspp_file mod_summary
         maybe_src_buf = ms_hspp_buf  mod_summary
@@ -1411,7 +1411,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- next showPass after this will be "Assembler".
         withTiming (pure dflags)
                    (text "CodeGen"<+>brackets (ppr this_mod))
-                   (const ()) $ do
+                   (const ()) PrintTimings $ do
             cmms <- {-# SCC "StgCmm" #-}
                             doCodeGen hsc_env this_mod data_tycons
                                 cost_centre_info
@@ -1808,7 +1808,7 @@ hscParseThingWithLocation :: (Outputable thing, Data thing) => String -> Int
 hscParseThingWithLocation source linenumber parser str
   = withTiming getDynFlags
                (text "Parser [source]")
-               (const ()) $ {-# SCC "Parser" #-} do
+               (const ()) PrintTimings $ {-# SCC "Parser" #-} do
     dflags <- getDynFlags
 
     let buf = stringToStringBuffer str
