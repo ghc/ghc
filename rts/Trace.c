@@ -98,8 +98,9 @@ void initTracing (void)
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
      */
 
+    initEventLogging();
     if (eventlog_enabled) {
-        initEventLogging(eventlog_writer);
+        startEventLogging(eventlog_writer);
     }
 }
 

@@ -21,6 +21,7 @@
  */
 extern char *EventTagDesc[];
 
+void initEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort
 void flushEventLog(void);     // event log inherited from parent

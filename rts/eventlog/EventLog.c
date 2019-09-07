@@ -474,19 +474,11 @@ postHeaderEvents(void)
 }
 
 void
-initEventLogging(const EventLogWriter *ev_writer)
+initEventLogging()
 {
     uint32_t n_caps;
 
     init_event_types();
-
-    if (event_log_writer) {
-      debugBelch("initEventLogging: Event logging already initialized");
-      return;
-    }
-
-    event_log_writer = ev_writer;
-    initEventLogWriter();
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
@@ -514,6 +506,17 @@ initEventLogging(const EventLogWriter *ev_writer)
 #if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
 #endif
+}
+
+bool
+startEventLogging(const EventLogWriter *ev_writer)
+{
+    if (event_log_writer) {
+        return false;
+    }
+
+    event_log_writer = ev_writer;
+    initEventLogWriter();
 
     postHeaderEvents();
 
@@ -527,6 +530,7 @@ initEventLogging(const EventLogWriter *ev_writer)
     for (uint32_t c = 0; c < n_caps; ++c) {
         postBlockMarker(&capEventBuf[c]);
     }
+    return true;
 }
 
 void
