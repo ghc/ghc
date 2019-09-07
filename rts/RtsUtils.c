@@ -79,7 +79,7 @@ stgMallocBytes (size_t n, char *msg)
       rtsConfig.mallocFailHook((W_) n, msg);
       stg_exit(EXIT_INTERNAL_ERROR);
     }
-    IF_DEBUG(sanity, memset(space, 0xbb, n));
+    IF_DEBUG(zero_on_gc, memset(space, 0xbb, n));
     return space;
 }
 
