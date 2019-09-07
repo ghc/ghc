@@ -1161,6 +1161,7 @@ recommended for everyday use!
 .. rts-flag::  -Dg  DEBUG: gc
 .. rts-flag::  -Db  DEBUG: block
 .. rts-flag::  -DS  DEBUG: sanity
+.. rts-flag::  -DZ  DEBUG: zero freed memory on GC
 .. rts-flag::  -Dt  DEBUG: stable
 .. rts-flag::  -Dp  DEBUG: prof
 .. rts-flag::  -Da  DEBUG: apply
