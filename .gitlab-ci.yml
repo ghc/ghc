@@ -18,13 +18,20 @@ before_script:
 stages:
   - lint       # Source linting
   - build      # A quick smoke-test to weed out broken commits
+  - full-build # Build all the things
+  - cleanup    # See Note [Cleanup after the shell executor]
+  - packaging  # Source distribution, etc.
+  - testing    # head.hackage correctness and compiler performance testing
+  - deploy     # push documentation
 
+# N.B.Don't run on wip/ branches, instead on run on merge requests.
 .only-default: &only-default
   only:
     - master
     - /ghc-[0-9]+\.[0-9]+/
     - merge_requests
     - tags
+    - web
 
 ############################################################
 # Runner Tags
