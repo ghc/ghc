@@ -207,7 +207,7 @@ defaultFlavour = Flavour
     { name               = "default"
     , args               = defaultArgs
     , packages           = defaultPackages
-    , integerLibrary     = (\x -> if x then integerSimple else integerGmp) <$> cmdIntegerSimple
+    , integerLibrary     = selectIntegerLibrary
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
@@ -215,6 +215,14 @@ defaultFlavour = Flavour
     , ghcProfiled        = False
     , ghcDebugged        = False
     , ghcDocs            = cmdDocsArgs }
+  where
+   selectIntegerLibrary = do
+      openssl <- cmdIntegerOpenSSL
+      simple <- cmdIntegerSimple
+      case (openssl, simple) of
+        (False, False) -> return integerGmp
+        (True, _) -> return integerSimple
+        (_, True) -> return integerOpenSSL
 
 -- | Default logic for determining whether to build
 --   dynamic GHC programs.

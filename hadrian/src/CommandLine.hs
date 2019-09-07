@@ -1,6 +1,6 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerOpenSSL,
+    cmdIntegerSimple, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -24,6 +24,7 @@ data CommandLineArgs = CommandLineArgs
     { configure      :: Bool
     , flavour        :: Maybe String
     , freeze1        :: Bool
+    , integerOpenSSL :: Bool
     , integerSimple  :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
@@ -38,6 +39,7 @@ defaultCommandLineArgs = CommandLineArgs
     { configure      = False
     , flavour        = Nothing
     , freeze1        = False
+    , integerOpenSSL = False
     , integerSimple  = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
@@ -98,6 +100,9 @@ readBuildRoot ms =
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
+
+readIntegerOpenSSL :: Either String (CommandLineArgs -> CommandLineArgs)
+readIntegerOpenSSL = Right $ \flags -> flags { integerOpenSSL = True }
 
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
@@ -222,6 +227,11 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
+    -- NOTE(SN) --integer-simple overrides this when also provided. A single
+    -- option --integer (gmp, openssl, simple) could avoid that, but would be a
+    -- breaking change.
+    , Option [] ["integer-openssl"] (NoArg readIntegerOpenSSL)
+      "Build GHC with integer-openssl library."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
@@ -314,6 +324,9 @@ lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
+
+cmdIntegerOpenSSL :: Action Bool
+cmdIntegerOpenSSL = integerOpenSSL <$> cmdLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs

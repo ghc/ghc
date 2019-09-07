@@ -4,8 +4,8 @@ module Packages (
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
-    ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
-    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
+    ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps, hpc,
+    hpcBin, integerGmp, integerOpenSSL, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
@@ -35,8 +35,8 @@ ghcPackages =
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
     , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
-    , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
-    , parsec, pretty, process, rts, runGhc, stm, templateHaskell
+    , hpc, hpcBin, integerGmp, integerOpenSSL, integerSimple, iserv, libffi
+    , libiserv, mtl, parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout ]
 
