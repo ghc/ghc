@@ -37,8 +37,6 @@ import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookup
 import SrcLoc
 import TcHsSyn                    ( hsLitType, hsPatType )
 import Type                       ( mkFunTys, Type )
-import Type                       ( mkVisFunTys, Type )
-import Type                       ( mkVisFunTys, Type)
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, EvId, Var, setVarName, varName, varType, varUnique )
 import TcRnTypes
@@ -113,7 +111,7 @@ instance ModifyState Name where
 
 instance ModifyState Id where
   addSubstitution mono poly hs =
-    hs{name_remapping = M.insert (varName mono) poly (name_remapping hs)}
+    hs{name_remapping = extendNameEnv (name_remapping hs) (varName mono) poly }
 
 modifyState :: ModifyState (IdP p) => [ABExport p] -> HieState -> HieState
 modifyState = foldr go id
