@@ -1451,6 +1451,22 @@ stg_writeTVarzh (P_ tvar,     /* :: TVar a */
  *
  * -------------------------------------------------------------------------- */
 
+stg_pauseThread ( P_ thread_id ) /* :: TheadId -> State# RW -> (# State# RW, MVar# () #) */
+{
+    P_ msg;
+    ALLOC_PRIM_P (SIZEOF_MessagePauseThread, stg_pauseThread, thread_id);
+    msg = Hp - SIZEOF_MessagePauseThread + WDS(1);
+
+    (P_ mvar) = call stg_newMVarzh();
+
+    SET_HDR(msg, stg_MSG_PAUSE_THREAD_info, CCCS);
+    MessagePauseThread_mvar(msg) = mvar;
+    MessagePauseThread_tso(msg) = tso;
+    ccall sendMessage(cap, StgTSO_cap(tso), msg);
+    
+    return (mvar);
+}
+
 stg_isEmptyMVarzh ( P_ mvar /* :: MVar a */ )
 {
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {

@@ -63,6 +63,7 @@ RTS_RET(stg_maskAsyncExceptionszh_ret);
 RTS_RET(stg_stack_underflow_frame);
 RTS_RET(stg_restore_cccs);
 RTS_RET(stg_restore_cccs_eval);
+RTS_RET(stg_pause_thread);
 
 // RTS_FUN(stg_interp_constr1_entry);
 // RTS_FUN(stg_interp_constr2_entry);
@@ -130,6 +131,7 @@ RTS_ENTRY(stg_STM_AWOKEN);
 RTS_ENTRY(stg_MSG_TRY_WAKEUP);
 RTS_ENTRY(stg_MSG_THROWTO);
 RTS_ENTRY(stg_MSG_BLACKHOLE);
+RTS_ENTRY(stg_MSG_PAUSE_THREAD);
 RTS_ENTRY(stg_MSG_NULL);
 RTS_ENTRY(stg_MVAR_TSO_QUEUE);
 RTS_ENTRY(stg_catch);

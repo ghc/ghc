@@ -556,6 +556,11 @@ wanteds os = concat
           ,closureField C "MessageBlackHole" "tso"
           ,closureField C "MessageBlackHole" "bh"
 
+          ,closureSize  C "MessagePauseThread"
+          ,closureField C "MessagePauseThread" "link"
+          ,closureField C "MessagePauseThread" "tso"
+          ,closureField C "MessagePauseThread" "mvar"
+
           ,closureSize  C "StgCompactNFData"
           ,closureField C "StgCompactNFData" "totalW"
           ,closureField C "StgCompactNFData" "autoBlockW"

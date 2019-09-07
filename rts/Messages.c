@@ -77,6 +77,15 @@ loop:
                       (W_)tso->id);
         tryWakeupThread(cap, tso);
     }
+    else if (i == &stg_MSG_PAUSE_THREAD_info)
+    {
+        MessagePauseThread *t = (MessagePauseThread *)m;
+        StgStack *stack = t->tso->stackobj;
+        stack->sp += sizeofW(StgPauseThread);
+        StgPauseThread *frame = (StgPauseThread *) stack->sp;
+        frame->mvar = t->mvar;
+        frame->header.info = &stg_pause_thread_info;
+    }
     else if (i == &stg_MSG_THROWTO_info)
     {
         MessageThrowTo *t = (MessageThrowTo *)m;

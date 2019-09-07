@@ -2892,6 +2892,12 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop PauseThread "pauseThread#" GenPrimOp
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, MVar# RealWorld () #)
+   with
+   out_of_line = True
+   has_side_effects = True
+
 primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    State# s -> State# s
    with

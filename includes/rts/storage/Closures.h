@@ -171,6 +171,11 @@ typedef struct _StgUpdateFrame {
 
 typedef struct {
     StgHeader  header;
+    struct StgMVar_ *mvar;
+} StgPauseThread;
+
+typedef struct {
+    StgHeader  header;
     StgWord    exceptions_blocked;
     StgClosure *handler;
 } StgCatchFrame;
@@ -279,7 +284,7 @@ typedef struct StgMVarTSOQueue_ {
     struct StgTSO_          *tso;
 } StgMVarTSOQueue;
 
-typedef struct {
+typedef struct StgMVar_ {
     StgHeader                header;
     struct StgMVarTSOQueue_ *head;
     struct StgMVarTSOQueue_ *tail;
@@ -411,6 +416,13 @@ typedef struct MessageBlackHole_ {
     StgTSO     *tso;
     StgClosure *bh;
 } MessageBlackHole;
+
+typedef struct MessagePauseThread_ {
+    StgHeader   header;
+    Message    *link;
+    StgTSO     *tso;
+    StgMVar    *mvar;
+} MessagePauseThread;
 
 /* ----------------------------------------------------------------------------
    Compact Regions

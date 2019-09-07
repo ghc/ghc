@@ -68,6 +68,16 @@ INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
     jump stg_ap_0_fast(ret);
 }
 
+INFO_TABLE_RET (stg_pause_thread, RET_SMALL)
+    /* explicit stack */
+{
+    P_ mvar;
+    mvar = Sp(1);
+    Sp_adj(2);
+    R1 = mvar;
+    jump stg_takeMVarzh [R1];
+}
+
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
@@ -581,6 +591,9 @@ INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
 // used to overwrite a MSG_THROWTO when the message has been used/revoked
 INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
 { foreign "C" barf("MSG_NULL object (%p) entered!", R1) never returns; }
+
+INFO_TABLE_CONSTR(stg_MSG_PAUSE_THREAD,1,0,0,PRIM,"MSG_PAUSE_THREAD","MSG_PAUSE_THREAD")
+{ foreign "C" barf("MSG_PAUSE_THREAD object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
