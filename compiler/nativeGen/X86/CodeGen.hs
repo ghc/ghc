@@ -87,9 +87,9 @@ import Data.Word
 import qualified Data.Map as M
 
 is32BitPlatform :: NatM Bool
-is32BitPlatform = do
-    dflags <- getDynFlags
-    return $ target32Bit (targetPlatform dflags)
+is32BitPlatform = return False
+
+is32Bit = False
 
 sse2Enabled :: NatM Bool
 sse2Enabled = do
@@ -506,7 +506,7 @@ getRegister e = do dflags <- getDynFlags
 
 getRegister' :: DynFlags -> Bool -> CmmExpr -> NatM Register
 
-getRegister' dflags is32Bit (CmmReg reg)
+getRegister' dflags _is32Bit (CmmReg reg)
   = case reg of
         CmmGlobal PicBaseReg
          | is32Bit ->
@@ -526,34 +526,33 @@ getRegister' dflags is32Bit (CmmReg reg)
                              (getRegisterReg platform  reg)
                              nilOL)
 
+getRegister' dflags _is32Bit (CmmRegOff r n)
+  = getRegister' dflags $ mangleIndexTree dflags r n
 
-getRegister' dflags is32Bit (CmmRegOff r n)
-  = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
-
-getRegister' dflags is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
+getRegister' dflags _is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
   = addAlignmentCheck align <$> getRegister' dflags is32Bit e
 
 -- for 32-bit architectures, support some 64 -> 32 bit conversions:
 -- TO_W_(x), TO_W_(x >> 32)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
+getRegister' _ _is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32)
+getRegister' _ _is32Bit (CmmMachOp (MO_SS_Conv W64 W32)
                      [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
  | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W32) [x])
+getRegister' _ _is32Bit (CmmMachOp (MO_UU_Conv W64 W32) [x])
  | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
+getRegister' _ _is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
  | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
@@ -591,43 +590,43 @@ getRegister' _ _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _]) = do
   return (Any II32 code)
 
 -- catch simple cases of zero- or sign-extended load
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOV II32) addr -- 32-bit loads zero-extend
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _])
+getRegister' _ _is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _])
  | not is32Bit = do
   code <- intLoadCode (MOVSxL II32) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
+getRegister' _ _is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
                                      CmmLit displacement])
  | not is32Bit = do
       return $ Any II64 (\dst -> unitOL $
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
-getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
+getRegister' dflags _is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
     case mop of
       MO_F_Neg w  -> sse2NegCode w x
 
@@ -759,7 +758,7 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                  return (swizzleRegisterRep e_code new_format)
 
 
-getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+getRegister' _ _is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   case mop of
       MO_F_Eq _ -> condFltReg is32Bit EQQ x y
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
@@ -986,7 +985,7 @@ getRegister' _ _ (CmmLoad mem pk)
     Amode addr mem_code <- getAmode mem
     loadFloatAmode  (typeWidth pk) addr mem_code
 
-getRegister' _ is32Bit (CmmLoad mem pk)
+getRegister' _ _is32Bit (CmmLoad mem pk)
   | is32Bit && not (isWord64 pk)
   = do
     code <- intLoadCode instr mem
@@ -1004,14 +1003,14 @@ getRegister' _ is32Bit (CmmLoad mem pk)
         -- simpler we do our 8-bit arithmetic with full 32-bit registers.
 
 -- Simpler memory load code on x86_64
-getRegister' _ is32Bit (CmmLoad mem pk)
+getRegister' _ _is32Bit (CmmLoad mem pk)
  | not is32Bit
   = do
     code <- intLoadCode (MOV format) mem
     return (Any format code)
   where format = intFormat $ typeWidth pk
 
-getRegister' _ is32Bit (CmmLit (CmmInt 0 width))
+getRegister' _ _is32Bit (CmmLit (CmmInt 0 width))
   = let
         format = intFormat width
 
@@ -1028,7 +1027,7 @@ getRegister' _ is32Bit (CmmLit (CmmInt 0 width))
   -- optimisation for loading small literals on x86_64: take advantage
   -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
   -- instruction forms are shorter.
-getRegister' dflags is32Bit (CmmLit lit)
+getRegister' dflags _is32Bit (CmmLit lit)
   | not is32Bit, isWord64 (cmmLitType dflags lit), not (isBigLit lit)
   = let
         imm = litToImm lit
@@ -1126,7 +1125,7 @@ getAmode' :: Bool -> CmmExpr -> NatM Amode
 getAmode' _ (CmmRegOff r n) = do dflags <- getDynFlags
                                  getAmode $ mangleIndexTree dflags r n
 
-getAmode' is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
+getAmode' _is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
                                                   CmmLit displacement])
  | not is32Bit
     = return $ Amode (ripRel (litToImm displacement)) nilOL
@@ -1134,14 +1133,14 @@ getAmode' is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
 
 -- This is all just ridiculous, since it carefully undoes
 -- what mangleIndexTree has just done.
-getAmode' is32Bit (CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)])
+getAmode' _is32Bit (CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)])
   | is32BitLit is32Bit lit
   -- ASSERT(rep == II32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (-(fromInteger i))
        return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-getAmode' is32Bit (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
+getAmode' _is32Bit (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
   | is32BitLit is32Bit lit
   -- ASSERT(rep == II32)???
   = do (x_reg, x_code) <- getSomeReg x
@@ -1150,7 +1149,7 @@ getAmode' is32Bit (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
 
 -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
 -- recognised by the next rule.
-getAmode' is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
+getAmode' _is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
                                   b@(CmmLit _)])
   = getAmode' is32Bit (CmmMachOp (MO_Add rep) [b,a])
 
@@ -1177,7 +1176,7 @@ getAmode' _ (CmmMachOp (MO_Add _)
 getAmode' _ (CmmMachOp (MO_Add _) [x,y])
   = x86_complex_amode x y 0 0
 
-getAmode' is32Bit (CmmLit lit) | is32BitLit is32Bit lit
+getAmode' _is32Bit (CmmLit lit) | is32BitLit is32Bit lit
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
 
 getAmode' _ expr = do
@@ -1189,7 +1188,7 @@ getAmode' _ expr = do
 -- registers on x86 when using instructions such as cmpxchg, which can
 -- use up to three virtual registers and one fixed register.
 getSimpleAmode :: DynFlags -> Bool -> CmmExpr -> NatM Amode
-getSimpleAmode dflags is32Bit addr
+getSimpleAmode dflags _is32Bit addr
     | is32Bit = do
         addr_code <- getAnyReg addr
         addr_r <- getNewRegNat (intFormat (wordWidth dflags))
@@ -1315,7 +1314,7 @@ getOperand_generic e = do
 
 isOperand :: Bool -> CmmExpr -> Bool
 isOperand _ (CmmLoad _ _) = True
-isOperand is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
+isOperand _is32Bit (CmmLit lit)  = is32BitLit is32Bit lit
                           || isSuitableFloatingPointLit lit
 isOperand _ _            = False
 
@@ -1386,7 +1385,7 @@ getRegOrMem e = do
     return (OpReg reg, code)
 
 is32BitLit :: Bool -> CmmLit -> Bool
-is32BitLit is32Bit (CmmInt i W64)
+is32BitLit _is32Bit (CmmInt i W64)
  | not is32Bit
     = -- assume that labels are in the range 0-2^31-1: this assumes the
       -- small memory model (see gcc docs, -mcmodel=small).
@@ -1450,7 +1449,7 @@ condIntCode cond x y = do is32Bit <- is32BitPlatform
 condIntCode' :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM CondCode
 
 -- memory vs immediate
-condIntCode' is32Bit cond (CmmLoad x pk) (CmmLit lit)
+condIntCode' _is32Bit cond (CmmLoad x pk) (CmmLit lit)
  | is32BitLit is32Bit lit = do
     Amode x_addr x_code <- getAmode x
     let
@@ -1462,7 +1461,7 @@ condIntCode' is32Bit cond (CmmLoad x pk) (CmmLit lit)
 
 -- anything vs zero, using a mask
 -- TODO: Add some sanity checking!!!!
-condIntCode' is32Bit cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 pk))
+condIntCode' _is32Bit cond (CmmMachOp (MO_And _) [x,o2]) (CmmLit (CmmInt 0 pk))
     | (CmmLit lit@(CmmInt mask _)) <- o2, is32BitLit is32Bit lit
     = do
       (x_reg, x_code) <- getSomeReg x
@@ -1482,7 +1481,7 @@ condIntCode' _ cond x (CmmLit (CmmInt 0 pk)) = do
     return (CondCode False cond code)
 
 -- anything vs operand
-condIntCode' is32Bit cond x y
+condIntCode' _is32Bit cond x y
  | isOperand is32Bit y = do
     dflags <- getDynFlags
     (x_reg, x_code) <- getNonClobberedReg x
@@ -1594,7 +1593,7 @@ assignMem_IntCode pk addr src = do
     return code
   where
     get_op_RI :: Bool -> CmmExpr -> NatM (InstrBlock,Operand)   -- code, operator
-    get_op_RI is32Bit (CmmLit lit) | is32BitLit is32Bit lit
+    get_op_RI _is32Bit (CmmLit lit) | is32BitLit is32Bit lit
       = return (nilOL, OpImm (litToImm lit))
     get_op_RI _ op
       = do (reg,code) <- getNonClobberedReg op
@@ -1686,7 +1685,7 @@ genCondBranch' :: Bool -> BlockId -> BlockId -> BlockId -> CmmExpr
                -> NatM InstrBlock
 
 -- 64-bit integer comparisons on 32-bit
-genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
+genCondBranch' _is32Bit _bid true false (CmmMachOp mop [e1,e2])
   | is32Bit, Just W64 <- maybeIntComparison mop = do
   ChildCode64 code1 r1_lo <- iselExpr64 e1
   ChildCode64 code2 r2_lo <- iselExpr64 e2
@@ -1894,7 +1893,7 @@ genCCall _ _ (PrimTarget MO_WriteBarrier) _ _ _ = return nilOL
 
 genCCall _ _ (PrimTarget MO_Touch) _ _ _ = return nilOL
 
-genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] _ =
+genCCall _ _is32Bit (PrimTarget (MO_Prefetch_Data n )) _  [src] _ =
         case n of
             0 -> genPrefetch src $ PREFETCH NTA  format
             1 -> genPrefetch src $ PREFETCH Lvl2 format
@@ -1904,7 +1903,7 @@ genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] _ =
             -- the c / llvm prefetch convention is 0, 1, 2, and 3
             -- the x86 corresponding names are : NTA, 2 , 1, and 0
    where
-        format = archWordFormat is32bit
+        format = archWordFormat is32Bit
         -- need to know what register width for pointers!
         genPrefetch inRegSrc prefetchCTor =
             do
@@ -1915,7 +1914,7 @@ genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] _ =
                               ((AddrBaseIndex (EABaseReg src_r )   EAIndexNone (ImmInt 0))))  ))
                   -- prefetch always takes an address
 
-genCCall dflags is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] _ = do
+genCCall dflags _is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] _ = do
     let platform = targetPlatform dflags
     let dst_r = getRegisterReg platform (CmmLocal dst)
     case width of
@@ -1937,7 +1936,7 @@ genCCall dflags is32Bit (PrimTarget (MO_BSwap width)) [dst] [src] _ = do
   where
     format = intFormat width
 
-genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
+genCCall dflags _is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] bid = do
     sse4_2 <- sse4_2Enabled
     let platform = targetPlatform dflags
@@ -1968,7 +1967,7 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (popCntLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
+genCCall dflags _is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
          args@[src, mask] bid = do
     let platform = targetPlatform dflags
     if isBmi2Enabled dflags
@@ -2001,7 +2000,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Pdep width)) dest_regs@[dst]
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (pdepLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
+genCCall dflags _is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
          args@[src, mask] bid = do
     let platform = targetPlatform dflags
     if isBmi2Enabled dflags
@@ -2034,7 +2033,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Pext width)) dest_regs@[dst]
     format = intFormat width
     lbl = mkCmmCodeLabel primUnitId (fsLit (pextLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
+genCCall dflags _is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] bid
   | is32Bit && width == W64 = do
     -- Fallback to `hs_clz64` on i386
     targetExpr <- cmmMakeDynamicReference dflags CallReference lbl
@@ -2078,7 +2077,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] b
     platform = targetPlatform dflags
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
+genCCall dflags _is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
   | is32Bit, width == W64 = do
       ChildCode64 vcode rlo <- iselExpr64 src
       let rhi     = getHiVRegFromLo rlo
@@ -2155,7 +2154,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
     bw = widthInBits width
     platform = targetPlatform dflags
 
-genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
+genCCall dflags _is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference dflags
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
@@ -2165,7 +2164,7 @@ genCCall dflags is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
   where
     lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
 
-genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop))
+genCCall dflags _is32Bit (PrimTarget (MO_AtomicRMW width amop))
                                            [dst] [addr, n] bid = do
     Amode amode addr_code <-
         if amop `elem` [AMO_Add, AMO_Sub]
@@ -2238,7 +2237,7 @@ genCCall _ _ (PrimTarget (MO_AtomicWrite width)) [] [addr, val] _ = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ code `snocOL` MFENCE
 
-genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = do
+genCCall dflags _is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = do
     -- On x86 we don't have enough registers to use cmpxchg with a
     -- complicated addressing mode, so on that architecture we
     -- pre-compute the address first.
@@ -2259,7 +2258,7 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _
   where
     format = intFormat width
 
-genCCall _ is32Bit target dest_regs args bid = do
+genCCall _ _is32Bit target dest_regs args bid = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
   case (target, dest_regs) of
@@ -2964,8 +2963,7 @@ genSwitch dflags expr targets
            -- getNonClobberedReg because it needs to survive across t_code
         lbl <- getNewLabelNat
         dflags <- getDynFlags
-        let is32bit = target32Bit (targetPlatform dflags)
-            os = platformOS (targetPlatform dflags)
+        let os = platformOS (targetPlatform dflags)
             -- Might want to use .rodata.<function we're in> instead, but as
             -- long as it's something unique it'll work out since the
             -- references to the jump table are in the appropriate section.
@@ -2975,7 +2973,7 @@ genSwitch dflags expr targets
               -- ld64 is unable to handle the relocations for
               --     .quad L1 - L0
               -- if L0 is not preceded by a non-anonymous label in its section.
-              OSDarwin | not is32bit -> Section Text lbl
+              OSDarwin | not is32Bit -> Section Text lbl
               _ -> Section ReadOnlyData lbl
         dynRef <- cmmMakeDynamicReference dflags DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
@@ -2983,7 +2981,7 @@ genSwitch dflags expr targets
                                        (EAIndex reg (wORD_SIZE dflags)) (ImmInt 0))
 
         offsetReg <- getNewRegNat (intFormat (wordWidth dflags))
-        return $ if is32bit || os == OSDarwin
+        return $ if is32Bit || os == OSDarwin
                  then e_code `appOL` t_code `appOL` toOL [
                                 ADD (intFormat (wordWidth dflags)) op (OpReg tableReg),
                                 JMP_TBL (OpReg tableReg) ids rosection lbl
@@ -3118,7 +3116,7 @@ condIntReg cond x y = do
 -- and plays better with the uOP cache.
 
 condFltReg :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM Register
-condFltReg is32Bit cond x y = condFltReg_sse2
+condFltReg _is32Bit cond x y = condFltReg_sse2
  where
 
 
@@ -3227,7 +3225,7 @@ trivialCode width instr m a b
 trivialCode' :: Bool -> Width -> (Operand -> Operand -> Instr)
              -> Maybe (Operand -> Operand -> Instr)
              -> CmmExpr -> CmmExpr -> NatM Register
-trivialCode' is32Bit width _ (Just revinstr) (CmmLit lit_a) b
+trivialCode' _is32Bit width _ (Just revinstr) (CmmLit lit_a) b
   | is32BitLit is32Bit lit_a = do
   b_code <- getAnyReg b
   let
