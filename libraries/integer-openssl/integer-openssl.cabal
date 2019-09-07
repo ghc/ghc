@@ -1,0 +1,88 @@
+name:           integer-openssl
+version:        0.1.0
+cabal-version:  >= 2.0
+author:         Sebastian Nagel
+maintainer:     sebastian.nagel@ncoding.at
+copyright:      2018 Sebastian Nagel
+license:        BSD3
+license-file:   LICENSE
+category:       Numeric, Algebra
+build-type:     Simple
+synopsis:       Integer library using openssl's bignum
+description:
+  Implementation of the 'Integer' type using the <https://www.openssl.org/ OpenSSL BIGNUM>
+  arbitrary size integer library.
+
+extra-source-files:
+  README.md
+
+source-repository head
+  type: git
+  location: https://github.com/ch1bo/integer-openssl
+
+flag redefine-unit-id
+  description: Rewrite package name without version, used for usage in ghc
+  default:     False
+
+flag integer-simple
+  description: Test and benchmark against integer-simple package instead of integer-gmp
+  default:     False
+
+library
+  default-language: Haskell2010
+  hs-source-dirs: src/
+  exposed-modules: GHC.Integer
+                 , GHC.Integer.Internals
+                 , GHC.Integer.Type
+                 , GHC.Integer.Logarithms
+                 , GHC.Integer.Logarithms.Internals
+  build-depends: ghc-prim >= 0.5.1.0
+  extra-libraries: crypto
+  includes: openssl/bn.h
+  c-sources: wrappers.c
+  -- We need to set the unit ID to integer-wired-in
+  -- (without a version number) as it's magic.
+  -- See Note [The integer library] in PrelNames
+  ghc-options: -this-unit-id integer-wired-in
+               -Wcompat
+               -Wall
+
+-- Internal helper library to re-export GHC.Integer module
+-- library integer-openssl-internal
+--   default-language: Haskell2010
+--   build-depends: integer-openssl
+--   reexported-modules: GHC.Integer as OpenSSL.GHC.Integer
+--                     , GHC.Integer.Type as OpenSSL.GHC.Integer.Type
+
+-- test-suite integer-openssl-test
+--   type: exitcode-stdio-1.0
+--   main-is: Spec.hs
+--   hs-source-dirs: test
+--   default-language: Haskell2010
+--   ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--   build-depends: base >=4.7 && <5
+--                , ghc-prim
+--                , hspec
+--                , integer-openssl-internal
+--                , QuickCheck
+
+--   if flag(integer-simple)
+--     build-depends: integer-simple
+--   else
+--     build-depends: integer-gmp
+
+-- benchmark integer-openssl-bench
+--   type: exitcode-stdio-1.0
+--   main-is: Bench.hs
+--   hs-source-dirs: bench
+--   default-language: Haskell2010
+--   ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--   build-depends: base >=4.7 && <5
+--                , ghc-prim
+--                , criterion
+--                , integer-openssl-internal
+
+--   if flag(integer-simple)
+--     build-depends: integer-simple
+--   else
+--     build-depends: integer-gmp
