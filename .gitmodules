@@ -93,7 +93,7 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = ../haddock.git
+	url = https://github.com/mpickering/haddock.git
 	ignore = untracked
 	branch = ghc-head
 [submodule "nofib"]
