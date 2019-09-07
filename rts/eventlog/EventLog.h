@@ -28,6 +28,10 @@ void abortEventLogging(void); // #4512 - after fork child needs to abort
 void flushEventLog(void);     // event log inherited from parent
 void moreCapEventBufs (uint32_t from, uint32_t to);
 
+
+// Get the current timestamp, used externally to fake timestamps for LDV
+// profiling events
+StgWord64 time_ns(void);
 /*
  * Post a scheduler event to the capability's event buffer (an event
  * that has an associated thread).
@@ -140,6 +144,7 @@ void postTaskDeleteEvent (EventTaskId taskId);
 void postHeapProfBegin(StgWord8 profile_id);
 
 void postHeapProfSampleBegin(StgInt era);
+void postHeapBioProfSampleBegin(StgInt era, StgWord64 time_ns);
 void postHeapProfSampleEnd(StgInt era);
 
 void postHeapProfSampleString(StgWord8 profile_id,
