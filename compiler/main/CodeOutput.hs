@@ -70,9 +70,10 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                     then Stream.mapM do_lint cmm_stream
                     else cmm_stream
 
-              do_lint cmm = withTiming (pure dflags)
-                                       (text "CmmLint"<+>brackets (ppr this_mod))
-                                       (const ()) $ do
+              do_lint cmm = withTimingSilent
+                  (pure dflags)
+                  (text "CmmLint"<+>brackets (ppr this_mod))
+                  (const ()) $ do
                 { case cmmLint dflags cmm of
                         Just err -> do { log_action dflags
                                                    dflags

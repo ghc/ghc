@@ -71,7 +71,7 @@ codeGen dflags this_mod data_tycons
         ; cgref <- liftIO $ newIORef =<< initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
-                cmm <- liftIO . withTiming (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
+                cmm <- liftIO . withTimingSilent (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 
