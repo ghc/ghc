@@ -1152,9 +1152,32 @@ recommended for everyday use!
     messages from the scheduler. Use ``+RTS -?`` to find out which debug
     flags are supported.
 
+    Full list of currently supported flags:
+
+.. rts-flag::  -Ds  DEBUG: scheduler
+.. rts-flag::  -Di  DEBUG: interpreter
+.. rts-flag::  -Dw  DEBUG: weak
+.. rts-flag::  -DG  DEBUG: gccafs
+.. rts-flag::  -Dg  DEBUG: gc
+.. rts-flag::  -Db  DEBUG: block
+.. rts-flag::  -DS  DEBUG: sanity
+.. rts-flag::  -DZ  DEBUG: zeroongc
+.. rts-flag::  -Dt  DEBUG: stable
+.. rts-flag::  -Dp  DEBUG: prof
+.. rts-flag::  -Da  DEBUG: apply
+.. rts-flag::  -Dl  DEBUG: linker
+.. rts-flag::  -Dm  DEBUG: stm
+.. rts-flag::  -Dz  DEBUG: stack squeezing
+.. rts-flag::  -Dc  DEBUG: program coverage
+.. rts-flag::  -Dr  DEBUG: sparks
+.. rts-flag::  -DC  DEBUG: compact
+
     Debug messages will be sent to the binary event log file instead of
     stdout if the :rts-flag:`-l` option is added. This might be useful for
     reducing the overhead of debug tracing.
+
+    To figure out what exactly they do, the least bad way is to grep the rts/ directory in
+    the ghc code for macros like ``DEBUG(scheduler`` or ``DEBUG_scheduler``.
 
 .. rts-flag:: -r ⟨file⟩
 
