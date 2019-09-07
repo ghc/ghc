@@ -95,7 +95,7 @@
 	path = utils/haddock
 	url = https://github.com/mpickering/haddock.git
 	ignore = untracked
-	branch = ghc-head
+	branch = 8.8-tc-hie
 [submodule "nofib"]
 	path = nofib
 	url = ../nofib.git
