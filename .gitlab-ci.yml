@@ -18,11 +18,6 @@ before_script:
 stages:
   - lint       # Source linting
   - build      # A quick smoke-test to weed out broken commits
-  - full-build # Build all the things
-  - cleanup    # See Note [Cleanup on Windows]
-  - packaging  # Source distribution, etc.
-  - hackage    # head.hackage testing
-  - deploy     # push documentation
 
 .only-default: &only-default
   only:
@@ -176,7 +171,7 @@ validate-x86_64-linux-deb8-hadrian:
     - ./configure $CONFIGURE_ARGS
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror
+      make V=0 -j$THREADS
     - |
       make binary-dist TAR_COMP_OPTS="-1"
     - |
@@ -468,7 +463,7 @@ release-x86_64-linux-centos7:
 
 validate-x86_64-linux-fedora27:
   extends: .validate-linux
-  stage: full-build
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
