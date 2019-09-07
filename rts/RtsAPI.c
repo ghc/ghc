@@ -705,6 +705,8 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 #else
 RtsPaused rts_pause (void)
 {
+    errorBelch("Warning: Pausing the RTS is only possible for "
+               "multithreaded RTS.");
     struct RtsPaused_ paused;
     paused.pausing_task = NULL;
     paused.capabilities = NULL;
@@ -713,15 +715,21 @@ RtsPaused rts_pause (void)
 
 void rts_unpause (RtsPaused  paused STG_UNUSED)
 {
+    errorBelch("Warning: Unpausing the RTS is only possible for "
+               "multithreaded RTS.");
 }
 
 
 void rts_listThreads(ListThreadsCb cb STG_UNUSED, void *user STG_UNUSED)
 {
+    errorBelch("Warning: Listing RTS-threads is only possible for "
+               "multithreaded RTS.");
 }
 
 void rts_listMiscRoots (ListRootsCb cb STG_UNUSED, void *user STG_UNUSED)
 {
+    errorBelch("Warning: Listing MiscRoots is only possible for "
+               "multithreaded RTS.");
 }
 #endif
 
