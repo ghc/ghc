@@ -14,6 +14,7 @@
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "ProfHeap.h"
+#include "eventlog/EventLog.h"
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
@@ -81,6 +82,7 @@ initLDVCtr( counter *ctr )
 
 typedef struct {
     double      time;    // the time in MUT time when the census is made
+    double     rtime;    // The eventlog time the census was made
     HashTable * hash;
     counter   * ctrs;
     Arena     * arena;
@@ -769,9 +771,10 @@ dumpCensus( Census *census )
     ssize_t count;
 
     printSample(true, census->time);
-    traceHeapProfSampleBegin(era);
+    traceHeapBioProfSampleBegin(era, census->rtime);
 
 #if defined(PROFILING)
+
     /* change typecast to uint64_t to remove
      * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -1174,6 +1177,10 @@ void heapCensus (Time t)
 
   census = &censuses[era];
   census->time  = mut_user_time_until(t);
+#if defined(PROFILING)
+  census->rtime = time_ns();
+#endif
+
 
   // calculate retainer sets if necessary
 #if defined(PROFILING)
