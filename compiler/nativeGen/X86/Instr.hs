@@ -47,10 +47,12 @@ import Debug (UnwindTable)
 import Control.Monad
 import Data.Maybe       (fromMaybe)
 
+is32Bit = False
+
 -- Format of an x86/x86_64 memory address, in bytes.
 --
 archWordFormat :: Bool -> Format
-archWordFormat is32Bit
+archWordFormat _is32Bit
  | is32Bit   = II32
  | otherwise = II64
 
@@ -672,7 +674,6 @@ x86_mkSpillInstr dflags reg delta slot
            RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel dflags off))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = targetPlatform dflags
-          is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
@@ -691,11 +692,9 @@ x86_mkLoadInstr dflags reg delta slot
               RcDouble  -> MOV FF64 (OpAddr (spRel dflags off)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
     where platform = targetPlatform dflags
-          is32Bit = target32Bit platform
 
 spillSlotSize :: Platform -> Int
 spillSlotSize dflags = if is32Bit then 12 else 8
-    where is32Bit = target32Bit dflags
 
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags

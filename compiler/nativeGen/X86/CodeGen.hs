@@ -527,7 +527,7 @@ getRegister' dflags _is32Bit (CmmReg reg)
                              nilOL)
 
 getRegister' dflags _is32Bit (CmmRegOff r n)
-  = getRegister' dflags $ mangleIndexTree dflags r n
+  = getRegister' dflags is32Bit $ mangleIndexTree dflags r n
 
 getRegister' dflags _is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
   = addAlignmentCheck align <$> getRegister' dflags is32Bit e
