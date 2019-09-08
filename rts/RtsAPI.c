@@ -19,6 +19,7 @@
 #include "Threads.h"
 #include "Weak.h"
 #include "StableName.h"
+#include "assert.h"
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -651,20 +652,18 @@ static bool rts_paused = false;
 // Halt execution of all Haskell threads.
 // It is different to rts_lock because it pauses all capabilities. rts_lock
 // only pauses a single capability.
-RtsPaused rts_pause (void)
+void rts_pause (RtsPaused * paused)
 {
-    struct RtsPaused_ paused;
-    paused.pausing_task = newBoundTask();
-    stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    paused->pausing_task = newBoundTask();
+    stopAllCapabilities(&paused->capabilities, paused->pausing_task);
     rts_paused = true;
-    return paused;
 }
 
-void rts_unpause (RtsPaused  paused)
+void rts_unpause (RtsPaused * paused)
 {
     rts_paused = false;
-    releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
-    freeTask(paused.pausing_task);
+    releaseAllCapabilities(n_capabilities, paused->capabilities, paused->pausing_task);
+    freeTask(paused->pausing_task);
 }
 
 
@@ -702,17 +701,36 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
 
-#else
-RtsPaused rts_pause (void)
+#else  // !DEFINED(THREADED_RTS)
+void rts_pause (RtsPaused * paused STG_UNUSED)
 {
-    struct RtsPaused_ paused;
-    paused.pausing_task = NULL;
-    paused.capabilities = NULL;
-    return paused;
+    ACQUIRE_LOCK(&nonThreadedPause.pauseLock);
+
+    // Wait until all previous pausers have unpaused the rts
+    while(nonThreadedPause.state != RUNNING){
+        waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
+    }
+
+    ++nonThreadedPause.pauseRequests;
+    nonThreadedPause.state = PAUSING;
+
+    // Wait for rts to actually pause
+    while(nonThreadedPause.state != PAUSED){
+        waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
+    }
+
+    RELEASE_LOCK(&nonThreadedPause.pauseLock);
 }
 
-void rts_unpause (RtsPaused  paused STG_UNUSED)
+void rts_unpause (RtsPaused * paused STG_UNUSED)
 {
+    ACQUIRE_LOCK(&NonTreadedPause.pauseLock);
+    assert(nonThreadedPause.state == PAUSED);
+    --nonThreadedPause.pauseRequests;
+    if (!nonThreadedPause.pauseRequests){
+        nonThreadedPause.state = STARTING;
+    }
+    RELEASE_LOCK(&nonThreadedPause.pauseRequestMutex);
 }
 
 

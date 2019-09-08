@@ -17,6 +17,7 @@
 #include "Interpreter.h"
 #include "Printer.h"
 #include "RtsSignals.h"
+#include "RtsAPI.h"
 #include "sm/Sanity.h"
 #include "Stats.h"
 #include "STM.h"
@@ -255,6 +256,27 @@ schedule (Capability *initialCapability, Task *task)
     //
     //   * We might be left with threads blocked in foreign calls,
     //     we should really attempt to kill these somehow (TODO).
+
+    #if !defined(THREADED_RTS)
+    if(nonThreadedPause.state == PAUSING){
+        ACQUIRE_LOCK(&nonThreadedPause.pauseLock);
+        if(nonThreadedPause.state == PAUSING){
+
+            nonThreadedPause.state = PAUSED;
+            broadcastCondition(&nonThreadedPause.stateChange);
+
+            while(nonThreadedPause.state != STARTING){
+                waitCondition(&nonThreadedPause.stateChange,
+                        &nonThreadedPause.pauseLock);
+            }
+
+            nonThreadedPause.state = RUNNING;
+            broadcastCondition(&nonThreadedPause.stateChange);
+        }
+
+        RELEASE_LOCK(&nonThreadedPause.pauseLock);
+    }
+    #endif
 
     switch (sched_state) {
     case SCHED_RUNNING:
@@ -2662,6 +2684,11 @@ initScheduler(void)
   blocked_queue_hd  = END_TSO_QUEUE;
   blocked_queue_tl  = END_TSO_QUEUE;
   sleeping_queue    = END_TSO_QUEUE;
+
+  initMutex(&nonThreadedPause.pauseLock);
+  initCondition(&nonThreadedPause.stateChange);
+  nonThreadedPause.pauseRequests = 0;
+  nonThreadedPause.state         = RUNNING;
 #endif
 
   sched_state    = SCHED_RUNNING;

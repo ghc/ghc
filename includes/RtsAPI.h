@@ -20,6 +20,7 @@ extern "C" {
 #include "rts/Time.h"
 #include "rts/Task.h"
 #include "rts/EventLogWriter.h"
+#include "rts/OSThreads.h"
 
 /*
  * Running the scheduler
@@ -453,8 +454,19 @@ typedef struct RtsPaused_ {
     Capability *capabilities;
 } RtsPaused;
 
-RtsPaused rts_pause (void);
-void rts_unpause (RtsPaused paused);
+
+#if !defined(THREADED_RTS)
+struct{
+    // Number of debuggers that want rts to pause
+    size_t pauseRequests;
+    enum {RUNNING, PAUSING, PAUSED, STARTING} state;
+    Mutex pauseLock;
+    Condition stateChange;
+} nonThreadedPause;
+#endif
+
+void rts_pause (/* out */ RtsPaused *paused);
+void rts_unpause (/* in */ RtsPaused *paused);
 
 // List all live threads. Must be done while RTS is paused.
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
