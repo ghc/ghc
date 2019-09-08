@@ -1,7 +1,7 @@
 #include "ghcconfig.h"
+#include "Rts.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "Rts.h"
 #include <string.h>
 
 #define ITERATIONS 1000
