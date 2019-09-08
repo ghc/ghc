@@ -1,8 +1,7 @@
-#include <stdio.h>
-
 #include "HsFFI.h"
-
 #include "fptr01.h"
+
+#include <stdio.h>
 
 void f( HsInt *i )
 {
