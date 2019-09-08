@@ -9,9 +9,6 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
-/* Useful in the headers that we share with the RTS */
-#define COMPILING_GHC 1
-
 /* Pull in all the platform defines for this build (foo_HOST_ARCH etc.) */
 #include "ghc_boot_platform.h"
 
