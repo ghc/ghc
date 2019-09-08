@@ -737,7 +737,14 @@ type instance XTick          (GhcPass _) = NoExtField
 type instance XBinTick       (GhcPass _) = NoExtField
 type instance XTickPragma    (GhcPass _) = NoExtField
 type instance XWrap          (GhcPass _) = NoExtField
-type instance XXExpr         (GhcPass _) = NoExtCon
+
+type instance XXExpr        GhcPs = NoExtCon
+type instance XXExpr        GhcRn = NoExtCon
+type instance XXExpr        GhcTc = HsHipHop
+
+-- | Aka HsWrap, but renamed for iterative development while replacing the
+-- constructor with a TTG extension.
+data HsHipHop = HsHipHop HsWrapper (HsExpr GhcTc)
 
 -- ---------------------------------------------------------------------
 
