@@ -21,8 +21,14 @@
 #pragma once
 
 #if defined(mingw32_HOST_OS)
+#  if defined(__USE_MINGW_ANSI_STDIO)
+#    if __USE_MINGW_ANSI_STDIO != 1
+#       error "Mismatch between __USE_MINGW_ANSI_STDIO definitions."
+#    endif
+#  else
 /* Inform mingw we want the ISO rather than Windows printf format specifiers. */
-#define __USE_MINGW_ANSI_STDIO 1
+#    define __USE_MINGW_ANSI_STDIO 1
+#endif
 #endif
 
 /* ISO C 99 says:

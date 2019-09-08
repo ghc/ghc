@@ -172,5 +172,4 @@ because we have no stdcall convention on 64 bits.
 See #9218
 */
 
-
 #include "EndPrivate.h"
