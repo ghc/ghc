@@ -1734,7 +1734,10 @@ wiredInDerivInfo tycon decl
   | DataDecl { tcdDataDefn = dataDefn } <- decl
   , HsDataDefn { dd_derivs = derivs } <- dataDefn
   = [ DerivInfo { di_rep_tc = tycon
-                , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars tycon)
+                , di_scoped_tvs =
+                    if isFunTyCon tycon || isPrimTyCon tycon
+                       then []  -- no tyConTyVars
+                       else mkTyVarNamePairs (tyConTyVars tycon)
                 , di_clauses = unLoc derivs
                 , di_ctxt = tcMkDeclCtxt decl } ]
 wiredInDerivInfo _ _ = []
