@@ -651,20 +651,18 @@ static bool rts_paused = false;
 // Halt execution of all Haskell threads.
 // It is different to rts_lock because it pauses all capabilities. rts_lock
 // only pauses a single capability.
-RtsPaused rts_pause (void)
+void rts_pause (RtsPaused * paused)
 {
-    struct RtsPaused_ paused;
-    paused.pausing_task = newBoundTask();
-    stopAllCapabilities(&paused.capabilities, paused.pausing_task);
+    paused->pausing_task = newBoundTask();
+    stopAllCapabilities(&paused->capabilities, paused->pausing_task);
     rts_paused = true;
-    return paused;
 }
 
-void rts_unpause (RtsPaused  paused)
+void rts_unpause (RtsPaused * paused)
 {
     rts_paused = false;
-    releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
-    freeTask(paused.pausing_task);
+    releaseAllCapabilities(n_capabilities, paused->capabilities, paused->pausing_task);
+    freeTask(paused->pausing_task);
 }
 
 
@@ -702,17 +700,29 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
     threadStablePtrTable(&list_roots_helper, (void *)&ctx);
 }
 
-#else
-RtsPaused rts_pause (void)
+#else  // !DEFINED(THREADED_RTS)
+void rts_pause (RtsPaused * paused STG_UNUSED)
 {
-    struct RtsPaused_ paused;
-    paused.pausing_task = NULL;
-    paused.capabilities = NULL;
-    return paused;
+    ACQUIRE_LOCK(&NonTreadedPause.pauseRequestMutex);
+    if (!NonThreadedPause.pauseRequests){
+        ACQUIRE_LOCK(&NonTreadedPause.pauseLock);
+    }
+    ++NonThreadedPause.pauseRequests;
+    RELEASE_LOCK(&NonTreadedPause.pauseRequestMutex);
+    // Wait for rts to actually pause
+    ACQUIRE_LOCK(&NonTreadedPause.runLock);
+    RELEASE_LOCK(&NonTreadedPause.runLock);
 }
 
-void rts_unpause (RtsPaused  paused STG_UNUSED)
+void rts_unpause (RtsPaused * paused STG_UNUSED)
 {
+    ACQUIRE_LOCK(&NonTreadedPause.pauseRequestMutex);
+    --NonThreadedPause.pauseRequests;
+    if (!NonThreadedPause.pauseRequests){
+        ACQUIRE_LOCK(&NonTreadedPause.runLock);
+        RELEASE_LOCK(&NonTreadedPause.pauseLock);
+    }
+    RELEASE_LOCK(&NonTreadedPause.pauseRequestMutex);
 }
 
 
