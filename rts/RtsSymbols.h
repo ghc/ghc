@@ -25,3 +25,8 @@ typedef struct _RtsSymbolVal {
 } RtsSymbolVal;
 
 extern RtsSymbolVal rtsSyms[];
+
+/* See Note [_iob_func symbol].  */
+#if defined(mingw32_HOST_OS)
+extern const void* __rts_iob_func;
+#endif

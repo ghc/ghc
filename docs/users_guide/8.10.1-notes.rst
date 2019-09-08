@@ -173,6 +173,10 @@ Compiler
   implemented correctly, and appears to be largely unused. This flag
   will be removed in a later version of GHC.
 
+- Windows bindist has been updated to GCC 9.2 and binutils 2.32.  These binaries have
+  been patched to no longer have have the MAX_PATH limit.  Windows users should no longer
+  have any issues with long path names.
+
 GHCi
 ~~~~
 
