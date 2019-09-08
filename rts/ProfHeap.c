@@ -771,7 +771,15 @@ dumpCensus( Census *census )
     ssize_t count;
 
     printSample(true, census->time);
-    traceHeapBioProfSampleBegin(era, census->rtime);
+
+
+    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+      traceHeapBioProfSampleBegin(era, census->rtime);
+    } else {
+      traceHeapProfSampleBegin(era);
+    }
+
+
 
 #if defined(PROFILING)
 
