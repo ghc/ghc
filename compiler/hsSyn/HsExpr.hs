@@ -746,6 +746,11 @@ type instance XXExpr        GhcTc = HsHipHop
 -- constructor with a TTG extension.
 data HsHipHop = HsHipHop HsWrapper (HsExpr GhcTc)
 
+instance Outputable HsHipHop where
+  ppr (HsHipHop co_fn e)
+    = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
+                                               else pprExpr e)
+
 -- ---------------------------------------------------------------------
 
 -- | Located Haskell Tuple Argument
@@ -1027,10 +1032,6 @@ ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
           <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
           ppr expr ]
 
-ppr_expr (HsWrap _ co_fn e)
-  = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
-                                             else pprExpr e)
-
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut _ e []) = ppr e
@@ -1067,6 +1068,7 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
 
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
+ppr_expr (HsWrap {}) = undefined -- will be caught when HsWrap is removed
 
 ppr_infix_expr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v)) = Just (pprInfixOcc v)

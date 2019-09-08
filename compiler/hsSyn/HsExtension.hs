@@ -1150,6 +1150,8 @@ type OutputableX p = -- See Note [OutputableX]
   ( Outputable (XIPBinds    p)
   , Outputable (XViaStrategy p)
   , Outputable (XViaStrategy GhcRn)
+  , Outputable (XXExpr p)
+  , Outputable (XXExpr GhcRn)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
