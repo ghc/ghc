@@ -266,7 +266,7 @@ schedule (Capability *initialCapability, Task *task)
             broadcastCondition(&nonThreadedPause.stateChange);
 
             while(nonThreadedPause.state != STARTING){
-                waitCondition(&nonThreadedPause.stateChange, 
+                waitCondition(&nonThreadedPause.stateChange,
                         &nonThreadedPause.pauseLock);
             }
 

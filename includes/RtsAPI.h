@@ -464,7 +464,7 @@ struct{
     Condition stateChange;
 } nonThreadedPause;
 #endif
-        
+
 void rts_pause (/* out */ RtsPaused *paused);
 void rts_unpause (/* in */ RtsPaused *paused);
 

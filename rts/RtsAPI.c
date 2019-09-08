@@ -705,7 +705,7 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 void rts_pause (RtsPaused * paused STG_UNUSED)
 {
     ACQUIRE_LOCK(&nonThreadedPause.pauseLock);
-    
+
     // Wait until all previous pausers have unpaused the rts
     while(nonThreadedPause.state != RUNNING){
         waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
@@ -713,7 +713,7 @@ void rts_pause (RtsPaused * paused STG_UNUSED)
 
     ++nonThreadedPause.pauseRequests;
     nonThreadedPause.state = PAUSING;
-    
+
     // Wait for rts to actually pause
     while(nonThreadedPause.state != PAUSED){
         waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
