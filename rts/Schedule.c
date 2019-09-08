@@ -258,12 +258,23 @@ schedule (Capability *initialCapability, Task *task)
     //     we should really attempt to kill these somehow (TODO).
 
     #if !defined(THREADED_RTS)
-    if(NonThreadedPause.pauseRequests){
-        // Tell the pauser that the rts has been paused
-        RELEASE_LOCK(&NonThreadedPause.runLock);
-        // Wait until the pause has ended
-        ACQUIRE_LOCK(&NonThreadedPause.pauseLock);
-        RELEASE_LOCK(&NonThreadedPause.pauseLock);
+    if(nonThreadedPause.state == PAUSING){
+        ACQUIRE_LOCK(&nonThreadedPause.pauseLock);
+        if(nonThreadedPause.state == PAUSING){
+
+            nonThreadedPause.state = PAUSED;
+            broadcastCondition(&nonThreadedPause.stateChange);
+
+            while(nonThreadedPause.state != STARTING){
+                waitCondition(&nonThreadedPause.stateChange, 
+                        &nonThreadedPause.pauseLock);
+            }
+
+            nonThreadedPause.state = RUNNING;
+            broadcastCondition(&nonThreadedPause.stateChange);
+        }
+
+        RELEASE_LOCK(&nonThreadedPause.pauseLock);
     }
     #endif
 
@@ -2674,11 +2685,10 @@ initScheduler(void)
   blocked_queue_tl  = END_TSO_QUEUE;
   sleeping_queue    = END_TSO_QUEUE;
 
-  initMutex(&NonThreadedPause.pauseRequestsMutex);
-  initMutex(&NonThreadedPause.pauseLock);
-  initMutex(&NonThreadedPause.runLock);
-  ACQUIRE_LOCK(&NonThreadedPause.runLock);
-  NonThreadedPause.pauseRequests = 0;
+  initMutex(&nonThreadedPause.pauseLock);
+  initCondition(&nonThreadedPause.stateChange);
+  nonThreadedPause.pauseRequests = 0;
+  nonThreadedPause.state         = RUNNING;
 #endif
 
   sched_state    = SCHED_RUNNING;

@@ -459,12 +459,10 @@ typedef struct RtsPaused_ {
 struct{
     // Number of debuggers that want rts to pause
     size_t pauseRequests;
-    Mutex pauseRequestsMutex;
-    // Is locked if there is a request to pause
+    enum {RUNNING, PAUSING, PAUSED, STARTING} state;
     Mutex pauseLock;
-    // Is locked if the rts is in normal operation
-    Mutex runLock;
-} NonThreadedPause;
+    Condition stateChange;
+} nonThreadedPause;
 #endif
         
 void rts_pause (/* out */ RtsPaused *paused);

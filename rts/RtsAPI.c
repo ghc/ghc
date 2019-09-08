@@ -19,6 +19,7 @@
 #include "Threads.h"
 #include "Weak.h"
 #include "StableName.h"
+#include "assert.h"
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -703,26 +704,33 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 #else  // !DEFINED(THREADED_RTS)
 void rts_pause (RtsPaused * paused STG_UNUSED)
 {
-    ACQUIRE_LOCK(&NonTreadedPause.pauseRequestMutex);
-    if (!NonThreadedPause.pauseRequests){
-        ACQUIRE_LOCK(&NonTreadedPause.pauseLock);
+    ACQUIRE_LOCK(&nonThreadedPause.pauseLock);
+    
+    // Wait until all previous pausers have unpaused the rts
+    while(nonThreadedPause.state != RUNNING){
+        waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
     }
-    ++NonThreadedPause.pauseRequests;
-    RELEASE_LOCK(&NonTreadedPause.pauseRequestMutex);
+
+    ++nonThreadedPause.pauseRequests;
+    nonThreadedPause.state = PAUSING;
+    
     // Wait for rts to actually pause
-    ACQUIRE_LOCK(&NonTreadedPause.runLock);
-    RELEASE_LOCK(&NonTreadedPause.runLock);
+    while(nonThreadedPause.state != PAUSED){
+        waitCondition(&nonThreadedPause.stateChange, &nonThreadedPause.pauseLock);
+    }
+
+    RELEASE_LOCK(&nonThreadedPause.pauseLock);
 }
 
 void rts_unpause (RtsPaused * paused STG_UNUSED)
 {
-    ACQUIRE_LOCK(&NonTreadedPause.pauseRequestMutex);
-    --NonThreadedPause.pauseRequests;
-    if (!NonThreadedPause.pauseRequests){
-        ACQUIRE_LOCK(&NonTreadedPause.runLock);
-        RELEASE_LOCK(&NonTreadedPause.pauseLock);
+    ACQUIRE_LOCK(&NonTreadedPause.pauseLock);
+    assert(nonThreadedPause.state == PAUSED);
+    --nonThreadedPause.pauseRequests;
+    if (!nonThreadedPause.pauseRequests){
+        nonThreadedPause.state = STARTING;
     }
-    RELEASE_LOCK(&NonTreadedPause.pauseRequestMutex);
+    RELEASE_LOCK(&nonThreadedPause.pauseRequestMutex);
 }
 
 
