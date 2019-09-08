@@ -28,6 +28,8 @@
   * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
     `Generic` and `Generic1` instances to `Kleisli`
 
+  * `openTempFile` is now fully atomic and thread-safe on Windows.
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
