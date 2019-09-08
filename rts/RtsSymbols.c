@@ -97,6 +97,35 @@
  * https://sourceforge.net/p/mingw-w64/wiki2/gnu%20printf/
  * https://sourceforge.net/p/mingw-w64/discussion/723797/thread/55520785/
  */
+/* Note [_iob_func symbol]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Microsoft in VS2013 to VS2015 transition made a backwards incompatible change
+ * to the stdio function __iob_func.
+ *
+ * They used to be defined as:
+ *
+ * #define stdin  (&__iob_func()[0])
+ * #define stdout (&__iob_func()[1])
+ * #define stderr (&__iob_func()[2])
+ *
+ * whereas now they're defined as:
+ *
+ * #define stdin  (__acrt_iob_func(0))
+ * #define stdout (__acrt_iob_func(1))
+ * #define stderr (__acrt_iob_func(2))
+ *
+ * Mingw-w64 followed along with the madness and so we have to deal with both
+ * version of these symbols.
+ *
+ * As such when you mix new and old libraries you get a missing symbols error
+ * for __acrt_iob_func.  It then links against the PLT for the function but that
+ * no longer exists.  Instead we forward the request for the PLT symbol to the
+ * symbol directly which is defined inline since we're using a newer compiler.
+ *
+ * See also:
+ * https://docs.microsoft.com/en-us/cpp/porting/visual-cpp-change-history-2003-2015?view=vs-2017#stdioh-and-conioh
+ */
 #define RTS_MINGW_ONLY_SYMBOLS                           \
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
@@ -112,7 +141,12 @@
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
-      SymI_HasProto(_unlock_file)
+      SymI_HasProto(_unlock_file)                        \
+      /* See Note [_iob_func symbol] */                  \
+      RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
+         __imp___acrt_iob_func, __rts_iob_func, true))   \
+      RTS_WIN32_ONLY(SymI_HasProto_redirect(             \
+         __imp____acrt_iob_func, __rts_iob_func, true))
 
 #define RTS_MINGW_COMPAT_SYMBOLS                         \
       SymI_HasProto_deprecated(access)                   \
@@ -977,7 +1011,7 @@
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)
 #endif
 #define SymI_HasProto(vvv) /**/
-#define SymI_HasProto_redirect(vvv,xxx) /**/
+#define SymI_HasProto_redirect(vvv,xxx,weak) /**/
 #define SymI_HasProto_deprecated(vvv) /**/
 RTS_SYMBOLS
 RTS_RET_SYMBOLS
@@ -1013,9 +1047,9 @@ RTS_LIBFFI_SYMBOLS
 
 // SymI_HasProto_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newRetainedCAF/newGCdCAF for an example.
-#define SymI_HasProto_redirect(vvv,xxx)   \
-    { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-      (void*)(&(xxx)), false },
+#define SymI_HasProto_redirect(vvv,xxx,weak) \
+    { MAYBE_LEADING_UNDERSCORE_STR(#vvv),    \
+      (void*)(&(xxx)), weak },
 
 // SymI_HasProto_deprecated allows us to redirect references from their deprecated
 // names to the undeprecated ones. e.g. access -> _access.

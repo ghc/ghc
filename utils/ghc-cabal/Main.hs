@@ -385,7 +385,23 @@ generate directory distdir config_args
           fixupRtsLibName x = x
           transitiveDepNames = map (display . packageName) transitive_dep_ids
 
-          libraryDirs = forDeps Installed.libraryDirs
+          -- Note [Msys2 path translation bug].
+          -- Msys2 has an annoying bug in their path conversion code.
+          -- Officially anything starting with a drive letter should not be
+          -- subjected to path translations, however it seems to only consider
+          -- E:\\ and E:// to be Windows paths.  Mixed mode paths such as E:/
+          -- that are produced here get corrupted.
+          --
+          -- Tamar@Rage /t/translate> ./a.exe -optc-I"E://ghc-dev/msys64/"
+          -- path: -optc-IE://ghc-dev/msys64/
+          -- Tamar@Rage /t/translate> ./a.exe -optc-I"E:ghc-dev/msys64/"
+          -- path: -optc-IE:ghc-dev/msys64/
+          -- Tamar@Rage /t/translate> ./a.exe -optc-I"E:\ghc-dev/msys64/"
+          -- path: -optc-IE:\ghc-dev/msys64/
+          --
+          -- As such, let's just normalize the filepaths which is a good thing
+          -- to do anyway.
+          libraryDirs = map normalise $ forDeps Installed.libraryDirs
           -- The mkLibraryRelDir function is a bit of a hack.
           -- Ideally it should be handled in the makefiles instead.
           mkLibraryRelDir "rts"        = "rts/dist/build"
@@ -402,7 +418,8 @@ generate directory distdir config_args
           injectDistInstall x | takeBaseName x == "include" = [x, takeDirectory x ++ "/dist-install/build/" ++ takeBaseName x]
           injectDistInstall x = [x]
 
-      wrappedIncludeDirs <- wrap $ concatMap injectDistInstall $ forDeps Installed.includeDirs
+      -- See Note [Msys2 path translation bug].
+      wrappedIncludeDirs <- wrap $ map normalise $ concatMap injectDistInstall $ forDeps Installed.includeDirs
 
       let variablePrefix = directory ++ '_':distdir
           mods      = map display modules

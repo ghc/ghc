@@ -111,7 +111,7 @@ createOSThread (OSThreadId* pId, char *name STG_UNUSED,
     HANDLE h;
     h = CreateThread ( NULL,  /* default security attributes */
                        0,
-                       (LPTHREAD_START_ROUTINE)startProc,
+                       (LPTHREAD_START_ROUTINE)(void*)startProc,
                        param,
                        0,
                        pId);
@@ -314,7 +314,9 @@ getNumberOfProcessorsGroups (void)
            on the API being available. So we'll have to resolve manually.  */
         HMODULE kernel = GetModuleHandleW(L"kernel32");
 
-        GetGroupCountProc GetActiveProcessorGroupCount = (GetGroupCountProc)GetProcAddress(kernel, "GetActiveProcessorGroupCount");
+        GetGroupCountProc GetActiveProcessorGroupCount
+          = (GetGroupCountProc)(void*)
+               GetProcAddress(kernel, "GetActiveProcessorGroupCount");
         n_groups = GetActiveProcessorGroupCount();
 
         IF_DEBUG(scheduler, debugBelch("[*] Number of processor groups detected: %u\n", n_groups));
@@ -348,7 +350,9 @@ getProcessorsDistribution (void)
         on the API being available. So we'll have to resolve manually.  */
         HMODULE kernel = GetModuleHandleW(L"kernel32");
 
-        GetItemCountProc  GetActiveProcessorCount = (GetItemCountProc)GetProcAddress(kernel, "GetActiveProcessorCount");
+        GetItemCountProc  GetActiveProcessorCount
+          = (GetItemCountProc)(void*)
+               GetProcAddress(kernel, "GetActiveProcessorCount");
 
         if (GetActiveProcessorCount)
         {
@@ -449,7 +453,9 @@ getNumberOfProcessors (void)
        on the API being available. So we'll have to resolve manually.  */
     HMODULE kernel = GetModuleHandleW(L"kernel32");
 
-    GetItemCountProc GetActiveProcessorCount = (GetItemCountProc)GetProcAddress(kernel, "GetActiveProcessorCount");
+    GetItemCountProc GetActiveProcessorCount
+      = (GetItemCountProc)(void*)
+          GetProcAddress(kernel, "GetActiveProcessorCount");
     if (GetActiveProcessorCount && !nproc)
     {
         nproc = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
@@ -516,7 +522,9 @@ setThreadAffinity (uint32_t n, uint32_t m) // cap N of M
        on the API being available. So we'll have to resolve manually.  */
     HMODULE kernel = GetModuleHandleW(L"kernel32");
 
-    SetThreadGroupAffinityProc SetThreadGroupAffinity = (SetThreadGroupAffinityProc)GetProcAddress(kernel, "SetThreadGroupAffinity");
+    SetThreadGroupAffinityProc SetThreadGroupAffinity
+      = (SetThreadGroupAffinityProc)(void*)
+          GetProcAddress(kernel, "SetThreadGroupAffinity");
 #endif
 
     for (i = 0; i < n_groups; i++)
@@ -564,8 +572,8 @@ interruptOSThread (OSThreadId id)
         sysErrorBelch("interruptOSThread: OpenThread");
         stg_exit(EXIT_FAILURE);
     }
-    pCSIO = (PCSIO) GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")),
-                                   "CancelSynchronousIo");
+    pCSIO = (PCSIO)(void*)GetProcAddress(GetModuleHandle(TEXT("Kernel32.dll")),
+                                         "CancelSynchronousIo");
     if ( NULL != pCSIO ) {
         pCSIO(hdl);
     } else {
