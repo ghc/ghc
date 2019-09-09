@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmMonad (
+module GHC.StgToCmm.Monad (
         FCode,        -- type
 
         initC, runC, fixC,
@@ -62,7 +62,7 @@ module StgCmmMonad (
 import GhcPrelude hiding( sequence, succ )
 
 import Cmm
-import StgCmmClosure
+import GHC.StgToCmm.Closure
 import DynFlags
 import Hoopl.Collections
 import MkGraph
@@ -164,7 +164,7 @@ data CgInfoDownwards        -- information only passed *downwards* by the monad
         cgd_self_loop :: Maybe SelfLoopInfo,-- Which tail calls can be compiled
                                             -- as local jumps? See Note
                                             -- [Self-recursive tail calls] in
-                                            -- StgCmmExpr
+                                            -- GHC.StgToCmm.Expr
         cgd_tick_scope:: CmmTickScope       -- Tick scope for new blocks & ticks
   }
 
