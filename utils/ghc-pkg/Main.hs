@@ -1186,7 +1186,7 @@ parsePackageInfo str =
       where
         ws = [ msg | msg <- warnings
                    , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
-    Left err -> die (unlines err)
+    Left err -> die (unlines (F.toList err))
 
 mungePackageInfo :: InstalledPackageInfo -> InstalledPackageInfo
 mungePackageInfo ipi = ipi
