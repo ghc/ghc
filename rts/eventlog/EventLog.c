@@ -182,7 +182,7 @@ static inline void postString(EventsBuf *eb, const char *buf)
     eb->pos++;
 }
 
-StgWord64 time_ns(void)
+static inline StgWord64 time_ns(void)
 { return TimeToNS(stat_getElapsedTime()); }
 
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)

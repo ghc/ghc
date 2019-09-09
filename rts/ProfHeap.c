@@ -82,7 +82,10 @@ initLDVCtr( counter *ctr )
 
 typedef struct {
     double      time;    // the time in MUT time when the census is made
-    double     rtime;    // The eventlog time the census was made
+    StgWord64   rtime;   // The eventlog time the census was made. This is used
+                         // for the LDV profiling events because they are all
+                         // emitted at the end of compilation so we need to know
+                         // when the sample actually took place.
     HashTable * hash;
     counter   * ctrs;
     Arena     * arena;
@@ -1185,9 +1188,7 @@ void heapCensus (Time t)
 
   census = &censuses[era];
   census->time  = mut_user_time_until(t);
-#if defined(PROFILING)
-  census->rtime = time_ns();
-#endif
+  census->rtime = TimeToNS(stat_getElapsedTime());
 
 
   // calculate retainer sets if necessary
