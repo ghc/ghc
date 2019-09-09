@@ -8,10 +8,10 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 {-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
-        PmLit(..), PmAltCon(..),
+        PmLit(..), PmLitValue(..), PmAltCon(..),
         pmAltConType, PmEquality(..), eqPmAltCon,
         pmLitType, literalToPmLit, negatePmLit, overloadPmLit,
-        pmLitAsStringLit, hsOverLitAsHsLit, coreExprAsPmLit
+        pmLitAsStringLit, coreExprAsPmLit
     ) where
 
 #include "HsVersions.h"
@@ -19,15 +19,11 @@ module PmExpr (
 import GhcPrelude
 
 import Util
-import DynFlags
-import BasicTypes (IntegralLit(..), negateIntegralLit)
 import FastString
-import HsSyn
 import Id
 import Name
 import DataCon
 import ConLike
-import TcType (isStringTy, isIntTy, isIntegerTy, isWordTy)
 import Outputable
 import Maybes
 import Type
@@ -139,10 +135,8 @@ eqConLike (PatSynCon psc1)  (PatSynCon psc2)
   = Equal
 eqConLike _                 _                 = PossiblyOverlap
 
--- | Represents a match against a 'ConLike' or literal. We mostly use it to
--- to encode shapes for a variable that immediately lead to a refutation.
---
--- See Note [Refutable shapes] in TmOracle. Really similar to 'CoreSyn.AltCon'.
+-- | Represents the head of a match against a 'ConLike' or literal.
+-- Really similar to 'CoreSyn.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 
@@ -260,9 +254,11 @@ negatePmLit (PmLit ty v) = PmLit ty <$> go v
 overloadPmLit :: Type -> PmLit -> Maybe PmLit
 overloadPmLit ty (PmLit _ v) = PmLit ty <$> go v
   where
-    go (PmLitInt i)    = Just (PmLitOverInt 0 i)
-    go (PmLitRat r)    = Just (PmLitOverRat 0 r)
-    go (PmLitString s) = Just (PmLitOverString s)
+    go (PmLitInt i)          = Just (PmLitOverInt 0 i)
+    go (PmLitRat r)          = Just (PmLitOverRat 0 r)
+    go (PmLitString s)
+      | ty `eqType` stringTy = Just v
+      | otherwise            = Just (PmLitOverString s)
     go _               = Nothing
 
 pmLitAsStringLit :: PmLit -> Maybe FastString
@@ -274,33 +270,6 @@ pmLitAsStringLit _                         = Nothing
 
 -- -----------------------------------------------------------------------
 -- ** Lift source expressions (HsExpr Id) to PmExpr
-
--- | Mimics 'MatchLit.tidyNPat', but solely for purposes of better pattern match
--- warnings. See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-hsOverLitAsHsLit :: DynFlags -> HsOverLit GhcTc -> Bool -> Type -> Maybe (HsLit GhcTc)
-hsOverLitAsHsLit dflags (OverLit (OverLitTc False ty) val _) negated outer_ty
-  | types_equal, isStringTy   ty, HsIsString src s <- val, not negated
-  = Just (HsString src s)
-  | types_equal,  isIntTy     ty, HsIntegral i <- val
-  , let ni = apply_negation i
-  , inIntRange dflags (il_value ni)
-  = Just (HsInt noExtField ni)
-  | types_equal,  isWordTy    ty, HsIntegral i <- val
-  , let ni = apply_negation i
-  , inWordRange dflags (il_value ni)
-  -- this is a type error... But as long as we do this consistently, this
-  -- shouldn't be a problem. The proper solution would be to return a HsExpr,
-  -- but that would require non-trivial boilerplate at the two call sites.
-  = Just (HsWordPrim (il_text ni) (il_value ni))
-  | types_equal,  isIntegerTy ty, HsIntegral i <- val
-  , let ni = apply_negation i
-  = Just (HsInteger (il_text ni) (il_value ni) ty)
-  where
-    types_equal = eqType outer_ty ty
-    apply_negation
-      | negated   = negateIntegralLit
-      | otherwise = id
-hsOverLitAsHsLit _ _ _ _ = Nothing
 
 coreExprAsPmLit :: CoreExpr -> Maybe PmLit
 -- coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
@@ -331,10 +300,9 @@ coreExprAsPmLit e = case collectArgs e of
     -> coreExprAsPmLit r >>= overloadPmLit (exprType e)
   (Var x, [Type _ty, _dict, s])
     | idName x == fromStringName
-    -- NB: Calls coreExprAsPmLit, so that we return PmLitOverStrings
+    -- NB: Calls coreExprAsPmLit and then overloadPmLit, so that we return PmLitOverStrings
     -> coreExprAsPmLit s >>= overloadPmLit (exprType e)
-  -- These last two cases handle String literals, which will be desugared to
-  -- lists by addVarCoreCt. See Note [Literals in PmPat]
+  -- These last two cases handle String literals
   (Var x, [Type ty])
     | Just dc <- isDataConWorkId_maybe x
     , dc == nilDataCon
@@ -353,72 +321,6 @@ coreExprAsPmLit e = case collectArgs e of
       = tyConName tc == ratioTyConName
       | otherwise
       = False
-
-{- Note [Translate Overloaded Literals for Exhaustiveness Checking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Due to Note [Undecidable Equality for PmAltCons], the exhaustiveness checker can
-do a much better job for primitive literals than for overloaded literals. So,
-ideally, we'd run exhaustiveness checks /after/ we had translated part of the
-overloaded literals ('HsOverLit') to their primitive counterpart ('HsLit') by
-use of 'MatchLit.tidyNPat'. But since that is not the case, we have to mimic its
-logic in 'translateNPat'.
-
-But that only concerns patterns! We surely have to make sure to translate
-expressions in a similar way in 'hsExprToPmExpr'. Thus, both 'translateNPat' and
-'hsExprToPmExpr' call out to 'hsOverLitAsHsLit'.
-
-Before #14546, the translations in 'hsExprToPmExpr' and 'translateNPat' were out
-of sync, so the resulting comparisons between 'PmSLit' and 'PmOLit' could never
-return True. But the fix in #14546 translated many occurrences where we could
-have 'PmSLit's into 'PmOLit's, resulting in a loss of precision due to
-Note [Undecidable Equality for PmAltCons].
-
-Now, we translate the literal value to match and the literal patterns
-consistently and try to turn them into plain literals as often as possible:
-
-  * For integral literals, we parse both the integral literal value and
-    the patterns as HsInt/HsWordPrim/HsInteger. For example:
-
-      case 0::Int of
-          0 -> putStrLn "A"
-          1 -> putStrLn "B"
-          _ -> putStrLn "C"
-
-    Note that we can decide now that the last two clauses are redundant.
-
-  * For string literals, we parse the string literals as HsString. When
-    OverloadedStrings is enabled and applicable for the data type, it will be
-    turned into a HsOverLit HsIsString. For example:
-
-      case "foo" of
-          "foo" -> putStrLn "A"
-          "bar" -> putStrLn "B"
-          "baz" -> putStrLn "C"
-
-    Even in the presence of -XOverloadedStrings, if @"foo" :: String@, the
-    overloaded string and its patterns will be turned into a list of character
-    literals, while for any other data type that satisfies 'IsString', this will
-    turn into the respective 'PmOLit'.
-
-    The desugaring of actual Strings to lists is so that we catch the redundant
-    pattern in following case:
-
-      case "foo" of
-          ('f':_) -> putStrLn "A"
-          "bar" -> putStrLn "B"
-
-    For overloaded strings, we can still capture the exhaustiveness of pattern
-    "foo" and the redundancy of pattern "bar" and "baz" in the following code:
-
-      {-# LANGUAGE OverloadedStrings #-}
-      data D = ...
-      instance IsString D where ...
-      main = do
-        case "foo" :: D of
-            "foo" -> putStrLn "A"
-            "bar" -> putStrLn "B"
-            "baz" -> putStrLn "C"
--}
 
 {-
 %************************************************************************

@@ -95,7 +95,6 @@ The algorithm is based on the paper:
 
 data PmPat where
   -- | For the arguments' meaning see 'HsPat.ConPatOut'.
-  -- See also Note [Literals in PmPat].
   PmCon  :: { pm_con_con     :: PmAltCon
             , pm_con_arg_tys :: [Type]
             , pm_con_tvs     :: [TyVar]
@@ -465,11 +464,23 @@ mkListPatVec ty xs ys = [PmCon { pm_con_con = PmAltConLike (RealDataCon consData
 {-# INLINE mkListPatVec #-}
 
 -- | Create a literal pattern
-mkPmLitPattern :: PmLit -> PmPat
-mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
-                           , pm_con_arg_tys = []
-                           , pm_con_tvs = []
-                           , pm_con_args = [] }
+mkPmLitPattern :: PmLit -> PatVec
+mkPmLitPattern lit@(PmLit _ val)
+  -- We translate String literals to list literals for better overlap reasoning.
+  -- It's a little unfortunate we do this here rather than in
+  -- 'PmOracle.trySolve' and 'PmOracle.addRefutableAltCon', but it's so much
+  -- simpler here.
+  -- See Note [Representation of Strings in TmState] in PmOracle
+  | PmLitString s <- val
+  , let mk_char_lit c = mkPmLitPattern (PmLit charTy (PmLitChar c))
+  = foldr (\c p -> mkListPatVec charTy (mk_char_lit c) p)
+          [nilPattern charTy]
+          (unpackFS s)
+  | otherwise
+  = [PmCon { pm_con_con = PmAltLit lit
+           , pm_con_arg_tys = []
+           , pm_con_tvs = []
+           , pm_con_args = [] }]
 {-# INLINE mkPmLitPattern #-}
 
 -- -----------------------------------------------------------------------
@@ -481,139 +492,139 @@ mkPmLitPattern lit = PmCon { pm_con_con = PmAltLit lit
 --          where z is fresh
 
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
-translatePat fam_insts pat = do
-  dflags <- getDynFlags
-  case pat of
-    WildPat  ty  -> mkPmVars [ty]
-    VarPat _ id  -> return [PmVar (unLoc id)]
-    ParPat _ p   -> translatePat fam_insts (unLoc p)
-    LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
+translatePat fam_insts pat = case pat of
+  WildPat  ty  -> mkPmVars [ty]
+  VarPat _ id  -> return [PmVar (unLoc id)]
+  ParPat _ p   -> translatePat fam_insts (unLoc p)
+  LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
 
-    -- ignore strictness annotations for now
-    BangPat _ p  -> translatePat fam_insts (unLoc p)
+  -- ignore strictness annotations for now
+  BangPat _ p  -> translatePat fam_insts (unLoc p)
 
-    -- (x@pat)   ===>   x (pat <- x)
-    AsPat _ (dL->L _ x) p -> do
-      pat <- translatePat fam_insts (unLoc p)
-      pure [PmVar x, PmGrd pat (Var x)]
+  -- (x@pat)   ===>   x (pat <- x)
+  AsPat _ (dL->L _ x) p -> do
+    pat <- translatePat fam_insts (unLoc p)
+    pure [PmVar x, PmGrd pat (Var x)]
 
-    SigPat _ p _ty -> translatePat fam_insts (unLoc p)
+  SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
-    -- See Note [Translate CoPats]
-    CoPat _ wrapper p ty
-      | isIdHsWrapper wrapper                   -> translatePat fam_insts p
-      | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts p
-      | otherwise -> do
-          ps <- translatePat fam_insts p
-          (xp,xe) <- mkPmId2Forms ty
-          g <- mkGuard ps (mkHsWrap wrapper (unLoc xe))
-          pure [xp,g]
+  -- See Note [Translate CoPats]
+  CoPat _ wrapper p ty
+    | isIdHsWrapper wrapper                   -> translatePat fam_insts p
+    | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts p
+    | otherwise -> do
+        ps <- translatePat fam_insts p
+        (xp,xe) <- mkPmId2Forms ty
+        g <- mkGuard ps (mkHsWrap wrapper (unLoc xe))
+        pure [xp,g]
 
-    -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
-    NPlusKPat ty (dL->L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty
+  -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
+  NPlusKPat ty (dL->L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty
 
-    -- (fun -> pat)   ===>   x (pat <- fun x)
-    ViewPat arg_ty lexpr lpat -> do
-      ps <- translatePat fam_insts (unLoc lpat)
-      -- See Note [Guards and Approximation]
-      res <- allM cantFailPattern ps
-      case res of
-        True  -> do
-          (xp,xe) <- mkPmId2Forms arg_ty
-          g <- mkGuard ps (HsApp noExtField lexpr xe)
-          return [xp, g]
-        False -> mkCanFailPmPat arg_ty
+  -- (fun -> pat)   ===>   x (pat <- fun x)
+  ViewPat arg_ty lexpr lpat -> do
+    ps <- translatePat fam_insts (unLoc lpat)
+    -- See Note [Guards and Approximation]
+    res <- allM cantFailPattern ps
+    case res of
+      True  -> do
+        (xp,xe) <- mkPmId2Forms arg_ty
+        g <- mkGuard ps (HsApp noExtField lexpr xe)
+        return [xp, g]
+      False -> mkCanFailPmPat arg_ty
 
-    -- list
-    ListPat (ListPatTc ty Nothing) ps -> do
-      pv <- translatePatVec fam_insts (map unLoc ps)
-      return (foldr (mkListPatVec ty) [nilPattern ty] pv)
+  -- list
+  ListPat (ListPatTc ty Nothing) ps -> do
+    pv <- translatePatVec fam_insts (map unLoc ps)
+    return (foldr (mkListPatVec ty) [nilPattern ty] pv)
 
-    -- overloaded list
-    ListPat (ListPatTc _elem_ty (Just (pat_ty, _to_list))) lpats -> do
-      dflags <- getDynFlags
-      if xopt LangExt.RebindableSyntax dflags
-        then mkCanFailPmPat pat_ty
-        else case splitListTyConApp_maybe pat_ty of
-                Just e_ty -> translatePat fam_insts
-                                          (ListPat (ListPatTc e_ty Nothing) lpats)
-                Nothing   -> mkCanFailPmPat pat_ty
-      -- (a) In the presence of RebindableSyntax, we don't know anything about
-      --     `toList`, we should treat `ListPat` as any other view pattern.
-      --
-      -- (b) In the absence of RebindableSyntax,
-      --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
-      --       as ordinary list pattern. Although we can give an instance
-      --       `IsList [Int]` (more specific than the default `IsList [a]`), in
-      --       practice, we almost never do that. We assume the `_to_list` is
-      --       the `toList` from `instance IsList [a]`.
-      --
-      --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
-      --
-      -- See #14547, especially comment#9 and comment#10.
-      --
-      -- Here we construct CanFailPmPat directly, rather can construct a view
-      -- pattern and do further translation as an optimization, for the reason,
-      -- see Note [Guards and Approximation].
+  -- overloaded list
+  ListPat (ListPatTc _elem_ty (Just (pat_ty, _to_list))) lpats -> do
+    dflags <- getDynFlags
+    if xopt LangExt.RebindableSyntax dflags
+      then mkCanFailPmPat pat_ty
+      else case splitListTyConApp_maybe pat_ty of
+              Just e_ty -> translatePat fam_insts
+                                        (ListPat (ListPatTc e_ty Nothing) lpats)
+              Nothing   -> mkCanFailPmPat pat_ty
+    -- (a) In the presence of RebindableSyntax, we don't know anything about
+    --     `toList`, we should treat `ListPat` as any other view pattern.
+    --
+    -- (b) In the absence of RebindableSyntax,
+    --     - If the pat_ty is `[a]`, then we treat the overloaded list pattern
+    --       as ordinary list pattern. Although we can give an instance
+    --       `IsList [Int]` (more specific than the default `IsList [a]`), in
+    --       practice, we almost never do that. We assume the `_to_list` is
+    --       the `toList` from `instance IsList [a]`.
+    --
+    --     - Otherwise, we treat the `ListPat` as ordinary view pattern.
+    --
+    -- See #14547, especially comment#9 and comment#10.
+    --
+    -- Here we construct CanFailPmPat directly, rather can construct a view
+    -- pattern and do further translation as an optimization, for the reason,
+    -- see Note [Guards and Approximation].
 
-    ConPatOut { pat_con     = (dL->L _ con)
-              , pat_arg_tys = arg_tys
-              , pat_tvs     = ex_tvs
-              , pat_args    = ps } -> do
-      let ty = conLikeResTy con arg_tys
-      groups <- allCompleteMatches ty
-      case groups of
-        [] -> mkCanFailPmPat ty
-        _  -> do
-          args <- translateConPatVec fam_insts arg_tys ex_tvs con ps
-          return [PmCon { pm_con_con     = PmAltConLike con
-                        , pm_con_arg_tys = arg_tys
-                        , pm_con_tvs     = ex_tvs
-                        , pm_con_args    = args }]
+  ConPatOut { pat_con     = (dL->L _ con)
+            , pat_arg_tys = arg_tys
+            , pat_tvs     = ex_tvs
+            , pat_args    = ps } -> do
+    let ty = conLikeResTy con arg_tys
+    groups <- allCompleteMatches ty
+    case groups of
+      [] -> mkCanFailPmPat ty
+      _  -> do
+        args <- translateConPatVec fam_insts arg_tys ex_tvs con ps
+        return [PmCon { pm_con_con     = PmAltConLike con
+                      , pm_con_arg_tys = arg_tys
+                      , pm_con_tvs     = ex_tvs
+                      , pm_con_args    = args }]
 
-    -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-    NPat ty (dL->L _ olit) mb_neg _
-      | Just lit <- hsOverLitAsHsLit dflags olit (isJust mb_neg) ty
-      -> translatePat fam_insts (LitPat noExtField lit)
-    NPat _ (dL->L _ olit) mb_neg _ -> do
-      core_expr <- dsOverLit olit
-      let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
-      let lit' = case mb_neg of
-            Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
-            Nothing -> lit
-      return [mkPmLitPattern lit']
+  NPat ty (dL->L _ olit) mb_neg _ -> do
+    -- See Note [Literal short cut] in MatchLit.hs
+    -- We inline the Literal short cut for @ty@ here, because @ty@ is more
+    -- precise than the field of OverLitTc, which is all that dsOverLit (which
+    -- normally does the literal short cut) can look at. Also @ty@ matches the
+    -- type of the scrutinee, so info on both pattern and scrutinee (for which
+    -- short cutting in dsOverLit works properly) is overloaded iff either is.
+    dflags <- getDynFlags
+    core_expr <- case olit of
+      OverLit{ ol_val = val, ol_ext = OverLitTc rebindable _ }
+        | not rebindable
+        , Just expr <- shortCutLit dflags val ty
+        -> dsExpr expr
+      _ -> dsOverLit olit
+    let lit  = expectJust "failed to detect OverLit" (coreExprAsPmLit core_expr)
+    let lit' = case mb_neg of
+          Just _  -> expectJust "failed to negate lit" (negatePmLit lit)
+          Nothing -> lit
+    return (mkPmLitPattern lit')
 
-    -- See Note [Translate Overloaded Literals for Exhaustiveness Checking]
-    LitPat _ lit
-      | HsString src s <- lit -> do
-          pv <- translatePatVec fam_insts
-                  (map (LitPat noExtField . HsChar src) (unpackFS s))
-          return (foldr (mkListPatVec charTy) [nilPattern charTy] pv)
-      | otherwise -> do
-          core_expr <- dsLit (convertLit lit)
-          let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
-          return [mkPmLitPattern lit]
+  LitPat _ lit -> do
+    core_expr <- dsLit (convertLit lit)
+    let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
+    return (mkPmLitPattern lit)
 
-    TuplePat tys ps boxity -> do
-      tidy_ps <- translatePatVec fam_insts (map unLoc ps)
-      let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
-          tys' = case boxity of
-                  Boxed -> tys
-                  -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-                  Unboxed -> map getRuntimeRep tys ++ tys
-      return [vanillaConPattern tuple_con tys' (concat tidy_ps)]
+  TuplePat tys ps boxity -> do
+    tidy_ps <- translatePatVec fam_insts (map unLoc ps)
+    let tuple_con = RealDataCon (tupleDataCon boxity (length ps))
+        tys' = case boxity of
+                Boxed -> tys
+                -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                Unboxed -> map getRuntimeRep tys ++ tys
+    return [vanillaConPattern tuple_con tys' (concat tidy_ps)]
 
-    SumPat ty p alt arity -> do
-      tidy_p <- translatePat fam_insts (unLoc p)
-      let sum_con = RealDataCon (sumDataCon alt arity)
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-      return [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
+  SumPat ty p alt arity -> do
+    tidy_p <- translatePat fam_insts (unLoc p)
+    let sum_con = RealDataCon (sumDataCon alt arity)
+    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+    return [vanillaConPattern sum_con (map getRuntimeRep ty ++ ty) tidy_p]
 
-    -- --------------------------------------------------------------------------
-    -- Not supposed to happen
-    ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
-    SplicePat {} -> panic "Check.translatePat: SplicePat"
-    XPat      {} -> panic "Check.translatePat: XPat"
+  -- --------------------------------------------------------------------------
+  -- Not supposed to happen
+  ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
+  SplicePat {} -> panic "Check.translatePat: SplicePat"
+  XPat      {} -> panic "Check.translatePat: XPat"
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
@@ -806,8 +817,7 @@ below is the *right thing to do*:
 The case with literals is a bit different. a literal @l@ should be translated
 to @x (True <- x == from l)@. Since we want to have better warnings for
 overloaded literals as it is a very common feature, we treat them differently.
-They are mainly covered in Note [Undecidable Equality for PmAltCons] and
-Note [Translate Overloaded Literals for Exhaustiveness Checking] in PmExpr.
+They are mainly covered in Note [Undecidable Equality for PmAltCons] in PmExpr.
 
 4. N+K Patterns & Pattern Synonyms
 ----------------------------------
@@ -1423,30 +1433,7 @@ addVarPatCt delta x (PmCon { pm_con_con = con, pm_con_args = args }) = runMaybeT
   MaybeT (addTmCt delta' (TmVarCon x con arg_ids))
 addVarPatCt delta _ _pat = ASSERT( patternArity _pat == 0 ) pure (Just delta)
 
-{- Note [Literals in PmPat]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Instead of translating a literal to a variable accompanied with a guard, we
-treat them like constructor patterns. The following example from
-"./libraries/base/GHC/IO/Encoding.hs" shows why:
-
-mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
-mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
-    "UTF8"    -> return $ UTF8.mkUTF8 cfm
-    "UTF16"   -> return $ UTF16.mkUTF16 cfm
-    "UTF16LE" -> return $ UTF16.mkUTF16le cfm
-    ...
-
-Each clause gets translated to a list of variables with an equal number of
-guards. For every guard we generate two cases (equals True/equals False) which
-means that we generate 2^n cases to feed the oracle with, where n is the sum of
-the length of all strings that appear in the patterns. For this particular
-example this means over 2^40 cases. Instead, by representing them like with
-constructor we get the following:
-  1. We exploit the common prefix with our representation of VSAs
-  2. We prune immediately non-reachable cases
-     (e.g. False == (x == "U"), True == (x == "U"))
-
-
+{-
 %************************************************************************
 %*                                                                      *
       Pretty printing of exhaustiveness/redundancy check warnings

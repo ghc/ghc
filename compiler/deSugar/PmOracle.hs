@@ -766,16 +766,13 @@ debugging traces.
 Note [Why record both positive and negative info?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 You might think that knowing positive info (like x ~ Just y) would render
-negative info irrelevant, but not so because of pattern synonyms.  E.g
-we might know that x cannot match (Foo 4), where
-    pattern Foo p = Just p
+negative info irrelevant, but not so because of pattern synonyms.  E.g we might
+know that x cannot match (Foo 4), where pattern Foo p = Just p
 
-Also overloaded literals themselves behave like pattern synonyms.
-E.g if postively we know that (x ~ I# y), we might also negatively
-want to record that x does not match 45
-  f 45       = e2
-  f (I# 22#) = e3
-  f 45       = e4  -- Overlapped
+Also overloaded literals themselves behave like pattern synonyms. E.g if
+postively we know that (x ~ I# y), we might also negatively want to record that
+x does not match 45 f 45       = e2 f (I# 22#) = e3 f 45       = e4  --
+Overlapped
 
 Note [TmState invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -810,6 +807,27 @@ Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
 
 Note that merging VarInfo in equate can be done by calling out to 'addVarConCt' and
 'addRefutableAltCon' for each of the facts individually.
+
+Note [Representation of Strings in TmState]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instead of treating regular String literals as a PmLits, we treat it as a list
+of characters in the oracle for better overlap reasoning. The following example
+shows why:
+
+  f :: String -> ()
+  f ('f':_) = ()
+  f "foo"   = ()
+  f _       = ()
+
+The second case is redundant, and we like to warn about it. Therefore either
+the oracle will have to do some smart conversion between the list and literal
+representation or treat is as the list it really is at runtime.
+
+The "smart conversion" has the advantage of leveraging the more compact literal
+representation wherever possible, but is really nasty to get right with negative
+equalities: Just think of how to encode @x /= "foo"@.
+The "list" option is far simpler, but incurs some overhead in representation and
+warning messages (which can be alleviated by someone with enough dedication).
 -}
 
 -- | Not user-facing.
@@ -1811,12 +1829,11 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
     core_expr x e
       | Just (pmLitAsStringLit -> Just s) <- coreExprAsPmLit e
       , expr_ty `eqType` stringTy
-      -- See Note [Literals in PmPat]
+      -- See Note [Representation of Strings in TmState]
       = case unpackFS s of
           -- We need this special case to break a loop with coreExprAsPmLit
           -- Otherwise we alternate endlessly between [] and ""
           [] -> data_con_app x nilDataCon []
-          -- See Note [Literals in PmPat]
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
