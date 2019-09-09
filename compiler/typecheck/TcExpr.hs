@@ -1443,6 +1443,24 @@ tcInstantiateFun defer_arrow fun fun_ty fun_orig orig_args herald
         doc = text "When checking the" <+> speakNth n <+>
               text "argument to" <+> quotes (ppr fun)
 
+{-
+Note [Quick look impredicativity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function `tcPerformQuickLook` is the entry point to the current
+implementation of impredicative polymorphism. The main idea is that
+when we check an application (or something akin to an application,
+like a section), we traverse the arguments twice:
+- In the first, "quick look", pass we only look at nested
+  applications, with the goal of inferring as many impredicative
+  instantiations as possible.
+- The second is the usual type checking pass, once the unification
+  variables have been filled in with the results of "quick look".
+  The second pass is *not* allowed to perform any further
+  impredicative unification.
+-}
+
+-- If `ImpredicativeTypes` is one, execute the quick look pass
+-- and fill unification variables with the result of the pass
 tcPerformQuickLook :: ([a] -> [TcSigmaType] -> TcM TCvSubst) -- ^ what to do on arguments
                    -> CtOrigin
                    -> (TcRhoType, ExpRhoType)  -- ^ result types
@@ -1450,21 +1468,29 @@ tcPerformQuickLook :: ([a] -> [TcSigmaType] -> TcM TCvSubst) -- ^ what to do on 
                    -> [TcSigmaType]            -- ^ and their types
                    -> TcM (TcRhoType, ExpRhoType, [TcSigmaType])
 tcPerformQuickLook ql_args orig (act_res_ty, exp_res_ty) args arg_tys
-  = do { dflags <- getDynFlags
-         -- only perform quick look if ImpredicativeTypes is on
-       ; if xopt LangExt.ImpredicativeTypes dflags
-            then do { (ql_subst, ql_vars)
-                        <- discardConstraints $
-                             tcQuickLookApp ql_args (act_res_ty, exp_res_ty) args arg_tys
-                    ; forM_ ql_vars $ \v ->
-                        uQuickLookTryFillPoly orig v
-                          (substTyAddInScope ql_subst (mkTyVarTy v))
-                    ; traceTc "tcPerformQuickLook" (vcat [ppr ql_subst, ppr ql_vars])
-                    ; (,,) <$> zonkTcType act_res_ty
-                           <*> zonkExpType exp_res_ty
-                           <*> mapM zonkTcType arg_tys }
-            else return (act_res_ty, exp_res_ty, arg_tys) }
+  = getDynFlags >>= go
+  where
+    go dflags
+      | xopt LangExt.ImpredicativeTypes dflags
+      = do { (ql_subst, ql_vars) <- discardConstraints $
+               tcQuickLookApp ql_args (act_res_ty, exp_res_ty) args arg_tys
+           ; forM_ ql_vars $ \v ->
+               case lookupTyVar ql_subst v of
+                 Nothing -> return ()  -- no information was found
+                 Just ql_ty -> uQuickLookTryFillPoly orig v ql_ty
+           ; traceTc "tcPerformQuickLook" (vcat [ppr ql_subst, ppr ql_vars])
+           ; (,,) <$> zonkTcType act_res_ty
+                  <*> zonkExpType exp_res_ty
+                  <*> mapM zonkTcType arg_tys }
+      | otherwise
+      = return (act_res_ty, exp_res_ty, arg_tys)
 
+-- `tcQuickLookApp` (and all the other quick look functions)
+-- work in a pure fashion with two exceptions:
+-- * the creation of fresh variables at instantiation
+-- * kind-checking type signatures
+-- The function `tcPerformQuickLook` is the one that eventually
+-- fill the unification variables with the result of this function
 tcQuickLookApp :: ([a] -> [TcSigmaType] -> TcM TCvSubst)
                -> (TcRhoType, ExpRhoType)        -- ^ result types
                -> [a]                            -- ^ arguments
@@ -1481,15 +1507,23 @@ tcQuickLookApp ql_args (act_res_ty, exp_res_ty) args arg_tys
            Check exp_res_ty
              -> do { act_res_ty' <- substTyAddInScope args_subst <$> zonkTcType act_res_ty
                    ; exp_res_ty' <- substTyAddInScope args_subst <$> zonkTcType exp_res_ty
-                   ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (act_res_ty':exp_res_ty':arg_tys'))
-                   ; lvl <- getTcLevel
-                   ; res_subst <- composeTCvSubst (mkEmptyTCvSubst in_scope)
-                                      <$> tcQuickLookUnify lvl act_res_ty' exp_res_ty'
+                   ; let in_scope = tyCoVarsOfTypes (act_res_ty':exp_res_ty':arg_tys')
+                   ; res_subst <- flip extendTCvInScopeSet in_scope 
+                                    <$> tcQuickLookUnify act_res_ty' exp_res_ty'
                    ; return ( composeTCvSubst res_subst args_subst
                             , tyCoVarsOfTypesList (act_res_ty':exp_res_ty':arg_tys') ) } } 
 
+-- The main `tcQuickLoopApp` is parametrized by the possible
+-- origins for arguments to quick look:
+-- * `tcQuickLookArgs` is used for regular application arguments,
+-- * `tcQuickLookTupArgs` is used for arguments of tuple (sections),
+-- * `tcQuickLookExprs` is used otherwise.
+-- Each of the functions know how to thread the instantiated
+-- argument type to the correct expression.
+
 tcQuickLookArgs :: [LHsExprArgIn]
-                -> [TcSigmaType]
+                -> [TcSigmaType]   -- ^ types of arguments obtained by instantating
+                                   --   the type of the application head
                 -> TcM TCvSubst
 tcQuickLookArgs args arg_tys
   = do { let in_scope = mkInScopeSet (tyCoVarsOfTypes arg_tys)
@@ -1585,26 +1619,28 @@ tcQuickLook e args ty
              -> do { ifr <- tcInstantiateFun IFA_DoNotDefer e fun_ty (lexprCtOrigin e) args underscore
                    ; case ifr of
                        IFR_OK arg_tys act_res_ty _
-                         -> do {   -- Quick look over the arguments
-                                 args_subst <- tcQuickLookArgs args arg_tys
-                                   -- Instantiate act_res_ty if ty is guarding
-                               ; let act_res_ty' = substTyAddInScope args_subst act_res_ty
-                               ; i_act_res_ty
-                                   <- if tcIsGuardedType ty || isFunTy ty
-                                         then snd <$> topInstantiate AppOrigin act_res_ty'
-                                         else return act_res_ty'
-                                   -- Unify return types
-                               ; lvl <- getTcLevel
-                               ; let in_scope = mkInScopeSet (tyCoVarsOfTypes (i_act_res_ty:ty:arg_tys)) 
-                               ; res_subst <- composeTCvSubst (mkEmptyTCvSubst in_scope)
-                                                <$> tcQuickLookUnify lvl i_act_res_ty ty
-                               ; let subst = composeTCvSubst res_subst args_subst
-                                   -- That's all!
+                         -> do { subst <- quick_look_continue arg_tys act_res_ty
                                ; traceTc "tcQuickLook/OK" (ppr subst)
                                ; return subst }
                        -- if there is any problem, just return empty substitution
                        _ -> do { traceTc "tcQuickLook/Bad" (ppr fun_ty)
                                ; return (mkEmptyTCvSubst emptyInScopeSet) } } }
+  where
+    quick_look_continue arg_tys act_res_ty
+      = do { -- Quick look over the arguments
+             args_subst <- tcQuickLookArgs args arg_tys
+             -- Instantiate act_res_ty if ty is guarding
+           ; let act_res_ty' = substTyAddInScope args_subst act_res_ty
+           ; i_act_res_ty
+               <- if tcIsGuardedType ty || isFunTy ty
+                     then snd <$> topInstantiate AppOrigin act_res_ty'
+                     else return act_res_ty'
+             -- Unify return types
+           ; let in_scope = tyCoVarsOfTypes (i_act_res_ty:ty:arg_tys)
+           ; res_subst <- flip extendTCvInScopeSet in_scope
+                            <$> tcQuickLookUnify i_act_res_ty ty
+             -- And compose both
+           ; return (composeTCvSubst res_subst args_subst) }
 
 tcQuickLookFun :: LHsExpr GhcRn -> TcM (Maybe TcSigmaType)
 tcQuickLookFun (L _ (HsPar _ e))

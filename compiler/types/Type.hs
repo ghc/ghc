@@ -1760,7 +1760,7 @@ isFullyMonoTauTy (FunTy InvisArg _ _) = False
 isFullyMonoTauTy (FunTy _ a b)        = isFullyMonoTauTy a && isFullyMonoTauTy b
 isFullyMonoTauTy (ForAllTy {})        = False
 isFullyMonoTauTy (CastTy ty _)        = isFullyMonoTauTy ty
-isFullyMonoTauTy (CoercionTy _)       = False  -- Not sure about this
+isFullyMonoTauTy (CoercionTy _)       = True
 
 {-
 %************************************************************************
