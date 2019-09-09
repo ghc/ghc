@@ -14,7 +14,6 @@
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "ProfHeap.h"
-#include "eventlog/EventLog.h"
 #include "Stats.h"
 #include "Hash.h"
 #include "RetainerProfile.h"
