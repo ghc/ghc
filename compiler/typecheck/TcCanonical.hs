@@ -1995,17 +1995,14 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
 
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
 
-       ; dflags <- getDynFlags
-       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_ty1 `mkCastTy` sym_co2) }
+       ; canEqTyVar2 new_ev eq_rel IsSwapped tv2 (ps_ty1 `mkCastTy` sym_co2) }
 
 canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_ty2
-  = do { dflags <- getDynFlags
-       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_ty2 }
+  = canEqTyVar2 ev eq_rel swapped tv1 ps_ty2
 
 -- The RHS here is either not a casted tyvar, or it's a tyvar but we want
 -- to rewrite the LHS to the RHS (as per swapOverTyVars)
-canEqTyVar2 :: DynFlags
-            -> CtEvidence   -- lhs ~ rhs (or, if swapped, orhs ~ olhs)
+canEqTyVar2 :: CtEvidence   -- lhs ~ rhs (or, if swapped, orhs ~ olhs)
             -> EqRel
             -> SwapFlag
             -> TcTyVar                  -- lhs = tv, flat
@@ -2014,7 +2011,7 @@ canEqTyVar2 :: DynFlags
 -- LHS is an inert type variable,
 -- and RHS is fully rewritten, but with type synonyms
 -- preserved as much as possible
-canEqTyVar2 _dflags ev eq_rel swapped tv1 rhs
+canEqTyVar2 ev eq_rel swapped tv1 rhs
   | Just rhs' <- metaTyVarUpdateOK False tv1 rhs  -- No occurs check
      -- Must do the occurs check even on tyvar/tyvar
      -- equalities, in case have  x ~ (y :: ..x...)

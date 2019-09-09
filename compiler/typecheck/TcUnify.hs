@@ -763,13 +763,11 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = 
         do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False exp_arg act_arg
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
-           -- ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
-                         -- GenSigCtxt: See Note [Setting the argument context]
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
+               -- GenSigCtxt: See Note [Setting the argument context]
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
-        -- given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
@@ -778,16 +776,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       , not (null tvs && null theta)
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
               -- quick look
-           ; dflags <- getDynFlags
-           ; in_rho' <- if xopt LangExt.ImpredicativeTypes dflags
-                           then do { lvl <- getTcLevel
-                                   ; ql_subst <- tcQuickLookUnify lvl in_rho ty_e
-                                   ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
-                                       uQuickLookTryFillPoly inst_orig v
-                                          (substTyAddInScope ql_subst (mkTyVarTy v))
-                                   ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
-                                   ; zonkTcType in_rho }
-                           else return in_rho
+           ; in_rho' <- getDynFlags >>= quick_look inst_orig in_rho ty_e
            ; body_wrap <- tc_sub_type_ds
                             (eq_orig { uo_actual = in_rho'
                                      , uo_expected = ty_expected })
@@ -824,12 +813,50 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig False ty_actual ty_expected
 
-tcQuickLookUnify :: TcLevel -> TcType -> TcType -> TcM TCvSubst
-tcQuickLookUnify lvl ty1 ty2
+    quick_look orig in_rho ty_e dflags
+      | xopt LangExt.ImpredicativeTypes dflags
+      = do { ql_subst <- tcQuickLookUnify in_rho ty_e
+           ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
+               case lookupTyVar ql_subst v of
+                 Nothing -> return ()  -- no information was found
+                 Just ql_ty -> uQuickLookTryFillPoly orig v ql_ty
+           ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
+           ; zonkTcType in_rho }
+      | otherwise
+      = return in_rho
+
+{-
+Note [Quick look unification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the `ImpredicativeTypes` extension is on, an additional
+"quick look" pass is done at every application
+(see note [Quick look impredicativity] in TcExpr)
+and during subtype checking (see tc_sub_type_ds).
+In both cases we need to use a restricted version of unification
+(implemented below in `tcQuickLookUnify`) which only performs
+such unification when a type variable is found under a type
+constructor. For example:
+* quickLookUnify alpha (forall a. a -> a)
+    => does nothing, since alpha is not guarded
+* quickLookUnify [alpha] [forall a. a -> a]
+    => unifies "alpha := forall a. a -> a"
+
+A type is "guarded" when:
+* it is of the form `T ...`, and `T` is an injective
+  type constructor, but not `(->)`; or
+* it is the first argument to a function type.
+-}
+tcQuickLookUnify :: TcType -> TcType -> TcM TCvSubst
+tcQuickLookUnify ty1 ty2 
+  = do { lvl <- getTcLevel
+       ; tcQuickLookUnify' lvl ty1 ty2 }
+
+tcQuickLookUnify' :: TcLevel -> TcType -> TcType -> TcM TCvSubst
+tcQuickLookUnify' lvl ty1 ty2
   | Just ty1' <- tcView ty1
-  = tcQuickLookUnify lvl ty1' ty2
+  = tcQuickLookUnify' lvl ty1' ty2
   | Just ty2' <- tcView ty2
-  = tcQuickLookUnify lvl ty1 ty2'
+  = tcQuickLookUnify' lvl ty1 ty2'
   -- case of one being a monotype => unify
   | tcIsGuardedType ty1 || tcIsGuardedType ty2
   = do { traceTc "tcQuickLookUnify/mono" (vcat [ppr ty1, ppr ty2])
@@ -841,11 +868,11 @@ tcQuickLookUnify lvl ty1 ty2
   , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
   = do { traceTc "tcQuickLookUnify/arrow-arrow" (vcat [ppr ty1, ppr ty2])
        ; case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
-           Nothing -> tcQuickLookUnify lvl res1 res2
+           Nothing -> tcQuickLookUnify' lvl res1 res2
            Just subst1
              -> let res1' = substTyAddInScope subst1 res1
                     res2' = substTyAddInScope subst1 res2
-                in flip composeTCvSubst subst1 <$> tcQuickLookUnify lvl res1' res2' }
+                in flip composeTCvSubst subst1 <$> tcQuickLookUnify' lvl res1' res2' }
   -- case of variable and function type
   | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
   , TyVarTy tv2 <- ty2, isTouchableMetaTyVar lvl tv2
@@ -854,7 +881,7 @@ tcQuickLookUnify lvl ty1 ty2
        ; let new_fun_ty  = mkVisFunTy arg1 beta
              small_subst = zipTvSubst [tv2] [new_fun_ty]
              ty1' = substTyAddInScope small_subst ty1
-       ; subst' <- tcQuickLookUnify lvl ty1' new_fun_ty
+       ; subst' <- tcQuickLookUnify' lvl ty1' new_fun_ty
        ; return (composeTCvSubst subst' small_subst) }
   | Just (arg2, res2) <- tcSplitFunTy_maybe ty2
   , TyVarTy tv1 <- ty1, isTouchableMetaTyVar lvl tv1
@@ -863,7 +890,7 @@ tcQuickLookUnify lvl ty1 ty2
        ; let new_fun_ty  = mkVisFunTy arg2 beta
              small_subst = zipTvSubst [tv1] [new_fun_ty]
              ty2' = substTyAddInScope small_subst ty2
-       ; subst' <- tcQuickLookUnify lvl new_fun_ty ty2'
+       ; subst' <- tcQuickLookUnify' lvl new_fun_ty ty2'
        ; return (composeTCvSubst subst' small_subst) }
   | otherwise
   = return emptyTCvSubst
@@ -1407,16 +1434,15 @@ unifyType, unifyTypeImpredicatively
           -> TcTauType -> TcTauType -> TcM TcCoercionN
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType TypeLevel origin False ty1 ty2
-  where
-    origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
-                          , uo_thing  = ppr <$> thing
-                          , uo_visible = True } -- always called from a visible context
+unifyType = unifyType' False
+unifyTypeImpredicatively = unifyType' True
 
-unifyTypeImpredicatively thing ty1 ty2
-                        = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType TypeLevel origin True ty1 ty2
+unifyType' :: Bool                   -- ^ Allow impredicativity?
+           -> Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
+           -> TcTauType -> TcTauType -> TcM TcCoercionN
+unifyType' impred thing ty1 ty2
+  = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
+    uType TypeLevel origin impred ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                           , uo_thing  = ppr <$> thing
