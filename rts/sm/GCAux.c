@@ -71,7 +71,7 @@ isAlive(StgClosure *p)
     }
 
     // check the mark bit for compacted generations
-    if ((bd->flags & BF_MARKED) && is_marked((P_)q,bd)) {
+    if ((bd->flags & BF_MARKED) && is_marked_live((P_)q,bd)) {
         return p;
     }
 

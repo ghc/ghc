@@ -222,20 +222,9 @@ data ArgDescr
 -----------------------------------------------------------------------------
 -- Construction
 
-mkHeapRep :: DynFlags -> IsStatic -> WordOff -> WordOff -> ClosureTypeInfo
-          -> SMRep
-mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type_info
-  = HeapRep is_static
-            ptr_wds
-            (nonptr_wds + slop_wds)
-            cl_type_info
-  where
-     slop_wds
-      | is_static = 0
-      | otherwise = max 0 (minClosureSize dflags - (hdr_size + payload_size))
-
-     hdr_size     = closureTypeHdrSize dflags cl_type_info
-     payload_size = ptr_wds + nonptr_wds
+mkHeapRep :: IsStatic -> WordOff -> WordOff -> ClosureTypeInfo -> SMRep
+mkHeapRep is_static ptr_wds nonptr_wds cl_type_info
+  = HeapRep is_static ptr_wds nonptr_wds cl_type_info
 
 mkRTSRep :: Int -> SMRep -> SMRep
 mkRTSRep = RTSRep
@@ -309,11 +298,6 @@ profHdrSize  :: DynFlags -> WordOff
 profHdrSize dflags
  | gopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE dflags
  | otherwise                      = 0
-
--- | The garbage collector requires that every closure is at least as
---   big as this.
-minClosureSize :: DynFlags -> WordOff
-minClosureSize dflags = fixedHdrSizeW dflags + mIN_PAYLOAD_SIZE dflags
 
 arrWordsHdrSize :: DynFlags -> ByteOff
 arrWordsHdrSize dflags

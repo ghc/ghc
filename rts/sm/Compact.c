@@ -787,7 +787,7 @@ update_fwd_compact( bdescr *blocks )
 
         while (p < bd->free ) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while ( p < bd->free && !is_marked_live(p,bd) ) {
                 p++;
             }
             if (p >= bd->free) {
@@ -830,15 +830,16 @@ update_fwd_compact( bdescr *blocks )
 
             size = p - q;
             if (free + size > free_bd->start + BLOCK_SIZE_W) {
-                // set the next bit in the bitmap to indicate that
-                // this object needs to be pushed into the next
-                // block.  This saves us having to run down the
-                // threaded info pointer list twice during the next pass.
-                mark(q+1,bd);
+                // set the next bit in the bitmap to indicate that this object
+                // needs to be pushed into the next block.  This saves us having
+                // to run down the threaded info pointer list twice during the
+                // next pass. See Note [Mark bits in mark-compact collector] in
+                // Compact.h.
+                mark_too_large(q,bd);
                 free_bd = free_bd->link;
                 free = free_bd->start;
             } else {
-                ASSERT(!is_marked(q+1,bd));
+                ASSERT(!is_marked_too_large(q,bd));
             }
 
             unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
@@ -873,7 +874,7 @@ update_bkwd_compact( generation *gen )
 
         while (p < bd->free ) {
 
-            while ( p < bd->free && !is_marked(p,bd) ) {
+            while ( p < bd->free && !is_marked_live(p,bd) ) {
                 p++;
             }
             if (p >= bd->free) {
@@ -898,7 +899,7 @@ update_bkwd_compact( generation *gen )
             }
 #endif
 
-            if (is_marked(p+1,bd)) {
+            if (is_marked_too_large(p,bd)) {
                 // don't forget to update the free ptr in the block desc.
                 free_bd->free = free;
                 free_bd = free_bd->link;

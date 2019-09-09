@@ -13,7 +13,6 @@ import GhcPrelude
 
 import ByteCodeTypes
 import GHCi
-import DynFlags
 import HscTypes
 import Name             ( Name, getName )
 import NameEnv
@@ -65,12 +64,9 @@ make_constr_itbls hsc_env cons =
 
          ptrs'  = ptr_wds
          nptrs' = tot_wds - ptr_wds
-         nptrs_really
-            | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
-            | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
 
          descr = dataConIdentity dcon
 
-     r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs_really
+     r <- iservCmd hsc_env (MkConInfoTable ptrs' nptrs'
                               conNo (tagForCon dflags dcon) descr)
      return (getName dcon, ItblPtr r)

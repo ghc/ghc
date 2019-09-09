@@ -44,9 +44,9 @@ exConstrClosure = ConstrClosure
 
 exFunClosure :: Closure
 exFunClosure = FunClosure
-    { info = exItbl{tipe=FUN_0_1, ptrs=0, nptrs=1}
+    { info = exItbl{tipe=FUN, ptrs=0, nptrs=0}
     , ptrArgs = []
-    , dataArgs = [0]
+    , dataArgs = []
     }
 
 exThunkClosure :: Closure

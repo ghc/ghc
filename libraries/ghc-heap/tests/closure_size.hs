@@ -18,9 +18,10 @@ data APC a = APC a
 
 main :: IO ()
 main = do
+  assertSize False 1
+  assertSize (Nothing :: Maybe ()) 1
   assertSize 'a' 2
   assertSize (Just ()) 2
-  assertSize (Nothing :: Maybe ()) 2
   assertSize ((1,2) :: (Int,Int)) 3
   assertSize ((1,2,3) :: (Int,Int,Int)) 4
 

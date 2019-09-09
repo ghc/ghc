@@ -698,7 +698,7 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
                 , closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
-    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    sm_rep     = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     prof       = mkProfilingInfo dflags id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
@@ -966,7 +966,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
  where
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
-   sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
+   sm_rep = mkHeapRep is_static ptr_wds nonptr_wds cl_type
    cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
                   -- We keep the *zero-indexed* tag in the srt_len field
                   -- of the info table of a data constructor.

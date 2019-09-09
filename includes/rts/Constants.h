@@ -20,16 +20,6 @@
 #pragma once
 
 /* -----------------------------------------------------------------------------
-   Minimum closure sizes
-
-   This is the minimum number of words in the payload of a
-   heap-allocated closure, so that the closure has enough room to be
-   overwritten with a forwarding pointer during garbage collection.
-   -------------------------------------------------------------------------- */
-
-#define MIN_PAYLOAD_SIZE 1
-
-/* -----------------------------------------------------------------------------
    Constants to do with specialised closure types.
    -------------------------------------------------------------------------- */
 

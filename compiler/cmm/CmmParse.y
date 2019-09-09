@@ -466,8 +466,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $11 $13
                           rep  = mkRTSRep (fromIntegral $9) $
-                                   mkHeapRep dflags False (fromIntegral $5)
-                                                   (fromIntegral $7) Thunk
+                                   mkHeapRep False (fromIntegral $5) (fromIntegral $7) Thunk
                               -- not really Thunk, but that makes the info table
                               -- we want.
                       return (mkCmmEntryLabel pkg $3,
@@ -484,8 +483,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                           ty   = Fun 0 (ArgSpec (fromIntegral $15))
                                 -- Arity zero, arg_type $15
                           rep = mkRTSRep (fromIntegral $9) $
-                                    mkHeapRep dflags False (fromIntegral $5)
-                                                    (fromIntegral $7) ty
+                                    mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
@@ -502,8 +500,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                           ty  = Constr (fromIntegral $9)  -- Tag
                                        (BS8.pack $13)
                           rep = mkRTSRep (fromIntegral $11) $
-                                  mkHeapRep dflags False (fromIntegral $5)
-                                                  (fromIntegral $7) ty
+                                  mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
@@ -520,7 +517,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       let prof = profilingInfo dflags $9 $11
                           ty  = ThunkSelector (fromIntegral $5)
                           rep = mkRTSRep (fromIntegral $7) $
-                                   mkHeapRep dflags False 0 0 ty
+                                   mkHeapRep False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
