@@ -652,6 +652,7 @@ loop:
   //
   case CONSTR_0_1:
   {
+      tag |= info->srt + 1;
 #if defined(COMPILING_WINDOWS_DLL)
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
 #else
@@ -676,9 +677,11 @@ loop:
       return;
   }
 
+  case CONSTR_1_0:
+      tag |= info->srt + 1;
+      FALLTHROUGH;
   case FUN_0_1:
   case FUN_1_0:
-  case CONSTR_1_0:
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       return;
 
@@ -693,15 +696,18 @@ loop:
     copy(p,info,q,sizeofW(StgThunk)+2,gen_no);
     return;
 
+  case CONSTR_1_1:
+  case CONSTR_2_0:
+      tag |= info->srt + 1;
+      FALLTHROUGH;
   case FUN_1_1:
   case FUN_2_0:
   case FUN_0_2:
-  case CONSTR_1_1:
-  case CONSTR_2_0:
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen_no,tag);
       return;
 
   case CONSTR_0_2:
+      tag |= info->srt + 1;
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen_no,tag);
       return;
 
@@ -709,9 +715,11 @@ loop:
       copy(p,info,q,thunk_sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
       return;
 
-  case FUN:
   case CONSTR:
   case CONSTR_NOCAF:
+      tag |= info->srt + 1;
+      FALLTHROUGH;
+  case FUN:
       copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
 
