@@ -126,7 +126,7 @@ module Type (
         tyConAppNeedsKindSig,
 
         -- (Lifting and boxity)
-        isLiftedType_maybe, isUnliftedType, isUnboxedTupleType, isUnboxedSumType,
+        isLiftedType_maybe, isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
@@ -2224,6 +2224,16 @@ isUnliftedType :: HasDebugCallStack => Type -> Bool
 isUnliftedType ty
   = not (isLiftedType_maybe ty `orElse`
          pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+
+-- | Returns:
+--
+-- * 'False' if the type is /guaranteed/ lifted or
+-- * 'True' if it is unlifted, OR we aren't sure (e.g. in a levity-polymorphic case)
+mightBeUnliftedType :: Type -> Bool
+mightBeUnliftedType ty
+  = case isLiftedType_maybe ty of
+      Just is_lifted -> not is_lifted
+      Nothing -> True
 
 -- | Is this a type of kind RuntimeRep? (e.g. LiftedRep)
 isRuntimeRepKindedTy :: Type -> Bool

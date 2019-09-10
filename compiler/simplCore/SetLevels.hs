@@ -89,7 +89,7 @@ import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increa
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
-                        , isUnliftedType, closeOverKindsDSet )
+                        , mightBeUnliftedType, closeOverKindsDSet )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -1099,8 +1099,8 @@ lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || not (profitableFloat env dest_lvl)
-  || (isTopLvl dest_lvl && any (isUnliftedType . idType) bndrs)
-       -- This isUnliftedType stuff is the same test as in the non-rec case
+  || (isTopLvl dest_lvl && any (mightBeUnliftedType . idType) bndrs)
+       -- This mightBeUnliftedType stuff is the same test as in the non-rec case
        -- You might wonder whether we can have a recursive binding for
        -- an unlifted value -- but we can if it's a /join binding/ (#16978)
        -- (Ultimately I think we should not use SetLevels to
