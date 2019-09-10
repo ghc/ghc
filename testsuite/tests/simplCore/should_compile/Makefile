@@ -257,3 +257,7 @@ T15631:
 	$(RM) -f T15631.o T15631.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T15631.hs | grep 'case'
 # Expecting one fewwer case expressions after fixing #15631
+
+T17140:
+	$(RM) -f T17140*.hi T17140*.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O T17140 T17140a -v0

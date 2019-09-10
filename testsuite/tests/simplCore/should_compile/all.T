@@ -308,3 +308,7 @@ test('T16918a', normal, compile, ['-O'])
 test('T16978', normal, compile, ['-O'])
 test('T16979a', normal, compile, ['-O'])
 test('T16979b', normal, compile, ['-O'])
+test('T17140',
+     [extra_files(['T17140a.hs'])],
+     makefile_test,
+     ['T17140'])
