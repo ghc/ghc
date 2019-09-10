@@ -24,7 +24,7 @@
  *
  *  NOTE: other places to change if you change this table:
  *       - utils/genapply/Main.hs: stackApplyTypes
- *       - compiler/codeGen/StgCmmLayout.hs: stdPattern
+ *       - GHC.StgToCmm.Layout: stdPattern
  */
 #define ARG_NONE     3 
 #define ARG_N        4  
