@@ -93,7 +93,7 @@ mkExtraObjToLinkIntoBinary dflags = do
                   _                      -> exeMain
 
     exeMain = vcat [
-        text "#include \"Rts.h\"",
+        text "#include <Rts.h>",
         text "extern StgClosure ZCMain_main_closure;",
         text "int main(int argc, char *argv[])",
         char '{',
@@ -119,7 +119,7 @@ mkExtraObjToLinkIntoBinary dflags = do
         ]
 
     dllMain = vcat [
-        text "#include \"Rts.h\"",
+        text "#include <Rts.h>",
         text "#include <windows.h>",
         text "#include <stdbool.h>",
         char '\n',

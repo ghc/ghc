@@ -24,7 +24,6 @@ module PrelRules
 where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
 
 import GhcPrelude
 

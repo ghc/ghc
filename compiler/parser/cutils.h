@@ -4,7 +4,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#include "HsFFI.h"
+#include <HsFFI.h>
 
 void enableTimingStats( void );
 void setHeapSize( HsInt size );

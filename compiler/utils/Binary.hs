@@ -64,9 +64,6 @@ module Binary
 
 #include "HsVersions.h"
 
--- The *host* architecture version:
-#include "../includes/MachDeps.h"
-
 import GhcPrelude
 
 import {-# SOURCE #-} Name (Name)

@@ -224,12 +224,12 @@ outputForeignStubs dflags mod location stubs
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
-              | platformMisc_libFFI $ platformMisc dflags = "#include \"ffi.h\"\n"
+              | platformMisc_libFFI $ platformMisc dflags = "#include <ffi.h>\n"
               | otherwise = ""
 
         stub_h_file_exists
            <- outputForeignStubs_help stub_h stub_h_output_w
-                ("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
+                ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
@@ -237,7 +237,7 @@ outputForeignStubs dflags mod location stubs
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
                 ("#define IN_STG_CODE 0\n" ++
-                 "#include \"Rts.h\"\n" ++
+                 "#include <Rts.h>\n" ++
                  rts_includes ++
                  ffi_includes ++
                  cplusplus_hdr)
