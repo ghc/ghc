@@ -10,7 +10,7 @@
 --
 module Util (
         -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn, ncgDebugIsOn,
+        ghciSupported, debugIsOn,
         ghciTablesNextToCode,
         isWindowsHost, isDarwinHost,
 
@@ -196,13 +196,6 @@ debugIsOn :: Bool
 debugIsOn = True
 #else
 debugIsOn = False
-#endif
-
-ncgDebugIsOn :: Bool
-#if defined(NCG_DEBUG)
-ncgDebugIsOn = True
-#else
-ncgDebugIsOn = False
 #endif
 
 ghciTablesNextToCode :: Bool
