@@ -885,3 +885,15 @@ Checking for determinism
       generates in decreasing order
     * ``-dinitial-unique=1 -dunique-increment=PRIME`` - where PRIME big enough
       to overflow often - nonsequential order
+
+Other
+-----
+
+.. ghc-flag:: -dno-typeable-binds
+    :shortdesc: Don't generate bindings for Typeable methods
+    :type: dynamic
+
+    This avoid generating Typeable-related bindings for modules and types. This
+    is useful when debugging because it gives smaller modules and dumps, but the
+    compiler will panic if you try to use Typeable instances of things that you
+    built with this flag.
