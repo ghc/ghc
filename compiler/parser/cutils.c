@@ -7,12 +7,6 @@ places in the GHC library.
 
 #include "HsFFI.h"
 
-#include <string.h>
-
-#if defined(HAVE_UNISTD_H)
-#include <unistd.h>
-#endif
-
 void
 enableTimingStats( void )       /* called from the driver */
 {
