@@ -9,7 +9,6 @@
 -----------------------------------------------------------------------------
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module PPC.Instr (
     archWordFormat,

@@ -33,6 +33,7 @@ module DriverPipeline (
    linkingNeeded, checkLinkInfo, writeInterfaceOnlyMode
   ) where
 
+#include <ghcplatform.h>
 #include "HsVersions.h"
 
 import GhcPrelude
