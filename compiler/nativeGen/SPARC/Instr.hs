@@ -8,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module SPARC.Instr (
         RI(..),

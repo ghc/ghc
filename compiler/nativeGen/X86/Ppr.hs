@@ -21,7 +21,6 @@ module X86.Ppr (
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 import GhcPrelude
 
