@@ -21,8 +21,7 @@ module Fingerprint (
         getFileHash
    ) where
 
-#include "md5.h"
-##include "HsVersions.h"
+#include "HsVersions.h"
 
 import GhcPrelude
 
