@@ -104,8 +104,8 @@ import Control.Concurrent
 import Module
 import Packages
 import RdrName
-import HsSyn
-import HsDumpAst
+import GHC.Hs
+import GHC.Hs.DumpAst
 import CoreSyn
 import StringBuffer
 import Parser

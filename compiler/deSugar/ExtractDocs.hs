@@ -8,12 +8,12 @@ module ExtractDocs (extractDocs) where
 
 import GhcPrelude
 import Bag
-import HsBinds
-import HsDoc
-import HsDecls
-import HsExtension
-import HsTypes
-import HsUtils
+import GHC.Hs.Binds
+import GHC.Hs.Doc
+import GHC.Hs.Decls
+import GHC.Hs.Extension
+import GHC.Hs.Types
+import GHC.Hs.Utils
 import Name
 import NameSet
 import SrcLoc

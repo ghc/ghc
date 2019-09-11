@@ -30,7 +30,7 @@ import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
 import DsMeta
-import HsSyn
+import GHC.Hs
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types

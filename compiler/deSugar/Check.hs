@@ -28,7 +28,7 @@ import TmOracle
 import PmPpr
 import Unify( tcMatchTy )
 import DynFlags
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import Id
 import ConLike
@@ -152,7 +152,7 @@ data PmPat :: PatTy -> * where
             , pm_con_tvs     :: [TyVar]
             , pm_con_dicts   :: [EvVar]
             , pm_con_args    :: [PmPat t] } -> PmPat t
-            -- For PmCon arguments' meaning see @ConPatOut@ in hsSyn/HsPat.hs
+            -- For PmCon arguments' meaning see @ConPatOut@ in GHC.Hs.Pat
   PmVar  :: { pm_var_id   :: Id } -> PmPat t
   PmLit  :: { pm_lit_lit  :: PmLit } -> PmPat t -- See Note [Literals in PmPat]
   PmNLit :: { pm_lit_id   :: Id
@@ -2366,7 +2366,7 @@ available so we can get more precise results. For this reason we have functions
 term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
-in HsPat.hs. This handles bug #4139 ( see example
+in GHC.Hs.Pat. This handles bug #4139 ( see example
   https://gitlab.haskell.org/ghc/ghc/snippets/672 )
 where this is needed.
 

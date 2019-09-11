@@ -12,22 +12,22 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module HsBinds where
+module GHC.Hs.Binds where
 
 import GhcPrelude
 
-import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
-                               MatchGroup, pprFunBind,
-                               GRHSs, pprPatBind )
-import {-# SOURCE #-} HsPat  ( LPat )
+import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
+                                    MatchGroup, pprFunBind,
+                                    GRHSs, pprPatBind )
+import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 
-import HsExtension
-import HsTypes
+import GHC.Hs.Extension
+import GHC.Hs.Types
 import CoreSyn
 import TcEvidence
 import Type
@@ -223,7 +223,7 @@ data HsBindLR idL idR
                                 -- free variables of this defn.
                                 -- See Note [Bind free vars]
 
-        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in HsExpr
+        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
