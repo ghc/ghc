@@ -1091,6 +1091,11 @@ ocBuildSegments_MachO(ObjectCode *oc)
 
     for (int i = 0; i < oc->n_sections; i++) {
         MachOSection *macho = &oc->info->macho_sections[i];
+        if (0 == macho->size) {
+            IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: found a zero length section, skipping\n"));
+            continue;
+        }
+
         size_t alignment = 1 << macho->align;
 
         if (S_GB_ZEROFILL == (macho->flags & SECTION_TYPE)) {
@@ -1118,16 +1123,21 @@ ocBuildSegments_MachO(ObjectCode *oc)
     if (n_rwSections > 0) {
         n_activeSegments++;
     }
-    if (n_gbZerofills >0) {
+    if (n_gbZerofills > 0) {
         n_activeSegments++;
     }
 
     // N.B. it's possible that there is nothing mappable in an object. In this
-    // case we avoid the mmap call since it would fail. See #16701.
-    if (size_compound > 0) {
-        mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
-        if (NULL == mem) return 0;
+    // case we avoid the mmap call and segment allocation/building since it will
+    // fail either here or further down the road, e.g. on size > 0 assert in
+    // addProddableBlock. See #16701.
+    if (0 == size_compound) {
+        IF_DEBUG(linker, debugBelch("ocBuildSegments_MachO: all segments are empty, skipping\n"));
+        return 1;
     }
+
+    mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
+    if (NULL == mem) return 0;
 
     IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));
     segments = (Segment*)stgCallocBytes(n_activeSegments, sizeof(Segment),
@@ -1182,6 +1192,11 @@ ocBuildSegments_MachO(ObjectCode *oc)
          i++)
     {
         MachOSection *macho = &oc->info->macho_sections[i];
+        // Skip zero size sections here as well since there was no place
+        // allocated for them in Segment's sections_idx array
+        if (0 == macho->size) {
+            continue;
+        }
 
         if (S_GB_ZEROFILL == (macho->flags & SECTION_TYPE)) {
             gbZerofillSegment->sections_idx[gb++] = i;
