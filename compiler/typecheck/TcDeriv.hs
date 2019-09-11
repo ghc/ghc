@@ -1755,8 +1755,10 @@ mkNewTypeEqn
                  -- enabled, we take the diplomatic approach of defaulting to
                  -- DeriveAnyClass, but emitting a warning about the choice.
                  -- See Note [Deriving strategies]
-                 when (newtype_deriving && deriveAnyClass) $
-                   lift $ addWarnTc NoReason $ sep
+                 when (newtype_deriving && deriveAnyClass) $ do
+                   dyn_flags <- getDynFlags
+                   when (wopt Opt_WarnDerivingDefaults dyn_flags) $
+                     lift $ addWarnTc NoReason $ sep
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"
