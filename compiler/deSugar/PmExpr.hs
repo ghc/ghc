@@ -19,7 +19,7 @@ import GhcPrelude
 
 import BasicTypes (SourceText)
 import FastString (FastString, unpackFS)
-import HsSyn
+import GHC.Hs
 import Id
 import Name
 import DataCon

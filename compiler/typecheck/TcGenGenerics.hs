@@ -16,7 +16,7 @@ module TcGenGenerics (canDoGenerics, canDoGenerics1,
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Type
 import TcType
 import TcGenDeriv

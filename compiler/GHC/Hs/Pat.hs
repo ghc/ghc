@@ -12,13 +12,13 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module HsPat (
+module GHC.Hs.Pat (
         Pat(..), InPat, OutPat, LPat,
         ListPatTc(..),
 
@@ -43,13 +43,13 @@ module HsPat (
 
 import GhcPrelude
 
-import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
+import {-# SOURCE #-} GHC.Hs.Expr (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
 -- friends:
-import HsBinds
-import HsLit
-import HsExtension
-import HsTypes
+import GHC.Hs.Binds
+import GHC.Hs.Lit
+import GHC.Hs.Extension
+import GHC.Hs.Types
 import TcEvidence
 import BasicTypes
 -- others:
@@ -89,7 +89,7 @@ data Pat p
   | VarPat      (XVarPat p)
                 (Located (IdP p))  -- ^ Variable Pattern
 
-                             -- See Note [Located RdrNames] in HsExpr
+                             -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
                 (LPat p)                -- ^ Lazy Pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
@@ -104,7 +104,7 @@ data Pat p
 
   | ParPat      (XParPat p)
                 (LPat p)                -- ^ Parenthesised pattern
-                                        -- See Note [Parens in HsSyn] in HsExpr
+                                        -- See Note [Parens in HsSyn] in GHC.Hs.Expr
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
     --                                    'ApiAnnotation.AnnClose' @')'@
 
@@ -155,7 +155,7 @@ data Pat p
     --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
     --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
-  | SumPat      (XSumPat p)        -- PlaceHolder before typechecker, filled in
+  | SumPat      (XSumPat p)        -- GHC.Hs.PlaceHolder before typechecker, filled in
                                    -- afterwards with the types of the
                                    -- alternative
                 (LPat p)           -- Sum sub-pattern
