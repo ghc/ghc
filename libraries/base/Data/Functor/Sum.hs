@@ -25,13 +25,16 @@ import Control.Applicative ((<|>))
 import Data.Data (Data)
 import Data.Functor.Classes
 import GHC.Generics (Generic, Generic1)
-import Text.Read (Read(..), readListDefault, readListPrecDefault)
 
 -- | Lifted sum of functors.
 data Sum f g a = InL (f a) | InR (g a)
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0
            , Generic1 -- ^ @since 4.9.0.0
+           , Eq       -- ^ @since 4.9.0.0
+           , Ord      -- ^ @since 4.9.0.0
+           , Read     -- ^ @since 4.9.0.0
+           , Show     -- ^ @since 4.9.0.0
            )
 
 -- | @since 4.9.0.0
@@ -63,22 +66,6 @@ instance (Show1 f, Show1 g) => Show1 (Sum f g) where
         showsUnaryWith (liftShowsPrec sp sl) "InL" d x
     liftShowsPrec sp sl d (InR y) =
         showsUnaryWith (liftShowsPrec sp sl) "InR" d y
-
--- | @since 4.9.0.0
-instance (Eq1 f, Eq1 g, Eq a) => Eq (Sum f g a) where
-    (==) = eq1
--- | @since 4.9.0.0
-instance (Ord1 f, Ord1 g, Ord a) => Ord (Sum f g a) where
-    compare = compare1
--- | @since 4.9.0.0
-instance (Read1 f, Read1 g, Read a) => Read (Sum f g a) where
-    readPrec = readPrec1
-
-    readListPrec = readListPrecDefault
-    readList     = readListDefault
--- | @since 4.9.0.0
-instance (Show1 f, Show1 g, Show a) => Show (Sum f g a) where
-    showsPrec = showsPrec1
 
 -- | @since 4.9.0.0
 instance (Functor f, Functor g) => Functor (Sum f g) where
