@@ -21,7 +21,7 @@ import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
 
 import BasicTypes ( Origin(..) )
 import DynFlags
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcEvidence
 import TcRnMonad
