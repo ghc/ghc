@@ -48,6 +48,7 @@ executable hadrian
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag
+                       , Oracles.Flavour
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Oracles.TestSettings
@@ -102,6 +103,7 @@ executable hadrian
                        , Settings.Flavours.GhcInGhci
                        , Settings.Packages
                        , Settings.Parser
+                       , Settings.Program
                        , Settings.Warnings
                        , Stage
                        , Target
