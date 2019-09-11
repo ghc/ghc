@@ -8,11 +8,13 @@ A ``lint'' pass to check for Core correctness
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module CoreLint (
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
     lintAnnots, lintTypes,
+    validateCoercion,
 
     -- ** Debug output
     endPass, endPassIO,
@@ -1800,11 +1802,9 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
               (checkTypes ty1 ty2)
        ; return (k1, k2, ty1, ty2, r) }
    where
-     report s = hang (text $ "Unsafe coercion: " ++ s)
+     report s = hang (text "Unsafe coercion:" <+> s)
                      2 (vcat [ text "From:" <+> ppr ty1
                              , text "  To:" <+> ppr ty2])
-     isUnBoxed :: PrimRep -> Bool
-     isUnBoxed = not . isGcPtrRep
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
@@ -1815,7 +1815,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; when (not (lev_poly1 || lev_poly2)) $
               do { checkWarnL (reps1 `equalLength` reps2)
                               (report "between values with different # of reps")
-                 ; zipWithM_ validateCoercion reps1 reps2 }}
+                 ; zipWithM_ validate_coercion reps1 reps2 }}
        where
          lev_poly1 = isTypeLevPoly t1
          lev_poly2 = isTypeLevPoly t2
@@ -1825,21 +1825,9 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
 
-     validateCoercion :: PrimRep -> PrimRep -> LintM ()
-     validateCoercion rep1 rep2
-       = do { dflags <- getDynFlags
-            ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
-                         (report "between unboxed and boxed value")
-            ; checkWarnL (TyCon.primRepSizeB dflags rep1
-                           == TyCon.primRepSizeB dflags rep2)
-                         (report "between unboxed values of different size")
-            ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
-                                   (TyCon.primRepIsFloat rep2)
-            ; case fl of
-                Nothing    -> addWarnL (report "between vector types")
-                Just False -> addWarnL (report "between float and integral values")
-                _          -> return ()
-            }
+         validate_coercion rep1 rep2 = do
+           dflags <- getDynFlags
+           forM_ (validateCoercion dflags rep1 rep2) (addWarnL . report)
 
      check_kinds kco k1 k2 = do { (k1', k2') <- lintStarCoercion kco
                                 ; ensureEqTys k1 k1' (mkBadUnivCoMsg CLeft  co)
@@ -2020,6 +2008,21 @@ lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
+-- | Returns the reason when the coercion is not valid.
+validateCoercion :: DynFlags -> PrimRep -> PrimRep -> Maybe SDoc
+validateCoercion dflags rep1 rep2
+  | isUnBoxed rep1 /= isUnBoxed rep2
+  = Just "between unboxed and boxed value"
+  | TyCon.primRepSizeB dflags rep1 /= TyCon.primRepSizeB dflags rep2
+  = Just "between unboxed values of different size"
+  | otherwise
+  = case liftA2 (==) (TyCon.primRepIsFloat rep1) (TyCon.primRepIsFloat rep2) of
+      Nothing -> Just "between vector types"
+      Just False -> Just "between float and integral values"
+      Just True -> Nothing
+  where
+    isUnBoxed :: PrimRep -> Bool
+    isUnBoxed = not . isGcPtrRep
 
 ----------
 lintUnliftedCoVar :: CoVar -> LintM ()
