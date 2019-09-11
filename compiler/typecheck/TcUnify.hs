@@ -40,7 +40,7 @@ module TcUnify (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TyCoRep
 import TcMType
 import TcRnMonad

@@ -33,7 +33,7 @@ where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import RdrName
 import HscTypes
 import TcEnv

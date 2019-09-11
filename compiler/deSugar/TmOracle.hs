@@ -34,7 +34,7 @@ import Util
 import Id
 import Name
 import Type
-import HsLit
+import GHC.Hs.Lit
 import TcHsSyn
 import MonadUtils
 import ListSetOps (insertNoDup, unionLists)
