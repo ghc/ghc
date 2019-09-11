@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
-module PlaceHolder where
+module GHC.Hs.PlaceHolder where
 
 import Name
 import NameSet

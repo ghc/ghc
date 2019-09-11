@@ -82,7 +82,7 @@ import TcType
 import InstEnv
 import FamInstEnv
 import TcRnMonad
-import HsSyn
+import GHC.Hs
 import HscTypes
 import Finder
 import DynFlags

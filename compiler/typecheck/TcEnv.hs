@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE TypeFamilies #-}
 
 module TcEnv(
@@ -74,7 +74,7 @@ module TcEnv(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import IfaceEnv
 import TcRnMonad
 import TcMType

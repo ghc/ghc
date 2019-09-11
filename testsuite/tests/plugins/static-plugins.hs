@@ -6,11 +6,11 @@ import DynFlags
   (getDynFlags, parseDynamicFlagsCmdLine, defaultFatalMessager, defaultFlushOut)
 import GHC
 import GHC.Fingerprint.Type
-import HsDecls
-import HsDoc
-import HsExpr
-import HsExtension
-import HsImpExp
+import GHC.Hs.Decls
+import GHC.Hs.Doc
+import GHC.Hs.Expr
+import GHC.Hs.Extension
+import GHC.Hs.ImpExp
 import HscTypes
 import Outputable
 import Plugins

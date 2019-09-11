@@ -39,7 +39,7 @@ import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
 import FastString
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcRnMonad
 import TcEnv
@@ -608,7 +608,7 @@ tcSyntaxName :: CtOrigin
              -> TcM (Name, HsExpr GhcTcId)
                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
--- See Note [CmdSyntaxTable] in HsExpr
+-- See Note [CmdSyntaxTable] in GHC.Hs.Expr
 
 tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
   | std_nm == user_nm
