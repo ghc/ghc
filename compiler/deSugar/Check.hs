@@ -35,7 +35,7 @@ import CoreUtils (exprType)
 import FastString (unpackFS)
 import Unify( tcMatchTy )
 import DynFlags
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import Id
 import ConLike
@@ -1334,7 +1334,7 @@ available so we can get more precise results. For this reason we have functions
 term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
-in HsPat.hs. This handles bug #4139 ( see example
+in GHC.Hs.Pat. This handles bug #4139 ( see example
   https://gitlab.haskell.org/ghc/ghc/snippets/672 )
 where this is needed.
 

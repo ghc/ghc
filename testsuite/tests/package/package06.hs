@@ -1,3 +1,3 @@
 module Package06 where
-import MyHsTypes
-import HsUtils
+import GHC.Hs.MyTypes
+import GHC.Hs.Utils

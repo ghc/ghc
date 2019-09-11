@@ -1,3 +1,3 @@
 module Package06e where
-import HsTypes
+import GHC.Hs.Types
 import UniqFM

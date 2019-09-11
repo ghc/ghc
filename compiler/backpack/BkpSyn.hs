@@ -19,7 +19,7 @@ module BkpSyn (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import SrcLoc
 import Outputable
 import Module
