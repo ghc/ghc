@@ -28,12 +28,6 @@
 #include "StablePtr.h"
 #include "StableName.h"
 
-// Turn off inlining when debugging - it obfuscates things
-#if defined(DEBUG)
-# undef  STATIC_INLINE
-# define STATIC_INLINE static
-#endif
-
 /* ----------------------------------------------------------------------------
    Threading / unthreading pointers.
 
@@ -769,9 +763,6 @@ static void
 update_fwd_compact( bdescr *blocks )
 {
     StgPtr p, q, free;
-#if 0
-    StgWord m;
-#endif
     bdescr *bd, *free_bd;
     StgInfoTable *info;
     StgWord size;
@@ -793,24 +784,6 @@ update_fwd_compact( bdescr *blocks )
             if (p >= bd->free) {
                 break;
             }
-
-#if 0
-    next:
-        m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
-        m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
-
-        while ( p < bd->free ) {
-
-            if ((m & 1) == 0) {
-                m >>= 1;
-                p++;
-                if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
-                    goto next;
-                } else {
-                    continue;
-                }
-            }
-#endif
 
             // Problem: we need to know the destination for this cell
             // in order to unthread its info pointer.  But we can't
@@ -843,9 +816,6 @@ update_fwd_compact( bdescr *blocks )
 
             unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
             free += size;
-#if 0
-            goto next;
-#endif
         }
     }
 }
@@ -854,9 +824,6 @@ static W_
 update_bkwd_compact( generation *gen )
 {
     StgPtr p, free;
-#if 0
-    StgWord m;
-#endif
     bdescr *bd, *free_bd;
     const StgInfoTable *info;
     StgWord size;
@@ -879,24 +846,6 @@ update_bkwd_compact( generation *gen )
             if (p >= bd->free) {
                 break;
             }
-
-#if 0
-    next:
-        m = * ((StgPtr)bd->u.bitmap + ((p - bd->start) / (BITS_IN(StgWord))));
-        m >>= ((p - bd->start) & (BITS_IN(StgWord) - 1));
-
-        while ( p < bd->free ) {
-
-            if ((m & 1) == 0) {
-                m >>= 1;
-                p++;
-                if (((StgWord)p & (sizeof(W_) * BITS_IN(StgWord))) == 0) {
-                    goto next;
-                } else {
-                    continue;
-                }
-            }
-#endif
 
             if (is_marked(p+1,bd)) {
                 // don't forget to update the free ptr in the block desc.
@@ -923,9 +872,6 @@ update_bkwd_compact( generation *gen )
 
             free += size;
             p += size;
-#if 0
-            goto next;
-#endif
         }
     }
 
