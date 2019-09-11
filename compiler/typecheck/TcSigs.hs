@@ -27,7 +27,7 @@ module TcSigs(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcHsType
 import TcRnTypes
 import TcRnMonad

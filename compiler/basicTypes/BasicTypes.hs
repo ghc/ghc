@@ -1211,7 +1211,7 @@ data Activation = NeverActive
                 | ActiveAfter SourceText PhaseNum
                   -- Active in this phase and later
                 deriving( Eq, Data )
-                  -- Eq used in comparing rules in HsDecls
+                  -- Eq used in comparing rules in GHC.Hs.Decls
 
 -- | Rule Match Information
 data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]

@@ -27,7 +27,7 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsSyntaxExpr )
 import DsMonad
 import DsUtils
 
-import HsSyn
+import GHC.Hs
 
 import Id
 import CoreSyn

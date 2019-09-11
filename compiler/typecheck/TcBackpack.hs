@@ -23,7 +23,7 @@ import BasicTypes (defaultFixity)
 import Packages
 import TcRnExports
 import DynFlags
-import HsSyn
+import GHC.Hs
 import RdrName
 import TcRnMonad
 import TcTyDecls

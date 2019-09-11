@@ -7,12 +7,12 @@ import Plugins
 import Bag
 import HscTypes
 import TcRnTypes
-import HsExtension
-import HsExpr
+import GHC.Hs.Extension
+import GHC.Hs.Expr
 import Outputable
 import SrcLoc
-import HsSyn
-import HsBinds
+import GHC.Hs
+import GHC.Hs.Binds
 import OccName
 import RdrName
 import Name
