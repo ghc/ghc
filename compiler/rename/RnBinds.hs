@@ -30,7 +30,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
-import HsSyn
+import GHC.Hs
 import TcRnMonad
 import RnTypes
 import RnPat
@@ -248,7 +248,7 @@ rnLocalValBindsLHS fix_env binds
 
          -- Check for duplicates and shadowing
          -- Must do this *after* renaming the patterns
-         -- See Note [Collect binders only after renaming] in HsUtils
+         -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
 
          -- We need to check for dups here because we
          -- don't don't bind all of the variables from the ValBinds at once

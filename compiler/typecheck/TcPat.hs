@@ -21,7 +21,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcSigs( TcPragEnv, lookupPragEnv, addInlinePrags )
 import TcRnMonad

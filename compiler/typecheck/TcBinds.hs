@@ -25,7 +25,7 @@ import CoreSyn (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
-import HsSyn
+import GHC.Hs
 import HscTypes( isHsBootOrSig )
 import TcSigs
 import TcRnMonad
