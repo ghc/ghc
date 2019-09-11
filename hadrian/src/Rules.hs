@@ -8,6 +8,7 @@ import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
 
 import Expression
+import qualified Oracles.Flavour
 import qualified Oracles.ModuleFiles
 import Packages
 import qualified Rules.BinaryDist
@@ -24,9 +25,9 @@ import qualified Rules.Register
 import qualified Rules.Rts
 import qualified Rules.SimpleTargets
 import Settings
+import Settings.Program (programContext)
 import Target
 import UserSettings
-
 
 -- | @tool-args@ is used by tooling in order to get the arguments necessary
 -- to set up a GHC API session which can compile modules from GHC. When
@@ -176,4 +177,5 @@ oracleRules = do
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
     Hadrian.Oracles.Path.pathOracle
     Hadrian.Oracles.TextFile.textFileOracle
+    Oracles.Flavour.oracles
     Oracles.ModuleFiles.moduleFilesOracle
