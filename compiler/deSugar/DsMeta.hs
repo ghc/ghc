@@ -30,7 +30,7 @@ import DsMonad
 
 import qualified Language.Haskell.TH as TH
 
-import HsSyn
+import GHC.Hs
 import PrelNames
 -- To avoid clashes with DsMeta.varName we must make a local alias for
 -- OccName.varName we do this by removing varName from the import of

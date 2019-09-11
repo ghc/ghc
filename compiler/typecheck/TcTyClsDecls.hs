@@ -26,7 +26,7 @@ module TcTyClsDecls (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import HscTypes
 import BuildTyCl
 import TcRnMonad
@@ -151,7 +151,7 @@ tcTyAndClassDecls tyclds_s
 tcTyClGroup :: TyClGroup GhcRn
             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo])
 -- Typecheck one strongly-connected component of type, class, and instance decls
--- See Note [TyClGroups and dependency analysis] in HsDecls
+-- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
                        , group_roles  = roles
                        , group_instds = instds })

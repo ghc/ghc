@@ -31,7 +31,7 @@ import GhcPrelude
 import Bag
 import Class         ( Class, classKey, classTyCon )
 import DynFlags
-import HsExpr        ( UnboundVar(..) )
+import GHC.Hs.Expr   ( UnboundVar(..) )
 import Id            ( idType, mkLocalId )
 import Inst
 import ListSetOps
