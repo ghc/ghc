@@ -32,7 +32,7 @@ import DataCon
 import DynFlags
 import ErrUtils
 import HscTypes (lookupFixity, mi_fix)
-import HsSyn
+import GHC.Hs
 import Inst
 import InstEnv
 import LoadIface (loadInterfaceForName)

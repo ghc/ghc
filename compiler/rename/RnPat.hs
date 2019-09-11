@@ -48,7 +48,7 @@ import {-# SOURCE #-} RnSplice ( rnSplicePat )
 
 #include "HsVersions.h"
 
-import HsSyn
+import GHC.Hs
 import TcRnMonad
 import TcHsSyn             ( hsOverLitName )
 import RnEnv
@@ -319,7 +319,7 @@ rnPats ctxt pats thing_inside
         ; unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
         { -- Check for duplicated and shadowed names
           -- Must do this *after* renaming the patterns
-          -- See Note [Collect binders only after renaming] in HsUtils
+          -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
           -- Because we don't bind the vars all at once, we can't
           --    check incrementally for duplicates;
           -- Nor can we check incrementally for shadowing, else we'll
@@ -642,7 +642,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                 -- due to #15884
 
 
-    rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in HsPat
+    rn_dotdot :: Maybe (Located Int)      -- See Note [DotDot fields] in GHC.Hs.Pat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
               -> [LHsRecField GhcRn arg] -- Explicit fields

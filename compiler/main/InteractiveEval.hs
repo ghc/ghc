@@ -53,7 +53,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GhcMonad
 import HscMain
-import HsSyn
+import GHC.Hs
 import HscTypes
 import InstEnv
 import IfaceEnv   ( newInteractiveBinder )

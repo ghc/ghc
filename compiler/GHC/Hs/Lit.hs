@@ -10,23 +10,23 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module HsLit where
+module GHC.Hs.Lit where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
+import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )
 import Type
 import Outputable
 import FastString
-import HsExtension
+import GHC.Hs.Extension
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -41,7 +41,7 @@ import Data.Data hiding ( Fixity )
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
--- Note [Trees that grow] in HsExtension for the Xxxxx fields in the following
+-- Note [Trees that grow] in GHC.Hs.Extension for the Xxxxx fields in the following
 -- | Haskell Literal
 data HsLit x
   = HsChar (XHsChar x) {- SourceText -} Char

@@ -13,23 +13,23 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
 
-module HsSyn (
-        module HsBinds,
-        module HsDecls,
-        module HsExpr,
-        module HsImpExp,
-        module HsLit,
-        module HsPat,
-        module HsTypes,
-        module HsUtils,
-        module HsDoc,
-        module PlaceHolder,
-        module HsExtension,
+module GHC.Hs (
+        module GHC.Hs.Binds,
+        module GHC.Hs.Decls,
+        module GHC.Hs.Expr,
+        module GHC.Hs.ImpExp,
+        module GHC.Hs.Lit,
+        module GHC.Hs.Pat,
+        module GHC.Hs.Types,
+        module GHC.Hs.Utils,
+        module GHC.Hs.Doc,
+        module GHC.Hs.PlaceHolder,
+        module GHC.Hs.Extension,
         Fixity,
 
         HsModule(..),
@@ -38,19 +38,19 @@ module HsSyn (
 -- friends:
 import GhcPrelude
 
-import HsDecls
-import HsBinds
-import HsExpr
-import HsImpExp
-import HsLit
-import PlaceHolder
-import HsExtension
-import HsPat
-import HsTypes
+import GHC.Hs.Decls
+import GHC.Hs.Binds
+import GHC.Hs.Expr
+import GHC.Hs.ImpExp
+import GHC.Hs.Lit
+import GHC.Hs.PlaceHolder
+import GHC.Hs.Extension
+import GHC.Hs.Pat
+import GHC.Hs.Types
 import BasicTypes       ( Fixity, WarningTxt )
-import HsUtils
-import HsDoc
-import HsInstances () -- For Data instances
+import GHC.Hs.Utils
+import GHC.Hs.Doc
+import GHC.Hs.Instances () -- For Data instances
 
 -- others:
 import Outputable

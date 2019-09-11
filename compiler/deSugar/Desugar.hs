@@ -22,7 +22,7 @@ import GhcPrelude
 import DsUsage
 import DynFlags
 import HscTypes
-import HsSyn
+import GHC.Hs
 import TcRnTypes
 import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )

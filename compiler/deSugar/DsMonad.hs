@@ -59,7 +59,7 @@ import FamInstEnv
 import CoreSyn
 import MkCore    ( unitExpr )
 import CoreUtils ( exprType, isExprLevPoly )
-import HsSyn
+import GHC.Hs
 import TcIface
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames

@@ -18,7 +18,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} Match     ( match )
 
-import HsSyn
+import GHC.Hs
 import DsBinds
 import ConLike
 import BasicTypes ( Origin(..) )

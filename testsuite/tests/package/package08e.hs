@@ -1,5 +1,5 @@
 module Package08e where
-import MyHsTypes
-import HsTypes
-import HsUtils
+import GHC.Hs.MyTypes
+import GHC.Hs.Types
+import GHC.Hs.Utils
 import UniqFM

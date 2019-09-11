@@ -33,8 +33,8 @@ import Class
 import DataCon
 import TcEvidence
 import TcEvTerm
-import HsExpr  ( UnboundVar(..) )
-import HsBinds ( PatSynBind(..) )
+import GHC.Hs.Expr  ( UnboundVar(..) )
+import GHC.Hs.Binds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan )

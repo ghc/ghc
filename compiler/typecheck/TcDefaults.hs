@@ -10,7 +10,7 @@ module TcDefaults ( tcDefaults ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Class
 import TcRnMonad
 import TcEnv

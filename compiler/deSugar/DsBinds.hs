@@ -31,7 +31,7 @@ import DsGRHSs
 import DsUtils
 import Check ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
-import HsSyn            -- lots of things
+import GHC.Hs           -- lots of things
 import CoreSyn          -- lots of things
 import CoreOpt          ( simpleOptExpr )
 import OccurAnal        ( occurAnalyseExpr )
@@ -618,9 +618,9 @@ We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
   x :: Char
   (# True, x #) = blah
 
-is *not* an unlifted bind. Unlifted binds are detected by HsUtils.isUnliftedHsBind.
+is *not* an unlifted bind. Unlifted binds are detected by GHC.Hs.Utils.isUnliftedHsBind.
 
-Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedHsBind.
+Define a "banged bind" to have a top-level bang. Detected by GHC.Hs.Pat.isBangedHsBind.
 Define a "strict bind" to be either an unlifted bind or a banged bind.
 
 The restrictions are:

@@ -52,8 +52,8 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              GetDocsFailure(..),
              getModuleGraph, handleSourceError )
 import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
-import HsImpExp
-import HsSyn
+import GHC.Hs.ImpExp
+import GHC.Hs
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
                   hsc_dynLinker )

@@ -44,7 +44,7 @@ import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
 
 -- compiler/hsSyn
-import HsSyn
+import GHC.Hs
 
 -- compiler/main
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
@@ -3416,7 +3416,7 @@ qconop :: { Located RdrName }
 -- Type constructors
 
 
--- See Note [Unit tuples] in HsTypes for the distinction
+-- See Note [Unit tuples] in GHC.Hs.Types for the distinction
 -- between gtycon and ntgtycon
 gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
         : ntgtycon                     { $1 }

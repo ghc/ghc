@@ -1,19 +1,19 @@
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module HsExpr where
+module GHC.Hs.Expr where
 
 import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
-import {-# SOURCE #-} HsPat  ( LPat )
+import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import HsExtension ( OutputableBndrId, GhcPass )
+import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 
 type role HsExpr nominal
 type role HsCmd nominal

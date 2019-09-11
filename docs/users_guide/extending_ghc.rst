@@ -752,13 +752,13 @@ displayed.
     import Plugins
     import HscTypes
     import TcRnTypes
-    import HsExtension
-    import HsDecls
-    import HsExpr
-    import HsImpExp
+    import GHC.Hs.Extension
+    import GHC.Hs.Decls
+    import GHC.Hs.Expr
+    import GHC.Hs.ImpExp
     import Avail
     import Outputable
-    import HsDoc
+    import GHC.Hs.Doc
 
     plugin :: Plugin
     plugin = defaultPlugin

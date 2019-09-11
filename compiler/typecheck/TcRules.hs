@@ -13,7 +13,7 @@ module TcRules ( tcRules ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcRnTypes
 import TcRnMonad
 import TcSimplify

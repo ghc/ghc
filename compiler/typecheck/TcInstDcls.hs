@@ -16,7 +16,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcBinds
 import TcTyClsDecls
 import TcTyDecls ( addTyConsToGblEnv )

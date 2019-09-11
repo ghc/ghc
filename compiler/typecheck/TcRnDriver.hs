@@ -64,7 +64,7 @@ import MkId
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
-import HsSyn
+import GHC.Hs
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
 import PatSyn( pprPatSynType )
@@ -134,7 +134,7 @@ import Bag
 import Inst (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data ( Data )
-import HsDumpAst
+import GHC.Hs.Dump
 import qualified Data.Set as S
 
 import Control.DeepSeq

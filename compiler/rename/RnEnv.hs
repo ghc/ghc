@@ -48,7 +48,7 @@ import GhcPrelude
 
 import LoadIface        ( loadInterfaceForName, loadSrcInterface_maybe )
 import IfaceEnv
-import HsSyn
+import GHC.Hs
 import RdrName
 import HscTypes
 import TcEnv

@@ -1,5 +1,5 @@
 module HsUtils where
-import HsBinds
+import GHC.Hs.Binds
 import SrcLoc
 
 

@@ -32,7 +32,7 @@ module RnNames (
 import GhcPrelude
 
 import DynFlags
-import HsSyn
+import GHC.Hs
 import TcEnv
 import RnEnv
 import RnFixity
@@ -607,7 +607,7 @@ extendGlobalRdrEnvRn avails new_fixities
     getLocalDeclBindersd@ returns the names for an HsDecl
              It's used for source code.
 
-        *** See Note [The Naming story] in HsDecls ****
+        *** See Note [The Naming story] in GHC.Hs.Decls ****
 *                                                                      *
 ********************************************************************* -}
 

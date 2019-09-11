@@ -177,7 +177,6 @@ Library
         coreSyn
         deSugar
         ghci
-        hsSyn
         iface
         llvmGen
         main
@@ -354,20 +353,20 @@ Library
         Match
         MatchCon
         MatchLit
-        HsBinds
-        HsDecls
-        HsDoc
-        HsExpr
-        HsImpExp
-        HsLit
-        PlaceHolder
-        HsExtension
-        HsInstances
-        HsPat
-        HsSyn
-        HsTypes
-        HsUtils
-        HsDumpAst
+        GHC.Hs
+        GHC.Hs.Binds
+        GHC.Hs.Decls
+        GHC.Hs.Doc
+        GHC.Hs.Expr
+        GHC.Hs.ImpExp
+        GHC.Hs.Lit
+        GHC.Hs.PlaceHolder
+        GHC.Hs.Extension
+        GHC.Hs.Instances
+        GHC.Hs.Pat
+        GHC.Hs.Types
+        GHC.Hs.Utils
+        GHC.Hs.Dump
         BinIface
         BinFingerprint
         BuildTyCl
@@ -663,7 +662,7 @@ Library
             Dwarf
             Dwarf.Types
             Dwarf.Constants
-            Convert
+            GHC.ThToHs
             ByteCodeTypes
             ByteCodeAsm
             ByteCodeGen

@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module HsDoc
+module GHC.Hs.Doc
   ( HsDocString
   , LHsDocString
   , mkHsDocString

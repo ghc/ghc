@@ -38,7 +38,7 @@ import GhcPrelude
 import {-# SOURCE #-} RnSplice( rnSpliceType )
 
 import DynFlags
-import HsSyn
+import GHC.Hs
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
@@ -280,7 +280,7 @@ partition_nwcs free_vars
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Identifiers starting with an underscore are always parsed as type variables.
 It is only here in the renamer that we give the special treatment.
-See Note [The wildcard story for types] in HsTypes.
+See Note [The wildcard story for types] in GHC.Hs.Types.
 
 It's easy!  When we collect the implicitly bound type variables, ready
 to bring them into scope, and NamedWildCards is on, we partition the
@@ -803,7 +803,7 @@ bindHsQTyVars :: forall a b.
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
                   -- the last clause of Note [CUSKs: Complete user-supplied
-                  -- kind signatures] in HsDecls
+                  -- kind signatures] in GHC.Hs.Decls
               -> RnM (b, FreeVars)
 
 -- See Note [bindHsQTyVars examples]

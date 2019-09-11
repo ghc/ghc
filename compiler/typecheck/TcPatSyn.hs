@@ -16,7 +16,7 @@ module TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcPat
 import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad

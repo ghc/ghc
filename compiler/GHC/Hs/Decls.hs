@@ -8,7 +8,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -16,7 +16,7 @@
 --
 -- Definitions for: @SynDecl@ and @ConDecl@, @ClassDecl@,
 -- @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
-module HsDecls (
+module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
@@ -88,18 +88,18 @@ module HsDecls (
 -- friends:
 import GhcPrelude
 
-import {-# SOURCE #-}   HsExpr( HsExpr, HsSplice, pprExpr,
-                                pprSpliceDecl )
+import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
+                                   pprSpliceDecl )
         -- Because Expr imports Decls via HsBracket
 
-import HsBinds
-import HsTypes
-import HsDoc
+import GHC.Hs.Binds
+import GHC.Hs.Types
+import GHC.Hs.Doc
 import TyCon
 import BasicTypes
 import Coercion
 import ForeignCall
-import HsExtension
+import GHC.Hs.Extension
 import NameSet
 
 -- others:
@@ -388,7 +388,7 @@ Default methods
    E.g. $dmmax
 
  - If there is a default method name at all, it's recorded in
-   the ClassOpSig (in HsBinds), in the DefMethInfo field.
+   the ClassOpSig (in GHC.Hs.Binds), in the DefMethInfo field.
    (DefMethInfo is defined in Class.hs)
 
 Source-code class decls and interface-code class decls are treated subtly
@@ -1370,7 +1370,7 @@ There's a wrinkle in ConDeclGADT
        con_res_ty = T a
 
   We need the RecCon before the reanmer, so we can find the record field
-  binders in HsUtils.hsConDeclsBinders.
+  binders in GHC.Hs.Utils.hsConDeclsBinders.
 
 * However for a GADT constr declaration which is not a record, it can
   be hard parse until we know operator fixities. Consider for example

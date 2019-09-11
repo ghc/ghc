@@ -103,7 +103,7 @@ module   RdrHsSyn (
     ) where
 
 import GhcPrelude
-import HsSyn            -- Lots of it
+import GHC.Hs           -- Lots of it
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
@@ -157,7 +157,7 @@ import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 -- Similarly for mkConDecl, mkClassOpSig and default-method names.
 
---         *** See Note [The Naming story] in HsDecls ****
+--         *** See Note [The Naming story] in GHC.Hs.Decls ****
 
 mkTyClD :: LTyClDecl (GhcPass p) -> LHsDecl (GhcPass p)
 mkTyClD (dL->L loc d) = cL loc (TyClD noExtField d)
@@ -670,7 +670,7 @@ mkGadtDecl names ty
 
     (args, res_ty) = split_tau tau
 
-    -- See Note [GADT abstract syntax] in HsDecls
+    -- See Note [GADT abstract syntax] in GHC.Hs.Decls
     split_tau (dL->L _ (HsFunTy _ (dL->L loc (HsRecTy _ rf)) res_ty))
       = (RecCon (cL loc rf), res_ty)
     split_tau tau
@@ -932,7 +932,7 @@ checkTyClHdr is_cls ty
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
-          -- See Note [Unit tuples] in HsTypes  (TODO: is this still relevant?)
+          -- See Note [Unit tuples] in GHC.Hs.Types  (TODO: is this still relevant?)
     go l _ _ _ _
       = addFatalError l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
@@ -1188,7 +1188,7 @@ checkFunBind strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
 
 makeFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
--- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
+-- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
@@ -2290,8 +2290,8 @@ rule, so this approach scales well to large parser productions.
 {- Note [Resolving parsing ambiguities: non-taken alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Alternative I, extra constructors in HsExpr
--------------------------------------------
+Alternative I, extra constructors in GHC.Hs.Expr
+------------------------------------------------
 We could add extra constructors to HsExpr to represent command-specific and
 pattern-specific syntactic constructs. Under this scheme, we parse patterns
 and commands as expressions and rejig later.  This is what GHC used to do, and
@@ -2326,15 +2326,15 @@ There are several issues with this:
       (f ! a b) ! c = ...
 
 
-Alternative II, extra constructors in HsExpr for GhcPs
-------------------------------------------------------
+Alternative II, extra constructors in GHC.Hs.Expr for GhcPs
+-----------------------------------------------------------
 We could address some of the problems with Alternative I by using Trees That
 Grow and extending HsExpr only in the GhcPs pass. However, GhcPs corresponds to
 the output of parsing, not to its intermediate results, so we wouldn't want
 them there either.
 
-Alternative III, extra constructors in HsExpr for GhcPrePs
-----------------------------------------------------------
+Alternative III, extra constructors in GHC.Hs.Expr for GhcPrePs
+---------------------------------------------------------------
 We could introduce a new pass, GhcPrePs, to keep GhcPs pristine.
 Unfortunately, creating a new pass would significantly bloat conversion code
 and slow down the compiler by adding another linear-time pass over the entire

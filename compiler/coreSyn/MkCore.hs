@@ -64,7 +64,7 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
-import HsUtils          ( mkChunkified, chunkify )
+import GHC.Hs.Utils     ( mkChunkified, chunkify )
 import Type
 import Coercion         ( isCoVar )
 import TysPrim

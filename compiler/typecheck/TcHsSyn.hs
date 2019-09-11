@@ -48,7 +48,7 @@ module TcHsSyn (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Id
 import IdInfo
 import TcRnMonad

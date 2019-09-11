@@ -5,7 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module HsInstances where
+module GHC.Hs.Instances where
 
 -- This module defines the Data instances for the hsSyn AST.
 
@@ -17,20 +17,20 @@ module HsInstances where
 import Data.Data hiding ( Fixity )
 
 import GhcPrelude
-import HsExtension
-import HsBinds
-import HsDecls
-import HsExpr
-import HsLit
-import HsTypes
-import HsPat
-import HsImpExp
+import GHC.Hs.Extension
+import GHC.Hs.Binds
+import GHC.Hs.Decls
+import GHC.Hs.Expr
+import GHC.Hs.Lit
+import GHC.Hs.Types
+import GHC.Hs.Pat
+import GHC.Hs.ImpExp
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsSyn -----------------------------------------
+-- Data derivations from GHC.Hs-----------------------------------------
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsBinds ---------------------------------------
+-- Data derivations from GHC.Hs.Binds ----------------------------------
 
 -- deriving instance (DataIdLR pL pR) => Data (HsLocalBindsLR pL pR)
 deriving instance Data (HsLocalBindsLR GhcPs GhcPs)
@@ -92,7 +92,7 @@ deriving instance Data (HsPatSynDir GhcRn)
 deriving instance Data (HsPatSynDir GhcTc)
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsDecls ---------------------------------------
+-- Data derivations from GHC.Hs.Decls ----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (HsDecl p)
 deriving instance Data (HsDecl GhcPs)
@@ -235,7 +235,7 @@ deriving instance Data (RoleAnnotDecl GhcRn)
 deriving instance Data (RoleAnnotDecl GhcTc)
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsExpr ----------------------------------------
+-- Data derivations from GHC.Hs.Expr -----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (SyntaxExpr p)
 deriving instance Data (SyntaxExpr GhcPs)
@@ -327,7 +327,7 @@ deriving instance                   Data PendingRnSplice
 deriving instance                   Data PendingTcSplice
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsLit ----------------------------------------
+-- Data derivations from GHC.Hs.Lit ------------------------------------
 
 -- deriving instance (DataId p) => Data (HsLit p)
 deriving instance Data (HsLit GhcPs)
@@ -340,7 +340,7 @@ deriving instance Data (HsOverLit GhcRn)
 deriving instance Data (HsOverLit GhcTc)
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsPat -----------------------------------------
+-- Data derivations from GHC.Hs.Pat ------------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (Pat p)
 deriving instance Data (Pat GhcPs)
@@ -355,7 +355,7 @@ deriving instance (Data body) => Data (HsRecFields GhcRn body)
 deriving instance (Data body) => Data (HsRecFields GhcTc body)
 
 -- ---------------------------------------------------------------------
--- Data derivations from HsTypes ---------------------------------------
+-- Data derivations from GHC.Hs.Types ----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (LHsQTyVars p)
 deriving instance Data (LHsQTyVars GhcPs)

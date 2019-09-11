@@ -51,8 +51,8 @@ import RdrName (mkOrig)
 import PrelNames (gHC_GHCI_HELPERS)
 import GHCi
 import GHCi.RemoteTypes
-import HsSyn (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
-import HsUtils
+import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
+import GHC.Hs.Utils
 import Util
 
 import Exception

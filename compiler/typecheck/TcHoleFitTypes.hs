@@ -12,7 +12,7 @@ import TcType
 
 import RdrName
 
-import HsDoc
+import GHC.Hs.Doc
 import Id
 
 import Outputable

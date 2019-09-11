@@ -227,7 +227,7 @@ module GHC (
         TyThing(..),
 
         -- ** Syntax
-        module HsSyn, -- ToDo: remove extraneous bits
+        module GHC.Hs, -- ToDo: remove extraneous bits
 
         -- ** Fixities
         FixityDirection(..),
@@ -314,7 +314,7 @@ import TcRnTypes
 import Packages
 import NameSet
 import RdrName
-import HsSyn
+import GHC.Hs
 import Type     hiding( typeKind )
 import TcType
 import Id

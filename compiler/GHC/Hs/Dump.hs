@@ -5,11 +5,11 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Contains a debug function to dump parts of the hsSyn AST. It uses a syb
+-- | Contains a debug function to dump parts of the GHC.Hs AST. It uses a syb
 -- traversal which falls back to displaying based on the constructor name, so
 -- can be used to dump anything having a @Data.Data@ instance.
 
-module HsDumpAst (
+module GHC.Hs.Dump (
         -- * Dumping ASTs
         showAstData,
         BlankSrcSpan(..),
@@ -25,7 +25,7 @@ import NameSet
 import Name
 import DataCon
 import SrcLoc
-import HsSyn
+import GHC.Hs
 import OccName hiding (occName)
 import Var
 import Module

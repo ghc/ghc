@@ -142,7 +142,7 @@ These data types are the heart of the compiler
 -- We get from Haskell source to this Core language in a number of stages:
 --
 -- 1. The source code is parsed into an abstract syntax tree, which is represented
---    by the data type 'HsExpr.HsExpr' with the names being 'RdrName.RdrNames'
+--    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'RdrName.RdrNames'
 --
 -- 2. This syntax tree is /renamed/, which attaches a 'Unique.Unique' to every 'RdrName.RdrName'
 --    (yielding a 'Name.Name') to disambiguate identifiers which are lexically identical.
@@ -162,9 +162,9 @@ These data types are the heart of the compiler
 --    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
---    type class arguments) to yield a 'HsExpr.HsExpr' type that has 'Id.Id' as it's names.
+--    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'Id.Id' as it's names.
 --
--- 4. Finally the syntax tree is /desugared/ from the expressive 'HsExpr.HsExpr' type into
+-- 4. Finally the syntax tree is /desugared/ from the expressive 'GHC.Hs.Expr.HsExpr' type into
 --    this 'Expr' type, which has far fewer constructors and hence is easier to perform
 --    optimization, analysis and code generation on.
 --

@@ -18,7 +18,7 @@ import GhcPrelude
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePatVar )
 
-import HsSyn
+import GHC.Hs
 import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)

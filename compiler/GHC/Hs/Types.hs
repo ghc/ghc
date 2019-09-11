@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-HsTypes: Abstract syntax: user-defined types
+GHC.Hs.Types: Abstract syntax: user-defined types
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -12,12 +12,12 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module HsTypes (
+module GHC.Hs.Types (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
         LHsQTyVars(..),
@@ -74,9 +74,9 @@ module HsTypes (
 
 import GhcPrelude
 
-import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
+import {-# SOURCE #-} GHC.Hs.Expr ( HsSplice, pprSplice )
 
-import HsExtension
+import GHC.Hs.Extension
 
 import Id ( Id )
 import Name( Name )
@@ -85,7 +85,7 @@ import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
-import HsDoc
+import GHC.Hs.Doc
 import BasicTypes
 import SrcLoc
 import Outputable
@@ -489,7 +489,7 @@ data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
          (Located (IdP pass))
-        -- See Note [Located RdrNames] in HsExpr
+        -- See Note [Located RdrNames] in GHC.Hs.Expr
   | KindedTyVar
          (XKindedTyVar pass)
          (Located (IdP pass))
@@ -542,7 +542,7 @@ data HsType pass
              (Located (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
-                  -- See Note [Located RdrNames] in HsExpr
+                  -- See Note [Located RdrNames] in GHC.Hs.Expr
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -594,7 +594,7 @@ data HsType pass
       -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsParTy             (XParTy pass)
-                        (LHsType pass)   -- See Note [Parens in HsSyn] in HsExpr
+                        (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr
         -- Parenthesis preserved for the precedence re-arrangement in RnTypes
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
@@ -1347,7 +1347,7 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- renamer, the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
                               , rdrNameFieldOcc :: Located RdrName
-                                 -- ^ See Note [Located RdrNames] in HsExpr
+                                 -- ^ See Note [Located RdrNames] in GHC.Hs.Expr
                               }
 
   | XFieldOcc
@@ -1377,9 +1377,9 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- (for unambiguous occurrences) or the typechecker (for ambiguous
 -- occurrences).
 --
--- See Note [HsRecField and HsRecUpdField] in HsPat and
+-- See Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat and
 -- Note [Disambiguating record fields] in TcExpr.
--- See Note [Located RdrNames] in HsExpr
+-- See Note [Located RdrNames] in GHC.Hs.Expr
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)
   | Ambiguous   (XAmbiguous pass)   (Located RdrName)

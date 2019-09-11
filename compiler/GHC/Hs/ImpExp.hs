@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-HsImpExp: Abstract syntax: imports, exports, interfaces
+GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -11,14 +11,14 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 
-module HsImpExp where
+module GHC.Hs.ImpExp where
 
 import GhcPrelude
 
 import Module           ( ModuleName )
-import HsDoc            ( HsDocString )
+import GHC.Hs.Doc       ( HsDocString )
 import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
 import BasicTypes       ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import FieldLabel       ( FieldLbl(..) )
@@ -26,7 +26,7 @@ import FieldLabel       ( FieldLbl(..) )
 import Outputable
 import FastString
 import SrcLoc
-import HsExtension
+import GHC.Hs.Extension
 
 import Data.Data
 import Data.Maybe
@@ -213,7 +213,7 @@ data IE pass
         --             'ApiAnnotation.AnnType','ApiAnnotation.AnnVal'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-        -- See Note [Located RdrNames] in HsExpr
+        -- See Note [Located RdrNames] in GHC.Hs.Expr
   | IEThingAll  (XIEThingAll pass) (LIEWrappedName (IdP pass))
         -- ^ Imported or exported Thing with All imported or exported
         --
@@ -224,7 +224,7 @@ data IE pass
         --                                 'ApiAnnotation.AnnType'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-        -- See Note [Located RdrNames] in HsExpr
+        -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | IEThingWith (XIEThingWith pass)
                 (LIEWrappedName (IdP pass))

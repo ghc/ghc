@@ -11,17 +11,17 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 
-module HsExtension where
+module GHC.Hs.Extension where
 
 -- This module captures the type families to precisely identify the extension
--- points for HsSyn
+-- points for GHC.Hs syntax
 
 import GhcPrelude
 
 import Data.Data hiding ( Fixity )
-import PlaceHolder
+import GHC.Hs.PlaceHolder
 import Name
 import RdrName
 import Var
@@ -152,7 +152,7 @@ type instance IdP GhcTc = Id
 type LIdP p = Located (IdP p)
 
 -- | Marks that a field uses the GhcRn variant even when the pass
--- parameter is GhcTc. Useful for storing HsTypes in HsExprs, say, because
+-- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because
 -- HsType GhcTc should never occur.
 type family NoGhcTc (p :: Type) where
     -- this way, GHC can figure out that the result is a GhcPass

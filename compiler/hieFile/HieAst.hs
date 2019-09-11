@@ -25,7 +25,7 @@ import CoreUtils                  ( exprType )
 import ConLike                    ( conLikeName )
 import Desugar                    ( deSugarExpr )
 import FieldLabel
-import HsSyn
+import GHC.Hs
 import HscTypes
 import Module                     ( ModuleName, ml_hs_file )
 import MonadUtils                 ( concatMapM, liftIO )

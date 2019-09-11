@@ -42,7 +42,7 @@ import TyCon
 -- others:
 import IfaceType( pprIfaceType, pprIfaceTypeApp )
 import ToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
-import HsSyn            -- HsType
+import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps

@@ -155,7 +155,7 @@ import GHCi.RemoteTypes
 import GHC.ForeignSrcLang
 
 import UniqFM
-import HsSyn
+import GHC.Hs
 import RdrName
 import Avail
 import Module

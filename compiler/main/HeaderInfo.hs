@@ -26,7 +26,7 @@ import HscTypes
 import Parser           ( parseHeader )
 import Lexer
 import FastString
-import HsSyn
+import GHC.Hs
 import Module
 import PrelNames
 import StringBuffer

@@ -9,7 +9,7 @@ module TcRnExports (tcRnExports, exports_from_avail) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import PrelNames
 import RdrName
 import TcRnMonad

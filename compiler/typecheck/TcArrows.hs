@@ -14,7 +14,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcPolyExpr )
 
-import HsSyn
+import GHC.Hs
 import TcMatches
 import TcHsSyn( hsLPatType )
 import TcType
@@ -388,7 +388,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                 -- NB:  The rec_ids for the recursive things
                 --      already scope over this part. This binding may shadow
                 --      some of them with polymorphic things with the same Name
-                --      (see note [RecStmt] in HsExpr)
+                --      (see note [RecStmt] in GHC.Hs.Expr)
 
         ; let rec_ids = takeList rec_names tup_ids
         ; later_ids <- tcLookupLocalIds later_names

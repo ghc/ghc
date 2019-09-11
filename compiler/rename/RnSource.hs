@@ -21,7 +21,7 @@ import GhcPrelude
 import {-# SOURCE #-} RnExpr( rnLExpr )
 import {-# SOURCE #-} RnSplice ( rnSpliceDecl, rnTopSpliceDecls )
 
-import HsSyn
+import GHC.Hs
 import FieldLabel
 import RdrName
 import RnTypes
@@ -1617,7 +1617,7 @@ dataDeclHasCUSK tyvars new_or_data no_rhs_kvs has_kind_sig = do
           | NewType <- new_or_data =
               unlifted_newtypes && not has_kind_sig
           | otherwise = False
-    -- See Note [CUSKs: complete user-supplied kind signatures] in HsDecls
+    -- See Note [CUSKs: complete user-supplied kind signatures] in GHC.Hs.Decls
   ; cusks_enabled <- xoptM LangExt.CUSKs
   ; return $ cusks_enabled && hsTvbAllKinded tyvars &&
              no_rhs_kvs && not non_cusk_newtype
@@ -2073,7 +2073,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                       RecCon {}    -> (new_args, new_res_ty)
                       PrefixCon as | (arg_tys, final_res_ty) <- splitHsFunType new_res_ty
                                    -> ASSERT( null as )
-                                      -- See Note [GADT abstract syntax] in HsDecls
+                                      -- See Note [GADT abstract syntax] in GHC.Hs.Decls
                                       (PrefixCon arg_tys, final_res_ty)
 
               new_qtvs =  HsQTvs { hsq_ext = implicit_tkvs

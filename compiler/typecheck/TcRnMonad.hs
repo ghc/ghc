@@ -148,7 +148,7 @@ import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
 import TcEvidence
 
-import HsSyn hiding (LIE)
+import GHC.Hs hiding (LIE)
 import HscTypes
 import Module
 import RdrName
