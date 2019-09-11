@@ -10,8 +10,8 @@ module Oracles.TestSettings
 import Base
 import Hadrian.Oracles.TextFile
 import Oracles.Setting (topDirectory, setting, Setting(..))
-import Settings (programContext)
 import Packages
+import Settings.Program (programContext)
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")

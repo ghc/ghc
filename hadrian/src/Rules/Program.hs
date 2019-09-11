@@ -12,6 +12,7 @@ import Oracles.Setting (topDirectory)
 import Packages
 import Settings
 import Settings.Default
+import Settings.Program (programContext)
 import Target
 import Utilities
 import Rules.Library
