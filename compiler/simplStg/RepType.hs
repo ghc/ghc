@@ -18,7 +18,7 @@ module RepType
 
     -- * Unboxed sum representation type
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
-    slotPrimRep, primRepSlot
+    slotPrimRep, primRepSlot, slotFitsIn
   ) where
 
 #include "HsVersions.h"
@@ -172,7 +172,7 @@ ubxSumRepType constrs0
       merge [] needed_slots
         = needed_slots
       merge (es : ess) (s : ss)
-        | Just s' <- s `fitsIn` es
+        | Just s' <- s `slotFitsIn` es
         = -- found a slot, use it
           s' : merge ess ss
         | s < es
@@ -209,7 +209,7 @@ layoutUbxSum sum_slots0 arg_slots0 =
     findSlot :: SlotTy -> Int -> SortedSlotTys -> IS.IntSet -> Int
     findSlot arg slot_idx (slot : slots) useds
       | not (IS.member slot_idx useds)
-      , Just slot == arg `fitsIn` slot
+      , Just slot == arg `slotFitsIn` slot
       = slot_idx
       | otherwise
       = findSlot arg (slot_idx + 1) slots useds
@@ -280,8 +280,8 @@ slotPrimRep DoubleSlot  = DoubleRep
 slotPrimRep FloatSlot   = FloatRep
 
 -- | Returns the bigger type if one fits into the other. (commutative)
-fitsIn :: SlotTy -> SlotTy -> Maybe SlotTy
-fitsIn ty1 ty2
+slotFitsIn :: SlotTy -> SlotTy -> Maybe SlotTy
+slotFitsIn ty1 ty2
   | isWordSlot ty1 && isWordSlot ty2
   = Just (max ty1 ty2)
   | isFloatSlot ty1 && isFloatSlot ty2
