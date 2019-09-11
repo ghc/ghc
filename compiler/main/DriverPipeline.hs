@@ -1736,23 +1736,6 @@ linkBinary' staticLink dflags o_files dep_packages = do
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags
 
-    -- Here are some libs that need to be linked at the *end* of
-    -- the command line, because they contain symbols that are referred to
-    -- by the RTS.  We can't therefore use the ordinary way opts for these.
-    let debug_opts | WayDebug `elem` ways dflags = [
-#if defined(HAVE_LIBBFD)
-                        "-lbfd", "-liberty"
-#endif
-                         ]
-                   | otherwise                   = []
-
-        thread_opts | WayThreaded `elem` ways dflags = [
-#if NEED_PTHREAD_LIB
-                        "-lpthread"
-#endif
-                        ]
-                    | otherwise                      = []
-
     rc_objs <- maybeCreateManifest dflags output_fn
 
     let link = if staticLink
@@ -1823,8 +1806,6 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ extraLinkObj:noteLinkObjs
                       ++ pkg_link_opts
                       ++ pkg_framework_opts
-                      ++ debug_opts
-                      ++ thread_opts
                       ++ (if platformOS platform == OSDarwin
                           then [ "-Wl,-dead_strip_dylibs" ]
                           else [])
