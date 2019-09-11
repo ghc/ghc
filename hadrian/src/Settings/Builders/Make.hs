@@ -4,6 +4,7 @@ import Oracles.Setting
 import Packages
 import Rules.Gmp
 import Settings.Builders.Common
+import Settings.Program (programContext)
 import CommandLine
 
 makeBuilderArgs :: Args
