@@ -365,7 +365,7 @@ The remaining blocks are simple,
 
 The flow of unwinding information through the compiler is a bit convoluted:
 
- * C-- begins life in StgCmm without any unwind information. This is because we
+ * C-- begins life in StgToCmm without any unwind information. This is because we
    haven't actually done any register assignment or stack layout yet, so there
    is no need for unwind information.
 

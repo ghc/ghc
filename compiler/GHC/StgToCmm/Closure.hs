@@ -11,7 +11,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmClosure (
+module GHC.StgToCmm.Closure (
         DynTag,  tagForCon, isSmallFamily,
 
         idPrimRep, isVoidRep, isGcPtrRep, addIdReps, addArgReps,
@@ -97,9 +97,9 @@ import qualified Data.ByteString.Char8 as BS8
 --                Data types and synonyms
 -----------------------------------------------------------------------------
 
--- These data types are mostly used by other modules, especially StgCmmMonad,
--- but we define them here because some functions in this module need to
--- have access to them as well
+-- These data types are mostly used by other modules, especially
+-- GHC.StgToCmm.Monad, but we define them here because some functions in this
+-- module need to have access to them as well
 
 data CgLoc
   = CmmLoc CmmExpr      -- A stable CmmExpr; that is, one not mentioning
@@ -566,7 +566,7 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   --   * function is performing a self-recursive call in a tail position
   --   * number of non-void parameters of the function matches functions arity.
   -- See Note [Self-recursive tail calls] and Note [Void arguments in
-  -- self-recursive tail calls] in StgCmmExpr for more details
+  -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
 getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc

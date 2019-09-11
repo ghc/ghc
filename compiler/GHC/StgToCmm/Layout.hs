@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmLayout (
+module GHC.StgToCmm.Layout (
         mkArgDescr,
         emitCall, emitReturn, adjustHpBackwards,
 
@@ -26,7 +26,7 @@ module StgCmmLayout (
         mkVirtConstrSizes,
         getHpRelOffset,
 
-        ArgRep(..), toArgRep, argRepSizeW -- re-exported from StgCmmArgRep
+        ArgRep(..), toArgRep, argRepSizeW -- re-exported from GHC.StgToCmm.ArgRep
   ) where
 
 
@@ -34,12 +34,12 @@ module StgCmmLayout (
 
 import GhcPrelude hiding ((<*>))
 
-import StgCmmClosure
-import StgCmmEnv
-import StgCmmArgRep -- notably: ( slowCallPattern )
-import StgCmmTicky
-import StgCmmMonad
-import StgCmmUtils
+import GHC.StgToCmm.Closure
+import GHC.StgToCmm.Env
+import GHC.StgToCmm.ArgRep -- notably: ( slowCallPattern )
+import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Utils
 
 import MkGraph
 import SMRep
@@ -387,7 +387,7 @@ hpRel :: VirtualHpOffset         -- virtual offset of Hp
 hpRel hp off = off - hp
 
 getHpRelOffset :: VirtualHpOffset -> FCode CmmExpr
--- See Note [Virtual and real heap pointers] in StgCmmMonad
+-- See Note [Virtual and real heap pointers] in GHC.StgToCmm.Monad
 getHpRelOffset virtual_offset
   = do dflags <- getDynFlags
        hp_usg <- getHpUsage
