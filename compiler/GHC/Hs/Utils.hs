@@ -19,7 +19,7 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module HsUtils(
+module GHC.Hs.Utils(
   -- Terms
   mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
@@ -93,14 +93,14 @@ module HsUtils(
 
 import GhcPrelude
 
-import HsDecls
-import HsBinds
-import HsExpr
-import HsPat
-import HsTypes
-import HsLit
-import PlaceHolder
-import HsExtension
+import GHC.Hs.Decls
+import GHC.Hs.Binds
+import GHC.Hs.Expr
+import GHC.Hs.Pat
+import GHC.Hs.Types
+import GHC.Hs.Lit
+import GHC.Hs.PlaceHolder
+import GHC.Hs.Extension
 
 import TcEvidence
 import RdrName
@@ -913,7 +913,7 @@ but the local, recursive, monomorphic bindings are:
 Here the binding for 'fm' is illegal.  So generally we check the abe_mono types.
 
 BUT we have a special case when abs_sig is true;
-  see HsBinds Note [The abs_sig field of AbsBinds]
+  see Note [The abs_sig field of AbsBinds] in GHC.Hs.Binds
 -}
 
 ----------------- Bindings --------------------------

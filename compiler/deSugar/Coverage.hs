@@ -18,7 +18,7 @@ import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
 import Type
-import HsSyn
+import GHC.Hs
 import Module
 import Outputable
 import DynFlags

@@ -66,7 +66,7 @@ module TcHsType (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcRnMonad
 import TcEvidence
 import TcEnv
@@ -398,7 +398,7 @@ argument, which we do not want because users should be able to write
 solution is to switch the PartialTypeSignatures flags here to let the
 typechecker know that it's checking a '@_' and do not emit hole
 constraints on it.  See related Note [Wildcards in visible kind
-application] and Note [The wildcard story for types] in HsTypes.hs
+application] and Note [The wildcard story for types] in GHC.Hs.Types
 
 Ugh!
 -}
@@ -713,7 +713,7 @@ tc_hs_type mode rn_ty@(HsListTy _ elt_ty) exp_kind
        ; checkWiredInTyCon listTyCon
        ; checkExpectedKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
 
--- See Note [Distinguishing tuple kinds] in HsTypes
+-- See Note [Distinguishing tuple kinds] in GHC.Hs.Types
 -- See Note [Inferring tuple kinds]
 tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
      -- (NB: not zonking before looking at exp_k, to avoid left-right bias)
@@ -871,7 +871,7 @@ And whenever we see a '@', we automatically turn on PartialTypeSignatures and
 turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
 under these conditions.
 See related Note [Wildcards in visible type application] here and
-Note [The wildcard story for types] in HsTypes.hs
+Note [The wildcard story for types] in GHC.Hs.Types
 
 -}
 
@@ -1716,7 +1716,7 @@ tcNamedWildCardBinders :: [Name]
                        -> TcM a
 -- Bring into scope the /named/ wildcard binders.  Remember that
 -- plain wildcards _ are anonymous and dealt with by HsWildCardTy
--- Soe Note [The wildcard story for types] in HsTypes
+-- Soe Note [The wildcard story for types] in GHC.Hs.Types
 tcNamedWildCardBinders wc_names thing_inside
   = do { wcs <- mapM (const newWildTyVar) wc_names
        ; let wc_prs = wc_names `zip` wcs
@@ -1766,7 +1766,7 @@ It has two cases:
 -- Used in 'getInitialKind' (for tycon kinds and other kinds)
 -- and in kind-checking (but not for tycon kinds, which are checked with
 -- tcTyClDecls). See Note [CUSKs: complete user-supplied kind signatures]
--- in HsDecls.
+-- in GHC.Hs.Decls.
 --
 -- This function does not do telescope checking.
 kcLHsQTyVars :: Name              -- ^ of the thing being checked
@@ -1966,7 +1966,7 @@ kcLHsQTyVarBndrs:
   * The tcLookupLocal_maybe code in kc_hs_tv
 
 See Note [Associated type tyvar names] in Class and
-    Note [TyVar binders for associated decls] in HsDecls
+    Note [TyVar binders for associated decls] in GHC.Hs.Decls
 
 We must do the same for family instance decls, where the in-scope
 variables may be bound by the enclosing class instance decl.

@@ -36,7 +36,7 @@ import Outputable
 import DynFlags( DynFlags )
 import NameSet
 import RdrName
-import HsTypes( HsIPName(..) )
+import GHC.Hs.Types( HsIPName(..) )
 
 import Pair
 import Util

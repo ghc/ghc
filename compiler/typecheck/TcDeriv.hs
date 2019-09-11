@@ -15,7 +15,7 @@ module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import DynFlags
 
 import TcRnMonad

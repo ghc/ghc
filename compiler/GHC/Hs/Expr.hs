@@ -7,27 +7,27 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract Haskell syntax for expressions.
-module HsExpr where
+module GHC.Hs.Expr where
 
 #include "HsVersions.h"
 
 -- friends:
 import GhcPrelude
 
-import HsDecls
-import HsPat
-import HsLit
-import PlaceHolder ( NameOrRdrName )
-import HsExtension
-import HsTypes
-import HsBinds
+import GHC.Hs.Decls
+import GHC.Hs.Pat
+import GHC.Hs.Lit
+import GHC.Hs.PlaceHolder ( NameOrRdrName )
+import GHC.Hs.Extension
+import GHC.Hs.Types
+import GHC.Hs.Binds
 
 -- others:
 import TcEvidence
@@ -629,7 +629,7 @@ data HsExpr p
   -- Finally, HsWrap appears only in typechecker output
   -- The contained Expr is *NOT* itself an HsWrap.
   -- See Note [Detecting forced eta expansion] in DsExpr. This invariant
-  -- is maintained by HsUtils.mkHsWrap.
+  -- is maintained by GHC.Hs.Utils.mkHsWrap.
 
   |  HsWrap     (XWrap p)
                 HsWrapper    -- TRANSLATION
@@ -1630,12 +1630,12 @@ pprMatches MG { mg_alts = matches }
       -- Don't print the type; it's only a place-holder before typechecking
 pprMatches (XMatchGroup x) = ppr x
 
--- Exported to HsBinds, which can't see the defn of HsMatchContext
+-- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprFunBind :: (OutputableBndrId (GhcPass idR), Outputable body)
            => MatchGroup (GhcPass idR) body -> SDoc
 pprFunBind matches = pprMatches matches
 
--- Exported to HsBinds, which can't see the defn of HsMatchContext
+-- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
 pprPatBind :: forall bndr p body. (OutputableBndrId (GhcPass bndr),
                                    OutputableBndrId (GhcPass p),
                                    Outputable body)
