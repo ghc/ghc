@@ -31,74 +31,110 @@
 /* ----------------------------------------------------------------------------
    Threading / unthreading pointers.
 
-   The basic idea here is to chain together all the fields pointing at
-   a particular object, with the root of the chain in the object's
-   info table field.  The original contents of the info pointer goes
-   at the end of the chain.
+   The basic idea here is as explained in "The Garbage Collection Handbook"
+   section 3.3. We chain together all the fields pointing at a particular
+   object, with the root of the chain in the object's info table field.  The
+   original contents of the info pointer goes at the end of the chain.
 
-   Adding a new field to the chain is a matter of swapping the
-   contents of the field with the contents of the object's info table
-   field.
+   After threading info pointer of an object gives us all locations of
+   references to the object.
 
-   To unthread the chain, we walk down it updating all the fields on
-   the chain with the new location of the object.  We stop when we
-   reach the info pointer at the end.
+   Adding a new field to the chain is a matter of swapping the contents of the
+   field with the contents of the referenced object's info table field:
 
-   The main difficulty here is that we need to be able to identify the
-   info pointer at the end of the chain.  We can't use the low bits of
-   the pointer for this; they are already being used for
-   pointer-tagging.  What's more, we need to retain the
-   pointer-tagging tag bits on each pointer during the
-   threading/unthreading process.
+      thread(field) = *field = **field, **field = field;
+
+   To unthread the chain, we walk down it updating all the fields on the chain
+   with the new location of the object.  We stop when we reach the info pointer
+   at the end.
+
+   The main difficulty here is that we need to be able to identify the info
+   pointer at the end of the chain.  We can't use the low bits of the pointer
+   for this; they are already being used for pointer-tagging.  What's more, we
+   need to retain the pointer-tagging tag bits on each pointer during the
+   threading/unthreading process, and in a single thread we may have both tagged
+   and untagged locations (a pointer from a root to an evaluated object won't be
+   tagged, while other pointers to the same object will be).
 
    Our solution is as follows:
      - an info pointer (chain length zero) is identified by having tag 0
      - in a threaded chain of length > 0:
         - the pointer-tagging tag bits are attached to the info pointer
-        - the first entry in the chain has tag 1
-        - second and subsequent entries in the chain have tag 2
+        - the first field in the chain has tag 1 if the field is tagged,
+          otherwise it has tag 3
+        - second and subsequent entries in the chain have tag 2 if they're
+          tagged, otherwise they have tag 4
 
-   This exploits the fact that the tag on each pointer to a given
-   closure is normally the same (if they are not the same, then
-   presumably the tag is not essential and it therefore doesn't matter
-   if we throw away some of the tags).
+   This way we can distinguish an info ptr from others (tag of an info ptr will
+   give us tag of the tagged pointers to this object), and we can tag some of
+   the fields in a chain while not tagging others.
+
+   Not doing this right caused #17088.
    ------------------------------------------------------------------------- */
+
+STATIC_INLINE StgWord get_threaded_info( StgPtr p );
+static void tag_threaded_info( StgPtr p, StgWord tag );
 
 STATIC_INLINE void
 thread (StgClosure **p)
 {
-    StgClosure *q0;
-    StgPtr q;
-    StgWord iptr;
-    bdescr *bd;
-
-    q0  = *p;
-    q   = (StgPtr)UNTAG_CLOSURE(q0);
-
-    // It doesn't look like a closure at the moment, because the info
-    // ptr is possibly threaded:
-    // ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+    StgClosure *q0 = *p;
+    StgWord q0_tag = GET_CLOSURE_TAG(q0);
+    StgPtr q = (StgPtr)UNTAG_CLOSURE(q0);
 
     if (HEAP_ALLOCED(q)) {
-        bd = Bdescr(q);
+        bdescr *bd = Bdescr(q);
 
         if (bd->flags & BF_MARKED)
         {
-            iptr = *q;
+            StgWord iptr = *q;
             switch (GET_CLOSURE_TAG((StgClosure *)iptr))
             {
             case 0:
                 // this is the info pointer; we are creating a new chain.
                 // save the original tag at the end of the chain.
-                *p = (StgClosure *)((StgWord)iptr + GET_CLOSURE_TAG(q0));
-                *q = (StgWord)p + 1;
+                if (q0_tag == 0) {
+                    *p = (StgClosure *)((StgWord)iptr);
+                    *q = (StgWord)p + 3;
+                } else {
+                    *p = (StgClosure *)((StgWord)iptr + q0_tag);
+                    *q = (StgWord)p + 1;
+                }
                 break;
             case 1:
             case 2:
+            {
+#if defined(DEBUG)
+                // We found a tagged pointer in the chain, make sure that the
+                // info ptr is tagged with the tag of this pointer. (#17088)
+                StgWord iptr_ = get_threaded_info(q);
+                StgWord iptr_tag = GET_CLOSURE_TAG((StgClosure*)iptr_);
+                ASSERT(q0_tag == iptr_tag);
+#endif
                 // this is a chain of length 1 or more
                 *p = (StgClosure *)iptr;
-                *q = (StgWord)p + 2;
+                if (q0_tag == 0) {
+                    *q = (StgWord)p + 4;
+                } else {
+                    *q = (StgWord)p + 2;
+                }
                 break;
+            }
+            case 3:
+            case 4:
+                if (q0_tag == 0) {
+                    *p = (StgClosure *)iptr;
+                    *q = (StgWord)p + 4;
+                } else {
+                    // Chaining a TAGGED field to a chain that is potentially
+                    // untagged; tag the info ptr with the given tag.
+                    tag_threaded_info((StgPtr)q, q0_tag);
+                    *p = (StgClosure *)iptr;
+                    *q = (StgWord)p + 2;
+                }
+                break;
+            default:
+                barf("thread");
             }
         }
     }
@@ -115,30 +151,35 @@ thread_root (void *user STG_UNUSED, StgClosure **p)
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
-unthread( StgPtr p, StgWord free )
+unthread( StgPtr p, StgWord free, StgWord tag )
 {
-    StgWord q, r;
-    StgPtr q0;
-
-    q = *p;
+    StgWord q = *p;
 loop:
-    switch (GET_CLOSURE_TAG((StgClosure *)q))
+    ;
+    StgWord q_tag = GET_CLOSURE_TAG((StgClosure *)q);
+    switch (q_tag)
     {
     case 0:
         // nothing to do; the chain is length zero
         return;
     case 1:
-        q0 = (StgPtr)(q-1);
-        r = *q0;  // r is the info ptr, tagged with the pointer-tag
-        *q0 = free;
+    case 3:
+    {
+        StgPtr q0 = (StgPtr)(q-q_tag);
+        StgWord r = *q0;  // r is the info ptr, tagged with the pointer-tag
+        *q0 = free + (q_tag == 1 ? tag : 0);
         *p = (StgWord)UNTAG_CLOSURE((StgClosure *)r);
         return;
+    }
     case 2:
-        q0 = (StgPtr)(q-2);
-        r = *q0;
-        *q0 = free;
+    case 4:
+    {
+        StgPtr q0 = (StgPtr)(q-q_tag);
+        StgWord r = *q0;
+        *q0 = free + (q_tag == 2 ? tag : 0);
         q = r;
         goto loop;
+    }
     default:
         barf("unthread");
     }
@@ -151,9 +192,7 @@ loop:
 STATIC_INLINE StgWord
 get_threaded_info( StgPtr p )
 {
-    StgWord q;
-
-    q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
+    StgWord q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
 
 loop:
     switch (GET_CLOSURE_TAG((StgClosure *)q))
@@ -171,8 +210,68 @@ loop:
     case 2:
         q = *(StgPtr)(q-2);
         goto loop;
+    case 3:
+    {
+        StgWord r = *(StgPtr)(q-3);
+        ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)
+               ((StgClosure *)r)));
+        return r;
+    }
+    case 4:
+        q = *(StgPtr)(q-4);
+        goto loop;
     default:
         barf("get_threaded_info");
+    }
+}
+
+// Given a chain tag the info ptr with the given tag.
+static void
+tag_threaded_info( StgPtr p, StgWord tag )
+{
+    StgWord q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
+
+loop:
+    switch (GET_CLOSURE_TAG((StgClosure *)q))
+    {
+    case 0:
+    {
+        barf("tag_threaded_info: p is not a chain");
+    }
+    case 1:
+    {
+        // Found a TAGGED pointer to the info ptr, make sure it's tagged as
+        // expected
+#if defined(DEBUG)
+        StgWord iptr_tag = GET_CLOSURE_TAG(*(StgClosure**)(q-1));
+        ASSERT(iptr_tag == tag);
+#endif
+        return;
+    }
+    case 2:
+    {
+#if defined(DEBUG)
+        // Found a tagged pointer in the chain, make sure the pointer to the
+        // info ptr is tagged as expected
+        StgWord iptr = get_threaded_info((StgPtr)q);
+        ASSERT(GET_CLOSURE_TAG((StgClosure*)iptr) == tag);
+#endif
+        return;
+    }
+    case 3:
+    {
+        // Found an UNTAGGED pointer to the info ptr, tag it
+        *(StgPtr)(q-3) += tag;
+        return;
+    }
+    case 4:
+    {
+        // Found another untagged pointer in the chain, follow it
+        q = *(StgPtr)(p-4);
+        goto loop;
+    }
+    default:
+        barf("tag_threaded_info");
     }
 }
 
@@ -764,9 +863,7 @@ update_fwd_compact( bdescr *blocks )
 {
     StgPtr p, q, free;
     bdescr *bd, *free_bd;
-    StgInfoTable *info;
     StgWord size;
-    StgWord iptr;
 
     bd = blocks;
     free_bd = blocks;
@@ -794,8 +891,8 @@ update_fwd_compact( bdescr *blocks )
             // ToDo: one possible avenue of attack is to use the fact
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
-            iptr = get_threaded_info(p);
-            info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
+            StgWord iptr = get_threaded_info(p);
+            StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_CLOSURE((StgClosure *)iptr));
 
             q = p;
 
@@ -815,7 +912,7 @@ update_fwd_compact( bdescr *blocks )
                 ASSERT(!is_marked(q+1,bd));
             }
 
-            unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
+            unthread(q,(StgWord)free, GET_CLOSURE_TAG((StgClosure *)iptr));
             free += size;
         }
     }
@@ -857,7 +954,7 @@ update_bkwd_compact( generation *gen )
             }
 
             iptr = get_threaded_info(p);
-            unthread(p, (StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
+            unthread(p, (StgWord)free, GET_CLOSURE_TAG((StgClosure *)iptr));
             ASSERT(LOOKS_LIKE_INFO_PTR((StgWord)((StgClosure *)p)->header.info));
             info = get_itbl((StgClosure *)p);
             size = closure_sizeW_((StgClosure *)p,info);

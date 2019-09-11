@@ -392,3 +392,4 @@ test('keep-cafs',
   makefile_test, ['KeepCafs'])
 
 test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
+test('T17088', normal, compile_and_run, ['-O -with-rtsopts="-c -A256k"'])
