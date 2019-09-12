@@ -18,7 +18,7 @@ import GhcPrelude hiding ((<*>))
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
-import GHC.StgToCmm.Con
+import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)

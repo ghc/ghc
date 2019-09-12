@@ -19,7 +19,7 @@ import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
-import GHC.StgToCmm.Con
+import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure

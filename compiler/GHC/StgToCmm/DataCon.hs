@@ -11,7 +11,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToCmm.Con (
+module GHC.StgToCmm.DataCon (
         cgTopRhsCon, buildDynCon, bindConArgs
     ) where
 
@@ -89,7 +89,7 @@ cgTopRhsCon dflags id con args =
                 amode <- getArgAmode arg
                 case amode of
                   CmmLit lit -> return lit
-                  _          -> panic "GHC.StgToCmm.Con.cgTopRhsCon"
+                  _          -> panic "GHC.StgToCmm.DataCon.cgTopRhsCon"
 
             nonptr_wds = tot_wds - ptr_wds
 
