@@ -303,7 +303,7 @@ retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, c
     } else {
         // This is not the first visit to *c.
         if (isMember(r, retainerSetOfc))
-            return 0;          // no need to process child
+            return 0;          // no need to process children
 
         if (s == NULL)
             associate(c, addElement(r, retainerSetOfc));
@@ -322,7 +322,7 @@ retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, c
         }
 
         if (isRetainer(c))
-            return 0;          // no need to process child
+            return 0;          // no need to process children
 
         // compute c_child_r
         out_data->c_child_r = r;
@@ -331,7 +331,7 @@ retainVisitClosure( StgClosure *c, const StgClosure *cp, const stackData data, c
     // now, RSET() of all of *c, *cp, and *r is valid.
     // (c, c_child_r) are available.
 
-    return 1;
+    return 1; // do process children
 }
 
 /**
