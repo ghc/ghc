@@ -4039,7 +4039,7 @@ number of important ways:
 
          deriving instance _ => Eq (Foo a)
 
-   This is essentially the same as if you had written ``deriving Foo`` after
+   This is essentially the same as if you had written ``deriving Eq`` after
    the declaration for ``data Foo a``. Using this feature requires the use of
    :extension:`PartialTypeSignatures` (:ref:`partial-type-signatures`).
 
