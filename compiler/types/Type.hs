@@ -2214,7 +2214,9 @@ isLiftedType_maybe ty = go (getRuntimeRep ty)
           | otherwise              = Nothing     -- levity polymorphic
 
 -- | See "Type#type_classification" for what an unlifted type is.
--- Panics on levity polymorphic types.
+-- Panics on levity polymorphic types; See 'mightBeUnliftedType' for
+-- a more approximate predicate that behaves better in the presence of
+-- levity polymorphism.
 isUnliftedType :: HasDebugCallStack => Type -> Bool
         -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#

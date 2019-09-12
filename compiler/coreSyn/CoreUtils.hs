@@ -1880,7 +1880,9 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- Top-level literal strings can't even be wrapped in ticks
 --   see Note [CoreSyn top-level string literals] in CoreSyn
 exprIsTopLevelBindable expr ty
-  = not (isUnliftedType ty)
+  = not (mightBeUnliftedType ty)
+    -- Note that 'expr' may be levity polymorphic here consequently we must use
+    -- 'mightBeUnliftedType' rather than 'isUnliftedType' as the latter would panic.
   || exprIsTickedString expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
