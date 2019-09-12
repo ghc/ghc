@@ -19,7 +19,7 @@ import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Env
-import GHC.StgToCmm.Con
+import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Prof (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Prim
