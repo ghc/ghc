@@ -919,6 +919,7 @@ data WarningFlag =
    | Opt_WarnUnusedPackages               -- Since 8.10
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
+   | Opt_WarnDerivingDefaults
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4025,6 +4026,7 @@ wWarningFlagsDeps = [
                                          Opt_WarnDeferredOutOfScopeVariables,
   flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "deriving-defaults"           Opt_WarnDerivingDefaults,
   flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "dodgy-exports"               Opt_WarnDodgyExports,
   flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
@@ -4822,6 +4824,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnDuplicateExports,
+        Opt_WarnDerivingDefaults,
         Opt_WarnOverflowedLiterals,
         Opt_WarnEmptyEnumerations,
         Opt_WarnMissingFields,
