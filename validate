@@ -26,6 +26,7 @@ Flags:
   --quiet           More pretty build log.
                     See Note [Default build system verbosity].
   --hadrian         Build the compiler and run the tests through hadrian.
+  --stack           Use Stack to build Hadrian and the Stage 1 compiler.
   --help            shows this usage help.
 
   validate runs 'make -j\$THREADS', where by default THREADS is the number of
@@ -56,6 +57,7 @@ be_quiet=0
 # mk/config.mk.in
 tar_comp=gzip
 use_hadrian=NO
+use_stack=NO
 
 while [ $# -gt 0 ]
 do
@@ -87,6 +89,9 @@ do
     --hadrian)
 	use_hadrian=YES
 	hadrian_build_root=_validatebuild
+	;;
+    --stack)
+	use_stack=YES
 	;;
     --help)
         show_help
@@ -154,9 +159,19 @@ then
    $make -C utils/checkUniques
 else
     # Just build hadrian.
-    hadrian/build.sh --help > /dev/null
-    cd hadrian
-    hadrian_cmd=$(cabal new-exec -- which hadrian)
+    if [ "$use_stack" = "NO" ]
+    then
+       hadrian/build.sh --help > /dev/null
+       cd hadrian
+       hadrian_cmd=$(cabal new-exec -- which hadrian)
+    else
+       if [ $no_clean -eq 0 ]; then
+          rm -rf hadrian/.stack-work
+       fi
+       hadrian/build.stack.sh --help > /dev/null
+       cd hadrian
+       hadrian_cmd=$(stack exec -- which hadrian)
+    fi
     cd ..
     # TODO: define a hadrian Flavour that mimics
     # mk/flavours/validate.mk and use it here
