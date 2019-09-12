@@ -28,7 +28,7 @@ import ConLike
 import Data.Either (lefts, rights)
 import DataCon
 import FamInstEnv
-import HsSyn
+import GHC.Hs
 import Name
 import NameSet ( emptyNameSet )
 import RdrName ( mkVarUnqual )
