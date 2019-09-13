@@ -2,10 +2,10 @@
  *
  * (c) The GHC Team, 1998-2011
  *
- * Registers used in STG code.  Might or might not correspond to
- * actual machine registers.
+ * This header includes MachRegs.h "selecting" regs for the current host
+ * platform.
  *
- * Do not #include this file directly: #include "Rts.h" instead.
+ * Don't #include this in the RTS directly, instead include "RTS.h".
  *
  * To understand the structure of the RTS headers, see the wiki:
  *   https://gitlab.haskell.org/ghc/ghc/wikis/commentary/source-tree/includes
@@ -13,6 +13,12 @@
  * ---------------------------------------------------------------------------*/
 
 #pragma once
+
+#if defined(UnregisterisedCompiler)
+#if !defined(NO_REGS)
+#define NO_REGS
+#endif
+#endif
 
 /*
  * Defining NO_REGS causes no global registers to be used.  NO_REGS is
@@ -41,7 +47,7 @@
 #endif
 
 #if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-            || defined(powerpc64le_HOST_ARCH) || defined(rs6000_HOST_ARCH)
+        || defined(powerpc64le_HOST_ARCH) || defined(rs6000_HOST_ARCH)
 #define MACHREGS_powerpc  1
 #endif
 

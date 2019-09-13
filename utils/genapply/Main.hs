@@ -19,7 +19,7 @@ module Main(main) where
 
 -- ...so that this header defines the right stuff.  It is the RTS's host, but
 -- our target, as we are generating code that uses that RTS.
-#include "../../includes/stg/HaskellMachRegs.h"
+#include "../../includes/stg/MachRegsForHost.h"
 
 #include "../../includes/rts/Constants.h"
 
