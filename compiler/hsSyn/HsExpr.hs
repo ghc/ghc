@@ -759,10 +759,12 @@ instance OutputableTTG HsHipHop where
   needsParens p (HsHipHop _ e) = needsParens p e
   isAtomic (HsHipHop _ e) = isAtomic e
 
+-- | FIXME: This instance faithfully returns the values that were used before
+-- this class existed, but do they actually make sense?
 instance OutputableTTG NoExtCon where
-  pprInfix = noExtCon
-  needsParens = const noExtCon
-  isAtomic = noExtCon
+  pprInfix _ = Nothing
+  needsParens _ = const True
+  isAtomic _ = False
 
 -- ---------------------------------------------------------------------
 
