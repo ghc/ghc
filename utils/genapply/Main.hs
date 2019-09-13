@@ -16,7 +16,7 @@ module Main(main) where
 #include "../../includes/ghcconfig.h"
 
 -- .. so that this header defines the right stuff.
-#include "../../includes/stg/HaskellMachRegs.h"
+#include "../../includes/stg/MachRegsForHost.h"
 
 #include "../../includes/rts/Constants.h"
 

@@ -168,12 +168,11 @@ library
                       rts/storage/MBlock.h
                       rts/storage/TSO.h
                       stg/DLL.h
-                      stg/HaskellMachRegs.h
                       stg/MachRegs.h
+                      stg/MachRegsForHost.h
                       stg/MiscClosures.h
                       stg/Prim.h
                       stg/Regs.h
-                      stg/RtsMachRegs.h
                       stg/SMP.h
                       stg/Ticky.h
                       stg/Types.h
