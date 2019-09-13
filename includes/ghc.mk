@@ -139,14 +139,6 @@ endef
 $(eval $(call includesHeaderConfig,0))
 $(eval $(call includesHeaderConfig,1))
 
-BUILDPLATFORM_0 = $(BUILDPLATFORM)
-BUILDPLATFORM_1 = $(HOSTPLATFORM)
-BUILDPLATFORM_2 = $(TARGETPLATFORM)
-
-HOSTPLATFORM_0 = $(HOSTPLATFORM)
-HOSTPLATFORM_1 = $(TARGETPLATFORM)
-HOSTPLATFORM_2 = $(TARGETPLATFORM)
-
 BuildPlatform_0_CPP = $(BuildPlatform_CPP)
 BuildPlatform_1_CPP = $(HostPlatform_CPP)
 BuildPlatform_2_CPP = $(TargetPlatform_CPP)
@@ -186,9 +178,6 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "Creating $$@..."
 	@echo "#if !defined(__GHCPLATFORM_H__)"  > $$@
 	@echo "#define __GHCPLATFORM_H__" >> $$@
-	@echo >> $$@
-	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM_$1)\"" >> $$@
-	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM_$1)\"" >> $$@
 	@echo >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)" >> $$@
