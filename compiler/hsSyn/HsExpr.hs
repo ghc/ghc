@@ -625,16 +625,6 @@ data HsExpr p
         -- See note [Pragma source text] in BasicTypes
      (LHsExpr p)
 
-  ---------------------------------------
-  -- Finally, HsWrap appears only in typechecker output
-  -- The contained Expr is *NOT* itself an HsWrap.
-  -- See Note [Detecting forced eta expansion] in DsExpr. This invariant
-  -- is maintained by HsUtils.mkHsWrap.
-
-  |  HsWrap     (XWrap p)
-                HsWrapper    -- TRANSLATION
-                (HsExpr p)
-
   | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
 
 
@@ -742,8 +732,15 @@ type instance XXExpr        GhcPs = NoExtCon
 type instance XXExpr        GhcRn = NoExtCon
 type instance XXExpr        GhcTc = HsHipHop
 
+
 -- | Aka HsWrap, but renamed for iterative development while replacing the
 -- constructor with a TTG extension.
+-- Old comment that is still relevant for HsWrap:
+---------------------------------------
+-- Finally, HsWrap appears only in typechecker output
+-- The contained Expr is *NOT* itself an HsWrap.
+-- See Note [Detecting forced eta expansion] in DsExpr. This invariant
+-- is maintained by HsUtils.mkHsWrap.
 data HsHipHop = HsHipHop HsWrapper (HsExpr GhcTc)
 
 instance Outputable HsHipHop where
