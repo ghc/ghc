@@ -29,9 +29,14 @@ compiler_stage1_C_FILES_NODEPS = compiler/parser/cutils.c
 # we just skip the check.
 compiler_NO_CHECK = YES
 
+# We need to decrement the 1-indexed compiler stage to be the 0-indexed stage
+# we use everwhere else.
 dec1 = 0
 dec2 = 1
 dec3 = 2
+# TODO(@Ericson2314) Get rid of compiler-specific stage indices. I think the
+# argument was stage n ghc is used to build stage n everything else, but I
+# don't buy that argument.
 
 ifneq "$(BINDIST)" "YES"
 
@@ -48,40 +53,53 @@ $(foreach n,1 2 3, \
   )
 endif
 
-compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	@echo 'Creating $@ ... '
-	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
-	@echo 'module Config'                                               >> $@
-	@echo '  ( module GHC.Version'                                      >> $@
-	@echo '  , cBuildPlatformString'                                    >> $@
-	@echo '  , cHostPlatformString'                                     >> $@
-	@echo '  , cProjectName'                                            >> $@
-	@echo '  , cBooterVersion'                                          >> $@
-	@echo '  , cStage'                                                  >> $@
-	@echo '  ) where'                                                   >> $@
-	@echo                                                               >> $@
-	@echo 'import GhcPrelude'                                           >> $@
-	@echo                                                               >> $@
-	@echo 'import GHC.Version'                                          >> $@
-	@echo                                                               >> $@
-	@echo '#include "ghcplatform.h"'                                    >> $@
-	@echo                                                               >> $@
-	@echo 'cBuildPlatformString :: String'                              >> $@
-	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
-	@echo                                                               >> $@
-	@echo 'cHostPlatformString :: String'                               >> $@
-	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
-	@echo                                                               >> $@
-	@echo 'cProjectName          :: String'                             >> $@
-	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
-	@echo                                                               >> $@
-	@echo 'cBooterVersion        :: String'                             >> $@
-	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
-	@echo                                                               >> $@
-	@echo 'cStage                :: String'                             >> $@
-	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
+BUILDPLATFORM_1 = $(BUILDPLATFORM)
+BUILDPLATFORM_2 = $(HOSTPLATFORM)
+BUILDPLATFORM_3 = $(TARGETPLATFORM)
+
+HOSTPLATFORM_1 = $(HOSTPLATFORM)
+HOSTPLATFORM_2 = $(TARGETPLATFORM)
+HOSTPLATFORM_3 = $(TARGETPLATFORM)
+
+define compilerConfig
+# $1 = compile stage (1-indexed)
+compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/.
+	$$(call removeFiles,$$@)
+	@echo 'Creating $$@ ... '
+	@echo '{-# LANGUAGE CPP #-}'                                        >> $$@
+	@echo 'module Config'                                               >> $$@
+	@echo '  ( module GHC.Version'                                      >> $$@
+	@echo '  , cBuildPlatformString'                                    >> $$@
+	@echo '  , cHostPlatformString'                                     >> $$@
+	@echo '  , cProjectName'                                            >> $$@
+	@echo '  , cBooterVersion'                                          >> $$@
+	@echo '  , cStage'                                                  >> $$@
+	@echo '  ) where'                                                   >> $$@
+	@echo                                                               >> $$@
+	@echo 'import GhcPrelude'                                           >> $$@
+	@echo                                                               >> $$@
+	@echo 'import GHC.Version'                                          >> $$@
+	@echo                                                               >> $$@
+	@echo 'cBuildPlatformString :: String'                              >> $$@
+	@echo 'cBuildPlatformString = "$(BUILDPLATFORM_$1)"'                >> $$@
+	@echo                                                               >> $$@
+	@echo 'cHostPlatformString :: String'                               >> $$@
+	@echo 'cHostPlatformString = "$(HOSTPLATFORM_$1)"'                  >> $$@
+	@echo                                                               >> $$@
+	@echo 'cProjectName          :: String'                             >> $$@
+	@echo 'cProjectName          = "$(ProjectName)"'                    >> $$@
+	@echo                                                               >> $$@
+	@echo 'cBooterVersion        :: String'                             >> $$@
+	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $$@
+	@echo                                                               >> $$@
+	@echo 'cStage                :: String'                             >> $$@
+	@echo 'cStage                = show (STAGE :: Int)'                 >> $$@
 	@echo done.
+endef
+
+$(eval $(call compilerConfig,0))
+$(eval $(call compilerConfig,1))
+$(eval $(call compilerConfig,2))
 
 # ----------------------------------------------------------------------------
 #		Generate supporting stuff for prelude/PrimOp.hs
