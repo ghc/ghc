@@ -162,7 +162,7 @@ Library
             if flag(stage3)
                 Include-Dirs: stage2
 
-    Install-Includes: HsVersions.h, ghc_boot_platform.h
+    Install-Includes: HsVersions.h
 
     c-sources:
         parser/cutils.c

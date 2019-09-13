@@ -1023,6 +1023,9 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_EXTRAS) \
     includes/Makefile \
     $(includes_H_FILES) \
+    $(includes_1_H_CONFIG) \
+    $(includes_1_H_PLATFORM) \
+    $(includes_1_H_VERSION) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
     $(libffi_HEADERS) \
@@ -1064,7 +1067,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 #
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 
-unix-binary-dist-prep:
+unix-binary-dist-prep: $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh llvm-targets llvm-passes ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
@@ -1302,9 +1305,9 @@ CLEAN_FILES += compiler/ghc.cabal.old
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
-CLEAN_FILES += includes/ghcautoconf.h
-CLEAN_FILES += includes/ghcplatform.h
-CLEAN_FILES += includes/ghcversion.h
+$(foreach n,0 1 2, \
+    $(foreach h,$(includes_$n_H_CONFIG) $(includes_$n_H_PLATFORM) $(includes_$n_H_VERSION), \
+        $(eval CLEAN_FILES += $h)))
 CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/prelude/primops.txt
@@ -1440,7 +1443,6 @@ maintainer-clean : distclean
 
 .PHONY: bootstrapping-files
 # See https://gitlab.haskell.org/ghc/ghc/wikis/building/porting
-bootstrapping-files: $(includes_H_CONFIG)
 bootstrapping-files: $(includes_DERIVEDCONSTANTS)
 bootstrapping-files: $(includes_GHCCONSTANTS)
 bootstrapping-files: $(libffi_HEADERS)
