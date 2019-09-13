@@ -43,14 +43,17 @@ compilePackage rs = do
 
       -- All else is haskell.
       -- This comes last as it overlaps with the above rules' file patterns.
-      forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) -> do
-        let foo = [ root -/- "**/build/**/*." ++ wayPat ++ oExt
-                  , root -/- "**/build/**/*." ++ wayPat ++ hiExt ]
-        let first = head foo
-        let foo' = if any ("**/*.o" ?==) foo
-                    then foo ++ [first -<.> "dyn_o"] ++ [first -<.> "dyn_hi"]
-                    else foo
-        foo' &%> \ (o: _) -> compileHsObjectAndHi rs o
+      [ root -/- "**/build/**/*.dyn_o", root -/- "**/build/**/*.dyn_hi" ]
+        &%> \ [dyn_o, _dyn_hi] -> do
+          let o  = dyn_o -<.> "o"
+              hi = dyn_o -<.> "hi"
+
+          need [o, hi]
+      
+      forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
+        [ root -/- "**/build/**/*." ++ wayPat ++ oExt
+        , root -/- "**/build/**/*." ++ wayPat ++ hiExt ]
+          &%> \ [o, _hi] -> compileHsObjectAndHi rs o
   where
     hsExts = [ ("o", "hi")
              , ("o-boot", "hi-boot")
@@ -172,30 +175,25 @@ objectContext (BuildPath _ stage pkgPath obj) =
 compileHsObjectAndHi
     :: [(Resource, Int)] -> FilePath -> Action ()
 compileHsObjectAndHi rs objpath = do
-  if "**/*.dyn_o" ?== objpath
-    then liftIO (putStrLn "Ignored DynRule")
-    else foo
-  where
-    foo = do
-      root <- buildRoot
-      b@(BuildPath _root stage _path _o)
-        <- parsePath (parseBuildObject root) "<object file path parser>" objpath
-      let ctx = objectContext b
-          way = C.way ctx
-      ctxPath <- contextPath ctx
-      (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
-      need (src:deps)
+  root <- buildRoot
+  b@(BuildPath _root stage _path _o)
+    <- parsePath (parseBuildObject root) "<object file path parser>" objpath
+  let ctx = objectContext b
+      way = C.way ctx
+  ctxPath <- contextPath ctx
+  (src, deps) <- lookupDependencies (ctxPath -/- ".dependencies") objpath
+  need (src:deps)
 
-      -- The .dependencies file lists indicating inputs. ghc will
-      -- generally read more *.hi and *.hi-boot files (direct inputs).
-      -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
-      -- Note that this may allow too many *.hi and *.hi-boot files, but
-      -- calculating the exact set of direct inputs is not feasible.
-      trackAllow [ "**/*." ++ hisuf     way
-                , "**/*." ++ hibootsuf way
-                ]
+  -- The .dependencies file lists indicating inputs. ghc will
+  -- generally read more *.hi and *.hi-boot files (direct inputs).
+  -- Allow such reads (see https://gitlab.haskell.org/ghc/ghc/wikis/Developing-Hadrian#haskell-object-files-and-hi-inputs)
+  -- Note that this may allow too many *.hi and *.hi-boot files, but
+  -- calculating the exact set of direct inputs is not feasible.
+  trackAllow [ "**/*." ++ hisuf     way
+            , "**/*." ++ hibootsuf way
+            ]
 
-      buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
+  buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
 
 compileNonHsObject :: [(Resource, Int)] -> SourceLang -> FilePath -> Action ()
 compileNonHsObject rs lang path = do
@@ -214,7 +212,6 @@ compileNonHsObject rs lang path = do
   need [src]
   needDependencies ctx src (path <.> "d")
   buildWithResources rs $ target ctx (builder stage) [src] [path]
-
 
 -- * Helpers
 
