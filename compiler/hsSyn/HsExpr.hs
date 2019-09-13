@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -748,6 +749,21 @@ instance Outputable HsHipHop where
     = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                                else pprExpr e)
 
+instance (OutputableBndrId (GhcPass p)) => OutputableTTG (HsExpr (GhcPass p)) where
+  pprInfix = ppr_infix_expr
+  needsParens p = hsExprNeedsParens p
+  isAtomic = isAtomicHsExpr
+
+instance OutputableTTG HsHipHop where
+  pprInfix (HsHipHop _ e) = pprInfix e
+  needsParens p (HsHipHop _ e) = needsParens p e
+  isAtomic (HsHipHop _ e) = isAtomic e
+
+instance OutputableTTG NoExtCon where
+  pprInfix = noExtCon
+  needsParens = const noExtCon
+  isAtomic = noExtCon
+
 -- ---------------------------------------------------------------------
 
 -- | Located Haskell Tuple Argument
@@ -1065,14 +1081,19 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
 
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
-ppr_expr (HsWrap {}) = undefined -- will be caught when HsWrap is removed
+
+-- | FIXME, this is an experiment for using TTG extensions to HsExpr.
+-- ppr_infix_expr was confounding matters.
+class Outputable a => OutputableTTG a where
+    pprInfix :: a -> Maybe SDoc
+    needsParens :: PprPrec -> a -> Bool
+    isAtomic :: a -> Bool
 
 ppr_infix_expr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v)) = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)= Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)    = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ h@TrueExprHole{}) = Just (pprInfixOcc (unboundVarOcc h))
-ppr_infix_expr (HsWrap _ _ e)    = ppr_infix_expr e
 ppr_infix_expr _                 = Nothing
 
 ppr_apps :: (OutputableBndrId (GhcPass p))
@@ -1162,7 +1183,6 @@ hsExprNeedsParens p = go
     go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
     go (HsSCC{})                      = p >= appPrec
-    go (HsWrap _ _ e)                 = go e
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
     go (HsRnBracketOut{})             = False
@@ -1174,7 +1194,7 @@ hsExprNeedsParens p = go
     go (HsTickPragma _ _ _ _ (L _ e)) = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
-    go (XExpr{})                      = True
+    go (XExpr x)                      = needsParens p x
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
@@ -1192,9 +1212,9 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsWrap _ _ e)    = isAtomicHsExpr e
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
+isAtomicHsExpr (XExpr x)         = isAtomic x
 isAtomicHsExpr _                 = False
 
 {-
