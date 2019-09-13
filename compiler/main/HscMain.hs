@@ -173,6 +173,7 @@ import System.IO (fixIO)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
+import Control.DeepSeq (force)
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts, hie_module )
@@ -673,7 +674,7 @@ hscIncrementalFrontend
             -- save the interface that comes back from checkOldIface.
             -- In one-shot mode we don't have the old iface until this
             -- point, when checkOldIface reads it from the disk.
-            let mb_old_hash = fmap mi_iface_hash mb_checked_iface
+            let mb_old_hash = fmap (mi_iface_hash . mi_exts) mb_checked_iface
 
             case mb_checked_iface of
                 Just iface | not (recompileRequired recomp_reqd) ->
@@ -835,6 +836,11 @@ finish summary tc_result mb_old_hash = do
           (cg_guts, details) <- {-# SCC "CoreTidy" #-}
               liftIO $ tidyProgram hsc_env desugared_guts
 
+          let !partial_iface =
+                {-# SCC "HscMain.mkPartialIface" #-}
+                -- This `force` saves 2M residency in test T10370
+                force (mkPartialIface hsc_env details desugared_guts)
+
           let iface_gen :: IO (ModIface, Bool)
               iface_gen = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
@@ -845,10 +851,10 @@ finish summary tc_result mb_old_hash = do
                   -- This captures hsc_env, we might get away with keeping
                   -- less of the environment alive here but don't do so
                   -- currently.
-                  res <-  {-# SCC "MkFinalIface" #-}
-                          mkIface hsc_env mb_old_hash details desugared_guts
                   dumpIfaceStats hsc_env
-                  return res
+                  final_iface <- mkFullIface hsc_env partial_iface
+                  let no_change = mb_old_hash == Just (mi_iface_hash (mi_exts final_iface))
+                  return (final_iface, no_change)
 
           return (HscRecomp cg_guts summary iface_gen,
                   Right $ \iface -> HomeModInfo
@@ -1356,10 +1362,11 @@ hscSimpleIface' tc_result mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     safe_mode <- hscGetSafeMode tc_result
-    (new_iface, no_change)
+    new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env mb_old_iface safe_mode details tc_result
+               mkIfaceTc hsc_env safe_mode details tc_result
+    let no_change = mb_old_iface == Just (mi_iface_hash (mi_exts new_iface))
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, no_change, details)
