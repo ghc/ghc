@@ -238,9 +238,6 @@ generateGhcPlatformH = do
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
-        , "#define BuildPlatform_NAME  " ++ show buildPlatform
-        , "#define HostPlatform_NAME   " ++ show hostPlatform
-        , ""
         , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
         , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
         , ""
@@ -336,6 +333,10 @@ generateSettings = do
 -- | Generate @Config.hs@ files.
 generateConfigHs :: Expr String
 generateConfigHs = do
+    stage <- getStage
+    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    buildPlatform <- chooseSetting BuildPlatform HostPlatform
+    hostPlatform <- chooseSetting HostPlatform TargetPlatform
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
@@ -354,13 +355,11 @@ generateConfigHs = do
         , ""
         , "import GHC.Version"
         , ""
-        , "#include \"ghcplatform.h\""
-        , ""
         , "cBuildPlatformString :: String"
-        , "cBuildPlatformString = BuildPlatform_NAME"
+        , "cBuildPlatformString = " ++ show buildPlatform
         , ""
         , "cHostPlatformString :: String"
-        , "cHostPlatformString = HostPlatform_NAME"
+        , "cHostPlatformString = " ++ show hostPlatform
         , ""
         , "cProjectName          :: String"
         , "cProjectName          = " ++ show cProjectName
