@@ -1,0 +1,12 @@
+
+==================== Strictness signatures ====================
+T16588.$trModule: m
+T16588.func: <S,1*U>
+T16588.func2: <S,1*U>
+
+
+
+==================== Strictness signatures ====================
+T16588.$trModule: m
+T16588.func: <S,1*U>
+T16588.func2: <S,1*U>
