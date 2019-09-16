@@ -208,6 +208,15 @@ deriving instance Show a => Show (Maybe a)
 -- | @since 4.11.0.0
 deriving instance Show a => Show (NonEmpty a)
 
+-- | @since 4.7.0.0
+instance Show Fingerprint where
+  show (Fingerprint w1 w2) = hex16 w1 ++ hex16 w2
+    where
+      -- | Formats a 64 bit number as 16 digits hex.
+      hex16 :: Word64 -> String
+      hex16 i = let hex = showHex i ""
+                 in replicate (16 - length hex) '0' ++ hex
+
 -- | @since 2.01
 instance Show TyCon where
   showsPrec p (TyCon _ _ _ tc_name _ _) = showsPrec p tc_name
