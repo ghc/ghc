@@ -51,9 +51,11 @@ import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 import Var (EvVar)
-
+import Coercion
+import TcEvidence
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr)
 import MatchLit (dsLit, dsOverLit)
+import IOEnv
 import DsMonad
 import Bag
 import TyCoRep
@@ -66,9 +68,6 @@ import Data.List     (find)
 import Control.Monad (forM, when, forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe
-import Coercion
-import TcEvidence
-import IOEnv
 import qualified Data.Semigroup as Semi
 
 {-
