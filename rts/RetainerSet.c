@@ -17,6 +17,7 @@
 #include "RetainerSet.h"
 #include "Arena.h"
 #include "Profiling.h"
+#include "Trace.h"
 
 #include <string.h>
 
@@ -230,7 +231,7 @@ printRetainer(FILE *f, retainer ccs)
  * -------------------------------------------------------------------------- */
 #if defined(SECOND_APPROACH)
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs, uint32_t max_length)
+printRetainerSetShort(FILE *f, RetainerSet *rs, W_ total_size, uint32_t max_length)
 {
     char tmp[max_length + 1];
     uint32_t size;
@@ -262,6 +263,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs, uint32_t max_length)
         }
     }
     fputs(tmp, f);
+    traceHeapProfSampleString(0, tmp, total_size);
 }
 #endif /* SECOND_APPROACH */
 
