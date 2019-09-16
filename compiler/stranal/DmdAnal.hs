@@ -184,6 +184,11 @@ dmdAnal' env dmd (App fun (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
+-- See Note [noinlineId magic] in MkId.
+dmdAnal' env dmd (App fun arg)
+  | fun `hasKey` noinlineIdKey
+  = dmdAnal env dmd arg
+
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
 dmdAnal' env dmd (App fun arg)
