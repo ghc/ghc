@@ -433,9 +433,7 @@ type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
 
 mkCAFLabel :: CLabel -> CAFLabel
-mkCAFLabel lbl = ret
-  where
-    ret = CAFLabel (toClosureLbl lbl)
+mkCAFLabel lbl = CAFLabel (toClosureLbl lbl)
 
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.

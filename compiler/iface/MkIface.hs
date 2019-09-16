@@ -157,7 +157,11 @@ mkPartialIface hsc_env mod_details
 
 mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameEnv (Name, Bool)) -> IO ModIface
 mkFullIface hsc_env partial_iface mb_caf_infos = do
-    let decls = updateDeclCafInfos (mi_decls partial_iface) mb_caf_infos
+    let decls
+          | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
+          = mi_decls partial_iface
+          | otherwise
+          = updateDeclCafInfos (mi_decls partial_iface) mb_caf_infos
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
