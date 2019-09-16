@@ -1595,6 +1595,12 @@ running the simplifier.
 when we serialize an expression to the interface format. See
 Note [Inlining and hs-boot files] in ToIface
 
+In addition, the demand analyser has a special case for 'noinline' to ensure
+that 'noinline f x' has the same demand characteristics as 'f x'. This special
+case arose from #16588, where we noticed that 'noinline' applications arising
+from hs-boot files (see Note [Inlining and hs-boot files] in ToIface) would
+prevent us from taking advantage of strictness signatures
+
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
