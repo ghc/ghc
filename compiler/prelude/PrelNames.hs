@@ -504,7 +504,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
-    gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
+    gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
@@ -540,7 +540,7 @@ gHC_CONC        = mkBaseModule (fsLit "GHC.Conc")
 gHC_IO          = mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
 gHC_ST          = mkBaseModule (fsLit "GHC.ST")
-gHC_ARR         = mkBaseModule (fsLit "GHC.Arr")
+gHC_IX          = mkBaseModule (fsLit "GHC.Ix")
 gHC_STABLE      = mkBaseModule (fsLit "GHC.Stable")
 gHC_PTR         = mkBaseModule (fsLit "GHC.Ptr")
 gHC_ERR         = mkBaseModule (fsLit "GHC.Err")
@@ -750,11 +750,11 @@ succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
 pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
 minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
 maxBound_RDR            = varQual_RDR gHC_ENUM (fsLit "maxBound")
-range_RDR               = varQual_RDR gHC_ARR (fsLit "range")
-inRange_RDR             = varQual_RDR gHC_ARR (fsLit "inRange")
-index_RDR               = varQual_RDR gHC_ARR (fsLit "index")
-unsafeIndex_RDR         = varQual_RDR gHC_ARR (fsLit "unsafeIndex")
-unsafeRangeSize_RDR     = varQual_RDR gHC_ARR (fsLit "unsafeRangeSize")
+range_RDR               = varQual_RDR gHC_IX (fsLit "range")
+inRange_RDR             = varQual_RDR gHC_IX (fsLit "inRange")
+index_RDR               = varQual_RDR gHC_IX (fsLit "index")
+unsafeIndex_RDR         = varQual_RDR gHC_IX (fsLit "unsafeIndex")
+unsafeRangeSize_RDR     = varQual_RDR gHC_IX (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
     readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
@@ -1214,7 +1214,7 @@ rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDo
 
 -- Class Ix
 ixClassName :: Name
-ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
+ixClassName = clsQual gHC_IX (fsLit "Ix") ixClassKey
 
 -- Typeable representation types
 trModuleTyConName
