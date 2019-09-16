@@ -130,7 +130,7 @@ import GHC.Prim
 import GHC.Prim.Ext
 import GHC.Err
 import GHC.Maybe
-import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
+import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
 import GHC.Tuple ()              -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()            -- Note [Depend on GHC.Integer]
@@ -1516,6 +1516,13 @@ bindIO (IO m) k = IO (\ s -> case m s of (# new_s, a #) -> unIO (k a) new_s)
 
 thenIO :: IO a -> IO b -> IO b
 thenIO (IO m) k = IO (\ s -> case m s of (# new_s, _ #) -> unIO k new_s)
+
+-- Note that it is import that we do not SOURCE import this as
+-- its demand signature encodes knowledge of its bottoming
+-- behavior, which can expose useful simplifications. See
+-- #16588.
+failIO :: String -> IO a
+failIO s = IO (raiseIO# (mkUserError s))
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a
