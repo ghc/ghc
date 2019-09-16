@@ -736,7 +736,7 @@ import GHC.Ptr     ( Ptr )
 import GHC.Types
 
 -- Needed for instances
-import GHC.Arr     ( Ix )
+import GHC.Ix      ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
                    , Semigroup(..), Monoid(..) )
