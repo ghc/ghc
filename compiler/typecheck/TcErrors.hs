@@ -68,6 +68,7 @@ import {-# SOURCE #-} TcHoleErrors ( findValidHoleFits )
 
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
+import GHC.TypeLits ( ErrorPriority (..) )
 
 
 {-
@@ -560,7 +561,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- type checking to get a Lint error later
     report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
               , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
-              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+              , ("custom_error_high", is_user_type_error HighPriority, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
               , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -578,6 +579,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
+              , ("custom_error_low", is_user_type_error LowPriority, True,  mkUserTypeErrorReporter)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
 
@@ -609,7 +611,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
 
-    is_user_type_error ct _ = isUserTypeErrorCt ct
+    is_user_type_error priority ct _ = isUserTypeErrorCt (== priority) ct
 
     is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _                  = False
@@ -712,8 +714,8 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ important
                         $ pprUserTypeErrorTy
                         $ case getUserTypeErrorMsg ct of
-                            Just msg -> msg
-                            Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
+                            Just (msg, _) -> msg
+                            Nothing       -> pprPanic "mkUserTypeError" (ppr ct)
 
 
 mkGivenErrorReporter :: Reporter

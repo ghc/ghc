@@ -1,0 +1,5 @@
+CustomTypeErrors09.hs:20:11:
+     Error
+     In the expression: bad
+      In an equation for ‘problem’: problem = bad
+

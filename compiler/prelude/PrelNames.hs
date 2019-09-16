@@ -456,11 +456,15 @@ basicKnownKeyNames
         , fingerprintDataConName
 
         -- Custom type errors
-        , errorMessageTypeErrorFamName
+        , errorMessageTypeErrorPriorityFamName
         , typeErrorTextDataConName
         , typeErrorAppendDataConName
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
+        , typeErrorShowTypePrecDataConName
+
+        , errorPriorityHighPriorityDataConName
+        , errorPriorityLowPriorityDataConName
 
     ]
 
@@ -1295,15 +1299,16 @@ starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")     star
 starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")   starArrStarArrStarKindRepKey
 
 -- Custom type errors
-errorMessageTypeErrorFamName
+errorMessageTypeErrorPriorityFamName
   , typeErrorTextDataConName
   , typeErrorAppendDataConName
   , typeErrorVAppendDataConName
   , typeErrorShowTypeDataConName
+  , typeErrorShowTypePrecDataConName
   :: Name
 
-errorMessageTypeErrorFamName =
-  tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
+errorMessageTypeErrorPriorityFamName =
+  tcQual gHC_TYPELITS (fsLit "TypeErrorPriority") errorMessageTypeErrorFamKey
 
 typeErrorTextDataConName =
   dcQual gHC_TYPELITS (fsLit "Text") typeErrorTextDataConKey
@@ -1316,6 +1321,19 @@ typeErrorVAppendDataConName =
 
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
+
+typeErrorShowTypePrecDataConName =
+  dcQual gHC_TYPELITS (fsLit "ShowTypePrec") typeErrorShowTypePrecDataConKey
+
+errorPriorityHighPriorityDataConName
+  , errorPriorityLowPriorityDataConName
+  :: Name
+
+errorPriorityHighPriorityDataConName =
+  dcQual gHC_TYPELITS (fsLit "HighPriority") errorPriorityHighPriorityDataConKey
+
+errorPriorityLowPriorityDataConName =
+  dcQual gHC_TYPELITS (fsLit "LowPriority") errorPriorityLowPriorityDataConKey
 
 
 
@@ -2057,6 +2075,15 @@ kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
+
+typeErrorShowTypePrecDataConKey :: Unique
+typeErrorShowTypePrecDataConKey = mkPreludeDataConUnique 114
+
+errorPriorityHighPriorityDataConKey,
+  errorPriorityLowPriorityDataConKey
+  :: Unique
+errorPriorityHighPriorityDataConKey = mkPreludeDataConUnique 115
+errorPriorityLowPriorityDataConKey  = mkPreludeDataConUnique 116
 
 
 ---------------- Template Haskell -------------------

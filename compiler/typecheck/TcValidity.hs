@@ -246,10 +246,10 @@ checkUserTypeError :: Type -> TcM ()
 checkUserTypeError = check
   where
   check ty
-    | Just msg     <- userTypeError_maybe ty  = fail_with msg
-    | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
-    | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
-    | Just (_,t1)  <- splitForAllTy_maybe ty  = check t1
+    | Just (msg, _) <- userTypeError_maybe ty  = fail_with msg
+    | Just (_,ts)   <- splitTyConApp_maybe ty  = mapM_ check ts
+    | Just (t1,t2)  <- splitAppTy_maybe ty     = check t1 >> check t2
+    | Just (_,t1)   <- splitForAllTy_maybe ty  = check t1
     | otherwise                               = return ()
 
   fail_with msg = do { env0 <- tcInitTidyEnv

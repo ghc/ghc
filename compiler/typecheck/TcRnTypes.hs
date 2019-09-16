@@ -207,6 +207,7 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
+import GHC.TypeLits  ( ErrorPriority (..) )
 
 import {-# SOURCE #-} TcHoleFitTypes ( HoleFitPlugin )
 
@@ -2255,7 +2256,7 @@ Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
 -- | A constraint is considered to be a custom type error, if it contains
 -- custom type errors anywhere in it.
 -- See Note [Custom type errors in constraints]
-getUserTypeErrorMsg :: Ct -> Maybe Type
+getUserTypeErrorMsg :: Ct -> Maybe (Type, ErrorPriority)
 getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
   where
   findUserTypeError t = msum ( userTypeError_maybe t
@@ -2272,10 +2273,10 @@ getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
 
 
 
-isUserTypeErrorCt :: Ct -> Bool
-isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
-                         Just _ -> True
-                         _      -> False
+isUserTypeErrorCt :: (ErrorPriority -> Bool) -> Ct -> Bool
+isUserTypeErrorCt p ct = case getUserTypeErrorMsg ct of
+                           Just (_, priority) | p priority -> True
+                           _      -> False
 
 isPendingScDict :: Ct -> Maybe Ct
 -- Says whether this is a CDictCan with cc_pend_sc is True,

@@ -1,17 +1,18 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE ConstraintKinds           #-}
+{-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE KindSignatures            #-}
+{-# LANGUAGE MagicHash                 #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE PolyKinds                 #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE Trustworthy               #-}
+{-# LANGUAGE TypeFamilies              #-}
+{-# LANGUAGE TypeOperators             #-}
+{-# LANGUAGE UndecidableInstances      #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -39,7 +40,9 @@ module GHC.TypeLits
   , N.CmpNat, CmpSymbol
 
   -- * User-defined type errors
-  , TypeError
+  , TypeErrorPriority
+  , type TypeError
+  , ErrorPriority(..)
   , ErrorMessage(..)
 
   ) where
@@ -145,6 +148,10 @@ data {-kind-} ErrorMessage = Text Symbol
                              -- ^ Pretty print the type.
                              -- @ShowType :: k -> ErrorMessage@
 
+                           | forall t. ShowTypePrec Nat t
+                             -- ^ Pretty print the type with the given precedence.
+                             -- @ShowTypePrec :: Nat -> k -> ErrorMessage@
+
                            | ErrorMessage :<>: ErrorMessage
                              -- ^ Put two pieces of error message next
                              -- to each other.
@@ -155,6 +162,14 @@ data {-kind-} ErrorMessage = Text Symbol
 
 infixl 5 :$$:
 infixl 6 :<>:
+
+-- | The priority of error messages. Lower priority messages aren't emitted if
+-- higher priority messages are present.
+data {-kind-} ErrorPriority = HighPriority
+                              -- ^ Most built-in errors in GHC are high priority.
+
+                            | LowPriority
+                            deriving (Eq, Ord)
 
 -- | The type-level equivalent of 'Prelude.error'.
 --
@@ -182,7 +197,12 @@ infixl 6 :<>:
 -- @
 --
 -- @since 4.9.0.0
-type family TypeError (a :: ErrorMessage) :: b where
+type family TypeError x where
+  TypeError x = TypeErrorPriority 'HighPriority x
+
+-- | Like 'TypeError', but with support for changing under what circumstances type
+-- errors are allowed to be emitted.
+type family TypeErrorPriority (p :: ErrorPriority) (a :: ErrorMessage) :: b where
 
 
 --------------------------------------------------------------------------------

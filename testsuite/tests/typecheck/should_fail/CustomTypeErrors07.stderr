@@ -1,0 +1,4 @@
+CustomTypeErrors07.hs:20:11:
+     Couldn't match expected type ‘()’ with actual type ‘Int’
+     In the expression: bad
+      In an equation for ‘problem’: problem = bad

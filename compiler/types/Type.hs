@@ -281,6 +281,7 @@ import Unique ( nonDetCmpUnique )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+import GHC.TypeLits     ( ErrorPriority(..) )
 
 -- $type_classification
 -- #type_classification#
@@ -880,16 +881,26 @@ isLitTy ty | Just ty1 <- coreView ty = isLitTy ty1
 isLitTy (LitTy l)                    = Just l
 isLitTy _                            = Nothing
 
+errorPriorityTyConToErrorPriority :: TyCon -> Maybe ErrorPriority
+errorPriorityTyConToErrorPriority tc
+  | tyConName tc == errorPriorityHighPriorityDataConName = Just HighPriority
+  | tyConName tc == errorPriorityLowPriorityDataConName  = Just LowPriority
+  -- TODO(sandy): Should this default to 'HighPriority' or something? As it is,
+  -- stuck type families for the priority will prevent an error from appearing.
+  | otherwise = Nothing
+
 -- | Is this type a custom user error?
 -- If so, give us the kind and the error message.
-userTypeError_maybe :: Type -> Maybe Type
+userTypeError_maybe :: Type -> Maybe (Type, ErrorPriority)
 userTypeError_maybe t
-  = do { (tc, _kind : msg : _) <- splitTyConApp_maybe t
+  = do { (tc, _kind : priority : msg : _) <- splitTyConApp_maybe t
           -- There may be more than 2 arguments, if the type error is
           -- used as a type constructor (e.g. at kind `Type -> Type`).
 
-       ; guard (tyConName tc == errorMessageTypeErrorFamName)
-       ; return msg }
+       ; guard (tyConName tc == errorMessageTypeErrorPriorityFamName)
+       ; (priority_tc, _) <- splitTyConApp_maybe priority
+       ; p <- errorPriorityTyConToErrorPriority priority_tc
+       ; return (msg, p) }
 
 -- | Render a type corresponding to a user type error into a SDoc.
 pprUserTypeErrorTy :: Type -> SDoc
@@ -904,6 +915,10 @@ pprUserTypeErrorTy ty =
     -- ShowType t
     Just (tc,[_k,t])
       | tyConName tc == typeErrorShowTypeDataConName -> ppr t
+
+    -- ShowTypePrec n t
+    Just (tc,[_k,LitTy (NumTyLit i),t])
+      | tyConName tc == typeErrorShowTypePrecDataConName -> pprPrec (fromInteger i) t
 
     -- t1 :<>: t2
     Just (tc,[t1,t2])
