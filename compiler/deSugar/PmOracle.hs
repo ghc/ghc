@@ -65,7 +65,7 @@ import Type
 import TcSimplify    (tcNormalise, tcCheckSatisfiability)
 import TcType        (evVarPred)
 import Unify         (tcMatchTy)
-import TcRnTypes     (pprEvVarWithType, completeMatchConLikes)
+import TcRnTypes     (completeMatchConLikes)
 import Coercion
 import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
@@ -168,7 +168,7 @@ getUnmatchedConstructor (PM _tc ms)
 -- existential and term binders with fresh variables of appropriate type.
 -- Also returns instantiated evidence variables from the match and the types of
 -- strict constructor fields.
-mkOneConFull :: [Type] -> ConLike -> DsM ([Id], Bag TyCt, [Type], [TyVar])
+mkOneConFull :: [Type] -> Maybe [TyVar] -> ConLike -> DsM ([Id], Bag TyCt, [Type])
 --  * 'con' K is a ConLike
 --       - In the case of DataCons and most PatSynCons, these
 --         are associated with a particular TyCon T
@@ -191,14 +191,21 @@ mkOneConFull :: [Type] -> ConLike -> DsM ([Id], Bag TyCt, [Type], [TyVar])
 --          Q
 --          [s1]
 --          [e1,..,en]
-mkOneConFull arg_tys con = do
+mkOneConFull arg_tys mb_ex_tvs con = do
   let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, _con_res_ty)
         = conLikeFullSig con
   -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
-  -- Instantiate fresh existentials as arguments to the contructor
-  (subst, ex_tvs') <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
+  -- Instantiate fresh existentials as arguments to the contructor or (better)
+  -- re-use the existential ty vars from the pattern match. Either way this is
+  -- important for instantiating the Thetas, even if we never use the
+  -- instantiated ex_tvs. See Note [Coverage checking and existential tyvars]
+  subst <- case mb_ex_tvs of
+    Nothing         -> fst . cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
+    Just pat_ex_tvs -> pure $ foldl' (uncurry . extendTvSubstWithClone)
+                                     subst_univ
+                                     (zipEqual "mkOneConFull" ex_tvs pat_ex_tvs)
   let field_tys' = substTys subst field_tys
   -- Instantiate fresh term variables (VAs) as arguments to the constructor
   vars <- mapM mkPmId field_tys'
@@ -208,17 +215,7 @@ mkOneConFull arg_tys con = do
   -- Figure out the types of strict constructor fields
   let arg_is_banged = map isBanged $ conLikeImplBangs con
       strict_arg_tys = filterByList arg_is_banged field_tys'
-  return (vars, listToBag ty_cs, strict_arg_tys, ex_tvs')
-
-equateTyVars :: [TyVar] -> [TyVar] -> Bag TyCt
-equateTyVars ex_tvs1 ex_tvs2
-  = ASSERT(ex_tvs1 `equalLength` ex_tvs2)
-    listToBag $ catMaybes $ zipWith mb_to_evvar ex_tvs1 ex_tvs2
-  where
-    mb_to_evvar tv1 tv2
-      | tv1 == tv2 = Nothing
-      | otherwise  = Just (to_evvar tv1 tv2)
-    to_evvar tv1 tv2 = PredTyCt $ mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
+  return (vars, listToBag ty_cs, strict_arg_tys)
 
 -------------------------
 -- * Pattern match oracle
@@ -1096,7 +1093,7 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
       case guessConLikeUnivTyArgsFromResTy env (vi_ty vi) con of
         Nothing -> pure True -- be conservative about this
         Just arg_tys -> do
-          (_vars, ty_cs, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
+          (_vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys Nothing con
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
@@ -1124,10 +1121,10 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
 -- If successful, returns the new @delta@ and the fresh term variables, or
 -- @Nothing@ otherwise.
 refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> DsM (Maybe (Delta, [Id]))
-refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 = runMaybeT $ do
+refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs = runMaybeT $ do
   delta' <- addVarConCt delta x l []
   pure (markRefined delta' x, [])
-refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
+refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs  = do
   -- The plan for ConLikes:
   -- Suppose K :: forall a b y z. (y,b) -> z -> T a b
   --   where the y,z are the existentials
@@ -1138,15 +1135,8 @@ refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   --   [ex1, ex2].
   -- Return Nothing if such a match is contradictory with delta.
 
-  (arg_vars, theta_ty_cs, strict_arg_tys, ex_tvs2) <- mkOneConFull arg_tys con
+  (arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys (Just ex_tvs) con
 
-  -- If we have identical constructors but different existential
-  -- tyvars, then generate extra equality constraints to ensure the
-  -- existential tyvars.
-  -- See Note [Coverage checking and existential tyvars].
-  let ex_ty_cs = equateTyVars ex_tvs1 ex_tvs2
-
-  let new_ty_cs = theta_ty_cs `unionBags` ex_ty_cs
   let new_tm_cs = unitBag (TmVarCon x alt arg_vars)
 
   -- Now check satifiability
@@ -1391,7 +1381,7 @@ mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
 mkInhabitationCandidate x dc = do
   let cl = RealDataCon dc
   let tc_args = tyConAppArgs (idType x)
-  (arg_vars, ty_cs, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args cl
+  (arg_vars, ty_cs, strict_arg_tys) <- mkOneConFull tc_args Nothing cl
   pure InhabitationCandidate
         { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
         , ic_ty_cs = ty_cs
