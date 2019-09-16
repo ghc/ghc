@@ -39,6 +39,8 @@ import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
 import UniqSet
+import Unique           ( hasKey )
+import PrelNames        ( noinlineIdKey )
 
 {-
 ************************************************************************
@@ -183,6 +185,11 @@ dmdAnal' env dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
+
+-- See Note [noinlineId magic] in MkId.
+dmdAnal' env dmd (App (Var fun) arg)
+  | fun `hasKey` noinlineIdKey
+  = dmdAnal env dmd arg
 
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
