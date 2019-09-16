@@ -943,9 +943,6 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
 
-    when (not (null (unitIdsToCheck dflags))) $
-      throwGhcException (ProgramError "Backpack typechecking not supported with -j")
-
     -- The bits of shared state we'll be using:
 
     -- The global HscEnv is updated with the module's HMI when a module
