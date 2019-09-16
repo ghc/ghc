@@ -8,3 +8,4 @@
   [1 of 1] Including p[A=q:A]
     Instantiating p[A=q:A]
     [1 of 1] Compiling A[sig]           ( p/A.hsig, bkp37.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
+  [1 of 1] Instantiating p
