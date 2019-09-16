@@ -662,7 +662,8 @@ hsunitModuleGraph dflags unit = do
             else fmap Just $ summariseRequirement pn mod_name
 
     -- 3. Return the kaboodle
-    return $ mkModuleGraph $ nodes ++ req_nodes
+    return $ mkModuleGraph' $
+      (ModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do

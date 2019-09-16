@@ -24,5 +24,5 @@
   [1 of 2] Compiling A[sig]           ( p2/A.hsig, nothing )
   [2 of 2] Compiling M                ( p2/M.hs, nothing )
 [7 of 7] Processing p3
-  [1 of 2] Compiling A[sig]           ( p3/A.hsig, nothing )
-  [2 of 2] Compiling M2               ( p3/M2.hs, nothing )
+  [1 of 4] Compiling A[sig]           ( p3/A.hsig, nothing )
+  [2 of 4] Compiling M2               ( p3/M2.hs, nothing )
