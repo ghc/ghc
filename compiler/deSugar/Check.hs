@@ -1364,10 +1364,10 @@ locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
   Nothing     -> k
   Just delta' -> updPmDelta delta' k
 
--- | Add in-scope type constraints
+-- | Add in-scope type constraints ('PredType') bound to 'EvVar's.
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
 addTyCsDs ev_vars =
-  locallyExtendPmDelta (\delta -> addTypeEvidence delta ev_vars)
+  locallyExtendPmDelta (\delta -> addTypeEvidence delta (EvVarTyCt <$> ev_vars))
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:

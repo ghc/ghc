@@ -16,7 +16,7 @@ module PmOracle (
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
         lookupNumberOfRefinements,
 
-        TmCt(..),
+        TmCt(..), TyCt(..),
         inhabitants,
         addTypeEvidence,    -- Add type equalities
         addRefutableAltCon, -- Add a negative term equality
@@ -63,6 +63,7 @@ import TysPrim (tYPETyCon)
 import TyCoRep
 import Type
 import TcSimplify    (tcNormalise, tcCheckSatisfiability)
+import TcType        (evVarPred)
 import Unify         (tcMatchTy)
 import TcRnTypes     (pprEvVarWithType, completeMatchConLikes)
 import Coercion
@@ -71,7 +72,7 @@ import DsMonad hiding (foldlM)
 import FamInst
 import FamInstEnv
 
-import Control.Monad (zipWithM, guard, mzero)
+import Control.Monad (guard, mzero)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
@@ -163,21 +164,11 @@ getUnmatchedConstructor (PM _tc ms)
 ---------------------------------------------------
 -- * Instantiating constructors, types and evidence
 
-newEvVar :: Name -> Type -> EvVar
-newEvVar name ty = mkLocalId name ty
-
-nameType :: String -> Type -> DsM EvVar
-nameType name ty = do
-  unique <- getUniqueM
-  let occname = mkVarOccFS (fsLit (name++"_"++show unique))
-      idname  = mkInternalName unique occname noSrcSpan
-  return (newEvVar idname ty)
-
 -- | Instantiate a 'ConLike' given its universal type arguments. Instantiates
 -- existential and term binders with fresh variables of appropriate type.
 -- Also returns instantiated evidence variables from the match and the types of
 -- strict constructor fields.
-mkOneConFull :: [Type] -> ConLike -> DsM ([Id], [EvVar], [Type], [TyVar])
+mkOneConFull :: [Type] -> ConLike -> DsM ([Id], Bag TyCt, [Type], [TyVar])
 --  * 'con' K is a ConLike
 --       - In the case of DataCons and most PatSynCons, these
 --         are associated with a particular TyCon T
@@ -213,23 +204,21 @@ mkOneConFull arg_tys con = do
   vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle
-  let theta_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
-  theta_ev_vars <- mapM (nameType "pm") theta_cs
+  let ty_cs = map PredTyCt (substTheta subst (eqSpecPreds eq_spec ++ thetas))
   -- Figure out the types of strict constructor fields
   let arg_is_banged = map isBanged $ conLikeImplBangs con
       strict_arg_tys = filterByList arg_is_banged field_tys'
-  return (vars, theta_ev_vars, strict_arg_tys, ex_tvs')
+  return (vars, listToBag ty_cs, strict_arg_tys, ex_tvs')
 
-equateTyVars :: [TyVar] -> [TyVar] -> DsM [EvVar]
+equateTyVars :: [TyVar] -> [TyVar] -> Bag TyCt
 equateTyVars ex_tvs1 ex_tvs2
   = ASSERT(ex_tvs1 `equalLength` ex_tvs2)
-    catMaybes <$> zipWithM mb_to_evvar ex_tvs1 ex_tvs2
+    listToBag $ catMaybes $ zipWith mb_to_evvar ex_tvs1 ex_tvs2
   where
     mb_to_evvar tv1 tv2
-      | tv1 == tv2 = pure Nothing
-      | otherwise  = Just <$> to_evvar tv1 tv2
-    to_evvar tv1 tv2 = nameType "pmConCon" $
-                       mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
+      | tv1 == tv2 = Nothing
+      | otherwise  = Just (to_evvar tv1 tv2)
+    to_evvar tv1 tv2 = PredTyCt $ mkPrimEqPred (mkTyVarTy tv1) (mkTyVarTy tv2)
 
 -------------------------
 -- * Pattern match oracle
@@ -238,7 +227,7 @@ equateTyVars ex_tvs1 ex_tvs2
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints.
-data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
+data Delta = MkDelta { delta_ty_cs :: Bag TyCt   -- Type oracle; things like a~Int
                      , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
 
 -- | An initial delta that is always satisfiable
@@ -250,7 +239,7 @@ instance Outputable Delta where
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
       ppr (delta_tm_cs delta),
-      ppr (pprEvVarWithType <$> delta_ty_cs delta)
+      ppr (delta_ty_cs delta)
       --ppr (delta_ty_cs delta)
     ]
 
@@ -323,8 +312,8 @@ instance Monoid SatisfiabilityCheck where
 pmIsSatisfiable
   :: Delta       -- ^ The ambient term and type constraints
                  --   (known to be satisfiable).
-  -> Bag TmCt -- ^ The new term constraints.
-  -> Bag EvVar   -- ^ The new type constraints.
+  -> Bag TmCt    -- ^ The new term constraints.
+  -> Bag TyCt    -- ^ The new type constraints.
   -> [Type]      -- ^ The strict argument types.
   -> DsM (Maybe Delta)
                  -- ^ @'Just' delta@ if the constraints (@delta@) are
@@ -382,7 +371,7 @@ instance Outputable TopNormaliseTypeResult where
                                      , text "newtype_dcs =" <+> ppr ds
                                      , text "core_ty =" <+> ppr core_ty ])
 
-pmTopNormaliseType :: Bag EvVar -> Type -> DsM TopNormaliseTypeResult
+pmTopNormaliseType :: Bag TyCt -> Type -> DsM TopNormaliseTypeResult
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
 --      * data family redex
@@ -403,7 +392,8 @@ pmTopNormaliseType ty_cs typ
        -- Before proceeding, we chuck typ into the constraint solver, in case
        -- solving for given equalities may reduce typ some. See
        -- "Wrinkle: local equalities" in Note [Type normalisation for EmptyCase].
-       (_, mb_typ') <- initTcDsForSolver $ tcNormalise ty_cs typ
+       ev_vars <- traverse nameTyCt ty_cs
+       (_, mb_typ') <- initTcDsForSolver $ tcNormalise ev_vars typ
        -- If tcNormalise didn't manage to simplify the type, continue anyway.
        -- We might be able to reduce type applications nonetheless!
        let typ' = fromMaybe typ mb_typ'
@@ -574,31 +564,55 @@ equalities (such as i ~ Int) that may be in scope.
 ----------------
 -- * Type oracle
 
+-- | Wraps a 'PredType', which is a constraint type.
+data TyCt = PredTyCt  PredType
+          | EvVarTyCt EvVar    -- ^ A 'PredTyCt' which is given a name.
+                               -- Avoids repeatedly coming up with fresh names.
+
+instance Outputable TyCt where
+  ppr (PredTyCt pred_ty) = ppr pred_ty
+  ppr (EvVarTyCt ev_var) = ppr (evVarPred ev_var)
+
+-- | Allocates a fresh 'EvVar' name for 'PredTyCt's, or simply returns the
+-- wrapped 'EvVar' for 'EvVarTyCt's.
+nameTyCt :: TyCt -> DsM EvVar
+nameTyCt (EvVarTyCt ev_var) = pure ev_var
+nameTyCt (PredTyCt pred_ty) = do
+  unique <- getUniqueM
+  let occname = mkVarOccFS (fsLit ("pm_"++show unique))
+      idname  = mkInternalName unique occname noSrcSpan
+  return (mkLocalId idname pred_ty)
+
 -- | Check whether a set of type constraints is satisfiable.
-tyOracle :: Bag EvVar -> DsM Bool
-tyOracle evs
-  = do { ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability evs
+tyOracle :: Bag TyCt -> DsM (Maybe (Bag TyCt))
+tyOracle cts
+  = do { evs <- traverse nameTyCt cts
+       ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability evs
        ; case res of
-            Just sat -> return sat
-            Nothing  -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
+            -- Note how this implicitly gives all former PredTyCts a name, so
+            -- that we don't needlessly re-allocate them every time!
+            Just True  -> return (Just (EvVarTyCt <$> evs))
+            Just False -> return Nothing
+            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing
 -- ones. Doesn't bother calling out to the type oracle if the bag of new type
 -- constraints was empty. Will only recheck 'PossibleMatches' in the term oracle
 -- for emptiness if the first argument is 'True'.
-tyIsSatisfiable :: Bool -> Bag EvVar -> SatisfiabilityCheck
+tyIsSatisfiable :: Bool -> Bag TyCt -> SatisfiabilityCheck
 tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
-  tracePm "tyIsSatisfiable" (ppr (fmap pprEvVarWithType new_ty_cs))
+  tracePm "tyIsSatisfiable" (ppr new_ty_cs)
   let ty_cs = new_ty_cs `unionBags` delta_ty_cs delta
-  let delta' = delta{ delta_ty_cs = ty_cs }
   if isEmptyBag new_ty_cs
     then pure (Just delta)
     else tyOracle ty_cs >>= \case
-      False                     -> pure Nothing
-      True
-        | recheck_complete_sets -> ensureAllPossibleMatchesInhabited delta'
-        | otherwise             -> pure (Just delta')
+      Nothing                   -> pure Nothing
+      Just ty_cs'               -> do
+        let delta' = delta{ delta_ty_cs = ty_cs' }
+        if recheck_complete_sets
+          then ensureAllPossibleMatchesInhabited delta'
+          else pure (Just delta')
 
 
 {- *********************************************************************
@@ -865,7 +879,7 @@ lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
 lookupVarInfo (TS env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
-initPossibleMatches :: Bag EvVar -> VarInfo -> DsM VarInfo
+initPossibleMatches :: Bag TyCt -> VarInfo -> DsM VarInfo
 initPossibleMatches ty_cs vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
   -- New evidence might lead to refined info on ty, in turn leading to discovery
   -- of a COMPLETE set.
@@ -946,7 +960,7 @@ instance Outputable TmCt where
   ppr (TmVarCon x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
 
 -- | Add type equalities to 'Delta'.
-addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
+addTypeEvidence :: Delta -> Bag TyCt -> DsM (Maybe Delta)
 addTypeEvidence delta dicts
   = runSatisfiabilityCheck delta (tyIsSatisfiable True dicts)
 
@@ -1082,13 +1096,13 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
       case guessConLikeUnivTyArgsFromResTy env (vi_ty vi) con of
         Nothing -> pure True -- be conservative about this
         Just arg_tys -> do
-          (_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
+          (_vars, ty_cs, strict_arg_tys, _ex_tyvars) <- mkOneConFull arg_tys con
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
             -- recursively call ensureAllPossibleMatchesInhabited, leading to an
             -- endless recursion.
-            [ tyIsSatisfiable False (listToBag ev_vars)
+            [ tyIsSatisfiable False ty_cs
             , tysAreNonVoid initRecTc strict_arg_tys
             ]
 
@@ -1124,15 +1138,15 @@ refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   --   [ex1, ex2].
   -- Return Nothing if such a match is contradictory with delta.
 
-  (arg_vars, theta_ev_vars, strict_arg_tys, ex_tvs2) <- mkOneConFull arg_tys con
+  (arg_vars, theta_ty_cs, strict_arg_tys, ex_tvs2) <- mkOneConFull arg_tys con
 
   -- If we have identical constructors but different existential
   -- tyvars, then generate extra equality constraints to ensure the
   -- existential tyvars.
   -- See Note [Coverage checking and existential tyvars].
-  ex_ev_vars <- equateTyVars ex_tvs1 ex_tvs2
+  let ex_ty_cs = equateTyVars ex_tvs1 ex_tvs2
 
-  let new_ty_cs = listToBag theta_ev_vars `unionBags` listToBag ex_ev_vars
+  let new_ty_cs = theta_ty_cs `unionBags` ex_ty_cs
   let new_tm_cs = unitBag (TmVarCon x alt arg_vars)
 
   -- Now check satifiability
@@ -1361,7 +1375,7 @@ addVarConCt delta@MkDelta{ delta_tm_cs = TS env } x alt args = do
 data InhabitationCandidate =
   InhabitationCandidate
   { ic_tm_cs          :: Bag TmCt
-  , ic_ty_cs          :: Bag EvVar
+  , ic_ty_cs          :: Bag TyCt
   , ic_strict_arg_tys :: [Type]
   }
 
@@ -1377,10 +1391,10 @@ mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
 mkInhabitationCandidate x dc = do
   let cl = RealDataCon dc
   let tc_args = tyConAppArgs (idType x)
-  (arg_vars, ev_vars, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args cl
+  (arg_vars, ty_cs, strict_arg_tys, _ex_tyvars) <- mkOneConFull tc_args cl
   pure InhabitationCandidate
         { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
-        , ic_ty_cs = listToBag ev_vars
+        , ic_ty_cs = ty_cs
         , ic_strict_arg_tys = strict_arg_tys
         }
 
@@ -1565,7 +1579,7 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
 -- 2. @C@ has no strict argument types.
 --
 -- See the @Note [Strict argument type constraints]@.
-definitelyInhabitedType :: Bag EvVar -> Type -> DsM Bool
+definitelyInhabitedType :: Bag TyCt -> Type -> DsM Bool
 definitelyInhabitedType ty_cs ty = do
   res <- pmTopNormaliseType ty_cs ty
   pure $ case res of
