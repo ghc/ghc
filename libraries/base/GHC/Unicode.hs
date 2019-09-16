@@ -34,7 +34,7 @@ import GHC.Base
 import GHC.Char        (chr)
 import GHC.Real
 import GHC.Enum ( Enum (..), Bounded (..) )
-import GHC.Arr ( Ix (..) )
+import GHC.Ix ( Ix (..) )
 import GHC.Num
 
 -- Data.Char.chr already imports this and we need to define a Show instance
