@@ -4603,7 +4603,7 @@ The class ``Typeable`` is very special:
    :extension:`DeriveDataTypeable` extension is enabled, but they are ignored,
    and they may be reported as an error in a later version of the compiler.
 
--  The rules for solving \`Typeable\` constraints are as follows:
+-  The rules for solving ``Typeable`` constraints are as follows:
 
    -  A concrete type constructor applied to some types. ::
 
