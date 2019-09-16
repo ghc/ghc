@@ -51,9 +51,11 @@ import PatSyn
 import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 import Var (EvVar)
-
+import Coercion
+import TcEvidence
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr)
 import MatchLit (dsLit, dsOverLit)
+import IOEnv
 import DsMonad
 import Bag
 import TyCoRep
@@ -66,9 +68,6 @@ import Data.List     (find)
 import Control.Monad (forM, when, forM_)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Maybe
-import Coercion
-import TcEvidence
-import IOEnv
 import qualified Data.Semigroup as Semi
 
 {-
@@ -1364,7 +1363,7 @@ locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
   Nothing     -> k
   Just delta' -> updPmDelta delta' k
 
--- | Add in-scope type constraints
+-- | Add in-scope type constraints ('PredType') bound to 'EvVar's.
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
 addTyCsDs ev_vars =
   locallyExtendPmDelta (\delta -> addTypeEvidence delta ev_vars)

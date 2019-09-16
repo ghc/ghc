@@ -860,12 +860,12 @@ see Note [Required quantifiers in the type of a term] in TcExpr.
 ********************************************************************** -}
 
 
--- | A type of the form @p@ of kind @Constraint@ represents a value whose type is
+-- | A type of the form @p@ of constraint kind represents a value whose type is
 -- the Haskell predicate @p@, where a predicate is what occurs before
 -- the @=>@ in a Haskell type.
 --
--- We use 'PredType' as documentation to mark those types that we guarantee to have
--- this kind.
+-- We use 'PredType' as documentation to mark those types that we guarantee to
+-- have this kind.
 --
 -- It can be expanded into its representation, but:
 --
