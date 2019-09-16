@@ -504,7 +504,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
-    gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
+    gHC_ST, gHC_ARR, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
@@ -541,6 +541,7 @@ gHC_IO          = mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
 gHC_ST          = mkBaseModule (fsLit "GHC.ST")
 gHC_ARR         = mkBaseModule (fsLit "GHC.Arr")
+gHC_IX          = mkBaseModule (fsLit "GHC.Ix")
 gHC_STABLE      = mkBaseModule (fsLit "GHC.Stable")
 gHC_PTR         = mkBaseModule (fsLit "GHC.Ptr")
 gHC_ERR         = mkBaseModule (fsLit "GHC.Err")
@@ -1214,7 +1215,7 @@ rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDo
 
 -- Class Ix
 ixClassName :: Name
-ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
+ixClassName = clsQual gHC_IX (fsLit "Ix") ixClassKey
 
 -- Typeable representation types
 trModuleTyConName
