@@ -6,8 +6,6 @@ Pattern Matching Coverage Checking.
 
 {-# LANGUAGE CPP            #-}
 {-# LANGUAGE GADTs          #-}
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
 {-# LANGUAGE MultiWayIf     #-}
@@ -45,25 +43,23 @@ import SrcLoc
 import Util
 import Outputable
 import DataCon
+import PatSyn (patSynArity)
 import BasicTypes (Boxity(..))
 import Var (EvVar)
 import Coercion
 import TcEvidence
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import MatchLit (dsLit, dsOverLit)
-import IOEnv
 import DsMonad
 import Bag
 import TyCoRep
 import Type
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (isJust, expectJust)
+import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List     (find)
-import Control.Monad (forM, when, forM_)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Maybe
+import Data.List     (find, isSubsequenceOf)
+import Control.Monad (forM, when, forM_, zipWithM)
 import qualified Data.Semigroup as Semi
 
 {-
@@ -88,24 +84,35 @@ The algorithm is based on the paper:
 %************************************************************************
 -}
 
-data PmPat where
-  -- | For the arguments' meaning see 'HsPat.ConPatOut'.
-  PmCon  :: { pm_con_con     :: PmAltCon
-            , pm_con_arg_tys :: [Type]
-            , pm_con_tvs     :: [TyVar]
-            , pm_con_args    :: [PmPat] } -> PmPat
+data PmPat
+  = -- | For the arguments' meaning see 'HsPat.ConPatOut'.
+    PmCon {
+      pm_con_con     :: PmAltCon,
+      pm_con_arg_tys :: [Type],
+      pm_con_tvs     :: [TyVar],
+      pm_con_dicts   :: [EvVar],
+      pm_con_args    :: [PmPat]
+    }
 
-  PmVar  :: { pm_var_id   :: Id } -> PmPat
+    -- | Possibly strict variable pattern match
+  | PmVar {
+      _pm_var_bang :: HsImplBang,
+      pm_var_id    :: Id
+    }
 
-  PmGrd  :: { pm_grd_pv   :: PatVec -- ^ Always has 'patVecArity' 1.
-            , pm_grd_expr :: CoreExpr } -> PmPat
-     -- (PmGrd pat expr) matches expr against pat, binding the variables in pat
+    -- | @PmGrd pat expr@ matches @expr@ against @pat@,
+    --   binding the variables in @pat@
+  | PmGrd {
+      pm_grd_pv   :: PatVec,
+      -- ^ Always has 'patVecArity' 1.
+      pm_grd_expr :: CoreExpr
+    }
 
 -- | Should not be user-facing.
 instance Outputable PmPat where
-  ppr (PmCon alt _arg_tys _con_tvs con_args)
+  ppr (PmCon alt _arg_tys _con_tvs _con_dicts con_args)
     = cparen (notNull con_args) (hsep [ppr alt, hsep (map ppr con_args)])
-  ppr (PmVar vid) = ppr vid
+  ppr (PmVar bang vid) = (if isBanged bang then char '!' else empty) <> ppr vid
   ppr (PmGrd pv ge) = hsep (map ppr pv) <+> text "<-" <+> ppr ge
 
 -- data T a where
@@ -416,7 +423,7 @@ nullaryConPattern :: ConLike -> PmPat
 -- Nullary data constructor and nullary type constructor
 nullaryConPattern con =
   PmCon { pm_con_con = (PmAltConLike con), pm_con_arg_tys = []
-        , pm_con_tvs = [], pm_con_args = [] }
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = [] }
 {-# INLINE nullaryConPattern #-}
 
 truePattern :: PmPat
@@ -427,20 +434,22 @@ vanillaConPattern :: ConLike -> [Type] -> PatVec -> PmPat
 -- ADT constructor pattern => no existentials, no local constraints
 vanillaConPattern con arg_tys args =
   PmCon { pm_con_con = PmAltConLike con, pm_con_arg_tys = arg_tys
-        , pm_con_tvs = [], pm_con_args = args }
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = args }
 {-# INLINE vanillaConPattern #-}
 
 -- | Create an empty list pattern of a given type
 nilPattern :: Type -> PmPat
 nilPattern ty =
   PmCon { pm_con_con = PmAltConLike (RealDataCon nilDataCon)
-        , pm_con_arg_tys = [ty], pm_con_tvs = [], pm_con_args = [] }
+        , pm_con_arg_tys = [ty], pm_con_tvs = [], pm_con_dicts = []
+        , pm_con_args = [] }
 {-# INLINE nilPattern #-}
 
 mkListPatVec :: Type -> PatVec -> PatVec -> PatVec
 mkListPatVec ty xs ys = [PmCon { pm_con_con = PmAltConLike (RealDataCon consDataCon)
                                , pm_con_arg_tys = [ty]
                                , pm_con_tvs = []
+                               , pm_con_dicts = []
                                , pm_con_args = xs++ys }]
 {-# INLINE mkListPatVec #-}
 
@@ -461,6 +470,7 @@ mkPmLitPattern lit@(PmLit _ val)
   = [PmCon { pm_con_con = PmAltLit lit
            , pm_con_arg_tys = []
            , pm_con_tvs = []
+           , pm_con_dicts = []
            , pm_con_args = [] }]
 {-# INLINE mkPmLitPattern #-}
 
@@ -475,17 +485,18 @@ mkPmLitPattern lit@(PmLit _ val)
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVars [ty]
-  VarPat _ id  -> return [PmVar (unLoc id)]
+  VarPat _ id  -> return [PmVar HsLazy (unLoc id)]
   ParPat _ p   -> translatePat fam_insts (unLoc p)
   LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
-
-  -- ignore strictness annotations for now
-  BangPat _ p  -> translatePat fam_insts (unLoc p)
+  BangPat _ p  -> map_single strictenPmPat <$> translatePat fam_insts (unLoc p)
+    where
+      map_single f [x] = [f x]
+      map_single _ xs  = xs
 
   -- (x@pat)   ===>   x (pat <- x)
   AsPat _ (dL->L _ x) p -> do
     pat <- translatePat fam_insts (unLoc p)
-    pure [PmVar x, PmGrd pat (Var x)]
+    pure [PmVar HsLazy x, PmGrd pat (Var x)]
 
   SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
@@ -504,8 +515,8 @@ translatePat fam_insts pat = case pat of
     (xp, xe) <- mkPmId2Forms pat_ty
     let ke1 = HsOverLit noExtField (unLoc k1)
         ke2 = HsOverLit noExtField k2
-    g1 <- mkGuardSyntaxExpr [truePattern] ge    [unLoc xe, ke1]
-    g2 <- mkGuardSyntaxExpr [PmVar n]     minus [ke2]
+    g1 <- mkGuardSyntaxExpr [truePattern]    ge    [unLoc xe, ke1]
+    g2 <- mkGuardSyntaxExpr [PmVar HsLazy n] minus [ke2]
     return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
@@ -556,11 +567,13 @@ translatePat fam_insts pat = case pat of
   ConPatOut { pat_con     = (dL->L _ con)
             , pat_arg_tys = arg_tys
             , pat_tvs     = ex_tvs
+            , pat_dicts   = dicts
             , pat_args    = ps } -> do
     args <- translateConPatVec fam_insts arg_tys ex_tvs con ps
     return [PmCon { pm_con_con     = PmAltConLike con
                   , pm_con_arg_tys = arg_tys
                   , pm_con_tvs     = ex_tvs
+                  , pm_con_dicts   = dicts
                   , pm_con_args    = args }]
 
   NPat ty (dL->L _ olit) mb_neg _ -> do
@@ -618,36 +631,36 @@ translatePatVec fam_insts pats = mapM (translatePat fam_insts) pats
 translateConPatVec :: FamInstEnvs -> [Type] -> [TyVar]
                    -> ConLike -> HsConPatDetails GhcTc
                    -> DsM PatVec
-translateConPatVec fam_insts _univ_tys _ex_tvs _ (PrefixCon ps)
-  = concat <$> translatePatVec fam_insts (map unLoc ps)
-translateConPatVec fam_insts _univ_tys _ex_tvs _ (InfixCon p1 p2)
-  = concat <$> translatePatVec fam_insts (map unLoc [p1,p2])
+translateConPatVec fam_insts _univ_tys _ex_tvs c (PrefixCon ps)
+  = addBangs c . concat <$> translatePatVec fam_insts (map unLoc ps)
+translateConPatVec fam_insts _univ_tys _ex_tvs c (InfixCon p1 p2)
+  = addBangs c . concat <$> translatePatVec fam_insts (map unLoc [p1,p2])
 translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- Nothing matched. Make up some fresh term variables
-  | null fs        = mkPmVars arg_tys
+  | null fs        = addBangs c <$> mkPmVars arg_tys
     -- The data constructor was not defined using record syntax. For the
     -- pattern to be in record syntax it should be empty (e.g. Just {}).
     -- So just like the previous case.
-  | null orig_lbls = ASSERT(null matched_lbls) mkPmVars arg_tys
+  | null orig_lbls = ASSERT(null matched_lbls) addBangs c <$> mkPmVars arg_tys
     -- Some of the fields appear, in the original order (there may be holes).
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
-  | matched_lbls `subsetOf` orig_lbls
+  | matched_lbls `isSubsequenceOf` orig_lbls
   = ASSERT(orig_lbls `equalLength` arg_tys)
-      let translateOne (lbl, ty) = case lookup lbl matched_pats of
+      let translateOne lbl ty = case lookup lbl matched_pats of
             Just p  -> translatePat fam_insts p
             Nothing -> mkPmVars [ty]
-      in  concatMapM translateOne (zip orig_lbls arg_tys)
+      in  addBangs c . concat <$> zipWithM translateOne orig_lbls arg_tys
     -- The fields that appear are not in the correct order. Make up fresh
     -- variables for all fields and add guards after matching, to force the
     -- evaluation in the correct order.
   | otherwise = do
-      arg_var_pats    <- mkPmVars arg_tys
+      arg_var_pats    <- addBangs c <$> mkPmVars arg_tys
       translated_pats <- forM matched_pats $ \(x,pat) -> do
         pvec <- translatePat fam_insts pat
         return (x, pvec)
 
-      let zipped = zip orig_lbls [ x | PmVar x <- arg_var_pats ]
+      let zipped = zip orig_lbls [ x | PmVar _ x <- arg_var_pats ]
           guards = map (\(name,pvec) -> case lookup name zipped of
                             Just x  -> PmGrd pvec (Var x)
                             Nothing -> panic "translateConPatVec: lookup")
@@ -655,8 +668,8 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
       return (arg_var_pats ++ guards)
   where
-    -- The actual argument types (instantiated)
-    arg_tys = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    -- The actual argument types (instantiated), with strictness marks
+    arg_tys     = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -664,12 +677,18 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
                    | (dL->L _ x) <- fs]
     matched_lbls = [ name | (name, _pat) <- matched_pats ]
 
-    subsetOf :: Eq a => [a] -> [a] -> Bool
-    subsetOf []     _  = True
-    subsetOf (_:_)  [] = False
-    subsetOf (x:xs) (y:ys)
-      | x == y    = subsetOf    xs  ys
-      | otherwise = subsetOf (x:xs) ys
+addBangs :: ConLike -> PatVec -> PatVec
+addBangs c ps = go ps bangs
+  where
+    bangs = case c of
+      RealDataCon dc -> dataConImplBangs dc
+      PatSynCon ps   -> take (patSynArity ps) (repeat HsLazy)
+
+    go (PmVar _ x:ps) (bang:bangs) = PmVar bang x : go ps bangs
+    go (p@PmGrd{}:ps) bangs        = p            : go ps bangs
+    go (p@PmCon{}:ps) (_   :bangs) = p            : go ps bangs
+    go []             []           = []
+    go _              _            = panic "addBangs"
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
@@ -852,13 +871,22 @@ mkGuardSyntaxExpr pv f args = do
   core_args <- traverse dsExpr args
   PmGrd pv <$> dsSyntaxExpr f core_args
 
--- | Generate a variable pattern of a given type
+-- | Generate a lazy variable pattern of a given type
 mkPmVar :: Type -> DsM PmPat
-mkPmVar ty = PmVar <$> mkPmId ty
+mkPmVar ty = PmVar HsLazy <$> mkPmId ty
 
--- | Generate many variable patterns, given a list of types
+-- | Generate many lazy variable patterns, given a list of types
 mkPmVars :: [Type] -> DsM PatVec
 mkPmVars tys = mapM mkPmVar tys
+
+-- | Applicable when there's a surrounding BangPat or it's a strict constructor
+-- field.
+strictenPmPat :: PmPat -> PmPat
+strictenPmPat (PmVar _ x) = PmVar HsStrict x
+-- PmCon is strict anyway
+strictenPmPat p@PmCon{}   = p
+-- PmGrd isn't really applicable because of patternArity 0
+strictenPmPat p@PmGrd{}   = p
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
@@ -866,7 +894,7 @@ mkPmVars tys = mapM mkPmVar tys
 mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar x, noLoc (HsVar noExtField (noLoc x)))
+  return (PmVar HsLazy x, noLoc (HsVar noExtField (noLoc x)))
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -1062,14 +1090,19 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
-pmcheck (PmVar x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
-  pmcheckI ps guards vva n delta'
+pmcheck (PmVar bang x : ps) guards (y : vva) n delta = do
+  delta_lzy <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
+  if isBanged bang
+    then do
+      pr <- assertNonVoid delta_lzy x >>= \case
+              Nothing        -> pure mempty
+              Just delta_str -> pmcheckI ps guards vva n delta_str
+      pure (forceIfCanDiverge delta x pr)
+    else pmcheckI ps guards vva n delta_lzy
 
 -- ConVar
-pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
-                , pm_con_arg_tys = arg_tys, pm_con_tvs = ex_tvs } : ps)
-        guards (x : vva) n delta = do
+pmcheck (p : ps) guards (x : vva) n delta
+  | PmCon{ pm_con_con = con, pm_con_args = args, pm_con_dicts = dicts } <- p = do
   -- E.g   f (K p q) = <rhs>
   --       <next equation>
   -- Split the value vector into two value vectors:
@@ -1077,7 +1110,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
   --    * one for <next equation>, recording that x is /not/ (K _ _)
 
   -- Stuff for <rhs>
-  pr_pos <- refineToAltCon delta x con arg_tys ex_tvs >>= \case
+  pr_pos <- addPositiveInfoFromPmCon delta x con dicts args >>= \case
     Nothing -> pure mempty
     Just (delta', arg_vas) ->
       pmcheckI (args ++ ps) guards (arg_vas ++ vva) n delta'
@@ -1097,6 +1130,18 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
 
 pmcheck [] _ (_:_) _ _ = panic "pmcheck: nil-cons"
 pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
+
+addPositiveInfoFromPmCon :: Delta -> Id -> PmAltCon -> [EvVar] -> PatVec -> DsM (Maybe (Delta, ValVec))
+addPositiveInfoFromPmCon delta x con dicts field_pats = do
+  let mk_id (PmVar _ x) = pure (Just x)
+      mk_id p@PmCon{} = Just <$> mkPmId (pmPatType p)
+      mk_id PmGrd{}   = pure Nothing -- PmGrds have arity 0, so just forget about them
+  field_vas <- catMaybes <$> traverse mk_id field_pats
+  runMaybeT $ do
+    delta_ty    <- MaybeT $ addTypeEvidence delta (listToBag dicts)
+    delta_tm_ty <- MaybeT $ addTmCt delta_ty (TmVarCon x con field_vas)
+    -- strictness on fields is unleashed when we match
+    pure (delta_tm_ty, field_vas)
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
@@ -1190,46 +1235,36 @@ addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
            -> [Id]                  -- MatchVars (should have length 1)
            -> DsM a
            -> DsM a
--- Morally, this computes an approximation of the Covered set for p1
--- (which pmcheck currently discards). TODO: Re-use pmcheck instead of calling
--- out to awkard addVarPatVecCt.
+-- Computes an approximation of the Covered set for p1 (which pmcheck currently
+-- discards).
 addPatTmCs ps xs k = do
   fam_insts <- dsGetFamInstEnvs
   pv <- concat <$> translatePatVec fam_insts ps
-  locallyExtendPmDelta (\delta -> addVarPatVecCt delta xs pv) k
+  locallyExtendPmDelta (\delta -> computeCovered pv xs delta) k
 
--- | Add a constraint equating a variable to a 'PatVec'. Picks out the single
--- 'PmPat' of arity 1 and equates x to it. Returns the original Delta if that
--- fails. Otherwise it returns Nothing when the resulting Delta would be
--- unsatisfiable, or @Just delta'@ when the extended @delta'@ is still possibly
--- satisfiable.
-addVarPatVecCt :: Delta -> [Id] -> PatVec -> DsM (Maybe Delta)
--- This is just a simple version of pmcheck to compute the Covered Delta
--- (which pmcheck doesn't even attempt to keep).
--- Also PmGrd, although having pattern arity 0, really stores important info.
--- For example, as-patterns desugar to a plain variable match and an associated
--- PmGrd for the RHS of the @. We don't currently look into that PmGrd and I'm
--- not willing to duplicate any more of pmcheck.
-addVarPatVecCt delta (x:xs) (pat:pv)
-  | patternArity pat == 1 -- PmVar or PmCon
-  = runMaybeT $ do
-      delta' <- MaybeT (addVarPatCt delta x pat)
-      MaybeT (addVarPatVecCt delta' xs pv)
-  | otherwise -- PmGrd or PmFake
-  = addVarPatVecCt delta (x:xs) pv
-addVarPatVecCt delta []     pv = ASSERT( patVecArity pv == 0 ) pure (Just delta)
-addVarPatVecCt _     (_:_)  [] = panic "More match vars than patterns"
-
--- | Convert a pattern to a 'PmTypes' (will be either 'Nothing' if the pattern is
--- a guard pattern, or 'Just' an expression in all other cases) by dropping the
--- guards
-addVarPatCt :: Delta -> Id -> PmPat -> DsM (Maybe Delta)
-addVarPatCt delta x (PmVar { pm_var_id  = y }) = addTmCt delta (TmVarVar x y)
-addVarPatCt delta x (PmCon { pm_con_con = con, pm_con_args = args }) = runMaybeT $ do
-  arg_ids <- traverse (lift . mkPmId . pmPatType) args
-  delta' <- foldlM (\delta (y, arg) -> MaybeT (addVarPatCt delta y arg)) delta (zip arg_ids args)
-  MaybeT (addTmCt delta' (TmVarCon x con arg_ids))
-addVarPatCt delta _ _pat = ASSERT( patternArity _pat == 0 ) pure (Just delta)
+-- | A dead simple version of 'pmcheck' that only computes the Covered set.
+-- So it only cares about collecting positive info.
+-- We use it to collect info from a pattern when we check its RHS.
+-- See 'addPatTmCs'.
+computeCovered :: PatVec -> ValVec -> Delta -> DsM (Maybe Delta)
+-- The duplication with 'pmcheck' is really unfortunate, but it's simpler than
+-- separating out the common cases with 'pmcheck', because that would make the
+-- ConVar case harder to understand.
+computeCovered [] [] delta = pure (Just delta)
+computeCovered (PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) vva delta = do
+  x <- mkPmId (exprType e)
+  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
+  computeCovered (pv ++ ps) (x : vva) delta'
+computeCovered (PmVar _ x : ps) (y : vva) delta = do
+  delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
+  computeCovered ps vva delta'
+computeCovered (p : ps) (x : vva) delta
+  | PmCon{ pm_con_con = con, pm_con_args = args, pm_con_dicts = dicts } <- p
+  = addPositiveInfoFromPmCon delta x con dicts args >>= \case
+      Nothing -> pure Nothing
+      Just (delta', arg_vas) ->
+        computeCovered (args ++ ps) (arg_vas ++ vva) delta'
+computeCovered ps vs _delta = pprPanic "computeCovered" (ppr ps $$ ppr vs)
 
 {-
 %************************************************************************

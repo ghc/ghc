@@ -1,0 +1,7 @@
+
+T17234.hs:8:1: warning: [-Woverlapping-patterns]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘f’: f !_ = ...
+  |
+8 | f !_ = ()
+  | ^^^^^^^^^
