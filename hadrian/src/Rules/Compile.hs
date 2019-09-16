@@ -6,6 +6,7 @@ import Hadrian.Oracles.TextFile
 import Base
 import Context as C
 import Expression
+import Oracles.Flag (platformSupportsSharedLibs)
 import Rules.Generate
 import Settings
 import Target
@@ -45,10 +46,10 @@ compilePackage rs = do
       -- This comes last as it overlaps with the above rules' file patterns.
       [ root -/- "**/build/**/*.dyn_o", root -/- "**/build/**/*.dyn_hi" ]
         &%> \ [dyn_o, _dyn_hi] -> do
-          let o  = dyn_o -<.> "o"
-              hi = dyn_o -<.> "hi"
-
-          need [o, hi]
+          p <- platformSupportsSharedLibs
+          if p
+            then need [dyn_o -<.> "o", dyn_o -<.> "hi"]
+            else compileHsObjectAndHi rs dyn_o
 
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
         [ root -/- "**/build/**/*." ++ wayPat ++ oExt
@@ -190,8 +191,8 @@ compileHsObjectAndHi rs objpath = do
   -- Note that this may allow too many *.hi and *.hi-boot files, but
   -- calculating the exact set of direct inputs is not feasible.
   trackAllow [ "**/*." ++ hisuf     way
-            , "**/*." ++ hibootsuf way
-            ]
+             , "**/*." ++ hibootsuf way
+             ]
 
   buildWithResources rs $ target ctx (Ghc CompileHs stage) [src] [objpath]
 
