@@ -1,0 +1,8 @@
+CustomTypeErrors06.hs:20:10:
+     Please define foo manually. Suggested definitions:
+        foo = something complicated
+        foo = something else complicated
+     In the expression: CustomTypeErrors06.$dmfoo @(Int)
+      In an equation for ‘foo’: foo = CustomTypeErrors06.$dmfoo @(Int)
+      In the instance declaration for ‘Foo Int’
+
