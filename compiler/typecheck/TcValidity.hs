@@ -243,17 +243,21 @@ checkUserTypeError :: Type -> TcM ()
 -- user-supplied one.  This is really only a half-baked fix;
 -- the other errors in checkValidType don't do tidying, and so
 -- may give bad error messages when given an inferred type.
-checkUserTypeError = check
+checkUserTypeError z = do
+    let (_, theta, ty) = tcSplitNestedSigmaTys z
+    for_ theta $ check True
+    check False ty
   where
-  check ty
-    | Just msg     <- userTypeError_maybe ty  = fail_with msg
-      -- We don't want to emit custom type errors that show up in givens. See #16906.
-    | Just (t1,t2) <- splitFunTy_maybe ty     =
-        unless (eqType (typeKind t1) constraintKind) (check t1) >> check t2
-    | Just (_,ts)  <- splitTyConApp_maybe ty  = mapM_ check ts
-    | Just (t1,t2) <- splitAppTy_maybe ty     = check t1 >> check t2
-    | Just (_,t1)  <- splitForAllTy_maybe ty  = check t1
-    | otherwise                               = return ()
+  -- This boolean tracks whether we're immediately inside of a theta type,
+  -- in which case we don't want to emit custom type errors, since they
+  -- appear as givens. See #16906.
+  check False ty
+    | Just msg     <- userTypeError_maybe ty = fail_with msg
+  check _ ty
+    | Just (_,ts)  <- splitTyConApp_maybe ty = mapM_ (check False) ts
+    | Just (t1,t2) <- splitAppTy_maybe ty    = check False t1 >> check False t2
+    | Just (_,t1)  <- splitForAllTy_maybe ty = check False t1
+    | otherwise                              = return ()
 
   fail_with msg = do { env0 <- tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
