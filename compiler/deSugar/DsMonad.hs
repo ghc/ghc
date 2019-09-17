@@ -70,7 +70,7 @@ import BasicTypes ( Origin )
 import DataCon
 import ConLike
 import TyCon
-import {-# SOURCE #-} PmOracle
+import PmTypes
 import Id
 import Module
 import Outputable
