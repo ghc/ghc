@@ -63,6 +63,7 @@ import StringBuffer
 import UniqFM
 import UniqDSet
 import TcBackpack
+import TcRnDriver
 import Packages
 import UniqSet
 import Util
