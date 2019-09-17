@@ -1,4 +1,4 @@
-module PmOracle where
+module PmTypes where
 
 import GhcPrelude ()
 
