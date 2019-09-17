@@ -148,7 +148,7 @@
 STATIC_INLINE StgPtr
 allocate_NONUPD (Capability *cap, int n_words)
 {
-    return allocate(cap, stg_max(sizeofW(StgHeader)+MIN_PAYLOAD_SIZE, n_words));
+    return allocate(cap, stg_max(sizeofW(StgHeader), n_words));
 }
 
 int rts_stop_next_breakpoint = 0;

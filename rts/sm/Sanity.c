@@ -467,7 +467,7 @@ void checkHeapChain (bdescr *bd)
             while (p < bd->free) {
                 uint32_t size = checkClosure((StgClosure *)p);
                 /* This is the smallest size of closure that can live in the heap */
-                ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
+                ASSERT( size >= sizeofW(StgHeader) );
                 p += size;
 
                 /* skip over slop */
@@ -488,7 +488,7 @@ checkHeapChunk(StgPtr start, StgPtr end)
     ASSERT(LOOKS_LIKE_INFO_PTR(*p));
     size = checkClosure((StgClosure *)p);
     /* This is the smallest size of closure that can live in the heap. */
-    ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
+    ASSERT( size >= sizeofW(StgHeader) );
   }
 }
 

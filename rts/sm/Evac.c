@@ -600,8 +600,8 @@ loop:
       /* If the object is in a gen that we're compacting, then we
        * need to use an alternative evacuate procedure.
        */
-      if (!is_marked((P_)q,bd)) {
-          mark((P_)q,bd);
+      if (!is_marked_live((P_)q,bd)) {
+          mark_live((P_)q,bd);
           push_mark_stack((P_)q);
       }
       return;
@@ -909,8 +909,8 @@ evacuate_BLACKHOLE(StgClosure **p)
         return;
     }
     if (bd->flags & BF_MARKED) {
-        if (!is_marked((P_)q,bd)) {
-            mark((P_)q,bd);
+        if (!is_marked_live((P_)q,bd)) {
+            mark_live((P_)q,bd);
             push_mark_stack((P_)q);
         }
         return;

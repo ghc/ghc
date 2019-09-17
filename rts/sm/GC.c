@@ -1414,17 +1414,14 @@ prepare_collected_gen (generation *gen)
 
     // for a compacted generation, we need to allocate the bitmap
     if (gen->mark) {
-        StgWord bitmap_size; // in bytes
-        bdescr *bitmap_bdescr;
-        StgWord *bitmap;
-
-        bitmap_size = gen->n_old_blocks * BLOCK_SIZE / BITS_IN(W_);
+        // in bytes
+        StgWord bitmap_size = (gen->n_old_blocks * BLOCK_SIZE / BITS_IN(W_)) * 2;
 
         if (bitmap_size > 0) {
-            bitmap_bdescr = allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size)
-                                       / BLOCK_SIZE);
+            bdescr *bitmap_bdescr =
+                allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size) / BLOCK_SIZE);
             gen->bitmap = bitmap_bdescr;
-            bitmap = bitmap_bdescr->start;
+            StgWord *bitmap = bitmap_bdescr->start;
 
             debugTrace(DEBUG_gc, "bitmap_size: %d, bitmap: %p",
                        bitmap_size, bitmap);
@@ -1436,7 +1433,7 @@ prepare_collected_gen (generation *gen)
             // block descriptor.
             for (bd=gen->old_blocks; bd != NULL; bd = bd->link) {
                 bd->u.bitmap = bitmap;
-                bitmap += BLOCK_SIZE_W / BITS_IN(W_);
+                bitmap += (BLOCK_SIZE_W / BITS_IN(W_)) * 2;
 
                 // Also at this point we set the BF_MARKED flag
                 // for this block.  The invariant is that

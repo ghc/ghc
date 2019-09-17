@@ -621,10 +621,6 @@ wanteds os = concat
           ,constantWord Haskell "MAX_SPEC_SELECTEE_SIZE" "MAX_SPEC_SELECTEE_SIZE"
           ,constantWord Haskell "MAX_SPEC_AP_SIZE"       "MAX_SPEC_AP_SIZE"
 
-          -- closure sizes: these do NOT include the header (see below for
-          -- header sizes)
-          ,constantWord Haskell "MIN_PAYLOAD_SIZE" "MIN_PAYLOAD_SIZE"
-
           ,constantInt  Haskell "MIN_INTLIKE" "MIN_INTLIKE"
           ,constantWord Haskell "MAX_INTLIKE" "MAX_INTLIKE"
 
