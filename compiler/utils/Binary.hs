@@ -5,6 +5,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DefaultSignatures #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
 -- We always optimise this, otherwise performance of a non-optimised
@@ -40,7 +41,7 @@ module Binary
    writeBinMem,
    readBinMem,
 
-   putAt, getAt,
+   put, putAt, getAt,
 
    -- * For writing instances
    putByte,
@@ -53,8 +54,8 @@ module Binary
    getSLEB128,
 
    -- * Lazy Binary I/O
-   lazyGet,
-   lazyPut,
+   lazyGet, lazyGets,
+   lazyPut, lazyPuts,
 
    -- * User data
    UserData(..), getUserData, setUserData,
@@ -97,6 +98,10 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Serialized
+
+import qualified Data.Binary as Data (Binary)
+import Data.Binary (encode, decode)
+import Data.ByteString.Lazy (fromStrict, toStrict)
 
 type BinArray = ForeignPtr Word8
 
@@ -149,15 +154,23 @@ castBin (BinPtr i) = BinPtr i
 -- | Do not rely on instance sizes for general types,
 -- we use variable length encoding for many of them.
 class Binary a where
+    default put_ :: Data.Binary a => BinHandle -> a -> IO ()
+    put_ bh x = put_ bh . toStrict $ encode x
+
+    default get :: Data.Binary a => BinHandle -> IO a
+    get bh = decode . fromStrict <$> get bh
+
     put_   :: BinHandle -> a -> IO ()
-    put    :: BinHandle -> a -> IO (Bin a)
+    -- put    :: BinHandle -> a -> IO (Bin a)
     get    :: BinHandle -> IO a
 
     -- define one of put_, put.  Use of put_ is recommended because it
     -- is more likely that tail-calls can kick in, and we rarely need the
     -- position return value.
-    put_ bh a = do _ <- put bh a; return ()
-    put bh a  = do p <- tellBin bh; put_ bh a; return p
+    -- put_ bh a = do _ <- put bh a; return ()
+
+put :: Binary a => BinHandle -> a -> IO (Bin a)
+put bh a  = do p <- tellBin bh; put_ bh a; return p
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
 putAt bh p x = do seekBin bh p; put_ bh x; return ()
@@ -1022,6 +1035,22 @@ lazyGet bh = do
         off_r <- newFastMutInt
         getAt bh { _off_r = off_r } p_a
     seekBin bh p -- skip over the object for now
+    return a
+
+lazyPuts :: Binary a => BinHandle -> [(Bin (Bin a), a)] -> IO ()
+lazyPuts bh = mapM_ $ \(pre, v) -> do
+    put_ bh v
+    q <- tellBin bh
+    putAt bh pre q
+    seekBin bh q
+
+lazyGets :: Binary a => BinHandle -> [Bin (Bin a)] -> IO [a]
+lazyGets bh = mapM $ \p -> do
+    p_a <- tellBin bh
+    a <- unsafeInterleaveIO $ do
+        off_r <- newFastMutInt
+        getAt bh { _off_r = off_r } p_a
+    seekBin bh p
     return a
 
 -- -----------------------------------------------------------------------------

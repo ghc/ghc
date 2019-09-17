@@ -85,6 +85,9 @@ module HscTypes (
         mi_semantic_module,
         mi_free_holes,
         renameFreeHoles,
+        insertSection, readSection,
+
+        OptionalFields, emptyOptionalFields,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -216,6 +219,14 @@ import Exception
 import System.FilePath
 import Control.Concurrent
 import System.Process   ( ProcessHandle )
+
+import Data.ByteString ( ByteString )
+import Data.ByteString.Lazy ( toStrict, fromStrict )
+import qualified Data.Binary as Data (Binary)
+import Data.Binary ( encode, decode )
+import Data.Map.Lazy ( Map )
+import qualified Data.Map.Lazy as Map
+import Control.Monad
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -986,9 +997,43 @@ data ModIface
         mi_decl_docs :: DeclDocMap,
                 -- ^ Docs on declarations.
 
-        mi_arg_docs :: ArgDocMap
+        mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
+        mi_optional_fields :: OptionalFields
      }
+
+newtype OptionalFields = OptionalFields (Map String ByteString) deriving Show
+
+emptyOptionalFields :: OptionalFields
+emptyOptionalFields = OptionalFields Map.empty
+
+insertSection :: Data.Binary a => String -> a -> ModIface -> ModIface
+insertSection name x mod@ModIface{ mi_optional_fields = OptionalFields fs } =
+    mod{ mi_optional_fields = OptionalFields $ Map.insert name (toStrict $ encode x) fs }
+
+readSection :: Data.Binary a => String -> ModIface -> Maybe a
+readSection name ModIface{ mi_optional_fields = OptionalFields fs } =
+    decode . fromStrict <$> Map.lookup name fs
+
+instance Binary OptionalFields where
+    put_ bh (OptionalFields fs) = do
+      put_ bh (Map.size fs)              -- save the number of fields
+      pres <- pointerSlots (Map.keys fs) -- save several slots for the field pointers
+      lazyPuts bh (zip pres (Map.elems fs))
+
+      where
+        pointerSlots = mapM $ \k -> do
+          put_ bh k
+          pre <- tellBin bh
+          put_ bh pre
+          return pre
+
+    get bh = do
+        n <- get bh
+        table <- replicateM n $ (,) <$> get bh <*> get bh
+        vals  <- lazyGets bh . snd $ unzip table
+        return . OptionalFields . Map.fromList $ zip (fst $ unzip table) vals
+
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
@@ -1068,7 +1113,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
-                 mi_arg_docs  = arg_docs }) = do
+                 mi_arg_docs  = arg_docs,
+                 mi_optional_fields = opt_fields }) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1100,6 +1146,7 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        put_ bh opt_fields
 
    get bh = do
         mod         <- get bh
@@ -1133,6 +1180,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        opt_fields  <- get bh
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1169,7 +1217,8 @@ instance Binary ModIface where
                  mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
-                 mi_arg_docs    = arg_docs })
+                 mi_arg_docs    = arg_docs,
+                 mi_optional_fields = opt_fields })
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1211,7 +1260,8 @@ emptyModIface mod
                mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
-               mi_arg_docs    = emptyArgDocMap }
+               mi_arg_docs    = emptyArgDocMap,
+               mi_optional_fields = emptyOptionalFields }
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
