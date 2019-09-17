@@ -600,7 +600,7 @@ and `foo` is in scope.  Then GHC will automatically solve a constraint like
 
 by emitting a new wanted
 
-    T alpha -> [alpha] ~# T Int -> b
+    T alpha -> [alpha] ~# Int -> b
 
 and building a HasField dictionary out of the selector function `foo`,
 appropriately cast.
