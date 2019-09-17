@@ -1951,6 +1951,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
+  ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
   ; let tycon = mkFamilyTyCon tc_name binders res_kind
                                (resultVariableName sig) OpenSynFamilyTyCon
                                parent inj'
@@ -1968,6 +1969,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                   ; return (inj', binders, res_kind) }
 
        ; checkFamFlag tc_name -- make sure we have -XTypeFamilies
+       ; checkResultSigFlag tc_name sig
 
          -- If Nothing, this is an abstract family in a hs-boot file;
          -- but eqns might be empty in the Just case as well
@@ -3706,6 +3708,14 @@ checkFamFlag tc_name
   where
     err_msg = hang (text "Illegal family declaration for" <+> quotes (ppr tc_name))
                  2 (text "Enable TypeFamilies to allow indexed type families")
+
+checkResultSigFlag :: Name -> FamilyResultSig GhcRn -> TcM ()
+checkResultSigFlag tc_name (TyVarSig _ tvb)
+  = do { ty_fam_deps <- xoptM LangExt.TypeFamilyDependencies
+       ; checkTc ty_fam_deps $
+         hang (text "Illegal result type variable" <+> ppr tvb <+> text "for" <+> quotes (ppr tc_name))
+            2 (text "Enable TypeFamilyDependencies to allow result variable names") }
+checkResultSigFlag _ _ = return ()  -- other cases OK
 
 {- Note [Class method constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
