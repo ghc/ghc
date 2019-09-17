@@ -184,7 +184,7 @@ ty_co_vars_of_type (TyVarTy v) is acc
 ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
-ty_co_vars_of_type (FunTy _ arg res)  is acc = ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc)
+ty_co_vars_of_type (FunTy _ w arg res)  is acc = ty_co_vars_of_type w is (ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc))
 ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc = ty_co_vars_of_type (varType tv) is $
                                                       ty_co_vars_of_type ty (extendVarSet is tv) acc
 ty_co_vars_of_type (CastTy ty co)     is acc = ty_co_vars_of_type ty is (ty_co_vars_of_co co is acc)
@@ -211,8 +211,9 @@ ty_co_vars_of_co (AppCo co arg)       is acc = ty_co_vars_of_co co is $
                                                ty_co_vars_of_co arg is acc
 ty_co_vars_of_co (ForAllCo tv kind_co co) is acc = ty_co_vars_of_co kind_co is $
                                                    ty_co_vars_of_co co (extendVarSet is tv) acc
-ty_co_vars_of_co (FunCo _ co1 co2)    is acc = ty_co_vars_of_co co1 is $
-                                               ty_co_vars_of_co co2 is acc
+ty_co_vars_of_co (FunCo _ w co1 co2)    is acc = ty_co_vars_of_co w is $
+                                                 ty_co_vars_of_co co1 is $
+                                                 ty_co_vars_of_co co2 is acc
 ty_co_vars_of_co (CoVarCo v)          is acc = ty_co_vars_of_co_var v is acc
 ty_co_vars_of_co (HoleCo h)           is acc = ty_co_vars_of_co_var (coHoleCoVar h) is acc
     -- See Note [CoercionHoles and coercion free variables]
@@ -329,7 +330,7 @@ exactTyCoVarsOfType ty
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy _ arg res)    = go arg `unionVarSet` go res
+    go (FunTy _ w arg res)  = go w `unionVarSet` go arg `unionVarSet` go res
     go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
@@ -343,7 +344,7 @@ exactTyCoVarsOfType ty
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (ForAllCo tv k_co co)
       = goCo co `delVarSet` tv `unionVarSet` goCo k_co
-    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
+    goCo (FunCo _ co_mult co1 co2) = goCo co_mult `unionVarSet` goCo co1 `unionVarSet` goCo co2
     goCo (CoVarCo v)         = goVar v
     goCo (HoleCo h)          = goVar (coHoleCoVar h)
     goCo (AxiomInstCo _ _ args) = goCos args
@@ -390,7 +391,7 @@ tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy _ arg res)  f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
@@ -442,8 +443,8 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ w co1 co2)    fv_cand in_scope acc
+  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
@@ -533,8 +534,9 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
   = almost_devoid_co_var_of_co kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
-almost_devoid_co_var_of_co (FunCo _ co1 co2) cv
-  = almost_devoid_co_var_of_co co1 cv
+almost_devoid_co_var_of_co (FunCo _ w co1 co2) cv
+  = almost_devoid_co_var_of_co w cv
+  && almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
 almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
@@ -585,8 +587,9 @@ almost_devoid_co_var_of_type (LitTy {}) _ = True
 almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
-almost_devoid_co_var_of_type (FunTy _ arg res) cv
-  = almost_devoid_co_var_of_type arg cv
+almost_devoid_co_var_of_type (FunTy _ w arg res) cv
+  = almost_devoid_co_var_of_type w cv
+  && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
@@ -632,22 +635,22 @@ almost_devoid_co_var_of_types (ty:tys) cv
 injectiveVarsOfType :: Type -> FV
 injectiveVarsOfType = go
   where
-    go ty                 | Just ty' <- coreView ty
-                          = go ty'
-    go (TyVarTy v)        = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)  =
+    go ty                  | Just ty' <- coreView ty
+                           = go ty'
+    go (TyVarTy v)         = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)         = go f `unionFV` go a
+    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)   =
       case tyConInjectivityInfo tc of
         NotInjective  -> emptyFV
         Injective inj -> mapUnionFV go $
                          filterByList (inj ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-    go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go ty
-    go LitTy{}           = emptyFV
-    go (CastTy ty _)     = go ty
-    go CoercionTy{}      = emptyFV
+    go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
+    go LitTy{}            = emptyFV
+    go (CastTy ty _)      = go ty
+    go CoercionTy{}       = emptyFV
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:
@@ -671,7 +674,9 @@ noFreeVarsOfType (TyVarTy _)      = False
 noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
+noFreeVarsOfType (FunTy _ w t1 t2) = noFreeVarsOfType w
+                                     && noFreeVarsOfType t1
+                                     && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
@@ -691,7 +696,9 @@ noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo c
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
-noFreeVarsOfCo (FunCo _ c1 c2)        = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
+noFreeVarsOfCo (FunCo _ w c1 c2)      = noFreeVarsOfCo c1
+                                          && noFreeVarsOfCo c2
+                                          && noFreeVarsOfCo w
 noFreeVarsOfCo (CoVarCo _)            = False
 noFreeVarsOfCo (HoleCo {})            = True    -- I'm unsure; probably never happens
 noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args

@@ -17,6 +17,7 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module HsUtils(
@@ -56,7 +57,7 @@ module HsUtils(
   mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
 
   -- Types
-  mkHsAppTy, mkHsAppKindTy, userHsTyVarBndrs, userHsLTyVarBndrs,
+  mkHsAppTy, mkHsAppKindTy,
   mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
@@ -106,6 +107,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
+import Multiplicity ( pattern One, pattern Omega )
 import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
 import TcType
@@ -311,7 +313,7 @@ mkBodyStmt body
   = BodyStmt noExtField body noSyntaxExpr noSyntaxExpr
 mkBindStmt pat body
   = BindStmt noExtField pat body noSyntaxExpr noSyntaxExpr
-mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr noSyntaxExpr
+mkTcBindStmt pat body = BindStmt (Omega, unitTy) pat body noSyntaxExpr noSyntaxExpr
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body.
@@ -367,17 +369,6 @@ mkHsString s = HsString NoSourceText (mkFastString s)
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
-
--------------
-userHsLTyVarBndrs :: SrcSpan -> [Located (IdP (GhcPass p))]
-                  -> [LHsTyVarBndr (GhcPass p)]
--- Caller sets location
-userHsLTyVarBndrs loc bndrs = [ cL loc (UserTyVar noExtField v) | v <- bndrs ]
-
-userHsTyVarBndrs :: SrcSpan -> [IdP (GhcPass p)] -> [LHsTyVarBndr (GhcPass p)]
--- Caller sets location
-userHsTyVarBndrs loc bndrs = [ cL loc (UserTyVar noExtField (cL loc v))
-                             | v <- bndrs ]
 
 
 {-
@@ -494,12 +485,12 @@ nlList exprs          = noLoc (ExplicitList noExtField Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsFunTy :: HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExtField f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExtField NotPromoted (noLoc x))
-nlHsFunTy a b = noLoc (HsFunTy noExtField (parenthesizeHsType funPrec a) b)
+nlHsFunTy mult a b = noLoc (HsFunTy noExtField mult (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLoc (HsParTy noExtField t)
 
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
@@ -650,9 +641,9 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType GhcPs
-    go ty@(FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+    go ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
       = case af of
-          VisArg   -> nlHsFunTy (go arg) (go res)
+          VisArg   -> nlHsFunTy (multToHsArrow mult) (go arg) (go res)
           InvisArg | (theta, tau) <- tcSplitPhiTy ty
                    -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                                       , hst_xqual = noExtField
@@ -705,6 +696,16 @@ typeToLHsType ty
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExtField (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
+
+-- | This is used to transform an arrow from Core's Type to surface
+-- syntax. There is a choice between being very explicit here, or trying to
+-- refold arrows into shorthands as much as possible. We choose to do the
+-- latter, for it should be more readable. It also helps printing Haskell'98
+-- code into Haskell'98 syntax.
+multToHsArrow :: Mult -> HsArrow GhcPs
+multToHsArrow One = HsLinearArrow
+multToHsArrow Omega = HsUnrestrictedArrow
+multToHsArrow ty = HsExplicitMult (typeToLHsType ty)
 
 {-
 Note [Kind signatures in typeToLHsType]

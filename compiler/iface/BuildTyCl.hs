@@ -34,6 +34,7 @@ import TyCon
 import Type
 import Id
 import TcType
+import Multiplicity
 
 import SrcLoc( SrcSpan, noSrcSpan )
 import DynFlags
@@ -61,7 +62,7 @@ mkNewTyConRhs tycon_name tycon con
     tvs    = tyConTyVars tycon
     roles  = tyConRoles tycon
     con_arg_ty = case dataConRepArgTys con of
-                   [arg_ty] -> arg_ty
+                   [arg_ty] -> scaledThing arg_ty
                    tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
     rhs_ty = substTyWith (dataConUnivTyVars con)
                          (mkTyVarTys tvs) con_arg_ty
@@ -106,7 +107,7 @@ buildDataCon :: FamInstEnvs
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
-           -> [KnotTied Type]          -- Arguments
+           -> [KnotTied (Scaled Type)] -- Arguments
            -> KnotTied Type            -- Result types
            -> KnotTied TyCon           -- Rep tycon
            -> NameEnv ConTag           -- Maps the Name of each DataCon to its
@@ -128,7 +129,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
         ; traceIf (text "buildDataCon 1" <+> ppr src_name)
         ; us <- newUniqueSupply
         ; dflags <- getDynFlags
-        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
+        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map scaledThing arg_tys) univ_tvs
               tag = lookupNameEnv_NF tag_map src_name
               -- See Note [Constructor tag allocation], fixes #14657
               data_con = mkDataCon src_name declared_infix prom_info
@@ -181,10 +182,10 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     -- compatible with the pattern synonym
     ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
                  , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst pat_ty1
+                 , pat_ty `eqType` substTy subst (scaledThing pat_ty1)
                  , prov_theta `eqTypes` substTys subst prov_theta1
                  , req_theta `eqTypes` substTys subst req_theta1
-                 , compareArgTys arg_tys (substTys subst arg_tys1)
+                 , compareArgTys arg_tys (substTys subst (map scaledThing arg_tys1))
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
@@ -199,7 +200,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
   where
     ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
-    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy cont_sigma
+    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (scaledThing cont_sigma)
     (arg_tys1, _) = (tcSplitFunTys cont_tau)
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
@@ -311,7 +312,7 @@ buildClass tycon_name binders roles fds
                                    univ_bndrs
                                    [{- No GADT equalities -}]
                                    [{- No theta -}]
-                                   arg_tys
+                                   (map unrestricted arg_tys) -- type classes are unrestricted
                                    (mkTyConApp rec_tycon (mkTyVarTys univ_tvs))
                                    rec_tycon
                                    (mkTyConTagMap rec_tycon)

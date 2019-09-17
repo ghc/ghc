@@ -1,128 +1,247 @@
-The Glasgow Haskell Compiler
-============================
+# GHC branch with linear types
 
-[![pipeline status](https://gitlab.haskell.org/ghc/ghc/badges/master/pipeline.svg?style=flat)](https://gitlab.haskell.org/ghc/ghc/commits/master)
-
-This is the source tree for [GHC][1], a compiler and interactive
-environment for the Haskell functional programming language.
-
-For more information, visit [GHC's web site][1].
-
-Information for developers of GHC can be found on the [GHC issue tracker][2].
-
-
-Getting the Source
-==================
-
-There are two ways to get a source tree:
-
- 1. *Download source tarballs*
-
-    Download the GHC source distribution:
-
-        ghc-<version>-src.tar.xz
-
-    which contains GHC itself and the "boot" libraries.
-
- 2. *Check out the source code from git*
-
-        $ git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
-
-    Note: cloning GHC from Github requires a special setup. See [Getting a GHC
-    repository from Github][7].
-
-  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).* First time contributors are encouraged to get started by just sending a Merge Request.
-
+This is an *in-development* branch of GHC with support for linear
+types. This branch is not supported by GHC HQ or anyone else. Please
+don't submit tickets about issues in this branch to GHC Trac.
 
 Building & Installing
 =====================
 
-For full information on building GHC, see the [GHC Building Guide][3].
-Here follows a summary - if you get into trouble, the Building Guide
-has all the answers.
+There are two ways of running this locally:
 
-Before building GHC you may need to install some other tools and
-libraries.  See, [Setting up your system for building GHC][8].
+1. By using a pre-built docker image, which integrates nicely
+   with [Stack](https://www.haskellstack.org/). (**recommended** since
+   building GHC takes quite a long time)
+2. By cloning this repository and building locally from source (extra
+   instructions and a good chunk of time required)
 
-*NB.* In particular, you need [GHC][1] installed in order to build GHC,
-because the compiler is itself written in Haskell.  You also need
-[Happy][4], [Alex][5], and [Cabal][9].  For instructions on how
-to port GHC to a new platform, see the [GHC Building Guide][3].
+## Using stack with the Docker image
 
-For building library documentation, you'll need [Haddock][6].  To build
-the compiler documentation, you need [Sphinx](http://www.sphinx-doc.org/)
-and Xelatex (only for PDF output).
+1. Setup Docker locally if you haven't got this already (see
+   documentation for your distribution/Docker instructions).
+2. Grab the Docker image from Docker Hub with `docker pull tweag/linear-types`.
+3. In your new/existing stack project, edit the `stack.yaml` so to
+   instruct stack to use a docker build of GHC:
 
-**Quick start**: the following gives you a default build:
+```
+[...]
+resolver: ghc-8.7
+compiler: ghc-8.7
+system-ghc: true
 
-    $ ./boot
-    $ ./configure
-    $ make         # can also say 'make -jX' for X number of jobs
-    $ make install
+docker:
+  enable: true
+  image: tweag/linear-types
+[...]
+```
 
-  On Windows, you need an extra repository containing some build tools.
-  These can be downloaded for you by configure. This only needs to be done once by running:
+The version numbers will depend on the specific version you want to
+use, and what the relevant image actually builds.
 
-    $ ./configure --enable-tarballs-autodownload
+4. You should now be able to build your project using the GHC from our
+   Docker image simply by running `stack build`!
 
-(NB: **Do you have multiple cores? Be sure to tell that to `make`!** This can
-save you hours of build time depending on your system configuration, and is
-almost always a win regardless of how many cores you have. As a simple rule,
-you should have about N+1 jobs, where `N` is the amount of cores you have.)
 
-The `./boot` step is only necessary if this is a tree checked out
-from git.  For source distributions downloaded from [GHC's web site][1],
-this step has already been performed.
+## Building from source
 
-These steps give you the default build, which includes everything
-optimised and built in various ways (eg. profiling libs are built).
-It can take a long time.  To customise the build, see the file `HACKING.md`.
+0. Verify that you have all the build dependencies:
+  * autoconf
+  * automake
+  * ncurses
+  * happy
+  * alex
+  * cabal-install
+  * ghc >= 8.4.3
 
-Filing bugs and feature requests
-================================
+1. Clone the GHC repository mirror from GitHub:
+  Note: cloning GHC from Github requires a special setup. See [Getting a GHC
+  repository from Github][7].
 
-If you've encountered what you believe is a bug in GHC, or you'd like
-to propose a feature request, please let us know! Submit an [issue][10] and we'll be sure to look into it. Remember:
-**Filing a bug is the best way to make sure your issue isn't lost over
-time**, so please feel free.
+  ```
+  $ git clone https://github.com/ghc/ghc
+  ```
 
-If you're an active user of GHC, you may also be interested in joining
-the [glasgow-haskell-users][11] mailing list, where developers and
-GHC users discuss various topics and hang out.
+2. Add this branch as a remote source:
 
-Hacking & Developing GHC
-========================
+  ```
+  $ cd ghc
+  $ git remote add tweag https://github.com/tweag/ghc.git
+  $ git fetch tweag linear-types
+  $ git checkout tweag/linear-types
+  ```
 
-Once you've filed a bug, maybe you'd like to fix it yourself? That
-would be great, and we'd surely love your company! If you're looking
-to hack on GHC, check out the guidelines in the `HACKING.md` file in
-this directory - they'll get you up to speed quickly.
+3. Because of differing naming conventions in GHC and GitHub we need to give `git` some extra pointers:
 
-Contributors & Acknowledgements
-===============================
+  ```
+  $ git config --global url."git://github.com/ghc/packages-".insteadOf     git://github.com/ghc/packages/
+  $ git config --global url."http://github.com/ghc/packages-".insteadOf    http://github.com/ghc/packages/
+  $ git config --global url."https://github.com/ghc/packages-".insteadOf   https://github.com/ghc/packages/
+  $ git config --global url."ssh://git\@github.com/ghc/packages-".insteadOf ssh://git\@github.com/ghc/packages/
+  $ git config --global url."git\@github.com:/ghc/packages-".insteadOf      git\@github.com:/ghc/packages/
+  ```
 
-GHC in its current form wouldn't exist without the hard work of
-[its many contributors][12]. Over time, it has grown to include the
-efforts and research of many institutions, highly talented people, and
-groups from around the world. We'd like to thank them all, and invite
-you to join!
+4. Update and initialise all the submodules:
 
-  [1]:  http://www.haskell.org/ghc/            "www.haskell.org/ghc/"
-  [2]:  https://gitlab.haskell.org/ghc/ghc/issues
-          "gitlab.haskell.org/ghc/ghc/issues"
-  [3]:  https://gitlab.haskell.org/ghc/ghc/wikis/building
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building"
-  [4]:  http://www.haskell.org/happy/          "www.haskell.org/happy/"
-  [5]:  http://www.haskell.org/alex/           "www.haskell.org/alex/"
-  [6]:  http://www.haskell.org/haddock/        "www.haskell.org/haddock/"
-  [7]: https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/getting-the-sources#cloning-from-github"
-  [8]:  https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation
-          "https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation"
-  [9]:  http://www.haskell.org/cabal/          "http://www.haskell.org/cabal/"
-  [10]: https://gitlab.haskell.org/ghc/ghc/issues
-          "https://gitlab.haskell.org/ghc/ghc/issues"
-  [11]: http://www.haskell.org/pipermail/glasgow-haskell-users/
-          "http://www.haskell.org/pipermail/glasgow-haskell-users/"
-  [12]: https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc
-          "https://gitlab.haskell.org/ghc/ghc/wikis/team-ghc"
+  ```
+  $ git submodule update --init
+  ```
+
+5. Then setup the project for building:
+
+  ```
+  $ ./boot
+  $ ./configure
+  ```
+
+6. Run the build with `make`. This will take between a few and several
+   hours to complete depending on your machine. You probably want to
+   utilise more than one core, which can be done by passing `-j N`
+   (for maximal speed, try N = #physical cores + 1.
+
+7. Now you can use `./inplace/bin/ghc-stage2` as your GHC, or add
+   `--interactive` to use `ghci`.
+
+
+## Issues & further building instructions
+
+If you run into trouble building, please consult
+the
+[GHC Building Guide](https://ghc.haskell.org/trac/ghc/wiki/Building)
+for possible answers.
+
+
+Usage documentation
+===================
+
+The extention is provided as-is, but here is some basic documentation of how
+to use it.
+
+Use `-XLinearTypes` to activate the extension. This adds the following syntax:
+
+* `a ->. b` for linear functions
+* `a ⊸ b` for linear functions, if `-XUnicodeSyntax` is on
+* `a -->.(p) b` for functions of multiplicity `p :: Multiplicity`. This type
+  is defined in `GHC.Types`.
+
+The syntax is not final and subject to change. The last type is highly experimental and expected to break in many cases.
+
+GADT constructors can use the unrestricted `->` and linear `->.` arrows.
+
+When writing a function, you declare in the types which arguments are to be
+checked for linearity. If you do not treat these as such in your
+implementation, the type checker will nag on you:
+
+```
+λ> let frugal :: a ⊸ (a,a); frugal a = (a,a)
+
+<interactive>:2:33: error:
+    • Couldn't match expected multiplicity ‘1’ of variable ‘a’ with actual multiplicity ‘Omega’
+    • In an equation for ‘frugal’: frugal a = (a, a)
+
+
+λ> let wasteful :: a ⊸ b ⊸ a; wasteful a b = a
+
+<interactive>:3:39: error:
+    • Couldn't match expected multiplicity ‘1’ of variable ‘b’ with actual multiplicity ‘Omega’
+    • In an equation for ‘wasteful’: wasteful a b = a
+```
+
+As you can see, the type checker gives some hints on _how_ you treated your
+variable wrongly, multiplicity `Omega` means it was used more than once, or a
+varying number in different code branches.
+
+This `expected ‘1’ but actually ‘Omega’`-error also occurs when the variables are
+passed to unrestricted functions, this is not always very obvious so be
+mindful of that possibility:
+
+```
+λ> let plus1 :: Int ⊸ Int; plus1 x = x + 1
+
+<interactive>:12:31: error:
+    • Couldn't match expected multiplicity ‘1’ of variable ‘x’ with actual multiplicity ‘Omega’
+    • In an equation for ‘plus1’: plus1 x = x + 1
+```
+
+This unfortunately applies to _all of prelude_ (`+` is the offender
+here), which means you might see this a few times.
+
+
+Currently the type checker does not infer linearity when not asked to do so,
+hence it is a requirement to explicitly declare the types of linear functions.
+Otherwise, they are assumed to be unrestricted which can give you errors from
+using functions that are _implemented_ linearly, but not declared as such.
+In particular, functions in `where`-clauses are easy to forget to annotate
+with signatures (`-XPartialTypeSignatures` or `-XScopedTypeVariables` are
+useful for this). Lambda expressions are linearly inferred using type
+information from their context.
+
+
+## Calling them
+By design, there is no obligations put on the caller of a linear function.
+This means any linear function can take unrestricted arguments, which makes
+all first-order ones "linearly polymorphic". However, passing a _linear_
+variable as an _unrestricted_ argument is illegal and will give you an error,
+as shown above. The key takeaway here is that a linear function can also act
+as an unrestricted one; just pass it unrestricted arguments.
+
+
+## Unimplemented features & known limitations
+There are some parts of Haskell that are not yet implemented linearly, meaning
+you cannot use them with linear variables.
+
+### `case` and `let`
+The probably most noteworthy things are `case` and `let`:
+
+```
+λ> let f :: a ⊸ a; f x = case x of x -> x
+
+<interactive>:27:19: error:
+    • Couldn't match expected multiplicity ‘1’ of variable ‘x’ with actual multiplicity ‘Omega’
+    • In an equation for ‘f’: f x = case x of { x -> x }
+
+
+λ> let f :: a ⊸ a; f x = let y = x in y
+
+<interactive>:28:19: error:
+    • Couldn't match expected multiplicity ‘1’ of variable ‘x’ with actual multiplicity ‘Omega’
+    • In an equation for ‘f’: f x = let y = x in y
+```
+
+### Records
+Record syntax itself works fine, but please note that type constructors are by
+default linear; mixed-linearity records could be possible but would need a new and
+probably complicated syntax. This does however affect record _projections_, which
+must be considered unrestricted, because in general they are. Consider something
+like
+
+```
+data P a b = P { p1 :: a, p2 :: b }
+p1 :: P a b -> a
+p2 :: P a b -> b
+```
+
+Here both the `a` and `b` are linear, but the corresponding projections are
+not, because they discard the other field. However, your can always work around
+this by writing your own, linear, projections like so:
+
+```
+unP :: P a b ⊸ (a, b)
+```
+
+It may in the future be possible to special-case single field records,
+which could be useful for convenient `newtype`s.
+
+
+### Pattern synonyms
+Pattern synonyms are also not compatible with linear types
+(and probably incorrect). These are the current _known_ limitations; there may
+be more but it has not been thoroughly tested yet.
+
+
+## Bugs
+Multiplicity polymorphism is not fully supported. Even in simple cases, you
+are likely to see an error message about multiplicity mismatch.
+
+There are probably more bugs; if you find something that definitely looks off,
+we would appreciate a well-documented bug report to
+[the issue tracker](https://github.com/tweag/ghc/issues) of this repository.

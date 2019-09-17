@@ -1,4 +1,5 @@
-UnliftedNewtypesLevityBinder.hs:16:7:
+
+UnliftedNewtypesLevityBinder.hs:16:7: error:
     Cannot use function with levity-polymorphic arguments:
-      UnliftedNewtypesLevityBinder.IdentC :: a -> Ident a
+      UnliftedNewtypesLevityBinder.$WIdentC :: a -> Ident a
     Levity-polymorphic arguments: a :: TYPE r

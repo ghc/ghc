@@ -109,7 +109,8 @@ configureArgs = do
                            , getStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ top -/- root -/- generatedDir
                            -- See https://github.com/snowleopard/hadrian/issues/523
-                           , arg $ "-I" ++ top -/- pkgPath pkg
+                           , arg $ "-iquote"
+                           , arg $ top -/- pkgPath pkg
                            , arg $ "-I" ++ top -/- "includes" ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)

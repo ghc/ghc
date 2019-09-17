@@ -2319,7 +2319,7 @@ getGhciStepIO = do
                      { hst_fvf = ForallInvis
                      , hst_bndrs = [noLoc $ UserTyVar noExtField (noLoc a_tv)]
                      , hst_xforall = noExtField
-                     , hst_body  = nlHsFunTy ghciM ioM }
+                     , hst_body  = nlHsFunTy HsUnrestrictedArrow ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
