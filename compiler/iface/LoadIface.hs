@@ -1153,7 +1153,7 @@ pprModIface iface
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
-        , text "optional sections:" $$ nest 2 (text $ show (mi_optional_fields iface))
+        , text "extra sections:" $$ nest 2 (text $ show (mi_extra_fields iface))
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"

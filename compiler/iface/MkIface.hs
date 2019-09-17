@@ -326,7 +326,7 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_doc_hdr     = doc_hdr,
               mi_decl_docs   = decl_docs,
               mi_arg_docs    = arg_docs,
-              mi_optional_fields = emptyOptionalFields }
+              mi_extra_fields = emptyExtraFields }
 
     (new_iface, no_change_at_all)
           <- {-# SCC "versioninfo" #-}

@@ -87,7 +87,7 @@ module HscTypes (
         renameFreeHoles,
         insertSection, readSection,
 
-        OptionalFields, emptyOptionalFields,
+        ExtraFields, emptyExtraFields,
 
         -- * Fixity
         FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
@@ -999,24 +999,26 @@ data ModIface
 
         mi_arg_docs :: ArgDocMap,
                 -- ^ Docs on arguments.
-        mi_optional_fields :: OptionalFields
+
+        mi_extra_fields :: ExtraFields
+                -- ^ Additional fields inserted by tooling.
      }
 
-newtype OptionalFields = OptionalFields (Map String ByteString) deriving Show
+newtype ExtraFields = ExtraFields (Map String ByteString) deriving Show
 
-emptyOptionalFields :: OptionalFields
-emptyOptionalFields = OptionalFields Map.empty
+emptyExtraFields :: ExtraFields
+emptyExtraFields = ExtraFields Map.empty
 
 insertSection :: Data.Binary a => String -> a -> ModIface -> ModIface
-insertSection name x mod@ModIface{ mi_optional_fields = OptionalFields fs } =
-    mod{ mi_optional_fields = OptionalFields $ Map.insert name (toStrict $ encode x) fs }
+insertSection name x mod@ModIface{ mi_extra_fields = ExtraFields fs } =
+    mod{ mi_extra_fields = ExtraFields $ Map.insert name (toStrict $ encode x) fs }
 
 readSection :: Data.Binary a => String -> ModIface -> Maybe a
-readSection name ModIface{ mi_optional_fields = OptionalFields fs } =
+readSection name ModIface{ mi_extra_fields = ExtraFields fs } =
     decode . fromStrict <$> Map.lookup name fs
 
-instance Binary OptionalFields where
-    put_ bh (OptionalFields fs) = do
+instance Binary ExtraFields where
+    put_ bh (ExtraFields fs) = do
       put_ bh (Map.size fs)              -- save the number of fields
       pres <- pointerSlots (Map.keys fs) -- save several slots for the field pointers
       lazyPuts bh (zip pres (Map.elems fs))
@@ -1032,7 +1034,7 @@ instance Binary OptionalFields where
         n <- get bh
         table <- replicateM n $ (,) <$> get bh <*> get bh
         vals  <- lazyGets bh . snd $ unzip table
-        return . OptionalFields . Map.fromList $ zip (fst $ unzip table) vals
+        return . ExtraFields . Map.fromList $ zip (fst $ unzip table) vals
 
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
@@ -1114,7 +1116,7 @@ instance Binary ModIface where
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
                  mi_arg_docs  = arg_docs,
-                 mi_optional_fields = opt_fields }) = do
+                 mi_extra_fields = extra_fields }) = do
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
@@ -1146,7 +1148,7 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
-        put_ bh opt_fields
+        put_ bh extra_fields
 
    get bh = do
         mod         <- get bh
@@ -1180,7 +1182,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
-        opt_fields  <- get bh
+        extra_fields <- get bh
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1218,7 +1220,7 @@ instance Binary ModIface where
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
                  mi_arg_docs    = arg_docs,
-                 mi_optional_fields = opt_fields })
+                 mi_extra_fields = extra_fields })
 
 -- | The original names declared of a certain module that are exported
 type IfaceExport = AvailInfo
@@ -1261,7 +1263,7 @@ emptyModIface mod
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
-               mi_optional_fields = emptyOptionalFields }
+               mi_extra_fields = emptyExtraFields }
 
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
