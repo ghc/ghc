@@ -1108,13 +1108,13 @@ isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _                 = False
 
 isTypeLSig :: LSig name -> Bool  -- Type signatures
-isTypeLSig (L _(TypeSig {}))    = True
-isTypeLSig (L _(ClassOpSig {})) = True
-isTypeLSig (L _(IdSig {}))      = True
-isTypeLSig _                    = False
+isTypeLSig (L _ (TypeSig {}))    = True
+isTypeLSig (L _ (ClassOpSig {})) = True
+isTypeLSig (L _ (IdSig {}))      = True
+isTypeLSig _                     = False
 
 isSpecLSig :: LSig name -> Bool
-isSpecLSig (L _(SpecSig {})) = True
+isSpecLSig (L _ (SpecSig {})) = True
 isSpecLSig _                 = False
 
 isSpecInstLSig :: LSig name -> Bool

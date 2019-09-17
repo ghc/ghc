@@ -1901,6 +1901,9 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsOverLitPV :: Located (HsOverLit GhcPs) -> PV (Located b)
   -- | Disambiguate a wildcard
   mkHsWildCardPV :: SrcSpan -> PV (Located b)
+  -- | An explicit hole _(...), _$(...) or _$$(...)
+  mkHsHolePV :: SrcSpan -> Maybe (Located Int) -> Maybe FastString -> PV (Located b)
+  mkHsHoleSplicePV :: SrcSpan -> Maybe (Located Int) -> Located (HsSplice GhcPs) -> PV (Located b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV :: SrcSpan -> Located b -> LHsType GhcPs -> PV (Located b)
   -- | Disambiguate "[a,b,c]" (list syntax)
@@ -1996,6 +1999,10 @@ instance p ~ GhcPs => DisambECP (HsCmd p) where
   mkHsLitPV (dL->L l a) = cmdFail l (ppr a)
   mkHsOverLitPV (dL->L l a) = cmdFail l (ppr a)
   mkHsWildCardPV l = cmdFail l (text "_")
+  mkHsHolePV l hid str = cmdFail l (text "_("  <+> (ppr str) <+> text ")" <+> prHid)
+    where prHid = maybe (text "") (\ (L _ i) -> ppr i) hid
+  mkHsHoleSplicePV l hid spl = cmdFail l (text "_"  <+> (ppr spl) <+> prHid)
+    where prHid = maybe (text "") (\ (L _ i) -> ppr i) hid
   mkHsTySigPV l a sig = cmdFail l (ppr a <+> text "::" <+> ppr sig)
   mkHsExplicitListPV l xs = cmdFail l $
     brackets (fsep (punctuate comma (map ppr xs)))
@@ -2049,6 +2056,8 @@ instance p ~ GhcPs => DisambECP (HsExpr p) where
   mkHsLitPV (dL->L l a) = return $ cL l (HsLit noExtField a)
   mkHsOverLitPV (dL->L l a) = return $ cL l (HsOverLit noExtField a)
   mkHsWildCardPV l = return $ cL l hsHoleExpr
+  mkHsHolePV l hid fs = return $ cL l $ hsHoleFSExpr hid fs
+  mkHsHoleSplicePV l hid spl = return $ cL l $ hsHoleSpliceExpr hid spl
   mkHsTySigPV l a sig = return $ cL l (ExprWithTySig noExtField a (mkLHsSigWcType sig))
   mkHsExplicitListPV l xs = return $ cL l (ExplicitList noExtField Nothing xs)
   mkHsSplicePV sp = return $ mapLoc (HsSpliceE noExtField) sp
@@ -2078,6 +2087,18 @@ patSynErr l e explanation =
 
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
+
+hsHoleFSExpr :: Maybe (Located Int) -> Maybe FastString -> HsExpr (GhcPass id)
+hsHoleFSExpr hid fs =
+      HsUnboundVar noExtField (TrueExprHole (mkVarOcc ("_(" ++ r ++")" ++ i)))
+  where r = maybe "" (show . unpackFS) fs
+        i = maybe "" (show . (\ (L _ i) -> i)) hid
+
+hsHoleSpliceExpr :: Maybe (Located Int) -> Located (HsSplice GhcPs) -> HsExpr (GhcPass id)
+hsHoleSpliceExpr hid spl =
+   HsUnboundVar noExtField $ TrueExprHole $
+    mkVarOcc $ "_" ++ (showSDocUnsafe (ppr spl)) ++ i -- Splices are printed as $(...) already
+    where i = maybe "" (show . (\ (L _ i) -> i)) hid
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
@@ -2133,6 +2154,8 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
     return $ cL l (PatBuilderPat (LitPat noExtField a))
   mkHsOverLitPV (dL->L l a) = return $ cL l (PatBuilderOverLit a)
   mkHsWildCardPV l = return $ cL l (PatBuilderPat (WildPat noExtField))
+  mkHsHolePV l _ _ = return $ cL l (PatBuilderPat (WildPat noExtField))
+  mkHsHoleSplicePV l _ _ = return $ cL l (PatBuilderPat (WildPat noExtField))
   mkHsTySigPV l b sig = do
     p <- checkLPat b
     return $ cL l (PatBuilderPat (SigPat noExtField p (mkLHsSigWcType sig)))

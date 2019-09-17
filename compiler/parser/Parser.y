@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 244 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -615,6 +615,10 @@ TH_ID_TY_SPLICE { L _ (ITidTyEscape _)  }   -- $$x
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
+
+ '_('           { L _ ITopenTypedHole }
+ '_$('          { L _ ITopenTypedHoleEscape }
+ '_$$('         { L _ ITopenTypedHoleTyEscape }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
@@ -2810,6 +2814,7 @@ aexp2   :: { ECP }
 
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
+        | typed_hole        { $1 }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ mkHsSplicePV $1 }
@@ -2846,6 +2851,26 @@ aexp2   :: { ECP }
                                       ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
                                                            Nothing (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
+
+typed_hole :: { ECP }
+        : '_(' maybe_hole_content ')' maybe_hole_id { ECP $ mkHsHolePV (maybe (comb2 $1 $3) (comb2 $1) $>) $4 $2 }
+        | typed_hole_splice           maybe_hole_id { ECP $ mkHsHoleSplicePV  (maybe (comb2 $1 $1) (comb2 $1) $>) $2 $1 }
+
+typed_hole_splice :: { Located (HsSplice GhcPs) }
+    : '_$(' exp ')'        {% runECP_P $2 >>= \ $2 ->
+                               ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
+                                 [mj AnnOpenPE $1,mj AnnCloseP $3] }
+    | '_$$(' exp ')'        {% runECP_P $2 >>= \ $2 ->
+                                ams (sLL $1 $> $ mkTypedSplice HasParens $2)
+                                  [mj AnnOpenPE $1,mj AnnCloseP $3] }
+
+maybe_hole_id :: { Maybe (Located Int) }
+  : INTEGER     { Just $ sLL $1 $1 $ fromInteger $ il_value $ getINTEGER $1}
+  | {- empty -} { Nothing }
+
+maybe_hole_content :: { Maybe FastString }
+  : STRING        { Just (getSTRING $1) }
+  | {- empty -}    { Nothing }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }

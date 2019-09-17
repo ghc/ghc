@@ -381,6 +381,10 @@ $tab          { warnTab }
   "$("        / { ifExtension ThBit }       { token ITparenEscape }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
+  "_("         { token ITopenTypedHole }
+  "_$("        / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
+  "_$$("       / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
+
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
   -- qualified quasi-quote (#5555)
@@ -780,6 +784,11 @@ data Token
   | ITdocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | ITlineComment     String     -- ^ comment starting by "--"
   | ITblockComment    String     -- ^ comment in {- -}
+
+  -- Typed-holes
+  | ITopenTypedHole              -- ^ _(
+  | ITopenTypedHoleEscape        -- ^ _$(
+  | ITopenTypedHoleTyEscape      -- ^ _$$(
 
   deriving Show
 
@@ -2881,17 +2890,19 @@ transitionalAlternativeLayoutWarning msg
    $$ text msg
 
 isALRopen :: Token -> Bool
-isALRopen ITcase          = True
-isALRopen ITif            = True
-isALRopen ITthen          = True
-isALRopen IToparen        = True
-isALRopen ITobrack        = True
-isALRopen ITocurly        = True
+isALRopen ITcase                  = True
+isALRopen ITif                    = True
+isALRopen ITthen                  = True
+isALRopen IToparen                = True
+isALRopen ITobrack                = True
+isALRopen ITocurly                = True
 -- GHC Extensions:
-isALRopen IToubxparen     = True
-isALRopen ITparenEscape   = True
-isALRopen ITparenTyEscape = True
-isALRopen _               = False
+isALRopen IToubxparen             = True
+isALRopen ITparenEscape           = True
+isALRopen ITparenTyEscape         = True
+isALRopen ITopenTypedHoleEscape   = True
+isALRopen ITopenTypedHoleTyEscape = True
+isALRopen _                       = False
 
 isALRclose :: Token -> Bool
 isALRclose ITof     = True
