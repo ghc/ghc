@@ -943,9 +943,6 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
 
-    when (not (null (unitIdsToCheck dflags))) $
-      throwGhcException (ProgramError "Backpack typechecking not supported with -j")
-
     -- The bits of shared state we'll be using:
 
     -- The global HscEnv is updated with the module's HMI when a module
@@ -1369,9 +1366,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     -> m (SuccessFlag, ModuleGraph)
   upsweep' _old_hpt done
      [] _ _ uids_to_check _
-   = do hsc_env <- getSession
-        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnitId hsc_env) uids_to_check
-        return (Succeeded, done)
+   = return (Succeeded, done)
 
   upsweep' _old_hpt done
      (CyclicSCC ms:_) _ _ _ _
@@ -1398,7 +1393,6 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 | ms_hsc_src mod == HsigFile
                 = addOneToUniqSet done_holes (ms_mod_name mod)
                 | otherwise = done_holes
-        liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnitId hsc_env) ready_uids
 
         -- Remove unwanted tmp files between compilations
         liftIO (cleanup hsc_env)
