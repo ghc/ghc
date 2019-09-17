@@ -31,7 +31,7 @@ module PmOracle (
 
 import GhcPrelude
 
-import PmExpr
+import PmTypes
 
 import DynFlags
 import Outputable
@@ -77,7 +77,6 @@ import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
 import Data.Foldable (foldlM)
 import Data.List     (find)
-import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
 
@@ -99,22 +98,6 @@ mkPmId ty = getUniqueM >>= \unique ->
 
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
-
-type ConLikeSet = UniqDSet ConLike
-
--- | A data type caching the results of 'completeMatchConLikes' with support for
--- deletion of contructors that were already matched on.
-data PossibleMatches
-  = PM TyCon (NonEmpty ConLikeSet)
-  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
-  -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
-  -- set at all, for which we have 'NoPM'
-  | NoPM
-  -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
-
-instance Outputable PossibleMatches where
-  ppr (PM _tc cs) = ppr (NonEmpty.toList cs)
-  ppr NoPM = text "<NoPM>"
 
 initIM :: Type -> DsM (Maybe PossibleMatches)
 initIM ty = case splitTyConApp_maybe ty of
@@ -233,26 +216,6 @@ equateTyVars ex_tvs1 ex_tvs2
 
 -------------------------
 -- * Pattern match oracle
-
-
--- | Term and type constraints to accompany each value vector abstraction.
--- For efficiency, we store the term oracle state instead of the term
--- constraints.
-data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
-                     , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
-
--- | An initial delta that is always satisfiable
-initDelta :: Delta
-initDelta = MkDelta emptyBag initTmState
-
-instance Outputable Delta where
-  ppr delta = vcat [
-      -- intentionally formatted this way enable the dev to comment in only
-      -- the info she needs
-      ppr (delta_tm_cs delta),
-      ppr (pprEvVarWithType <$> delta_ty_cs delta)
-      --ppr (delta_ty_cs delta)
-    ]
 
 
 {- Note [Recovering from unsatisfiable pattern-matching constraints]
@@ -603,67 +566,9 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
 
 {- *********************************************************************
 *                                                                      *
-                 SharedIdEnv
               DIdEnv with sharing
 *                                                                      *
 ********************************************************************* -}
-
--- | Either @Indirect x@, meaning the value is represented by that of @x@, or
--- an @Entry@ containing containing the actual value it represents.
-data Shared a
-  = Indirect Id
-  | Entry a
-
--- | A 'DIdEnv' in which entries can be shared by multiple 'Id's.
--- Merge equivalence classes of two Ids by 'setIndirectSDIE' and set the entry
--- of an Id with 'setEntrySDIE'.
-newtype SharedDIdEnv a
-  = SDIE { unSDIE :: DIdEnv (Shared a) }
-
-emptySDIE :: SharedDIdEnv a
-emptySDIE = SDIE emptyDVarEnv
-
-lookupReprAndEntrySDIE :: SharedDIdEnv a -> Id -> (Id, Maybe a)
-lookupReprAndEntrySDIE sdie@(SDIE env) x = case lookupDVarEnv env x of
-  Nothing           -> (x, Nothing)
-  Just (Indirect y) -> lookupReprAndEntrySDIE sdie y
-  Just (Entry a)    -> (x, Just a)
-
--- | @lookupSDIE env x@ looks up an entry for @x@, looking through all
--- 'Indirect's until it finds a shared 'Entry'.
-lookupSDIE :: SharedDIdEnv a -> Id -> Maybe a
-lookupSDIE sdie x = snd (lookupReprAndEntrySDIE sdie x)
-
--- | Check if two variables are part of the same equivalence class.
-sameRepresentative :: SharedDIdEnv a -> Id -> Id -> Bool
-sameRepresentative sdie x y =
-  fst (lookupReprAndEntrySDIE sdie x) == fst (lookupReprAndEntrySDIE sdie y)
-
--- | @setIndirectSDIE env x y@ sets @x@'s 'Entry' to @Indirect y@, thereby
--- merging @x@'s equivalence class into @y@'s. This will discard all info on
--- @x@!
-setIndirectSDIE :: SharedDIdEnv a -> Id -> Id -> SharedDIdEnv a
-setIndirectSDIE sdie@(SDIE env) x y =
-  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Indirect y)
-
--- | @setEntrySDIE env x a@ sets the 'Entry' @x@ is associated with to @a@,
--- thereby modifying its whole equivalence class.
-setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
-setEntrySDIE sdie@(SDIE env) x a =
-  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
-
-traverseSharedIdEnv :: Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
-traverseSharedIdEnv f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unSDIE
-  where
-    g (u, Indirect y) = pure (u,Indirect y)
-    g (u, Entry a)    = (u,) . Entry <$> f a
-
-instance Outputable a => Outputable (Shared a) where
-  ppr (Indirect x) = ppr x
-  ppr (Entry a)    = ppr a
-
-instance Outputable a => Outputable (SharedDIdEnv a) where
-  ppr (SDIE env) = ppr env
 
 
 {- *********************************************************************
@@ -672,66 +577,6 @@ instance Outputable a => Outputable (SharedDIdEnv a) where
           What we know about terms
 *                                                                      *
 ********************************************************************* -}
-
--- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
--- entries are possibly shared when we figure out that two variables must be
--- equal, thus represent the same set of values.
---
--- See Note [TmState invariants].
-newtype TmState = TS (SharedDIdEnv VarInfo)
-  -- Deterministic so that we generate deterministic error messages
-
--- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
--- and negative ('vi_neg') facts, like "x is not (:)".
--- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
--- ('vi_cache') and the number of times each variable was refined
--- ('vi_n_refines').
---
--- Subject to Note [The Pos/Neg invariant].
-data VarInfo
-  = VI
-  { vi_ty  :: !Type
-  -- ^ The type of the variable. Important for rejecting possible GADT
-  -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
-
-  , vi_pos :: [(PmAltCon, [Id])]
-  -- ^ Positive info: 'PmExprCon's it is (i.e. @x ~ [Just y, PatSyn z]@), all
-  -- at the same time (i.e. conjunctive).  We need a list because of nested
-  -- pattern matches involving pattern synonym
-  --    case x of { Just y -> case x of PatSyn z -> ... }
-  -- However, no more than one RealDataCon in the list, otherwise contradiction
-  -- because of generativity.
-
-  , vi_neg :: ![PmAltCon]
-  -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
-  -- Example, assuming
-  --
-  -- @
-  --     data T = Leaf Int | Branch T T | Node Int T
-  -- @
-  --
-  -- then @x /~ [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
-  -- and hence can only match @Branch@. Is orthogonal to anything from 'vi_pos',
-  -- in the sense that 'eqPmAltCon' returns @PossiblyOverlap@ for any pairing
-  -- between 'vi_pos' and 'vi_neg'.
-
-  -- See Note [Why record both positive and negative info?]
-
-  , vi_cache :: !PossibleMatches
-  -- ^ A cache of the associated COMPLETE sets. At any time a superset of
-  -- possible constructors of each COMPLETE set. So, if it's not in here, we
-  -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
-  -- to recognise completion of a COMPLETE set efficiently for large enums.
-
-  , vi_n_refines :: !Int
-  -- ^ Purely for Check performance reasons. The number of times this
-  -- representative was refined ('refineToAltCon') in the Check's ConVar split.
-  -- Sadly, we can't store this info in the Check module, as it's tightly coupled
-  -- to the particular 'Delta' and also is per *representative*, not per
-  -- syntactic variable. Note that this number does not always correspond to the
-  -- length of solutions: 'addVarConCt' might add a solution without
-  -- incurring the potential exponential blowup by ConVar.
-  }
 
 {- Note [The Pos/Neg invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -829,19 +674,6 @@ equalities: Just think of how to encode @x /= "foo"@.
 The "list" option is far simpler, but incurs some overhead in representation and
 warning messages (which can be alleviated by someone with enough dedication).
 -}
-
--- | Not user-facing.
-instance Outputable TmState where
-  ppr (TS state) = ppr state
-
--- | Not user-facing.
-instance Outputable VarInfo where
-  ppr (VI ty pos neg cache n)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
-
--- | Initial state of the oracle.
-initTmState :: TmState
-initTmState = TS emptySDIE
 
 -- | A 'SatisfiabilityCheck' based on new term-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing
@@ -1098,15 +930,15 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
 -- impossible matches.
 ensureAllPossibleMatchesInhabited :: Delta -> DsM (Maybe Delta)
 ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_cs = TS env }
-  = runMaybeT (set_tm_cs_env delta <$> traverseSharedIdEnv go env)
+  = runMaybeT (set_tm_cs_env delta <$> traverseSDIE go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_cs = TS env }
     go vi = MaybeT (ensureInhabited delta vi)
 
 -- | @refineToAltCon delta x con arg_tys ex_tyvars@ instantiates @con@ at
 -- @arg_tys@ with fresh variables (equating existentials to @ex_tyvars@).
--- It adds a new term equality equating @x@ is to the resulting 'PmExprCon' and
--- new type equalities arising from GADT matches.
+-- It adds a new term equality equating @x@ is to the resulting 'PmAltCon' app
+-- and new type equalities arising from GADT matches.
 -- If successful, returns the new @delta@ and the fresh term variables, or
 -- @Nothing@ otherwise.
 refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> DsM (Maybe (Delta, [Id]))
@@ -1286,19 +1118,19 @@ addVarVarCt delta@MkDelta{ delta_tm_cs = TS env } (x, y)
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
   -- @testsuite/tests/pmcheck/should_compile/CyclicSubst.hs@.
-  | sameRepresentative env x y = pure delta
-  | otherwise                  = equate delta x y
+  | sameRepresentativeSDIE env x y = pure delta
+  | otherwise                      = equate delta x y
 
 -- | @equate ts@(TS env) x y@ merges the equivalence classes of @x@ and @y@ by
 -- adding an indirection to the environment.
 -- Makes sure that the positive and negative facts of @x@ and @y@ are
 -- compatible.
--- Preconditions: @not (sameRepresentative env x y)@
+-- Preconditions: @not (sameRepresentativeSDIE env x y)@
 --
 -- See Note [TmState invariants].
 equate :: Delta -> Id -> Id -> MaybeT DsM Delta
 equate delta@MkDelta{ delta_tm_cs = TS env } x y
-  = ASSERT( not (sameRepresentative env x y) )
+  = ASSERT( not (sameRepresentativeSDIE env x y) )
     case (lookupSDIE env x, lookupSDIE env y) of
       (Nothing, _) -> pure (delta{ delta_tm_cs = TS (setIndirectSDIE env x y) })
       (_, Nothing) -> pure (delta{ delta_tm_cs = TS (setIndirectSDIE env y x) })
@@ -1323,9 +1155,9 @@ equate delta@MkDelta{ delta_tm_cs = TS env } x y
         -- go!
         pure delta_neg
 
--- | @addVarConCt x alt args ts@ extends the substitution with a mapping @x: ->
--- PmExprCon alt args@ if compatible with refutable shapes of @x@ and its
--- solution, reject (@Nothing@) otherwise.
+-- | @addVarConCt x alt args ts@ extends the substitution with a solution
+-- @x :-> (alt, args)@ if compatible with refutable shapes of @x@ and its
+-- other solutions, reject (@Nothing@) otherwise.
 --
 -- See Note [TmState invariants].
 addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
