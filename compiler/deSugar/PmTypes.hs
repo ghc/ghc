@@ -1,17 +1,35 @@
 {-
 Author: George Karachalias <george.karachalias@cs.kuleuven.be>
-
-Haskell expressions (as used by the pattern matching checker) and utilities.
+        Sebastian Graf <sgraf1337@gmail.com>
 -}
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
-module PmExpr (
-        PmLit(..), PmLitValue(..), PmAltCon(..),
-        pmAltConType, PmEquality(..), eqPmAltCon,
-        pmLitType, literalToPmLit, negatePmLit, overloadPmLit,
-        pmLitAsStringLit, coreExprAsPmLit
+-- | Types used through-out pattern match checking. This module is mostly there
+-- to be imported from "TcRnTypes". The exposed API is that of "PmOracle" and
+-- "Check".
+module PmTypes (
+        -- * Representations for Literals and AltCons
+        PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
+
+        -- ** Equality on 'PmAltCon's
+        PmEquality(..), eqPmAltCon,
+
+        -- ** Operations on 'PmLit'
+        literalToPmLit, negatePmLit, overloadPmLit,
+        pmLitAsStringLit, coreExprAsPmLit,
+
+        -- * Caching partially matched COMPLETE sets
+        ConLikeSet, PossibleMatches(..),
+
+        -- * A 'DIdEnv' where entries may be shared
+        Shared(..), SharedDIdEnv(..), emptySDIE, lookupSDIE, sameRepresentativeSDIE,
+        setIndirectSDIE, setEntrySDIE, traverseSDIE,
+
+        -- * The pattern match oracle
+        VarInfo(..), TmState(..), Delta(..), initDelta,
     ) where
 
 #include "HsVersions.h"
@@ -19,8 +37,13 @@ module PmExpr (
 import GhcPrelude
 
 import Util
+import Bag
 import FastString
+import Var (EvVar)
 import Id
+import VarEnv
+import UniqDSet
+import UniqDFM
 import Name
 import DataCon
 import ConLike
@@ -34,21 +57,12 @@ import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
+import TcRnTypes (pprEvVarWithType)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
-
-{-
-%************************************************************************
-%*                                                                      *
-                         Lifted Expressions
-%*                                                                      *
-%************************************************************************
--}
-
--- ----------------------------------------------------------------------------
--- ** Types
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -117,6 +131,39 @@ pmLitType (PmLit ty _) = ty
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+instance Outputable PmLitValue where
+  ppr (PmLitInt i)        = ppr i
+  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
+  ppr (PmLitChar c)       = pprHsChar c
+  ppr (PmLitString s)     = pprHsString s
+  ppr (PmLitOverInt n i)  = minuses n (ppr i)
+  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
+  ppr (PmLitOverString s) = pprHsString s
+
+-- Take care of negated literals
+minuses :: Int -> SDoc -> SDoc
+minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
+
+instance Outputable PmLit where
+  ppr (PmLit ty v) = ppr v <> suffix
+    where
+      -- Some ad-hoc hackery for displaying proper lit suffixes based on type
+      tbl = [ (intPrimTy, primIntSuffix)
+            , (int64PrimTy, primInt64Suffix)
+            , (wordPrimTy, primWordSuffix)
+            , (word64PrimTy, primWord64Suffix)
+            , (charPrimTy, primCharSuffix)
+            , (floatPrimTy, primFloatSuffix)
+            , (doublePrimTy, primDoubleSuffix) ]
+      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
+
+instance Outputable PmAltCon where
+  ppr (PmAltConLike cl) = ppr cl
+  ppr (PmAltLit l)      = ppr l
+
+instance Outputable PmEquality where
+  ppr = text . show
 
 -- | Undecidable equality for values represented by 'ConLike's.
 -- See Note [Undecidable Equality for PmAltCons].
@@ -265,12 +312,6 @@ pmLitAsStringLit :: PmLit -> Maybe FastString
 pmLitAsStringLit (PmLit _ (PmLitString s)) = Just s
 pmLitAsStringLit _                         = Nothing
 
--- ----------------------------------------------------------------------------
--- ** Predicates on PmExpr
-
--- -----------------------------------------------------------------------
--- ** Lift source expressions (HsExpr Id) to PmExpr
-
 coreExprAsPmLit :: CoreExpr -> Maybe PmLit
 -- coreExprAsPmLit e | pprTrace "coreExprAsPmLit" (ppr e) False = undefined
 coreExprAsPmLit (Tick _t e) = coreExprAsPmLit e
@@ -322,43 +363,167 @@ coreExprAsPmLit e = case collectArgs e of
       | otherwise
       = False
 
-{-
-%************************************************************************
-%*                                                                      *
-                            Pretty printing
-%*                                                                      *
-%************************************************************************
--}
+type ConLikeSet = UniqDSet ConLike
 
-instance Outputable PmLitValue where
-  ppr (PmLitInt i)        = ppr i
-  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
-  ppr (PmLitChar c)       = pprHsChar c
-  ppr (PmLitString s)     = pprHsString s
-  ppr (PmLitOverInt n i)  = minuses n (ppr i)
-  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
-  ppr (PmLitOverString s) = pprHsString s
+-- | A data type caching the results of 'completeMatchConLikes' with support for
+-- deletion of contructors that were already matched on.
+data PossibleMatches
+  = PM TyCon (NonEmpty.NonEmpty ConLikeSet)
+  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
+  -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
+  -- set at all, for which we have 'NoPM'
+  | NoPM
+  -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
 
--- Take care of negated literals
-minuses :: Int -> SDoc -> SDoc
-minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
+instance Outputable PossibleMatches where
+  ppr (PM _tc cs) = ppr (NonEmpty.toList cs)
+  ppr NoPM = text "<NoPM>"
 
-instance Outputable PmLit where
-  ppr (PmLit ty v) = ppr v <> suffix
-    where
-      -- Some ad-hoc hackery for displaying proper lit suffixes based on type
-      tbl = [ (intPrimTy, primIntSuffix)
-            , (int64PrimTy, primInt64Suffix)
-            , (wordPrimTy, primWordSuffix)
-            , (word64PrimTy, primWord64Suffix)
-            , (charPrimTy, primCharSuffix)
-            , (floatPrimTy, primFloatSuffix)
-            , (doublePrimTy, primDoubleSuffix) ]
-      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
+-- | Either @Indirect x@, meaning the value is represented by that of @x@, or
+-- an @Entry@ containing containing the actual value it represents.
+data Shared a
+  = Indirect Id
+  | Entry a
 
-instance Outputable PmAltCon where
-  ppr (PmAltConLike cl) = ppr cl
-  ppr (PmAltLit l)      = ppr l
+-- | A 'DIdEnv' in which entries can be shared by multiple 'Id's.
+-- Merge equivalence classes of two Ids by 'setIndirectSDIE' and set the entry
+-- of an Id with 'setEntrySDIE'.
+newtype SharedDIdEnv a
+  = SDIE { unSDIE :: DIdEnv (Shared a) }
 
-instance Outputable PmEquality where
-  ppr = text . show
+emptySDIE :: SharedDIdEnv a
+emptySDIE = SDIE emptyDVarEnv
+
+lookupReprAndEntrySDIE :: SharedDIdEnv a -> Id -> (Id, Maybe a)
+lookupReprAndEntrySDIE sdie@(SDIE env) x = case lookupDVarEnv env x of
+  Nothing           -> (x, Nothing)
+  Just (Indirect y) -> lookupReprAndEntrySDIE sdie y
+  Just (Entry a)    -> (x, Just a)
+
+-- | @lookupSDIE env x@ looks up an entry for @x@, looking through all
+-- 'Indirect's until it finds a shared 'Entry'.
+lookupSDIE :: SharedDIdEnv a -> Id -> Maybe a
+lookupSDIE sdie x = snd (lookupReprAndEntrySDIE sdie x)
+
+-- | Check if two variables are part of the same equivalence class.
+sameRepresentativeSDIE :: SharedDIdEnv a -> Id -> Id -> Bool
+sameRepresentativeSDIE sdie x y =
+  fst (lookupReprAndEntrySDIE sdie x) == fst (lookupReprAndEntrySDIE sdie y)
+
+-- | @setIndirectSDIE env x y@ sets @x@'s 'Entry' to @Indirect y@, thereby
+-- merging @x@'s equivalence class into @y@'s. This will discard all info on
+-- @x@!
+setIndirectSDIE :: SharedDIdEnv a -> Id -> Id -> SharedDIdEnv a
+setIndirectSDIE sdie@(SDIE env) x y =
+  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Indirect y)
+
+-- | @setEntrySDIE env x a@ sets the 'Entry' @x@ is associated with to @a@,
+-- thereby modifying its whole equivalence class.
+setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
+setEntrySDIE sdie@(SDIE env) x a =
+  SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
+
+traverseSDIE :: Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
+traverseSDIE f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unSDIE
+  where
+    g (u, Indirect y) = pure (u,Indirect y)
+    g (u, Entry a)    = (u,) . Entry <$> f a
+
+instance Outputable a => Outputable (Shared a) where
+  ppr (Indirect x) = ppr x
+  ppr (Entry a)    = ppr a
+
+instance Outputable a => Outputable (SharedDIdEnv a) where
+  ppr (SDIE env) = ppr env
+
+-- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
+-- entries are possibly shared when we figure out that two variables must be
+-- equal, thus represent the same set of values.
+--
+-- See Note [TmState invariants].
+newtype TmState = TS (SharedDIdEnv VarInfo)
+  -- Deterministic so that we generate deterministic error messages
+
+-- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
+-- and negative ('vi_neg') facts, like "x is not (:)".
+-- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
+-- ('vi_cache') and the number of times each variable was refined
+-- ('vi_n_refines').
+--
+-- Subject to Note [The Pos/Neg invariant].
+data VarInfo
+  = VI
+  { vi_ty  :: !Type
+  -- ^ The type of the variable. Important for rejecting possible GADT
+  -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
+
+  , vi_pos :: [(PmAltCon, [Id])]
+  -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
+  -- at the same time (i.e. conjunctive).  We need a list because of nested
+  -- pattern matches involving pattern synonym
+  --    case x of { Just y -> case x of PatSyn z -> ... }
+  -- However, no more than one RealDataCon in the list, otherwise contradiction
+  -- because of generativity.
+
+  , vi_neg :: ![PmAltCon]
+  -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
+  -- Example, assuming
+  --
+  -- @
+  --     data T = Leaf Int | Branch T T | Node Int T
+  -- @
+  --
+  -- then @x /~ [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
+  -- and hence can only match @Branch@. Is orthogonal to anything from 'vi_pos',
+  -- in the sense that 'eqPmAltCon' returns @PossiblyOverlap@ for any pairing
+  -- between 'vi_pos' and 'vi_neg'.
+
+  -- See Note [Why record both positive and negative info?]
+
+  , vi_cache :: !PossibleMatches
+  -- ^ A cache of the associated COMPLETE sets. At any time a superset of
+  -- possible constructors of each COMPLETE set. So, if it's not in here, we
+  -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
+  -- to recognise completion of a COMPLETE set efficiently for large enums.
+
+  , vi_n_refines :: !Int
+  -- ^ Purely for Check performance reasons. The number of times this
+  -- representative was refined ('refineToAltCon') in the Check's ConVar split.
+  -- Sadly, we can't store this info in the Check module, as it's tightly coupled
+  -- to the particular 'Delta' and also is per *representative*, not per
+  -- syntactic variable. Note that this number does not always correspond to the
+  -- length of solutions: 'addVarConCt' might add a solution without
+  -- incurring the potential exponential blowup by ConVar.
+  }
+
+-- | Not user-facing.
+instance Outputable TmState where
+  ppr (TS state) = ppr state
+
+-- | Not user-facing.
+instance Outputable VarInfo where
+  ppr (VI ty pos neg cache n)
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
+
+-- | Initial state of the oracle.
+initTmState :: TmState
+initTmState = TS emptySDIE
+
+-- | Term and type constraints to accompany each value vector abstraction.
+-- For efficiency, we store the term oracle state instead of the term
+-- constraints.
+data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
+                     , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
+
+-- | An initial delta that is always satisfiable
+initDelta :: Delta
+initDelta = MkDelta emptyBag initTmState
+
+instance Outputable Delta where
+  ppr delta = vcat [
+      -- intentionally formatted this way enable the dev to comment in only
+      -- the info she needs
+      ppr (delta_tm_cs delta),
+      ppr (pprEvVarWithType <$> delta_ty_cs delta)
+      --ppr (delta_ty_cs delta)
+    ]

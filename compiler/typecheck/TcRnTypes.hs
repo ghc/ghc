@@ -167,7 +167,7 @@ import TcType
 import Annotations
 import InstEnv
 import FamInstEnv
-import {-# SOURCE #-} PmOracle (Delta)
+import {-# SOURCE #-} PmTypes (Delta)
 import IOEnv
 import RdrName
 import Name
