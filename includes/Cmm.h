@@ -358,7 +358,7 @@
  * Need MachRegs, because some of the RTS code is conditionally
  * compiled based on REG_R1, REG_R2, etc.
  */
-#include "stg/RtsMachRegs.h"
+#include "stg/MachRegsForHost.h"
 
 #include "rts/prof/LDV.h"
 

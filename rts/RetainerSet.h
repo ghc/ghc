@@ -140,7 +140,7 @@ RetainerSet *addElement(retainer, RetainerSet *);
 
 #if defined(SECOND_APPROACH)
 // Prints a single retainer set.
-void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
+void printRetainerSetShort(FILE *, RetainerSet *, W_, uint32_t);
 #endif
 
 // Print the statistics on all the retainer sets.
