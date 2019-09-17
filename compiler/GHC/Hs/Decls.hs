@@ -63,7 +63,9 @@ module GHC.Hs.Decls (
   SpliceDecl(..), LSpliceDecl,
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
-  CImportSpec(..),
+  CImportSpec(..), ForeignImportOptions(..),
+  ForeignImportOptionsRaw(..),
+  AbsStrictSig(..), AbsStrictSigArg(..), AbsStrictSigRes(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl,
   HsConDeclDetails, hsConDeclArgTys, hsConDeclTheta,
@@ -100,6 +102,7 @@ import GHC.Hs.Doc
 import TyCon
 import BasicTypes
 import Coercion
+import FastString
 import ForeignCall
 import GHC.Hs.Extension
 import NameSet
@@ -114,6 +117,7 @@ import Type
 import Bag
 import Maybes
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Functor.Identity
 
 {-
 ************************************************************************
@@ -2038,7 +2042,8 @@ data ForeignDecl pass
       { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: Located (IdP pass)    -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
-      , fd_fi     :: ForeignImport }
+      , fd_fi     :: ForeignImport pass
+      }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
@@ -2072,30 +2077,88 @@ type instance XForeignExport   GhcTc = Coercion
 
 type instance XXForeignDecl    (GhcPass _) = NoExtCon
 
--- Specification Of an imported external entity in dependence on the calling
+-- | Specification Of an imported external entity in dependence on the calling
 -- convention
+data ForeignImport pass
+  -- | import of a C entity
+     --
+  --  * the two strings specifying a header file or library
+  --   may be empty, which indicates the absence of a
+  --   header or object specification (both are not used
+  --   in the case of `CWrapper' and when `CFunction'
+  --   has a dynamic target)
+  --
+  --  * the calling convention is irrelevant for code
+  --   generation in the case of `CLabel', but is needed
+  --   for pretty printing
+  --
+  --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
+  --
+  = CImport
+      { fi_call_conv :: Located CCallConv -- ^ ccall or stdcall
+      , fi_safety:: Located Safety -- ^ interruptible, safe or unsafe
+      , fi_header :: Maybe Header -- ^ name of C header
+      , fi_spec :: CImportSpec -- ^ details of the C entity
+      , fi_options :: (XForeignImportOptions pass) -- ^ optional custom strictness
+      , fi_src :: Located SourceText -- ^ original source text for the C entity
+      }
+
+-- Raw syntax, list of 'key = value' pairs from where clause.
+type instance XForeignImportOptions GhcPs = Maybe [Located ForeignImportOptionsRaw]
+-- Sanitized record of options
+type instance XForeignImportOptions GhcRn = ForeignImportOptions Maybe
+type instance XForeignImportOptions GhcTc = ForeignImportOptions Identity
+
+-- Just a list of 'var = var' definitions
+data ForeignImportOptionsRaw = ForeignImportOptionsRaw
+  { foreignImportOptionsRaw_key :: Located FastString
+  , foreignImportOptionsRaw_value :: Located (Either FastString [Located FastString])
+  } deriving (Eq, Data)
+
+-- | Custom options for foreign imports, currently only used by non-standard
+-- "foreign import prim".
 --
-data ForeignImport = -- import of a C entity
-                     --
-                     --  * the two strings specifying a header file or library
-                     --   may be empty, which indicates the absence of a
-                     --   header or object specification (both are not used
-                     --   in the case of `CWrapper' and when `CFunction'
-                     --   has a dynamic target)
-                     --
-                     --  * the calling convention is irrelevant for code
-                     --   generation in the case of `CLabel', but is needed
-                     --   for pretty printing
-                     --
-                     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
-                     --
-                     CImport  (Located CCallConv) -- ccall or stdcall
-                              (Located Safety)  -- interruptible, safe or unsafe
-                              (Maybe Header)       -- name of C header
-                              CImportSpec          -- details of the C entity
-                              (Located SourceText) -- original source text for
-                                                   -- the C entity
-  deriving Data
+-- See 'primops.txt.pp' for what these fields are. We only include the options
+-- relevant for foreign calls.
+data ForeignImportOptions f = ForeignImportOptions
+  { fio_hasSideEffects :: f Bool
+  , fio_canFail :: f Bool
+  , fio_commutable :: f Bool
+  , fio_strictness :: f AbsStrictSig
+  }
+
+deriving instance (Eq (f Bool), Eq (f AbsStrictSig)) => Eq (ForeignImportOptions f)
+deriving instance (Ord (f Bool), Ord (f AbsStrictSig)) => Ord (ForeignImportOptions f)
+deriving instance (Show (f Bool), Show (f AbsStrictSig)) => Show (ForeignImportOptions f)
+deriving instance (Typeable f, Data (f Bool), Data (f AbsStrictSig)) => Data (ForeignImportOptions f)
+
+-- | A simplified representation of the arguments to 'Demand.mkClosedStrictSig'
+-- used in practice for what were "out of line primops".
+--
+-- Primops have an arbitrary haskell function for their strictness sig spliced
+-- into the compiler, so to lessen compiler awareness of these foreign calls
+-- without sacrificing fine-grained control over the ABI, we need encode all of
+-- those splices into some language. Here's a crude defunctionalization.
+--
+-- If richer and richer strictness signatures are used by out of line primops,
+-- we will have to rethink the approach of just bloating an ad-hoc language.
+-- (use TH?) But, this seems fine for now.
+data AbsStrictSig = AbsStrictSig [AbsStrictSigArg] AbsStrictSigRes
+  deriving (Eq, Ord, Show, Data)
+
+data AbsStrictSigRes
+  = TopRes
+  | BotRes
+  deriving (Eq, Ord, Show, Data)
+
+data AbsStrictSigArg
+  = TopDmd
+  | BotDmd
+  | LazyApply1Dmd
+  | LazyApply2Dmd
+  | StrictApply1Dmd
+  | EvalDmd
+  deriving (Eq, Ord, Show, Data)
 
 -- details of an external C entity
 --
@@ -2127,11 +2190,17 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
        2 (dcolon <+> ppr ty)
   ppr (XForeignDecl x) = ppr x
 
-instance Outputable ForeignImport where
-  ppr (CImport  cconv safety mHeader spec (L _ srcText)) =
-    ppr cconv <+> ppr safety
-      <+> pprWithSourceText srcText (pprCEntity spec "")
+instance Outputable (ForeignImport pass) where
+  ppr (CImport cconv safety mHeader spec options (L _ srcText)) = case unLoc cconv of
+      -- Only unstable "foreign import prim" supports custom options
+      PrimCallConv -> vcat
+        [ top_matter <+> text "where"
+        , nest 2 $ pp_options
+        ]
+      _ -> top_matter
     where
+      top_matter = ppr cconv <+> ppr safety
+        <+> pprWithSourceText srcText (pprCEntity spec "")
       pp_hdr = case mHeader of
                Nothing -> empty
                Just (Header _ header) -> ftext header
@@ -2154,6 +2223,7 @@ instance Outputable ForeignImport where
       pprCEntity (CFunction DynamicTarget) _ =
         doubleQuotes $ text "dynamic"
       pprCEntity CWrapper _ = doubleQuotes $ text "wrapper"
+      pp_options = seq options $ text "TODO pretty print foreign import options"
 
 instance Outputable ForeignExport where
   ppr (CExport  (L _ (CExportStatic _ lbl cconv)) _) =

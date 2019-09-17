@@ -44,6 +44,7 @@ import FastString
 import Util
 import DynFlags
 import ForeignCall
+import ForeignCallDecl
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
@@ -539,7 +540,7 @@ coreToStgApp f args ticks = do
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
-                                          PrimCallConv _))
+                                          PrimCallConv _) _)
                                  -> ASSERT( saturated )
                                     StgOpApp (StgPrimCallOp (PrimCall lbl pkgId)) args' res_ty
 

@@ -68,7 +68,7 @@ import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import DataCon
 import DynFlags
-import ForeignCall ( ForeignCall )
+import ForeignCallDecl ( ForeignCallDecl )
 import Id
 import IdInfo      ( mayHaveCafRefs )
 import VarSet
@@ -664,7 +664,7 @@ StgOp
 *                                                                      *
 ************************************************************************
 
-An StgOp allows us to group together PrimOps and ForeignCalls. It's quite useful
+An StgOp allows us to group together PrimOps and ForeignCallDecls. It's quite useful
 to move these around together, notably in StgOpApp and COpStmt.
 -}
 
@@ -673,7 +673,7 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Type
+  | StgFCallOp ForeignCallDecl Type
         -- The Type, which is obtained from the foreign import declaration
         -- itself, is needed by the stg-to-cmm pass to determine the offset to
         -- apply to unlifted boxed arguments in GHC.StgToCmm.Foreign. See Note

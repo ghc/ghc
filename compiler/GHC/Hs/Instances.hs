@@ -199,6 +199,11 @@ deriving instance Data (DefaultDecl GhcPs)
 deriving instance Data (DefaultDecl GhcRn)
 deriving instance Data (DefaultDecl GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (ForeignImport p)
+deriving instance Data (ForeignImport GhcPs)
+deriving instance Data (ForeignImport GhcRn)
+deriving instance Data (ForeignImport GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (ForeignDecl p)
 deriving instance Data (ForeignDecl GhcPs)
 deriving instance Data (ForeignDecl GhcRn)

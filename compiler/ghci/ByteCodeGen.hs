@@ -29,6 +29,7 @@ import MkId
 import Id
 import Var             ( updateVarType )
 import ForeignCall
+import ForeignCallDecl
 import HscTypes
 import CoreUtils
 import CoreSyn
@@ -803,7 +804,7 @@ schemeT d s p app
    = implement_tagToId d s p arg constr_names
 
    -- Case 1
-   | Just (CCall ccall_spec) <- isFCallId_maybe fn
+   | Just (CCall ccall_spec _) <- isFCallId_maybe fn
    = if isSupportedCConv ccall_spec
       then generateCCall d s p ccall_spec fn args_r_to_l
       else unsupportedCConvException

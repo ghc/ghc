@@ -9,6 +9,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module RnSource (
         rnSrcDecls, addTcgDUs, findSplice
@@ -66,11 +67,14 @@ import OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State
 import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import qualified Data.Map as Map
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
 
@@ -376,10 +380,12 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
         -- Mark any PackageTarget style imports as coming from the current package
        ; let unitId = thisPackage $ hsc_dflags topEnv
              spec'      = patchForeignImport unitId spec
+       ; options' <- resolveImportOptions $ fi_options spec'
+       ; let spec'' = spec' { fi_options = options' }
 
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
-                               , fd_fi = spec' }, fvs) }
+                               , fd_fi = spec'' }, fvs) }
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
@@ -394,14 +400,86 @@ rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
 
 rnHsForeignDecl (XForeignDecl nec) = noExtCon nec
 
+resolveImportOptions :: XForeignImportOptions GhcPs -> RnM (ForeignImportOptions Maybe)
+resolveImportOptions raw_pairs = do
+  let
+    -- TODO use align / These to make the dup check a lot easier, also consider
+    -- sharing code with other dup checks (e.g. record syntax).
+    mkPair (ForeignImportOptionsRaw x y) = (unLoc x, y)
+    pairs :: [Map.Map
+                FastString
+                (RnM (Located (Located (Either FastString [Located FastString]))))]
+    pairs =
+      fmap (fmap pure . uncurry Map.singleton . sequence . fmap mkPair) $ fromMaybe [] raw_pairs
+    complainDup key l r = do
+      l' <- l
+      r' <- r
+      addErrAt (combineSrcSpans (getLoc l') (getLoc r')) $
+        "Cannot specify foreign import option" <+> ppr key <+> "twice"
+      pure l'
+  m <- sequence $ foldl' (Map.unionWithKey complainDup) mempty $ pairs
+  let
+    defaultOpts = ForeignImportOptions
+      { fio_hasSideEffects = Nothing
+      , fio_canFail = Nothing
+      , fio_commutable = Nothing
+      , fio_strictness = Nothing
+      }
+  -- TODO Map.traverseWithKey_ / itraverse_
+  (_, s) <- flip runStateT defaultOpts $ flip Map.traverseWithKey m $
+    \k (dL -> L lk (dL -> L lv v)) -> do
+      let handleBool setter = case v of
+            Right _ -> lift $ addErrAt lv $
+              ppr k <+> "takes a single Bool, not a list of stuff"
+            Left b -> do
+              mset <- case b of
+                "True" -> pure $ Just True
+                "False" -> pure $ Just False
+                _  -> do
+                  lift $ addErrAt lv $ ppr b <+> "is not 'True' or ''False'."
+                  pure Nothing
+              modify $ setter mset
+      case k of
+        "has_side_effects" -> handleBool $ \mset x -> x { fio_hasSideEffects = mset }
+        "can_fail" -> handleBool $ \mset x -> x { fio_canFail = mset }
+        "commutable" -> handleBool $ \mset x -> x { fio_commutable = mset }
+        "strictness" -> case v of
+          Left _ -> lift $ addErrAt lv
+            "strictness options must be a list, of arg demands but then ending in res"
+          Right [] -> lift $ addErrAt lv
+            "strictness list must not be empty, because at least the res must be specified"
+          Right (s : ss) -> do
+              whole_sig <- lift $ AbsStrictSig <$> traverse f args <*> g res
+              modify $ \x -> x { fio_strictness = Just whole_sig }
+            where
+              x = s :| ss
+              args = NE.init x
+              res = NE.last x
+              f :: Located FastString -> RnM AbsStrictSigArg
+              f (dL -> L l arg) = case arg of
+                "topDmd" -> pure TopDmd
+                "botDmd" -> pure BotDmd
+                "lazyApply1Dmd" -> pure LazyApply1Dmd
+                "lazyApply2Dmd" -> pure LazyApply2Dmd
+                "strictApply1Dmd" -> pure StrictApply1Dmd
+                "evalDmd" -> pure EvalDmd
+                x -> failAt l $ "unrecognized arg dmd" <+> ppr x
+              g :: Located FastString -> RnM AbsStrictSigRes
+              g (dL -> L l res) = case res of
+                "topRes" -> pure TopRes
+                "botRes" -> pure BotRes
+                x -> failAt l $ "unrecognized res" <+> ppr x
+        _ -> lift $ addErrAt lk $
+          "key" <+> ppr lk <+> "is not a valid foreign import option"
+  pure s
+
 -- | For Windows DLLs we need to know what packages imported symbols are from
 --      to generate correct calls. Imported symbols are tagged with the current
 --      package, so if they get inlined across a package boundary we'll still
 --      know where they're from.
---
-patchForeignImport :: UnitId -> ForeignImport -> ForeignImport
-patchForeignImport unitId (CImport cconv safety fs spec src)
-        = CImport cconv safety fs (patchCImportSpec unitId spec) src
+patchForeignImport :: UnitId -> ForeignImport pass -> ForeignImport pass
+patchForeignImport unitId (CImport cconv safety fs spec opts src)
+        = CImport cconv safety fs (patchCImportSpec unitId spec) opts src
 
 patchCImportSpec :: UnitId -> CImportSpec -> CImportSpec
 patchCImportSpec unitId spec

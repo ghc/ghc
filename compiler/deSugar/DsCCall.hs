@@ -27,6 +27,7 @@ import CoreUtils
 import MkCore
 import MkId
 import ForeignCall
+import ForeignCallDecl
 import DataCon
 import DsUtils
 
@@ -34,6 +35,7 @@ import TcType
 import Type
 import Id   ( Id )
 import Coercion
+import Demand
 import PrimOp
 import TysPrim
 import TyCon
@@ -98,11 +100,19 @@ dsCCall lbl args may_gc result_ty
        dflags <- getDynFlags
        let
            target = StaticTarget NoSourceText lbl Nothing True
-           the_fcall    = CCall (CCallSpec target CCallConv may_gc)
+           -- TODO double check this is appropriate sig
+           arity = length args
+           strict_sig = mkFCallDefaultSig arity
+           options = ForeignCallOptions
+             True
+             False
+             False
+             strict_sig
+           the_fcall    = CCall (CCallSpec target CCallConv may_gc) options
            the_prim_app = mkFCall dflags uniq the_fcall unboxed_args ccall_result_ty
        return (foldr ($) (res_wrapper the_prim_app) arg_wrappers)
 
-mkFCall :: DynFlags -> Unique -> ForeignCall
+mkFCall :: DynFlags -> Unique -> ForeignCallDecl
         -> [CoreExpr]     -- Args
         -> Type           -- Result type
         -> CoreExpr

@@ -1794,11 +1794,12 @@ instance ToHie (LForeignDecl GhcRn) where
         ]
       XForeignDecl _ -> []
 
-instance ToHie ForeignImport where
-  toHie (CImport (L a _) (L b _) _ _ (L c _)) = pure $ concat $
+-- TODO
+instance ToHie (ForeignImport GhcRn) where
+  toHie (CImport (L a _) (L b _) _ _ _ (L d _)) = pure $ concat $
     [ locOnly a
     , locOnly b
-    , locOnly c
+    , locOnly d
     ]
 
 instance ToHie ForeignExport where

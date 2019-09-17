@@ -1,3 +1,4 @@
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -5,7 +6,11 @@
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 -}
 
-{-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Demand (
         StrDmd, UseDmd(..), Count,
@@ -35,6 +40,7 @@ module Demand (
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         trimCPRInfo, returnsCPR_maybe,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
+        mkFCallDefaultSig, 
         nopSig, botSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
@@ -77,6 +83,8 @@ import Type            ( Type )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
 
+import Data.Data
+
 {-
 ************************************************************************
 *                                                                      *
@@ -86,7 +94,7 @@ import DataCon         ( splitDataProductType_maybe )
 -}
 
 data JointDmd s u = JD { sd :: s, ud :: u }
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 getStrDmd :: JointDmd s u -> s
 getStrDmd = sd
@@ -202,7 +210,7 @@ data StrDmd
                          -- A polymorphic demand: used for values of all types,
                          --                       including a type variable
 
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 -- | Strictness of a function argument.
 type ArgStr = Str StrDmd
@@ -210,7 +218,7 @@ type ArgStr = Str StrDmd
 -- | Strictness demand.
 data Str s = Lazy  -- ^ Lazy (top of the lattice)
            | Str s -- ^ Strict
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 -- Well-formedness preserving constructors for the Strictness domain
 strBot, strTop :: ArgStr
@@ -359,7 +367,7 @@ data UseDmd
 
   | Used                 -- ^ May be used and its sub-components may be used.
                          -- (top of the lattice)
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 -- Extended usage demand for absence and counting
 type ArgUse = Use UseDmd
@@ -369,11 +377,11 @@ data Use u
                     -- Bottom of the lattice
 
   | Use Count u     -- May be used with some cardinality
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 -- | Abstract counting of usages
 data Count = One | Many
-  deriving ( Eq, Show )
+  deriving ( Eq, Show, Data )
 
 -- Pretty-printing
 instance Outputable ArgUse where
@@ -926,7 +934,7 @@ We have lubs, but not glbs; but that is ok.
 data Termination r
   = Diverges    -- Definitely diverges
   | Dunno r     -- Might diverge or converge
-  deriving( Eq, Show )
+  deriving( Eq, Show, Data )
 
 -- At this point, Termination is just the 'Lifted' lattice over 'r'
 -- (https://hackage.haskell.org/package/lattices/docs/Algebra-Lattice-Lifted.html)
@@ -936,7 +944,7 @@ type DmdResult = Termination CPRResult
 data CPRResult = NoCPR          -- Top of the lattice
                | RetProd        -- Returns a constructor from a product type
                | RetSum ConTag  -- Returns a constructor from a data type
-               deriving( Eq, Show )
+               deriving( Eq, Show, Data )
 
 lubCPR :: CPRResult -> CPRResult -> CPRResult
 lubCPR (RetSum t1) (RetSum t2)
@@ -1070,6 +1078,7 @@ data DmdType = DmdType
                                 --      free variables
                   [Demand]      -- Demand on arguments
                   DmdResult     -- See [Nature of result demand]
+  deriving (Data)
 
 {-
 Note [Nature of result demand]
@@ -1626,7 +1635,7 @@ information if necessary.
 -- to unleash. Better construct this through 'mkStrictSigForArity'.
 -- See Note [Understanding DmdType and StrictSig]
 newtype StrictSig = StrictSig DmdType
-                  deriving( Eq )
+                  deriving (Eq, Data)
 
 instance Outputable StrictSig where
    ppr (StrictSig ty) = ppr ty
@@ -1643,6 +1652,10 @@ mkStrictSigForArity arity dmd_ty = StrictSig (ensureArgs arity dmd_ty)
 
 mkClosedStrictSig :: [Demand] -> DmdResult -> StrictSig
 mkClosedStrictSig ds res = mkStrictSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+
+-- | Make basic "n strict arguments" sig, suitable for foreign calls to a strict language.
+mkFCallDefaultSig :: Int -> StrictSig
+mkFCallDefaultSig arity = mkClosedStrictSig (replicate arity topDmd) topRes
 
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)

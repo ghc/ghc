@@ -8,6 +8,7 @@ Desugaring foreign declarations (see also DsCCall).
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -37,10 +38,12 @@ import Coercion
 import TcEnv
 import TcType
 
+import Demand
 import CmmExpr
 import CmmUtils
 import HscTypes
 import ForeignCall
+import ForeignCallDecl
 import TysWiredIn
 import TysPrim
 import PrelNames
@@ -56,6 +59,7 @@ import Util
 import Hooks
 import Encoding
 
+import Data.Functor.Identity
 import Data.Maybe
 import Data.List
 
@@ -142,10 +146,10 @@ because it exposes the boxing to the call site.
 
 dsFImport :: Id
           -> Coercion
-          -> ForeignImport
+          -> ForeignImport GhcTc
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety mHeader spec _) =
-    dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader
+dsFImport id co (CImport cconv safety mHeader spec options _) =
+    dsCImport id co spec (unLoc cconv) (unLoc safety) mHeader options
 
 dsCImport :: Id
           -> Coercion
@@ -153,8 +157,9 @@ dsCImport :: Id
           -> CCallConv
           -> Safety
           -> Maybe Header
+          -> XForeignImportOptions GhcTc
           -> DsM ([Binding], SDoc, SDoc)
-dsCImport id co (CLabel cid) cconv _ _ = do
+dsCImport id co (CLabel cid) cconv _ _ _ = do
    dflags <- getDynFlags
    let ty  = pFst $ coercionKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
@@ -171,12 +176,28 @@ dsCImport id co (CLabel cid) cconv _ _ = do
     in
     return ([(id, rhs')], empty, empty)
 
-dsCImport id co (CFunction target) cconv@PrimCallConv safety _
-  = dsPrimCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co (CFunction target) cconv safety mHeader
-  = dsFCall id co (CCall (CCallSpec target cconv safety)) mHeader
-dsCImport id co CWrapper cconv _ _
+dsCImport id co (CFunction target) cconv@PrimCallConv safety _ options
+  = dsPrimCall id co (CCall (CCallSpec target cconv safety) $ dsFOptions options)
+dsCImport id co (CFunction target) cconv safety mHeader options
+  = dsFCall id co (CCall (CCallSpec target cconv safety) $ dsFOptions options) mHeader
+dsCImport id co CWrapper cconv _ _ _
   = dsFExportDynamic id co cconv
+
+dsFOptions :: XForeignImportOptions GhcTc -> ForeignCallOptions
+dsFOptions (ForeignImportOptions
+             (Identity hse) (Identity cf)
+             (Identity c) (Identity (AbsStrictSig sargs sres))) =
+    ForeignCallOptions hse cf c s'
+  where s' = mkClosedStrictSig (f <$> sargs) $ case sres of
+          TopRes -> topRes
+          BotRes -> botRes
+        f = \case
+          TopDmd -> topDmd
+          BotDmd -> botDmd
+          LazyApply1Dmd -> lazyApply1Dmd
+          LazyApply2Dmd -> lazyApply2Dmd
+          StrictApply1Dmd -> strictApply1Dmd
+          EvalDmd -> evalDmd
 
 -- For stdcall labels, if the type was a FunPtr or newtype thereof,
 -- then we need to calculate the size of the arguments in order to add
@@ -200,7 +221,7 @@ fun_type_arg_stdcall_info _ _other_conv _
 ************************************************************************
 -}
 
-dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
+dsFCall :: Id -> Coercion -> ForeignCallDecl -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co fcall mDeclHeader = do
     let
@@ -223,13 +244,15 @@ dsFCall fn_id co fcall mDeclHeader = do
     (fcall', cDoc) <-
               case fcall of
               CCall (CCallSpec (StaticTarget _ cName mUnitId isFun)
-                               CApiConv safety) ->
+                               CApiConv safety)
+                    options ->
                do wrapperName <- mkWrapperName "ghc_wrapper" (unpackFS cName)
                   let fcall' = CCall (CCallSpec
                                       (StaticTarget NoSourceText
                                                     wrapperName mUnitId
                                                     True)
                                       CApiConv safety)
+                                     options
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include \"" <> ftext h
@@ -301,7 +324,7 @@ kind of Id, or perhaps to bundle them with PrimOps since semantically and
 for calling convention they are really prim ops.
 -}
 
-dsPrimCall :: Id -> Coercion -> ForeignCall
+dsPrimCall :: Id -> Coercion -> ForeignCallDecl
            -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsPrimCall fn_id co fcall = do
     let

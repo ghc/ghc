@@ -145,7 +145,7 @@ import Name
 import Module
 import Class
 import {-# SOURCE #-} PrimOp (PrimOp)
-import ForeignCall
+import ForeignCallDecl
 import Maybes
 import SrcLoc
 import Outputable
@@ -427,7 +427,7 @@ isDFunId                :: Id -> Bool
 
 isClassOpId_maybe       :: Id -> Maybe Class
 isPrimOpId_maybe        :: Id -> Maybe PrimOp
-isFCallId_maybe         :: Id -> Maybe ForeignCall
+isFCallId_maybe         :: Id -> Maybe ForeignCallDecl
 isDataConWorkId_maybe   :: Id -> Maybe DataCon
 isDataConWrapId_maybe   :: Id -> Maybe DataCon
 

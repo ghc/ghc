@@ -613,7 +613,7 @@ repDataFamInstD (DataFamInstDecl (HsIB _ (XFamEqn nec)))
 repForD :: Located (ForeignDecl GhcRn) -> DsM (SrcSpan, Core TH.DecQ)
 repForD (dL->L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
                                   , fd_fi = CImport (dL->L _ cc)
-                                                    (dL->L _ s) mch cis _ }))
+                                                    (dL->L _ s) mch cis _ _ }))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repHsSigType typ
       MkC cc' <- repCCallConv cc

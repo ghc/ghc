@@ -485,11 +485,13 @@ type ForallXDefaultDecl (c :: * -> Constraint) (x :: *) =
 -- -------------------------------------
 -- DefaultDecl type families
 type family XForeignImport     x
+type family XForeignImportOptions x
 type family XForeignExport     x
 type family XXForeignDecl      x
 
 type ForallXForeignDecl (c :: * -> Constraint) (x :: *) =
        ( c (XForeignImport      x)
+       , c (XForeignImportOptions x)
        , c (XForeignExport      x)
        , c (XXForeignDecl       x)
        )

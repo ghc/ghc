@@ -2743,8 +2743,14 @@ mkInlinePragma src (inl, match_info) mb_act
 mkImport :: Located CCallConv
          -> Located Safety
          -> (Located StringLiteral, Located RdrName, LHsSigType GhcPs)
+         -> (Maybe (Located [Located ForeignImportOptionsRaw]))
          -> P (HsDecl GhcPs)
-mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
+mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) options = do
+    case (options, unLoc cconv) of
+      (Just _, PrimCallConv) -> pure ()
+      (Just (getLoc -> l), _) -> addError l $ text
+        "foreign import options are non-standard and only allowed with \"foreign import prim\"."
+      (Nothing, _) -> pure ()
     case unLoc cconv of
       CCallConv          -> mkCImport
       CApiConv           -> mkCImport
@@ -2770,7 +2776,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
                         then mkExtName (unLoc v)
                         else entity
         funcTarget = CFunction (StaticTarget esrc entity' Nothing True)
-        importSpec = CImport cconv safety Nothing funcTarget (cL loc esrc)
+        importSpec = CImport cconv safety Nothing funcTarget (fmap unLoc options) (cL loc esrc)
 
     returnSpec spec = return $ ForD noExtField $ ForeignImport
           { fd_i_ext  = noExtField
@@ -2786,7 +2792,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
 -- that one.
 parseCImport :: Located CCallConv -> Located Safety -> FastString -> String
              -> Located SourceText
-             -> Maybe ForeignImport
+             -> Maybe (ForeignImport GhcPs)
 parseCImport cconv safety nm str sourceText =
  listToMaybe $ map fst $ filter (null.snd) $
      readP_to_S parse str
@@ -2813,7 +2819,7 @@ parseCImport cconv safety nm str sourceText =
                        | id_char c -> pfail
                       _            -> return ()
 
-   mk h n = CImport cconv safety h n sourceText
+   mk h n = CImport cconv safety h n Nothing sourceText
 
    hdr_char c = not (isSpace c)
    -- header files are filenames, which can contain

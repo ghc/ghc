@@ -64,6 +64,8 @@ import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Functor.Identity
+import Data.Maybe (fromMaybe)
 
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
@@ -268,18 +270,19 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 
 -- ------------ Checking types for foreign import ----------------------
 
-tcCheckFIType :: [Type] -> Type -> ForeignImport -> TcM ForeignImport
+tcCheckFIType :: [Type] -> Type -> ForeignImport GhcRn -> TcM (ForeignImport GhcTc)
 
-tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
+tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) options src)
   -- Foreign import label
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
        check (isFFILabelTy (mkVisFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
-       return (CImport (L lc cconv') safety mh l src)
+       options' <- checkOptions arg_tys res_ty options
+       return (CImport (L lc cconv') safety mh l options' src)
 
-tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
+tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper options src) = do
         -- Foreign wrapper (former f.e.d.)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
         -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
@@ -293,10 +296,11 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr Outputable.empty (text "One argument expected"))
-    return (CImport (L lc cconv') safety mh CWrapper src)
+    options' <- checkOptions arg_tys res_ty options
+    return (CImport (L lc cconv') safety mh CWrapper options' src)
 
-tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
-                                            (CFunction target) src)
+tcCheckFIType arg_tys res_ty (CImport (L lc cconv) (L ls safety) mh
+                                      (CFunction target) options src)
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
@@ -310,7 +314,8 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
                 (illegalForeignTyErr argument)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
-      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
+      options' <- checkOptions arg_tys res_ty options
+      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) options' src
   | cconv == PrimCallConv = do
       dflags <- getDynFlags
       checkTc (xopt LangExt.GHCForeignImportPrim dflags)
@@ -322,7 +327,8 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
       checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
-      return idecl
+      options' <- checkOptions arg_tys res_ty options
+      return $ CImport (L lc cconv) (L ls safety) mh (CFunction target) options' src
   | otherwise = do              -- Normal foreign import
       checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
@@ -331,13 +337,37 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
+      options' <- checkOptions arg_tys res_ty options
       case target of
           StaticTarget _ _ _ False
            | not (null arg_tys) ->
               addErrTc (text "`value' imports cannot have function types")
           _ -> return ()
-      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) src
+      return $ CImport (L lc cconv') (L ls safety) mh (CFunction target) options' src
 
+checkOptions
+  :: [Type]
+  -> Type
+  -> ForeignImportOptions Maybe
+  -> TcM (ForeignImportOptions Identity)
+checkOptions arg_tys res_ty options = do
+  let
+    hasSideEffects = fromMaybe True $ fio_hasSideEffects options
+    canFail = fromMaybe False $ fio_canFail options
+    commutable = fromMaybe False $ fio_commutable options
+    arity = length arg_tys
+  strictness <- case fio_strictness options of
+    Nothing -> pure $ AbsStrictSig (replicate arity TopDmd) TopRes
+    Just ssig@(AbsStrictSig sargs _) -> do
+      unless (length sargs == length (res_ty : arg_tys)) $
+        addErr $ text "wrong number of arguments in strictness signature"
+      pure ssig
+  pure $ ForeignImportOptions
+    { fio_hasSideEffects = Identity hasSideEffects
+    , fio_canFail = Identity canFail
+    , fio_commutable = Identity commutable
+    , fio_strictness = Identity strictness
+    }
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C

@@ -667,6 +667,7 @@ cvtForD (ImportF callconv safety from nm ty)
                     (CFunction (StaticTarget (SourceText from)
                                              (mkFastString from) Nothing
                                              True))
+                    Nothing -- TODO represent "foreign import prim" options in TH
                     (noLoc $ quotedSourceText from))
   | Just impspec <- parseCImport (noLoc (cvt_conv callconv)) (noLoc safety')
                                  (mkFastString (TH.nameBase nm))

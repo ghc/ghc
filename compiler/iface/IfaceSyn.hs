@@ -57,6 +57,7 @@ import Name
 import CostCentre
 import Literal
 import ForeignCall
+import ForeignCallDecl
 import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
 import Outputable
@@ -495,7 +496,7 @@ data IfaceExpr
   | IfaceLet    IfaceBinding  IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
-  | IfaceFCall  ForeignCall IfaceType
+  | IfaceFCall  ForeignCallDecl IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
 data IfaceTickish

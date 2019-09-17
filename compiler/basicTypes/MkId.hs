@@ -56,7 +56,7 @@ import Class
 import NameSet
 import Name
 import PrimOp
-import ForeignCall
+import ForeignCallDecl
 import DataCon
 import Id
 import IdInfo
@@ -1235,7 +1235,7 @@ mkPrimOpId prim_op
 -- details of the ccall, type and all.  This means that the interface
 -- file reader can reconstruct a suitable Id
 
-mkFCallId :: DynFlags -> Unique -> ForeignCall -> Type -> Id
+mkFCallId :: DynFlags -> Unique -> ForeignCallDecl -> Type -> Id
 mkFCallId dflags uniq fcall ty
   = ASSERT( noFreeVarsOfType ty )
     -- A CCallOpId should have no free type variables;
@@ -1250,12 +1250,11 @@ mkFCallId dflags uniq fcall ty
 
     info = noCafIdInfo
            `setArityInfo`          arity
-           `setStrictnessInfo`     strict_sig
+           `setStrictnessInfo`     fco_strictness (fcd_options fcall)
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs
-    strict_sig = mkClosedStrictSig (replicate arity topDmd) topRes
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
     -- necessarily force them. See #11076.

@@ -37,6 +37,7 @@ import RepType
 import CLabel
 import SMRep
 import ForeignCall
+import ForeignCallDecl
 import DynFlags
 import Maybes
 import Outputable
@@ -56,13 +57,13 @@ import Control.Monad
 -- | Emit code for a foreign call, and return the results to the sequel.
 -- Precondition: the length of the arguments list is the same as the
 -- arity of the foreign function.
-cgForeignCall :: ForeignCall            -- the op
+cgForeignCall :: ForeignCallDecl        -- the op
               -> Type                   -- type of foreign function
               -> [StgArg]               -- x,y    arguments
               -> Type                   -- result type
               -> FCode ReturnKind
 
-cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
+cgForeignCall (CCall (CCallSpec target cconv safety) _) typ stg_args res_ty
   = do  { dflags <- getDynFlags
         ; let -- in the stdcall calling convention, the symbol needs @size appended
               -- to it, where size is the total number of bytes of arguments.  We

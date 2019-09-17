@@ -63,7 +63,7 @@ import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
 import Outputable
-import ForeignCall
+import ForeignCallDecl
 import Name
 
 import qualified Data.ByteString as BS
@@ -710,7 +710,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
           is_inline_scrut scrut
               | (Var f, _) <- collectArgs scrut
                 = case idDetails f of
-                    FCallId fc  -> not (isSafeForeignCall fc)
+                    FCallId fc  -> not (isSafeForeignCallDecl fc)
                     PrimOpId op -> not (primOpOutOfLine op)
                     _other      -> False
               | otherwise

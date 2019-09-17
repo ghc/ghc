@@ -648,6 +648,15 @@ identifier :: { Located RdrName }
     | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
                                [mop $1,mj AnnTilde $2,mcp $3] }
 
+-- | not really a "good" haskell identifier non-terminal, as it conflates upper
+-- and lowercase identifiers while ignoring the true general case of qualified
+-- identifiers. But it has some use in other syntax, namely backpack unit files and
+-- "foreign import prim" includes.
+eithercase_id :: { Located FastString }
+        : VARID  { sL1 $1 $ getVARID $1 }
+        | CONID  { sL1 $1 $ getCONID $1 }
+        | special_id { $1 }
+
 -----------------------------------------------------------------------------
 -- Backpack stuff
 
@@ -686,15 +695,10 @@ pkgname :: { Located PackageName }
         : STRING     { sL1 $1 $ PackageName (getSTRING $1) }
         | litpkgname { sL1 $1 $ PackageName (unLoc $1) }
 
-litpkgname_segment :: { Located FastString }
-        : VARID  { sL1 $1 $ getVARID $1 }
-        | CONID  { sL1 $1 $ getCONID $1 }
-        | special_id { $1 }
-
 litpkgname :: { Located FastString }
-        : litpkgname_segment { $1 }
+        : eithercase_id { $1 }
         -- a bit of a hack, means p - b is parsed same as p-b, enough for now.
-        | litpkgname_segment '-' litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
+        | eithercase_id '-' litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
 
 mayberns :: { Maybe [LRenaming] }
         : {- empty -} { Nothing }
@@ -1241,24 +1245,22 @@ where_type_family :: { Located ([AddAnn],FamilyInfo GhcPs) }
 ty_fam_inst_eqn_list :: { Located ([AddAnn],Maybe [LTyFamInstEqn GhcPs]) }
         :     '{' ty_fam_inst_eqns '}'     { sLL $1 $> ([moc $1,mcc $3]
                                                 ,Just (unLoc $2)) }
-        | vocurly ty_fam_inst_eqns close   { let (dL->L loc _) = $2 in
-                                             cL loc ([],Just (unLoc $2)) }
+        | vocurly ty_fam_inst_eqns close   { fmap (\inside -> ([], Just inside)) $2 }
         |     '{' '..' '}'                 { sLL $1 $> ([moc $1,mj AnnDotdot $2
                                                  ,mcc $3],Nothing) }
-        | vocurly '..' close               { let (dL->L loc _) = $2 in
-                                             cL loc ([mj AnnDotdot $2],Nothing) }
+        | vocurly '..' close               { fmap (\_ -> ([mj AnnDotdot $2], Nothing)) $2 }
 
 ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         : ty_fam_inst_eqns ';' ty_fam_inst_eqn
-                                      {% let (dL->L loc (anns, eqn)) = $3 in
-                                         asl (unLoc $1) $2 (cL loc eqn)
+                                      {% let (anns, eqn) = sequence $3 in
+                                         asl (unLoc $1) $2 eqn
                                          >> ams $3 anns
-                                         >> return (sLL $1 $> (cL loc eqn : unLoc $1)) }
+                                         >> return (sLL $1 $> (eqn : unLoc $1)) }
         | ty_fam_inst_eqns ';'        {% addAnnotation (gl $1) AnnSemi (gl $2)
                                          >> return (sLL $1 $>  (unLoc $1)) }
-        | ty_fam_inst_eqn             {% let (dL->L loc (anns, eqn)) = $1 in
+        | ty_fam_inst_eqn             {% let (anns, eqn) = sequence $1 in
                                          ams $1 anns
-                                         >> return (sLL $1 $> [cL loc eqn]) }
+                                         >> return (sLL $1 $> [eqn]) }
         | {- empty -}                 { noLoc [] }
 
 ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
@@ -1788,12 +1790,21 @@ annotation :: { LHsDecl GhcPs }
 -- Foreign import and export declarations
 
 fdecl :: { Located ([AddAnn],HsDecl GhcPs) }
-fdecl : 'import' callconv safety fspec
-               {% mkImport $2 $3 (snd $ unLoc $4) >>= \i ->
-                 return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $4),i))  }
-      | 'import' callconv        fspec
-               {% do { d <- mkImport $2 (noLoc PlaySafe) (snd $ unLoc $3);
-                    return (sLL $1 $> (mj AnnImport $1 : (fst $ unLoc $3),d)) }}
+fdecl : 'import' callconv safety fspec where_fdecl
+               {% do { i <- mkImport $2 $3 (snd $ unLoc $4) (sequence $ fmap snd $5);
+                     ; return $ sLL $1 $>
+                        ( mj AnnImport $1 : (fst $ unLoc $4) ++ (fst $ unLoc $5)
+                        , i
+                        )
+                     } }
+      -- TODO debug odd shift-reduce conflict and merge with previous
+      | 'import' callconv fspec where_fdecl
+               {% do { i <- mkImport $2 (noLoc PlaySafe) (snd $ unLoc $3) (sequence $ fmap snd $4);
+                     ; return $ sLL $1 $>
+                        ( mj AnnImport $1 : (fst $ unLoc $3) ++ (fst $ unLoc $4)
+                        , i
+                        )
+                     } }
       | 'export' callconv fspec
                {% mkExport $2 (snd $ unLoc $3) >>= \i ->
                   return (sLL $1 $> (mj AnnExport $1 : (fst $ unLoc $3),i) ) }
@@ -1820,6 +1831,57 @@ fspec :: { Located ([AddAnn]
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
+
+where_fdecl :: { Located ([AddAnn], Maybe [Located ForeignImportOptionsRaw]) }
+        : 'where' fdecl_option_list     { sLL $1 $> ( mj AnnWhere $1 : fst (unLoc $2)
+                                                    , Just $ reverse $ snd $ unLoc $2
+                                                    ) }
+        | {- empty -} { noLoc ([], Nothing) }
+
+fdecl_option_list :: { Located ([AddAnn], [Located ForeignImportOptionsRaw]) }
+        :     '{' fdecl_options '}'     { sLL $1 $> ( [moc $1,mcc $3]
+                                                    , unLoc $2
+                                                    ) }
+        | vocurly fdecl_options close   { fmap (\inside -> ([], inside)) $2 }
+
+fdecl_options :: { Located [Located ForeignImportOptionsRaw] }
+        : fdecl_options ';' fdecl_option
+                                   {% do { let { (anns, eqn) = sequence $3 }
+                                         ; asl (unLoc $1) $2 eqn
+                                         ; ams eqn anns
+                                         ; return $ sLL $1 $> (eqn : unLoc $1)
+                                         } }
+        | fdecl_options ';'        {% do { addAnnotation (gl $1) AnnSemi (gl $2)
+                                         ; return (sLL $1 $>  (unLoc $1))
+                                         } }
+        | fdecl_option             {% do { let { (anns, eqn) = sequence $1 }
+                                         ; ams eqn anns
+                                         ; return $ sLL $1 $> [eqn]
+                                         } }
+        | {- empty -}              { noLoc [] }
+
+fdecl_option :: { Located ([AddAnn], ForeignImportOptionsRaw) }
+        : eithercase_id '=' fdecl_option_rhs { sLL $1 $> ( mj AnnEqual $2 : fst (unLoc $3)
+                                                         , ForeignImportOptionsRaw $1 $ fmap snd $3
+                                                         ) }
+
+fdecl_option_rhs  :: { Located ([AddAnn], Either FastString [Located FastString]) }
+        : eithercase_id { sLL $1 $> ([], Left $ unLoc $1) }
+        | '[' fdecl_strictness_list ']' { sLL $1 $> ( [mos $1, mcs $3]
+                                                    , Right $ unLoc $2
+                                                    ) }
+
+fdecl_strictness_list :: { Located [Located FastString] }
+        : fdecl_strictness_list ';' eithercase_id
+                                    {% do { asl (unLoc $1) $2 $3
+                                          ; return $ sLL $1 $> ($3 : unLoc $1)
+                                          } }
+        | fdecl_strictness_list ';' {% do { addAnnotation (gl $1) AnnSemi (gl $2)
+                                          ; return (sLL $1 $>  (unLoc $1))
+                                          } }
+        | eithercase_id             { sLL $1 $> [$1] }
+        | {- empty -}               { noLoc [] }
+
 
 -----------------------------------------------------------------------------
 -- Type signatures

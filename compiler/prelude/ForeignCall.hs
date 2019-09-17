@@ -6,17 +6,16 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module ForeignCall (
-        ForeignCall(..), isSafeForeignCall,
-        Safety(..), playSafe, playInterruptible,
+module ForeignCall
+  ( Safety(..), playSafe, playInterruptible
 
-        CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
-        CCallSpec(..),
-        CCallTarget(..), isDynamicTarget,
-        CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
+  , CExportSpec(..), CLabelString, isCLabelString, pprCLabelString
+  , CCallSpec(..)
+  , CCallTarget(..), isDynamicTarget
+  , CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute
 
-        Header(..), CType(..),
-    ) where
+  , Header(..), CType(..)
+  ) where
 
 import GhcPrelude
 
@@ -36,17 +35,6 @@ import Data.Data
 *                                                                      *
 ************************************************************************
 -}
-
-newtype ForeignCall = CCall CCallSpec
-  deriving Eq
-
-isSafeForeignCall :: ForeignCall -> Bool
-isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
-
--- We may need more clues to distinguish foreign calls
--- but this simple printer will do for now
-instance Outputable ForeignCall where
-  ppr (CCall cc)  = ppr cc
 
 data Safety
   = PlaySafe            -- Might invoke Haskell GC, or do a call back, or
@@ -100,7 +88,7 @@ data CCallSpec
   =  CCallSpec  CCallTarget     -- What to call
                 CCallConv       -- Calling convention to use.
                 Safety
-  deriving( Eq )
+  deriving (Eq, Data)
 
 -- The call target:
 
@@ -252,10 +240,6 @@ instance Outputable CType where
 *                                                                      *
 ************************************************************************
 -}
-
-instance Binary ForeignCall where
-    put_ bh (CCall aa) = put_ bh aa
-    get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
     put_ bh PlaySafe = do
