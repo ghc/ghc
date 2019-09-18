@@ -259,15 +259,12 @@ instance Outputable UncoveredCandidates where
 checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
-  mb_pm_res <- tryM (checkSingle' locn var p)
-  case mb_pm_res of
-    Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+  res <- checkSingle' locn var p
+  dsPmWarn dflags ctxt res
 
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
 checkSingle' locn var p = do
-  resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
   clause    <- translatePat fam_insts p
   missing   <- getPmDelta
@@ -308,14 +305,12 @@ checkMatches dflags ctxt vars matches = do
                                , text "Matches:"])
                                2
                                (vcat (map ppr matches)))
-  mb_pm_res <- tryM $ case matches of
+  res <- case matches of
     -- Check EmptyCase separately
     -- See Note [Checking EmptyCase Expressions] in PmOracle
     [] | [var] <- vars -> checkEmptyCase' var
     _normal_match      -> checkMatches' vars matches
-  case mb_pm_res of
-    Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+  dsPmWarn dflags ctxt res
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
@@ -323,7 +318,6 @@ checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
 checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
-      resetPmIterDs -- set the iter-no to zero
       missing    <- getPmDelta
       tracePm "checkMatches': missing" (ppr missing)
       (rs,us,ds) <- go matches [missing]
@@ -395,21 +389,19 @@ mAX_REFINEMENTS :: Int
 -- other tests being broken like ds022 above.
 mAX_REFINEMENTS = 3
 
--- | The threshold for detecting exponential blow-up in the number of 'Delta's
--- to check introduced by guards.
-tHRESHOLD_GUARD_DELTAS :: Int
-tHRESHOLD_GUARD_DELTAS = 100
-
 -- | Multiply the estimated number of 'Delta's to process by a constant
 -- branching factor induced by a guard and return the new estimate if it
 -- doesn't exceed a constant threshold.
 -- See 6. in Note [Guards and Approximation].
-tryMultiplyDeltas :: Int -> Int -> Maybe Int
-tryMultiplyDeltas multiplier n_delta
+tryMultiplyDeltas :: DynFlags -> Int -> Int -> Maybe Int
+tryMultiplyDeltas dflags multiplier n_delta
+  -- Always allow for some more refinements from pattern matches by allocating
+  -- only at most 20% for guards
+  | let limit = maxPmCheckDeltas dflags `div` 5
   -- The ^2 below is intentional: We want to give up on guards with a large
   -- branching factor rather quickly, still leaving room for small informative
   -- ones later on.
-  | n_delta*multiplier^(2::Int) < tHRESHOLD_GUARD_DELTAS
+  , n_delta*multiplier^(2::Int) <= limit
   = Just (n_delta*multiplier)
   | otherwise
   = Nothing
@@ -1178,37 +1170,40 @@ runMany pm (m:ms) = do
   res <- pm m
   combinePartialResults res <$> runMany pm ms
 
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheck`
+-- | Print diagnostic info, actually call 'pmcheck' and then decide whether
+-- the number of Deltas @n@ that will need to be processed in a similar manner
+-- doesn't overwhelm the checker. If so, don't split delta any further and just
+-- forget about uncovered refinements from the current clause.
+-- See Note [Guards and Approximation].
 pmcheckI :: PatVec -> [PatVec] -> ValVec -> Int -> Delta -> DsM PartialResult
 pmcheckI ps guards vva n delta = do
-  m <- incrCheckPmIterDs
-  tracePm "pmCheck" (ppr m <> colon
-                        $$ hang (text "patterns:") 2 (ppr ps)
-                        $$ hang (text "guards:") 2 (ppr guards)
-                        $$ ppr vva
-                        $$ ppr delta)
+  tracePm "pmCheck" $ vcat [ ppr n <> colon
+                           , hang (text "patterns:") 2 (ppr ps)
+                           , hang (text "guards:") 2 (ppr guards)
+                           , ppr vva
+                           , ppr delta ]
   res <- pmcheck ps guards vva n delta
   tracePm "pmCheckResult:" (ppr res)
-  return res
+  limit <- maxPmCheckDeltas <$> getDynFlags
+  if n <= limit || length (presultUncovered res) == 1
+    then return res
+    else do
+      -- See Note [Guards and Approximation]
+      tracePm "Too many Deltas in flight" (ppr delta)
+      return res{ presultUncovered = [delta] }
 {-# INLINE pmcheckI #-}
-
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> Int -> Delta -> DsM PartialResult
-pmcheckGuardsI gvs n delta = incrCheckPmIterDs >> pmcheckGuards gvs n delta
-{-# INLINE pmcheckGuardsI #-}
 
 -- | Check the list of mutually exclusive guards
 pmcheckGuards :: [PatVec] -> Int -> Delta -> DsM PartialResult
 pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
+  dflags <- getDynFlags
   let (n', unc')
         -- See 6. in Note [Guards and Approximation]
-        | Just n' <- tryMultiplyDeltas (length unc) n = (n', unc)
-        | otherwise                                   = (n, [delta])
-  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
+        | Just n' <- tryMultiplyDeltas dflags (length unc) n = (n', unc)
+        | otherwise                                          = (n, [delta])
+  (PartialResult css uncs dss) <- runMany (pmcheckGuards gvs n') unc'
   return $ PartialResult (cs `mappend` css)
                          uncs
                          (ds `mappend` dss)
@@ -1226,7 +1221,7 @@ pmcheck
   -> DsM PartialResult
 pmcheck [] guards [] n delta
   | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuardsI guards n delta
+  | otherwise   = pmcheckGuards guards n delta
 
 -- Guard
 pmcheck (PmFake : ps) guards vva n delta =
@@ -1530,23 +1525,6 @@ it's impossible:
 We don't want to warn about the inaccessible branch because the programmer
 didn't put it there!  So we filter out the warning here.
 -}
-
--- | Issue a warning when the predefined number of iterations is exceeded
--- for the pattern match checker
-warnPmIters :: DynFlags -> DsMatchContext -> DsM ()
-warnPmIters dflags (DsMatchContext kind loc)
-  = when (flag_i || flag_u) $ do
-      iters <- maxPmCheckIterations <$> getDynFlags
-      putSrcSpanDs loc (warnDs NoReason (msg iters))
-  where
-    ctxt   = pprMatchContext kind
-    msg is = fsep [ text "Pattern match checker exceeded"
-                  , parens (ppr is), text "iterations in", ctxt <> dot
-                  , text "(Use -fmax-pmcheck-iterations=n"
-                  , text "to set the maximum number of iterations to n)" ]
-
-    flag_i = wopt Opt_WarnOverlappingPatterns dflags
-    flag_u = exhaustive dflags kind
 
 dots :: Int -> [a] -> SDoc
 dots maxPatterns qs
