@@ -392,10 +392,7 @@ data DsLclEnv = DsLclEnv {
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
         -- The oracle state Delta is augmented as we walk inwards,
         -- through each pattern match in turn
-        dsl_delta   :: Delta,
-
-        dsl_pm_iter :: IORef Int  -- Number of iterations for pmcheck so far
-                                  -- We fail if this gets too big
+        dsl_delta   :: Delta
      }
 
 -- Inside [| |] brackets, the desugarer looks

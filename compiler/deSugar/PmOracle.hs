@@ -14,7 +14,6 @@ module PmOracle (
 
         DsM, tracePm, mkPmId,
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
-        lookupNumberOfRefinements,
 
         TmCt(..),
         inhabitants,
@@ -702,7 +701,7 @@ tmOracle delta = runMaybeT . foldlM go delta
 -- * Looking up VarInfo
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) [] [] NoPM 0
+emptyVarInfo x = VI (idType x) [] [] NoPM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
@@ -740,7 +739,7 @@ canDiverge MkDelta{ delta_tm_st = ts } x
   -- a solution (i.e. some equivalent literal or constructor) for it yet.
   -- Even if we don't have a solution yet, it might be involved in a negative
   -- constraint, in which case we must already have evaluated it earlier.
-  | VI _ [] [] _ _ <- lookupVarInfo ts x
+  | VI _ [] [] _ <- lookupVarInfo ts x
   = True
   -- Variable x is already in WHNF or we know some refutable shape, so the
   -- constraint is non-satisfiable
@@ -767,13 +766,6 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_st delta) x) of
   pos
     | Just sol <- find isDataConSolution pos -> Just sol
     | otherwise                              -> Just (head pos)
-
--- | @lookupNumberOfRefinements delta x@ Looks up how many times we have refined
--- ('refineToAltCon') @x@ for some 'PmAltCon' to arrive at @delta@. This number
--- is always less or equal to @length (lookupSolution delta x)@!
-lookupNumberOfRefinements :: Delta -> Id -> Int
-lookupNumberOfRefinements delta x
-  = vi_n_refines (lookupVarInfo (delta_tm_st delta) x)
 
 -------------------------------
 -- * Adding facts to the oracle
@@ -805,7 +797,7 @@ addTmCt delta ct = runMaybeT $ case ct of
 -- See Note [TmState invariants].
 addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env } x nalt = runMaybeT $ do
-  vi@(VI _ pos neg pm _) <- lift (initLookupVarInfo delta x)
+  vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -955,7 +947,7 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env }
 refineToAltCon :: Delta -> Id -> PmAltCon -> [Type] -> [TyVar] -> DsM (Maybe (Delta, [Id]))
 refineToAltCon delta x l@PmAltLit{}           _arg_tys _ex_tvs1 = runMaybeT $ do
   delta' <- addVarConCt delta x l []
-  pure (markRefined delta' x, [])
+  pure (delta', [])
 refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
   -- The plan for ConLikes:
   -- Suppose K :: forall a b y z. (y,b) -> z -> T a b
@@ -988,15 +980,7 @@ refineToAltCon delta x alt@(PmAltConLike con) arg_tys  ex_tvs1  = do
                                  , ppr mb_delta ])
   case mb_delta of
     Nothing     -> pure Nothing
-    Just delta' -> pure (Just (markRefined delta' x, arg_vars))
-
--- | This is the only place that actualy increments 'vi_n_refines'.
-markRefined :: Delta -> Id -> Delta
-markRefined delta@MkDelta{ delta_tm_st = ts@(TmSt env) } x
-  = delta{ delta_tm_st = TmSt env' }
-  where
-    vi = lookupVarInfo ts x
-    env' = setEntrySDIE env x vi{ vi_n_refines = vi_n_refines vi + 1 }
+    Just delta' -> pure (Just (delta', arg_vars))
 
 {-
 Note [Coverage checking and existential tyvars]
@@ -1153,8 +1137,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env } x y
         -- First assume that x and y are in the same equivalence class
         let env_ind = setIndirectSDIE env x y
         -- Then sum up the refinement counters
-        let vi_y' = vi_y{ vi_n_refines = vi_n_refines vi_x + vi_n_refines vi_y }
-        let env_refs = setEntrySDIE env_ind y vi_y'
+        let env_refs = setEntrySDIE env_ind y vi_y
         let delta_refs = delta{ delta_tm_st = TmSt env_refs }
         -- and then gradually merge every positive fact we have on x into y
         let add_fact delta (cl, args) = addVarConCt delta y cl args
@@ -1173,7 +1156,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env } x y
 -- See Note [TmState invariants].
 addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
 addVarConCt delta@MkDelta{ delta_tm_st = TmSt env } x alt args = do
-  VI ty pos neg cache n <- lift (initLookupVarInfo delta x)
+  VI ty pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1190,7 +1173,7 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env } x alt args = do
       -- the new solution)
       let neg' = filter ((== PossiblyOverlap) . eqPmAltCon alt) neg
       let pos' = (alt,args):pos
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache n))}
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache))}
 
 ----------------------------------------
 -- * Enumerating inhabitation candidates
@@ -1563,7 +1546,7 @@ provideEvidenceForEquation = go init_ts
     go _      _      0 _     = pure []
     go _      []     _ delta = pure [delta]
     go rec_ts (x:xs) n delta = do
-      VI ty pos neg pm _ <- initLookupVarInfo delta x
+      VI ty pos neg pm <- initLookupVarInfo delta x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their

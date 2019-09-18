@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Woverlapping-patterns -Wincomplete-patterns #-}
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 
 module T11195 where
 
