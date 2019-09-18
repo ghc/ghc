@@ -44,7 +44,8 @@ import Var           (EvVar)
 import Name
 import CoreSyn
 import CoreFVs ( exprFreeVars )
-import CoreOpt (exprIsConApp_maybe)
+import CoreMap
+import CoreOpt (simpleOptExpr, exprIsConApp_maybe)
 import CoreUtils (exprType)
 import MkCore (mkListExpr, mkCharExpr)
 import UniqSupply
@@ -78,6 +79,7 @@ import Data.Foldable (foldlM)
 import Data.List     (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Semigroup as Semigroup
+import Data.Tuple    (swap)
 
 -- Debugging Infrastructre
 
@@ -688,7 +690,7 @@ emptyVarInfo x = VI (idType x) [] [] NoPM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
+lookupVarInfo (TmSt env _) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
 
 initPossibleMatches :: TyState -> VarInfo -> DsM VarInfo
 initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
@@ -731,7 +733,7 @@ canDiverge MkDelta{ delta_tm_st = ts } x
 lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
-lookupRefuts MkDelta{ delta_tm_st = ts@(TmSt (SDIE env)) } k =
+lookupRefuts MkDelta{ delta_tm_st = ts@(TmSt (SDIE env) _) } k =
   case lookupUDFM env k of
     Nothing -> []
     Just (Indirect y) -> vi_neg (lookupVarInfo ts y)
@@ -782,7 +784,7 @@ addTmCt delta ct = runMaybeT $ case ct of
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
 -- See Note [TmState invariants].
 addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env } x nalt = runMaybeT $ do
+addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = runMaybeT $ do
   vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
@@ -801,7 +803,7 @@ addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env } x nalt = runMaybeT $ 
     PmAltConLike cl
       -> MaybeT (ensureInhabited delta vi_ext{ vi_cache = markMatched cl pm })
     _ -> pure vi_ext
-  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') }
+  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps }
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
@@ -868,12 +870,12 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
 -- commit to upholding that constraint in the future. This will be rectified
 -- in a follow-up patch. The status quo should work good enough for now.
 addVarNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
-addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x = do
+addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   vi  <- lift $ initLookupVarInfo delta x
   vi' <- MaybeT $ ensureInhabited delta vi
   -- vi' has probably constructed and then thinned out some PossibleMatches.
   -- We want to cache that work
-  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi')}
+  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- Returns (Just vi) guarantees that at least one member
@@ -929,10 +931,10 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
 -- This check is necessary after having matched on a GADT con to weed out
 -- impossible matches.
 ensureAllPossibleMatchesInhabited :: Delta -> DsM (Maybe Delta)
-ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env }
+ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
   = runMaybeT (set_tm_cs_env delta <$> traverseSDIE go env)
   where
-    set_tm_cs_env delta env = delta{ delta_tm_st = TmSt env }
+    set_tm_cs_env delta env = delta{ delta_tm_st = TmSt env reps }
     go vi = MaybeT (ensureInhabited delta vi)
 
 --------------------------------------
@@ -946,7 +948,7 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env }
 --
 -- See Note [TmState invariants].
 addVarVarCt :: Delta -> (Id, Id) -> MaybeT DsM Delta
-addVarVarCt delta@MkDelta{ delta_tm_st = TmSt env } (x, y)
+addVarVarCt delta@MkDelta{ delta_tm_st = TmSt env _ } (x, y)
   -- It's important that we never @equate@ two variables of the same equivalence
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
@@ -962,11 +964,11 @@ addVarVarCt delta@MkDelta{ delta_tm_st = TmSt env } (x, y)
 --
 -- See Note [TmState invariants].
 equate :: Delta -> Id -> Id -> MaybeT DsM Delta
-equate delta@MkDelta{ delta_tm_st = TmSt env } x y
+equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
   = ASSERT( not (sameRepresentativeSDIE env x y) )
     case (lookupSDIE env x, lookupSDIE env y) of
-      (Nothing, _) -> pure (delta{ delta_tm_st = TmSt (setIndirectSDIE env x y) })
-      (_, Nothing) -> pure (delta{ delta_tm_st = TmSt (setIndirectSDIE env y x) })
+      (Nothing, _) -> pure (delta{ delta_tm_st = TmSt (setIndirectSDIE env x y) reps })
+      (_, Nothing) -> pure (delta{ delta_tm_st = TmSt (setIndirectSDIE env y x) reps })
       -- Merge the info we have for x into the info for y
       (Just vi_x, Just vi_y) -> do
         -- This assert will probably trigger at some point...
@@ -976,7 +978,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env } x y
         let env_ind = setIndirectSDIE env x y
         -- Then sum up the refinement counters
         let env_refs = setEntrySDIE env_ind y vi_y
-        let delta_refs = delta{ delta_tm_st = TmSt env_refs }
+        let delta_refs = delta{ delta_tm_st = TmSt env_refs reps }
         -- and then gradually merge every positive fact we have on x into y
         let add_fact delta (cl, args) = addVarConCt delta y cl args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
@@ -993,7 +995,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env } x y
 --
 -- See Note [TmState invariants].
 addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-addVarConCt delta@MkDelta{ delta_tm_st = TmSt env } x alt args = do
+addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt args = do
   VI ty pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
@@ -1011,7 +1013,7 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env } x alt args = do
       -- the new solution)
       let neg' = filter ((== PossiblyOverlap) . eqPmAltCon alt) neg
       let pos' = (alt,args):pos
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache))}
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache)) reps}
 
 ----------------------------------------
 -- * Enumerating inhabitation candidates
@@ -1483,6 +1485,20 @@ isVanillaDataType ty = fromMaybe False $ do
   dcs <- tyConDataCons_maybe tc
   pure (all isVanillaDataCon dcs)
 
+-- | See if we already encountered a semantically equivalent expression and
+-- return its representative.
+representCoreExpr :: Delta -> CoreExpr -> DsM (Delta, Id)
+representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e = do
+  dflags <- getDynFlags
+  let e' = simpleOptExpr dflags e
+  case lookupCoreMap reps e' of
+    Just rep -> pure (delta, rep)
+    Nothing  -> do
+      rep <- mkPmId (exprType e')
+      let reps'  = extendCoreMap reps e' rep
+      let delta' = delta{ delta_tm_st = ts{ ts_reps = reps' } }
+      pure (delta', rep)
+
 -- Most of our actions thread around a delta from one computation to the next,
 -- thereby potentially failing. This is expressed in the following Monad:
 -- type PmM a = StateT Delta (MaybeT DsM) a
@@ -1512,12 +1528,15 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
             <- exprIsConApp_maybe in_scope_env e
       = do { arg_ids <- traverse bind_expr args
            ; data_con_app x dc arg_ids }
-      -- TODO: Think about how to recognize PatSyns
+      -- See Note [Detecting pattern synonym applications in expressions]
       | Var y <- e, not (isDataConWorkId x)
+      -- We don't consider (unsaturated!) DataCons as flexible variables
       = modifyT (\delta -> addVarVarCt delta (x, y))
       | otherwise
-      -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
-      = pure ()
+      -- Any other expression. Try to find other uses of a semantically
+      -- equivalent expression and represent them by the same variable!
+      = do { rep <- represent_expr e
+           ; modifyT (\delta -> addVarVarCt delta (x, rep)) }
       where
         expr_ty       = exprType e
         expr_in_scope = mkInScopeSet (exprFreeVars e)
@@ -1533,6 +1552,12 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
           core_expr x e
           pure x
 
+        -- See if we already encountered a semantically equivalent expression
+        -- and return its representative
+        represent_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
+        represent_expr e = StateT $ \delta ->
+          swap <$> lift (representCoreExpr delta e)
+
     data_con_app :: Id -> DataCon -> [Id] -> StateT Delta (MaybeT DsM) ()
     data_con_app x dc args = pm_alt_con_app x (PmAltConLike (RealDataCon dc)) args
 
@@ -1546,3 +1571,27 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
 modifyT f = StateT $ fmap ((,) ()) . f
+
+{- Note [Detecting pattern synonym applications in expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we fail to detect pattern synonyms in scrutinees and RHS of
+guards. This could be alleviated with considerable effort and complexity, but
+the returns are meager. Consider:
+
+    pattern P
+    pattern Q
+    case P 15 of
+      Q _  -> ...
+      P 15 ->
+
+Compared to the situation where P and Q are DataCons, the lack of generativity
+means we could never flag Q as redundant.
+(also see Note [Undecidable Equality for PmAltCons] in PmTypes.)
+On the other hand, if we fail to recognise the pattern synonym, we flag the
+pattern match as incomplete. That wouldn't happen if had knowledge about the
+scrutinee, in which case the oracle basically knows "If it's a P, then its field
+is 15".
+
+This is a pretty narrow use case and I don't think we should to try to fix it
+until a user complains energetically.
+-}
