@@ -53,6 +53,7 @@ import Type
 import TyCon
 import Literal
 import CoreSyn
+import CoreMap
 import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
@@ -440,9 +441,17 @@ instance Outputable a => Outputable (SharedDIdEnv a) where
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
 --
--- See Note [TmState invariants].
-newtype TmState = TS (SharedDIdEnv VarInfo)
-  -- Deterministic so that we generate deterministic error messages
+-- See Note [TmState invariants] in PmOracle.
+data TmState
+  = TS
+  { ts_facts :: SharedDIdEnv VarInfo
+  -- ^ Facts about term variables. Deterministic env, so that we generate
+  -- deterministic error messages.
+  , ts_reps  :: CoreMap Id
+  -- ^ An environment for looking up whether we already encountered semantically
+  -- equivalent expressions that we want to represent by the same 'Id'
+  -- representative.
+  }
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
@@ -450,7 +459,7 @@ newtype TmState = TS (SharedDIdEnv VarInfo)
 -- ('vi_cache') and the number of times each variable was refined
 -- ('vi_n_refines').
 --
--- Subject to Note [The Pos/Neg invariant].
+-- Subject to Note [The Pos/Neg invariant] in PmOracle.
 data VarInfo
   = VI
   { vi_ty  :: !Type
@@ -498,16 +507,16 @@ data VarInfo
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TS state) = ppr state
+  ppr (TS reps state) = ppr reps $$ ppr state
 
 -- | Not user-facing.
 instance Outputable VarInfo where
   ppr (VI ty pos neg cache n)
     = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
 
--- | Initial state of the oracle.
+-- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TS emptySDIE
+initTmState = TS emptySDIE emptyCoreMap
 
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
