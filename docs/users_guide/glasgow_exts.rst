@@ -11010,7 +11010,8 @@ of bindings that mention it.
 The rationale for this more conservative strategy is given in `the
 papers <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf>`__
 "Let should not be generalised" and "Modular type inference with local
-assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7>`__.
+assumptions", and a related `blog post
+<https://www.haskell.org/ghc/blog/20100930-LetGeneralisationInGhc7.html>`__.
 
 The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
 and :extension:`GADTs`. You can switch it off again with
