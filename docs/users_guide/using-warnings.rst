@@ -831,20 +831,22 @@ of ``-W(no-)*``.
         h = \[] -> 2
         Just k = f y
 
-.. ghc-flag:: -fmax-pmcheck-iterations=⟨n⟩
-    :shortdesc: the iteration limit for the pattern match checker
+.. ghc-flag:: -fmax-pmcheck-models=⟨n⟩
+    :shortdesc: soft limit on the number of parallel models the pattern match
+        checker should check a pattern match clause against
     :type: dynamic
     :category:
 
-    :default: 2000000
+    :default: 100
 
-    Sets how many iterations of the pattern-match checker will perform before
-    giving up. This limit is to catch cases where pattern-match checking might
-    be excessively costly (due to the exponential complexity of coverage
-    checking in the general case). It typically shouldn't be necessary to set
-    this unless GHC informs you that it has exceeded the pattern match checker's
-    iteration limit (in which case you may want to consider refactoring your
-    pattern match, for the sake of future readers of your code.
+    Pattern match checking can be exponential in some cases. This limit makes
+    sure we scale polynomially in the number of patterns, by forgetting refined
+    information gained from a partially successful match. For example, when
+    matching ``x`` against ``Just 4``, we split each incoming matching model
+    into two sub-models: One where ``x`` is not ``Nothing`` and one where ``x``
+    is ``Just y`` but ``y`` is not ``4``. When the number of incoming models
+    exceeds the limit, we continue checking the next clause with the original,
+    unrefined model.
 
 .. ghc-flag:: -Wincomplete-record-updates
     :shortdesc: warn when a record update could fail
