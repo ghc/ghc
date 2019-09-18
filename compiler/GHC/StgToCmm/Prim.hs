@@ -1,6 +1,10 @@
 {-# LANGUAGE CPP #-}
+
+#if !MIN_VERSION_ghc(8,10,0)
+-- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
 -- emitPrimOp is quite large
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
+#endif
 
 ----------------------------------------------------------------------------
 --

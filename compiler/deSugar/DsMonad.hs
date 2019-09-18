@@ -32,8 +32,8 @@ module DsMonad (
         -- Getting and setting pattern match oracle states
         getPmDelta, updPmDelta,
 
-        -- Iterations for pm checking
-        incrCheckPmIterDs, resetPmIterDs, dsGetCompleteMatches,
+        -- Get COMPLETE sets of a TyCon
+        dsGetCompleteMatches,
 
         -- Warnings and errors
         DsWarning, warnDs, warnIfSetDs, errDs, errDsCoreExpr,
@@ -392,22 +392,6 @@ getPmDelta = do { env <- getLclEnv; return (dsl_delta env) }
 -- See 'dsl_delta'.
 updPmDelta :: Delta -> DsM a -> DsM a
 updPmDelta delta = updLclEnv (\env -> env { dsl_delta = delta })
-
--- | Increase the counter for elapsed pattern match check iterations.
--- If the current counter is already over the limit, fail
-incrCheckPmIterDs :: DsM Int
-incrCheckPmIterDs = do
-  env <- getLclEnv
-  cnt <- readTcRef (dsl_pm_iter env)
-  max_iters <- maxPmCheckIterations <$> getDynFlags
-  if cnt >= max_iters
-    then failM
-    else updTcRef (dsl_pm_iter env) (+1)
-  return cnt
-
--- | Reset the counter for pattern match check iterations to zero
-resetPmIterDs :: DsM ()
-resetPmIterDs = do { env <- getLclEnv; writeTcRef (dsl_pm_iter env) 0 }
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
