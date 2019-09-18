@@ -974,7 +974,6 @@ data DynFlags = DynFlags {
   debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
-  maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
   inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
@@ -998,6 +997,10 @@ data DynFlags = DynFlags {
                                         --   error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
+  maxPmCheckModels      :: Int,         -- ^ Soft limit on the number of models
+                                        --   the pattern match checker checks
+                                        --   a pattern against. A safe guard
+                                        --   against exponential blow-up.
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
@@ -1926,7 +1929,6 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
-        maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         inlineCheck             = Nothing,
         binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
@@ -1935,6 +1937,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         maxRefHoleFits     = Just 6,
         refLevelHoleFits   = Nothing,
         maxUncoveredPatterns    = 4,
+        maxPmCheckModels        = 100,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
@@ -3599,12 +3602,16 @@ dynamic_flags_deps = [
             "vectors registers are now passed in registers by default."
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
+  , make_ord_flag defFlag "fmax-pmcheck-models"
+      (intSuffix (\n d -> d { maxPmCheckModels = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
       (intSuffix (\n d -> d { simplPhases = n }))
   , make_ord_flag defFlag "fmax-simplifier-iterations"
       (intSuffix (\n d -> d { maxSimplIterations = n }))
-  , make_ord_flag defFlag "fmax-pmcheck-iterations"
-      (intSuffix (\n d -> d{ maxPmCheckIterations = n }))
+  , (Deprecated, defFlag "fmax-pmcheck-iterations"
+      (intSuffixM (\_ d ->
+       do { deprecate $ "use -fmax-pmcheck-models instead"
+          ; return d })))
   , make_ord_flag defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d { simplTickFactor = n }))
   , make_ord_flag defFlag "fspec-constr-threshold"
