@@ -1,6 +1,10 @@
 {-# LANGUAGE CPP #-}
+
+#if __GLASGOW_HASKELL__ <= 808
+-- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
 -- emitPrimOp is quite large
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
+#endif
 
 ----------------------------------------------------------------------------
 --

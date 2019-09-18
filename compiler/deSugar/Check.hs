@@ -166,28 +166,50 @@ instance Monoid Diverged where
   mempty = NotDiverged
   mappend = (Semi.<>)
 
+data Precision = Approximate | Precise
+  deriving (Eq, Show)
+
+instance Outputable Precision where
+  ppr = text . show
+
+instance Semi.Semigroup Precision where
+  Approximate <> _ = Approximate
+  _ <> Approximate = Approximate
+  Precise <> Precise = Precise
+
+instance Monoid Precision where
+  mempty = Precise
+  mappend = (Semi.<>)
+
 -- | A triple <C,U,D> of covered, uncovered, and divergent sets.
+--
+-- Also stores a flag 'presultApprox' denoting whether we ran into the
+-- 'maxPmCheckModels' limit for the purpose of hints in warning messages to
+-- maybe increase the limit.
 data PartialResult = PartialResult {
                         presultCovered   :: Covered
                       , presultUncovered :: Uncovered
-                      , presultDivergent :: Diverged }
+                      , presultDivergent :: Diverged
+                      , presultApprox    :: Precision }
 
 emptyPartialResult :: PartialResult
 emptyPartialResult = PartialResult { presultUncovered = mempty
                                    , presultCovered   = mempty
-                                   , presultDivergent = mempty }
+                                   , presultDivergent = mempty
+                                   , presultApprox    = mempty }
 
 combinePartialResults :: PartialResult -> PartialResult -> PartialResult
-combinePartialResults (PartialResult cs1 vsa1 ds1) (PartialResult cs2 vsa2 ds2)
+combinePartialResults (PartialResult cs1 vsa1 ds1 ap1) (PartialResult cs2 vsa2 ds2 ap2)
   = PartialResult (cs1 Semi.<> cs2)
                   (vsa1 Semi.<> vsa2)
                   (ds1 Semi.<> ds2)
+                  (ap1 Semi.<> ap2) -- the result is approximate if either is
 
 instance Outputable PartialResult where
-  ppr (PartialResult c vsa d)
-    = hang (text "PartialResult" <+> ppr c <+> ppr d) 2  (ppr_vsa vsa)
+  ppr (PartialResult c unc d pc)
+    = hang (text "PartialResult" <+> ppr c <+> ppr d <+> ppr pc) 2 (ppr_unc unc)
     where
-      ppr_vsa = braces . fsep . punctuate comma . map ppr
+      ppr_unc = braces . fsep . punctuate comma . map ppr
 
 instance Semi.Semigroup PartialResult where
   (<>) = combinePartialResults
@@ -201,6 +223,8 @@ instance Monoid PartialResult where
 -- * Redundant clauses
 -- * Not-covered clauses (or their type, if no pattern is available)
 -- * Clauses with inaccessible RHS
+-- * A flag saying whether we ran into the 'maxPmCheckModels' limit for the
+--   purpose of suggesting to crank it up in the warning message
 --
 -- More details about the classification of clauses into useful, redundant
 -- and with inaccessible right hand side can be found here:
@@ -211,13 +235,15 @@ data PmResult =
   PmResult {
       pmresultRedundant    :: [Located [LPat GhcTc]]
     , pmresultUncovered    :: UncoveredCandidates
-    , pmresultInaccessible :: [Located [LPat GhcTc]] }
+    , pmresultInaccessible :: [Located [LPat GhcTc]]
+    , pmresultApproximate  :: Precision }
 
 instance Outputable PmResult where
   ppr pmr = hang (text "PmResult") 2 $ vcat
     [ text "pmresultRedundant" <+> ppr (pmresultRedundant pmr)
     , text "pmresultUncovered" <+> ppr (pmresultUncovered pmr)
     , text "pmresultInaccessible" <+> ppr (pmresultInaccessible pmr)
+    , text "pmresultApproximate" <+> ppr (pmresultApproximate pmr)
     ]
 
 -- | Either a list of patterns that are not covered, or their type, in case we
@@ -250,27 +276,24 @@ instance Outputable UncoveredCandidates where
 checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
-  mb_pm_res <- tryM (checkSingle' locn var p)
-  case mb_pm_res of
-    Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+  res <- checkSingle' locn var p
+  dsPmWarn dflags ctxt res
 
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
 checkSingle' locn var p = do
-  resetPmIterDs -- set the iter-no to zero
   fam_insts <- dsGetFamInstEnvs
   clause    <- translatePat fam_insts p
   missing   <- getPmDelta
   tracePm "checkSingle': missing" (ppr missing)
-  PartialResult cs us ds <- pmcheckI clause [] [var] 1 missing
+  PartialResult cs us ds pc <- pmcheckI clause [] [var] 1 missing
   dflags <- getDynFlags
   us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
   let uc = UncoveredPatterns [var] us'
   return $ case (cs,ds) of
-    (Covered,  _    )         -> PmResult [] uc [] -- useful
-    (NotCovered, NotDiverged) -> PmResult m  uc [] -- redundant
-    (NotCovered, Diverged )   -> PmResult [] uc m  -- inaccessible rhs
+    (Covered,  _    )         -> PmResult [] uc [] pc -- useful
+    (NotCovered, NotDiverged) -> PmResult m  uc [] pc -- redundant
+    (NotCovered, Diverged )   -> PmResult [] uc m  pc -- inaccessible rhs
   where m = [cL locn [cL locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
@@ -299,14 +322,12 @@ checkMatches dflags ctxt vars matches = do
                                , text "Matches:"])
                                2
                                (vcat (map ppr matches)))
-  mb_pm_res <- tryM $ case matches of
+  res <- case matches of
     -- Check EmptyCase separately
     -- See Note [Checking EmptyCase Expressions] in PmOracle
     [] | [var] <- vars -> checkEmptyCase' var
     _normal_match      -> checkMatches' vars matches
-  case mb_pm_res of
-    Left  _   -> warnPmIters dflags ctxt
-    Right res -> dsPmWarn dflags ctxt res
+  dsPmWarn dflags ctxt res
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
@@ -314,38 +335,45 @@ checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
 checkMatches' vars matches
   | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
-      resetPmIterDs -- set the iter-no to zero
       missing    <- getPmDelta
       tracePm "checkMatches': missing" (ppr missing)
-      (rs,us,ds) <- go matches [missing]
+      (rs,us,ds,pc) <- go matches [missing]
       dflags <- getDynFlags
       us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
       let up = UncoveredPatterns vars us'
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
                  , pmresultUncovered    = up
-                 , pmresultInaccessible = map hsLMatchToLPats ds }
+                 , pmresultInaccessible = map hsLMatchToLPats ds
+                 , pmresultApproximate  = pc }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
        -> DsM ( [LMatch GhcTc (LHsExpr GhcTc)]
               , Uncovered
-              , [LMatch GhcTc (LHsExpr GhcTc)])
-    go []     missing = return ([], missing, [])
+              , [LMatch GhcTc (LHsExpr GhcTc)]
+              , Precision)
+    go []     missing = return ([], missing, [], Precise)
     go (m:ms) missing = do
       tracePm "checkMatches': go" (ppr m)
+      dflags             <- getDynFlags
       fam_insts          <- dsGetFamInstEnvs
       (clause, guards)   <- translateMatch fam_insts m
-      r@(PartialResult cs missing' ds)
-        <- runMany (pmcheckI clause guards vars (length missing)) missing
+      let limit           = maxPmCheckModels dflags
+          n_siblings      = length missing
+          throttled_check delta =
+            snd <$> throttle limit (pmcheckI clause guards vars) n_siblings delta
+
+      r@(PartialResult cs missing' ds pc1) <- runMany throttled_check missing
+
       tracePm "checkMatches': go: res" (ppr r)
-      (rs, final_u, is)  <- go ms missing'
+      (rs, final_u, is, pc2)  <- go ms missing'
       return $ case (cs, ds) of
         -- useful
-        (Covered,  _    )        -> (rs, final_u,   is)
+        (Covered,  _    )        -> (rs, final_u,    is, pc1 Semi.<> pc2)
         -- redundant
-        (NotCovered, NotDiverged) -> (m:rs, final_u,is)
+        (NotCovered, NotDiverged) -> (m:rs, final_u, is, pc1 Semi.<> pc2)
         -- inaccessible
-        (NotCovered, Diverged )   -> (rs, final_u, m:is)
+        (NotCovered, Diverged )   -> (rs, final_u, m:is, pc1 Semi.<> pc2)
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
@@ -363,7 +391,7 @@ checkEmptyCase' x = do
     -- A list of oracle states for the different satisfiable constructors is
     -- available. Turn this into a value set abstraction.
     Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
-  pure (PmResult [] us [])
+  pure (PmResult [] us [] Precise)
 
 getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
 getNFirstUncovered _    0 _              = pure []
@@ -372,38 +400,6 @@ getNFirstUncovered vars n (delta:deltas) = do
   front <- provideEvidenceForEquation vars n delta
   back <- getNFirstUncovered vars (n - length front) deltas
   pure (front ++ back)
-
--- | The maximum successive number of refinements ('refineToAltCon') we allow
--- per representative. See Note [Limit the number of refinements].
-mAX_REFINEMENTS :: Int
--- The current number is chosen so that PrelRules is still checked with
--- reasonable performance. If this is set to below 2, ds022 will start to fail.
--- Although that is probably due to the fact that we always increase the
--- refinement counter instead of just increasing it when the contraposition
--- is satisfiable (when the not taken case 'addRefutableAltCon' is
--- satisfiable, that is). That would be the first thing I'd try if we have
--- performance problems on one test while decreasing the threshold leads to
--- other tests being broken like ds022 above.
-mAX_REFINEMENTS = 3
-
--- | The threshold for detecting exponential blow-up in the number of 'Delta's
--- to check introduced by guards.
-tHRESHOLD_GUARD_DELTAS :: Int
-tHRESHOLD_GUARD_DELTAS = 100
-
--- | Multiply the estimated number of 'Delta's to process by a constant
--- branching factor induced by a guard and return the new estimate if it
--- doesn't exceed a constant threshold.
--- See 6. in Note [Guards and Approximation].
-tryMultiplyDeltas :: Int -> Int -> Maybe Int
-tryMultiplyDeltas multiplier n_delta
-  -- The ^2 below is intentional: We want to give up on guards with a large
-  -- branching factor rather quickly, still leaving room for small informative
-  -- ones later on.
-  | n_delta*multiplier^(2::Int) < tHRESHOLD_GUARD_DELTAS
-  = Just (n_delta*multiplier)
-  | otherwise
-  = Nothing
 
 {-
 %************************************************************************
@@ -555,7 +551,7 @@ translatePat fam_insts pat = case pat of
     --
     -- Here we construct CanFailPmPat directly, rather can construct a view
     -- pattern and do further translation as an optimization, for the reason,
-    -- see Note [Guards and Approximation].
+    -- see Note [Countering exponential blowup].
 
   ConPatOut { pat_con     = (dL->L _ con)
             , pat_arg_tys = arg_tys
@@ -734,18 +730,41 @@ translateBoolGuard e
     -- PatVec for efficiency
   | otherwise = (:[]) <$> mkGuard [truePattern] (unLoc e)
 
-{- Note [Guards and Approximation]
+{- Note [Countering exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Precise pattern match exchaustiveness checking is necessarily exponential in
-the size of some input programs. We implement a couple approximation and safe
-guards to prevent exponential blow-up:
+Precise pattern match exhaustiveness checking is necessarily exponential in
+the size of some input programs. We implement a counter-measure in the form of
+the -fmax-pmcheck-models flag, limiting the number of Deltas we check against
+each pattern by a constant.
 
-  * Guards usually provide little information gain while quickly leading to
-    exponential blow-up. See Note [Combinatorial explosion in guards].
-  * Similar to the situation with guards, refining a variable to a pattern
-    synonym application provides little value while easily leading to
-    exponential blow-up due to lack of generativity compared to DataCons.
-    See Note [Limit the number of refinements].
+How do we do that? Consider
+
+  f True True = ()
+  f True True = ()
+
+And imagine we set our limit to 1 for the sake of the example. The first clause
+will be checked against the initial Delta, {}. Doing so will produce an
+Uncovered set of size 2, containing the models {x/~True} and {x~True,y/~True}.
+Also we find the first clause to cover the model {x~True,y~True}.
+
+But the Uncovered set we get out of the match is too huge! We somehow have to
+ensure not to make things worse as they are already, so we continue checking
+with a singleton Uncovered set of the initial Delta {}. Why is this
+sound (wrt. notion of the GADTs Meet their Match paper)? Well, it basically
+amounts to forgetting that we matched against the first clause. The values
+represented by {} are a superset of those represented by its two refinements
+{x/~True} and {x~True,y/~True}.
+
+This forgetfulness becomes very apparent in the example above: By continuing
+with {} we don't detect the second clause as redundant, as it again covers the
+same non-empty subset of {}. So we don't flag everything as redundant anymore,
+but still will never flag something as redundant that isn't.
+
+For exhaustivity, the converse applies: We will report @f@ as non-exhaustive
+and report @f _ _@ as missing, which is a superset of the actual missing
+matches. But soundness means we will never fail to report a missing match.
+
+This mechanism is implemented in the higher-order function 'throttle'.
 
 Note [Combinatorial explosion in guards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -758,54 +777,11 @@ split! Hence splitting k-fold just means having k-fold more work. The problem
 exacerbates for larger k, because it gets even more unlikely that we can handle
 all of the arising Deltas better than just continue working on the original
 Delta.
-Long story short: At each point we estimate the number of Deltas we possibly
-have to check in the same manner as the current Delta. If we hit a guard that
-splits the current Delta k-fold, we check whether this split would get us beyond
-a certain threshold ('tryMultiplyDeltas') and continue to check the other guards
-with the original Delta.
 
-Note [Limit the number of refinements]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In PrelRules, we have a huge case with relatively deep matches on pattern
-synonyms. Since we allow multiple compatible solutions in the oracle
-(i.e. @x ~ [I# y, 42]@), and every pattern synonym is compatible according to
-'eqPmAltCon' with every other (no generativity as with DataCons), what would
-usually result in a ConVar split where only one branch is satisfiable results
-in a blow-up of Deltas. Here's an example:
-    case x of
-      A (A _) -> ()
-      B (B _) -> ()
-      ...
-By the time we hit the first clause's RHS, we have split the initial Delta twice
-and handled the {x~A y, y ~ A z} case, leaving {x/~A} and {x~A y, y/~A} models
-for the second clause to check.
-
-Now consider what happens if A=Left, B=Right. We get x~B y' from the match,
-which contradicts with {x~A y, y/~A}, because A and B are incompatible due to
-the generative nature of DataCons. This leaves only {x/~A} for checking B's
-clause, which ultimately leaves {x/~[A,B]} and {x~B y', y'/~B} uncovered.
-Resulting in three models to check for the next clause. That's only linear
-growth in the number of models for each clause.
-
-Consider A and B were arbitrary pattern synonyms instead. We still get x~B y'
-from the match, but this no longer refutes {x~A y, y/~A}, because we don't
-assume generativity for pattern synonyms. Ergo, @eqPmAltCon A B == Nothing@
-and we get to check the second clause's inner match with {x~B y', x/~A} and
-{x~[A y,B y'], y/~A}, splitting both in turn. That makes 4 instead of 3 deltas.
-If we keep on doing this, we see that in the nth clause we'd have O(2^n) models
-to check instead of just O(n) as above!
-
-Clearly we have to put a stop to this. So we count in the oracle the number of
-times we refined x to some constructor. If the number of splits exceeds the
-'mAX_REFINEMENTS', we check the next clause using the original Delta rather
-than the union of Deltas arising from the ConVar split.
-
-If for the above example we had mAX_REFINEMENTS=1, then in the second clause
-we would still check the inner match with {x~B y', x/~A} and {x~[A y,B y'], y/~A}
-but *discard* the two Deltas arising from splitting {x~[A y,B y'], y/~A},
-checking the next clause with {x~A y, y/~A} instead of its two refinements.
-In addition to {x~B y', y'~B z', x/~A} (which arose from the other split) and
-{x/~[A,B]} that makes 3 models for the third equation, so linear :).
+We simply apply the same mechanism as in Note [Countering exponential blowup].
+But we don't want to forget about actually useful info from pattern match
+clauses just because we had one clause with many guards. So we set the limit for
+guards much lower.
 
 Note [Translate CoPats]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1006,49 +982,62 @@ Main functions are:
   Processes the guards.
 -}
 
--- | Lift a pattern matching action from a single value vector abstration to a
--- value set abstraction, but calling it on every vector and combining the
--- results.
-runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
-runMany _  []     = return emptyPartialResult
-runMany pm (m:ms) = do
-  res <- pm m
-  combinePartialResults res <$> runMany pm ms
+-- | @throttle limit f n delta@ executes the pattern match action @f@ but
+-- replaces the 'Uncovered' set by @[delta]@ if not doing so would lead to
+-- too many Deltas to check.
+--
+-- See Note [Countering exponential blowup] and
+-- Note [Combinatorial explosion in guards]
+--
+-- How many is "too many"? @throttle@ assumes that the pattern match action
+-- will be executed against @n@ similar other Deltas, its "siblings". Now, by
+-- observing the branching factor (i.e. the number of children) of executing
+-- the action, we can estimate how many Deltas there would be in the next
+-- generation. If we find that this number exceeds @limit@, we do
+-- "birth control": We simply don't allow a branching factor of more than 1.
+-- Otherwise we just return the singleton set of the original @delta@.
+-- This amounts to forgetting about the refined facts we got from running the
+-- action.
+throttle :: Int -> (Int -> Delta -> DsM PartialResult) -> Int -> Delta -> DsM (Int, PartialResult)
+throttle limit f n_siblings delta = do
+  res <- f n_siblings delta
+  let n_own_children = length (presultUncovered res)
+  let n_next_gen = n_siblings * n_own_children
+  -- Birth control!
+  if n_next_gen <= limit || n_own_children <= 1
+    then pure (n_next_gen, res)
+    else pure (n_siblings, res { presultUncovered = [delta], presultApprox = Approximate })
 
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheck`
+-- | Map a pattern matching action processing a single 'Delta' over a
+-- 'Uncovered' set and return the combined 'PartialResult's.
+runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
+runMany f unc = mconcat <$> traverse f unc
+
+-- | Print diagnostic info and actually call 'pmcheck'.
 pmcheckI :: PatVec -> [PatVec] -> ValVec -> Int -> Delta -> DsM PartialResult
 pmcheckI ps guards vva n delta = do
-  m <- incrCheckPmIterDs
-  tracePm "pmCheck" (ppr m <> colon
-                        $$ hang (text "patterns:") 2 (ppr ps)
-                        $$ hang (text "guards:") 2 (ppr guards)
-                        $$ ppr vva
-                        $$ ppr delta)
+  tracePm "pmCheck {" $ vcat [ ppr n <> colon
+                           , hang (text "patterns:") 2 (ppr ps)
+                           , hang (text "guards:") 2 (ppr guards)
+                           , ppr vva
+                           , ppr delta ]
   res <- pmcheck ps guards vva n delta
-  tracePm "pmCheckResult:" (ppr res)
+  tracePm "}:" (ppr res) -- braces are easier to match by tooling
   return res
 {-# INLINE pmcheckI #-}
-
--- | Increase the counter for elapsed algorithm iterations, check that the
--- limit is not exceeded and call `pmcheckGuards`
-pmcheckGuardsI :: [PatVec] -> Int -> Delta -> DsM PartialResult
-pmcheckGuardsI gvs n delta = incrCheckPmIterDs >> pmcheckGuards gvs n delta
-{-# INLINE pmcheckGuardsI #-}
 
 -- | Check the list of mutually exclusive guards
 pmcheckGuards :: [PatVec] -> Int -> Delta -> DsM PartialResult
 pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
-  (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
-  let (n', unc')
-        -- See Note [Combinatorial explosion in guards]
-        | Just n' <- tryMultiplyDeltas (length unc) n = (n', unc)
-        | otherwise                                   = (n, [delta])
-  (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
+  dflags <- getDynFlags
+  let limit = maxPmCheckModels dflags `div` 5
+  (n', PartialResult cs unc ds pc) <- throttle limit (pmcheckI gv [] []) n delta
+  (PartialResult css uncs dss pcs) <- runMany (pmcheckGuards gvs n') unc
   return $ PartialResult (cs `mappend` css)
                          uncs
                          (ds `mappend` dss)
+                         (pc `mappend` pcs)
 
 -- | Matching function: Check simultaneously a clause (takes separately the
 -- patterns and the list of guards) for exhaustiveness, redundancy and
@@ -1058,12 +1047,12 @@ pmcheck
   -> [PatVec] -- ^ (Possibly multiple) guards of the clause
   -> ValVec   -- ^ The value vector abstraction to match against
   -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
-              --   See 6. in Note [Guards and Approximation]
+              --   See 6. in Note [Countering exponential blowup]
   -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
   -> DsM PartialResult
 pmcheck [] guards [] n delta
   | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuardsI guards n delta
+  | otherwise   = pmcheckGuards guards n delta
 
 -- Guard
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
@@ -1104,13 +1093,7 @@ pmcheck (p@PmCon{ pm_con_con = con, pm_con_args = args
 
   -- Combine both into a single PartialResult
   let pr = mkUnion pr_pos' pr_neg
-  case (presultUncovered pr_pos', presultUncovered pr_neg) of
-    ([], _)                                   -> pure pr
-    (_, [])                                   -> pure pr
-    -- See Note [Limit the number of refinements]
-    _ | lookupNumberOfRefinements delta x < mAX_REFINEMENTS
-      -> pure pr
-      | otherwise                             -> pure pr{ presultUncovered = [delta] }
+  pure pr
 
 pmcheck [] _ (_:_) _ _ = panic "pmcheck: nil-cons"
 pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
@@ -1284,6 +1267,10 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
           exists_u = flag_u && (case uncovered of
                                   TypeOfUncovered   _     -> True
                                   UncoveredPatterns _ unc -> notNull unc)
+          approx   = precision == Approximate
+
+      when (approx && (exists_u || exists_i)) $
+        putSrcSpanDs loc (warnDs NoReason approx_msg)
 
       when exists_r $ forM_ redundant $ \(dL->L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
@@ -1299,7 +1286,8 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     PmResult
       { pmresultRedundant = redundant
       , pmresultUncovered = uncovered
-      , pmresultInaccessible = inaccessible } = pm_result
+      , pmresultInaccessible = inaccessible
+      , pmresultApproximate = precision } = pm_result
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
@@ -1327,6 +1315,17 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     warnEmptyCase ty = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
 
+    approx_msg = vcat
+      [ hang
+          (text "Pattern match checker ran into -fmax-pmcheck-models="
+            <> int (maxPmCheckModels dflags)
+            <> text " limit, so")
+          2
+          (  bullet <+> text "Redundant clauses might not be reported at all"
+          $$ bullet <+> text "Redundant clauses might be reported as inaccessible"
+          $$ bullet <+> text "Patterns reported as unmatched might actually be matched")
+      , text "Increase the limit or resolve the warnings to suppress this message." ]
+
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (#12957)
@@ -1348,23 +1347,6 @@ it's impossible:
 We don't want to warn about the inaccessible branch because the programmer
 didn't put it there!  So we filter out the warning here.
 -}
-
--- | Issue a warning when the predefined number of iterations is exceeded
--- for the pattern match checker
-warnPmIters :: DynFlags -> DsMatchContext -> DsM ()
-warnPmIters dflags (DsMatchContext kind loc)
-  = when (flag_i || flag_u) $ do
-      iters <- maxPmCheckIterations <$> getDynFlags
-      putSrcSpanDs loc (warnDs NoReason (msg iters))
-  where
-    ctxt   = pprMatchContext kind
-    msg is = fsep [ text "Pattern match checker exceeded"
-                  , parens (ppr is), text "iterations in", ctxt <> dot
-                  , text "(Use -fmax-pmcheck-iterations=n"
-                  , text "to set the maximum number of iterations to n)" ]
-
-    flag_i = wopt Opt_WarnOverlappingPatterns dflags
-    flag_u = exhaustive dflags kind
 
 dots :: Int -> [a] -> SDoc
 dots maxPatterns qs

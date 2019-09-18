@@ -447,8 +447,7 @@ newtype TmState = TmSt (SharedDIdEnv VarInfo)
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
 -- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
--- ('vi_cache') and the number of times each variable was refined
--- ('vi_n_refines').
+-- ('vi_cache').
 --
 -- Subject to Note [The Pos/Neg invariant].
 data VarInfo
@@ -485,15 +484,6 @@ data VarInfo
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
   -- to recognise completion of a COMPLETE set efficiently for large enums.
-
-  , vi_n_refines :: !Int
-  -- ^ Purely for Check performance reasons. The number of times this
-  -- representative was refined ('refineToAltCon') in the Check's ConVar split.
-  -- Sadly, we can't store this info in the Check module, as it's tightly coupled
-  -- to the particular 'Delta' and also is per *representative*, not per
-  -- syntactic variable. Note that this number does not always correspond to the
-  -- length of solutions: 'addVarConCt' might add a solution without
-  -- incurring the potential exponential blowup by ConVar.
   }
 
 -- | Not user-facing.
@@ -502,8 +492,8 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache n)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache, ppr n]))
+  ppr (VI ty pos neg cache)
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
 
 -- | Initial state of the oracle.
 initTmState :: TmState

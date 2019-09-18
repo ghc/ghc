@@ -115,6 +115,8 @@ test('CyclicSubst', [],  compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('CaseOfKnownCon', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('TooManyDeltas', [], compile,
+     ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # EmptyCase
 test('T10746', [], compile,
