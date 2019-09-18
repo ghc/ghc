@@ -1,0 +1,5 @@
+CustomTypeErrors07.hs:12:12:
+     Bad show!
+     In the type signature:
+        badShow :: Show (TypeError ('Text "Bad show!")) => ()
+

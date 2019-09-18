@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module OkGivenTypeError where
+module CustomTypeErrors07 where
 
 import GHC.TypeLits
 
