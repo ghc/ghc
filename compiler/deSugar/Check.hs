@@ -33,7 +33,6 @@ import BasicTypes (Origin, isGenerated)
 import CoreSyn (CoreExpr, Expr(Var))
 import CoreUtils (exprType)
 import FastString (unpackFS)
-import Unify( tcMatchTy )
 import DynFlags
 import GHC.Hs
 import TcHsSyn
@@ -42,18 +41,15 @@ import ConLike
 import Name
 import FamInst
 import TysWiredIn
-import TyCon
 import SrcLoc
 import Util
 import Outputable
 import DataCon
-import PatSyn
-import HscTypes (CompleteMatch(..))
 import BasicTypes (Boxity(..))
 import Var (EvVar)
 import Coercion
 import TcEvidence
-import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr)
+import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import MatchLit (dsLit, dsOverLit)
 import IOEnv
 import DsMonad
@@ -105,16 +101,12 @@ data PmPat where
             , pm_grd_expr :: CoreExpr } -> PmPat
      -- (PmGrd pat expr) matches expr against pat, binding the variables in pat
 
-  -- | A fake guard pattern (True <- _) used to represent cases we cannot handle.
-  PmFake :: PmPat
-
 -- | Should not be user-facing.
 instance Outputable PmPat where
   ppr (PmCon alt _arg_tys _con_tvs con_args)
     = cparen (notNull con_args) (hsep [ppr alt, hsep (map ppr con_args)])
   ppr (PmVar vid) = ppr vid
   ppr (PmGrd pv ge) = hsep (map ppr pv) <+> text "<-" <+> ppr ge
-  ppr PmFake = text "<PmFake>"
 
 -- data T a where
 --     MkT :: forall p q. (Eq p, Ord q) => p -> q -> T [p]
@@ -435,12 +427,6 @@ truePattern :: PmPat
 truePattern = nullaryConPattern (RealDataCon trueDataCon)
 {-# INLINE truePattern #-}
 
--- | Generate a `canFail` pattern vector of a specific type
-mkCanFailPmPat :: Type -> DsM PatVec
-mkCanFailPmPat ty = do
-  var <- mkPmVar ty
-  return [var, PmFake]
-
 vanillaConPattern :: ConLike -> [Type] -> PatVec -> PmPat
 -- ADT constructor pattern => no existentials, no local constraints
 vanillaConPattern con arg_tys args =
@@ -518,19 +504,20 @@ translatePat fam_insts pat = case pat of
         pure [xp,g]
 
   -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)
-  NPlusKPat ty (dL->L _ _n) _k1 _k2 _ge _minus -> mkCanFailPmPat ty
+  NPlusKPat pat_ty (dL->L _ n) k1 k2 ge minus -> do
+    (xp, xe) <- mkPmId2Forms pat_ty
+    let ke1 = HsOverLit noExtField (unLoc k1)
+        ke2 = HsOverLit noExtField k2
+    g1 <- mkGuardSyntaxExpr [truePattern] ge    [unLoc xe, ke1]
+    g2 <- mkGuardSyntaxExpr [PmVar n]     minus [ke2]
+    return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
   ViewPat arg_ty lexpr lpat -> do
     ps <- translatePat fam_insts (unLoc lpat)
-    -- See Note [Guards and Approximation]
-    res <- allM cantFailPattern ps
-    case res of
-      True  -> do
-        (xp,xe) <- mkPmId2Forms arg_ty
-        g <- mkGuard ps (HsApp noExtField lexpr xe)
-        return [xp, g]
-      False -> mkCanFailPmPat arg_ty
+    (xp,xe) <- mkPmId2Forms arg_ty
+    g <- mkGuard ps (HsApp noExtField lexpr xe)
+    return [xp, g]
 
   -- list
   ListPat (ListPatTc ty Nothing) ps -> do
@@ -538,14 +525,20 @@ translatePat fam_insts pat = case pat of
     return (foldr (mkListPatVec ty) [nilPattern ty] pv)
 
   -- overloaded list
-  ListPat (ListPatTc _elem_ty (Just (pat_ty, _to_list))) lpats -> do
+  ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) lpats -> do
     dflags <- getDynFlags
-    if xopt LangExt.RebindableSyntax dflags
-      then mkCanFailPmPat pat_ty
-      else case splitListTyConApp_maybe pat_ty of
-              Just e_ty -> translatePat fam_insts
-                                        (ListPat (ListPatTc e_ty Nothing) lpats)
-              Nothing   -> mkCanFailPmPat pat_ty
+    case splitListTyConApp_maybe pat_ty of
+      Just e_ty
+        | not (xopt LangExt.RebindableSyntax dflags)
+        -- Just translate it as a regular ListPat
+        -> translatePat fam_insts (ListPat (ListPatTc e_ty Nothing) lpats)
+      _ -> do
+        ps       <- translatePatVec fam_insts (map unLoc lpats)
+        (xp, xe) <- mkPmId2Forms pat_ty
+        let pats = foldr (mkListPatVec elem_ty) [nilPattern elem_ty] ps
+        g <- mkGuardSyntaxExpr pats to_list [unLoc xe]
+        return [xp,g]
+
     -- (a) In the presence of RebindableSyntax, we don't know anything about
     --     `toList`, we should treat `ListPat` as any other view pattern.
     --
@@ -568,16 +561,11 @@ translatePat fam_insts pat = case pat of
             , pat_arg_tys = arg_tys
             , pat_tvs     = ex_tvs
             , pat_args    = ps } -> do
-    let ty = conLikeResTy con arg_tys
-    groups <- allCompleteMatches ty
-    case groups of
-      [] -> mkCanFailPmPat ty
-      _  -> do
-        args <- translateConPatVec fam_insts arg_tys ex_tvs con ps
-        return [PmCon { pm_con_con     = PmAltConLike con
-                      , pm_con_arg_tys = arg_tys
-                      , pm_con_tvs     = ex_tvs
-                      , pm_con_args    = args }]
+    args <- translateConPatVec fam_insts arg_tys ex_tvs con ps
+    return [PmCon { pm_con_con     = PmAltConLike con
+                  , pm_con_arg_tys = arg_tys
+                  , pm_con_tvs     = ex_tvs
+                  , pm_con_args    = args }]
 
   NPat ty (dL->L _ olit) mb_neg _ -> do
     -- See Note [Literal short cut] in MatchLit.hs
@@ -713,14 +701,6 @@ translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> DsM PatVec
 translateGuards fam_insts guards =
   concat <$> mapM (translateGuard fam_insts) guards
 
--- | Check whether a pattern can fail to match
-cantFailPattern :: PmPat -> DsM Bool
-cantFailPattern PmVar {}      = pure True
-cantFailPattern PmCon { pm_con_con = c, pm_con_arg_tys = tys, pm_con_args = ps}
-  = (&&) <$> singleMatchConstructor c tys <*> allM cantFailPattern ps
-cantFailPattern (PmGrd pv _e) = allM cantFailPattern pv
-cantFailPattern _             = pure False
-
 -- | Translate a guard statement to Pattern
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM PatVec
 translateGuard fam_insts guard = case guard of
@@ -756,90 +736,19 @@ translateBoolGuard e
 
 {- Note [Guards and Approximation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Even if the algorithm is really expressive, the term oracle we use is not.
-Hence, several features are not translated *properly* but we approximate.
-The list includes:
+Precise pattern match exchaustiveness checking is necessarily exponential in
+the size of some input programs. We implement a couple approximation and safe
+guards to prevent exponential blow-up:
 
-1. View Patterns
-----------------
-A view pattern @(f -> p)@ should be translated to @x (p <- f x)@. The term
-oracle does not handle function applications so we know that the generated
-constraints will not be handled at the end. Hence, we distinguish between two
-cases:
-  a) Pattern @p@ cannot fail. Then this is just a binding and we do the *right
-     thing*.
-  b) Pattern @p@ can fail. This means that when checking the guard, we will
-     generate several cases, with no useful information. E.g.:
+  * Guards usually provide little information gain while quickly leading to
+    exponential blow-up. See Note [Combinatorial explosion in guards].
+  * Similar to the situation with guards, refining a variable to a pattern
+    synonym application provides little value while easily leading to
+    exponential blow-up due to lack of generativity compared to DataCons.
+    See Note [Limit the number of refinements].
 
-       h (f -> [a,b]) = ...
-       h x ([a,b] <- f x) = ...
-
-       uncovered set = { [x |> { False ~ (f x ~ [])            }]
-                       , [x |> { False ~ (f x ~ (t1:[]))       }]
-                       , [x |> { False ~ (f x ~ (t1:t2:t3:t4)) }] }
-
-     So we have two problems:
-       1) Since we do not print the constraints in the general case (they may
-          be too many), the warning will look like this:
-
-            Pattern match(es) are non-exhaustive
-            In an equation for `h':
-                Patterns not matched:
-                    _
-                    _
-                    _
-          Which is not short and not more useful than a single underscore.
-       2) The size of the uncovered set increases a lot, without gaining more
-          expressivity in our warnings.
-
-     Hence, in this case, we replace the guard @([a,b] <- f x)@ with a *dummy*
-     @PmFake@: @True <- _@. That is, we record that there is a possibility
-     of failure but we minimize it to a True/False. This generates a single
-     warning and much smaller uncovered sets.
-
-2. Overloaded Lists
--------------------
-An overloaded list @[...]@ should be translated to @x ([...] <- toList x)@. The
-problem is exactly like above, as its solution. For future reference, the code
-below is the *right thing to do*:
-
-   ListPat (ListPatTc elem_ty (Just (pat_ty, _to_list))) lpats
-     otherwise -> do
-       (xp, xe) <- mkPmId2Forms pat_ty
-       ps       <- translatePatVec (map unLoc lpats)
-       let pats = foldr (mkListPatVec elem_ty) [nilPattern elem_ty] ps
-           g    = mkGuard pats (HsApp (noLoc to_list) xe)
-       return [xp,g]
-
-3. Overloaded Literals
-----------------------
-The case with literals is a bit different. a literal @l@ should be translated
-to @x (True <- x == from l)@. Since we want to have better warnings for
-overloaded literals as it is a very common feature, we treat them differently.
-They are mainly covered in Note [Undecidable Equality for PmAltCons] in PmTypes.
-
-4. N+K Patterns & Pattern Synonyms
-----------------------------------
-An n+k pattern (n+k) should be translated to @x (True <- x >= k) (n <- x-k)@.
-Since the only pattern of the three that causes failure is guard @(n <- x-k)@,
-and has two possible outcomes. Hence, there is no benefit in using a dummy and
-we implement the proper thing. Pattern synonyms are simply not implemented yet.
-Hence, to be conservative, we generate a dummy pattern, assuming that the
-pattern can fail.
-
-5. Actual Guards
-----------------
-During translation, boolean guards and pattern guards are translated properly.
-Let bindings though are omitted by function @translateLet@. Since they are lazy
-bindings, we do not actually want to generate a (strict) equality (like we do
-in the pattern bind case). Hence, we safely drop them.
-
-Additionally, top-level guard translation (performed by @translateGuards@)
-replaces guards that cannot be reasoned about (like the ones we described in
-1-4) with a single @PmFake@ to record the possibility of failure to match.
-
-6. Combinatorial explosion
---------------------------
+Note [Combinatorial explosion in guards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Function with many clauses and deeply nested guards like in #11195 tend to
 overwhelm the checker because they lead to exponential splitting behavior.
 See the comments on #11195 on refinement trees. Every guard refines the
@@ -937,7 +846,6 @@ pmPatType (PmVar  { pm_var_id  = x }) = idType x
 pmPatType (PmGrd  { pm_grd_pv  = pv })
   = ASSERT(patVecArity pv == 1) (pmPatType p)
   where Just p = find ((==1) . patternArity) pv
-pmPatType PmFake = pmPatType truePattern
 
 {-
 Note [Extensions to GADTs Meet Their Match]
@@ -963,6 +871,11 @@ the paper. This Note serves as a reference for these new features.
 mkGuard :: PatVec -> HsExpr GhcTc -> DsM PmPat
 mkGuard pv e = PmGrd pv <$> dsExpr e
 
+mkGuardSyntaxExpr :: PatVec -> SyntaxExpr GhcTc -> [HsExpr GhcTc] -> DsM PmPat
+mkGuardSyntaxExpr pv f args = do
+  core_args <- traverse dsExpr args
+  PmGrd pv <$> dsSyntaxExpr f core_args
+
 -- | Generate a variable pattern of a given type
 mkPmVar :: Type -> DsM PmPat
 mkPmVar ty = PmVar <$> mkPmId ty
@@ -978,80 +891,6 @@ mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
   return (PmVar x, noLoc (HsVar noExtField (noLoc x)))
-
--- | Check whether a 'PmAltCon' has the /single match/ property, i.e. whether
--- it is the only possible match in the given context. See also
--- 'allCompleteMatches' and Note [Single match constructors].
-singleMatchConstructor :: PmAltCon -> [Type] -> DsM Bool
-singleMatchConstructor PmAltLit{}        _   = pure False
-singleMatchConstructor (PmAltConLike cl) tys =
-  any isSingleton <$> allCompleteMatches (conLikeResTy cl tys)
-
-{-
-Note [Single match constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When translating pattern guards for consumption by the checker, we desugar
-every pattern guard that might fail ('cantFailPattern') to 'PmFake'
-(True <- _). Which patterns can't fail? Exactly those that only match on
-'singleMatchConstructor's.
-
-Here are a few examples:
-  * @f a | (a, b) <- foo a = 42@: Product constructors are generally
-    single match. This extends to single constructors of GADTs like 'Refl'.
-  * If @f | Id <- id () = 42@, where @pattern Id = ()@ and 'Id' is part of a
-    singleton `COMPLETE` set, then 'Id' has the single match property.
-
-In effect, we can just enumerate 'allCompleteMatches' and check if the conlike
-occurs as a singleton set.
-There's the chance that 'Id' is part of multiple `COMPLETE` sets. That's
-irrelevant; If the user specified a singleton set, it is single-match.
-
-Note that this doesn't really take into account incoming type constraints;
-It might be obvious from type context that a particular GADT constructor has
-the single-match property. We currently don't (can't) check this in the
-translation step. See #15753 for why this yields surprising results.
--}
-
--- | For a given type, finds all the COMPLETE sets of conlikes that inhabit it.
---
--- Note that for a data family instance, this must be the *representation* type.
--- e.g. data instance T (a,b) = T1 a b
---   leads to
---      data TPair a b = T1 a b  -- The "representation" type
---   It is TPair a b, not T (a, b), that is given to allCompleteMatches
---
--- These come from two places.
---  1. From data constructors defined with the result type constructor.
---  2. From `COMPLETE` pragmas which have the same type as the result
---     type constructor. Note that we only use `COMPLETE` pragmas
---     *all* of whose pattern types match. See #14135
-allCompleteMatches :: Type -> DsM [[ConLike]]
-allCompleteMatches ty = case splitTyConApp_maybe ty of
-  Nothing -> pure [] -- NB: We don't know any COMPLETE set, as opposed to [[]]
-  Just (tc, tc_args) -> do
-    -- Look into the representation type of a data family instance, too.
-    env <- dsGetFamInstEnvs
-    let (tc', _tc_args', _co) = tcLookupDataFamInst env tc tc_args
-    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc'
-    let maybe_to_list = maybe [] (:[])
-    let rdcs = maybe_to_list mb_rdcs
-    -- NB: tc, because COMPLETE sets are associated with the parent data family
-    -- TyCon
-    pragmas <- dsGetCompleteMatches tc
-    let fams = mapM dsLookupConLike . completeMatchConLikes
-    pscs <- mapM fams pragmas
-    let candidates = rdcs ++ pscs
-    -- Check that all the pattern synonym return types in a `COMPLETE`
-    -- pragma subsume the type we're matching.
-    -- See Note [Filtering out non-matching COMPLETE sets]
-    pure (filter (isValidCompleteMatch ty) candidates)
-      where
-        isValidCompleteMatch :: Type -> [ConLike] -> Bool
-        isValidCompleteMatch ty = all p
-          where
-            p (RealDataCon _) = True
-            p (PatSynCon ps)  = isJust (tcMatchTy (projResTy (patSynSig ps)) ty)
-            projResTy (_, _, _, _, _, res_ty) = res_ty
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -1141,7 +980,6 @@ patVecArity = sum . map patternArity
 -- | Compute the arity of a pattern
 patternArity :: PmPat -> PmArity
 patternArity (PmGrd {}) = 0
-patternArity PmFake     = 0
 patternArity _other_pat = 1
 
 {-
@@ -1204,7 +1042,7 @@ pmcheckGuards []       _ delta = return (usimple delta)
 pmcheckGuards (gv:gvs) n delta = do
   (PartialResult cs unc ds) <- pmcheckI gv [] [] n delta
   let (n', unc')
-        -- See 6. in Note [Guards and Approximation]
+        -- See Note [Combinatorial explosion in guards]
         | Just n' <- tryMultiplyDeltas (length unc) n = (n', unc)
         | otherwise                                   = (n, [delta])
   (PartialResult css uncs dss) <- runMany (pmcheckGuardsI gvs n') unc'
@@ -1228,16 +1066,6 @@ pmcheck [] guards [] n delta
   | otherwise   = pmcheckGuardsI guards n delta
 
 -- Guard
-pmcheck (PmFake : ps) guards vva n delta =
-  -- short-circuit if the guard pattern is useless.
-  -- we just have two possible outcomes: fail here or match and recurse
-  -- none of the two contains any useful information about the failure
-  -- though. So just have these two cases but do not do all the boilerplate
-  -- TODO: I don't think this should mkCons delta, rather than just replace the
-  --       presultUncovered by [delta] completely. Note that the uncovered set
-  --       returned from the recursive call can only be a refinement of the
-  --       original delta.
-  forces . mkCons delta <$> pmcheckI ps guards vva n delta
 pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = do
   tracePm "PmGrd: pmPatType" (vcat [ppr p, ppr (pmPatType p)])
   x <- mkPmId (exprType e)
@@ -1290,11 +1118,6 @@ pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
 
-updateUncovered :: (Uncovered -> Uncovered) -> (PartialResult -> PartialResult)
-updateUncovered f p@(PartialResult { presultUncovered = old })
-  = p { presultUncovered = f old }
-
-
 -- | Initialise with default values for covering and divergent information and
 -- a singleton uncovered set.
 usimple :: Delta -> PartialResult
@@ -1307,10 +1130,6 @@ usimple delta = mempty { presultUncovered = [delta] }
 
 mkUnion :: PartialResult -> PartialResult -> PartialResult
 mkUnion = mappend
-
--- | Add a model to the uncovered set.
-mkCons :: Delta -> PartialResult -> PartialResult
-mkCons model = updateUncovered (model:)
 
 -- | Set the divergent set to not empty
 forces :: PartialResult -> PartialResult
