@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ViewPatterns #-}
 
--- | Provides factilities for pretty-printing 'PmExpr's in a way approriate for
+-- | Provides factilities for pretty-printing 'Delta's in a way appropriate for
 -- user facing pattern match warnings.
 module PmPpr (
         pprUncovered
@@ -22,7 +22,7 @@ import Util
 import Maybes
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
-import PmExpr
+import PmTypes
 import PmOracle
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
@@ -44,7 +44,7 @@ pprUncovered delta vas
   | otherwise         = hang (fsep vec) 4 $
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
   where
-    ppr_action       = mapM (pprPmExprVar 2) vas
+    ppr_action       = mapM (pprPmVar 2) vas
     (vec, renamings) = runPmPpr delta ppr_action
     refuts           = prettifyRefuts delta renamings
 
@@ -128,16 +128,16 @@ checkRefuts x = do
 -- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
-pprPmExprVar :: Int -> Id -> PmPprM SDoc
-pprPmExprVar prec x = do
+pprPmVar :: Int -> Id -> PmPprM SDoc
+pprPmVar prec x = do
   delta <- ask
   case lookupSolution delta x of
-    Just (alt, args) -> pprPmExprCon prec alt args
+    Just (alt, args) -> pprPmAltCon prec alt args
     Nothing          -> fromMaybe underscore <$> checkRefuts x
 
-pprPmExprCon :: Int -> PmAltCon -> [Id] -> PmPprM SDoc
-pprPmExprCon _prec (PmAltLit l)      _    = pure (ppr l)
-pprPmExprCon prec  (PmAltConLike cl) args = do
+pprPmAltCon :: Int -> PmAltCon -> [Id] -> PmPprM SDoc
+pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)
+pprPmAltCon prec  (PmAltConLike cl) args = do
   delta <- ask
   pprConLike delta prec cl args
 
@@ -146,24 +146,24 @@ pprConLike delta _prec cl args
   | Just pm_expr_list <- pmExprAsList delta (PmAltConLike cl) args
   = case pm_expr_list of
       NilTerminated list ->
-        brackets . fsep . punctuate comma <$> mapM (pprPmExprVar 0) list
+        brackets . fsep . punctuate comma <$> mapM (pprPmVar 0) list
       WcVarTerminated pref x ->
-        parens   . fcat . punctuate colon <$> mapM (pprPmExprVar 0) (toList pref ++ [x])
+        parens   . fcat . punctuate colon <$> mapM (pprPmVar 0) (toList pref ++ [x])
 pprConLike _delta _prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
-  = hash_parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
+  = hash_parens . fsep . punctuate comma <$> mapM (pprPmVar 0) args
   | isTupleDataCon con
-  = parens . fsep . punctuate comma <$> mapM (pprPmExprVar 0) args
+  = parens . fsep . punctuate comma <$> mapM (pprPmVar 0) args
 pprConLike _delta prec cl args
   | conLikeIsInfix cl = case args of
-      [x, y] -> do x' <- pprPmExprVar 1 x
-                   y' <- pprPmExprVar 1 y
+      [x, y] -> do x' <- pprPmVar 1 x
+                   y' <- pprPmVar 1 y
                    return (cparen (prec > 0) (x' <+> ppr cl <+> y'))
       -- can it be infix but have more than two arguments?
-      list   -> pprPanic "pprPmExprCon:" (ppr list)
+      list   -> pprPanic "pprConLike:" (ppr list)
   | null args = return (ppr cl)
-  | otherwise = do args' <- mapM (pprPmExprVar 2) args
+  | otherwise = do args' <- mapM (pprPmVar 2) args
                    return (cparen (prec > 1) (fsep (ppr cl : args')))
 
 -- | The result of 'pmExprAsList'.
@@ -171,7 +171,7 @@ data PmExprList
   = NilTerminated [Id]
   | WcVarTerminated (NonEmpty Id) Id
 
--- | Extract a list of 'PmExpr's out of a sequence of cons cells, optionally
+-- | Extract a list of 'Id's out of a sequence of cons cells, optionally
 -- terminated by a wildcard variable instead of @[]@. Some examples:
 --
 -- * @pmExprAsList (1:2:[]) == Just ('NilTerminated' [1,2])@, a regular,

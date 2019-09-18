@@ -26,7 +26,7 @@ module Check (
 
 import GhcPrelude
 
-import PmExpr
+import PmTypes
 import PmOracle
 import PmPpr
 import BasicTypes (Origin, isGenerated)
@@ -817,7 +817,7 @@ below is the *right thing to do*:
 The case with literals is a bit different. a literal @l@ should be translated
 to @x (True <- x == from l)@. Since we want to have better warnings for
 overloaded literals as it is a very common feature, we treat them differently.
-They are mainly covered in Note [Undecidable Equality for PmAltCons] in PmExpr.
+They are mainly covered in Note [Undecidable Equality for PmAltCons] in PmTypes.
 
 4. N+K Patterns & Pattern Synonyms
 ----------------------------------
@@ -949,7 +949,7 @@ additional features added to the coverage checker which are not described in
 the paper. This Note serves as a reference for these new features.
 
 * Value abstractions are severely simplified to the point where they are just
-  variables. The information about the PmExpr shape of a variable is encoded in
+  variables. The information about the shape of a variable is encoded in
   the oracle state 'Delta' instead.
 * Handling of uninhabited fields like `!Void`.
   See Note [Strict argument type constraints] in PmOracle.
@@ -1397,9 +1397,6 @@ addPatTmCs ps xs k = do
   pv <- concat <$> translatePatVec fam_insts ps
   locallyExtendPmDelta (\delta -> addVarPatVecCt delta xs pv) k
 
--- ----------------------------------------------------------------------------
--- * Converting between Value Abstractions, Patterns and PmExpr
-
 -- | Add a constraint equating a variable to a 'PatVec'. Picks out the single
 -- 'PmPat' of arity 1 and equates x to it. Returns the original Delta if that
 -- fails. Otherwise it returns Nothing when the resulting Delta would be
@@ -1422,7 +1419,7 @@ addVarPatVecCt delta (x:xs) (pat:pv)
 addVarPatVecCt delta []     pv = ASSERT( patVecArity pv == 0 ) pure (Just delta)
 addVarPatVecCt _     (_:_)  [] = panic "More match vars than patterns"
 
--- | Convert a pattern to a 'PmExpr' (will be either 'Nothing' if the pattern is
+-- | Convert a pattern to a 'PmTypes' (will be either 'Nothing' if the pattern is
 -- a guard pattern, or 'Just' an expression in all other cases) by dropping the
 -- guards
 addVarPatCt :: Delta -> Id -> PmPat -> DsM (Maybe Delta)

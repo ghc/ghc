@@ -334,9 +334,9 @@ Library
         CoreStats
         MkCore
         PprCore
-        PmExpr
-        PmPpr
         PmOracle
+        PmPpr
+        PmTypes
         Check
         Coverage
         Desugar
