@@ -49,7 +49,7 @@ import TcRnMonad as TcM
 import TcSMonad  as TcS
 import TcType
 import Type
-import TysWiredIn    ( liftedRepTy )
+import TysWiredIn    ( liftedRepTy, omegaDataConTy )
 import Unify         ( tcMatchTyKi )
 import Util
 import Var
@@ -64,6 +64,7 @@ import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Maybes             ( isJust )
+import Multiplicity
 
 {-
 *********************************************************************************
@@ -656,7 +657,7 @@ tcNormalise given_ids ty
     mk_wanted_ct = do
       let occ = mkVarOcc "$tcNorm"
       name <- newSysName occ
-      let ev = mkLocalId name ty
+      let ev = mkLocalId name Omega ty -- evidences are always unrestricted
           hole = ExprHole $ OutOfScope occ emptyGlobalRdrEnv
       newHoleCt hole ev ty
 
@@ -2101,6 +2102,13 @@ defaultTyVarTcS the_tv
     -- and Note [Inferring kinds for type declarations] in TcTyClsDecls
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isMultiplicityVar the_tv
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
+                             -- never with a type; c.f. TcMType.defaultTyVar
+                             -- See Note [Kind generalisation and SigTvs]
+  = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
+       ; unifyTyVar the_tv omegaDataConTy
        ; return True }
   | otherwise
   = return False  -- the common case

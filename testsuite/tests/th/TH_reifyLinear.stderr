@@ -1,0 +1,4 @@
+
+TH_reifyLinear.hs:10:5: error:
+    Can't represent non-Omega multiplicity in Template Haskell: Int
+                                                                ->. Int

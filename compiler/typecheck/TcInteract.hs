@@ -2606,4 +2606,3 @@ matchLocalInst pred loc
         qtv_set = mkVarSet qtvs
         this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst qcis
-

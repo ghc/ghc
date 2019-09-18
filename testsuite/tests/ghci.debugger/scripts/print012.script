@@ -3,6 +3,7 @@
 :a Test
 :m +Main
 let o = O (id foo)
+seq o ()
 :p o
 seq _t1 ()
 :t _t1

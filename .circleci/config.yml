@@ -1,0 +1,321 @@
+# Questions about this file?
+# See https://gitlab.haskell.org/ghc/ghc/wikis/continuous-integration/usage.
+
+version: 2
+aliases:
+  - &defaults
+    working_directory: ~/ghc
+  - &prepare
+    run:
+      name: prepare-system
+      command: .circleci/prepare-system.sh
+  - &submodules
+    run:
+      name: submodules
+      command: .circleci/fetch-submodules.sh
+  - &buildenv
+    # ideally we would simply set THREADS here instead of re-detecting it every
+    # time we need it below. Unfortunately, there is no way to set an environment
+    # variable with the result of a shell script.
+    SKIP_PERF_TESTS: NO
+    VERBOSE: 2
+  - &boot
+    run:
+      name: Boot
+      command: |
+        ./boot
+
+        cat <<EOF >> mk/build.mk
+        BuildFlavour=$BUILD_FLAVOUR
+        ifneq "\$(BuildFlavour)" ""
+        include mk/flavours/\$(BuildFlavour).mk
+        endif
+        GhcLibHcOpts       = -O -dcore-lint
+        # TODO: arnaud: revert the above line before merge (hack)
+        EOF
+  - &set_git_identity
+      run:
+        name: Set Git Identity
+        command: |
+          git config user.email "ghc-circleci@haskell.org"
+          git config user.name "GHC CircleCI"
+  - &configure_unix
+    run:
+      name: Configure
+      command: ./configure 
+  - &configure_unix_32
+    run:
+      name: Configure
+      command: |
+        setarch i386 ./configure --with-ghc=/opt/ghc-i386/8.4.2/bin/ghc
+  - &configure_bsd
+    run:
+      name: Configure
+      command: ./configure --target=x86_64-unknown-freebsd10
+  - &configure_unreg
+    run:
+      name: Configure
+      command: ./configure --enable-unregisterised
+  - &make
+    run:
+      name: Build
+      command: "make -j2 V=0"
+  - &build_hadrian
+    run:
+      name: Build GHC using Hadrian
+      command: |
+        cabal update
+        hadrian/build.sh -j2
+  - &test
+    run:
+      name: Test
+      command: |
+        mkdir -p test-results
+        METRICS_FILE=$(mktemp)
+        echo "export METRICS_FILE=$METRICS_FILE" >> $BASH_ENV
+        make test THREADS=2 SKIP_PERF_TESTS=$SKIP_PERF_TESTS TEST_ENV=$TEST_ENV JUNIT_FILE=../../test-results/junit.xml METRICS_FILE=$METRICS_FILE
+  - &store_test_results
+    store_test_results:
+      path: test-results
+  - &push_perf_note
+    run:
+      name: Push Performance Git Notes
+      command: .circleci/push-test-metrics.sh
+  - &slowtest
+    run:
+      name: Full Test
+      command: |
+        mkdir -p test-results
+        make slowtest SKIP_PERF_TESTS=YES THREADS=2 JUNIT_FILE=../../test-results/junit.xml
+  - &bindist
+    run:
+      name: Create bindist
+      # Reduce compression effort to 3
+      command: make binary-dist TAR_COMP_OPTS="-2"
+      # Building bindist takes ~15 minutes without output, account for
+      # that.
+      no_output_timeout: "30m"
+  - &storeartifacts
+    run:
+      name: Store artifacts
+      command: |
+        curl https://ghc-artifacts.s3.amazonaws.com/tools/ghc-artifact-collector-$GHC_COLLECTOR_FLAVOR --output ghc-artifact-collector
+        chmod +x ghc-artifact-collector
+        ./ghc-artifact-collector ghc*.tar.xz
+  - &trigger_on_tags
+    filters:
+      tags:
+        only: /^ghc-.*/
+
+jobs:
+  "validate-x86_64-linux":
+    docker:
+      - image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:e517150438cd9df9564fb91adc4b42e2667b2bc1"
+    environment:
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
+      BUILD_SPHINX_PDF: "NO"
+      BUILD_SPHINX_HTML: "NO"
+      TEST_ENV: x86_64-linux
+      BUILD_FLAVOUR: validate
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-x86_64-freebsd":
+    docker:
+      - image: ghcci/x86_64-freebsd
+    environment:
+      TARGET: FreeBSD
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-freebsd
+      TEST_ENV: x86_64-freebsd
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_bsd
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-x86_64-darwin":
+    macos:
+      xcode: "9.0"
+    environment:
+      MACOSX_DEPLOYMENT_TARGET: "10.7"
+      # Only Sierra and onwards supports clock_gettime. See #12858
+      ac_cv_func_clock_gettime: "no"
+    environment:
+      GHC_COLLECTOR_FLAVOR: x86_64-darwin
+      <<: *buildenv
+      TEST_ENV: x86_64-darwin
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-hadrian-x86_64-linux":
+    docker:
+      - image: ghcci/x86_64-linux:0.0.7
+    environment:
+      <<: *buildenv
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *build_hadrian
+
+  "validate-x86_64-linux-unreg":
+    docker:
+      - image: ghcci/x86_64-linux:0.0.7
+    environment:
+      <<: *buildenv
+      TEST_ENV: x86_64-linux-unreg
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-x86_64-linux-llvm":
+    docker:
+      - image: ghcci/x86_64-linux:0.0.7
+    environment:
+      <<: *buildenv
+      BUILD_FLAVOUR: perf-llvm
+      TEST_ENV: x86_64-linux-llvm
+    steps:
+      - run:
+          name: Install LLVM
+          command: |
+            curl http://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
+            echo "export PATH=`pwd`/../clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
+      - run:
+          name: Verify that llc works
+          command: llc
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *push_perf_note
+
+  # Nightly build with -DDEBUG using devel2 flavour
+  "validate-x86_64-linux-debug":
+    docker:
+      - image: ghcci/x86_64-linux:0.0.7
+    environment:
+      BUILD_FLAVOUR: devel2
+      <<: *buildenv
+      TEST_ENV: x86_64-linux-debug
+      SKIP_PERF_TESTS: YES
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-i386-linux":
+    docker:
+      - image: ghcci/i386-linux:0.0.6
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: i386-linux
+      TEST_ENV: i386-linux
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix_32
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "validate-x86_64-fedora":
+    docker:
+      - image: ghcci/x86_64-linux-fedora:0.0.16
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-fedora
+      TEST_ENV: x86_64-fedora
+    steps:
+      - checkout
+      - *set_git_identity
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+      - *push_perf_note
+
+  "slow-validate-x86_64-linux":
+    docker:
+      - image: ghcci/x86_64-linux:0.0.7
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+      - *store_test_results
+      - *push_perf_note
+
+workflows:
+  version: 2
+  validate:
+    jobs:
+    - validate-x86_64-linux

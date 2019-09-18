@@ -54,9 +54,9 @@ import ErrUtils
 import Var           (EvVar)
 import TyCoRep
 import Type
+import Multiplicity
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
-import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List     (find)
@@ -853,7 +853,7 @@ inhabitationCandidates ty_cs ty = do
     alts_to_check :: Type -> Type -> [DataCon]
                   -> PmM (Either Type (TyCon, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
-      Just (tc, _)
+      Just (tc, tc_args)
         |  tc `elem` trivially_inhabited
         -> case dcs of
              []    -> return (Left src_ty)
@@ -869,7 +869,7 @@ inhabitationCandidates ty_cs ty = do
            -- them extremely misleading.
         -> liftD $ do
              var  <- mkPmId core_ty -- it would be wrong to unify x
-             alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
+             alts <- mapM (mkOneConFull var tc_args . RealDataCon) (tyConDataCons tc)
              return $ Right
                (tc, [ alt{ic_val_abs = build_tm (ic_val_abs alt) dcs}
                     | alt <- alts ])
@@ -1229,7 +1229,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated)
-    arg_tys = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys = map scaledThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -1616,38 +1616,32 @@ instance Outputable InhabitationCandidate where
 
 -- | Generate an 'InhabitationCandidate' for a given conlike (generate
 -- fresh variables of the appropriate type for arguments)
-mkOneConFull :: Id -> ConLike -> DsM InhabitationCandidate
---  *  x :: T tys, where T is an algebraic data type
---     NB: in the case of a data family, T is the *representation* TyCon
---     e.g.   data instance T (a,b) = T1 a b
---       leads to
---            data TPair a b = T1 a b  -- The "representation" type
---       It is TPair, not T, that is given to mkOneConFull
+mkOneConFull :: Id -> [Type] -> ConLike -> DsM InhabitationCandidate
+--  * 'con' K is a conlike of algebraic data type 'T tys'
+
+--  * 'tc_args' are the type arguments of the 'con's TyCon T
 --
---  * 'con' K is a conlike of data type T
+--  *  'x' is the variable for which we encode an equality constraint
+--     in the term oracle
 --
--- After instantiating the universal tyvars of K we get
---          K tys :: forall bs. Q => s1 .. sn -> T tys
+-- After instantiating the universal tyvars of K to tc_args we get
+--          K @tys :: forall bs. Q => s1 .. sn -> T tys
 --
 -- Suppose y1 is a strict field. Then we get
 -- Results: ic_val_abs:        K (y1::s1) .. (yn::sn)
 --          ic_tm_ct:          x ~ K y1..yn
 --          ic_ty_cs:          Q
 --          ic_strict_arg_tys: [s1]
-mkOneConFull x con = do
-  let res_ty  = idType x
-      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
+mkOneConFull x tc_args con = do
+  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, _con_res_ty)
         = conLikeFullSig con
       arg_is_banged = map isBanged $ conLikeImplBangs con
-      tc_args = tyConAppArgs res_ty
-      subst1  = case con of
-                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
-                  PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
-                                    -- See Note [Pattern synonym result type] in PatSyn
+      subst1  = zipTvSubst univ_tvs tc_args
 
   (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
-  let arg_tys' = substTys subst arg_tys
+  -- Field types
+  let arg_tys' = substTys subst (map scaledThing arg_tys)
   -- Fresh term variables (VAs) as arguments to the constructor
   arguments <-  mapM mkPmVar arg_tys'
   -- All constraints bound by the constructor (alpha-renamed)
@@ -1705,7 +1699,7 @@ mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalId name ty)
+  in  return (mkLocalId name Omega ty)
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
@@ -1871,7 +1865,7 @@ the scrutinee type, SBool z.
 -- * Types and constraints
 
 newEvVar :: Name -> Type -> EvVar
-newEvVar name ty = mkLocalId name ty
+newEvVar name ty = mkLocalId name Omega ty
 
 nameType :: String -> Type -> DsM EvVar
 nameType name ty = do
@@ -2076,7 +2070,7 @@ pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
           | tv1 == tv2 = pure Nothing
           | otherwise  = Just <$> to_evvar tv1 tv2
     evvars <- (listToBag . catMaybes) <$>
-              ASSERT(ex_tvs1 `equalLength` ex_tvs2)
+              ASSERT2(ex_tvs1 `equalLength` ex_tvs2, ppr c1 <+> ppr ex_tvs1 <+> ppr ex_tvs2)
               liftD (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
     let delta' = delta { delta_ty_cs = evvars `unionBags` delta_ty_cs delta }
     kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)
@@ -2094,7 +2088,7 @@ pmcheckHd (p@(PmCon { pm_con_con = con, pm_con_arg_tys = tys }))
           (PmVar x) (ValVec vva delta) = do
   (prov, complete_match) <- select =<< liftD (allCompleteMatches con tys)
 
-  cons_cs <- mapM (liftD . mkOneConFull x) complete_match
+  cons_cs <- mapM (liftD . mkOneConFull x tys) complete_match
 
   inst_vsa <- flip mapMaybeM cons_cs $
       \InhabitationCandidate{ ic_val_abs = va, ic_tm_ct = tm_ct
@@ -2201,11 +2195,11 @@ Where:
   u_1, ..., u_p are the universally quantified type variables.
 
 In the ConVar case, the coverage algorithm will have in hand the constructor
-K as well as a pattern variable (pv :: T PV_1 ... PV_p), where PV_1, ..., PV_p
-are some types that instantiate u_1, ... u_p. The idea is that we should
-substitute PV_1 for u_1, ..., and PV_p for u_p when forming a PmCon (the
-mkOneConFull function accomplishes this) and then hand this PmCon off to the
-ConCon case.
+K as well as a list of type arguments [t_1, ..., t_n] to substitute T's
+universally quantified type variables u_1, ..., u_n for. It's crucial to take
+these in as arguments, as it is non-trivial to derive them just from the result
+type of a pattern synonym and the ambient type of the match (#11336, #17112).
+The type checker already did the hard work, so we should just make use of it.
 
 The presence of existentially quantified type variables adds a significant
 wrinkle. We always grab e_1, ..., e_m from the definition of K to begin with,

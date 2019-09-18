@@ -30,11 +30,12 @@ module DataCon (
         dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTagZ,
         dataConTyCon, dataConOrigTyCon,
-        dataConUserType,
+        dataConUserType, dataConDisplayType, dataConSourceType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConUserTyVars, dataConUserTyVarBinders,
         dataConEqSpec, dataConTheta,
         dataConStupidTheta,
+        dataConOtherTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
         dataConInstOrigArgTys, dataConRepArgTys,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
@@ -68,6 +69,7 @@ import Type
 import ForeignCall ( CType )
 import Coercion
 import Unify
+import Multiplicity
 import TyCon
 import FieldLabel
 import Class
@@ -83,6 +85,9 @@ import Module
 import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
+
+import DynFlags
+import GHC.LanguageExtensions as LangExt
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
@@ -189,23 +194,28 @@ Note [Data constructor workers and wrappers]
 
 * Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
 
-* The wrapper (if it exists) takes dcOrigArgTys as its arguments
+* The wrapper (if it exists) takes dcOrigArgTys as its arguments, as well as
+  the additional multiplicity arguments.
   The worker takes dataConRepArgTys as its arguments
   If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
 
-* The 'NoDataConRep' case of DataConRep is important. Not only is it
-  efficient, but it also ensures that the wrapper is replaced by the
-  worker (because it *is* the worker) even when there are no
-  args. E.g. in
-               f (:) x
-  the (:) *is* the worker.  This is really important in rule matching,
-  (We could match on the wrappers, but that makes it less likely that
-  rules will match when we bring bits of unfoldings together.)
+* The 'NoDataConRep' case is important because not every data constructor can
+  have a wrapper. Specifically levity-polymorphic data constructors (unboxed
+  tuples and unboxed sums) can't be eta-expanded, as this would not respect the
+  levity-polymorphism restriction. Type-class dictionaries don't have a
+  wrapper, they don't need one, and wrappers seem to cause problems with `(~#)`
+  constraints.
 
 Note [The need for a wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Why might the wrapper have anything to do?  The full story is
-in wrapper_reqd in MkId.mkDataConRep.
+All datatypes have a wrapper; see wrapper_reqd in
+wrapper_reqd in MkId.mkDataConRep.
+
+This is for uniformity. There are multiple reasons a
+wrapper might be useful:
+
+* For simple data type the only purpose of the wrapper is to make them
+  polymorphic in the multiplicity of their fields.
 
 * Unboxing strict fields (with -funbox-strict-fields)
         data T = MkT !(Int,Int)
@@ -411,7 +421,7 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
-        dcOrigArgTys :: [Type],         -- Original argument types
+        dcOrigArgTys :: [Scaled Type],  -- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
                 -- NB: for a data instance, the original user result type may
@@ -610,9 +620,9 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [Type]  -- Final, representation argument types,
-                                 -- after unboxing and flattening,
-                                 -- and *including* all evidence args
+        , dcr_arg_tys :: [Scaled Type]    -- Final, representation argument types,
+                                          -- after unboxing and flattening,
+                                          -- and *including* all evidence args
 
         , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
                 -- See also Note [Data-con worker strictness] in MkId.hs
@@ -884,19 +894,19 @@ isMarkedStrict _               = True   -- All others are strict
 
 -- | Build a new data constructor
 mkDataCon :: Name
-          -> Bool           -- ^ Is the constructor declared infix?
-          -> TyConRepName   -- ^  TyConRepName for the promoted TyCon
-          -> [HsSrcBang]    -- ^ Strictness/unpack annotations, from user
-          -> [FieldLabel]   -- ^ Field labels for the constructor,
-                            -- if it is a record, otherwise empty
-          -> [TyVar]        -- ^ Universals.
-          -> [TyCoVar]      -- ^ Existentials.
-          -> [TyVarBinder]  -- ^ User-written 'TyVarBinder's.
-                            --   These must be Inferred/Specified.
-                            --   See @Note [TyVarBinders in DataCons]@
-          -> [EqSpec]       -- ^ GADT equalities
-          -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
-          -> [KnotTied Type]    -- ^ Original argument types
+          -> Bool               -- ^ Is the constructor declared infix?
+          -> TyConRepName       -- ^  TyConRepName for the promoted TyCon
+          -> [HsSrcBang]        -- ^ Strictness/unpack annotations, from user
+          -> [FieldLabel]       -- ^ Field labels for the constructor,
+                                -- if it is a record, otherwise empty
+          -> [TyVar]            -- ^ Universals.
+          -> [TyCoVar]          -- ^ Existentials.
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's.
+                                --   These must be Inferred/Specified.
+                                --   See @Note [TyVarBinders in DataCons]@
+          -> [EqSpec]           -- ^ GADT equalities
+          -> KnotTied ThetaType -- ^ Theta-type occuring before the arguments proper
+          -> [KnotTied (Scaled Type)]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
           -> RuntimeRepInfo     -- ^ See comments on 'TyCon.RuntimeRepInfo'
           -> KnotTied TyCon     -- ^ Representation type constructor
@@ -973,7 +983,7 @@ mkDataCon name declared_infix prom_info
     prom_theta_bndrs = [ mkAnonTyConBinder InvisArg (mkTyVar n t)
      {- Invisible -}   | (n,t) <- fresh_names `zip` theta ]
     prom_arg_bndrs   = [ mkAnonTyConBinder VisArg (mkTyVar n t)
-     {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` orig_arg_tys ]
+     {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
     prom_bndrs       = prom_tv_bndrs ++ prom_theta_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty
     promoted         = mkPromotedDataCon con name prom_info prom_bndrs
@@ -981,7 +991,7 @@ mkDataCon name declared_infix prom_info
 
     roles = map (\tv -> if isTyVar tv then Nominal else Phantom)
                 (univ_tvs ++ ex_tvs)
-            ++ map (const Representational) (theta ++ orig_arg_tys)
+            ++ map (const Representational) (theta ++ map scaledThing orig_arg_tys)
 
 freshNames :: [Name] -> [Name]
 -- Make an infinite list of Names whose Uniques and OccNames
@@ -1158,7 +1168,7 @@ dataConFieldType con label = case dataConFieldType_maybe con label of
 dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
-  = find ((== label) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con)
+  = find ((== label) . flLabel . fst) (dcFields con `zip` (scaledThing <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
@@ -1215,10 +1225,10 @@ dataConBoxer _ = Nothing
 --    Dependent GADT equalities are *also* listed in return value (1), so be
 --    careful!
 --
--- 3) The type arguments to the constructor
+-- 3) The type arguments to the constructor with linearity annotations
 --
 -- 4) The /original/ result type of the 'DataCon'
-dataConSig :: DataCon -> ([TyCoVar], ThetaType, [Type], Type)
+dataConSig :: DataCon -> ([TyCoVar], ThetaType, [Scaled Type], Type)
 dataConSig con@(MkData {dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (dataConUnivAndExTyCoVars con, dataConTheta con, arg_tys, res_ty)
 
@@ -1238,7 +1248,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (dataConTheta con)
-    , substTys   subst arg_tys)
+    , substTys subst (map scaledThing arg_tys))
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = Type.substVarBndrs univ_subst ex_tvs
@@ -1258,11 +1268,12 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
 -- equalities
 --
 -- 5) The original argument types to the 'DataCon' (i.e. before
---    any change of the representation of the type)
+--    any change of the representation of the type) with linearity
+--    annotations
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Type], Type)
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
@@ -1276,6 +1287,20 @@ dataConOrigResTy dc = dcOrigResTy dc
 -- > data Eq a => T a = ...
 dataConStupidTheta :: DataCon -> ThetaType
 dataConStupidTheta dc = dcStupidTheta dc
+
+-- TODO remove
+-- Multiplicity variables of a DataCon, and arguments scaled by them.
+-- See Note [Wrapper multiplicities].
+--
+-- To avoid spurious renaming, do not use names that were written by user.
+-- For example, given
+--    MkT :: forall n. n ->. T n
+-- we don't want to use 'n' for the multiplicity variable, because the user
+-- would see
+--    MkT :: forall {n :: Multiplicity} n2. n2 -->.(n) T n2
+-- and without linear types,
+--    MkT :: forall n2. n2 -> T n2
+-- See test LinearGhci.
 
 dataConUserType :: DataCon -> Type
 -- ^ The user-declared type of the data constructor
@@ -1296,9 +1321,33 @@ dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
   = mkForAllTys user_tvbs $
-    mkInvisFunTys theta $
+    mkInvisFunTysOm theta $
     mkVisFunTys arg_tys $
     res_ty
+
+dataConDisplayType :: DataCon -> Type
+dataConDisplayType (MkData { dcUserTyVarBinders = user_tvbs,
+                             dcOtherTheta = theta, dcOrigArgTys = arg_tys,
+                             dcOrigResTy = res_ty })
+  = mkForAllTys user_tvbs $
+    mkInvisFunTysOm theta $
+    -- TODO do that only with -XNoLinearTypes
+    -- return a Doc instead?
+    mkVisFunTys (map (\(Scaled w t) -> case w of One -> Scaled Omega t; _ -> Scaled w t) arg_tys) $
+    res_ty
+
+-- TODO describe why we have three functions
+dataConSourceType :: DynFlags -> DataCon -> Type
+dataConSourceType dflags (MkData { dcUserTyVarBinders = user_tvbs,
+                                   dcOtherTheta = theta, dcOrigArgTys = arg_tys,
+                                   dcOrigResTy = res_ty })
+  = let lin = xopt LangExt.LinearTypes dflags
+        arg_tys' | lin = arg_tys
+                 | otherwise = (map (\(Scaled w t) -> case w of One -> Scaled Omega t; _ -> Scaled w t) arg_tys)
+    in mkForAllTys user_tvbs $
+       mkInvisFunTysOm theta $
+       mkVisFunTys arg_tys' $
+       res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a
 -- 'DataCon' representation
@@ -1309,13 +1358,13 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                                 -- However, it can have a dcTheta (notably it can be a
                                 -- class dictionary, with superclasses)
                   -> [Type]     -- ^ Instantiated at these types
-                  -> [Type]
+                  -> [Scaled Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyCoVars = ex_tvs}) inst_tys
  = ASSERT2( univ_tvs `equalLength` inst_tys
           , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2( null ex_tvs, ppr dc )
-   map (substTyWith univ_tvs inst_tys) (dataConRepArgTys dc)
+   map (mapScaledType (substTyWith univ_tvs inst_tys)) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
@@ -1323,7 +1372,7 @@ dataConInstOrigArgTys
         :: DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
-        -> [Type]
+        -> [Scaled Type]
 -- For vanilla datacons, it's all quite straightforward
 -- But for the call in MatchCon, we really do want just the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
@@ -1331,26 +1380,29 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcExTyCoVars = ex_tvs}) inst_tys
   = ASSERT2( tyvars `equalLength` inst_tys
            , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (substTy subst) arg_tys
+    map (mapScaledType (substTy subst)) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
     subst  = zipTCvSubst tyvars inst_tys
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
-dataConOrigArgTys :: DataCon -> [Type]
+dataConOrigArgTys :: DataCon -> [Scaled Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
+
+dataConOtherTheta :: DataCon -> ThetaType
+dataConOtherTheta dc = dcOtherTheta dc
 
 -- | Returns the arg types of the worker, including *all* non-dependent
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
-dataConRepArgTys :: DataCon -> [Type]
+dataConRepArgTys :: DataCon -> [Scaled Type]
 dataConRepArgTys (MkData { dcRep = rep
                          , dcEqSpec = eq_spec
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> ASSERT( null eq_spec ) theta ++ orig_arg_tys
+      NoDataConRep -> ASSERT( null eq_spec ) (map unrestricted theta) ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
@@ -1465,7 +1517,7 @@ splitDataProductType_maybe
         -> Maybe (TyCon,                -- The type constructor
                   [Type],               -- Type args of the tycon
                   DataCon,              -- The data constructor
-                  [Type])               -- Its /representation/ arg types
+                  [Scaled Type])        -- Its /representation/ arg types
 
         -- Rejecting existentials is conservative.  Maybe some things
         -- could be made to work with them, but I'm not going to sweat

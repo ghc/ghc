@@ -1,0 +1,3 @@
+
+LinearPolyType.hs:15:1: error:
+    Multiplicity coercions are currently not supported

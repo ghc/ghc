@@ -4,6 +4,7 @@
 :l GADT
 
 let d = DictN (1 :: Int)
+seq d ()
 :p d
 seq _t1 ()
 :p d
