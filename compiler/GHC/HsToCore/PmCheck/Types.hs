@@ -53,6 +53,7 @@ import Type
 import TyCon
 import Literal
 import CoreSyn
+import CoreMap
 import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
@@ -440,23 +441,31 @@ instance Outputable a => Outputable (SharedDIdEnv a) where
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
 --
--- See Note [TmState invariants].
-newtype TmState = TmSt (SharedDIdEnv VarInfo)
-  -- Deterministic so that we generate deterministic error messages
+-- See Note [TmState invariants] in Oracle.
+data TmState
+  = TmSt
+  { ts_facts :: !(SharedDIdEnv VarInfo)
+  -- ^ Facts about term variables. Deterministic env, so that we generate
+  -- deterministic error messages.
+  , ts_reps  :: !(CoreMap Id)
+  -- ^ An environment for looking up whether we already encountered semantically
+  -- equivalent expressions that we want to represent by the same 'Id'
+  -- representative.
+  }
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
 -- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
 -- ('vi_cache').
 --
--- Subject to Note [The Pos/Neg invariant].
+-- Subject to Note [The Pos/Neg invariant] in PmOracle.
 data VarInfo
   = VI
   { vi_ty  :: !Type
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
 
-  , vi_pos :: [(PmAltCon, [Id])]
+  , vi_pos :: ![(PmAltCon, [Id])]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
   -- pattern matches involving pattern synonym
@@ -488,16 +497,16 @@ data VarInfo
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt state) = ppr state
+  ppr (TmSt state reps) = ppr state $$ ppr reps
 
 -- | Not user-facing.
 instance Outputable VarInfo where
   ppr (VI ty pos neg cache)
     = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
 
--- | Initial state of the oracle.
+-- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptySDIE
+initTmState = TmSt emptySDIE emptyCoreMap
 
 -- | The type oracle state. A poor man's 'TcSMonad.InsertSet': The invariant is
 -- that all constraints in there are mutually compatible.
