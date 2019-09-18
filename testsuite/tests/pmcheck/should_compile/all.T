@@ -40,16 +40,14 @@ test('T11303', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 test('T11276', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-
 test('T11303b', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-
 test('T11374', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-
+test('T11822', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11195', collect_compiler_stats('bytes allocated',10), compile,
      ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
-
 test('T11984', normal, compile,
     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T14086', normal, compile,
