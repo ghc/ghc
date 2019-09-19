@@ -1,0 +1,68 @@
+* Simple is from a custom GHC 8.8.1 bindist (perf flavour)
+* GMP is from GHC 8.6.5 (LTS-14.6 from Stackage)
+* Sizes of the operands are given in Words
+* Native built with lts-14.6
+
+
+Native vs Simple
+================
+
+benchmarking 8-word + 1-word/New Integer
+time                 17.16 ns   (17.13 ns .. 17.20 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.18 ns   (17.16 ns .. 17.22 ns)
+std dev              96.51 ps   (77.86 ps .. 127.5 ps)
+
+benchmarking 8-word + 1-word/Stock Integer
+time                 11.10 ns   (11.07 ns .. 11.13 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 11.11 ns   (11.09 ns .. 11.14 ns)
+std dev              77.34 ps   (68.19 ps .. 88.99 ps)
+
+benchmarking 8-word - 1-word/New Integer
+time                 18.03 ns   (17.98 ns .. 18.10 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 18.08 ns   (18.05 ns .. 18.12 ns)
+std dev              114.5 ps   (97.44 ps .. 137.0 ps)
+
+benchmarking 8-word - 1-word/Stock Integer
+time                 18.14 ns   (18.11 ns .. 18.18 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 18.16 ns   (18.13 ns .. 18.20 ns)
+std dev              125.4 ps   (90.42 ps .. 197.3 ps)
+
+benchmarking 8-word * 1-word/New Integer
+time                 24.88 ns   (24.81 ns .. 24.96 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 24.92 ns   (24.87 ns .. 24.97 ns)
+std dev              165.3 ps   (134.6 ps .. 203.4 ps)
+
+benchmarking 8-word * 1-word/Stock Integer
+time                 167.6 ns   (167.5 ns .. 167.8 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 167.7 ns   (167.5 ns .. 167.9 ns)
+std dev              525.0 ps   (390.4 ps .. 813.8 ps)
+
+benchmarking 8-word `quotRem` 1-word/New Integer
+time                 156.2 ns   (155.7 ns .. 156.6 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 156.4 ns   (156.1 ns .. 156.7 ns)
+std dev              941.3 ps   (790.7 ps .. 1.133 ns)
+
+benchmarking 8-word `quotRem` 1-word/Stock Integer
+time                 8.718 μs   (8.705 μs .. 8.733 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 8.708 μs   (8.698 μs .. 8.717 μs)
+std dev              31.20 ns   (25.00 ns .. 41.96 ns)
+
+benchmarking 8-word `gcd` 1-word/New Integer
+time                 262.3 ns   (261.8 ns .. 263.1 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 262.5 ns   (262.2 ns .. 263.0 ns)
+std dev              1.292 ns   (962.7 ps .. 1.763 ns)
+
+benchmarking 8-word `gcd` 1-word/Stock Integer
+time                 23.01 μs   (22.97 μs .. 23.06 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 22.98 μs   (22.95 μs .. 23.01 μs)
+std dev              105.8 ns   (85.64 ns .. 133.8 ns)
