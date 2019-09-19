@@ -714,7 +714,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --          ...
 --          6 --> lbl5
 --          7 --> fallbackLbl_info
---        
+--
 --        <pre-join insertion comes here>
 --        fallbackLbl_info:
 --        switch [6..20] (R1->infoTag)
@@ -723,7 +723,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --          ...
 --          19 --> lbl19
 --        </pre-join insertion>
---        
+--
 --        joinLbl:  -- lbl0 .. lbl19 all finally branch here
 --          <continuation>
 --
