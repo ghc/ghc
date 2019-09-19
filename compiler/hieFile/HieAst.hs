@@ -12,6 +12,7 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ConstraintKinds #-}
 module HieAst ( mkHieFile ) where
 
 import GhcPrelude
@@ -643,16 +644,16 @@ instance HasType (LHsExpr GhcTc) where
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before marking more things here as 'False'. See impact on Haddock
       -- performance before marking more things as 'True'.
-      skipDesugaring :: HsExpr a -> Bool
+      skipDesugaring :: HsExpr GhcTc -> Bool
       skipDesugaring e = case e of
-        HsVar{}        -> False
-        HsUnboundVar{} -> False
-        HsConLikeOut{} -> False
-        HsRecFld{}     -> False
-        HsOverLabel{}  -> False
-        HsIPVar{}      -> False
-        HsWrap{}       -> False
-        _              -> True
+        HsVar{}               -> False
+        HsUnboundVar{}        -> False
+        HsConLikeOut{}        -> False
+        HsRecFld{}            -> False
+        HsOverLabel{}         -> False
+        HsIPVar{}             -> False
+        (XExpr (HsHipHop {})) -> False
+        _                     -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
@@ -866,27 +867,55 @@ instance ( ToHie (Located body)
       ]
     XGRHS _ -> []
 
-instance ( a ~ GhcPass p
-         , ToHie (Context (Located (IdP a)))
-         , HasType (LHsExpr a)
-         , ToHie (PScoped (LPat a))
-         , ToHie (MatchGroup a (LHsExpr a))
-         , ToHie (LGRHS a (LHsExpr a))
-         , ToHie (RContext (HsRecordBinds a))
-         , ToHie (RFContext (Located (AmbiguousFieldOcc a)))
-         , ToHie (ArithSeqInfo a)
-         , ToHie (LHsCmdTop a)
-         , ToHie (RScoped (GuardLStmt a))
-         , ToHie (RScoped (LHsLocalBinds a))
-         , ToHie (TScoped (LHsWcType (NoGhcTc a)))
-         , ToHie (TScoped (LHsSigWcType (NoGhcTc a)))
-         , Data (HsExpr a)
-         , Data (HsSplice a)
-         , Data (HsTupArg a)
-         , Data (AmbiguousFieldOcc a)
-         , (HasRealDataConName a)
-         ) => ToHie (LHsExpr (GhcPass p)) where
-  toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
+-- | The constraint for the ToHie instances of LHsExpr.
+type ToHieConstraint a =
+  ( ToHie (Context (Located (IdP a)))
+  , ToHie (LHsExpr a)
+  , HasType (LHsExpr a)
+  , ToHie (PScoped (LPat a))
+  , ToHie (MatchGroup a (LHsExpr a))
+  , ToHie (LGRHS a (LHsExpr a))
+  , ToHie (RContext (HsRecordBinds a))
+  , ToHie (RFContext (Located (AmbiguousFieldOcc a)))
+  , ToHie (ArithSeqInfo a)
+  , ToHie (LHsCmdTop a)
+  , ToHie (RScoped (GuardLStmt a))
+  , ToHie (RScoped (LHsLocalBinds a))
+  , ToHie (TScoped (LHsWcType (NoGhcTc a)))
+  , ToHie (TScoped (LHsSigWcType (NoGhcTc a)))
+  , Data (HsExpr a)
+  , Data (HsSplice a)
+  , Data (HsTupArg a)
+  , Data (AmbiguousFieldOcc a)
+  , (HasRealDataConName a)
+  )
+
+-- There used to be a single instance for a polymorphic LHsExpr, but the
+-- addition of an extension constructor complicated things. Luckily, there was
+-- only one reference to HsWrap at the top level. Rather than add a type class,
+-- we will use a function argument that handles the extension (Section 3.6 of
+-- TTG).
+
+instance ToHieConstraint GhcPs => ToHie (LHsExpr GhcPs) where
+  toHie e = toHie' (const []) e
+
+instance ToHieConstraint GhcRn => ToHie (LHsExpr GhcRn) where
+  toHie e = toHie' (const []) e
+
+instance ToHieConstraint GhcTc => ToHie (LHsExpr GhcTc) where
+  toHie e@(L mspan _) = toHie' toHieHipHop e
+    where toHieHipHop (HsHipHop _ e') = [toHie (L mspan e')]
+
+-- | This was originally the single instance for 'ToHie (LHSExpr p)', extended to
+-- handle 'XXExpr p'.
+toHie'
+  :: forall p a
+  .  (ToHieConstraint (GhcPass p), a ~ GhcPass p)
+  => (XXExpr (GhcPass p) -> [HieM [HieAST Type]])
+  -- ^ extension construction handler
+  -> LHsExpr (GhcPass p)
+  -> HieM [HieAST Type]
+toHie' xfunc e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
@@ -1003,9 +1032,6 @@ instance ( a ~ GhcPass p
       HsTickPragma _ _ _ _ expr ->
         [ toHie expr
         ]
-      HsWrap _ _ a ->
-        [ toHie $ L mspan a
-        ]
       HsBracket _ b ->
         [ toHie b
         ]
@@ -1020,7 +1046,7 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      XExpr _ -> []
+      XExpr x -> xfunc x
 
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)

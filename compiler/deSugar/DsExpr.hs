@@ -274,7 +274,7 @@ ds_expr _ (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-ds_expr _ (HsWrap _ co_fn e)
+ds_expr _ (XExpr (HsHipHop co_fn e))
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
@@ -754,7 +754,6 @@ ds_expr _ (HsTickPragma _ _ _ _ expr) = do
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
-ds_expr _ (XExpr nec)         = noExtCon nec
 
 
 ------------------------------

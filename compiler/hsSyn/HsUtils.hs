@@ -206,16 +206,18 @@ mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
-nlHsTyApp :: IdP (GhcPass id) -> [Type] -> LHsExpr (GhcPass id)
+nlHsTyApp :: IdP GhcTc -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
   = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLoc fun_id)))
 
-nlHsTyApps :: IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
-           -> LHsExpr (GhcPass id)
+nlHsTyApps :: IdP GhcTc -> [Type] -> [LHsExpr GhcTc]
+           -> LHsExpr GhcTc
 nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
-mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsPar
+  :: OutputableTTG (XXExpr (GhcPass id))
+  => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 -- Wrap in parens if (hsExprNeedsParens appPrec) says it needs them
 -- So   'f x'  becomes '(f x)', but '3' stays as '3'
 mkLHsPar le@(dL->L loc e)
@@ -396,11 +398,13 @@ nlVarPat n = noLoc (VarPat noExtField (noLoc n))
 nlLitPat :: HsLit GhcPs -> LPat GhcPs
 nlLitPat l = noLoc (LitPat noExtField l)
 
-nlHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+nlHsApp
+  :: OutputableTTG (XXExpr (GhcPass id))
+  => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 nlHsApp f x = noLoc (HsApp noExtField f (mkLHsPar x))
 
-nlHsSyntaxApps :: SyntaxExpr (GhcPass id) -> [LHsExpr (GhcPass id)]
-               -> LHsExpr (GhcPass id)
+nlHsSyntaxApps :: SyntaxExpr GhcTc -> [LHsExpr GhcTc]
+               -> LHsExpr GhcTc
 nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
                            , syn_arg_wraps = arg_wraps
                            , syn_res_wrap  = res_wrap }) args
@@ -412,7 +416,9 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
   = mkLHsWrap res_wrap (foldl' nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
 
-nlHsApps :: IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
+nlHsApps
+  :: OutputableTTG (XXExpr (GhcPass id))
+  => IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
 nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IdP (GhcPass id) -> [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
@@ -743,25 +749,25 @@ positions in the kind of the tycon.
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsWrap :: HsWrapper -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrap co_fn (dL->L loc e) = cL loc (mkHsWrap co_fn e)
 
 -- Avoid (HsWrap co (HsWrap co' _)).
 -- See Note [Detecting forced eta expansion] in DsExpr
-mkHsWrap :: HsWrapper -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
-mkHsWrap co_fn (HsWrap _ co_fn' e)     = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn e                       = HsWrap noExtField co_fn e
+mkHsWrap co_fn (XExpr (HsHipHop co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn e                           = (XExpr (HsHipHop co_fn e))
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
-           -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+           -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrapCo co e = mkHsWrap (mkWpCastN co) e
 
 mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
-            -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+            -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 
-mkLHsWrapCo :: TcCoercionN -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsWrapCo :: TcCoercionN -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrapCo co (dL->L loc e) = cL loc (mkHsWrapCo co e)
 
 mkHsCmdWrap :: HsWrapper -> HsCmd (GhcPass p) -> HsCmd (GhcPass p)

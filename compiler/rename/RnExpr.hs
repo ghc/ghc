@@ -398,7 +398,6 @@ rnExpr (HsProc x pat body)
       ; return (HsProc x pat' body', fvBody) }
 
 rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
-        -- HsWrap
 
 ----------------------
 -- See Note [Parsing sections] in Parser.y

@@ -3733,7 +3733,6 @@ exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
 exprCtOrigin (HsTickPragma _ _ _ _ e) = lexprCtOrigin e
-exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 exprCtOrigin (XExpr nec)        = noExtCon nec
 
 -- | Extract a suitable CtOrigin from a MatchGroup

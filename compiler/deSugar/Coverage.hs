@@ -628,8 +628,8 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (HsWrap x w e) =
-        liftM2 (HsWrap x)
+addTickHsExpr (XExpr (HsHipHop w e)) =
+        liftM2 (\w' -> XExpr . HsHipHop w')
                 (return w)
                 (addTickHsExpr e)       -- Explicitly no tick on inside
 

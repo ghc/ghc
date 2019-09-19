@@ -954,10 +954,10 @@ zonkExpr env (HsProc x pat body)
 zonkExpr env (HsStatic fvs expr)
   = HsStatic fvs <$> zonkLExpr env expr
 
-zonkExpr env (HsWrap x co_fn expr)
+zonkExpr env (XExpr (HsHipHop co_fn expr))
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
        new_expr <- zonkExpr env1 expr
-       return (HsWrap x new_co_fn new_expr)
+       return (XExpr (HsHipHop new_co_fn new_expr))
 
 zonkExpr _ e@(HsUnboundVar {}) = return e
 

@@ -20,6 +20,7 @@ module HsExtension where
 
 import GhcPrelude
 
+import BasicTypes ( PprPrec )
 import Data.Data hiding ( Fixity )
 import PlaceHolder
 import Name
@@ -1150,6 +1151,8 @@ type OutputableX p = -- See Note [OutputableX]
   ( Outputable (XIPBinds    p)
   , Outputable (XViaStrategy p)
   , Outputable (XViaStrategy GhcRn)
+  , OutputableTTG (XXExpr p)
+  , OutputableTTG (XXExpr GhcRn)
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
@@ -1166,3 +1169,52 @@ type OutputableBndrId id =
   , OutputableX id
   , OutputableX (NoGhcTc id)
   )
+
+-- | The Outputable instance for HsExpr previously referred to HsWrap in four
+-- places. The call graphs were:
+--
+-- ppr_expr
+--     <- pprExpr (3 cases)
+--     <- ppr
+--
+-- ppr_infix_expr
+--     <- ppr_expr (3 cases)
+--     <- [...]
+--
+-- hsExprNeedsParens
+--     <- pprParendExpr
+--     <- pprParendLExpr
+--     <- pprDebugParendExpr
+--     <- ppr_expr (4 cases)
+--     <- ppr
+--
+-- isAtomicHsExpr
+--     <- pprExpr
+--     <- ppr
+--
+-- If we have to modify the signatures for these functions, it ends up changing
+-- many other functions that call them, such as ppr_cmd.
+--
+-- Furthermore, it isn't clear to me that isQuietHsExpr should be masking
+-- HsWrap, which it currenly does.
+--
+-- In order to replace HsWrap with (XExpr x), we have to replace the references
+-- with calls to a function that will handle the extension constructor. Given
+-- the depth and breadth of nesting, passing actual function arguments around
+-- seems pretty noisy. Let's try a type class instead (Section 3.7 of TTG).
+--
+-- Note: Instead of putting pprExprX here, we could define an Outputable
+-- instance for the extension constructor. But it seems nice to have all these
+-- extension handlers in one place.
+
+class OutputableTTG a where
+    pprExprX :: a -> SDoc
+    pprInfixExprX :: a -> Maybe SDoc
+    pprNeedsParensX :: PprPrec -> a -> Bool
+    pprIsAtomicX :: a -> Bool
+
+instance OutputableTTG NoExtCon where
+    pprExprX = noExtCon
+    pprInfixExprX = noExtCon
+    pprNeedsParensX _ = noExtCon
+    pprIsAtomicX = noExtCon

@@ -737,7 +737,12 @@ type instance XTick          (GhcPass _) = NoExtField
 type instance XBinTick       (GhcPass _) = NoExtField
 type instance XTickPragma    (GhcPass _) = NoExtField
 type instance XWrap          (GhcPass _) = NoExtField
-type instance XXExpr         (GhcPass _) = NoExtCon
+
+type instance XXExpr         GhcPs = NoExtCon
+type instance XXExpr         GhcRn = NoExtCon
+type instance XXExpr         GhcTc = HsHipHop
+
+data HsHipHop = HsHipHop HsWrapper (HsExpr GhcTc)
 
 -- ---------------------------------------------------------------------
 
@@ -842,6 +847,14 @@ There are unfortunately enough differences between the ParsedSource and the
 RenamedSource that the API Annotations cannot be used directly with
 RenamedSource, so this allows a simple mapping to be used based on the location.
 -}
+
+-- | See discussion at 'Outputable TTG'.
+instance OutputableTTG HsHipHop where
+    pprExprX (HsHipHop co_fn e)
+      = pprHsWrapper co_fn (const (pprExpr e))
+    pprInfixExprX (HsHipHop _ e) = ppr_infix_expr e
+    pprNeedsParensX p (HsHipHop _ e) = hsExprNeedsParens p e
+    pprIsAtomicX (HsHipHop _ e) = isAtomicHsExpr e
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p) where
     ppr expr = pprExpr expr
@@ -1020,10 +1033,6 @@ ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
           <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
           ppr expr ]
 
-ppr_expr (HsWrap _ co_fn e)
-  = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
-                                             else pprExpr e)
-
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut _ e []) = ppr e
@@ -1059,14 +1068,14 @@ ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
           text ")"]
 
 ppr_expr (HsRecFld _ f) = ppr f
-ppr_expr (XExpr x) = ppr x
+ppr_expr (XExpr x) = pprExprX x
 
 ppr_infix_expr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v)) = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)= Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)    = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ h@TrueExprHole{}) = Just (pprInfixOcc (unboundVarOcc h))
-ppr_infix_expr (HsWrap _ _ e)    = ppr_infix_expr e
+ppr_infix_expr (XExpr x)         = pprInfixExprX x
 ppr_infix_expr _                 = Nothing
 
 ppr_apps :: (OutputableBndrId (GhcPass p))
@@ -1122,7 +1131,7 @@ pprParendExpr p expr
 
 -- | @'hsExprNeedsParens' p e@ returns 'True' if the expression @e@ needs
 -- parentheses under precedence @p@.
-hsExprNeedsParens :: PprPrec -> HsExpr p -> Bool
+hsExprNeedsParens :: (OutputableTTG (XXExpr p)) => PprPrec -> HsExpr p -> Bool
 hsExprNeedsParens p = go
   where
     go (HsVar{})                      = False
@@ -1156,7 +1165,7 @@ hsExprNeedsParens p = go
     go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
     go (HsSCC{})                      = p >= appPrec
-    go (HsWrap _ _ e)                 = go e
+    go (XExpr x)                      = pprNeedsParensX p x
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
     go (HsRnBracketOut{})             = False
@@ -1168,16 +1177,17 @@ hsExprNeedsParens p = go
     go (HsTickPragma _ _ _ _ (L _ e)) = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
-    go (XExpr{})                      = True
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
-parenthesizeHsExpr :: PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+parenthesizeHsExpr
+  :: (OutputableTTG (XXExpr (GhcPass p)))
+  => PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 parenthesizeHsExpr p le@(L loc e)
   | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
 
-isAtomicHsExpr :: HsExpr id -> Bool
+isAtomicHsExpr :: OutputableTTG (XXExpr id) => HsExpr id -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})        = True
 isAtomicHsExpr (HsConLikeOut {}) = True
@@ -1186,7 +1196,7 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsWrap _ _ e)    = isAtomicHsExpr e
+isAtomicHsExpr (XExpr x)         = pprIsAtomicX x
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr _                 = False

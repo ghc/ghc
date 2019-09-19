@@ -236,7 +236,7 @@ hsExprToPmExpr (HsTickPragma _ _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsSCC          _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsCoreAnn      _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (ExprWithTySig    _ e _) = lhsExprToPmExpr e
-hsExprToPmExpr (HsWrap           _ w e)
+hsExprToPmExpr (XExpr   (HsHipHop w e))
   -- A dictionary application spoils e and we have no choice but to return an
   -- PmExprOther. Same thing for other stuff that can't erased in the
   -- compilation process. Otherwise this bites in

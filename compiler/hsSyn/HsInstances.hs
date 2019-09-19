@@ -290,6 +290,8 @@ deriving instance (Data body) => Data (StmtLR   GhcTc GhcTc body)
 
 deriving instance Data RecStmtTc
 
+deriving instance Data HsHipHop
+
 -- deriving instance (DataIdLR p p) => Data (ParStmtBlock p p)
 deriving instance Data (ParStmtBlock GhcPs GhcPs)
 deriving instance Data (ParStmtBlock GhcPs GhcRn)
