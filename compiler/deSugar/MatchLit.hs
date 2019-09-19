@@ -95,7 +95,6 @@ dsLit l = do
     HsString _ str    -> mkStringExprFS str
     HsInteger _ i _   -> mkIntegerExpr i
     HsInt _ i         -> return (mkIntExpr dflags (il_value i))
-    HsRat _ fl ty     -> dsFractionalLitToRational fl ty
     HsRat _ fl _      -> dsFractionalLitToRational fl
     XLit nec         -> noExtCon nec
 
