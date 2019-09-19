@@ -43,3 +43,5 @@ unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
 
 tupleTyConName :: TupleSort -> Arity -> Name
+
+integerTy, naturalTy :: Type

@@ -1,0 +1,21 @@
+resolver: nightly-2019-10-24
+
+packages:
+- .
+
+ghc-variant: integersimple
+
+setup-info:
+  ghc:
+    linux64-integersimple-tinfo6:
+      8.8.1:
+        url: /home/hsyl20/projects/ghc/integer/libraries/ghc-bignum/ghc-8.8.1-x86_64-unknown-linux.tar.xz
+        sha256: faa780dd143058b17ba4856708219440488ac0209b056ebfd2ff2c2134c34f82
+
+flags:
+   hashable:
+      integer-gmp: false
+   integer-logarithms:
+      integer-gmp: false
+   scientific:
+      integer-simple: true
