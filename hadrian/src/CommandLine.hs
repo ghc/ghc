@@ -1,5 +1,5 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdBignum,
     cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
@@ -24,7 +24,7 @@ data CommandLineArgs = CommandLineArgs
     { configure      :: Bool
     , flavour        :: Maybe String
     , freeze1        :: Bool
-    , integerSimple  :: Bool
+    , bignum         :: Maybe String
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
@@ -38,7 +38,7 @@ defaultCommandLineArgs = CommandLineArgs
     { configure      = False
     , flavour        = Nothing
     , freeze1        = False
-    , integerSimple  = False
+    , bignum         = Nothing
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
@@ -87,6 +87,10 @@ readConfigure = Right $ \flags -> flags { configure = True }
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
 
+readBignum :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readBignum ms = Right $ \flags -> flags { bignum = lower <$> ms }
+
+
 readBuildRoot :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
 readBuildRoot ms =
     maybe (Left "Cannot parse build-root") (Right . set) (go =<< ms)
@@ -98,9 +102,6 @@ readBuildRoot ms =
 
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
-
-readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
-readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -224,8 +225,8 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
-    , Option [] ["integer-simple"] (NoArg readIntegerSimple)
-      "Build GHC with integer-simple library."
+    , Option [] ["bignum"] (OptArg readBignum "BIGNUM")
+      "Select GHC BigNum backend: native, gmp, ffi."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
@@ -317,8 +318,8 @@ lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
-cmdIntegerSimple :: Action Bool
-cmdIntegerSimple = integerSimple <$> cmdLineArgs
+cmdBignum :: Action (Maybe String)
+cmdBignum = bignum <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
