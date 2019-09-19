@@ -984,8 +984,11 @@ else
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
-  [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+if test ! -f compiler/parser/Lexer.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
+      [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
