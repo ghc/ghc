@@ -317,7 +317,7 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
        ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
                                  -- See Note [GC for conditionals]
-       ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1) (pure ())
+       ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
        ; return AssignedDirectly
        }
   where
@@ -647,7 +647,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
         ; if small || null info
            then -- Yes, bndr_reg has constr. tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
-                 (if small then fam_sz else maxpt) (pure ())
+                 (if small then fam_sz else maxpt)
 
            else -- No, get exact tag from info table when mAX_PTR_TAG
                 -- See Note [double switching for big families]
@@ -656,10 +656,9 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                     itag_expr = getConstrTag dflags untagged_ptr
                     info0 = first pred <$> info
                 if null ptr then
-                  emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1) (pure ())
+                  emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
                 else do
-                  infos_lbl <- newBlockId -- branch destination for
-                                          -- info pointer lookup
+                  infos_lbl <- newBlockId
                   infos_scp <- getTickScope
 
                   let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
@@ -670,11 +669,17 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                       prelabel _ = return (Nothing, Nothing)
 
                   (mb_deflt, mb_branch) <- prelabel mb_deflt
-
+                  -- Switch on pointer tag
                   emitSwitch ptag_expr (catchall : ptr) mb_deflt 1 maxpt
-                    (do emitLabel infos_lbl
-                        emitSwitch itag_expr info0 mb_branch
-                          (maxpt - 1) (fam_sz - 1) (pure ()))
+                  join_lbl <- newBlockId
+                  --dummy <- newBlockId
+                  --emitOutOfLine dummy (mkBranch join_lbl, infos_scp)
+                  emit (mkBranch join_lbl)
+                  -- Switch on info table tag
+                  emitLabel infos_lbl
+                  emitSwitch itag_expr info0 mb_branch
+                    (maxpt - 1) (fam_sz - 1)
+                  emitLabel join_lbl
 
         ; return AssignedDirectly }
 
