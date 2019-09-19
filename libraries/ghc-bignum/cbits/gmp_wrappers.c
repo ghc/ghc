@@ -1,5 +1,5 @@
 /*
- * `integer-gmp` GMP FFI wrappers
+ * `ghc-bignum` GMP FFI wrappers
  *
  * Copyright (c) 2014, Herbert Valerio Riedel <hvr@gnu.org>
  *

@@ -29,13 +29,11 @@ module GHC.Platform
    , platformInIntRange
    , platformInWordRange
    , PlatformMisc(..)
-   , IntegerLibrary(..)
    , stringEncodeArch
    , stringEncodeOS
    , SseVersion (..)
    , BmiVersion (..)
-)
-
+   )
 where
 
 import Prelude -- See Note [Why do we import Prelude here?]
@@ -292,8 +290,6 @@ osSubsectionsViaSymbols _        = False
 data PlatformMisc = PlatformMisc
   { -- TODO Recalculate string from richer info?
     platformMisc_targetPlatformString :: String
-  , platformMisc_integerLibrary       :: String
-  , platformMisc_integerLibraryType   :: IntegerLibrary
   , platformMisc_ghcWithInterpreter   :: Bool
   , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
@@ -308,11 +304,6 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcRtsWithLibdw      :: Bool
   , platformMisc_llvmTarget           :: String
   }
-
-data IntegerLibrary
-    = IntegerGMP
-    | IntegerSimple
-    deriving (Read, Show, Eq)
 
 -- | Minimum representable Int value for the given platform
 platformMinInt :: Platform -> Integer
