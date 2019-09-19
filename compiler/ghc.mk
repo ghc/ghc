@@ -77,7 +77,7 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo                                                               >> $@
 	@echo 'cStage                :: String'                             >> $@
-	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
+	@echo 'cStage                = show (GHC_STAGE :: Int)'             >> $@
 	@echo done.
 
 # -----------------------------------------------------------------------------
@@ -95,7 +95,7 @@ compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
 	@echo "#define __PLATFORM_H__"                            >> $@
-	@echo "#define STAGE 1"                                   >> $@
+	@echo "#define GHC_STAGE 1"                               >> $@
 	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
 	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\""   >> $@
@@ -129,7 +129,7 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
 	@echo "#define __PLATFORM_H__"                            >> $@
-	@echo "#define STAGE 2"                                   >> $@
+	@echo "#define GHC_STAGE 2"                               >> $@
 	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
 	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
