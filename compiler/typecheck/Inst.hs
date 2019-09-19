@@ -48,7 +48,7 @@ import TcOrigin
 import TcEnv
 import TcEvidence
 import InstEnv
-import TysWiredIn  ( heqDataCon, eqDataCon )
+import TysWiredIn  ( heqDataCon, eqDataCon, integerTyConName )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
