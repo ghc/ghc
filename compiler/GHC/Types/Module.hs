@@ -9,6 +9,8 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -134,7 +136,12 @@ module GHC.Types.Module
         emptyModuleSet, mkModuleSet, moduleSetElts,
         extendModuleSet, extendModuleSetList, delModuleSet,
         elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet,
-        unitModuleSet
+        unitModuleSet,
+
+        -- * hs-boot
+        IsBootInterface(..),
+        ModuleNameWithIsBoot(..),
+        ModuleWithIsBoot(..),
     ) where
 
 import GHC.Prelude
@@ -295,11 +302,11 @@ addBootSuffix :: FilePath -> FilePath
 -- ^ Add the @-boot@ suffix to .hs, .hi and .o files
 addBootSuffix path = path ++ "-boot"
 
-addBootSuffix_maybe :: Bool -> FilePath -> FilePath
+addBootSuffix_maybe :: IsBootInterface -> FilePath -> FilePath
 -- ^ Add the @-boot@ suffix if the @Bool@ argument is @True@
-addBootSuffix_maybe is_boot path
- | is_boot   = addBootSuffix path
- | otherwise = path
+addBootSuffix_maybe is_boot path = case is_boot of
+ IsBoot -> addBootSuffix path
+ NotBoot -> path
 
 addBootSuffixLocn :: ModLocation -> ModLocation
 -- ^ Add the @-boot@ suffix to all file paths associated with the module
@@ -1320,3 +1327,78 @@ type ModuleNameEnv elt = UniqFM elt
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
 type DModuleNameEnv elt = UniqDFM elt
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Boot modules}
+*                                                                      *
+************************************************************************
+-}
+
+-- Note [Boot Module Naming]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Why is this section here? After all, The module is supposed to be about
+-- module names, not modules themselves. Well, the "bootness" of a module is in
+-- a way part of its name, because 'import {-# SOURCE #-} Foo' references the
+-- boot module in particular while 'import Foo' references the regular module.
+-- Backpack signatures live in the normal module namespace (no special import),
+-- so they don't matter here.
+--
+-- When dealing with the modules themselves, however, one should use not
+-- 'IsBoot' or conflate signatures and modules in opposition to boot
+-- interfaces. Instead, one should use 'DriverPhases.HscSource'. See Note
+-- [HscSource types].
+
+-- | Indicates whether a module name is referring to a boot interface (hs-boot
+-- file) or regular module (hs file).
+-- We need to treat boot modules specially when building compilation graphs,
+-- since they break cycles.  Regular source files and signature files are treated
+-- equivalently.
+
+data IsBootInterface = NotBoot | IsBoot
+  deriving (Eq, Ord, Show, Data)
+
+instance Binary IsBootInterface where
+  put_ bh ib = put_ bh $
+    case ib of
+      NotBoot -> False
+      IsBoot -> True
+  get bh = do
+    b <- get bh
+    return $ case b of
+      False -> NotBoot
+      True -> IsBoot
+
+data ModuleNameWithIsBoot = ModuleNameWithIsBoot
+  { mnwib_moduleName :: ModuleName
+  , mnwib_isBoot :: IsBootInterface
+  } deriving (Eq, Ord)
+
+instance Binary ModuleNameWithIsBoot where
+  put_ bh (ModuleNameWithIsBoot x y) = put_ bh (x, y)
+  get bh = do
+    (x, y) <- get bh
+    pure $ ModuleNameWithIsBoot x y
+
+instance Outputable ModuleNameWithIsBoot where
+  ppr (ModuleNameWithIsBoot m b) = hsep $ ppr m : case b of
+    IsBoot -> []
+    NotBoot -> [text "{-# SOURCE #-}"]
+
+data ModuleWithIsBoot = ModuleWithIsBoot
+  { mwib_module :: Module
+  , mwib_isBoot :: IsBootInterface
+  } deriving (Eq, Ord)
+
+instance Binary ModuleWithIsBoot where
+  put_ bh (ModuleWithIsBoot x y) = put_ bh (x, y)
+  get bh = do
+    (x, y) <- get bh
+    pure $ ModuleWithIsBoot x y
+
+instance Outputable ModuleWithIsBoot where
+  ppr (ModuleWithIsBoot m b) = hsep $ ppr m : case b of
+    IsBoot -> []
+    NotBoot -> [text "{-# SOURCE #-}"]
