@@ -105,7 +105,7 @@
 	url = https://gitlab.haskell.org/ghc/libffi-tarballs.git
 	ignore = untracked
 [submodule "gmp-tarballs"]
-	path = libraries/integer-gmp/gmp/gmp-tarballs
+	path = libraries/ghc-bignum/gmp/gmp-tarballs
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
