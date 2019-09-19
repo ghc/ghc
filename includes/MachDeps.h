@@ -25,7 +25,7 @@
  * In those cases code change assumed target defines like SIZEOF_HSINT
  * are applied to host platform, not target platform.
  *
- * So what should be used instead in STAGE=1?
+ * So what should be used instead in GHC_STAGE=1?
  *
  * To get host's equivalent of SIZEOF_HSINT you can use Bits instances:
  *    Data.Bits.finiteBitSize (0 :: Int)
@@ -36,9 +36,9 @@
  *    wORD_SIZE :: DynFlags -> Int
  *    wORD_SIZE dflags = pc_WORD_SIZE (platformConstants dflags)
  *
- * Hence we hide these macros from -DSTAGE=1
+ * Hence we hide these macros from GHC_STAGE=1
  */
-#if !defined(STAGE) || STAGE >= 2
+#if !defined(GHC_STAGE) || GHC_STAGE >= 2
 
 /* Sizes of C types come from here... */
 #include "ghcautoconf.h"
@@ -120,4 +120,4 @@
 
 #define TAG_MASK ((1 << TAG_BITS) - 1)
 
-#endif /* !defined(STAGE) || STAGE >= 2 */
+#endif /* !defined(GHC_STAGE) || GHC_STAGE >= 2 */
