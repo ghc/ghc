@@ -1,11 +1,11 @@
 module ToIface where
 
-import {-# SOURCE #-} TyCoRep ( Type, TyLit, Coercion )
+import {-# SOURCE #-} GHC.Core.TyCoRep ( Type, TyLit, Coercion )
 import {-# SOURCE #-} IfaceType( IfaceType, IfaceTyCon, IfaceForAllBndr
                                , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
 import Var ( TyCoVarBinder )
 import VarEnv ( TidyEnv )
-import TyCon ( TyCon )
+import GHC.Core.TyCon ( TyCon )
 import VarSet( VarSet )
 
 -- For TyCoRep

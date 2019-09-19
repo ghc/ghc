@@ -58,11 +58,11 @@ import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon )
-import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
+import {-# SOURCE #-} GHC.Core.TyCoRep as TyCoRep
 
 import DynFlags
-import TyCon hiding ( pprPromotionQuote )
-import CoAxiom
+import GHC.Core.TyCon hiding ( pprPromotionQuote )
+import GHC.Core.CoAxiom
 import Var
 import PrelNames
 import Name
@@ -546,7 +546,7 @@ stripInvisArgs dflags tys
               -- Keep recursing through the remainder of the arguments, as it's
               -- possible that there are remaining invisible ones.
               -- See the "In type declarations" section of Note [VarBndrs,
-              -- TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+              -- TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCoRep.
               |  otherwise
               -> suppress_invis ts
 
@@ -654,7 +654,7 @@ kind application syntax to distinguish the two cases:
 
 Here, @{k} indicates that `k` is an inferred argument, and @k indicates that
 `k` is a specified argument. (See
-Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep for
+Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCoRep for
 a lengthier explanation on what "inferred" and "specified" mean.)
 
 ************************************************************************
@@ -720,7 +720,7 @@ pprIfaceTyConBinders = sep . map go
       case vis of
         AnonTCB  VisArg    -> ppr_bndr True
         AnonTCB  InvisArg  -> char '@' <> braces (ppr_bndr False)
-          -- The above case is rare. (See Note [AnonTCB InvisArg] in TyCon.)
+          -- The above case is rare. (See Note [AnonTCB InvisArg] in GHC.Core.TyCon.)
           -- Should we print these differently?
         NamedTCB Required  -> ppr_bndr True
         NamedTCB Specified -> char '@' <> ppr_bndr True
@@ -1116,7 +1116,7 @@ criteria are met:
    utterly misleading.
 
    See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
-   in TyCoRep.
+   in GHC.Core.TyCoRep.
 
 N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
 
@@ -1193,7 +1193,7 @@ pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
 pprSpaceIfPromotedTyCon _
   = id
 
--- See equivalent function in TyCoRep.hs
+-- See equivalent function in GHC.Core.TyCoRep
 pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
 -- it in list notation [t1, ...].
@@ -1399,7 +1399,7 @@ ppr_iface_tc_app pp ctxt_prec tc tys
 pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprSum _arity is_promoted args
   =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+      -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     let tys   = appArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI is_promoted
@@ -1422,7 +1422,7 @@ pprTuple _ sort IsPromoted args
 
 pprTuple _ sort promoted args
   =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+      -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     let tys   = appArgsIfaceTypes args
         args' = case sort of
                   UnboxedTuple -> drop (length tys `div` 2) tys

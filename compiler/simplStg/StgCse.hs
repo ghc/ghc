@@ -93,10 +93,10 @@ import Id
 import StgSyn
 import Outputable
 import VarEnv
-import CoreSyn (AltCon(..))
+import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe)
-import CoreMap
+import GHC.Core.Map
 import NameEnv
 import Control.Monad( (>=>) )
 

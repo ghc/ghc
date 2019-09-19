@@ -55,10 +55,10 @@ module DsMonad (
 import GhcPrelude
 
 import TcRnMonad
-import FamInstEnv
-import CoreSyn
-import MkCore    ( unitExpr )
-import CoreUtils ( exprType, isExprLevPoly )
+import GHC.Core.FamInstEnv
+import GHC.Core
+import GHC.Core.Make  ( unitExpr )
+import GHC.Core.Utils ( exprType, isExprLevPoly )
 import GHC.Hs
 import TcIface
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
@@ -69,13 +69,13 @@ import Bag
 import BasicTypes ( Origin )
 import DataCon
 import ConLike
-import TyCon
+import GHC.Core.TyCon
 import PmTypes
 import Id
 import Module
 import Outputable
 import SrcLoc
-import Type
+import GHC.Core.Type
 import UniqSupply
 import Name
 import NameEnv

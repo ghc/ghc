@@ -50,7 +50,7 @@ import CmmInfo
 import CLabel
 import StgSyn
 import Id
-import TyCon             ( PrimRep(..), primRepSizeB )
+import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
 import DynFlags
 import Module

@@ -40,7 +40,7 @@ import Id
 import IdInfo
 import RepType
 import DataCon
-import TyCon
+import GHC.Core.TyCon
 import Module
 import Outputable
 import Stream

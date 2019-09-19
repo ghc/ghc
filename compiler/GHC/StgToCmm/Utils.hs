@@ -58,8 +58,8 @@ import GHC.StgToCmm.CgUtils
 
 import ForeignCall
 import IdInfo
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import SMRep
 import Module
 import Literal

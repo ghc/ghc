@@ -34,7 +34,7 @@ import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
 import TcSigs           ( tcUserTypeSig, tcInstSig )
 import TcSimplify       ( simplifyInfer, InferMode(..) )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
-import FamInstEnv       ( FamInstEnvs )
+import GHC.Core.FamInstEnv ( FamInstEnvs )
 import RnEnv            ( addUsedGRE )
 import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
@@ -54,10 +54,10 @@ import Name
 import NameEnv
 import NameSet
 import RdrName
-import TyCon
-import TyCoRep
-import TyCoSubst (substTyWithInScope)
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCoRep
+import GHC.Core.TyCoSubst (substTyWithInScope)
+import GHC.Core.Type
 import TcEvidence
 import VarSet
 import MkId( seqId )
@@ -74,7 +74,7 @@ import Maybes
 import Outputable
 import FastString
 import Control.Monad
-import Class(classTyCon)
+import GHC.Core.Class(classTyCon)
 import UniqSet ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -471,7 +471,8 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
                            -- Unboxed tuples have RuntimeRep vars, which we
                            -- don't care about here
-                           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                           -- See Note [Unboxed tuple RuntimeRep vars] in
+                           -- GHC.Core.TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
        ; tup_args1 <- tcTupArgs tup_args arg_tys'
@@ -1389,7 +1390,7 @@ We want to reject this type application to Int, but in earlier
 GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
-in TyCoRep.
+in GHC.Core.TyCoRep.
 
 Note [VTA for out-of-scope functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

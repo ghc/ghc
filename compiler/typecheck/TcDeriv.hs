@@ -27,11 +27,11 @@ import TcClassDcl( instDeclCtxt3, tcATDefault )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import TcValidity( checkValidInstHead )
-import InstEnv
+import GHC.Core.InstEnv
 import Inst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import TcHsType
-import TyCoRep
+import GHC.Core.TyCoRep
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
@@ -40,16 +40,16 @@ import RnUtils    ( bindLocalNamesFV )
 import RnSource   ( addTcgDUs )
 import Avail
 
-import Unify( tcUnifyTy )
-import Class
-import Type
+import GHC.Core.Unify( tcUnifyTy )
+import GHC.Core.Class
+import GHC.Core.Type
 import ErrUtils
 import DataCon
 import Maybes
 import RdrName
 import Name
 import NameSet
-import TyCon
+import GHC.Core.TyCon
 import TcType
 import Var
 import VarEnv

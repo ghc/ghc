@@ -2,7 +2,7 @@ module TcRnDriver where
 
 import GhcPrelude
 import DynFlags (DynFlags)
-import Type (TyThing)
+import GHC.Core.Type (TyThing)
 import TcRnTypes (TcM)
 import Outputable (SDoc)
 import Name (Name)

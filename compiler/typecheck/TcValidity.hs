@@ -27,17 +27,17 @@ import Maybes
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
-import TyCoFVs
-import TyCoRep
+import GHC.Core.TyCoFVs
+import GHC.Core.TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
-import Type
-import Unify      ( tcMatchTyX_BM, BindFlag(..) )
-import Coercion
-import CoAxiom
-import Class
-import TyCon
+import GHC.Core.Type
+import GHC.Core.Unify      ( tcMatchTyX_BM, BindFlag(..) )
+import GHC.Core.Coercion
+import GHC.Core.CoAxiom
+import GHC.Core.Class
+import GHC.Core.TyCon
 
 -- others:
 import IfaceType( pprIfaceType, pprIfaceTypeApp )
@@ -46,8 +46,7 @@ import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
-import FamInstEnv  ( isDominatedBy, injectiveBranches,
-                     InjectivityCheckResult(..) )
+import GHC.Core.FamInstEnv  ( isDominatedBy, injectiveBranches, InjectivityCheckResult(..) )
 import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
@@ -876,7 +875,7 @@ checkEscapingKind env tvbs theta tau =
   case occCheckExpand (binderVars tvbs) phi_kind of
     -- Ensure that none of the tvs occur in the kind of the forall
     -- /after/ expanding type synonyms.
-    -- See Note [Phantom type variables in kinds] in Type
+    -- See Note [Phantom type variables in kinds] in GHC.Core.Type
     Nothing -> failWithTcM $ forAllEscapeErr env tvbs theta tau tau_kind
     Just _  -> pure ()
   where
@@ -928,7 +927,7 @@ checkConstraintsOK ve theta ty
   | allConstraintsAllowed (ve_ctxt ve) = return ()
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
-    -- See Note [Constraints in kinds] in TyCoRep, and #16263
+    -- See Note [Constraints in kinds] in GHC.Core.TyCoRep, and #16263
     checkTcM (all isEqPred theta) $
     constraintTyErr (ve_tidy_env ve) ty
 

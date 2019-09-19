@@ -6,24 +6,52 @@
 -- with saying "import GhcPlugins".
 --
 -- Particularly interesting modules for plugin writers include
--- "CoreSyn" and "CoreMonad".
-module GhcPlugins(
-        module Plugins,
-        module RdrName, module OccName, module Name, module Var, module Id, module IdInfo,
-        module CoreMonad, module CoreSyn, module Literal, module DataCon,
-        module CoreUtils, module MkCore, module CoreFVs, module CoreSubst,
-        module Rules, module Annotations,
-        module DynFlags, module Packages,
-        module Module, module Type, module TyCon, module Coercion,
-        module TysWiredIn, module HscTypes, module BasicTypes,
-        module VarSet, module VarEnv, module NameSet, module NameEnv,
-        module UniqSet, module UniqFM, module FiniteMap,
-        module Util, module GHC.Serialized, module SrcLoc, module Outputable,
-        module UniqSupply, module Unique, module FastString,
-
-        -- * Getting 'Name's
-        thNameToGhcName
-    ) where
+-- "GHC.Core" and "GHC.Core.Monad".
+module GhcPlugins
+   ( module Plugins
+   , module RdrName
+   , module OccName
+   , module Name
+   , module Var
+   , module Id
+   , module IdInfo
+   , module GHC.Core.Monad
+   , module GHC.Core
+   , module Literal
+   , module DataCon
+   , module GHC.Core.Utils
+   , module GHC.Core.Make
+   , module GHC.Core.FVs
+   , module GHC.Core.Subst
+   , module GHC.Core.Rules
+   , module Annotations
+   , module DynFlags
+   , module Packages
+   , module Module
+   , module GHC.Core.Type
+   , module GHC.Core.TyCon
+   , module GHC.Core.Coercion
+   , module TysWiredIn
+   , module HscTypes
+   , module BasicTypes
+   , module VarSet
+   , module VarEnv
+   , module NameSet
+   , module NameEnv
+   , module UniqSet
+   , module UniqFM
+   , module FiniteMap
+   , module Util
+   , module GHC.Serialized
+   , module SrcLoc
+   , module Outputable
+   , module UniqSupply
+   , module Unique
+   , module FastString
+     -- * Getting 'Name's
+   , thNameToGhcName
+   )
+where
 
 -- Plugin stuff itself
 import Plugins
@@ -37,18 +65,18 @@ import Id       hiding  ( lazySetIdInfo, setIdExported, setIdNotExported {- all 
 import IdInfo
 
 -- Core
-import CoreMonad
-import CoreSyn
+import GHC.Core.Monad
+import GHC.Core
 import Literal
 import DataCon
-import CoreUtils
-import MkCore
-import CoreFVs
-import CoreSubst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
+import GHC.Core.Utils
+import GHC.Core.Make
+import GHC.Core.FVs
+import GHC.Core.Subst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
        -- These names are also exported by Type
 
 -- Core "extras"
-import Rules
+import GHC.Core.Rules
 import Annotations
 
 -- Pipeline-related stuff
@@ -57,11 +85,11 @@ import Packages
 
 -- Important GHC types
 import Module
-import Type     hiding {- conflict with CoreSubst -}
-                ( substTy, extendTvSubst, extendTvSubstList, isInScope )
-import Coercion hiding {- conflict with CoreSubst -}
-                ( substCo )
-import TyCon
+import GHC.Core.Type     hiding {- conflict with CoreSubst -}
+                         ( substTy, extendTvSubst, extendTvSubstList, isInScope )
+import GHC.Core.Coercion hiding {- conflict with CoreSubst -}
+                         ( substCo )
+import GHC.Core.TyCon
 import TysWiredIn
 import HscTypes
 import BasicTypes hiding ( Version {- conflicts with Packages.Version -} )

@@ -21,15 +21,16 @@ module PprTyThing (
 
 import GhcPrelude
 
-import Type    ( ArgFlag(..), TyThing(..), mkTyVarBinders, pprUserForAll )
+import GHC.Core.Type ( ArgFlag(..), TyThing(..), mkTyVarBinders, pprUserForAll
+                     , tidyOpenType
+                     , Type, pprTypeApp, pprSigmaType
+                     )
 import IfaceSyn ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
-import CoAxiom ( coAxiomTyCon )
+import GHC.Core.CoAxiom ( coAxiomTyCon )
 import HscTypes( tyThingParent_maybe )
 import MkIface ( tyThingToIfaceDecl )
-import Type ( tidyOpenType )
-import FamInstEnv( FamInst(..), FamFlavor(..) )
-import Type( Type, pprTypeApp, pprSigmaType )
+import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import Name
 import VarEnv( emptyTidyEnv )
 import Outputable

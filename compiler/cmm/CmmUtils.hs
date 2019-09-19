@@ -70,7 +70,7 @@ module CmmUtils(
 
 import GhcPrelude
 
-import TyCon    ( PrimRep(..), PrimElemRep(..) )
+import GHC.Core.TyCon    ( PrimRep(..), PrimElemRep(..) )
 import RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
 
 import SMRep

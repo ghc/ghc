@@ -21,7 +21,7 @@ import TcRnMonad
 import TcMType
 import TcEvidence
 import TcType
-import Type
+import GHC.Core.Type
 import DataCon
 import Name
 import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )

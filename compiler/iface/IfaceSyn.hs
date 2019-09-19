@@ -45,13 +45,13 @@ import GhcPrelude
 
 import IfaceType
 import BinFingerprint
-import CoreSyn( IsOrphan, isOrphan )
+import GHC.Core( IsOrphan, isOrphan )
 import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
 import Demand
-import Class
+import GHC.Core.Class
 import FieldLabel
 import NameSet
-import CoAxiom ( BranchIndex )
+import GHC.Core.CoAxiom ( BranchIndex )
 import Name
 import CostCentre
 import Literal
@@ -65,7 +65,7 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
-import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
+import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
@@ -526,7 +526,7 @@ Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In IfaceSyn an IfaceCase does not record the types of the alternatives,
 unlike CorSyn Case.  But we need this type if the alternatives are empty.
-Hence IfaceECase.  See Note [Empty case alternatives] in CoreSyn.
+Hence IfaceECase.  See Note [Empty case alternatives] in GHC.Core.
 
 Note [Expose recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1143,7 +1143,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- 3. Pretty-print the data type constructor applied to its arguments.
     --    This process will omit any invisible arguments, such as coercion
     --    variables, if necessary. (See Note
-    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.)
+    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCoRep.)
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
       <+> pprIfaceAppArgs

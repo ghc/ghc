@@ -71,16 +71,16 @@ import FlagChecker
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import Annotations
-import CoreSyn
-import Class
-import TyCon
-import CoAxiom
+import GHC.Core
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.CoAxiom
 import ConLike
 import DataCon
-import Type
+import GHC.Core.Type
 import TcType
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import TcRnMonad
 import GHC.Hs
 import HscTypes

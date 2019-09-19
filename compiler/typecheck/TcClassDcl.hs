@@ -30,16 +30,16 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe, piResultTys )
+import GHC.Core.Type     ( getClassPredTys_maybe, piResultTys )
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))
 import BuildTyCl( TcMethInfo )
-import Class
-import Coercion ( pprCoAxiom )
+import GHC.Core.Class
+import GHC.Core.Coercion ( pprCoAxiom )
 import DynFlags
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import Id
 import Name
 import NameEnv
@@ -48,7 +48,7 @@ import Var
 import VarEnv
 import Outputable
 import SrcLoc
-import TyCon
+import GHC.Core.TyCon
 import Maybes
 import BasicTypes
 import Bag

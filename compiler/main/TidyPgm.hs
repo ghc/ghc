@@ -16,21 +16,21 @@ import GhcPrelude
 
 import TcRnTypes
 import DynFlags
-import CoreSyn
-import CoreUnfold
-import CoreFVs
-import CoreTidy
-import CoreMonad
-import CorePrep
-import CoreUtils        (rhsIsStatic)
-import CoreStats        (coreBindsStats, CoreStats(..))
-import CoreSeq          (seqBinds)
-import CoreLint
+import GHC.Core
+import GHC.Core.Unfold
+import GHC.Core.FVs
+import GHC.Core.Tidy
+import GHC.Core.Monad
+import GHC.Core.Prep
+import GHC.Core.Utils        (rhsIsStatic)
+import GHC.Core.Stats        (coreBindsStats, CoreStats(..))
+import GHC.Core.Seq          (seqBinds)
+import GHC.Core.Lint
 import Literal
-import Rules
+import GHC.Core.Rules
 import PatSyn
 import ConLike
-import CoreArity        ( exprArity, exprBotStrictness_maybe )
+import GHC.Core.Arity        ( exprArity, exprBotStrictness_maybe )
 import StaticPtrTable
 import VarEnv
 import VarSet
@@ -38,8 +38,8 @@ import Var
 import Id
 import MkId             ( mkDictSelRhs )
 import IdInfo
-import InstEnv
-import Type             ( tidyTopType )
+import GHC.Core.InstEnv
+import GHC.Core.Type    ( tidyTopType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
 import BasicTypes
 import Name hiding (varName)
@@ -50,8 +50,8 @@ import IfaceEnv
 import TcEnv
 import TcRnMonad
 import DataCon
-import TyCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.Class
 import Module
 import Packages( isDllName )
 import HscTypes
@@ -516,7 +516,7 @@ much like any other Id.  But doing "light" optimisation on an implicit
 Id still makes sense.]
 
 At one time I tried injecting the implicit bindings *early*, at the
-beginning of SimplCore.  But that gave rise to real difficulty,
+beginning of Core's simplifier.  But that gave rise to real difficulty,
 because GlobalIds are supposed to have *fixed* IdInfo, but the
 simplifier and other core-to-core passes mess with IdInfo all the
 time.  The straw that broke the camels back was when a class selector
@@ -1469,7 +1469,7 @@ mustExposeTyCon no_trim_types exports tc
 
   | null data_cons              -- Ditto if there are no data constructors
   = True                        -- (NB: empty data types do not count as enumerations
-                                -- see Note [Enumeration types] in TyCon
+                                -- see Note [Enumeration types] in GHC.Core.TyCon
 
   | any exported_con data_cons  -- Expose rep if any datacon or field is exported
   = True

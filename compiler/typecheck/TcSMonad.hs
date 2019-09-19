@@ -130,9 +130,9 @@ import GhcPrelude
 import HscTypes
 
 import qualified Inst as TcM
-import InstEnv
+import GHC.Core.InstEnv
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
@@ -140,16 +140,16 @@ import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import ClsInst( InstanceWhat(..) )
-import Kind
+import GHC.Core.Kind
 import TcType
 import DynFlags
-import Type
-import Coercion
-import Unify
+import GHC.Core.Type
+import GHC.Core.Coercion
+import GHC.Core.Unify
 
 import TcEvidence
-import Class
-import TyCon
+import GHC.Core.Class
+import GHC.Core.TyCon
 import TcErrors   ( solverDepthErrorTcS )
 
 import Name
@@ -170,7 +170,7 @@ import UniqFM
 import UniqDFM
 import Maybes
 
-import CoreMap
+import GHC.Core.Map
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import MonadUtils

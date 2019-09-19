@@ -122,7 +122,7 @@ module Id (
 import GhcPrelude
 
 import DynFlags
-import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding,
+import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
                  isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
 import IdInfo
@@ -136,14 +136,14 @@ import Var( Id, CoVar, DictId, JoinId,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
-import Type
+import GHC.Core.Type
 import RepType
 import TysPrim
 import DataCon
 import Demand
 import Name
 import Module
-import Class
+import GHC.Core.Class
 import {-# SOURCE #-} PrimOp (PrimOp)
 import ForeignCall
 import Maybes

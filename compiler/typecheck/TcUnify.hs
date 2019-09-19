@@ -41,16 +41,16 @@ module TcUnify (
 import GhcPrelude
 
 import GHC.Hs
-import TyCoRep
+import GHC.Core.TyCoRep
 import TcMType
 import TcRnMonad
 import TcType
-import Type
-import Coercion
+import GHC.Core.Type
+import GHC.Core.Coercion
 import TcEvidence
 import Name( isSystemName )
 import Inst
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
 import TysPrim( tYPE )
 import Var

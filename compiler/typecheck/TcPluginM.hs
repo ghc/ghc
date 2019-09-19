@@ -63,7 +63,7 @@ import qualified FamInst   as TcM
 import qualified IfaceEnv
 import qualified Finder
 
-import FamInstEnv ( FamInstEnv )
+import GHC.Core.FamInstEnv ( FamInstEnv )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
@@ -76,14 +76,14 @@ import Var        ( EvVar )
 
 import Module
 import Name
-import TyCon
+import GHC.Core.TyCon
 import DataCon
-import Class
+import GHC.Core.Class
 import HscTypes
 import Outputable
-import Type
+import GHC.Core.Type
 import Id
-import InstEnv
+import GHC.Core.InstEnv
 import FastString
 import Unique
 

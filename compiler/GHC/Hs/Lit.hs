@@ -23,7 +23,7 @@ import GhcPrelude
 import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )
-import Type
+import GHC.Core.Type
 import Outputable
 import FastString
 import GHC.Hs.Extension

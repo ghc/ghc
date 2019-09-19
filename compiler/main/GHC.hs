@@ -315,19 +315,19 @@ import Packages
 import NameSet
 import RdrName
 import GHC.Hs
-import Type     hiding( typeKind )
+import GHC.Core.Type hiding( typeKind )
 import TcType
 import Id
 import TysPrim          ( alphaTyVars )
-import TyCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.Class
 import DataCon
 import Name             hiding ( varName )
 import Avail
-import InstEnv
-import FamInstEnv ( FamInst )
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv ( FamInst )
 import SrcLoc
-import CoreSyn
+import GHC.Core
 import TidyPgm
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
@@ -354,8 +354,8 @@ import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
-import CoreFVs          ( orphNamesOfFamInst )
-import FamInstEnv       ( famInstEnvElts )
+import GHC.Core.FVs        ( orphNamesOfFamInst )
+import GHC.Core.FamInstEnv ( famInstEnvElts )
 import TcRnDriver
 import Inst
 import FamInst

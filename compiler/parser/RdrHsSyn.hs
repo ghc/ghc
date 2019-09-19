@@ -104,17 +104,17 @@ module   RdrHsSyn (
 
 import GhcPrelude
 import GHC.Hs           -- Lots of it
-import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
+import GHC.Core.TyCon   ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
-import CoAxiom          ( Role, fsFromRole )
+import GHC.Core.CoAxiom ( Role, fsFromRole )
 import RdrName
 import Name
 import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..), funTyCon )
+import GHC.Core.Type    ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,

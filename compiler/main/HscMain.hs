@@ -92,10 +92,9 @@ import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
-import CoreTidy         ( tidyExpr )
-import Type             ( Type )
-import {- Kind parts of -} Type         ( Kind )
-import CoreLint         ( lintInteractiveExpr )
+import GHC.Core.Tidy    ( tidyExpr )
+import GHC.Core.Type    ( Type, Kind )
+import GHC.Core.Lint    ( lintInteractiveExpr )
 import VarEnv           ( emptyTidyEnv )
 import Panic
 import ConLike
@@ -106,7 +105,7 @@ import Packages
 import RdrName
 import GHC.Hs
 import GHC.Hs.Dump
-import CoreSyn
+import GHC.Core
 import StringBuffer
 import Parser
 import Lexer
@@ -120,16 +119,16 @@ import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
 import MkIface
 import Desugar
-import SimplCore
+import GHC.Core.Simplifier
 import TidyPgm
-import CorePrep
+import GHC.Core.Prep
 import CoreToStg        ( coreToStg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
 import ProfInit
-import TyCon
+import GHC.Core.TyCon
 import Name
 import SimplStg         ( stg2stg )
 import Cmm
@@ -138,8 +137,8 @@ import CmmBuildInfoTables
 import CmmPipeline
 import CmmInfo
 import CodeOutput
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
 import TcEnv

@@ -31,7 +31,7 @@ import           Data.Time
 import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
-import qualified CoreUtils
+import qualified GHC.Core.Utils as CoreUtils
 import           Desugar
 import           DynFlags (HasDynFlags(..))
 import           FastString

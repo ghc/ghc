@@ -909,7 +909,7 @@ Note [LoopBreaker OccInfo]
    IAmALoopBreaker False <=> A "strong" loop breaker
                              Do not inline at all
 
-See OccurAnal Note [Weak loop breakers]
+See Note [Weak loop breakers] in GHC.Core.OccurAnal
 -}
 
 noOccInfo :: OccInfo

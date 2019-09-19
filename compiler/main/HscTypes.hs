@@ -159,22 +159,22 @@ import GHC.Hs
 import RdrName
 import Avail
 import Module
-import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
-import FamInstEnv
-import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
+import GHC.Core.InstEnv ( InstEnv, ClsInst, identicalClsInstHead )
+import GHC.Core.FamInstEnv
+import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
 import VarSet
 import Var
 import Id
 import IdInfo           ( IdDetails(..), RecSelParent(..))
-import Type
+import GHC.Core.Type
 
 import ApiAnnotation    ( ApiAnns )
 import Annotations      ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
-import Class
-import TyCon
-import CoAxiom
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.CoAxiom
 import ConLike
 import DataCon
 import PatSyn

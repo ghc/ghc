@@ -23,13 +23,13 @@ import GhcPrelude
 
 import Name
 import Var
-import Class
-import Type
+import GHC.Core.Class
+import GHC.Core.Type
 import TcType( transSuperClasses )
-import CoAxiom( TypeEqn )
-import Unify
+import GHC.Core.CoAxiom( TypeEqn )
+import GHC.Core.Unify
 import FamInst( injTyVarsOfTypes )
-import InstEnv
+import GHC.Core.InstEnv
 import VarSet
 import VarEnv
 import Outputable

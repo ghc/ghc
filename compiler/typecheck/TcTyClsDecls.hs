@@ -45,13 +45,13 @@ import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
 import RnEnv( lookupConstructorFields )
 import FamInst
-import FamInstEnv
-import Coercion
-import Type
-import TyCoRep   -- for checkValidRoles
-import Class
-import CoAxiom
-import TyCon
+import GHC.Core.FamInstEnv
+import GHC.Core.Coercion
+import GHC.Core.Type
+import GHC.Core.TyCoRep   -- for checkValidRoles
+import GHC.Core.Class
+import GHC.Core.CoAxiom
+import GHC.Core.TyCon
 import DataCon
 import Id
 import Var
@@ -63,7 +63,7 @@ import NameSet
 import NameEnv
 import Outputable
 import Maybes
-import Unify
+import GHC.Core.Unify
 import Util
 import SrcLoc
 import ListSetOps
@@ -635,7 +635,7 @@ generaliseTcTyCon tc
        -- Step 4: Find the Specified and Inferred variables
        -- NB: spec_req_tvs = spec_tvs ++ req_tvs
        --     And req_tvs is 1-1 with tyConTyVars
-       --     See Note [Scoped tyvars in a TcTyCon] in TyCon
+       --     See Note [Scoped tyvars in a TcTyCon] in GHC.Core.TyCon
        ; let n_spec        = length final_spec_req_tvs - tyConArity tc
              (spec_tvs, req_tvs) = splitAt n_spec final_spec_req_tvs
              specified     = scopedSort spec_tvs
@@ -706,7 +706,7 @@ promises about the ordering of some variables. These might swizzle
 around even between minor released. By forbidding visible type
 application, we ensure users aren't caught unawares.
 
-Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCoRep.
 
 The question for this Note is this:
    given a TyClDecl, how are its quantified type variables classified?

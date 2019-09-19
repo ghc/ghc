@@ -6,7 +6,7 @@ module HieUtils where
 
 import GhcPrelude
 
-import CoreMap
+import GHC.Core.Map
 import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import IfaceType
@@ -14,9 +14,9 @@ import Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
 import ToIface
-import TyCon
-import TyCoRep
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCoRep
+import GHC.Core.Type
 import Var
 import VarEnv
 

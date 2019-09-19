@@ -194,23 +194,23 @@ module TcType (
 -- friends:
 import GhcPrelude
 
-import Kind
-import TyCoRep
-import TyCoSubst ( mkTvSubst, substTyWithCoVars )
-import TyCoFVs
-import TyCoPpr ( pprParendTheta )
-import Class
+import GHC.Core.Kind
+import GHC.Core.TyCoRep
+import GHC.Core.TyCoSubst ( mkTvSubst, substTyWithCoVars )
+import GHC.Core.TyCoFVs
+import GHC.Core.TyCoPpr   ( pprParendTheta )
+import GHC.Core.Class
 import Var
 import ForeignCall
 import VarSet
-import Coercion
-import Type
+import GHC.Core.Coercion
+import GHC.Core.Type as Type
 import RepType
-import TyCon
+import GHC.Core.TyCon
 
 -- others:
 import DynFlags
-import CoreFVs
+import GHC.Core.FVs
 import Name -- hiding (varName)
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
@@ -1566,7 +1566,7 @@ tcEqKind = tcEqType
 
 tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
 -- tcEqType is a proper implements the same Note [Non-trivial definitional
--- equality] (in TyCoRep) as `eqType`, but Type.eqType believes (* ==
+-- equality] in GHC.Core.TyCoRep as `eqType`, but Type.eqType believes (* ==
 -- Constraint), and that is NOT what we want in the type checker!
 tcEqType ty1 ty2
   =  tc_eq_type False False ki1 ki2
@@ -1628,7 +1628,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     go env ty (FunTy _ arg res) = eqFunTy env arg res ty
     go env (FunTy _ arg res) ty = eqFunTy env arg res ty
 
-      -- See Note [Equality on AppTys] in Type
+      -- See Note [Equality on AppTys] in GHC.Core.Type
     go env (AppTy s1 t1)        ty2
       | Just (s2, t2) <- tcRepSplitAppTy_maybe ty2
       = go env s1 s2 && go env t1 t2
@@ -1995,7 +1995,7 @@ Note [Lift equality constaints when quantifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't quantify over a constraint (t1 ~# t2) because that isn't a
 predicate type; see Note [Types for coercions, predicates, and evidence]
-in Type.hs.
+in GHC.Core.Type
 
 So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
 to Coercible.

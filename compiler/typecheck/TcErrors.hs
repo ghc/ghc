@@ -20,16 +20,16 @@ import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import RnUnbound ( unknownNameSuggestions )
-import Type
-import TyCoRep
-import Unify            ( tcMatchTys )
+import GHC.Core.Type
+import GHC.Core.TyCoRep
+import GHC.Core.Unify            ( tcMatchTys )
 import Module
 import FamInst
-import FamInstEnv       ( flattenTys )
+import GHC.Core.FamInstEnv       ( flattenTys )
 import Inst
-import InstEnv
-import TyCon
-import Class
+import GHC.Core.InstEnv
+import GHC.Core.TyCon
+import GHC.Core.Class
 import DataCon
 import TcEvidence
 import TcEvTerm

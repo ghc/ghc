@@ -74,20 +74,20 @@ import TcUnify
 import TcIface
 import TcSimplify
 import TcHsSyn
-import TyCoRep  ( Type(..) )
+import GHC.Core.TyCoRep  ( Type(..) )
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import TyCoRep( TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
-import Type
+import GHC.Core.TyCoRep( TyCoBinder(..) )  -- Used in etaExpandAlgTyCon
+import GHC.Core.Type
 import TysPrim
 import RdrName( lookupLocalRdrOcc )
 import Var
 import VarSet
-import TyCon
+import GHC.Core.TyCon
 import ConLike
 import DataCon
-import Class
+import GHC.Core.Class
 import Name
 -- import NameSet
 import VarEnv
@@ -931,7 +931,7 @@ finish_tuple :: HsType GhcRn
 finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr tau_kinds $$ ppr exp_kind)
        ; let arg_tys  = case tup_sort of
-                   -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
+                   -- See also Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
                  UnboxedTuple    -> tau_reps ++ tau_tys
                  BoxedTuple      -> tau_tys
                  ConstraintTuple -> tau_tys
@@ -1476,7 +1476,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
-    -- See Note [Constraints in kinds] in TyCoRep
+    -- See Note [Constraints in kinds] in GHC.Core.TyCoRep
     dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
     dc_theta_illegal_constraint = find (not . isEqPred)
 

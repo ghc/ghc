@@ -68,9 +68,9 @@ import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( funTyCon )
-import Kind             ( Kind )
-import Class            ( FunDep )
+import GHC.Core.Type    ( funTyCon )
+import GHC.Core.Kind    ( Kind )
+import GHC.Core.Class   ( FunDep )
 
 -- compiler/parser
 import RdrHsSyn

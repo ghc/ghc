@@ -153,11 +153,11 @@ import HscTypes
 import Module
 import RdrName
 import Name
-import Type
+import GHC.Core.Type
 
 import TcType
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import PrelNames
 
 import Id

@@ -35,12 +35,12 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
                                dsSyntaxExpr )
 
 import TcType
-import Type ( splitPiTy )
+import GHC.Core.Type ( splitPiTy )
 import TcEvidence
-import CoreSyn
-import CoreFVs
-import CoreUtils
-import MkCore
+import GHC.Core
+import GHC.Core.FVs
+import GHC.Core.Utils
+import GHC.Core.Make
 import DsBinds (dsHsWrapper)
 
 import Name

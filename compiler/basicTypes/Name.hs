@@ -81,7 +81,7 @@ module Name (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep( TyThing )
+import {-# SOURCE #-} GHC.Core.TyCoRep( TyThing )
 
 import OccName
 import Module

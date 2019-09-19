@@ -1,7 +1,7 @@
 module TysWiredIn where
 
-import {-# SOURCE #-} TyCon      ( TyCon )
-import {-# SOURCE #-} TyCoRep    (Type, Kind)
+import {-# SOURCE #-} GHC.Core.TyCon   ( TyCon )
+import {-# SOURCE #-} GHC.Core.TyCoRep (Type, Kind)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type

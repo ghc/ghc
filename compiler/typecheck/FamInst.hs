@@ -16,17 +16,17 @@ module FamInst (
 import GhcPrelude
 
 import HscTypes
-import FamInstEnv
-import InstEnv( roughMatchTcs )
-import Coercion
-import CoreLint
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv( roughMatchTcs )
+import GHC.Core.Coercion
+import GHC.Core.Lint
 import TcEvidence
 import LoadIface
 import TcRnMonad
 import SrcLoc
-import TyCon
+import GHC.Core.TyCon
 import TcType
-import CoAxiom
+import GHC.Core.CoAxiom
 import DynFlags
 import Module
 import Outputable
@@ -34,8 +34,8 @@ import Util
 import RdrName
 import DataCon ( dataConName )
 import Maybes
-import Type
-import TyCoRep
+import GHC.Core.Type
+import GHC.Core.TyCoRep
 import TcMType
 import Name
 import Pair

@@ -27,14 +27,14 @@ import GhcPrelude
 
 import Bag
 import BasicTypes
-import Class
+import GHC.Core.Class
 import DataCon
 import DynFlags
 import ErrUtils
 import HscTypes (lookupFixity, mi_fix)
 import GHC.Hs
 import Inst
-import InstEnv
+import GHC.Core.InstEnv
 import LoadIface (loadInterfaceForName)
 import Module (getModule)
 import Name
@@ -47,8 +47,8 @@ import TcGenGenerics
 import TcRnMonad
 import TcType
 import THNames (liftClassKey)
-import TyCon
-import Type
+import GHC.Core.TyCon
+import GHC.Core.Type
 import Util
 import VarSet
 
@@ -773,7 +773,7 @@ cond_isEnumeration _ _ rep_tc
     why = sep [ quotes (pprSourceTyCon rep_tc) <+>
                   text "must be an enumeration type"
               , text "(an enumeration consists of one or more nullary, non-GADT constructors)" ]
-                  -- See Note [Enumeration types] in TyCon
+                  -- See Note [Enumeration types] in GHC.Core.TyCon
 
 cond_isProduct :: Condition
 cond_isProduct _ _ rep_tc

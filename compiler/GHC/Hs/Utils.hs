@@ -105,8 +105,8 @@ import GHC.Hs.Extension
 import TcEvidence
 import RdrName
 import Var
-import TyCoRep
-import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
+import GHC.Core.TyCoRep
+import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
 import TysWiredIn ( unitTy )
 import TcType
 import DataCon

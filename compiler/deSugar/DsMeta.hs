@@ -44,11 +44,11 @@ import Name hiding( isVarOcc, isTcOcc, varName, tcName )
 import THNames
 import NameEnv
 import TcType
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
-import CoreSyn
-import MkCore
-import CoreUtils
+import GHC.Core
+import GHC.Core.Make
+import GHC.Core.Utils
 import SrcLoc
 import Unique
 import BasicTypes

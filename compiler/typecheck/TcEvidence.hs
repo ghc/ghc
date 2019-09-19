@@ -52,14 +52,14 @@ module TcEvidence (
 import GhcPrelude
 
 import Var
-import CoAxiom
-import Coercion
-import PprCore ()   -- Instance OutputableBndr TyVar
+import GHC.Core.CoAxiom
+import GHC.Core.Coercion
+import GHC.Core.Pretty ()   -- Instance OutputableBndr TyVar
 import TcType
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import DataCon( DataCon, dataConWrapId )
-import Class( Class )
+import GHC.Core.Class( Class )
 import PrelNames
 import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
@@ -67,10 +67,10 @@ import VarSet
 import Name
 import Pair
 
-import CoreSyn
-import Class ( classSCSelId )
+import GHC.Core
+import GHC.Core.Class ( classSCSelId )
 import Id ( isEvVar )
-import CoreFVs ( exprSomeFreeVars )
+import GHC.Core.FVs ( exprSomeFreeVars )
 
 import Util
 import Bag

@@ -29,7 +29,7 @@ module TcSimplify(
 import GhcPrelude
 
 import Bag
-import Class         ( Class, classKey, classTyCon )
+import GHC.Core.Class( Class, classKey, classTyCon )
 import DynFlags
 import GHC.Hs.Expr   ( UnboundVar(..) )
 import Id            ( idType, mkLocalId )
@@ -48,9 +48,9 @@ import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
 import TcType
-import Type
-import TysWiredIn    ( liftedRepTy )
-import Unify         ( tcMatchTyKi )
+import GHC.Core.Type
+import TysWiredIn     ( liftedRepTy )
+import GHC.Core.Unify ( tcMatchTyKi )
 import Util
 import Var
 import VarSet
