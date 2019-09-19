@@ -18,7 +18,7 @@ module GHC.Hs.ImpExp where
 
 import GhcPrelude
 
-import GHC.Types.Module       ( ModuleName )
+import GHC.Types.Module       ( ModuleName, IsBootInterface )
 import GHC.Hs.Doc             ( HsDocString )
 import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
@@ -83,7 +83,7 @@ data ImportDecl pass
                                  -- Note [Pragma source text] in GHC.Types.Basic
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
-      ideclSource    :: Bool,          -- ^ True <=> {-\# SOURCE \#-} import
+      ideclSource    :: IsBootInterface, -- ^ True <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
