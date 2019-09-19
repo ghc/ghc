@@ -12,13 +12,13 @@ module BkpSyn (
     HsComponentId(..),
     LHsUnit, HsUnit(..),
     LHsUnitDecl, HsUnitDecl(..),
-    HsDeclType(..),
     IncludeDecl(..),
     LRenaming, Renaming(..),
     ) where
 
 import GhcPrelude
 
+import DriverPhases
 import GHC.Hs
 import SrcLoc
 import Outputable
@@ -60,9 +60,8 @@ type LHsUnit n = Located (HsUnit n)
 
 -- | A declaration in a package, e.g. a module or signature definition,
 -- or an include.
-data HsDeclType = ModuleD | SignatureD
 data HsUnitDecl n
-    = DeclD   HsDeclType (Located ModuleName) (Maybe (Located (HsModule GhcPs)))
+    = DeclD   HscSource (Located ModuleName) (Maybe (Located (HsModule GhcPs)))
     | IncludeD   (IncludeDecl n)
 type LHsUnitDecl n = Located (HsUnitDecl n)
 

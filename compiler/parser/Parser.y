@@ -47,6 +47,7 @@ import Control.Applicative ((<$))
 import GHC.Hs
 
 -- compiler/main
+import DriverPhases     ( HscSource(..) )
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import DynFlags
 import BkpSyn
@@ -719,17 +720,27 @@ unitdecls :: { OrdList (LHsUnitDecl PackageName) }
         | unitdecl              { unitOL $1 }
 
 unitdecl :: { LHsUnitDecl PackageName }
-        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
+        : maybedocheader 'module' maybe_src  modid maybemodwarning maybeexports 'where' body
              -- XXX not accurate
-             { sL1 $2 $ DeclD ModuleD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+             { sL1 $2 $ DeclD
+                 (case snd $3 of
+                   Nothing -> HsSrcFile
+                   Just _ -> HsBootFile)
+                 $4
+                 (Just $ sL1 $2 (HsModule (Just $4) $6 (fst $ snd $8) (snd $ snd $8) $5 $1)) }
         | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
-             { sL1 $2 $ DeclD SignatureD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+             { sL1 $2 $ DeclD
+                 HsigFile
+                 $3
+                 (Just $ sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1)) }
         -- NB: MUST have maybedocheader here, otherwise shift-reduce conflict
         -- will prevent us from parsing both forms.
-        | maybedocheader 'module' modid
-             { sL1 $2 $ DeclD ModuleD $3 Nothing }
+        | maybedocheader 'module' maybe_src modid
+             { sL1 $2 $ DeclD (case snd $3 of
+                   Nothing -> HsSrcFile
+                   Just _ -> HsBootFile) $4 Nothing }
         | maybedocheader 'signature' modid
-             { sL1 $2 $ DeclD SignatureD $3 Nothing }
+             { sL1 $2 $ DeclD HsigFile $3 Nothing }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -961,22 +972,24 @@ importdecl :: { LImportDecl GhcPs }
                   ; checkImportDecl $4 $7
                   ; ams (cL (comb4 $1 $6 (snd $8) $9) $
                       ImportDecl { ideclExt = noExtField
-                                  , ideclSourceSrc = snd $ fst $2
+                                  , ideclSourceSrc = fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
-                                  , ideclSource = snd $2, ideclSafe = snd $3
+                                  , ideclSource = isJust $ snd $2, ideclSafe = snd $3
                                   , ideclQualified = importDeclQualifiedStyle $4 $7
                                   , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
                                   , ideclHiding = unLoc $9 })
-                         ((mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
+                         ((mj AnnImport $1 : fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
                                           ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8))
                   }
                 }
 
-maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
-        : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
-                                      ,True) }
-        | {- empty -}               { (([],NoSourceText),False) }
+maybe_src :: { (SourceText, Maybe SrcSpan) }
+        : '{-# SOURCE' '#-}'        {% do { let { openL = getLoc $1 }
+                                          ; addAnnsAt openL [mo $1,mc $2]
+                                          ; pure (getSOURCE_PRAGs $1, Just openL)
+                                          } }
+        | {- empty -}               { (NoSourceText, Nothing) }
 
 maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
