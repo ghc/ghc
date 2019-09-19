@@ -28,7 +28,6 @@ module GHC.Platform (
         platformInWordRange,
 
         PlatformMisc(..),
-        IntegerLibrary(..),
 
         stringEncodeArch,
         stringEncodeOS,
@@ -290,8 +289,6 @@ osSubsectionsViaSymbols _        = False
 data PlatformMisc = PlatformMisc
   { -- TODO Recalculate string from richer info?
     platformMisc_targetPlatformString :: String
-  , platformMisc_integerLibrary       :: String
-  , platformMisc_integerLibraryType   :: IntegerLibrary
   , platformMisc_ghcWithInterpreter   :: Bool
   , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
@@ -307,11 +304,6 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcRtsWithLibdw      :: Bool
   , platformMisc_llvmTarget           :: String
   }
-
-data IntegerLibrary
-    = IntegerGMP
-    | IntegerSimple
-    deriving (Read, Show, Eq)
 
 -- | Minimum representable Int value for the given platform
 platformMinInt :: Platform -> Integer
