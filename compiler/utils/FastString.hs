@@ -124,7 +124,7 @@ import GHC.IO
 
 import Foreign
 
-#if STAGE >= 2
+#if GHC_STAGE >= 2
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
