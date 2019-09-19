@@ -260,6 +260,9 @@ data AnnKeywordId
     | AnnOpenP   -- ^ '('
     | AnnOpenPE  -- ^ '$('
     | AnnOpenPTE -- ^ '$$('
+    | AnnOpenHoleP -- ^ '_('
+    | AnnOpenHolePE -- ^ '_$('
+    | AnnOpenHolePTE -- ^ '_$$('
     | AnnOpenS   -- ^ '['
     | AnnPackageName
     | AnnPattern

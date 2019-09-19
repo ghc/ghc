@@ -2814,7 +2814,7 @@ aexp2   :: { ECP }
 
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
         | '_'               { ECP $ mkHsWildCardPV (getLoc $1) }
-        | typed_hole        { $1 }
+        | extended_typed_hole { ECP $1 }
 
         -- Template Haskell Extension
         | splice_untyped { ECP $ mkHsSplicePV $1 }
@@ -2852,24 +2852,35 @@ aexp2   :: { ECP }
                                                            Nothing (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
-typed_hole :: { ECP }
-        : '_(' maybe_hole_content ')' maybe_hole_id { ECP $ mkHsHolePV (maybe (comb2 $1 $3) (comb2 $1) $>) $4 $2 }
-        | typed_hole_splice           maybe_hole_id { ECP $ mkHsHoleSplicePV  (maybe (comb2 $1 $1) (comb2 $1) $>) $2 $1 }
+extended_typed_hole :: { forall b. DisambECP b => PV (Located b) }
+        : '_(' maybe_hole_content ')' maybe_hole_id {amms
+                                                       (mkHsExtHolePV (maybe (comb2 $1 $3) (comb2 $1) $>) $4 $2)
+                                                       [mj AnnOpenHoleP $1, mj AnnCloseP $3 ] }
+        | typed_hole_splice           maybe_hole_id { mkHsExtHoleSplicePV (maybe (comb2 $1 $1) (comb2 $1) $>) $2 $1 }
+
+infix_extended_typed_hole :: { forall b. DisambInfixOp b => PV (Located b) }
+        : '`' '_(' maybe_hole_content ')' maybe_hole_id '`' { amms (mkHsExtInfixHolePV (comb2 $1 $>) $5 $3)
+                                                              [mj AnnBackquote $1, mj AnnOpenHoleP $2,
+                                                               mj AnnCloseP $4, mj AnnBackquote $6] }
+        | '`' typed_hole_splice           maybe_hole_id '`' { amms (mkHsExtInfixHoleSplicePV (comb2 $1 $>) $3 $2)
+                                                              [mj AnnBackquote $1, mj AnnBackquote $4] }
+
 
 typed_hole_splice :: { Located (HsSplice GhcPs) }
     : '_$(' exp ')'        {% runECP_P $2 >>= \ $2 ->
                                ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
-                                 [mj AnnOpenPE $1,mj AnnCloseP $3] }
+                                 [mj AnnOpenHolePE $1, mj AnnCloseP $3] }
     | '_$$(' exp ')'        {% runECP_P $2 >>= \ $2 ->
                                 ams (sLL $1 $> $ mkTypedSplice HasParens $2)
-                                  [mj AnnOpenPE $1,mj AnnCloseP $3] }
+                                  [mj AnnOpenHolePTE $1, mj AnnCloseP $3] }
 
 maybe_hole_id :: { Maybe (Located Int) }
-  : INTEGER     { Just $ sLL $1 $1 $ fromInteger $ il_value $ getINTEGER $1}
+  : INTEGER     {% ajs (Just $ sLL $1 $1 $ fromInteger $ il_value $ getINTEGER $1)
+                  [mj AnnVal $1] }
   | {- empty -} { Nothing }
 
-maybe_hole_content :: { Maybe FastString }
-  : STRING        { Just (getSTRING $1) }
+maybe_hole_content :: { Maybe (Located FastString) }
+  : STRING        {% ajs (Just $ sLL $1 $1 $ getSTRING $1) [mj AnnValStr $1] }
   | {- empty -}    { Nothing }
 
 splice_exp :: { LHsExpr GhcPs }
@@ -3564,6 +3575,7 @@ hole_op :: { forall b. DisambInfixOp b => PV (Located b) }   -- used in sections
 hole_op : '`' '_' '`'           { amms (mkHsInfixHolePV (comb2 $1 $>))
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
+        | infix_extended_typed_hole { $1 }
 
 qvarop :: { Located RdrName }
         : qvarsym               { $1 }
