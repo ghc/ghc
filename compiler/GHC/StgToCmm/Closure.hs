@@ -373,15 +373,7 @@ isSmallFamily :: DynFlags -> Int -> Bool
 isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
 tagForCon :: DynFlags -> DataCon -> DynTag
-tagForCon dflags con
-  | isSmallFamilyTyCon dflags fam_size = con_tag
-  | con_tag <= max_tag                 = con_tag
-  | otherwise                          = max_tag
-  where
-    con_tag = dataConTag con -- NB: 1-indexed
-    tycon = dataConTyCon con
-    fam_size = tyConFamilySize tycon
-    max_tag = mAX_PTR_TAG dflags
+tagForCon dflags con = min (dataConTag con) (mAX_PTR_TAG dflags)
 
 tagForArity :: DynFlags -> RepArity -> DynTag
 tagForArity dflags arity
