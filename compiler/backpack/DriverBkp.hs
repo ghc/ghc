@@ -107,7 +107,7 @@ computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
     cid = hsComponentId (unLoc (hsunitName unit))
     reqs = uniqDSetToList (unionManyUniqDSets (map (get_reqs . unLoc) (hsunitBody unit)))
     get_reqs (DeclD SignatureD (L _ modname) _) = unitUniqDSet modname
-    get_reqs (DeclD ModuleD _ _) = emptyUniqDSet
+    get_reqs (DeclD (ModuleD _) _ _) = emptyUniqDSet
     get_reqs (IncludeD (IncludeDecl (L _ hsuid) _ _)) =
         unitIdFreeHoles (convertHsUnitId hsuid)
 
@@ -644,7 +644,8 @@ hsunitModuleGraph dflags unit = do
     --  explicitly mentioned module/signature.
     let get_decl (L _ (DeclD dt lmodname mb_hsmod)) = do
           let hsc_src = case dt of
-                          ModuleD    -> HsSrcFile
+                          ModuleD False -> HsSrcFile
+                          ModuleD True -> HsBootFile
                           SignatureD -> HsigFile
           Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
