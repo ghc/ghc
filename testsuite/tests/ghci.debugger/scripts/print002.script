@@ -5,12 +5,9 @@ let f = Just (1.2::Float)
 f
 :p f
 
--- With @integer-gmp@, small integer literals get converted directly into
--- @S# 10#@. This optimization means that small integers are always already
+-- With @ghc-bignum@, small integer literals get converted directly into
+-- @IS 10#@. This optimization means that small integers are always already
 -- evaluated in the output for @:p@.
---
--- Since we want this test to work on @integer-simple@ too, we explicitly
--- force the literal.
 let ten = 10 :: Integer
 :f ten
 let i = Just ten

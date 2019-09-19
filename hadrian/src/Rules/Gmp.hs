@@ -11,7 +11,7 @@ import Utilities
 gmpObjects :: Action [FilePath]
 gmpObjects = do
     gmpPath <- gmpBuildPath
-    need [gmpPath -/- gmpLibraryH]
+    --need [gmpPath -/- gmpLibraryH]
     -- The line below causes a Shake Lint failure on Windows, which forced us to
     -- disable Lint by default. See more details here:
     -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
@@ -19,7 +19,7 @@ gmpObjects = do
         liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
 gmpBase :: FilePath
-gmpBase = pkgPath integerGmp -/- "gmp"
+gmpBase = pkgPath ghcBignum -/- "gmp"
 
 gmpLibraryInTreeH :: FilePath
 gmpLibraryInTreeH = "include/gmp.h"
@@ -29,7 +29,7 @@ gmpLibrary = ".libs/libgmp.a"
 
 -- | GMP is considered a Stage1 package. This determines GMP build directory.
 gmpContext :: Context
-gmpContext = vanillaContext Stage1 integerGmp
+gmpContext = vanillaContext Stage1 ghcBignum
 
 -- TODO: Location of 'gmpBuildPath' is important: it should be outside any
 -- package build directory, as otherwise GMP's object files will match build
