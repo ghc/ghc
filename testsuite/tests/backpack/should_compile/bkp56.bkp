@@ -1,0 +1,20 @@
+-- Test the evil combination of backpack and hs-boot
+unit common where
+  module Class where
+    class C x where
+unit consumer-abs where
+  dependency common
+  signature Instance where
+    import Class
+    data I = I Int
+    instance C I where
+unit consumer-impl where
+  dependency common
+  module {-# SOURCE #-} Impl where
+    import Class
+    data I = I Int
+    instance C I where
+  module Impl where
+    import Class
+    data I = I Int
+    instance C I where
