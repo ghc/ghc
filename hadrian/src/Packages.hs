@@ -3,9 +3,9 @@ module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
+    filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcCompact,
     ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
-    hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
+    hsc2hs, hp2ps, hpc, hpcBin, iserv, iservProxy, integerGmp, integerSimple,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
@@ -35,7 +35,7 @@ ghcPackages =
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
     , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
-    , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
+    , hpc, hpcBin, ghcBignum, iserv, libffi, libiserv, mtl, integerGmp, integerSimple
     , parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout ]
@@ -62,6 +62,7 @@ filepath            = lib  "filepath"
 genapply            = util "genapply"
 genprimopcode       = util "genprimopcode"
 ghc                 = prg  "ghc-bin"         `setPath` "ghc"
+ghcBignum           = lib  "ghc-bignum"
 ghcBoot             = lib  "ghc-boot"
 ghcBootTh           = lib  "ghc-boot-th"
 ghcCompact          = lib  "ghc-compact"

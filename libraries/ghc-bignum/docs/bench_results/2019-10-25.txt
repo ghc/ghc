@@ -1,0 +1,471 @@
+* Simple is from a custom GHC 8.8.1 bindist (perf flavour)
+* GMP is from GHC 8.6.5 (LTS-14.6 from Stackage)
+* Sizes of the operands is given in Words
+
+Summary:
+
+* For the four operations (+,-,*,/), in the four bench cases (1-1, 8-1, 80-8,
+  20-20 number words), Native is always faster than Simple except in 1 case: + for
+  8-1 (why?)
+
+* Simple's quotRem is so bad that in my four bench cases Native is at least 50x
+  faster (193x faster in the 20-word / 20-word case)
+
+* native is sometimes faster than GMP (e.g. 1.3x with `+` in 80-8 word case). But in
+  general it is between 1-10x slower which is not that bad (it is never 50x
+  slower for instance). It probably would be with larger test cases though.
+
++-------------------------+--------+--------+
+| Operation               |  GMP   | Simple |
++-------------------------+--------+--------+
+| 1-word  `+` 1-word      | 1.00   | 1.34   |
+| 8-word  `+` 1-word      | 0.96   | 0.66   |
+| 20-word `+` 20-word     | 0.79   | 2.78   |
+| 80-word `+` 8-word      | 1.30   | 1.16   |
++-------------------------+--------+--------+
+
++-------------------------+--------+--------+
+| Operation               |  GMP   | Simple |
++-------------------------+--------+--------+
+| 1-word  `-` 1-word      | 1.10   | 2.31   |
+| 8-word  `-` 1-word      | 0.99   | 1.16   |
+| 20-word `-` 20-word     | 0.33   | 4.45   |
+| 80-word `-` 8-word      | 1.00   | 1.88   |
++-------------------------+--------+--------+
+
++-------------------------+--------+--------+
+| Operation               |  GMP   | Simple |
++-------------------------+--------+--------+
+| 1-word  `*` 1-word      | 1.09   | 1.29   |
+| 8-word  `*` 1-word      | 0.99   | 1.22   |
+| 20-word `*` 20-word     | 0.16   | 7.26   |
+| 80-word `*` 8-word      | 0.17   | 7.9    |
++-------------------------+--------+--------+
+
++---------------------------+--------+--------+
+| Operation                 |  GMP   | Simple |
++---------------------------+--------+--------+
+| 1-word  `quotRem` 1-word  | 1.14   | 56.02  |
+| 8-word  `quotRem` 1-word  | 0.34   | 55.3   |
+| 20-word `quotRem` 20-word | 0.38   | 193.57 |
+| 80-word `quotRem` 8-word  | 0.11   | 52.43  |
++---------------------------+--------+--------+
+
+
+80-word - 8-word: native vs simple 8.8.1
+----------------------------------------
+
+
+benchmarking 80-word + 8-word/New Integer
+time                 29.90 ns   (29.83 ns .. 29.99 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 29.96 ns   (29.87 ns .. 30.10 ns)
+std dev              371.0 ps   (209.9 ps .. 567.1 ps)
+variance introduced by outliers: 14% (moderately inflated)
+                      
+benchmarking 80-word + 8-word/Stock Integer
+time                 35.76 ns   (35.73 ns .. 35.80 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 35.84 ns   (35.79 ns .. 35.90 ns)
+std dev              190.5 ps   (146.6 ps .. 227.5 ps)
+                      
+benchmarking 80-word - 8-word/New Integer
+time                 32.59 ns   (32.47 ns .. 32.74 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 32.63 ns   (32.55 ns .. 32.73 ns)
+std dev              285.2 ps   (226.0 ps .. 374.5 ps)
+                      
+benchmarking 80-word - 8-word/Stock Integer
+time                 62.10 ns   (61.95 ns .. 62.27 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 62.18 ns   (62.03 ns .. 62.31 ns)
+std dev              475.5 ps   (417.2 ps .. 581.6 ps)
+                      
+benchmarking 80-word * 8-word/New Integer
+time                 1.936 μs   (1.932 μs .. 1.942 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.937 μs   (1.933 μs .. 1.943 μs)
+std dev              16.15 ns   (11.07 ns .. 23.68 ns)
+                      
+benchmarking 80-word * 8-word/Stock Integer
+time                 15.30 μs   (15.24 μs .. 15.38 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 15.27 μs   (15.23 μs .. 15.34 μs)
+std dev              155.9 ns   (88.85 ns .. 247.6 ns)
+                      
+benchmarking 80-word `quotRem` 8-word/New Integer
+time                 4.881 μs   (4.869 μs .. 4.899 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 4.905 μs   (4.893 μs .. 4.919 μs)
+std dev              43.09 ns   (37.71 ns .. 49.98 ns)
+                      
+benchmarking 80-word `quotRem` 8-word/Stock Integer
+time                 255.9 μs   (255.6 μs .. 256.2 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 255.8 μs   (255.6 μs .. 256.2 μs)
+std dev              1.008 μs   (728.1 ns .. 1.441 μs)
+
+
+
+80-word - 8-word: native vs gmp 8.6.5
+-------------------------------------
+
+benchmarking 80-word + 8-word/New Integer
+time                 31.58 ns   (31.52 ns .. 31.66 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 31.52 ns   (31.49 ns .. 31.59 ns)
+std dev              155.5 ps   (88.10 ps .. 248.2 ps)
+
+benchmarking 80-word + 8-word/Stock Integer
+time                 40.95 ns   (40.87 ns .. 41.05 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 40.91 ns   (40.87 ns .. 41.01 ns)
+std dev              208.8 ps   (113.0 ps .. 367.8 ps)
+
+benchmarking 80-word - 8-word/New Integer
+time                 41.19 ns   (40.97 ns .. 41.37 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 40.96 ns   (40.90 ns .. 41.08 ns)
+std dev              268.7 ps   (169.7 ps .. 409.3 ps)
+
+benchmarking 80-word - 8-word/Stock Integer
+time                 41.82 ns   (41.74 ns .. 41.89 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 41.76 ns   (41.74 ns .. 41.80 ns)
+std dev              92.88 ps   (62.43 ps .. 135.0 ps)
+
+benchmarking 80-word * 8-word/New Integer
+time                 1.982 μs   (1.976 μs .. 1.990 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.979 μs   (1.977 μs .. 1.983 μs)
+std dev              9.750 ns   (5.676 ns .. 13.35 ns)
+
+benchmarking 80-word * 8-word/Stock Integer
+time                 341.7 ns   (341.5 ns .. 341.9 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 341.5 ns   (341.4 ns .. 341.7 ns)
+std dev              524.1 ps   (386.0 ps .. 707.2 ps)
+
+benchmarking 80-word `quotRem` 8-word/New Integer
+time                 6.543 μs   (6.522 μs .. 6.572 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 6.531 μs   (6.520 μs .. 6.551 μs)
+std dev              50.92 ns   (32.97 ns .. 83.42 ns)
+
+benchmarking 80-word `quotRem` 8-word/Stock Integer
+time                 724.5 ns   (723.8 ns .. 725.6 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 724.5 ns   (724.0 ns .. 725.6 ns)
+std dev              2.426 ns   (1.371 ns .. 4.512 ns)
+
+8-word - 1-word: native vs simple 8.8.1
+---------------------------------------
+
+benchmarking 8-word + 1-word/New Integer
+time                 17.14 ns   (17.10 ns .. 17.20 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.14 ns   (17.10 ns .. 17.18 ns)
+std dev              132.3 ps   (114.7 ps .. 152.6 ps)
+                    
+benchmarking 8-word + 1-word/Stock Integer
+time                 11.40 ns   (11.36 ns .. 11.43 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 11.38 ns   (11.36 ns .. 11.41 ns)
+std dev              76.97 ps   (62.53 ps .. 92.49 ps)
+                    
+benchmarking 8-word - 1-word/New Integer
+time                 17.54 ns   (17.50 ns .. 17.60 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.59 ns   (17.54 ns .. 17.64 ns)
+std dev              170.5 ps   (131.1 ps .. 226.9 ps)
+                    
+benchmarking 8-word - 1-word/Stock Integer
+time                 20.48 ns   (20.47 ns .. 20.50 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 20.49 ns   (20.47 ns .. 20.52 ns)
+std dev              76.36 ps   (50.73 ps .. 121.6 ps)
+                    
+benchmarking 8-word * 1-word/New Integer
+time                 25.01 ns   (24.97 ns .. 25.05 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 24.98 ns   (24.96 ns .. 25.01 ns)
+std dev              63.95 ps   (48.64 ps .. 93.49 ps)
+                    
+benchmarking 8-word * 1-word/Stock Integer
+time                 175.5 ns   (175.3 ns .. 175.8 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 175.2 ns   (175.1 ns .. 175.5 ns)
+std dev              618.1 ps   (464.2 ps .. 998.2 ps)
+                    
+benchmarking 8-word `quotRem` 1-word/New Integer
+time                 138.8 ns   (138.5 ns .. 139.2 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 138.8 ns   (138.6 ns .. 139.1 ns)
+std dev              743.8 ps   (606.2 ps .. 884.5 ps)
+                    
+benchmarking 8-word `quotRem` 1-word/Stock Integer
+time                 7.674 μs   (7.656 μs .. 7.696 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 7.687 μs   (7.670 μs .. 7.705 μs)
+std dev              60.95 ns   (52.15 ns .. 73.55 ns)
+
+
+8-word - 1-word: native vs gmp 8.6.5
+------------------------------------
+
+benchmarking 8-word + 1-word/New Integer
+time                 17.86 ns   (17.84 ns .. 17.88 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.85 ns   (17.84 ns .. 17.86 ns)
+std dev              40.03 ps   (32.92 ps .. 50.07 ps)
+                    
+benchmarking 8-word + 1-word/Stock Integer
+time                 17.24 ns   (17.23 ns .. 17.26 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.24 ns   (17.23 ns .. 17.26 ns)
+std dev              39.27 ps   (27.64 ps .. 62.69 ps)
+                    
+benchmarking 8-word - 1-word/New Integer
+time                 18.63 ns   (18.59 ns .. 18.67 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 18.50 ns   (18.46 ns .. 18.56 ns)
+std dev              163.0 ps   (148.4 ps .. 182.1 ps)
+                    
+benchmarking 8-word - 1-word/Stock Integer
+time                 18.58 ns   (18.55 ns .. 18.62 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 18.66 ns   (18.62 ns .. 18.71 ns)
+std dev              150.1 ps   (129.7 ps .. 184.6 ps)
+                    
+benchmarking 8-word * 1-word/New Integer
+time                 30.07 ns   (29.98 ns .. 30.20 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 30.14 ns   (30.06 ns .. 30.23 ns)
+std dev              292.0 ps   (242.7 ps .. 398.1 ps)
+                    
+benchmarking 8-word * 1-word/Stock Integer
+time                 30.06 ns   (29.95 ns .. 30.19 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 30.00 ns   (29.93 ns .. 30.10 ns)
+std dev              263.2 ps   (228.7 ps .. 314.3 ps)
+                    
+benchmarking 8-word `quotRem` 1-word/New Integer
+time                 138.2 ns   (137.8 ns .. 138.7 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 137.8 ns   (137.4 ns .. 138.2 ns)
+std dev              1.320 ns   (1.106 ns .. 1.687 ns)
+                    
+benchmarking 8-word `quotRem` 1-word/Stock Integer
+time                 47.59 ns   (47.46 ns .. 47.70 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 47.49 ns   (47.41 ns .. 47.58 ns)
+std dev              294.3 ps   (242.3 ps .. 376.5 ps)
+
+20-word - 20-word: native vs gmp 8.6.5
+--------------------------------------
+
+benchmarking 20-word + 20-word/New Integer
+time                 30.00 ns   (29.92 ns .. 30.11 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 30.22 ns   (30.14 ns .. 30.29 ns)
+std dev              242.5 ps   (203.4 ps .. 279.2 ps)
+                    
+benchmarking 20-word + 20-word/Stock Integer
+time                 23.76 ns   (23.71 ns .. 23.84 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 23.82 ns   (23.76 ns .. 23.90 ns)
+std dev              231.1 ps   (168.0 ps .. 325.8 ps)
+                    
+benchmarking 20-word - 20-word/New Integer
+time                 75.48 ns   (75.38 ns .. 75.65 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 75.79 ns   (75.65 ns .. 75.95 ns)
+std dev              509.1 ps   (459.8 ps .. 563.2 ps)
+                    
+benchmarking 20-word - 20-word/Stock Integer
+time                 25.37 ns   (25.35 ns .. 25.40 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 25.45 ns   (25.40 ns .. 25.52 ns)
+std dev              193.4 ps   (136.7 ps .. 303.8 ps)
+                    
+benchmarking 20-word * 20-word/New Integer
+time                 1.339 μs   (1.335 μs .. 1.345 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.335 μs   (1.333 μs .. 1.339 μs)
+std dev              8.627 ns   (5.864 ns .. 13.81 ns)
+                    
+benchmarking 20-word * 20-word/Stock Integer
+time                 217.9 ns   (217.7 ns .. 218.2 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 217.9 ns   (217.7 ns .. 218.1 ns)
+std dev              593.0 ps   (413.0 ps .. 837.8 ps)
+                    
+benchmarking 20-word `quotRem` 20-word/New Integer
+time                 250.6 ns   (250.1 ns .. 251.2 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 250.5 ns   (250.2 ns .. 251.4 ns)
+std dev              1.870 ns   (1.123 ns .. 3.623 ns)
+                    
+benchmarking 20-word `quotRem` 20-word/Stock Integer
+time                 96.86 ns   (96.74 ns .. 97.03 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 96.85 ns   (96.77 ns .. 96.99 ns)
+std dev              329.9 ps   (246.8 ps .. 483.5 ps)
+
+
+20-word - 20-word: native vs simple 8.8.1
+-----------------------------------------
+
+benchmarking 20-word + 20-word/New Integer
+time                 28.07 ns   (27.97 ns .. 28.17 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 28.07 ns   (27.99 ns .. 28.24 ns)
+std dev              357.3 ps   (225.3 ps .. 545.5 ps)
+variance introduced by outliers: 14% (moderately inflated)
+                    
+benchmarking 20-word + 20-word/Stock Integer
+time                 78.02 ns   (77.96 ns .. 78.11 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 78.31 ns   (78.16 ns .. 78.52 ns)
+std dev              613.9 ps   (466.5 ps .. 788.5 ps)
+                    
+benchmarking 20-word - 20-word/New Integer
+time                 41.89 ns   (41.85 ns .. 41.93 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 41.86 ns   (41.84 ns .. 41.89 ns)
+std dev              81.73 ps   (66.43 ps .. 101.4 ps)
+                    
+benchmarking 20-word - 20-word/Stock Integer
+time                 186.3 ns   (185.6 ns .. 187.0 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 185.7 ns   (185.5 ns .. 186.1 ns)
+std dev              836.3 ps   (413.5 ps .. 1.376 ns)
+                    
+benchmarking 20-word * 20-word/New Integer
+time                 1.258 μs   (1.254 μs .. 1.261 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.253 μs   (1.251 μs .. 1.256 μs)
+std dev              7.852 ns   (6.273 ns .. 9.387 ns)
+                    
+benchmarking 20-word * 20-word/Stock Integer
+time                 9.132 μs   (9.114 μs .. 9.155 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 9.129 μs   (9.111 μs .. 9.162 μs)
+std dev              75.70 ns   (41.61 ns .. 118.4 ns)
+                    
+benchmarking 20-word `quotRem` 20-word/New Integer
+time                 223.8 ns   (223.4 ns .. 224.3 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 223.9 ns   (223.5 ns .. 224.4 ns)
+std dev              1.429 ns   (778.8 ps .. 2.141 ns)
+                    
+benchmarking 20-word `quotRem` 20-word/Stock Integer
+time                 43.32 μs   (43.16 μs .. 43.46 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 43.14 μs   (43.07 μs .. 43.26 μs)
+std dev              304.3 ns   (244.4 ns .. 367.3 ns)
+
+
+1-word - 1-word: native vs gmp 8.6.5
+------------------------------------
+
+benchmarking 1-word + 1-word/New Integer
+time                 8.600 ns   (8.571 ns .. 8.627 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 8.592 ns   (8.572 ns .. 8.613 ns)
+std dev              66.25 ps   (58.33 ps .. 75.26 ps)
+
+benchmarking 1-word + 1-word/Stock Integer
+time                 8.607 ns   (8.576 ns .. 8.649 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 8.589 ns   (8.567 ns .. 8.621 ns)
+std dev              87.29 ps   (64.67 ps .. 120.1 ps)
+variance introduced by outliers: 10% (moderately inflated)
+
+benchmarking 1-word - 1-word/New Integer
+time                 8.166 ns   (8.142 ns .. 8.192 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 8.190 ns   (8.173 ns .. 8.214 ns)
+std dev              68.32 ps   (58.92 ps .. 85.31 ps)
+
+benchmarking 1-word - 1-word/Stock Integer
+time                 8.993 ns   (8.959 ns .. 9.043 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 9.001 ns   (8.977 ns .. 9.028 ns)
+std dev              83.30 ps   (59.56 ps .. 138.0 ps)
+
+benchmarking 1-word * 1-word/New Integer
+time                 15.93 ns   (15.88 ns .. 15.98 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 15.92 ns   (15.90 ns .. 15.95 ns)
+std dev              87.05 ps   (73.02 ps .. 105.1 ps)
+
+benchmarking 1-word * 1-word/Stock Integer
+time                 17.47 ns   (17.45 ns .. 17.49 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.46 ns   (17.45 ns .. 17.48 ns)
+std dev              54.15 ps   (38.34 ps .. 85.42 ps)
+
+benchmarking 1-word `quotRem` 1-word/New Integer
+time                 16.86 ns   (16.82 ns .. 16.92 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 16.83 ns   (16.82 ns .. 16.86 ns)
+std dev              63.96 ps   (39.78 ps .. 106.1 ps)
+
+benchmarking 1-word `quotRem` 1-word/Stock Integer
+time                 19.17 ns   (19.13 ns .. 19.21 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 19.17 ns   (19.13 ns .. 19.21 ns)
+std dev              128.1 ps   (110.7 ps .. 159.2 ps)
+
+1-word - 1-word: native vs simple 8.8.1
+---------------------------------------
+
+benchmarking 1-word + 1-word/New Integer
+time                 7.711 ns   (7.691 ns .. 7.733 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 7.699 ns   (7.691 ns .. 7.712 ns)
+std dev              32.62 ps   (22.96 ps .. 46.18 ps)
+
+benchmarking 1-word + 1-word/Stock Integer
+time                 10.32 ns   (10.28 ns .. 10.37 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 10.27 ns   (10.25 ns .. 10.32 ns)
+std dev              105.9 ps   (70.16 ps .. 176.6 ps)
+variance introduced by outliers: 11% (moderately inflated)
+
+benchmarking 1-word - 1-word/New Integer
+time                 7.515 ns   (7.489 ns .. 7.545 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 7.491 ns   (7.478 ns .. 7.515 ns)
+std dev              53.37 ps   (32.13 ps .. 82.29 ps)
+
+benchmarking 1-word - 1-word/Stock Integer
+time                 17.35 ns   (17.32 ns .. 17.38 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 17.44 ns   (17.40 ns .. 17.48 ns)
+std dev              145.0 ps   (124.5 ps .. 197.5 ps)
+
+benchmarking 1-word * 1-word/New Integer
+time                 14.70 ns   (14.67 ns .. 14.73 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 14.70 ns   (14.67 ns .. 14.74 ns)
+std dev              119.5 ps   (78.28 ps .. 164.3 ps)
+
+benchmarking 1-word * 1-word/Stock Integer
+time                 19.06 ns   (19.04 ns .. 19.08 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 19.07 ns   (19.06 ns .. 19.10 ns)
+std dev              62.74 ps   (43.77 ps .. 89.96 ps)
+
+benchmarking 1-word `quotRem` 1-word/New Integer
+time                 15.47 ns   (15.42 ns .. 15.54 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 15.45 ns   (15.42 ns .. 15.51 ns)
+std dev              131.2 ps   (54.05 ps .. 253.6 ps)
+
+benchmarking 1-word `quotRem` 1-word/Stock Integer
+time                 866.7 ns   (865.5 ns .. 868.4 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 866.8 ns   (865.9 ns .. 868.3 ns)
+std dev              3.768 ns   (1.964 ns .. 5.793 ns)

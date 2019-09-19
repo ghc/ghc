@@ -7,7 +7,6 @@ module GHC.Maybe
    )
 where
 
-import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Classes
 
 default ()

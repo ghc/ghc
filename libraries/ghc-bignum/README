@@ -1,0 +1,31 @@
+
+1. Clearly separate BigNat from Integer/Natural
+
+2. Integer and Natural use BigNat primitives and type
+
+3. We have several BigNat backends:
+   * GMP: based on GMP library (adapted from integer-gmp)
+   * Native: brand new implementation built from scratch
+   * FFI: implementation that relies on FFI calls. This backend is useful for
+     alternative GHC backends that target non native platforms (e.g. GHCJS
+     targets JavaScript's BigInt: it would just have to replace BigNat FFI calls
+     appropriately during code generation).
+   * Note that Simple backend (from integer-simple) is gone as it was a pain to
+     adapt to the new BigNat interface and as it was slower than the newer
+     Native backend (which code is quite simple to understand too)
+
+4. New backends are easier to add
+   * The BigNat interface is much simpler than the whole Integer/Natural one
+   * FFI backend can be used to try new backends: just link with an object
+     exporting the expected bignat symbols.
+
+5. The compiler only knows about Integer and Natural representation
+   * it is the same with all the BigNat backends so we can remove backend
+     specific hacks in the compiler
+   * optimization rules that were only available with integer-gmp are now always
+     available.
+
+6. The code of the Native backend has the same license as GHC.
+
+7. Performances:
+   TODO
