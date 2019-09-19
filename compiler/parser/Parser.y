@@ -782,10 +782,10 @@ implicit_top :: { () }
 
 maybemodwarning :: { Maybe (Located WarningTxt) }
     : '{-# DEPRECATED' strings '#-}'
-                      {% ajs (Just (sLL $1 $> $ DeprecatedTxt (sL1 $1 (getDEPRECATED_PRAGs $1)) (snd $ unLoc $2)))
+                      {% ajs (sLL $1 $> $ DeprecatedTxt (sL1 $1 (getDEPRECATED_PRAGs $1)) (snd $ unLoc $2))
                              (mo $1:mc $3: (fst $ unLoc $2)) }
     | '{-# WARNING' strings '#-}'
-                         {% ajs (Just (sLL $1 $> $ WarningTxt (sL1 $1 (getWARNING_PRAGs $1)) (snd $ unLoc $2)))
+                         {% ajs (sLL $1 $> $ WarningTxt (sL1 $1 (getWARNING_PRAGs $1)) (snd $ unLoc $2))
                                 (mo $1:mc $3 : (fst $ unLoc $2)) }
     |  {- empty -}                  { Nothing }
 
@@ -1168,13 +1168,13 @@ inst_decl :: { LInstDecl GhcPs }
                        :(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 overlap_pragma :: { Maybe (Located OverlapMode) }
-  : '{-# OVERLAPPABLE'    '#-}' {% ajs (Just (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1))))
+  : '{-# OVERLAPPABLE'    '#-}' {% ajs (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# OVERLAPPING'     '#-}' {% ajs (Just (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1))))
+  | '{-# OVERLAPPING'     '#-}' {% ajs (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# OVERLAPS'        '#-}' {% ajs (Just (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1))))
+  | '{-# OVERLAPS'        '#-}' {% ajs (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# INCOHERENT'      '#-}' {% ajs (Just (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1))))
+  | '{-# INCOHERENT'      '#-}' {% ajs (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1)))
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
@@ -1191,11 +1191,11 @@ deriv_strategy_via :: { LDerivStrategy GhcPs }
                                             [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
-  : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
+  : 'stock'                     {% ajs (sL1 $1 StockStrategy)
                                        [mj AnnStock $1] }
-  | 'anyclass'                  {% ajs (Just (sL1 $1 AnyclassStrategy))
+  | 'anyclass'                  {% ajs (sL1 $1 AnyclassStrategy)
                                        [mj AnnAnyclass $1] }
-  | 'newtype'                   {% ajs (Just (sL1 $1 NewtypeStrategy))
+  | 'newtype'                   {% ajs (sL1 $1 NewtypeStrategy)
                                        [mj AnnNewtype $1] }
   | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
@@ -1411,12 +1411,12 @@ tycl_hdr_inst :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), Maybe [LHsTyVarB
 
 capi_ctype :: { Maybe (Located CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
-                                        (getSTRINGs $3,getSTRING $3))))
+                       {% ajs (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
+                                        (getSTRINGs $3,getSTRING $3)))
                               [mo $1,mj AnnHeader $2,mj AnnVal $3,mc $4] }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) Nothing  (getSTRINGs $2, getSTRING $2))))
+                       {% ajs (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, getSTRING $2)))
                               [mo $1,mj AnnVal $2,mc $3] }
 
            |           { Nothing }
@@ -4042,14 +4042,15 @@ am a (b,s) = do
 -- as any annotations that may arise in the binds. This will include open
 -- and closing braces if they are used to delimit the let expressions.
 --
-ams :: MonadP m => Located a -> [AddAnn] -> m (Located a)
+ams :: (MonadP m, HasSrcSpan a) => a -> [AddAnn] -> m a
 ams a@(dL->L l _) bs = addAnnsAt l bs >> return a
 
 amsL :: SrcSpan -> [AddAnn] -> P ()
 amsL sp bs = addAnnsAt sp bs >> return ()
 
--- |Add all [AddAnn] to an AST element wrapped in a Just
-ajs a@(Just (dL->L l _)) bs = addAnnsAt l bs >> return a
+-- |Add all [AddAnn] to an AST element, and wrap it in a 'Just'
+ajs :: (MonadP m, HasSrcSpan a) => a -> [AddAnn] -> m (Maybe a)
+ajs a bs = Just <$> ams a bs
 
 -- |Add a list of AddAnns to the given AST element, where the AST element is the
 --  result of a monadic action
