@@ -32,8 +32,6 @@
 
 module Unsafe.Coerce (unsafeCoerce) where
 
-import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
-import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import GHC.Prim (unsafeCoerce#)
 
 local_id :: a -> a
