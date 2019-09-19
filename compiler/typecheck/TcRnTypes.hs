@@ -1334,7 +1334,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
+        imp_dep_mods :: ModuleNameEnv ModuleNameWithIsBoot,
           -- ^ Home-package modules needed by the module being compiled
           --
           -- It doesn't matter whether any of these dependencies
@@ -1375,15 +1375,15 @@ data ImportAvails
           -- including us for imported modules)
       }
 
-mkModDeps :: [(ModuleName, IsBootInterface)]
-          -> ModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps :: [ModuleNameWithIsBoot]
+          -> ModuleNameEnv ModuleNameWithIsBoot
 mkModDeps deps = foldl' add emptyUFM deps
-               where
-                 add env elt@(m,_) = addToUFM env m elt
+  where
+    add env elt = addToUFM env (mnwib_moduleName elt) elt
 
 modDepsElts
-  :: ModuleNameEnv (ModuleName, IsBootInterface)
-  -> [(ModuleName, IsBootInterface)]
+  :: ModuleNameEnv ModuleNameWithIsBoot
+  -> [ModuleNameWithIsBoot]
 modDepsElts = sort . nonDetEltsUFM
   -- It's OK to use nonDetEltsUFM here because sorting by module names
   -- restores determinism
@@ -1420,7 +1420,7 @@ plusImportAvails
                    imp_orphs         = orphs1 `unionLists` orphs2,
                    imp_finsts        = finsts1 `unionLists` finsts2 }
   where
-    plus_mod_dep r1@(m1, boot1) r2@(m2, boot2)
+    plus_mod_dep r1@(ModuleNameWithIsBoot m1 boot1) r2@(ModuleNameWithIsBoot m2 boot2)
       | ASSERT2( m1 == m2, (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
         boot1 = r2
       | otherwise = r1
