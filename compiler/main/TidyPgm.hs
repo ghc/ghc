@@ -1075,15 +1075,8 @@ tidyTopBinds :: HscEnv
              -> IO (TidyEnv, CoreProgram)
 
 tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
-  = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-       mkNaturalId <- lookupMkNaturalName dflags hsc_env
-       integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-       naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
-       let cvt_literal nt i = case nt of
-             LitNumInteger -> Just (cvtLitInteger dflags mkIntegerId integerSDataCon i)
-             LitNumNatural -> Just (cvtLitNatural dflags mkNaturalId naturalSDataCon i)
-             _             -> Nothing
-           result      = tidy cvt_literal init_env binds
+  = do cvt_literal <- mkConvertNumLiteral dflags hsc_env
+       let result = tidy cvt_literal init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
@@ -1370,7 +1363,7 @@ hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   -- Don't forget that mk_integer id might have Caf refs!
   -- We first need to convert the Integer into its final form, to
   -- see whether mkInteger is used. Same for LitNatural.
-  cafRefsL (LitNumber nt i _) = case cvt_literal nt i of
+  cafRefsL (LitNumber nt i) = case cvt_literal nt i of
     Just e  -> cafRefsE e
     Nothing -> False
   cafRefsL _                = False
