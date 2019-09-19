@@ -16,8 +16,8 @@
 # which causes problems for Debian.
 
 ifneq "$(BINDIST)" "YES"
-GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/gmp-tarballs/gmp*.tar.bz2)
-GMP_DIR := $(patsubst libraries/integer-gmp/gmp/gmp-tarballs/%-nodoc.tar.bz2,%,$(GMP_TARBALL))
+GMP_TARBALL := $(wildcard libraries/ghc-bignum/gmp/gmp-tarballs/gmp*.tar.bz2)
+GMP_DIR := $(patsubst libraries/ghc-bignum/gmp/gmp-tarballs/%-nodoc.tar.bz2,%,$(GMP_TARBALL))
 
 ifeq "$(GMP_TARBALL)" ""
 $(error "GMP tarball is missing; you may need to run 'git submodule update --init'.")
@@ -26,28 +26,28 @@ endif
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
-  libraries/integer-gmp/include/ghc-gmp.h \
-  libraries/integer-gmp/gmp/libgmp.a \
-  libraries/integer-gmp/gmp/gmp.h \
-  libraries/integer-gmp/gmp/gmpbuild \
-  libraries/integer-gmp/gmp/$(GMP_DIR)))
+  libraries/ghc-bignum/include/ghc-gmp.h \
+  libraries/ghc-bignum/gmp/libgmp.a \
+  libraries/ghc-bignum/gmp/gmp.h \
+  libraries/ghc-bignum/gmp/gmpbuild \
+  libraries/ghc-bignum/gmp/$(GMP_DIR)))
 
 clean : clean_gmp
 .PHONY: clean_gmp
 clean_gmp:
-	$(call removeTrees,libraries/integer-gmp/gmp/objs)
-	$(call removeTrees,libraries/integer-gmp/gmp/gmpbuild)
+	$(call removeTrees,libraries/ghc-bignum/gmp/objs)
+	$(call removeTrees,libraries/ghc-bignum/gmp/gmpbuild)
 endif
 
 ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
-libraries/integer-gmp_CONFIGURE_OPTS += --with-gmp-framework-preferred
+libraries/ghc-bignum_CONFIGURE_OPTS += --with-gmp-framework-preferred
 endif
 
 ifneq "$(CLEANING)" "YES"
 # Hack. The file config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
 # sdist go through, right after ./configure, don't consider this an error.
--include libraries/integer-gmp/dist-install/build/config.mk
+-include libraries/ghc-bignum/dist-install/build/config.mk
 endif
 
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
@@ -67,7 +67,7 @@ endif
 # In a bindist, we don't want to know whether /this/ machine has gmp,
 # but whether the machine the bindist was built on had gmp.
 ifeq "$(BINDIST)" "YES"
-ifeq "$(wildcard libraries/integer-gmp/gmp/libgmp.a)" ""
+ifeq "$(wildcard libraries/ghc-bignum/gmp/libgmp.a)" ""
 HaveLibGmp = YES
 HaveFrameworkGMP = YES
 else
@@ -89,21 +89,21 @@ libraries/integer-gmp/cbits/wrappers.c: libraries/integer-gmp/include/ghc-gmp.h
 ifeq "$(UseIntreeGmp)" "YES"
 
 # Copy header from in-tree build (gmp.h => ghc-gmp.h)
-libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/gmp.h
+libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/gmp.h
 	$(CP) $< $@
 
 # Link in-tree GMP objects
-libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/*.o
+libraries/ghc-bignum_dist-install_EXTRA_OBJS += libraries/ghc-bignum/gmp/objs/*.o
 
 else
 
 # Copy header from source tree
-libraries/integer-gmp/include/ghc-gmp.h: libraries/integer-gmp/gmp/ghc-gmp.h
+libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/ghc-gmp.h
 	$(CP) $< $@
 
 endif
 
-libraries/integer-gmp_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
+libraries/ghc-bignum_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
 
 ifneq "$(CLEANING)" "YES"
 # When running `make clean` before `./configure`, CC_STAGE1 is undefined.
@@ -115,25 +115,25 @@ else
 CCX = $(CC_STAGE1)
 endif
 
-libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
-	$(RM) -rf libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild libraries/integer-gmp/gmp/objs
-	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
-	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
-	cd libraries/integer-gmp/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
-	chmod +x libraries/integer-gmp/gmp/ln
+libraries/ghc-bignum/gmp/libgmp.a libraries/ghc-bignum/gmp/gmp.h:
+	$(RM) -rf libraries/ghc-bignum/gmp/$(GMP_DIR) libraries/ghc-bignum/gmp/gmpbuild libraries/ghc-bignum/gmp/objs
+	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/ghc-bignum/gmp && $(TAR_CMD) -xf - ; }
+	mv libraries/ghc-bignum/gmp/$(GMP_DIR) libraries/ghc-bignum/gmp/gmpbuild
+	cd libraries/ghc-bignum/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
+	chmod +x libraries/ghc-bignum/gmp/ln
 
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's
 	#       `./configure`, not `HOSTPLATFORM`: the 'host' on which GMP will
 	#       run is the 'target' platform of the compiler we're building.
-	cd libraries/integer-gmp/gmp/gmpbuild; \
+	cd libraries/ghc-bignum/gmp/gmpbuild; \
 	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
 	          --enable-shared=no --with-pic=yes \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
-	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
-	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
-	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
-	$(MKDIRHIER) libraries/integer-gmp/gmp/objs
-	cd libraries/integer-gmp/gmp/objs && $(AR_STAGE1) x ../libgmp.a
-	$(RANLIB_CMD) libraries/integer-gmp/gmp/libgmp.a
+	$(MAKE) -C libraries/ghc-bignum/gmp/gmpbuild MAKEFLAGS=
+	$(CP) libraries/ghc-bignum/gmp/gmpbuild/gmp.h libraries/ghc-bignum/gmp/
+	$(CP) libraries/ghc-bignum/gmp/gmpbuild/.libs/libgmp.a libraries/ghc-bignum/gmp/
+	$(MKDIRHIER) libraries/ghc-bignum/gmp/objs
+	cd libraries/ghc-bignum/gmp/objs && $(AR_STAGE1) x ../libgmp.a
+	$(RANLIB_CMD) libraries/ghc-bignum/gmp/libgmp.a
 
 endif # CLEANING
