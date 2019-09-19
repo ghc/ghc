@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
-    isLibrary, stagePackages, getIntegerPackage, completeSetting
+    isLibrary, stagePackages, getBignumBackend, completeSetting
     ) where
 
 import CommandLine
@@ -35,6 +35,10 @@ getLibraryWays = expr flavour >>= libraryWays
 getRtsWays :: Ways
 getRtsWays = expr flavour >>= rtsWays
 
+getBignumBackend :: Expr String
+getBignumBackend = expr $ do
+    fromMaybe defaultBignumBackend <$> cmdBignum
+
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = do
     f <- flavour
@@ -64,9 +68,6 @@ flavour = do
 
     return $ maybe unknownFlavour tweak $
         find ((== flavourName) . name) flavours
-
-getIntegerPackage :: Expr Package
-getIntegerPackage = expr (integerLibrary =<< flavour)
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

@@ -1,0 +1,120 @@
+GCD benchmark
+=============
+
+* Simple is from a custom GHC 8.8.1 bindist (perf flavour)
+* GMP is from GHC 8.6.5 (LTS-14.6 from Stackage)
+* Sizes of the operands is given in Words
+
++-------------------------+--------+--------+
+| Operation               |  GMP   | Simple |
++-------------------------+--------+--------+
+| 1-word  `gcd` 1-word    | 0.20   | 120.44 |
+| 8-word  `gcd` 1-word    | 0.20   | 87.40  |
+| 20-word `gcd` 20-word   | 0.017  | 86.56  |
+| 80-word `gcd` 8-word    | 0.037  | 36.22  |
++-------------------------+--------+--------+
+
+native vs gmp 8.6.5
+-------------------
+
+benchmarking 1-word `gcd` 1-word/New Integer
+time                 150.7 ns   (150.3 ns .. 151.2 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 151.6 ns   (151.1 ns .. 152.4 ns)
+std dev              1.940 ns   (1.338 ns .. 3.107 ns)
+variance introduced by outliers: 13% (moderately inflated)
+
+benchmarking 1-word `gcd` 1-word/Stock Integer
+time                 30.39 ns   (30.30 ns .. 30.51 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 30.46 ns   (30.38 ns .. 30.55 ns)
+std dev              265.3 ps   (224.7 ps .. 325.4 ps)
+
+benchmarking 8-word `gcd` 1-word/New Integer
+time                 250.9 ns   (250.4 ns .. 251.3 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 250.6 ns   (250.2 ns .. 251.0 ns)
+std dev              1.389 ns   (1.176 ns .. 1.600 ns)
+                        
+benchmarking 8-word `gcd` 1-word/Stock Integer
+time                 51.78 ns   (51.62 ns .. 51.92 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 51.69 ns   (51.60 ns .. 51.83 ns)
+std dev              393.9 ps   (287.7 ps .. 592.3 ps)
+
+benchmarking 20-word `gcd` 20-word/New Integer
+time                 145.6 μs   (145.3 μs .. 146.0 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 145.7 μs   (145.5 μs .. 146.1 μs)
+std dev              997.6 ns   (740.0 ns .. 1.519 μs)
+                        
+benchmarking 20-word `gcd` 20-word/Stock Integer
+time                 2.477 μs   (2.472 μs .. 2.481 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 2.474 μs   (2.471 μs .. 2.478 μs)
+std dev              13.33 ns   (9.993 ns .. 21.65 ns)
+
+benchmarking 80-word `gcd` 8-word/New Integer
+time                 42.46 μs   (42.42 μs .. 42.51 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 42.51 μs   (42.47 μs .. 42.59 μs)
+std dev              203.7 ns   (143.0 ns .. 293.3 ns)
+
+benchmarking 80-word `gcd` 8-word/Stock Integer
+time                 1.564 μs   (1.561 μs .. 1.567 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.559 μs   (1.557 μs .. 1.563 μs)
+std dev              9.790 ns   (8.146 ns .. 11.56 ns)
+
+native vs simple 8.8.1
+----------------------
+
+benchmarking 1-word `gcd` 1-word/New Integer
+time                 150.7 ns   (150.4 ns .. 151.1 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 150.2 ns   (149.9 ns .. 150.4 ns)
+std dev              834.5 ps   (696.5 ps .. 1.016 ns)
+                        
+benchmarking 1-word `gcd` 1-word/Stock Integer
+time                 18.15 μs   (18.10 μs .. 18.20 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 18.19 μs   (18.15 μs .. 18.23 μs)
+std dev              126.1 ns   (98.85 ns .. 166.5 ns)
+
+benchmarking 8-word `gcd` 1-word/New Integer
+time                 253.3 ns   (252.5 ns .. 254.3 ns)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 252.8 ns   (252.5 ns .. 253.4 ns)
+std dev              1.577 ns   (982.4 ps .. 2.673 ns)
+
+benchmarking 8-word `gcd` 1-word/Stock Integer
+time                 22.14 μs   (22.06 μs .. 22.23 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 22.10 μs   (22.05 μs .. 22.16 μs)
+std dev              192.1 ns   (161.5 ns .. 252.2 ns)
+
+
+benchmarking 20-word `gcd` 20-word/New Integer
+time                 137.7 μs   (137.4 μs .. 137.9 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 137.1 μs   (136.9 μs .. 137.4 μs)
+std dev              877.5 ns   (753.9 ns .. 1.009 μs)
+
+benchmarking 20-word `gcd` 20-word/Stock Integer
+time                 11.92 ms   (11.88 ms .. 11.97 ms)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 11.93 ms   (11.91 ms .. 11.96 ms)
+std dev              64.09 μs   (51.55 μs .. 81.80 μs)
+
+benchmarking 80-word `gcd` 8-word/New Integer
+time                 39.12 μs   (39.03 μs .. 39.25 μs)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 39.25 μs   (39.17 μs .. 39.33 μs)
+std dev              258.7 ns   (221.9 ns .. 297.3 ns)
+
+benchmarking 80-word `gcd` 8-word/Stock Integer
+time                 1.417 ms   (1.414 ms .. 1.421 ms)
+                     1.000 R²   (1.000 R² .. 1.000 R²)
+mean                 1.419 ms   (1.417 ms .. 1.421 ms)
+std dev              8.022 μs   (6.408 μs .. 9.741 μs)
+

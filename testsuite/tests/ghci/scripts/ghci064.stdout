@@ -6,9 +6,9 @@ instance GHC.Base.MonadPlus Maybe -- Defined in ‘GHC.Base’
 instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
-instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
+instance [safe] Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
 instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
-instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
+instance [safe] Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
 instance Semigroup _ => Semigroup (Maybe _)
   -- Defined in ‘GHC.Base’
 instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
