@@ -60,7 +60,9 @@ type LHsUnit n = Located (HsUnit n)
 
 -- | A declaration in a package, e.g. a module or signature definition,
 -- or an include.
-data HsDeclType = ModuleD | SignatureD
+data HsDeclType
+    = ModuleD IsBootInterface
+    | SignatureD
 data HsUnitDecl n
     = DeclD   HsDeclType (Located ModuleName) (Maybe (Located (HsModule GhcPs)))
     | IncludeD   (IncludeDecl n)

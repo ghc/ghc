@@ -2351,9 +2351,6 @@ type WhetherHasOrphans   = Bool
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
 
--- | Did this module originate from a *-boot file?
-type IsBootInterface = Bool
-
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy.
 --

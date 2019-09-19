@@ -133,7 +133,10 @@ module Module
         emptyModuleSet, mkModuleSet, moduleSetElts,
         extendModuleSet, extendModuleSetList, delModuleSet,
         elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet,
-        unitModuleSet
+        unitModuleSet,
+
+        -- * hs-boot
+        IsBootInterface
     ) where
 
 import GhcPrelude
@@ -1301,3 +1304,21 @@ type ModuleNameEnv elt = UniqFM elt
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
 type DModuleNameEnv elt = UniqDFM elt
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Boot modules}
+*                                                                      *
+Why is this here? Boot modules are arguably separate signatures which
+just by convention are 1-1 with "real" modules. '{-# SOURCE #-} import's
+prove that sometimes the boot module needs to be referenced separately.
+Therefore it makes sense to treat the hs vs hs-boot distinction as part
+of a module name of sorts.
+*                                                                      *
+************************************************************************
+-}
+
+-- | Did this module originate from a *-boot file?
+type IsBootInterface = Bool
