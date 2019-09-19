@@ -1,5 +1,10 @@
 # Changelog for [`integer-gmp` package](http://hackage.haskell.org/package/integer-gmp)
 
+## 1.1 *2020*
+
+  * integer-gmp is now a shallow backward compatibility package on top of
+    ghc-bignum
+
 ## 1.0.3.0 *January 2019*
 
   * Bundled with GHC 8.10.1
