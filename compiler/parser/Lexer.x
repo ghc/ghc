@@ -381,9 +381,9 @@ $tab          { warnTab }
   "$("        / { ifExtension ThBit }       { token ITparenEscape }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
-  "_("         { token ITopenTypedHole }
-  "_$("        / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
-  "_$$("       / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
+  "_("        { token ITopenTypedHole }
+  "_$("       / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
+  "_$$("      / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
