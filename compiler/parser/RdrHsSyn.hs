@@ -2154,8 +2154,12 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
     return $ cL l (PatBuilderPat (LitPat noExtField a))
   mkHsOverLitPV (dL->L l a) = return $ cL l (PatBuilderOverLit a)
   mkHsWildCardPV l = return $ cL l (PatBuilderPat (WildPat noExtField))
-  mkHsHolePV l _ _ = return $ cL l (PatBuilderPat (WildPat noExtField))
-  mkHsHoleSplicePV l _ _ = return $ cL l (PatBuilderPat (WildPat noExtField))
+  mkHsHolePV l _ _ =  addFatalError l $ text "(_(...))-syntax in pattern"
+  mkHsHoleSplicePV l _ (L _ spl) = addFatalError l $
+    text "(" <+> rep <+> text ")-syntax in pattern"
+      where rep = text $ case spl of
+                           HsTypedSplice{} -> "_$$(...)"
+                           _ -> "_$(...)"
   mkHsTySigPV l b sig = do
     p <- checkLPat b
     return $ cL l (PatBuilderPat (SigPat noExtField p (mkLHsSigWcType sig)))
