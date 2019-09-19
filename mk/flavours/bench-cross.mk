@@ -10,7 +10,7 @@ BUILD_SPHINX_PDF   = NO
 BUILD_MAN          = NO
 WITH_TERMINFO      = NO
 
-INTEGER_LIBRARY      = integer-simple
+BIGNUM_BACKEND       = native
 Stage1Only           = YES
 DYNAMIC_BY_DEFAULT   = NO
 DYNAMIC_GHC_PROGRAMS = NO
