@@ -321,6 +321,8 @@ deriving instance Data (ArithSeqInfo GhcPs)
 deriving instance Data (ArithSeqInfo GhcRn)
 deriving instance Data (ArithSeqInfo GhcTc)
 
+deriving instance Data HsHipHop
+
 deriving instance                   Data RecordConTc
 deriving instance                   Data CmdTopTc
 deriving instance                   Data PendingRnSplice
