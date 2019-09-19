@@ -19,7 +19,7 @@ import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion
-import CoreLint
+import GHC.Core.Lint
 import TcEvidence
 import LoadIface
 import TcRnMonad

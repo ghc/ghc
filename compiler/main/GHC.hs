@@ -327,7 +327,7 @@ import Avail
 import InstEnv
 import FamInstEnv ( FamInst )
 import SrcLoc
-import CoreSyn
+import GHC.Core
 import TidyPgm
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
@@ -354,7 +354,7 @@ import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
-import CoreFVs          ( orphNamesOfFamInst )
+import GHC.Core.FVs     ( orphNamesOfFamInst )
 import FamInstEnv       ( famInstEnvElts )
 import TcRnDriver
 import Inst

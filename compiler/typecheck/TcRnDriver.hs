@@ -78,7 +78,7 @@ import TcRnExports
 import TcEvidence
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
-import CoreFVs( orphNamesOfFamInst )
+import GHC.Core.FVs( orphNamesOfFamInst )
 import FamInst
 import InstEnv
 import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons

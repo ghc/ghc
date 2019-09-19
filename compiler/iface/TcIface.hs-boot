@@ -7,7 +7,7 @@ import TyCoRep     ( TyThing )
 import TcRnTypes   ( IfL )
 import InstEnv     ( ClsInst )
 import FamInstEnv  ( FamInst )
-import CoreSyn     ( CoreRule )
+import GHC.Core    ( CoreRule )
 import HscTypes    ( CompleteMatch )
 import Annotations ( Annotation )
 

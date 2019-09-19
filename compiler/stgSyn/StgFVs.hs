@@ -9,7 +9,7 @@ import GhcPrelude
 import StgSyn
 import Id
 import VarSet
-import CoreSyn    ( Tickish(Breakpoint) )
+import GHC.Core    ( Tickish(Breakpoint) )
 import Outputable
 import Util
 

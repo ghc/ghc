@@ -106,10 +106,10 @@ There are a few key invariants about expressions:
 \item The right-hand sides of all top-level and recursive $[[let]]$s
 must be of lifted type, with one exception: the right-hand side of a top-level
 $[[let]]$ may be of type \texttt{Addr\#} if it's a primitive string literal.
-See \verb|#top_level_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
+See \verb|#top_level_invariant#| in \ghcfile{GHC/Core.hs}.
 \item The right-hand side of a non-recursive $[[let]]$ and the argument
 of an application may be of unlifted type, but only if the expression
-is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
+is ok-for-speculation. See \verb|Note [Core let/app_invariant]| in \ghcfile{GHC/Core.hs}.
 \item We allow a non-recursive $[[let]]$ for bind a type variable.
 \item The $[[_]]$ case for a $[[case]]$ must come first.
 \item The list of case alternatives must be exhaustive.
@@ -119,7 +119,7 @@ In other words, the payload inside of a \texttt{Type} constructor must not turn 
 to be built with \texttt{CoercionTy}.
 \item Join points (introduced by $[[join]]$ expressions) follow the invariants
 laid out in \verb|Note [Invariants on join points]| in
-\ghcfile{coreSyn/CoreSyn.hs}:
+\ghcfile{GHC/Core.hs}:
 \begin{enumerate}
     \item All occurences must be tail calls. This is enforced in our typing
     rules using the label environment $[[D]]$.
@@ -363,7 +363,7 @@ and then check each binding.
 
 \ottdefnlintCoreBindings{}
 
-Here is the definition of $[[vars_of]]$, taken from \coderef{coreSyn/CoreSyn.hs}{bindersOf}:
+Here is the definition of $[[vars_of]]$, taken from \coderef{GHC/Core.hs}{bindersOf}:
 
 \[
 \begin{array}{ll}
@@ -412,7 +412,7 @@ for that matter) up to the $i$th binding. This logic is extracted from
 \coderef{coreSyn/CoreLint.hs}{lintAndScopeIds}.
 
 \item The GHC source code checks all arguments in an application expression
-all at once using \coderef{coreSyn/CoreSyn.hs}{collectArgs}
+all at once using \coderef{GHC/Core.hs}{collectArgs}
 and \coderef{coreSyn/CoreLint.hs}{lintCoreArgs}. The operation
 has been unfolded for presentation here.
 
@@ -463,7 +463,7 @@ There are three very similar checks for names, two performed as part of
 
 The point of the extra checks on $[[t']]$ is that a join point's type cannot be
 polymorphic in its return type; see \texttt{Note [The polymorphism rule of join
-points]} in \ghcfile{coreSyn/CoreSyn.hs}.
+points]} in \ghcfile{GHC/Core.hs}.
 
 \ottdefnlintBinder{}
 
@@ -581,7 +581,7 @@ to the constructor. The terms are the regular term arguments stored in an
 algebraic datatype. Coercions (say, in a GADT) are considered term arguments.
 \item The rule \ottdrulename{S\_CasePush} is the most complex rule.
 \begin{itemize}
-\item The logic in this rule is implemented in \coderef{coreSyn/CoreSubst.hs}{exprIsConApp\_maybe}.
+\item The logic in this rule is implemented in \coderef{GHC/Core/Subst.hs}{exprIsConApp\_maybe}.
 \item The $[[coercionKind]]$ function (\coderef{types/Coercion.hs}{coercionKind})
 extracts the two types (and their kinds) from
 a coercion. It does not require a typing context, as it does not \emph{check} the

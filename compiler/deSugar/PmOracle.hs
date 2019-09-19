@@ -45,11 +45,11 @@ import VarEnv
 import UniqDFM
 import Var           (EvVar)
 import Name
-import CoreSyn
-import CoreFVs ( exprFreeVars )
-import CoreOpt (exprIsConApp_maybe)
-import CoreUtils (exprType)
-import MkCore (mkListExpr, mkCharExpr)
+import GHC.Core
+import GHC.Core.FVs   (exprFreeVars)
+import GHC.Core.Opt   (exprIsConApp_maybe)
+import GHC.Core.Utils (exprType)
+import GHC.Core.Make  (mkListExpr, mkCharExpr)
 import UniqSupply
 import FastString
 import SrcLoc

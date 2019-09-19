@@ -25,7 +25,7 @@ import BasicTypes ( Origin(..) )
 import TcType
 import DsMonad
 import DsUtils
-import MkCore   ( mkCoreLets )
+import GHC.Core.Make   ( mkCoreLets )
 import Util
 import Id
 import NameEnv

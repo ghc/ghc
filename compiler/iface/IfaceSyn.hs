@@ -45,7 +45,7 @@ import GhcPrelude
 
 import IfaceType
 import BinFingerprint
-import CoreSyn( IsOrphan, isOrphan )
+import GHC.Core( IsOrphan, isOrphan )
 import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
 import Demand
 import Class
@@ -526,7 +526,7 @@ Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In IfaceSyn an IfaceCase does not record the types of the alternatives,
 unlike CorSyn Case.  But we need this type if the alternatives are empty.
-Hence IfaceECase.  See Note [Empty case alternatives] in CoreSyn.
+Hence IfaceECase.  See Note [Empty case alternatives] in GHC.Core.
 
 Note [Expose recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -122,7 +122,7 @@ module Id (
 import GhcPrelude
 
 import DynFlags
-import CoreSyn ( CoreRule, isStableUnfolding, evaldUnfolding,
+import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
                  isCompulsoryUnfolding, Unfolding( NoUnfolding ) )
 
 import IdInfo

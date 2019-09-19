@@ -566,7 +566,7 @@ data GeneralFlag
    | Opt_CmmElimCommonBlocks
    | Opt_AsmShortcutting
    | Opt_OmitYields
-   | Opt_FunToThunk               -- allow WwLib.mkWorkerArgs to remove all value lambdas
+   | Opt_FunToThunk               -- allow WorkWrapLib.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
@@ -4715,7 +4715,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_StgCSE)
     , ([2],     Opt_StgLiftLams)
     , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
-                                         --              in PrelRules
+                                         --              in GHC.Core.ConstantFold
     , ([1,2],   Opt_FloatIn)
     , ([1,2],   Opt_FullLaziness)
     , ([1,2],   Opt_IgnoreAsserts)

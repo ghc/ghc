@@ -30,8 +30,8 @@ import PmTypes
 import PmOracle
 import PmPpr
 import BasicTypes (Origin, isGenerated)
-import CoreSyn (CoreExpr, Expr(Var))
-import CoreUtils (exprType)
+import GHC.Core (CoreExpr, Expr(Var))
+import GHC.Core.Utils (exprType)
 import FastString (unpackFS)
 import DynFlags
 import GHC.Hs
@@ -376,7 +376,7 @@ getNFirstUncovered vars n (delta:deltas) = do
 -- | The maximum successive number of refinements ('refineToAltCon') we allow
 -- per representative. See Note [Limit the number of refinements].
 mAX_REFINEMENTS :: Int
--- The current number is chosen so that PrelRules is still checked with
+-- The current number is chosen so that GHC.Core.ConstantFold is still checked with
 -- reasonable performance. If this is set to below 2, ds022 will start to fail.
 -- Although that is probably due to the fact that we always increase the
 -- refinement counter instead of just increasing it when the contraposition
@@ -766,7 +766,7 @@ with the original Delta.
 
 Note [Limit the number of refinements]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In PrelRules, we have a huge case with relatively deep matches on pattern
+In GHC.Core.ConstantFold, we have a huge case with relatively deep matches on pattern
 synonyms. Since we allow multiple compatible solutions in the oracle
 (i.e. @x ~ [I# y, 42]@), and every pattern synonym is compatible according to
 'eqPmAltCon' with every other (no generativity as with DataCons), what would

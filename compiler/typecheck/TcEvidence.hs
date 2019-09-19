@@ -54,7 +54,7 @@ import GhcPrelude
 import Var
 import CoAxiom
 import Coercion
-import PprCore ()   -- Instance OutputableBndr TyVar
+import GHC.Core.Pretty ()   -- Instance OutputableBndr TyVar
 import TcType
 import Type
 import TyCon
@@ -67,10 +67,10 @@ import VarSet
 import Name
 import Pair
 
-import CoreSyn
+import GHC.Core
 import Class ( classSCSelId )
 import Id ( isEvVar )
-import CoreFVs ( exprSomeFreeVars )
+import GHC.Core.FVs ( exprSomeFreeVars )
 
 import Util
 import Bag
