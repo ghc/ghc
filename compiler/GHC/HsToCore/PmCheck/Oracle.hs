@@ -16,7 +16,6 @@ module GHC.HsToCore.PmCheck.Oracle (
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
 
         TmCt(..),
-        inhabitants,
         addTypeEvidence,    -- Add type equalities
         addRefutableAltCon, -- Add a negative term equality
         addTmCt,            -- Add a positive term equality x ~ e
@@ -73,7 +72,6 @@ import FamInstEnv
 import Control.Monad (guard, mzero)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
-import Data.Bifunctor (second)
 import Data.Foldable (foldlM)
 import Data.List     (find)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -220,11 +218,10 @@ that we expect.
 -- this check. If so, return 'Just' a potentially extended 'Delta'. Return
 -- 'Nothing' if unsatisfiable.
 --
--- There are three essential SatisfiabilityChecks:
+-- There are two essential SatisfiabilityChecks:
 --   1. 'tmIsSatisfiable', adding term oracle facts
 --   2. 'tyIsSatisfiable', adding type oracle facts
---   3. 'tysAreNonVoid', checks if the given types have an inhabitant
--- Functions like 'pmIsSatisfiable', 'nonVoid' and 'testInhabited' plug these
+-- Functions like 'pmIsSatisfiable' and 'testInhabited' plug these
 -- together as they see fit.
 newtype SatisfiabilityCheck = SC (Delta -> DsM (Maybe Delta))
 
@@ -251,31 +248,24 @@ instance Monoid SatisfiabilityCheck where
 -------------------------------
 -- * Oracle transition function
 
--- | Given a conlike's term constraints, type constraints, and strict argument
--- types, check if they are satisfiable.
--- (In other words, this is the ⊢_Sat oracle judgment from the GADTs Meet
--- Their Match paper.)
---
--- Taking strict argument types into account is something which was not
--- discussed in GADTs Meet Their Match. For an explanation of what role they
--- serve, see @Note [Strict argument type constraints]@.
+-- | Given a conlike's term constraints and type constraints, check if they are
+-- satisfiable. (In other words, this is the ⊢_Sat oracle judgment from the
+-- GADTs Meet Their Match paper.)
 pmIsSatisfiable
   :: Delta       -- ^ The ambient term and type constraints
                  --   (known to be satisfiable).
   -> Bag TmCt    -- ^ The new term constraints.
   -> Bag TyCt    -- ^ The new type constraints.
-  -> [Type]      -- ^ The strict argument types.
   -> DsM (Maybe Delta)
                  -- ^ @'Just' delta@ if the constraints (@delta@) are
                  -- satisfiable, and each strict argument type is inhabitable.
                  -- 'Nothing' otherwise.
-pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
+pmIsSatisfiable amb_cs new_tm_cs new_ty_cs =
   -- The order is important here! Check the new type constraints before we check
   -- whether strict argument types are inhabited given those constraints.
   runSatisfiabilityCheck amb_cs $ mconcat
     [ tyIsSatisfiable True new_ty_cs
     , tmIsSatisfiable new_tm_cs
-    , tysAreNonVoid initRecTc strict_arg_tys
     ]
 
 -----------------------
@@ -329,7 +319,7 @@ pmTopNormaliseType :: TyState -> Type -> DsM TopNormaliseTypeResult
 --
 -- Behaves like `topNormaliseType_maybe`, but instead of returning a
 -- coercion, it returns useful information for issuing pattern matching
--- warnings. See Note [Type normalisation for EmptyCase] for details.
+-- warnings. See Note [Type normalisation] for details.
 -- It also initially 'tcNormalise's the type with the bag of local constraints.
 --
 -- See 'TopNormaliseTypeResult' for the meaning of the return value.
@@ -341,7 +331,7 @@ pmTopNormaliseType (TySt inert) typ
   = do env <- dsGetFamInstEnvs
        -- Before proceeding, we chuck typ into the constraint solver, in case
        -- solving for given equalities may reduce typ some. See
-       -- "Wrinkle: local equalities" in Note [Type normalisation for EmptyCase].
+       -- "Wrinkle: local equalities" in Note [Type normalisation].
        (_, mb_typ') <- initTcDsForSolver $ tcNormalise inert typ
        -- If tcNormalise didn't manage to simplify the type, continue anyway.
        -- We might be able to reduce type applications nonetheless!
@@ -395,9 +385,9 @@ pmTopNormaliseType (TySt inert) typ
       = let (_args_co, ntys, _res_co) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
           -- normalise_tc_args (which takes the LiftingContext described
-          -- in Note [Normalising types]) because the reduceTyFamApp below
-          -- works only at top level. We'll never recur in this function
-          -- after reducing the kind of a bound tyvar.
+          -- in Note [Normalising types] in FamInstEnvs) because the
+          -- reduceTyFamApp below works only at top level. We'll never recur in
+          -- this function after reducing the kind of a bound tyvar.
 
         case reduceTyFamApp_maybe env Representational tc ntys of
           Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
@@ -437,10 +427,12 @@ pmIsClosedType ty
     is_algebraic_like :: TyCon -> Bool
     is_algebraic_like tc = isAlgTyCon tc || tc == tYPETyCon
 
-{- Note [Type normalisation for EmptyCase]
+{- Note [Type normalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 EmptyCase is an exception for pattern matching, since it is strict. This means
 that it boils down to checking whether the type of the scrutinee is inhabited.
+A similar situation arises for strict constructor fields: A variable can be
+refined to a particular constructor only if all strict fields have inhabitants.
 Function pmTopNormaliseType gets rid of the outermost type function/data
 family redex and newtypes, in search of an algebraic type constructor, which is
 easier to check for inhabitation.
@@ -559,14 +551,6 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta -> do
         if recheck_complete_sets
           then ensureAllPossibleMatchesInhabited delta'
           else pure (Just delta')
-
-
-{- *********************************************************************
-*                                                                      *
-              DIdEnv with sharing
-*                                                                      *
-********************************************************************* -}
-
 
 {- *********************************************************************
 *                                                                      *
@@ -754,7 +738,7 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_st delta) x) of
 -- * Adding facts to the oracle
 
 -- | A term constraint. Either equates two variables or a variable with a
--- 'PmAltCon' application.
+-- 'PmAltCon' application, or asserts that a variable is inhabited.
 data TmCt
   = TmVarVar     !Id !Id
   | TmVarCon     !Id !PmAltCon ![Id]
@@ -917,11 +901,8 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
           (_vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys con
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
-            -- Important to pass False to tyIsSatisfiable here, so that we won't
-            -- recursively call ensureAllPossibleMatchesInhabited, leading to an
-            -- endless recursion.
             [ tyIsSatisfiable False ty_cs
-            , tysAreNonVoid initRecTc strict_arg_tys
+            , tmIsSatisfiable strict_tm_cs
             ]
 
 -- | Checks if every 'VarInfo' in the term oracle has still an inhabited
@@ -1013,233 +994,16 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env } x alt args = do
       let pos' = (alt,args):pos
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache))}
 
-----------------------------------------
--- * Enumerating inhabitation candidates
-
--- | Information about a conlike that is relevant to coverage checking.
--- It is called an \"inhabitation candidate\" since it is a value which may
--- possibly inhabit some type, but only if its term constraints ('ic_tm_cs')
--- and type constraints ('ic_ty_cs') are permitting, and if all of its strict
--- argument types ('ic_strict_arg_tys') are inhabitable.
--- See @Note [Strict argument type constraints]@.
-data InhabitationCandidate =
-  InhabitationCandidate
-  { ic_tm_cs          :: Bag TmCt
-  , ic_ty_cs          :: Bag TyCt
-  , ic_strict_arg_tys :: [Type]
-  }
-
-instance Outputable InhabitationCandidate where
-  ppr (InhabitationCandidate tm_cs ty_cs strict_arg_tys) =
-    text "InhabitationCandidate" <+>
-      vcat [ text "ic_tm_cs          =" <+> ppr tm_cs
-           , text "ic_ty_cs          =" <+> ppr ty_cs
-           , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
-
-mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
--- Precondition: idType x is a TyConApp, so that tyConAppArgs in here is safe.
-mkInhabitationCandidate x dc = do
-  let cl = RealDataCon dc
-  let tc_args = tyConAppArgs (idType x)
-  (arg_vars, ty_cs, strict_arg_tys) <- mkOneConFull tc_args cl
-  pure InhabitationCandidate
-        { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
-        , ic_ty_cs = ty_cs
-        , ic_strict_arg_tys = strict_arg_tys
-        }
-
--- | Generate all 'InhabitationCandidate's for a given type. The result is
--- either @'Left' ty@, if the type cannot be reduced to a closed algebraic type
--- (or if it's one trivially inhabited, like 'Int'), or @'Right' candidates@,
--- if it can. In this case, the candidates are the signature of the tycon, each
--- one accompanied by the term- and type- constraints it gives rise to.
--- See also Note [Checking EmptyCase Expressions]
-inhabitationCandidates :: Delta -> Type
-                       -> DsM (Either Type (TyCon, Id, [InhabitationCandidate]))
-inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
-  pmTopNormaliseType ty_st ty >>= \case
-    NoChange _                    -> alts_to_check ty     ty      []
-    NormalisedByConstraints ty'   -> alts_to_check ty'    ty'     []
-    HadRedexes src_ty dcs core_ty -> alts_to_check src_ty core_ty dcs
-  where
-    -- All these types are trivially inhabited
-    trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
-                          , intTyCon, wordTyCon, word8TyCon ]
-
-    build_newtype :: (Type, DataCon) -> Id -> DsM (Id, TmCt)
-    build_newtype (ty, dc) x = do
-      -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
-      y <- mkPmId ty
-      pure (y, TmVarCon y (PmAltConLike (RealDataCon dc)) [x])
-
-    build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmCt])
-    build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
-      where
-        go dc x cts = second (:cts) <$> build_newtype dc x
-
-    -- Inhabitation candidates, using the result of pmTopNormaliseType
-    alts_to_check :: Type -> Type -> [(Type, DataCon)]
-                  -> DsM (Either Type (TyCon, Id, [InhabitationCandidate]))
-    alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
-      Just (tc, _)
-        |  tc `elem` trivially_inhabited
-        -> case dcs of
-             []    -> return (Left src_ty)
-             (_:_) -> do inner <- mkPmId core_ty
-                         (outer, new_tm_cts) <- build_newtypes inner dcs
-                         return $ Right (tc, outer, [InhabitationCandidate
-                           { ic_tm_cs = listToBag new_tm_cts
-                           , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }])
-
-        |  pmIsClosedType core_ty && not (isAbstractTyCon tc)
-           -- Don't consider abstract tycons since we don't know what their
-           -- constructors are, which makes the results of coverage checking
-           -- them extremely misleading.
-        -> do
-             inner <- mkPmId core_ty -- it would be wrong to unify inner
-             alts <- mapM (mkInhabitationCandidate inner) (tyConDataCons tc)
-             (outer, new_tm_cts) <- build_newtypes inner dcs
-             let wrap_dcs alt = alt{ ic_tm_cs = listToBag new_tm_cts `unionBags` ic_tm_cs alt}
-             return $ Right (tc, outer, map wrap_dcs alts)
-      -- For other types conservatively assume that they are inhabited.
-      _other -> return (Left src_ty)
-
-inhabitants :: Delta -> Type -> DsM (Either Type (Id, [Delta]))
-inhabitants delta ty = inhabitationCandidates delta ty >>= \case
-  Left ty' -> pure (Left ty')
-  Right (_, va, candidates) -> do
-    deltas <- flip mapMaybeM candidates $
-        \InhabitationCandidate{ ic_tm_cs = tm_cs
-                              , ic_ty_cs = ty_cs
-                              , ic_strict_arg_tys = strict_arg_tys } -> do
-      pmIsSatisfiable delta tm_cs ty_cs strict_arg_tys
-    pure (Right (va, deltas))
-
-----------------------------
--- * Detecting vacuous types
-
-{- Note [Checking EmptyCase Expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Empty case expressions are strict on the scrutinee. That is, `case x of {}`
-will force argument `x`. Hence, `checkMatches` is not sufficient for checking
-empty cases, because it assumes that the match is not strict (which is true
-for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
-we do the following:
-
-1. We normalise the outermost type family redex, data family redex or newtype,
-   using pmTopNormaliseType (in types/FamInstEnv.hs). This computes 3
-   things:
-   (a) A normalised type src_ty, which is equal to the type of the scrutinee in
-       source Haskell (does not normalise newtypes or data families)
-   (b) The actual normalised type core_ty, which coincides with the result
-       topNormaliseType_maybe. This type is not necessarily equal to the input
-       type in source Haskell. And this is precicely the reason we compute (a)
-       and (c): the reasoning happens with the underlying types, but both the
-       patterns and types we print should respect newtypes and also show the
-       family type constructors and not the representation constructors.
-
-   (c) A list of all newtype data constructors dcs, each one corresponding to a
-       newtype rewrite performed in (b).
-
-   For an example see also Note [Type normalisation for EmptyCase]
-   in types/FamInstEnv.hs.
-
-2. Function Check.checkEmptyCase' performs the check:
-   - If core_ty is not an algebraic type, then we cannot check for
-     inhabitation, so we emit (_ :: src_ty) as missing, conservatively assuming
-     that the type is inhabited.
-   - If core_ty is an algebraic type, then we unfold the scrutinee to all
-     possible constructor patterns, using inhabitationCandidates, and then
-     check each one for constraint satisfiability, same as we do for normal
-     pattern match checking.
--}
-
--- | A 'SatisfiabilityCheck' based on "NonVoid ty" constraints, e.g. Will
--- check if the @strict_arg_tys@ are actually all inhabited.
--- Returns the old 'Delta' if all the types are non-void according to 'Delta'.
-tysAreNonVoid :: RecTcChecker -> [Type] -> SatisfiabilityCheck
-tysAreNonVoid rec_env strict_arg_tys = SC $ \delta -> do
-  all_non_void <- checkAllNonVoid rec_env delta strict_arg_tys
-  -- Check if each strict argument type is inhabitable
-  pure $ if all_non_void
-            then Just delta
-            else Nothing
-
--- | Implements two performance optimizations, as described in
--- @Note [Strict argument type constraints]@.
-checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> DsM Bool
-checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
-  let definitely_inhabited = definitelyInhabitedType (delta_ty_st amb_cs)
-  tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
-  let rec_max_bound | tys_to_check `lengthExceeds` 1
-                    = 1
-                    | otherwise
-                    = defaultRecTcMaxBound
-      rec_ts' = setRecTcMaxBound rec_max_bound rec_ts
-  allM (nonVoid rec_ts' amb_cs) tys_to_check
-
--- | Checks if a strict argument type of a conlike is inhabitable by a
--- terminating value (i.e, an 'InhabitationCandidate').
--- See @Note [Strict argument type constraints]@.
-nonVoid
-  :: RecTcChecker -- ^ The per-'TyCon' recursion depth limit.
-  -> Delta        -- ^ The ambient term/type constraints (known to be
-                  --   satisfiable).
-  -> Type         -- ^ The strict argument type.
-  -> DsM Bool     -- ^ 'True' if the strict argument type might be inhabited by
-                  --   a terminating value (i.e., an 'InhabitationCandidate').
-                  --   'False' if it is definitely uninhabitable by anything
-                  --   (except bottom).
-nonVoid rec_ts amb_cs strict_arg_ty = do
-  mb_cands <- inhabitationCandidates amb_cs strict_arg_ty
-  case mb_cands of
-    Right (tc, _, cands)
-      |  Just rec_ts' <- checkRecTc rec_ts tc
-      -> anyM (cand_is_inhabitable rec_ts' amb_cs) cands
-           -- A strict argument type is inhabitable by a terminating value if
-           -- at least one InhabitationCandidate is inhabitable.
-    _ -> pure True
-           -- Either the type is trivially inhabited or we have exceeded the
-           -- recursion depth for some TyCon (so bail out and conservatively
-           -- claim the type is inhabited).
-  where
-    -- Checks if an InhabitationCandidate for a strict argument type:
-    --
-    -- (1) Has satisfiable term and type constraints.
-    -- (2) Has 'nonVoid' strict argument types (we bail out of this
-    --     check if recursion is detected).
-    --
-    -- See Note [Strict argument type constraints]
-    cand_is_inhabitable :: RecTcChecker -> Delta
-                        -> InhabitationCandidate -> DsM Bool
-    cand_is_inhabitable rec_ts amb_cs
-      (InhabitationCandidate{ ic_tm_cs          = new_tm_cs
-                            , ic_ty_cs          = new_ty_cs
-                            , ic_strict_arg_tys = new_strict_arg_tys }) =
-        fmap isJust $ runSatisfiabilityCheck amb_cs $ mconcat
-          [ tyIsSatisfiable False new_ty_cs
-          , tmIsSatisfiable new_tm_cs
-          , tysAreNonVoid rec_ts new_strict_arg_tys
-          ]
-
--- | @'definitelyInhabitedType' ty@ returns 'True' if @ty@ has at least one
--- constructor @C@ such that:
---
--- 1. @C@ has no equality constraints.
--- 2. @C@ has no strict argument types.
---
--- See the @Note [Strict argument type constraints]@.
-definitelyInhabitedType :: TyState -> Type -> DsM Bool
-definitelyInhabitedType ty_st ty = do
-  res <- pmTopNormaliseType ty_st ty
-  pure $ case res of
-           HadRedexes _ cons _ -> any meets_criteria cons
-           _                   -> False
-  where
-    meets_criteria :: (Type, DataCon) -> Bool
-    meets_criteria (_, con) =
-      null (dataConEqSpec con) && -- (1)
-      null (dataConImplBangs con) -- (2)
+-- | Assert that a variable is non-void, i.e. that there are inhabitants besides
+-- ⊥.
+addVarNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
+addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x =
+  if not (canDiverge delta x)
+    then pure delta
+    else do
+      vi  <- lift (initLookupVarInfo delta x)
+      vi' <- MaybeT (ensureInhabited delta vi)
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') }
 
 {- Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -241,7 +241,7 @@ instance Monoid PartialResult where
 data PmResult =
   PmResult {
       pmresultRedundant    :: [Located [LPat GhcTc]]
-    , pmresultUncovered    :: UncoveredCandidates
+    , pmresultUncovered    :: Uncovered
     , pmresultInaccessible :: [Located [LPat GhcTc]]
     , pmresultApproximate  :: Precision }
 
@@ -252,24 +252,6 @@ instance Outputable PmResult where
     , text "pmresultInaccessible" <+> ppr (pmresultInaccessible pmr)
     , text "pmresultApproximate" <+> ppr (pmresultApproximate pmr)
     ]
-
--- | Either a list of patterns that are not covered, or their type, in case we
--- have no patterns at hand. Not having patterns at hand can arise when
--- handling EmptyCase expressions, in two cases:
---
--- * The type of the scrutinee is a trivially inhabited type (like Int or Char)
--- * The type of the scrutinee cannot be reduced to WHNF.
---
--- In both these cases we have no inhabitation candidates for the type at hand,
--- but we don't want to issue just a wildcard as missing. Instead, we print a
--- type annotated wildcard, so that the user knows what kind of patterns is
--- expected (e.g. (_ :: Int), or (_ :: F Int), where F Int does not reduce).
-data UncoveredCandidates = UncoveredPatterns [Id] [Delta]
-                         | TypeOfUncovered Type
-
-instance Outputable UncoveredCandidates where
-  ppr (UncoveredPatterns vva deltas) = text "UnPat" <+> ppr vva $$ ppr deltas
-  ppr (TypeOfUncovered ty)   = text "UnTy" <+> ppr ty
 
 {-
 %************************************************************************
@@ -284,7 +266,7 @@ checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
   res <- checkSingle' locn var p
-  dsPmWarn dflags ctxt res
+  dsPmWarn dflags ctxt [var] res
 
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
@@ -296,11 +278,10 @@ checkSingle' locn var p = do
   PartialResult cs us ds pc <- pmcheckI clause [] [var] 1 missing
   dflags <- getDynFlags
   us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
-  let uc = UncoveredPatterns [var] us'
   return $ case (cs,ds) of
-    (Covered,  _    )         -> PmResult [] uc [] pc -- useful
-    (NotCovered, NotDiverged) -> PmResult m  uc [] pc -- redundant
-    (NotCovered, Diverged )   -> PmResult [] uc m  pc -- inaccessible rhs
+    (Covered,  _    )         -> PmResult [] us' [] pc -- useful
+    (NotCovered, NotDiverged) -> PmResult m  us' [] pc -- redundant
+    (NotCovered, Diverged )   -> PmResult [] us' m  pc -- inaccessible rhs
   where m = [cL locn [cL locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
@@ -334,7 +315,7 @@ checkMatches dflags ctxt vars matches = do
     -- See Note [Checking EmptyCase Expressions] in GHC.HsToCore.PmCheck.Oracle
     [] | [var] <- vars -> checkEmptyCase' var
     _normal_match      -> checkMatches' vars matches
-  dsPmWarn dflags ctxt res
+  dsPmWarn dflags ctxt vars res
 
 -- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
 -- list of matches. For empty case expressions, use checkEmptyCase' instead.
@@ -347,10 +328,9 @@ checkMatches' vars matches
       (rs,us,ds,pc) <- go matches [missing]
       dflags <- getDynFlags
       us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
-      let up = UncoveredPatterns vars us'
       return $ PmResult {
                    pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = up
+                 , pmresultUncovered    = us'
                  , pmresultInaccessible = map hsLMatchToLPats ds
                  , pmresultApproximate  = pc }
   where
@@ -391,14 +371,23 @@ checkMatches' vars matches
 --   in "GHC.HsToCore.PmCheck.Oracle" for details.
 checkEmptyCase' :: Id -> DsM PmResult
 checkEmptyCase' x = do
-  delta         <- getPmDelta
-  us <- inhabitants delta (idType x) >>= \case
-    -- Inhabitation checking failed / the type is trivially inhabited
-    Left ty            -> pure (TypeOfUncovered ty)
-    -- A list of oracle states for the different satisfiable constructors is
-    -- available. Turn this into a value set abstraction.
-    Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
-  pure (PmResult [] us [] Precise)
+  delta  <- getPmDelta
+  dflags <- getDynFlags
+  us <- maybeToList <$> addTmCt delta (TmVarNonVoid x)
+  us' <- getNFirstUncovered [x] (maxUncoveredPatterns dflags + 1) us
+  pure (PmResult [] us' [] Precise)
+
+{- Note [Checking EmptyCase Expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Empty case expressions are strict on the scrutinee. That is, `case x of {}`
+will force argument `x`. Hence, `checkMatches` is not sufficient for checking
+empty cases, because it assumes that the match is not strict (which is true
+for all other cases, apart from EmptyCase). This gave rise to #10746.
+
+Instead, we record a non-void constraint ('TmVarNonVoid') on the match variable
+to assert it is in fact inhabited. This is the case when 'addTmCt' returns
+'Nothing' when faced with that constraint.
+-}
 
 getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
 getNFirstUncovered _    0 _              = pure []
@@ -893,6 +882,122 @@ the paper. This Note serves as a reference for these new features.
   See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle.
 * Efficient handling of literal splitting, large enumerations and accurate
   redundancy warnings for `COMPLETE` groups through the oracle.
+
+Note [Strict argument type constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the ConVar case of clause processing, each conlike K traditionally
+generates two different forms of constraints:
+
+* A term constraint (e.g., x ~ K y1 ... yn)
+* Type constraints from the conlike's context (e.g., if K has type
+  forall bs. Q => s1 .. sn -> T tys, then Q would be its type constraints)
+
+As it turns out, these alone are not enough to detect a certain class of
+unreachable code. Consider the following example (adapted from #15305):
+
+  data K = K1 | K2 !Void
+
+  f :: K -> ()
+  f K1 = ()
+
+Even though `f` doesn't match on `K2`, `f` is exhaustive in its patterns. Why?
+Because it's impossible to construct a terminating value of type `K` using the
+`K2` constructor, and thus it's impossible for `f` to ever successfully match
+on `K2`.
+
+The reason is because `K2`'s field of type `Void` is //strict//. Because there
+are no terminating values of type `Void`, any attempt to construct something
+using `K2` will immediately loop infinitely or throw an exception due to the
+strictness annotation. (If the field were not strict, then `f` could match on,
+say, `K2 undefined` or `K2 (let x = x in x)`.)
+
+Thus, when we refine `x` to `K`, we generate strictness constraints
+('TmVarNonVoid') in mkOneConFull and solve them in the oracle. So when we feed
+addVarCt with the constraint
+
+* `x::Void /~ ⊥` it refutes, since Void has no inhabitants.
+  (This is what lets us discard the `K2` constructor in the earlier example.)
+* `x::(Int :~: Int) /~ ⊥` is satisfiable, since it has an inhabitant
+  (through the Refl constructor), so (x ~ Refl) is a term solution and
+  type constraint (Int ~ Int) are satisfiable.
+* `x::(Int :~: Bool) /~ ⊥` it refutes. Although it has a term solution
+  (by way of Refl), its type constraint (Int ~ Bool) is not satisfiable.
+* Given the following definition of `MyVoid`:
+
+    data MyVoid = MkMyVoid !Void
+
+  `x::MyVoid /~ ⊥` refutes. When we try to refine x to the MkMyVoid
+  constructor, we find it contains a strict Void field, and since `x::Void /~ ⊥`
+  is refutable, that inhabitation candidate is discarded, leaving no others.
+
+* Performance considerations
+
+We must be careful to avoid endless recursion when checking for inhabitants.
+Consider the following example:
+
+  data Abyss = MkAbyss !Abyss
+
+  stareIntoTheAbyss :: Abyss -> a
+  stareIntoTheAbyss x = case x of {}
+
+In principle, stareIntoTheAbyss is exhaustive, since there is no way to
+construct a terminating value using MkAbyss. However, both the term and type
+constraints for MkAbyss are satisfiable, so the only way one could determine
+that MkAbyss is unreachable is to check if `x::Abyss /~ ⊥` refutes.
+There is only one constructor for Abyss—MkAbyss—and both its term
+and type constraints are satisfiable, so we'd need to check if `x::Abyss /~ ⊥`
+refutes... and now we've entered an infinite loop!
+
+
+TODO: Update the rest of this Note! I think we also need the RecTc
+
+To avoid this sort of conundrum, `nonVoid` uses a simple test to detect the
+presence of recursive types (through `checkRecTc`), and if recursion is
+detected, we bail out and conservatively assume that the type is inhabited by
+some terminating value. This avoids infinite loops at the expense of making
+the coverage checker incomplete with respect to functions like
+stareIntoTheAbyss above. Then again, the same problem occurs with recursive
+newtypes, like in the following code:
+
+  newtype Chasm = MkChasm Chasm
+
+  gazeIntoTheChasm :: Chasm -> a
+  gazeIntoTheChasm x = case x of {} -- Erroneously warned as non-exhaustive
+
+So this limitation is somewhat understandable.
+
+Note that even with this recursion detection, there is still a possibility that
+`nonVoid` can run in exponential time. Consider the following data type:
+
+  data T = MkT !T !T !T
+
+If we call `nonVoid` on each of its fields, that will require us to once again
+check if `MkT` is inhabitable in each of those three fields, which in turn will
+require us to check if `MkT` is inhabitable again... As you can see, the
+branching factor adds up quickly, and if the recursion depth limit is, say,
+100, then `nonVoid T` will effectively take forever.
+
+To mitigate this, we check the branching factor every time we are about to call
+`nonVoid` on a list of strict argument types. If the branching factor exceeds 1
+(i.e., if there is potential for exponential runtime), then we limit the
+maximum recursion depth to 1 to mitigate the problem. If the branching factor
+is exactly 1 (i.e., we have a linear chain instead of a tree), then it's okay
+to stick with a larger maximum recursion depth.
+
+Another microoptimization applies to data types like this one:
+
+  data S a = ![a] !T
+
+Even though there is a strict field of type [a], it's quite silly to call
+nonVoid on it, since it's "obvious" that it is inhabitable. To make this
+intuition formal, we say that a type is definitely inhabitable (DI) if:
+
+  * It has at least one constructor C such that:
+    1. C has no equality constraints (since they might be unsatisfiable)
+    2. C has no strict argument types (since they might be uninhabitable)
+
+It's relatively cheap to check if a type is DI, so before we call `nonVoid`
+on a list of strict argument types, we filter out all of the DI ones.
 -}
 
 -- ----------------------------------------------------------------------------
@@ -1323,14 +1428,12 @@ needToRunPmCheck dflags origin
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
-dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
-dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
+dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> PmResult -> DsM ()
+dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
   = when (flag_i || flag_u) $ do
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible && not is_rec_upd
-          exists_u = flag_u && (case uncovered of
-                                  TypeOfUncovered   _     -> True
-                                  UncoveredPatterns _ unc -> notNull unc)
+          exists_u = flag_u && notNull uncovered
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
@@ -1343,9 +1446,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
-        case uncovered of
-          TypeOfUncovered ty    -> warnEmptyCase ty
-          UncoveredPatterns vars unc -> pprEqns vars unc
+        pprEqns vars uncovered
   where
     PmResult
       { pmresultRedundant = redundant
