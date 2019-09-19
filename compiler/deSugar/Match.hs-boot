@@ -4,7 +4,7 @@ import GhcPrelude
 import Var      ( Id )
 import TcType   ( Type )
 import DsMonad  ( DsM, EquationInfo, MatchResult )
-import CoreSyn  ( CoreExpr )
+import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import Name     ( Name )
 import GHC.Hs.Extension ( GhcTc )

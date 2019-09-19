@@ -18,14 +18,14 @@ import GhcPrelude
 
 import TcRnMonad        -- temp
 
-import CoreSyn
+import GHC.Core
 
 import DsCCall
 import DsMonad
 
 import GHC.Hs
 import DataCon
-import CoreUnfold
+import GHC.Core.Unfold
 import Id
 import Literal
 import Module

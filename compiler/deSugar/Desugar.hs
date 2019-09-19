@@ -30,10 +30,10 @@ import Id
 import Name
 import Type
 import Avail
-import CoreSyn
-import CoreFVs     ( exprsSomeFreeVarsList )
-import CoreOpt     ( simpleOptPgm, simpleOptExpr )
-import PprCore
+import GHC.Core
+import GHC.Core.FVs     ( exprsSomeFreeVarsList )
+import GHC.Core.Opt     ( simpleOptPgm, simpleOptExpr )
+import GHC.Core.Pretty
 import DsMonad
 import DsExpr
 import DsBinds
@@ -44,14 +44,14 @@ import Unique      ( hasKey )
 import Coercion    ( mkCoVarCo )
 import TysWiredIn  ( coercibleDataCon )
 import DataCon     ( dataConWrapId )
-import MkCore      ( mkCoreLet )
+import GHC.Core.Make    ( mkCoreLet )
 import Module
 import NameSet
 import NameEnv
-import Rules
+import GHC.Core.Rules
 import BasicTypes       ( Activation(.. ), competesWith, pprRuleName )
-import CoreMonad        ( CoreToDo(..) )
-import CoreLint         ( endPassIO )
+import GHC.Core.Monad   ( CoreToDo(..) )
+import GHC.Core.Lint    ( endPassIO )
 import VarSet
 import FastString
 import ErrUtils

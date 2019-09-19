@@ -97,7 +97,7 @@ default ()
 --
 -- TODO: Note that some functions have commented CONSTANT_FOLDED annotations,
 -- that's because the Integer counter-parts of these functions do actually have
--- a builtinRule in PrelRules, where the Natural functions do not. The plan is
+-- a builtinRule in GHC.Core.ConstantFold, where the Natural functions do not. The plan is
 -- to eventually also add builtin rules for those functions on Natural.
 #define CONSTANT_FOLDED NOINLINE
 

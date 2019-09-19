@@ -40,11 +40,11 @@ import HscTypes
 import Annotations
 import InstEnv
 import FamInstEnv
-import CoreSyn
-import CoreUtils
-import CoreUnfold
-import CoreLint
-import MkCore
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.Unfold
+import GHC.Core.Lint
+import GHC.Core.Make
 import Id
 import MkId
 import IdInfo
@@ -60,7 +60,7 @@ import VarSet
 import Name
 import NameEnv
 import NameSet
-import OccurAnal        ( occurAnalyseExpr )
+import GHC.Core.OccurAnal ( occurAnalyseExpr )
 import Demand
 import Module
 import UniqFM

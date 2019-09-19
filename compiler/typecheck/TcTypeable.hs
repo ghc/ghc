@@ -38,7 +38,7 @@ import GHC.Hs
 import DynFlags
 import Bag
 import Var ( VarBndr(..) )
-import CoreMap
+import GHC.Core.Map
 import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable

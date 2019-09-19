@@ -39,9 +39,9 @@ import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
-import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
-import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
+import GHC.Core.Unfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
 import Type
 import TcEvidence
 import TyCon

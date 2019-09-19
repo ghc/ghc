@@ -317,22 +317,22 @@ Library
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
         SMRep
-        CoreArity
-        CoreFVs
-        CoreLint
-        CorePrep
-        CoreSubst
-        CoreOpt
-        CoreSyn
+        GHC.Core.Arity
+        GHC.Core.FVs
+        GHC.Core.Lint
+        GHC.Core.Prep
+        GHC.Core.Subst
+        GHC.Core.Opt
+        GHC.Core
         TrieMap
-        CoreTidy
-        CoreUnfold
-        CoreUtils
-        CoreMap
-        CoreSeq
-        CoreStats
-        MkCore
-        PprCore
+        GHC.Core.Tidy
+        GHC.Core.Unfold
+        GHC.Core.Utils
+        GHC.Core.Map
+        GHC.Core.Seq
+        GHC.Core.Stats
+        GHC.Core.Make
+        GHC.Core.Pretty
         PmOracle
         PmPpr
         PmTypes
@@ -429,7 +429,7 @@ Library
         KnownUniques
         PrelInfo
         PrelNames
-        PrelRules
+        GHC.Core.ConstantFold
         PrimOp
         ToolSettings
         TysPrim
@@ -449,19 +449,19 @@ Library
         RnFixity
         RnUtils
         RnUnbound
-        CoreMonad
-        CSE
-        FloatIn
-        FloatOut
-        LiberateCase
-        OccurAnal
-        SAT
-        SetLevels
-        SimplCore
-        SimplEnv
-        SimplMonad
-        SimplUtils
-        Simplify
+        GHC.Core.Monad
+        GHC.Core.CSE
+        GHC.Core.FloatIn
+        GHC.Core.FloatOut
+        GHC.Core.LiberateCase
+        GHC.Core.OccurAnal
+        GHC.Core.SAT
+        GHC.Core.SetLevels
+        GHC.Core.Simplifier
+        GHC.Core.Simplify.Env
+        GHC.Core.Simplify.Monad
+        GHC.Core.Simplify.Utils
+        GHC.Core.Simplify
         SimplStg
         StgStats
         StgCse
@@ -472,18 +472,18 @@ Library
         StgSubst
         UnariseStg
         RepType
-        Rules
-        SpecConstr
-        Specialise
+        GHC.Core.Rules
+        GHC.Core.SpecConstr
+        GHC.Core.Specialise
         CoreToStg
         StgLint
         StgSyn
         StgFVs
-        CallArity
-        DmdAnal
-        Exitify
-        WorkWrap
-        WwLib
+        GHC.Core.CallArity
+        GHC.Core.DmdAnal
+        GHC.Core.Exitify
+        GHC.Core.WorkWrap
+        GHC.Core.WorkWrapLib
         FamInst
         ClsInst
         Inst

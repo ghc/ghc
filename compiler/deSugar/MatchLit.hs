@@ -30,8 +30,8 @@ import DsUtils
 import GHC.Hs
 
 import Id
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 import TyCon
 import DataCon
 import TcHsSyn ( shortCutLit )
@@ -363,7 +363,7 @@ tidyNPat (OverLit (OverLitTc False ty) val _) mb_neg _eq outer_ty
      -- NB: do /not/ convert Float or Double literals to F# 3.8 or D# 5.3
      -- If we do convert to the constructor form, we'll generate a case
      -- expression on a Float# or Double# and that's not allowed in Core; see
-     -- #9238 and Note [Rules for floating-point comparisons] in PrelRules
+     -- #9238 and Note [Rules for floating-point comparisons] in GHC.Core.ConstantFold
   where
     -- Sometimes (like in test case
     -- overloadedlists/should_run/overloadedlistsrun04), the SyntaxExprs include

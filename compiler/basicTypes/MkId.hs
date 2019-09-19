@@ -32,24 +32,24 @@ module MkId (
         coerceName,
 
         -- Re-export error Ids
-        module PrelRules
+        module GHC.Core.ConstantFold
     ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import Rules
+import GHC.Core.Rules
 import TysPrim
 import TysWiredIn
-import PrelRules
+import GHC.Core.ConstantFold
 import Type
 import FamInstEnv
 import Coercion
 import TcType
-import MkCore
-import CoreUtils        ( exprType, mkCast )
-import CoreUnfold
+import GHC.Core.Make
+import GHC.Core.Utils        ( exprType, mkCast )
+import GHC.Core.Unfold
 import Literal
 import TyCon
 import Class
@@ -61,7 +61,7 @@ import DataCon
 import Id
 import IdInfo
 import Demand
-import CoreSyn
+import GHC.Core
 import Unique
 import UniqSupply
 import PrelNames
@@ -96,7 +96,7 @@ There are several reasons why an Id might appear in the wiredInIds:
 
 * magicIds: see Note [magicIds]
 
-* errorIds, defined in coreSyn/MkCore.hs.
+* errorIds, defined in GHC.Core.Make.
   These error functions (e.g. rUNTIME_ERROR_ID) are wired in
   because the desugarer generates code that mentions them directly
 
@@ -140,7 +140,7 @@ wiredInIds :: [Id]
 wiredInIds
   =  magicIds
   ++ ghcPrimIds
-  ++ errorIds           -- Defined in MkCore
+  ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
 magicIds = [lazyId, oneShotId, noinlineId]
@@ -349,7 +349,7 @@ With -XUnliftedNewtypes, this is allowed -- even though MkN is levity-
 polymorphic. It's OK because MkN evaporates in the compiled code, becoming
 just a cast. That is, it has a compulsory unfolding. As long as its
 argument is not levity-polymorphic (which it can't be, according to
-Note [Levity polymorphism invariants] in CoreSyn), and it's saturated,
+Note [Levity polymorphism invariants] in GHC.Core), and it's saturated,
 no levity-polymorphic code ends up in the code generator. The saturation
 condition is effectively checked by Note [Detecting forced eta expansion]
 in DsExpr.
@@ -1658,7 +1658,7 @@ cannot be instantiated with a forall.  The field of `WrapC` contains
 a `Proxy` parameter which is used to link the type of the constraint,
 `C a`, with the type of the `Wrap` value being made.
 
-Next, we add a built-in Prelude rule (see prelude/PrelRules.hs),
+Next, we add a built-in Prelude rule (see GHC.Core.ConstantFold),
 which will replace the RHS of this definition with the appropriate
 definition in Core.  The rewrite rule works as follows:
 

@@ -31,7 +31,7 @@ import Name
 import Bag
 import CostCentre
 import CostCentreState
-import CoreSyn
+import GHC.Core
 import Id
 import VarSet
 import Data.List
