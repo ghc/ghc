@@ -239,7 +239,7 @@ data HscStatus
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
                             -- ^ Module info
-        , hscs_iface_gen  :: Maybe (NameEnv (Name, Bool)) -> IO (ModIface, Bool)
+        , hscs_iface_gen  :: Maybe (NameEnv Name) -> IO (ModIface, Bool)
                             -- ^ Function to generate iface after codegen.
         }
 -- Should HscStatus contain the HomeModInfo?

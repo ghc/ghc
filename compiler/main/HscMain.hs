@@ -842,7 +842,7 @@ finish summary tc_result mb_old_hash = do
                 -- This `force` saves 2M residency in test T10370
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          let iface_gen :: Maybe (NameEnv (Name, Bool)) -> IO (ModIface, Bool)
+          let iface_gen :: Maybe (NameEnv Name) -> IO (ModIface, Bool)
               iface_gen mb_caf_infos = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
                   -- core if necessary.
@@ -1430,7 +1430,7 @@ hscWriteIface dflags iface no_change mod_location = do
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)],
-                      NameEnv (Name, Bool))
+                      NameEnv Name)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1557,7 +1557,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup (NameEnv (Name, Bool)))
+            -> IO (Stream IO CmmGroup (NameEnv Name))
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1584,11 +1584,11 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroup (NameEnv (Name, Bool))
+        pipeline_stream :: Stream IO CmmGroup (NameEnv Name)
         pipeline_stream =
           {-# SCC "cmmPipeline" #-}
           Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
-            <&> cafInfos
+            <&> caffyNames
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)

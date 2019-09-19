@@ -30,11 +30,7 @@ import Control.Monad
 import Outputable
 import GHC.Platform
 
-import Name
 import NameEnv
-import NameSet
-import CLabel (hasHaskellName)
-import Data.Maybe (mapMaybe)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -50,20 +46,12 @@ cmmPipeline
 cmmPipeline hsc_env srtInfo0 prog = withTimingSilent (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env (cafInfos srtInfo0)) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env (moduleSRTMap srtInfo0)) prog
      (srtInfo0, cmms, new_cafs) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo0 tops
 
-     let
-       cmm_decl_name :: CmmDecl -> Maybe Name
-       cmm_decl_name (CmmProc _ entry _ _) = hasHaskellName entry
-       cmm_decl_name (CmmData _ (Statics lbl _)) = hasHaskellName lbl
-
-       all_names = mapMaybe cmm_decl_name prog
-
-       new_cafs_set = mkNameSet new_cafs
-       new_caf_infos = map (\n -> (n, (n, elemNameSet n new_cafs_set))) all_names
-       caf_infos' = extendNameEnvList (cafInfos srtInfo0) new_caf_infos
-       srtInfo1 = srtInfo0{ cafInfos = caf_infos' }
+     let srtInfo1 =
+           srtInfo0 { caffyNames =
+             extendNameEnvList (caffyNames srtInfo0) (map (\x->(x,x)) new_cafs) }
 
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
@@ -74,9 +62,9 @@ cmmPipeline hsc_env srtInfo0 prog = withTimingSilent (return dflags) (text "Cmm 
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> NameEnv (Name, Bool) -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
-cpsTop _ caf_infos p@(CmmData _ statics) = return (Right (cafAnalData caf_infos statics, p))
-cpsTop hsc_env caf_infos proc =
+cpsTop :: HscEnv -> SRTMap -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop _ srtMap p@(CmmData _ statics) = return (Right (cafAnalData srtMap statics, p))
+cpsTop hsc_env srtMap proc =
     do
        ----------- Control-flow optimisations ----------------------------------
 
@@ -133,7 +121,7 @@ cpsTop hsc_env caf_infos proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l caf_infos g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l srtMap g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points
