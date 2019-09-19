@@ -183,6 +183,14 @@ which will take 1-2 minutes. Loading GHC into GHCi itself takes about 30 seconds
 reloads after that take in the region of 1-5 seconds depending on which modules
 need to be recompiled.
 
+You can further speed up the script by passing `-j` as an argument. This will
+have the effect of passing `-j` to both hadrian and ghci so they will both
+build in parallel.
+
+```
+./hadrian/ghci.sh -j8
+```
+
 #### Testing
 
 To run GHC testsuite, use `build test`. See
