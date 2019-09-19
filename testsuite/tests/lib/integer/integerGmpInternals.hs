@@ -9,8 +9,8 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
-import qualified GHC.Integer.GMP.Internals as I
+import GHC.Num.Integer
+import qualified GHC.Num.Integer as I
 
 -- NOTE: Some of the following operations were provided with
 -- integer-gmp-0.5.1, but were not ported to integer-gmp-1.0.0 (yet);
@@ -37,7 +37,7 @@ exportInteger :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO W
 exportInteger = I.exportIntegerToMutableByteArray
 
 exportIntegerAddr :: Integer -> Addr# -> Int# -> IO Word
-exportIntegerAddr = I.exportIntegerToAddr
+exportIntegerAddr = I.integerToAddr
 
 importInteger :: ByteArray# -> Word# -> Word# -> Int# -> Integer
 importInteger = I.importIntegerFromByteArray
@@ -116,8 +116,8 @@ main = do
     print $ rle [ S# (I.testPrimeInteger k 25#) | k <- [ e .. e + 1000 ] ]
 
     -- import/export primitives
-    print $ [ W# (I.sizeInBaseInteger x 2#)   | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
-    print $ [ W# (I.sizeInBaseInteger x 256#) | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
+    print $ [ W# (I.integerSizeInBase x 2#)   | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
+    print $ [ W# (I.integerSizeInBase x 256#) | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
 
     BA ba <- do
         MBA mba <- newByteArray 128##
