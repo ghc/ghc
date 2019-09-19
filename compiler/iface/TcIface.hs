@@ -533,11 +533,11 @@ tcHiBootIface hsc_src mod
         ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
             Nothing -> return NoSelfBoot -- The typical case
 
-            Just (_, False) -> failWithTc moduleLoop
+            Just (ModuleNameWithIsBoot _ False) -> failWithTc moduleLoop
                 -- Someone below us imported us!
                 -- This is a loop with no hi-boot in the way
 
-            Just (_mod, True) -> failWithTc (elaborate err)
+            Just (ModuleNameWithIsBoot _mod True) -> failWithTc (elaborate err)
                 -- The hi-boot file has mysteriously disappeared.
     }}}}
   where

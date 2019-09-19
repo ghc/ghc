@@ -453,7 +453,10 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
             -- know if any of them depended on CM.hi-boot, in
             -- which case we should do the hi-boot consistency
             -- check.  See LoadIface.loadHiBootInterface
-            ((moduleName imp_mod,want_boot):dep_mods deps,dep_pkgs deps,ptrust)
+            ( ModuleNameWithIsBoot (moduleName imp_mod) want_boot : dep_mods deps
+            , dep_pkgs deps
+            , ptrust
+            )
 
          | otherwise =
             -- Imported module is from another package
