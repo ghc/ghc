@@ -215,14 +215,16 @@ unboundVarOcc (OutOfScope occ _) = occ
 unboundVarOcc (TrueExprHole occ) = occ
 
 {-
-Note [ExtendedHole]
+Note [Extended Typed-Holes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Extended holes are used to enable more feature rich typed-holes, where we can
 pass arguments along to the typed-hole message beyond just the name of the hole.
 
-
+They can carry either a string (which is then fed to hole plugins) or a template
+haskell splice, which is run and the contents then handed to hole plugins.
 -}
+
 data ExtendedHole p
   = ExtendedHole OccName (Maybe (Located FastString))
   | ExtendedHoleSplice OccName (LHsExpr p)
@@ -626,7 +628,7 @@ data HsExpr p
              (LHsExpr p)        -- Body
 
   ---------------------------------------
-  -- Extended typed-holes
+  -- See Note [Extended Typed-Holes]
   | HsExtendedHole (XExtendedHole p)
                    (ExtendedHole p)
   ---------------------------------------

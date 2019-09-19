@@ -212,14 +212,16 @@ rnExpr (NegApp _ e _)
 rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
 
 rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
+
 ------------------------------------------
--- Template Haskell extensions
--- Extended typed holes
-rnExpr (HsExtendedHole ext (ExtendedHole nm fs)) =
-   return (HsExtendedHole ext (ExtendedHole nm fs), emptyFVs)
-rnExpr (HsExtendedHole ext (ExtendedHoleSplice nm (L l (HsSpliceE _ spl)))) =
-    do (expr, fvs) <- rnSpliceExpr spl
-       return (HsExtendedHole ext $ ExtendedHoleSplice nm (L l expr), fvs)
+-- See Note [Extended Typed-Holes]
+rnExpr (HsExtendedHole ext hole) =
+    case hole of
+      (ExtendedHole nm fs) ->
+        return (HsExtendedHole ext (ExtendedHole nm fs), emptyFVs)
+      (ExtendedHoleSplice nm (L l (HsSpliceE _ spl))) ->
+        do (expr, fvs) <- rnSpliceExpr spl
+           return (HsExtendedHole ext $ ExtendedHoleSplice nm (L l expr), fvs)
 
 ---------------------------------------------
 --      Sections

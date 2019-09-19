@@ -2096,6 +2096,7 @@ patSynErr l e explanation =
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
 
+-- See Note [Extended Typed-Holes]
 hsHoleFSExpr :: Maybe (Located Int)
              -> Maybe (Located FastString)
              -> HsExpr (GhcPass id)
