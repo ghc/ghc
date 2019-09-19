@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 242 -- shift/reduce conflicts
+%expect 244 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -617,6 +617,8 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
  '_('           { L _ ITopenTypedHole }
+ '_$('          { L _ ITopenTypedHoleEscape }
+ '_$$('         { L _ ITopenTypedHoleTyEscape }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
@@ -2867,8 +2869,12 @@ infix_extended_typed_hole :: { forall b. DisambInfixOp b => PV (Located b) }
 -- We only have $(...) and not $..., since otherwise we wouldn't be able to know
 -- if _$abc0 was $abc with identifier 0, or $abc0.
 typed_hole_splice :: { Located (HsSplice GhcPs) }
-    : '_' splice_untyped_parens {% ams (sLL $1 $> $ unLoc $2) [mj AnnVal $1] }
-    | '_' splice_typed_parens   {% ams (sLL $1 $> $ unLoc $2) [mj AnnVal $1] }
+    : '_$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
+                                ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
+                                    [mj AnnOpenHolePE $1,mj AnnCloseP $3] }
+    | '_$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
+                                 ams (sLL $1 $> $ mkTypedSplice HasParens $2)
+                                    [mj AnnOpenHolePTE $1,mj AnnCloseP $3] }
 
 
 maybe_hole_id :: { Maybe (Located Int) }
@@ -2884,17 +2890,12 @@ splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { mapLoc (HsSpliceE noExtField) $1 }
         | splice_typed   { mapLoc (HsSpliceE noExtField) $1 }
 
-
 splice_untyped :: { Located (HsSplice GhcPs) }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
                                         (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
-        | splice_untyped_parens { $1 }
-
--- We split this out for re-use in extended typed-holes.
-splice_untyped_parens :: { Located (HsSplice GhcPs) }
-        : '$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
+        | '$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
                                    ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
 
@@ -2903,11 +2904,7 @@ splice_typed :: { Located (HsSplice GhcPs) }
                                         (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
-        | splice_typed_parens   { $1 }
-
--- We split this out for re-use in extended typed-holes.
-splice_typed_parens :: { Located (HsSplice GhcPs) }
-        : '$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
+        | '$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
                                     ams (sLL $1 $> $ mkTypedSplice HasParens $2)
                                        [mj AnnOpenPTE $1,mj AnnCloseP $3] }
 
