@@ -1,1 +1,1 @@
-{"span": null,"doc": "TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [base-4.13.0.0, ghc-prim-0.6.1,\n                     integer-gmp-1.0.2.0]","severity": "SevOutput","reason": null}
+{"span": null,"doc": "TYPE SIGNATURES\n  foo :: forall a. a -> a\nDependent modules: []\nDependent packages: [base-4.13.0.0, ghc-bignum-1.0, ghc-prim-0.6.1]","severity": "SevOutput","reason": null}

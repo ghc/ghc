@@ -52,8 +52,6 @@ import GHC.Types (Char, Int)
 
 -- Make implicit dependency known to build system
 import GHC.Tuple ()   -- See Note [Depend on GHC.Tuple] in GHC.Base
-import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
-import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 
 ----------------------------------------------------------------------
 -- Explicit call-stacks built via ImplicitParams

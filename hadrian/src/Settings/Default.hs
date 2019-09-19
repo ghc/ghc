@@ -9,8 +9,8 @@ module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
     defaultArgs,
 
-    -- * Default build flavour
-    defaultFlavour
+    -- * Default build flavour and BigNum backend
+    defaultFlavour, defaultBignumBackend
     ) where
 
 import qualified Hadrian.Builder.Ar
@@ -23,7 +23,6 @@ import Expression
 import Flavour
 import Oracles.Flag
 import Packages
-import Settings
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Cabal
@@ -50,6 +49,10 @@ defaultPackages Stage1 = stage1Packages
 defaultPackages Stage2 = stage2Packages
 defaultPackages Stage3 = return []
 
+-- | Default bignum backend.
+defaultBignumBackend :: String
+defaultBignumBackend = "gmp"
+
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
 stage0Packages :: Action [Package]
 stage0Packages = do
@@ -62,6 +65,7 @@ stage0Packages = do
              , genapply
              , genprimopcode
              , ghc
+             , ghcBignum
              , ghcBoot
              , ghcBootTh
              , ghcHeap
@@ -81,7 +85,6 @@ stage0Packages = do
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
 stage1Packages = do
-    intLib     <- integerLibrary =<< flavour
     libraries0 <- filter isLibrary <$> stage0Packages
     cross      <- flag CrossCompiling
     return $ libraries0 -- Build all Stage0 libraries in Stage1
@@ -99,7 +102,7 @@ stage1Packages = do
              , haskeline
              , hp2ps
              , hsc2hs
-             , intLib
+             , ghcBignum
              , pretty
              , process
              , rts
@@ -207,7 +210,7 @@ defaultFlavour = Flavour
     { name               = "default"
     , args               = defaultArgs
     , packages           = defaultPackages
-    , integerLibrary     = (\x -> if x then integerSimple else integerGmp) <$> cmdIntegerSimple
+    , bignumBackend      = defaultBignumBackend
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , dynamicGhcPrograms = defaultDynamicGhcPrograms
