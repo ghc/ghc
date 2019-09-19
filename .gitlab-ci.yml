@@ -422,8 +422,6 @@ validate-x86_64-darwin:
   variables:
     TEST_ENV: "aarch64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-aarch64-linux-deb9.tar.xz"
-    # Inexplicably makeindex fails
-    BUILD_SPHINX_PDF: "NO"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -458,8 +456,6 @@ nightly-aarch64-linux-deb9:
     TEST_ENV: "armv7-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-armv7-linux-deb9.tar.xz"
     CONFIGURE_ARGS: "--host=arm-linux-gnueabihf --build=arm-linux-gnueabihf --target=arm-linux-gnueabihf"
-    # Inexplicably makeindex fails
-    BUILD_SPHINX_PDF: "NO"
   cache:
     key: linux-armv7-deb9
   tags:
