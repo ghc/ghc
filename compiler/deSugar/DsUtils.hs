@@ -52,19 +52,19 @@ import {-# SOURCE #-} DsExpr ( dsLExpr )
 import GHC.Hs
 import TcHsSyn
 import TcType( tcSplitTyConApp )
-import CoreSyn
+import GHC.Core
 import DsMonad
 
-import CoreUtils
-import MkCore
+import GHC.Core.Utils
+import GHC.Core.Make
 import MkId
 import Id
 import Literal
-import TyCon
+import GHC.Core.TyCon
 import DataCon
 import PatSyn
-import Type
-import Coercion
+import GHC.Core.Type
+import GHC.Core.Coercion
 import TysPrim
 import TysWiredIn
 import BasicTypes
@@ -414,7 +414,7 @@ Note [Desugaring seq (1)]  cf #1031
 ~~~~~~~~~~~~~~~~~~~~~~~~~
    f x y = x `seq` (y `seq` (# x,y #))
 
-The [CoreSyn let/app invariant] means that, other things being equal, because
+The [Core let/app invariant] means that, other things being equal, because
 the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
 
    f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
@@ -486,7 +486,7 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
                           -> v1        -- Note [Desugaring seq (2) and (3)]
                    _      -> mkWildValBinder ty1
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
+mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in GHC.Core.Make
 
 -- NB: No argument can be levity polymorphic
 mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr

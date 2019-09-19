@@ -7,7 +7,7 @@ import GhcPrelude
 import CLabel
 import CmmExpr         ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
-import CoreSyn         ( Tickish(..) )
+import GHC.Core        ( Tickish(..) )
 import Debug
 import DynFlags
 import Module

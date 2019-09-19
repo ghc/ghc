@@ -45,11 +45,11 @@ import VarEnv
 import UniqDFM
 import Var           (EvVar)
 import Name
-import CoreSyn
-import CoreFVs ( exprFreeVars )
-import CoreOpt (exprIsConApp_maybe)
-import CoreUtils (exprType)
-import MkCore (mkListExpr, mkCharExpr)
+import GHC.Core
+import GHC.Core.FVs       (exprFreeVars)
+import GHC.Core.SimpleOpt (exprIsConApp_maybe)
+import GHC.Core.Utils     (exprType)
+import GHC.Core.Make      (mkListExpr, mkCharExpr)
 import UniqSupply
 import FastString
 import SrcLoc
@@ -58,20 +58,20 @@ import Maybes
 import ConLike
 import DataCon
 import PatSyn
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
 import TysPrim (tYPETyCon)
-import TyCoRep
-import Type
+import GHC.Core.TyCoRep
+import GHC.Core.Type
 import TcSimplify    (tcNormalise, tcCheckSatisfiability)
 import TcType        (evVarPred)
-import Unify         (tcMatchTy)
+import GHC.Core.Unify (tcMatchTy)
 import TcRnTypes     (completeMatchConLikes)
-import Coercion
+import GHC.Core.Coercion
 import MonadUtils hiding (foldlM)
 import DsMonad hiding (foldlM)
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 
 import Control.Monad (guard, mzero)
 import Control.Monad.Trans.Class (lift)

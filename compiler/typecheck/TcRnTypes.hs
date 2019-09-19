@@ -150,14 +150,14 @@ module TcRnTypes(
 import GhcPrelude
 
 import GHC.Hs
-import CoreSyn
+import GHC.Core
 import HscTypes
 import TcEvidence
-import Type
-import Class    ( Class )
-import TyCon    ( TyCon, TyConFlavour, tyConKind )
-import TyCoRep  ( coHoleCoVar )
-import Coercion ( Coercion, mkHoleCo )
+import GHC.Core.Type
+import GHC.Core.Class    ( Class )
+import GHC.Core.TyCon    ( TyCon, TyConFlavour, tyConKind )
+import GHC.Core.TyCoRep  ( coHoleCoVar )
+import GHC.Core.Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
@@ -165,8 +165,8 @@ import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
 import TcType
 import Annotations
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import {-# SOURCE #-} PmTypes (Delta)
 import IOEnv
 import RdrName
@@ -2883,7 +2883,7 @@ data TcEvDest
 
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
-              -- See Note [Coercion holes] in TyCoRep
+              -- See Note [Coercion holes] in GHC.Core.TyCoRep
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals

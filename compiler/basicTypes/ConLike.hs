@@ -35,9 +35,9 @@ import Unique
 import Util
 import Name
 import BasicTypes
-import TyCoRep (Type, ThetaType)
+import GHC.Core.TyCoRep (Type, ThetaType)
 import Var
-import Type (mkTyConApp)
+import GHC.Core.Type (mkTyConApp)
 
 import qualified Data.Data as Data
 

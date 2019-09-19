@@ -37,8 +37,8 @@ import BlockId
 import MkGraph
 import StgSyn
 import Cmm
-import Type     ( Type, tyConAppTyCon )
-import TyCon
+import GHC.Core.Type     ( Type, tyConAppTyCon )
+import GHC.Core.TyCon
 import CLabel
 import CmmUtils
 import PrimOp

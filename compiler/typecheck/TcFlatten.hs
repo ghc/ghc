@@ -13,11 +13,11 @@ import GhcPrelude
 
 import TcRnTypes
 import TcType
-import Type
+import GHC.Core.Type
 import TcEvidence
-import TyCon
-import TyCoRep   -- performs delicate algorithm on types
-import Coercion
+import GHC.Core.TyCon
+import GHC.Core.TyCoRep   -- performs delicate algorithm on types
+import GHC.Core.Coercion
 import Var
 import VarSet
 import VarEnv
@@ -893,7 +893,10 @@ faster. This doesn't seem quite worth it, yet.
 Note [flatten_exact_fam_app_fully performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The refactor of GRefl seems to cause performance trouble for T9872x: the allocation of flatten_exact_fam_app_fully_performance increased. See note [Generalized reflexive coercion] in TyCoRep for more information about GRefl and #15192 for the current state.
+The refactor of GRefl seems to cause performance trouble for T9872x: the
+allocation of flatten_exact_fam_app_fully_performance increased. See note
+[Generalized reflexive coercion] in GHC.Core.TyCoRep for more information about
+GRefl and #15192 for the current state.
 
 The explicit pattern match in homogenise_result helps with T9872a, b, c.
 

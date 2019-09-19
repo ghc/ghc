@@ -53,11 +53,11 @@ import PrelInfo
 import PrimOp   ( allThePrimOps, primOpFixity, primOpOcc )
 import MkId     ( seqId )
 import TysPrim  ( funTyConName )
-import Rules
-import TyCon
+import GHC.Core.Rules
+import GHC.Core.TyCon
 import Annotations
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import Name
 import NameEnv
 import Avail

@@ -31,9 +31,9 @@ import SrcLoc
 import State
 import TcGenDeriv
 import TcType
-import TyCon
-import TyCoRep
-import Type
+import GHC.Core.TyCon
+import GHC.Core.TyCoRep
+import GHC.Core.Type
 import Util
 import Var
 import VarSet

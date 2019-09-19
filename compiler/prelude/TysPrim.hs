@@ -110,14 +110,14 @@ import {-# SOURCE #-} TysWiredIn
 
 import Var              ( TyVar, mkTyVar )
 import Name
-import TyCon
+import GHC.Core.TyCon
 import SrcLoc
 import Unique
 import PrelNames
 import FastString
 import Outputable
-import TyCoRep   -- Doesn't need special access, but this is easier to avoid
-                 -- import loops which show up if you import Type instead
+import GHC.Core.TyCoRep   -- Doesn't need special access, but this is easier to avoid
+                          -- import loops which show up if you import Type instead
 
 import Data.Char
 

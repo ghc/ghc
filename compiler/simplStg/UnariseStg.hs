@@ -201,18 +201,18 @@ module UnariseStg (unarise) where
 import GhcPrelude
 
 import BasicTypes
-import CoreSyn
+import GHC.Core
 import DataCon
 import FastString (FastString, mkFastString)
 import Id
 import Literal
-import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
+import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import MkId (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
 import RepType
 import StgSyn
-import Type
+import GHC.Core.Type
 import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
 import TysWiredIn
 import UniqSupply
@@ -579,7 +579,7 @@ mkUbxSum dc ty_args args0
 
       slotRubbishArg :: SlotTy -> StgArg
       slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
+                     -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
       slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)

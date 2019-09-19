@@ -57,7 +57,7 @@ import Util
 import FastString
 import FastStringEnv
 import Id
-import Type
+import GHC.Core.Type
 import PatSyn
 import qualified GHC.LanguageExtensions as LangExt
 

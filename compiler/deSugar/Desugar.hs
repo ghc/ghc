@@ -28,12 +28,17 @@ import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )
 import Id
 import Name
-import Type
 import Avail
-import CoreSyn
-import CoreFVs     ( exprsSomeFreeVarsList )
-import CoreOpt     ( simpleOptPgm, simpleOptExpr )
-import PprCore
+import GHC.Core
+import GHC.Core.Coercion  ( mkCoVarCo )
+import GHC.Core.FVs       ( exprsSomeFreeVarsList )
+import GHC.Core.Lint      ( endPassIO )
+import GHC.Core.Make      ( mkCoreLet )
+import GHC.Core.Pretty
+import GHC.Core.Rules
+import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
+import GHC.Core.Type
+import GHC.CoreToCore.Monad ( CoreToDo(..) )
 import DsMonad
 import DsExpr
 import DsBinds
@@ -41,17 +46,12 @@ import DsForeign
 import PrelNames   ( coercibleTyConKey )
 import TysPrim     ( eqReprPrimTyCon )
 import Unique      ( hasKey )
-import Coercion    ( mkCoVarCo )
 import TysWiredIn  ( coercibleDataCon )
 import DataCon     ( dataConWrapId )
-import MkCore      ( mkCoreLet )
 import Module
 import NameSet
 import NameEnv
-import Rules
 import BasicTypes       ( Activation(.. ), competesWith, pprRuleName )
-import CoreMonad        ( CoreToDo(..) )
-import CoreLint         ( endPassIO )
 import VarSet
 import FastString
 import ErrUtils

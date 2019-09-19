@@ -32,7 +32,7 @@ import BlockId (newBlockId)
 import Cmm
 import CmmUtils
 import MkGraph
-import Type
+import GHC.Core.Type
 import RepType
 import CLabel
 import SMRep
@@ -43,7 +43,7 @@ import Outputable
 import UniqSupply
 import BasicTypes
 
-import TyCoRep
+import GHC.Core.TyCoRep
 import TysPrim
 import Util (zipEqual)
 

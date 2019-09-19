@@ -55,12 +55,12 @@ import GhcMonad
 import HscMain
 import GHC.Hs
 import HscTypes
-import InstEnv
+import GHC.Core.InstEnv
 import IfaceEnv   ( newInteractiveBinder )
-import FamInstEnv ( FamInst )
-import CoreFVs    ( orphNamesOfFamInst )
-import TyCon
-import Type             hiding( typeKind )
+import GHC.Core.FamInstEnv ( FamInst )
+import GHC.Core.FVs        ( orphNamesOfFamInst )
+import GHC.Core.TyCon
+import GHC.Core.Type       hiding( typeKind )
 import RepType
 import TcType
 import Var

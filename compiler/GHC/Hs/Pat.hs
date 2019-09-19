@@ -53,15 +53,15 @@ import GHC.Hs.Types
 import TcEvidence
 import BasicTypes
 -- others:
-import PprCore          ( {- instance OutputableBndr TyVar -} )
+import GHC.Core.Pretty          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
 import RdrName ( RdrName )
 import ConLike
 import DataCon
-import TyCon
+import GHC.Core.TyCon
 import Outputable
-import Type
+import GHC.Core.Type
 import SrcLoc
 import Bag -- collect ev vars from pats
 import DynFlags( gopt, GeneralFlag(..) )

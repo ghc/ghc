@@ -20,7 +20,7 @@ import Id
 import Name
 import Module
 import RdrName
-import Type
+import GHC.Core.Type
 import SrcLoc
 import Exception
 

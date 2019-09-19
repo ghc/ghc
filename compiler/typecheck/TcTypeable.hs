@@ -17,7 +17,7 @@ import GhcPrelude
 import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
-import TyCoRep( Type(..), TyLit(..) )
+import GHC.Core.TyCoRep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
@@ -30,15 +30,15 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , nilDataCon, consDataCon )
 import Name
 import Id
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import DataCon
 import Module
 import GHC.Hs
 import DynFlags
 import Bag
 import Var ( VarBndr(..) )
-import CoreMap
+import GHC.Core.Map
 import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable
@@ -76,7 +76,7 @@ The overall plan is this:
    recipe for computing the kind of an instantiation of the tycon (see
    Note [Representing TyCon kinds: KindRep] later in this file for details).
 
-   We define (in TyCon)
+   We define (in GHC.Core.TyCon)
 
         type TyConRepName = Name
 

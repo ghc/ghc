@@ -17,15 +17,15 @@ module CoreToStg ( coreToStg ) where
 
 import GhcPrelude
 
-import CoreSyn
-import CoreUtils        ( exprType, findDefault, isJoinBind
+import GHC.Core
+import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
-import CoreArity        ( manifestArity )
+import GHC.Core.Arity   ( manifestArity )
 import StgSyn
 
-import Type
+import GHC.Core.Type
 import RepType
-import TyCon
+import GHC.Core.TyCon
 import MkId             ( coercionTokenId )
 import Id
 import IdInfo
@@ -251,7 +251,7 @@ coreTopBindToStg
 coreTopBindToStg _ _ env ccs (NonRec id e)
   | Just str <- exprIsTickedString_maybe e
   -- top-level string literal
-  -- See Note [CoreSyn top-level string literals] in CoreSyn
+  -- See Note [Core top-level string literals] in GHC.Core
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
@@ -422,7 +422,7 @@ coreToStgExpr (Cast expr _)
 
 coreToStgExpr (Case scrut _ _ [])
   = coreToStgExpr scrut
-    -- See Note [Empty case alternatives] in CoreSyn If the case
+    -- See Note [Empty case alternatives] in GHC.Core If the case
     -- alternatives are empty, the scrutinee must diverge or raise an
     -- exception, so we can just dive into it.
     --
@@ -440,7 +440,7 @@ coreToStgExpr (Case scrut bndr _ alts) = do
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
-        -- See Note [Nullary unboxed tuple] in Type.hs
+        -- See Note [Nullary unboxed tuple] in GHC.Core.Type
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
         do { rhs2 <- coreToStgExpr rhs

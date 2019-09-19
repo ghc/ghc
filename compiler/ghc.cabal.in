@@ -174,7 +174,6 @@ Library
         backpack
         basicTypes
         cmm
-        coreSyn
         deSugar
         ghci
         iface
@@ -185,11 +184,8 @@ Library
         prelude
         profiling
         rename
-        simplCore
         simplStg
-        specialise
         stgSyn
-        stranal
         typecheck
         types
         utils
@@ -316,23 +312,40 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
+        GHC.Core
+        GHC.Core.Arity
+        GHC.Core.Class
+        GHC.Core.CoAxiom
+        GHC.Core.Coercion
+        GHC.Core.FamInstEnv
+        GHC.Core.FVs
+        GHC.Core.InstEnv
+        GHC.Core.Kind
+        GHC.Core.Lint
+        GHC.Core.Make
+        GHC.Core.Map
+        GHC.Core.OccurAnal
+        GHC.Core.OptCoercion
+        GHC.Core.Prep
+        GHC.Core.Pretty
+        GHC.Core.Rules
+        GHC.Core.Seq
+        GHC.Core.SimpleOpt
+        GHC.Core.Stats
+        GHC.Core.Subst
+        GHC.Core.Tidy
+        GHC.Core.TyCoFVs
+        GHC.Core.TyCon
+        GHC.Core.TyCoPpr
+        GHC.Core.TyCoRep
+        GHC.Core.TyCoSubst
+        GHC.Core.TyCoTidy
+        GHC.Core.Type
+        GHC.Core.Unfold
+        GHC.Core.Unify
+        GHC.Core.Utils
         SMRep
-        CoreArity
-        CoreFVs
-        CoreLint
-        CorePrep
-        CoreSubst
-        CoreOpt
-        CoreSyn
         TrieMap
-        CoreTidy
-        CoreUnfold
-        CoreUtils
-        CoreMap
-        CoreSeq
-        CoreStats
-        MkCore
-        PprCore
         PmOracle
         PmPpr
         PmTypes
@@ -421,7 +434,6 @@ Library
         Ctype
         HaddockUtils
         Lexer
-        OptCoercion
         Parser
         RdrHsSyn
         ApiAnnotation
@@ -429,7 +441,6 @@ Library
         KnownUniques
         PrelInfo
         PrelNames
-        PrelRules
         PrimOp
         ToolSettings
         TysPrim
@@ -449,19 +460,26 @@ Library
         RnFixity
         RnUtils
         RnUnbound
-        CoreMonad
-        CSE
-        FloatIn
-        FloatOut
-        LiberateCase
-        OccurAnal
-        SAT
-        SetLevels
-        SimplCore
-        SimplEnv
-        SimplMonad
-        SimplUtils
-        Simplify
+        GHC.CoreToCore.CallArity
+        GHC.CoreToCore.ConstantFold
+        GHC.CoreToCore.CSE
+        GHC.CoreToCore.DmdAnal
+        GHC.CoreToCore.Exitify
+        GHC.CoreToCore.FloatIn
+        GHC.CoreToCore.FloatOut
+        GHC.CoreToCore.LiberateCase
+        GHC.CoreToCore.Monad
+        GHC.CoreToCore.StaticArgs
+        GHC.CoreToCore.SetLevels
+        GHC.CoreToCore.Simplifier
+        GHC.CoreToCore.Simplify.Env
+        GHC.CoreToCore.Simplify.Monad
+        GHC.CoreToCore.Simplify.Utils
+        GHC.CoreToCore.Simplify
+        GHC.CoreToCore.SpecConstr
+        GHC.CoreToCore.Specialise
+        GHC.CoreToCore.WorkWrap
+        GHC.CoreToCore.WorkWrapLib
         SimplStg
         StgStats
         StgCse
@@ -472,18 +490,10 @@ Library
         StgSubst
         UnariseStg
         RepType
-        Rules
-        SpecConstr
-        Specialise
         CoreToStg
         StgLint
         StgSyn
         StgFVs
-        CallArity
-        DmdAnal
-        Exitify
-        WorkWrap
-        WwLib
         FamInst
         ClsInst
         Inst
@@ -534,23 +544,9 @@ Library
         TcSMonad
         TcTypeNats
         TcSplice
-        Class
-        Coercion
         DsMeta
         THNames
-        FamInstEnv
         FunDeps
-        InstEnv
-        TyCon
-        CoAxiom
-        Kind
-        Type
-        TyCoRep
-        TyCoFVs
-        TyCoSubst
-        TyCoPpr
-        TyCoTidy
-        Unify
         Bag
         Binary
         BooleanFormula

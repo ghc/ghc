@@ -20,16 +20,16 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyn
 
 import GHC.Hs
 import TcHsSyn
-import CoreSyn
-import MkCore
+import GHC.Core
+import GHC.Core.Make
 
 import DsMonad          -- the monadery used in the desugarer
 import DsUtils
 
 import DynFlags
-import CoreUtils
+import GHC.Core.Utils
 import Id
-import Type
+import GHC.Core.Type
 import TysWiredIn
 import Match
 import PrelNames

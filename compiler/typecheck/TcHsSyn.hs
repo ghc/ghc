@@ -59,10 +59,10 @@ import TcMType
 import TcEnv   ( tcLookupGlobalOnly )
 import TcEvidence
 import TysPrim
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
-import Type
-import Coercion
+import GHC.Core.Type
+import GHC.Core.Coercion
 import ConLike
 import DataCon
 import HscTypes
@@ -79,7 +79,7 @@ import Bag
 import Outputable
 import Util
 import UniqFM
-import CoreSyn
+import GHC.Core
 
 import {-# SOURCE #-} TcSplice (runTopSplice)
 

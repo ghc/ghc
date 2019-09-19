@@ -34,15 +34,15 @@ import GhcPrelude
 import TcRnMonad
 import TcEnv
 import TcBinds( tcValBinds, addTypecheckedBinds )
-import TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import GHC.Core.TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )
-import MkCore( rEC_SEL_ERROR_ID )
+import GHC.Core.Make( rEC_SEL_ERROR_ID )
 import GHC.Hs
-import Class
-import Type
+import GHC.Core.Class
+import GHC.Core.Type
 import HscTypes
-import TyCon
+import GHC.Core.TyCon
 import ConLike
 import DataCon
 import Name
@@ -53,7 +53,7 @@ import Id
 import IdInfo
 import VarEnv
 import VarSet
-import Coercion ( ltRole )
+import GHC.Core.Coercion ( ltRole )
 import BasicTypes
 import SrcLoc
 import Unique ( mkBuiltinUnique )

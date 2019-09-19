@@ -21,7 +21,7 @@ import GhcPrelude
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
-import CoreSyn (Tickish (..))
+import GHC.Core (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
@@ -36,11 +36,11 @@ import TcEvidence
 import TcHsType
 import TcPat
 import TcMType
-import FamInstEnv( normaliseType )
+import GHC.Core.FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
-import TyCon
+import GHC.Core.TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
+import GHC.Core.Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
 import TysPrim
 import TysWiredIn( mkBoxedTupleTy )
 import Id

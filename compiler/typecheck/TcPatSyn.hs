@@ -18,7 +18,8 @@ import GhcPrelude
 
 import GHC.Hs
 import TcPat
-import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
+import GHC.Core.Type( tidyTyCoVarBinders, tidyTypes, tidyType
+                    , PredTree(..), EqRel(..), classifyPredType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -40,7 +41,6 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
-import Type( PredTree(..), EqRel(..), classifyPredType )
 import TysWiredIn
 import TcType
 import TcEvidence
@@ -300,7 +300,7 @@ have type
   $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
 
 and that is bad because (a ~# Maybe b) is not a predicate type
-(see Note [Types for coercions, predicates, and evidence] in Type)
+(see Note [Types for coercions, predicates, and evidence] in GHC.Core.Type)
 and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
@@ -397,7 +397,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
                   -- satisfy the substitution invariant. There's no need to
                   -- add 'ex_tvs' as they are already in the domain of the
                   -- substitution.
-                  -- See also Note [The substitution invariant] in TyCoSubst.
+                  -- See also Note [The substitution invariant] in GHC.Core.TyCoSubst.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }

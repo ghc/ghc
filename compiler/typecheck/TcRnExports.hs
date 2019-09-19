@@ -26,7 +26,7 @@ import Name
 import NameEnv
 import NameSet
 import Avail
-import TyCon
+import GHC.Core.TyCon
 import SrcLoc
 import HscTypes
 import Outputable

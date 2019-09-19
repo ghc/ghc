@@ -36,7 +36,7 @@ import TcUnify
 import Name
 import TysWiredIn
 import Id
-import TyCon
+import GHC.Core.TyCon
 import TysPrim
 import TcEvidence
 import Outputable
@@ -44,7 +44,7 @@ import Util
 import SrcLoc
 
 -- Create chunkified tuple tybes for monad comprehensions
-import MkCore
+import GHC.Core.Make
 
 import Control.Monad
 import Control.Arrow ( second )

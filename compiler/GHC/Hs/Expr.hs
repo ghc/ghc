@@ -31,7 +31,7 @@ import GHC.Hs.Binds
 
 -- others:
 import TcEvidence
-import CoreSyn
+import GHC.Core
 import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
 import NameSet
@@ -42,7 +42,7 @@ import SrcLoc
 import Util
 import Outputable
 import FastString
-import Type
+import GHC.Core.Type
 import TcType (TcType)
 import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 

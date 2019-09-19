@@ -33,13 +33,13 @@ import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
-import Type ( pprTyVars )
+import GHC.Core.Type ( pprTyVars )
 import TcType
 import TcUnify
 import TcHsType
 import TysWiredIn
 import TcEvidence
-import TyCon
+import GHC.Core.TyCon
 import DataCon
 import PatSyn
 import ConLike
@@ -449,7 +449,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv pat_ty
                      -- Unboxed tuples have RuntimeRep vars, which we discard:
-                     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+                     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
         ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
                                            Boxed   -> arg_tys
         ; (pats', res) <- tc_lpats penv pats (map mkCheckExpType con_arg_tys)

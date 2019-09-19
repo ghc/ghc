@@ -46,7 +46,7 @@ import SrcLoc
 import THNames
 import TcUnify
 import TcEnv
-import Coercion( etaExpandCoAxBranch )
+import GHC.Core.Coercion( etaExpandCoAxBranch )
 import FileCleanup ( newTempName, TempFileLifetime(..) )
 
 import Control.Monad
@@ -68,15 +68,15 @@ import RnFixity ( lookupFixityRn_help )
 import RnTypes
 import TcHsSyn
 import TcSimplify
-import Type
+import GHC.Core.Type as Type
 import NameSet
 import TcMType
 import TcHsType
 import TcIface
-import TyCoRep
+import GHC.Core.TyCoRep as TyCoRep
 import FamInst
-import FamInstEnv
-import InstEnv
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv as InstEnv
 import Inst
 import NameEnv
 import PrelNames
@@ -86,9 +86,9 @@ import Hooks
 import Var
 import Module
 import LoadIface
-import Class
-import TyCon
-import CoAxiom
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.CoAxiom
 import PatSyn
 import ConLike
 import DataCon
@@ -1916,7 +1916,7 @@ reify_tc_app tc tys
     r_tc | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
          | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
          | isPromotedTupleTyCon tc        = TH.PromotedTupleT (arity `div` 2)
-             -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+             -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity
@@ -1933,7 +1933,7 @@ reify_tc_app tc tys
          | otherwise                      = TH.ConT (reifyName tc)
 
     -- See Note [When does a tycon application need an explicit kind
-    -- signature?] in TyCoRep
+    -- signature?] in GHC.Core.TyCoRep
     maybe_sig_t th_type
       | tyConAppNeedsKindSig
           False -- We don't reify types using visible kind applications, so

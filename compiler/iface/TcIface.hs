@@ -31,25 +31,26 @@ import IfaceEnv
 import BuildTyCl
 import TcRnMonad
 import TcType
-import Type
-import Coercion
-import CoAxiom
-import TyCoRep    -- needs to build types & coercions in a knot
-import TyCoSubst ( substTyCoVars )
+import GHC.Core
+import GHC.Core.Class
+import GHC.Core.CoAxiom
+import GHC.Core.Coercion
+import GHC.Core.FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.Lint
+import GHC.Core.Make
+import GHC.Core.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.TyCon
+import GHC.Core.TyCoRep    -- needs to build types & coercions in a knot
+import GHC.Core.TyCoSubst ( substTyCoVars )
+import GHC.Core.Type
+import GHC.Core.Unfold
+import GHC.Core.Utils
 import HscTypes
 import Annotations
-import InstEnv
-import FamInstEnv
-import CoreSyn
-import CoreUtils
-import CoreUnfold
-import CoreLint
-import MkCore
 import Id
 import MkId
 import IdInfo
-import Class
-import TyCon
 import ConLike
 import DataCon
 import PrelNames
@@ -60,7 +61,6 @@ import VarSet
 import Name
 import NameEnv
 import NameSet
-import OccurAnal        ( occurAnalyseExpr )
 import Demand
 import Module
 import UniqFM
@@ -1174,7 +1174,7 @@ tcIfaceTupleTy sort is_promoted args
                         kind_args = map typeKind args'
                   ; return (mkTyConApp tc (kind_args ++ args')) } }
 
--- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+-- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
 tcTupleTyCon :: Bool    -- True <=> typechecking a *type* (vs. an expr)
              -> TupleSort
              -> Arity   -- the number of args. *not* the tuple arity.

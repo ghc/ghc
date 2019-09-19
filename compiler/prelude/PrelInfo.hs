@@ -54,7 +54,7 @@ import Unique           ( isValidKnownKeyUnique )
 import ConLike          ( ConLike(..) )
 import THNames          ( templateHaskellNames )
 import PrelNames
-import PrelRules
+import GHC.CoreToCore.ConstantFold
 import Avail
 import PrimOp
 import DataCon
@@ -66,8 +66,8 @@ import Outputable
 import TysPrim
 import TysWiredIn
 import HscTypes
-import Class
-import TyCon
+import GHC.Core.Class
+import GHC.Core.TyCon
 import UniqFM
 import Util
 import TcTypeNats ( typeNatTyCons )

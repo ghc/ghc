@@ -39,8 +39,8 @@ import Id               ( Id, mkVanillaGlobalWithInfo )
 import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
 import Name
 import PrelNames        ( gHC_PRIMOPWRAPPERS )
-import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
-import Type
+import GHC.Core.TyCon   ( TyCon, isPrimTyCon, PrimRep(..) )
+import GHC.Core.Type
 import RepType          ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
@@ -326,7 +326,7 @@ Note [Checking versus non-checking primops]
 
   It is important that a non-checking primop never be transformed in a way that
   would cause it to bottom. Doing so would violate Core's let/app invariant
-  (see Note [CoreSyn let/app invariant] in CoreSyn) which is critical to
+  (see Note [Core let/app invariant] in GHC.Core) which is critical to
   the simplifier's ability to float without fear of changing program meaning.
 
 

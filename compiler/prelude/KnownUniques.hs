@@ -29,7 +29,7 @@ module KnownUniques
 import GhcPrelude
 
 import TysWiredIn
-import TyCon
+import GHC.Core.TyCon
 import DataCon
 import Id
 import BasicTypes

@@ -24,8 +24,8 @@ import TcExpr
 import TcEnv
 import TcUnify( buildImplicationFor )
 import TcEvidence( mkTcCoVarCo )
-import Type
-import TyCon( isTypeFamilyTyCon )
+import GHC.Core.Type
+import GHC.Core.TyCon( isTypeFamilyTyCon )
 import Id
 import Var( EvVar )
 import VarSet

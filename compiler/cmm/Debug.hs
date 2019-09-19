@@ -29,7 +29,7 @@ import BlockId
 import CLabel
 import Cmm
 import CmmUtils
-import CoreSyn
+import GHC.Core
 import FastString      ( nilFS, mkFastString )
 import Module
 import Outputable

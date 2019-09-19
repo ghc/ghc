@@ -95,19 +95,19 @@ import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
 import GHC.Hs.Binds
 import GHC.Hs.Types
 import GHC.Hs.Doc
-import TyCon
+import GHC.Core.TyCon
 import BasicTypes
-import Coercion
+import GHC.Core.Coercion
 import ForeignCall
 import GHC.Hs.Extension
 import NameSet
 
 -- others:
-import Class
+import GHC.Core.Class
 import Outputable
 import Util
 import SrcLoc
-import Type
+import GHC.Core.Type
 
 import Bag
 import Maybes
@@ -994,7 +994,7 @@ other argument:
 Here injectivity annotation would consist of two comma-separated injectivity
 conditions.
 
-See also Note [Injective type families] in TyCon
+See also Note [Injective type families] in GHC.Core.TyCon
 -}
 
 -- | Located type Family Result Signature

@@ -17,7 +17,7 @@ import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
-import Type
+import GHC.Core.Type
 import GHC.Hs
 import Module
 import Outputable
@@ -31,13 +31,13 @@ import Name
 import Bag
 import CostCentre
 import CostCentreState
-import CoreSyn
+import GHC.Core
 import Id
 import VarSet
 import Data.List
 import FastString
 import HscTypes
-import TyCon
+import GHC.Core.TyCon
 import BasicTypes
 import MonadUtils
 import Maybes

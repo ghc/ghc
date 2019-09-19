@@ -64,13 +64,13 @@ module DataCon (
 import GhcPrelude
 
 import {-# SOURCE #-} MkId( DataConBoxer )
-import Type
+import GHC.Core.Type as Type
 import ForeignCall ( CType )
-import Coercion
-import Unify
-import TyCon
+import GHC.Core.Coercion
+import GHC.Core.Unify
+import GHC.Core.TyCon
 import FieldLabel
-import Class
+import GHC.Core.Class
 import Name
 import PrelNames
 import Var
@@ -470,7 +470,8 @@ data DataCon
                                 -- The actual fixity is stored elsewhere
 
         dcPromoted :: TyCon    -- The promoted TyCon
-                               -- See Note [Promoted data constructors] in TyCon
+                               -- See Note [Promoted data constructors] in
+                               -- GHC.Core.TyCon
   }
 
 
@@ -480,7 +481,7 @@ For the TyVarBinders in a DataCon and PatSyn:
 
  * Each argument flag is Inferred or Specified.
    None are Required. (A DataCon is a term-level function; see
-   Note [No Required TyCoBinder in terms] in TyCoRep.)
+   Note [No Required TyCoBinder in terms] in GHC.Core.TyCoRep.)
 
 Why do we need the TyVarBinders, rather than just the TyVars?  So that
 we can construct the right type for the DataCon with its foralls
@@ -962,7 +963,7 @@ mkDataCon name declared_infix prom_info
                  mkVisFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
-      -- See Note [Promoted data constructors] in TyCon
+      -- See Note [Promoted data constructors] in GHC.Core.TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
                     | Bndr tv vis <- user_tvbs ]
 

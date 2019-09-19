@@ -84,17 +84,17 @@ module IdInfo (
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 
-import Class
+import GHC.Core.Class
 import {-# SOURCE #-} PrimOp (PrimOp)
 import Name
 import VarSet
 import BasicTypes
 import DataCon
-import TyCon
+import GHC.Core.TyCon
 import PatSyn
-import Type
+import GHC.Core.Type
 import ForeignCall
 import Outputable
 import Module
@@ -161,7 +161,7 @@ data IdDetails
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
-       -- Note [Join points] in CoreSyn
+       -- Note [Join points] in GHC.Core
 
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
@@ -424,7 +424,7 @@ data RuleInfo
         DVarSet         -- Locally-defined free vars of *both* LHS and RHS
                         -- of rules.  I don't think it needs to include the
                         -- ru_fn though.
-                        -- Note [Rule dependency info] in OccurAnal
+                        -- Note [Rule dependency info] in GHC.Core.OccurAnal
 
 -- | Assume that no specilizations exist: always safe
 emptyRuleInfo :: RuleInfo

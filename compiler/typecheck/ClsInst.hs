@@ -19,7 +19,7 @@ import TcEvidence
 import TcTypeableValidity
 import RnEnv( addUsedGRE )
 import RdrName( lookupGRE_FieldLabel )
-import InstEnv
+import GHC.Core.InstEnv
 import Inst( instDFunType )
 import FamInst( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 
@@ -28,14 +28,14 @@ import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
 import PrelNames
 
 import Id
-import Type
-import MkCore ( mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Type
+import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
 import Name   ( Name )
 import VarEnv ( VarEnv )
 import DataCon
-import TyCon
-import Class
+import GHC.Core.TyCon
+import GHC.Core.Class
 import DynFlags
 import Outputable
 import Util( splitAtList, fstOf3 )

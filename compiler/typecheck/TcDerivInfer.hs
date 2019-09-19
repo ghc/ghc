@@ -17,7 +17,7 @@ import GhcPrelude
 
 import Bag
 import BasicTypes
-import Class
+import GHC.Core.Class
 import DataCon
 import ErrUtils
 import Inst
@@ -30,12 +30,12 @@ import TcGenGenerics
 import TcMType
 import TcRnMonad
 import TcType
-import TyCon
-import Type
+import GHC.Core.TyCon
+import GHC.Core.Type
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor, checkConstraints)
-import Unify (tcUnifyTy)
+import GHC.Core.Unify (tcUnifyTy)
 import Util
 import Var
 import VarSet

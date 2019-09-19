@@ -20,23 +20,23 @@ module DsCCall
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 
 import DsMonad
-import CoreUtils
-import MkCore
+import GHC.Core.Utils
+import GHC.Core.Make
 import MkId
 import ForeignCall
 import DataCon
 import DsUtils
 
 import TcType
-import Type
+import GHC.Core.Type
 import Id   ( Id )
-import Coercion
+import GHC.Core.Coercion
 import PrimOp
 import TysPrim
-import TyCon
+import GHC.Core.TyCon
 import TysWiredIn
 import BasicTypes
 import Literal

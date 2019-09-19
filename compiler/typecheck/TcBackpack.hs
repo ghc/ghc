@@ -27,8 +27,8 @@ import GHC.Hs
 import RdrName
 import TcRnMonad
 import TcTyDecls
-import InstEnv
-import FamInstEnv
+import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import Inst
 import TcIface
 import TcMType
@@ -46,7 +46,7 @@ import Avail
 import SrcLoc
 import HscTypes
 import Outputable
-import Type
+import GHC.Core.Type
 import FastString
 import RnFixity ( lookupFixityRn )
 import Maybes

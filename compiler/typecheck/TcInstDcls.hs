@@ -32,23 +32,23 @@ import TcType
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
-import InstEnv
+import GHC.Core.InstEnv
 import FamInst
-import FamInstEnv
+import GHC.Core.FamInstEnv
 import TcDeriv
 import TcEnv
 import TcHsType
 import TcUnify
-import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
-import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
-import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
-import Type
+import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
+import GHC.Core.Unfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import GHC.Core.Type
 import TcEvidence
-import TyCon
-import CoAxiom
+import GHC.Core.TyCon
+import GHC.Core.CoAxiom
 import DataCon
 import ConLike
-import Class
+import GHC.Core.Class
 import Var
 import VarEnv
 import VarSet
@@ -720,7 +720,7 @@ tcDataFamInstDecl mb_clsinfo
                     parent = DataFamInstTyCon axiom fam_tc all_pats
 
                       -- NB: Use the full ty_binders from the pats. See bullet toward
-                      -- the end of Note [Data type families] in TyCon
+                      -- the end of Note [Data type families] in GHC.Core.TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders final_res_kind
                                           (map (const Nominal) ty_binders)

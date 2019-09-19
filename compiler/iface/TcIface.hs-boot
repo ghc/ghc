@@ -3,11 +3,11 @@ module TcIface where
 import GhcPrelude
 import IfaceSyn    ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule,
                      IfaceAnnotation, IfaceCompleteMatch )
-import TyCoRep     ( TyThing )
+import GHC.Core.TyCoRep     ( TyThing )
 import TcRnTypes   ( IfL )
-import InstEnv     ( ClsInst )
-import FamInstEnv  ( FamInst )
-import CoreSyn     ( CoreRule )
+import GHC.Core.InstEnv     ( ClsInst )
+import GHC.Core.FamInstEnv  ( FamInst )
+import GHC.Core    ( CoreRule )
 import HscTypes    ( CompleteMatch )
 import Annotations ( Annotation )
 

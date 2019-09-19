@@ -20,8 +20,8 @@ import Avail                      ( Avails )
 import Bag                        ( Bag, bagToList )
 import BasicTypes
 import BooleanFormula
-import Class                      ( FunDep )
-import CoreUtils                  ( exprType )
+import GHC.Core.Class             ( FunDep )
+import GHC.Core.Utils             ( exprType )
 import ConLike                    ( conLikeName )
 import Desugar                    ( deSugarExpr )
 import FieldLabel
@@ -33,7 +33,7 @@ import Name                       ( Name, nameSrcSpan, setNameLoc )
 import NameEnv                    ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import SrcLoc
 import TcHsSyn                    ( hsLitType, hsPatType )
-import Type                       ( mkVisFunTys, Type )
+import GHC.Core.Type              ( mkVisFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes

@@ -27,7 +27,7 @@ import HscTypes
 import Name
 import NameSet
 import Literal
-import TyCon
+import GHC.Core.TyCon
 import FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import SMRep

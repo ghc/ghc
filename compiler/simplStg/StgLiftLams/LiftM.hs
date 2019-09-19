@@ -35,7 +35,7 @@ import Outputable
 import OrdList
 import StgSubst
 import StgSyn
-import Type
+import GHC.Core.Type
 import UniqSupply
 import Util
 import VarEnv

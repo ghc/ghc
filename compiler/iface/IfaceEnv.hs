@@ -26,7 +26,7 @@ import GhcPrelude
 
 import TcRnMonad
 import HscTypes
-import Type
+import GHC.Core.Type
 import Var
 import Name
 import Avail

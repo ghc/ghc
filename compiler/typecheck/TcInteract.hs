@@ -14,22 +14,22 @@ import TcCanonical
 import TcFlatten
 import TcUnify( canSolveByUnification )
 import VarSet
-import Type
-import InstEnv( DFunInstType )
-import CoAxiom( sfInteractTop, sfInteractInert )
+import GHC.Core.Type as Type
+import GHC.Core.InstEnv( DFunInstType )
+import GHC.Core.CoAxiom( sfInteractTop, sfInteractInert )
 
 import Var
 import TcType
 import PrelNames ( coercibleTyConKey,
                    heqTyConKey, eqTyConKey, ipClassKey )
-import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
-import Class
-import TyCon
+import GHC.Core.CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
+import GHC.Core.Class
+import GHC.Core.TyCon
 import FunDeps
 import FamInst
 import ClsInst( InstanceWhat(..), safeOverlap )
-import FamInstEnv
-import Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
+import GHC.Core.FamInstEnv
+import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import TcEvidence
 import Outputable
@@ -39,7 +39,7 @@ import TcSMonad
 import Bag
 import MonadUtils ( concatMapM, foldlM )
 
-import CoreSyn
+import GHC.Core
 import Data.List( partition, deleteFirstsBy )
 import SrcLoc
 import VarEnv
@@ -1449,7 +1449,7 @@ We could go further and offer evidence from decomposing injective type-function
 applications, but that would require new evidence forms, and an extension to
 FC, so we don't do that right now (Dec 14).
 
-See also Note [Injective type families] in TyCon
+See also Note [Injective type families] in GHC.Core.TyCon
 
 
 Note [Cache-caused loops]
@@ -1860,7 +1860,7 @@ selection. This avoids having to support quantified constraints whose
 kind is not Constraint, such as (forall a. F a ~# b)
 
 See
- * Note [Evidence for quantified constraints] in Type
+ * Note [Evidence for quantified constraints] in GHC.Core.Type
  * Note [Equality superclasses in quantified constraints]
    in TcCanonical
 -}

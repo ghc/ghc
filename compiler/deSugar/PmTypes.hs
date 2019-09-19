@@ -49,11 +49,11 @@ import DataCon
 import ConLike
 import Outputable
 import Maybes
-import Type
-import TyCon
+import GHC.Core.Type
+import GHC.Core.TyCon
 import Literal
-import CoreSyn
-import CoreUtils (exprType)
+import GHC.Core
+import GHC.Core.Utils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
@@ -183,7 +183,7 @@ eqConLike (PatSynCon psc1)  (PatSynCon psc2)
 eqConLike _                 _                 = PossiblyOverlap
 
 -- | Represents the head of a match against a 'ConLike' or literal.
--- Really similar to 'CoreSyn.AltCon'.
+-- Really similar to 'GHC.Core.AltCon'.
 data PmAltCon = PmAltConLike ConLike
               | PmAltLit     PmLit
 

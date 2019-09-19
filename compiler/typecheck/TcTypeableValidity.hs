@@ -10,9 +10,9 @@ module TcTypeableValidity (tyConIsTypeable, typeIsTypeable) where
 
 import GhcPrelude
 
-import TyCoRep
-import TyCon
-import Type
+import GHC.Core.TyCoRep
+import GHC.Core.TyCon
+import GHC.Core.Type
 
 import Data.Maybe (isJust)
 

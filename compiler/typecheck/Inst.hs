@@ -44,18 +44,18 @@ import TcHsSyn
 import TcRnMonad
 import TcEnv
 import TcEvidence
-import InstEnv
+import GHC.Core.InstEnv
 import TysWiredIn  ( heqDataCon, eqDataCon )
-import CoreSyn     ( isOrphan )
+import GHC.Core    ( isOrphan )
 import FunDeps
 import TcMType
-import Type
-import TyCoRep
+import GHC.Core.Type
+import GHC.Core.TyCoRep
 import TcType
 import HscTypes
-import Class( Class )
+import GHC.Core.Class( Class )
 import MkId( mkDictFunId )
-import CoreSyn( Expr(..) )  -- For the Coercion constructor
+import GHC.Core( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
 import Var      ( EvVar, tyVarName, VarBndr(..) )
@@ -444,7 +444,7 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
 tcInstInvisibleTyBinder subst (Anon af ty)
   | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst ty)
     -- Equality is the *only* constraint currently handled in types.
-    -- See Note [Constraints in kinds] in TyCoRep
+    -- See Note [Constraints in kinds] in GHC.Core.TyCoRep
   = ASSERT( af == InvisArg )
     do { co <- unifyKind Nothing k1 k2
        ; arg' <- mk co
@@ -462,7 +462,7 @@ get_eq_tys_maybe :: Type
                           , Type  -- t1
                           , Type  -- t2
                           )
--- See Note [Constraints in kinds] in TyCoRep
+-- See Note [Constraints in kinds] in GHC.Core.TyCoRep
 get_eq_tys_maybe ty
   -- Lifted heterogeneous equality (~~)
   | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty

@@ -19,16 +19,16 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePatVar )
 
 import GHC.Hs
-import MkCore
-import CoreSyn
-import CoreUtils (bindNonRec)
+import GHC.Core.Make
+import GHC.Core
+import GHC.Core.Utils (bindNonRec)
 
 import BasicTypes (Origin(FromSource))
 import DynFlags
 import Check (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import DsMonad
 import DsUtils
-import Type   ( Type )
+import GHC.Core.Type   ( Type )
 import Name
 import Util
 import SrcLoc

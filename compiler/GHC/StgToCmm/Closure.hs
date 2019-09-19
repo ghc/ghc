@@ -80,10 +80,10 @@ import Id
 import IdInfo
 import DataCon
 import Name
-import Type
-import TyCoRep
+import GHC.Core.Type
+import GHC.Core.TyCoRep
 import TcType
-import TyCon
+import GHC.Core.TyCon
 import RepType
 import BasicTypes
 import Outputable
