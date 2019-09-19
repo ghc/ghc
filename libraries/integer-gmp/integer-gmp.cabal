@@ -1,6 +1,6 @@
 cabal-version:       2.0
 name:                integer-gmp
-version:             1.0.3.0
+version:             1.1
 
 synopsis:            Integer library based on GMP
 license:             BSD3
@@ -8,74 +8,24 @@ license-file:        LICENSE
 author:              Herbert Valerio Riedel
 maintainer:          hvr@gnu.org
 category:            Numeric, Algebra
-build-type:          Configure
+build-type:          Simple
 description:
-    This package provides the low-level implementation of the standard
-    'Integer' type based on the
+    This package used to provide an implementation of the standard 'Integer'
+    type based on the
     <http://gmplib.org/ GNU Multiple Precision Arithmetic Library (GMP)>.
     .
-    This package provides access to the internal representation of
-    'Integer' as well as primitive operations with no proper error
-    handling, and should only be used directly with the utmost care.
-
-extra-source-files:
-    aclocal.m4
-    cbits/wrappers.c
-    changelog.md
-    config.guess
-    config.sub
-    configure
-    configure.ac
-    config.mk.in
-    include/HsIntegerGmp.h.in
-    install-sh
-    integer-gmp.buildinfo.in
-
--- NB: Many of these tmp files no longer ever actually get plopped in
--- the root directory post Cabal 2.4, thanks to a change that causes
--- autoconf/configure to get run inside the dist directory.
-extra-tmp-files:
-    autom4te.cache
-    config.log
-    config.status
-    config.mk
-    integer-gmp.buildinfo
-    include/HsIntegerGmp.h
+    It is now deprecated in favor of the 'ghc-bignum' package.
+    .
+    Its purpose is to provide backward compatibility for codes directly
+    depending on the `integer-gmp` package.
 
 library
   default-language:    Haskell2010
-  other-extensions:
-    BangPatterns
-    CApiFFI
-    CPP
-    DeriveDataTypeable
-    ExplicitForAll
-    GHCForeignImportPrim
-    MagicHash
-    NegativeLiterals
-    NoImplicitPrelude
-    RebindableSyntax
-    StandaloneDeriving
-    UnboxedTuples
-    UnliftedFFITypes
-  build-depends:       ghc-prim >= 0.5.1.0 && < 0.7
   hs-source-dirs:      src/
-  -- We need to set the unit ID to integer-wired-in
-  -- (without a version number) as it's magic.
-  -- See Note [The integer library] in PrelNames
-  ghc-options: -this-unit-id integer-wired-in -Wall
-  cc-options: -std=c99 -Wall
-
-  include-dirs: include
-  c-sources:
-    cbits/wrappers.c
+  ghc-options:         -Wall
+  build-depends:
+      base >= 4.11 && < 5
+    , ghc-prim
 
   exposed-modules:
-    GHC.Integer
-    GHC.Integer.Logarithms
-    GHC.Integer.Logarithms.Internals
-
     GHC.Integer.GMP.Internals
-
-  other-modules:
-    GHC.Integer.Type
