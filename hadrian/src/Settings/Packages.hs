@@ -58,7 +58,7 @@ packageArgs = do
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
-            [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
+            [ arg $ "--ghc-option=-DGHC_STAGE=" ++ show (fromEnum stage + 1)
             , arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
