@@ -12,6 +12,7 @@ import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
 import Rules.Register
+import Settings
 import Target
 import Utilities
 
@@ -134,8 +135,12 @@ cObjects context = do
 -- 'Context' is @integer-gmp@.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == integerGmp = gmpObjects
-    | otherwise                     = return []
+    | package context == ghcBignum = do
+         interpretInContext context getBignumBackend >>= \case
+            "gmp" -> gmpObjects
+            _     -> return []
+
+    | otherwise = return []
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.
