@@ -25,8 +25,8 @@ data Flavour = Flavour {
     args :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
-    -- | Either 'integerGmp' or 'integerSimple'.
-    integerLibrary :: Action Package,
+    -- | 'Native', 'GMP', 'FFI'.
+    bignumBackend :: String,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
