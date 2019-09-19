@@ -117,7 +117,6 @@ rnUnboundVar v
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
                 ; return (HsVar noExtField (noLoc n), emptyFVs) } }
-
 rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
@@ -213,6 +212,14 @@ rnExpr (NegApp _ e _)
 rnExpr e@(HsBracket _ br_body) = rnBracket e br_body
 
 rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
+------------------------------------------
+-- Template Haskell extensions
+-- Extended typed holes
+rnExpr (HsExtendedHole ext (ExtendedHole nm fs)) =
+   return (HsExtendedHole ext (ExtendedHole nm fs), emptyFVs)
+rnExpr (HsExtendedHole ext (ExtendedHoleSplice nm (L l (HsSpliceE _ spl)))) =
+    do (expr, fvs) <- rnSpliceExpr spl
+       return (HsExtendedHole ext $ ExtendedHoleSplice nm (L l expr), fvs)
 
 ---------------------------------------------
 --      Sections

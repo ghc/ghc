@@ -600,6 +600,7 @@ type family XRnBracketOut   x
 type family XTcBracketOut   x
 type family XSpliceE        x
 type family XProc           x
+type family XExtendedHole   x
 type family XStatic         x
 type family XTick           x
 type family XBinTick        x

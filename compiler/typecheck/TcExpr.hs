@@ -641,6 +641,21 @@ tcExpr (HsStatic fvs expr) res_ty
                                          (L loc $ mkHsWrap wrap fromStaticPtr)
                                          (L loc (HsStatic fvs expr'))
         }
+tcExpr e@(HsExtendedHole _ eh) res_ty
+  = do { ty <- newOpenFlexiTyVarTy
+       ; let occ = extendedHoleOcc eh
+       ; name <- newSysName occ
+       ; tEh <- case eh of
+                ExtendedHoleSplice name (L l splexpr) ->
+                  do { nt <- newInferExpTypeNoInst
+                     ; tcE <- tcExpr splexpr nt
+                     ; return (ExtendedHoleSplice name (L l tcE)) }
+                ExtendedHole name fs -> return (ExtendedHole name fs)
+       ; let ev = mkLocalId name ty
+       ; can <- newHoleCt (ExtendedExprHole tEh) ev ty
+       ; emitInsoluble can
+       ; tcWrapResultO HoleOrigin e (HsVar noExtField (noLoc ev)) ty res_ty }
+
 
 {-
 ************************************************************************

@@ -136,7 +136,7 @@ module TcRnTypes(
 
         -- Misc other types
         TcId, TcIdSet,
-        Hole(..), holeOcc,
+        Hole(..), holeOcc, isExprHole,
         NameShape(..),
 
         -- Role annotations
@@ -1798,14 +1798,23 @@ data Hole = ExprHole UnboundVar
             -- expression (TypedHoles)
           | TypeHole OccName
             -- ^ A hole in a type (PartialTypeSignatures)
+          | ExtendedExprHole (ExtendedHole GhcTcId)
+            -- ^ A extended hole (_(...)) in an expression extended holes
+
+isExprHole :: Hole -> Bool
+isExprHole (ExprHole {}) = True
+isExprHole (ExtendedExprHole {}) = True
+isExprHole _ = False
 
 instance Outputable Hole where
   ppr (ExprHole ub)  = ppr ub
   ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
+  ppr (ExtendedExprHole eh) = ppr eh
 
 holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
 holeOcc (TypeHole occ) = occ
+holeOcc (ExtendedExprHole eh) = extendedHoleOcc eh
 
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2218,6 +2227,7 @@ isOutOfScopeCt _ = False
 
 isExprHoleCt :: Ct -> Bool
 isExprHoleCt (CHoleCan { cc_hole = ExprHole {} }) = True
+isExprHoleCt (CHoleCan { cc_hole = ExtendedExprHole {} }) = True
 isExprHoleCt _ = False
 
 isTypeHoleCt :: Ct -> Bool
@@ -3730,6 +3740,7 @@ exprCtOrigin (HsTcBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
 exprCtOrigin (HsSpliceE {})      = Shouldn'tHappenOrigin "TH splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
+exprCtOrigin (HsExtendedHole {}) = HoleOrigin
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
 exprCtOrigin (HsTickPragma _ _ _ _ e) = lexprCtOrigin e

@@ -215,6 +215,40 @@ unboundVarOcc (OutOfScope occ _) = occ
 unboundVarOcc (TrueExprHole occ) = occ
 
 {-
+Note [ExtendedHole]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Extended holes are used to enable more feature rich typed-holes, where we can
+pass arguments along to the typed-hole message beyond just the name of the hole.
+
+
+-}
+data ExtendedHole p
+  = ExtendedHole OccName (Maybe (Located FastString))
+  | ExtendedHoleSplice OccName (LHsExpr p)
+
+instance Outputable (ExtendedHole p) where
+  ppr (ExtendedHole occ _) = text "ExtendedHole" <> parens (ppr occ)
+  ppr (ExtendedHoleSplice occ _) = text "ExtendedHoleSplice" <> parens (ppr occ)
+
+extendedHoleOcc :: ExtendedHole p -> OccName
+extendedHoleOcc (ExtendedHole occ _) = occ
+extendedHoleOcc (ExtendedHoleSplice occ _) = occ
+
+pprExtendedHoleContent :: (p ~ GhcPass pass, OutputableBndrId p)
+                       => ExtendedHole p -> SDoc
+pprExtendedHoleContent (ExtendedHole _ fs) = ppr fs
+pprExtendedHoleContent (ExtendedHoleSplice _ expr) = ppr expr
+
+instance Data p => Data (ExtendedHole p) where
+  gunfold _ _ _ = panic "ExtendedHole"
+  toConstr  a   = mkConstr (dataTypeOf a) "ExtendedHole" [] Data.Prefix
+  dataTypeOf a  = mkDataType dtName [toConstr a]
+    where dtName = case a of
+                  ExtendedHole {} -> "HsExpr.ExtendedHole"
+                  ExtendedHoleSplice {} -> "HsExpr.ExtendedHoleSplice"
+
+{-
 Note [OutOfScope and GlobalRdrEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 To understand why we bundle a GlobalRdrEnv with an out-of-scope variable,
@@ -592,6 +626,10 @@ data HsExpr p
              (LHsExpr p)        -- Body
 
   ---------------------------------------
+  -- Extended typed-holes
+  | HsExtendedHole (XExtendedHole p)
+                   (ExtendedHole p)
+  ---------------------------------------
   -- Haskell program coverage (Hpc) Support
 
   | HsTick
@@ -728,6 +766,8 @@ type instance XTcBracketOut  (GhcPass _) = NoExtField
 
 type instance XSpliceE       (GhcPass _) = NoExtField
 type instance XProc          (GhcPass _) = NoExtField
+
+type instance XExtendedHole  (GhcPass _) = NoExtField
 
 type instance XStatic        GhcPs = NoExtField
 type instance XStatic        GhcRn = NameSet
@@ -1036,6 +1076,8 @@ ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
 ppr_expr (HsProc _ pat (L _ (XCmdTop x)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr x]
 
+ppr_expr (HsExtendedHole _ hole) = ppr (extendedHoleOcc hole)
+
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
 
@@ -1163,6 +1205,7 @@ hsExprNeedsParens p = go
     go (HsTcBracketOut{})             = False
     go (HsProc{})                     = p > topPrec
     go (HsStatic{})                   = p >= appPrec
+    go (HsExtendedHole {})            = False
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (HsTickPragma _ _ _ _ (L _ e)) = go e

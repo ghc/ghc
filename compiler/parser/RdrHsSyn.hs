@@ -2096,17 +2096,24 @@ patSynErr l e explanation =
 hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
 
-hsHoleFSExpr :: Maybe (Located Int) -> Maybe (Located FastString) -> HsExpr (GhcPass id)
+hsHoleFSExpr :: Maybe (Located Int)
+             -> Maybe (Located FastString)
+             -> HsExpr (GhcPass id)
 hsHoleFSExpr hid fs =
-      HsUnboundVar noExtField (TrueExprHole (mkVarOcc ("_(" ++ r ++")" ++ i)))
-  where r = maybe "" (show . unpackFS . unLoc) fs
-        i = maybe "" (show . unLoc) hid
+      HsExtendedHole noExtField (ExtendedHole (mkVarOcc ("_(...)" ++ i)) fs)
+  where i = maybe "" (show . unLoc) hid
 
-hsHoleSpliceExpr :: Maybe (Located Int) -> Located (HsSplice GhcPs) -> HsExpr (GhcPass id)
-hsHoleSpliceExpr hid spl =
-   HsUnboundVar noExtField $ TrueExprHole $
-    mkVarOcc $ "_" ++ (showSDocUnsafe (ppr spl)) ++ i -- Splices are printed as $(...) already
+hsHoleSpliceExpr :: Maybe (Located Int)
+                 -> Located (HsSplice (GhcPass p))
+                 -> HsExpr (GhcPass p)
+hsHoleSpliceExpr hid lspl@(L _ spl) =
+   HsExtendedHole noExtField $ ExtendedHoleSplice (mkVarOcc $ pat ++ i) lexpr
     where i = maybe "" (show . unLoc) hid
+          lexpr = mapLoc (HsSpliceE noExtField) lspl
+          pat = case spl of
+                  HsUntypedSplice{} -> "_$(...)"
+                  HsTypedSplice{} -> "_$$(...)"
+                  _ -> undefined
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p

@@ -38,6 +38,8 @@ import DynFlags
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
+import HsExpr (ExtendedHole(..))
+
 import Control.Arrow ( (&&&) )
 
 import Control.Monad    ( filterM, replicateM, foldM )
@@ -541,6 +543,12 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
                   -> TcM (TidyEnv, SDoc)
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
+     ; traceTc "Hole is extended by: " $  case ct of
+        (CHoleCan { cc_hole = ExtendedExprHole eh}) ->
+          case eh of
+            ExtendedHole _ fs -> ppr fs
+            ExtendedHoleSplice _ expr -> ppr expr
+        _ -> text "Nothing"
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
      ; hfdc <- getHoleFitDispConfig
