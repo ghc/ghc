@@ -786,7 +786,7 @@ getOrphanHashes hsc_env mods = do
 
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
- = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
+ = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS . mnwib_moduleName)) (dep_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
@@ -1305,7 +1305,7 @@ checkVersions hsc_env mod_summary iface
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
-    mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
+    mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 -- | Check if any plugins are requesting recompilation
@@ -1508,7 +1508,7 @@ checkDependencies hsc_env summary iface
      case find_res of
         Found _ mod
           | pkg == this_pkg
-           -> if moduleName mod `notElem` map fst prev_dep_mods ++ prev_dep_plgn
+           -> if moduleName mod `notElem` map mnwib_moduleName prev_dep_mods ++ prev_dep_plgn
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
@@ -1527,7 +1527,10 @@ checkDependencies hsc_env summary iface
            where pkg = moduleUnitId mod
         _otherwise  -> return (RecompBecause reason)
 
-   old_deps = Set.fromList $ map fst $ filter (not . snd) prev_dep_mods
+   projectNonBootNames = map mnwib_moduleName
+     . filter (not . mnwib_isBoot)
+   old_deps = Set.fromList
+     $ projectNonBootNames prev_dep_mods
    isOldHomeDeps = flip Set.member old_deps
    checkForNewHomeDependency (L _ mname) = do
      let
@@ -1542,8 +1545,8 @@ checkDependencies hsc_env summary iface
        then return (UpToDate, [])
        else do
          mb_result <- getFromModIface "need mi_deps for" mod $ \imported_iface -> do
-           let mnames = mname:(map fst $ filter (not . snd) $
-                 dep_mods $ mi_deps imported_iface)
+           let mnames = mname :
+                 projectNonBootNames (dep_mods $ mi_deps imported_iface)
            case find (not . isOldHomeDeps) mnames of
              Nothing -> return (UpToDate, mnames)
              Just new_dep_mname -> do

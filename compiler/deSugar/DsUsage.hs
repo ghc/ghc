@@ -215,7 +215,8 @@ mkPluginUsage hsc_env pluginModule
     platform = targetPlatform dflags
     pNm      = moduleName (mi_module pluginModule)
     pPkg     = moduleUnitId (mi_module pluginModule)
-    deps     = map fst (dep_mods (mi_deps pluginModule))
+    deps     = map mnwib_moduleName $
+      dep_mods $ mi_deps pluginModule
 
     -- Lookup object file for a plugin dependency,
     -- from the same package as the plugin.

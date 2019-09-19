@@ -21,7 +21,6 @@ module GhcMake(
 
         ms_home_srcimps, ms_home_imps,
 
-        IsBoot(..),
         summariseModule,
         hscSourceToIsBoot,
         findExtraSigImports,
@@ -909,23 +908,25 @@ buildCompGraph (scc:sccs) = case scc of
         return ((ms,mvar,log_queue):rest, cycle)
     CyclicSCC mss -> return ([], Just mss)
 
--- A Module and whether it is a boot module.
-type BuildModule = (Module, IsBoot)
+-- | A Module and whether it is a boot module.
+--
+-- We need to treat boot modules specially when building compilation graphs,
+-- since they break cycles. Regular source files and signature files are treated
+-- equivalently.
+type BuildModule = ModuleWithIsBoot
 
--- | 'Bool' indicating if a module is a boot module or not.  We need to treat
--- boot modules specially when building compilation graphs, since they break
--- cycles.  Regular source files and signature files are treated equivalently.
-data IsBoot = NotBoot | IsBoot
-    deriving (Ord, Eq, Show, Read)
-
--- | Tests if an 'HscSource' is a boot file, primarily for constructing
--- elements of 'BuildModule'.
-hscSourceToIsBoot :: HscSource -> IsBoot
-hscSourceToIsBoot HsBootFile = IsBoot
-hscSourceToIsBoot _ = NotBoot
+-- | Tests if an 'HscSource' is a boot file, primarily for constructing elements
+-- of 'BuildModule'. We conflate signatures and modules because they are bound
+-- in the same namespace; only boot interfaces can be disambiguated with
+-- `import {-# SOURCE #-}`.
+hscSourceToIsBoot :: HscSource -> IsBootInterface
+hscSourceToIsBoot HsBootFile = True
+hscSourceToIsBoot _ = False
 
 mkBuildModule :: ModSummary -> BuildModule
-mkBuildModule ms = (ms_mod ms, if isBootSummary ms then IsBoot else NotBoot)
+mkBuildModule ms = ModuleWithIsBoot
+  (ms_mod ms)
+  (isBootSummary ms)
 
 -- | The entry point to the parallel upsweep.
 --
@@ -1172,9 +1173,12 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
     let home_src_imps = map unLoc $ ms_home_srcimps mod
 
     -- All the textual imports of this module.
-    let textual_deps = Set.fromList $ mapFst (mkModule (thisPackage lcl_dflags)) $
-                            zip home_imps     (repeat NotBoot) ++
-                            zip home_src_imps (repeat IsBoot)
+    let textual_deps = Set.fromList $
+            zipWith f home_imps     (repeat False) ++
+            zipWith f home_src_imps (repeat True)
+          where f mn isBoot = ModuleWithIsBoot
+                  (mkModule (thisPackage lcl_dflags) mn)
+                  isBoot
 
     -- Dealing with module loops
     -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1280,8 +1284,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                     -- SCCs include the loop closer, so we have to filter
                     -- it out.
                     Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
-                                 filter (/= moduleName (fst this_build_mod)) $
-                                 map (moduleName . fst) loop
+                                 filter (/= moduleName (mwib_module this_build_mod)) $
+                                 map (moduleName . mwib_module) loop
 
                 -- Compile the module.
                 mod_info <- upsweep_mod lcl_hsc_env'' mHscMessage old_hpt stable_mods
@@ -1310,7 +1314,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                     hsc_env'' <- case finish_loop of
                         Nothing   -> return hsc_env'
                         Just loop -> typecheckLoop lcl_dflags hsc_env' $
-                                     map (moduleName . fst) loop
+                                     map (moduleName . mwib_module) loop
                     return (hsc_env'', localize_hsc_env hsc_env'')
 
                 -- Clean up any intermediate files.
@@ -1952,14 +1956,19 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     numbered_summaries = zip summaries [1..]
 
     lookup_node :: HscSource -> ModuleName -> Maybe SummaryNode
-    lookup_node hs_src mod = Map.lookup (mod, hscSourceToIsBoot hs_src) node_map
+    lookup_node hs_src mod = Map.lookup
+      (ModuleNameWithIsBoot mod $ hscSourceToIsBoot hs_src)
+      node_map
 
     lookup_key :: HscSource -> ModuleName -> Maybe Int
     lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
 
     node_map :: NodeMap SummaryNode
-    node_map = Map.fromList [ ((moduleName (ms_mod s),
-                                hscSourceToIsBoot (ms_hsc_src s)), node)
+    node_map = Map.fromList [ ( ModuleNameWithIsBoot
+                                  (moduleName $ ms_mod s)
+                                  (hscSourceToIsBoot $ ms_hsc_src s)
+                              , node
+                              )
                             | node <- nodes
                             , let s = summaryNodeSummary node ]
 
@@ -1993,17 +2002,17 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     out_edge_keys :: HscSource -> [ModuleName] -> [Int]
     out_edge_keys hi_boot ms = mapMaybe (lookup_key hi_boot) ms
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
-        -- IsBoot; else NotBoot
+        -- IsBoot; else False
 
 -- The nodes of the graph are keyed by (mod, is boot?) pairs
 -- NB: hsig files show up as *normal* nodes (not boot!), since they don't
 -- participate in cycles (for now)
-type NodeKey   = (ModuleName, IsBoot)
+type NodeKey   = ModuleNameWithIsBoot
 type NodeMap a = Map.Map NodeKey a
 
 msKey :: ModSummary -> NodeKey
 msKey (ModSummary { ms_mod = mod, ms_hsc_src = boot })
-    = (moduleName mod, hscSourceToIsBoot boot)
+    = ModuleNameWithIsBoot (moduleName mod) (hscSourceToIsBoot boot)
 
 mkNodeMap :: [ModSummary] -> NodeMap ModSummary
 mkNodeMap summaries = Map.fromList [ (msKey s, s) | s <- summaries]
@@ -2103,7 +2112,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                     else return $ Left $ unitBag $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
-           = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
+           = do maybe_summary <- summariseModule hsc_env old_summary_map False
                                            (L rootLoc modl) obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
@@ -2125,7 +2134,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
 
-        loop :: [(Located ModuleName,IsBoot)]
+        loop :: [(Located ModuleName, IsBootInterface)]
                         -- Work list: process these modules
              -> NodeMap [Either ErrorMessages ModSummary]
                         -- Visited set; the range is a list because
@@ -2152,7 +2161,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                        loop (calcDeps s) (Map.insert key [Right s] done)
                      loop ss new_map
           where
-            key = (unLoc wanted_mod, is_boot)
+            key = ModuleNameWithIsBoot (unLoc wanted_mod) is_boot
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs template haskell. We enable codegen to
@@ -2263,9 +2272,9 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
                   -- If a module imports a boot module, msDeps helpfully adds a
                   -- dependency to that non-boot module in it's result. This
                   -- means we don't have to think about boot modules here.
-                  | (L _ mn, NotBoot) <- msDeps ms
+                  | (L _ mn, False) <- msDeps ms
                   , dep_ms <-
-                      toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
+                      toList (Map.lookup (ModuleNameWithIsBoot mn False) nodemap) >>= toList >>=
                       toList
                   ]
                 new_marked_mods = Set.insert ms_mod marked_mods
@@ -2284,10 +2293,10 @@ mkRootMap summaries = Map.insertListWith (flip (++))
 -- modules always contains B.hs if it contains B.hs-boot.
 -- Remember, this pass isn't doing the topological sort.  It's
 -- just gathering the list of all relevant ModSummaries
-msDeps :: ModSummary -> [(Located ModuleName, IsBoot)]
+msDeps :: ModSummary -> [(Located ModuleName, IsBootInterface)]
 msDeps s =
-    concat [ [(m,IsBoot), (m,NotBoot)] | m <- ms_home_srcimps s ]
-        ++ [ (m,NotBoot) | m <- ms_home_imps s ]
+    concat [ [(m, True), (m, False)] | m <- ms_home_srcimps s ]
+        ++ [ (m, False) | m <- ms_home_imps s ]
 
 -----------------------------------------------------------------------------
 -- Summarising modules
@@ -2328,7 +2337,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
 
                 -- return the cached summary if the source didn't change
         checkSummaryTimestamp
-            hsc_env dflags obj_allowed NotBoot (new_summary src_fn)
+            hsc_env dflags obj_allowed False (new_summary src_fn)
             old_summary location src_timestamp
 
    | otherwise
@@ -2355,7 +2364,7 @@ summariseFile hsc_env old_summaries src_fn mb_phase obj_allowed maybe_buf
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
             , nms_src_timestamp = src_timestamp
-            , nms_is_boot = NotBoot
+            , nms_is_boot = False
             , nms_hsc_src =
                 if isHaskellSigFilename src_fn
                    then HsigFile
@@ -2374,7 +2383,7 @@ findSummaryBySourceFile summaries file
         (x:_) -> Just x
 
 checkSummaryTimestamp
-    :: HscEnv -> DynFlags -> Bool -> IsBoot
+    :: HscEnv -> DynFlags -> Bool -> IsBootInterface
     -> (UTCTime -> IO (Either e ModSummary))
     -> ModSummary -> ModLocation -> UTCTime
     -> IO (Either e ModSummary)
@@ -2415,7 +2424,7 @@ checkSummaryTimestamp
 summariseModule
           :: HscEnv
           -> NodeMap ModSummary -- Map of old summaries
-          -> IsBoot             -- IsBoot <=> a {-# SOURCE #-} import
+          -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
@@ -2427,7 +2436,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | wanted_mod `elem` excl_mods
   = return Nothing
 
-  | Just old_summary <- Map.lookup (wanted_mod, is_boot) old_summary_map
+  | Just old_summary <- Map.lookup
+      (ModuleNameWithIsBoot wanted_mod is_boot)
+      old_summary_map
   = do          -- Find its new timestamp; all the
                 -- ModSummaries in the old map have valid ml_hs_files
         let location = ms_location old_summary
@@ -2473,8 +2484,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
                 -- hi file, object file, when is_boot says so
-        let location' | IsBoot <- is_boot = addBootSuffixLocn location
-                      | otherwise         = location
+        let location' | is_boot = addBootSuffixLocn location
+                      | otherwise = location
             src_fn = expectJust "summarise2" (ml_hs_file location')
 
                 -- Check that it exists
@@ -2496,10 +2507,10 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
         -- case, we know if it's a boot or not because of the {-# SOURCE #-}
         -- annotation, but we don't know if it's a signature or a regular
         -- module until we actually look it up on the filesystem.
-        let hsc_src = case is_boot of
-                IsBoot -> HsBootFile
-                _ | isHaskellSigFilename src_fn -> HsigFile
-                  | otherwise -> HsSrcFile
+        let hsc_src
+              | is_boot = HsBootFile
+              | isHaskellSigFilename src_fn = HsigFile
+              | otherwise = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
                 throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
@@ -2542,7 +2553,7 @@ data MakeNewModSummary
   = MakeNewModSummary
       { nms_src_fn :: FilePath
       , nms_src_timestamp :: UTCTime
-      , nms_is_boot :: IsBoot
+      , nms_is_boot :: IsBootInterface
       , nms_hsc_src :: HscSource
       , nms_location :: ModLocation
       , nms_mod :: Module
@@ -2586,10 +2597,11 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
       , ms_obj_date = obj_timestamp
       }
 
-getObjTimestamp :: ModLocation -> IsBoot -> IO (Maybe UTCTime)
+getObjTimestamp :: ModLocation -> IsBootInterface -> IO (Maybe UTCTime)
 getObjTimestamp location is_boot
-  = if is_boot == IsBoot then return Nothing
-                         else modificationTimeIfExists (ml_obj_file location)
+  = if is_boot
+    then return Nothing
+    else modificationTimeIfExists (ml_obj_file location)
 
 data PreprocessedImports
   = PreprocessedImports
@@ -2704,8 +2716,9 @@ cyclicModuleErr mss
     graph = [ DigraphNode ms (msKey ms) (get_deps ms) | ms <- mss]
 
     get_deps :: ModSummary -> [NodeKey]
-    get_deps ms = ([ (unLoc m, IsBoot)  | m <- ms_home_srcimps ms ] ++
-                   [ (unLoc m, NotBoot) | m <- ms_home_imps    ms ])
+    get_deps ms =
+      [ (ModuleNameWithIsBoot (unLoc m) True)  | m <- ms_home_srcimps ms ] ++
+      [ (ModuleNameWithIsBoot (unLoc m) False) | m <- ms_home_imps    ms ]
 
     show_path []         = panic "show_path"
     show_path [m]        = text "module" <+> ppr_ms m

@@ -533,14 +533,15 @@ tcHiBootIface hsc_src mod
         -- disappeared.
     do  { eps <- getEps
         ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
-            Nothing -> return NoSelfBoot -- The typical case
-
-            Just (_, False) -> failWithTc moduleLoop
-                -- Someone below us imported us!
-                -- This is a loop with no hi-boot in the way
-
-            Just (_mod, True) -> failWithTc (elaborate err)
-                -- The hi-boot file has mysteriously disappeared.
+            -- The typical case
+            Nothing -> return NoSelfBoot
+            -- error cases
+            Just (ModuleNameWithIsBoot _ is_boot) -> case is_boot of
+              -- Someone below us imported us!
+              -- This is a loop with no hi-boot in the way
+              True -> failWithTc moduleLoop
+              -- The hi-boot file has mysteriously disappeared.
+              False -> failWithTc (elaborate err)
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod

@@ -326,7 +326,7 @@ tcRnImports hsc_env import_decls
   = do  { (rn_imports, rdr_env, imports, hpc_info) <- rnImports import_decls ;
 
         ; this_mod <- getModule
-        ; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
+        ; let { dep_mods :: ModuleNameEnv ModuleNameWithIsBoot
               ; dep_mods = imp_dep_mods imports
 
                 -- We want instance declarations from all home-package

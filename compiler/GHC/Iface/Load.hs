@@ -363,7 +363,7 @@ loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBy
 ------------------
 -- | Loads a user interface and throws an exception if it fails. The first parameter indicates
 -- whether we should import the boot variant of the module
-loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
+loadUserInterface :: IsBootInterface -> SDoc -> Module -> IfM lcl ModIface
 loadUserInterface is_boot doc mod_name
   = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
 
@@ -718,7 +718,7 @@ wantHiBootFile dflags eps mod from
 
           | otherwise
           -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
-                Just (_, is_boot) -> Succeeded is_boot
+                Just (ModuleNameWithIsBoot _ is_boot) -> Succeeded is_boot
                 Nothing           -> Succeeded False
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
@@ -1212,7 +1212,7 @@ pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
           text "family instance modules:" <+> fsep (map ppr finsts)
         ]
   where
-    ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
+    ppr_mod (ModuleNameWithIsBoot mod_name boot) = ppr mod_name <+> ppr_boot boot
     ppr_pkg (pkg,trust_req)  = ppr pkg <>
                                (if trust_req then text "*" else Outputable.empty)
     ppr_boot True  = text "[boot]"

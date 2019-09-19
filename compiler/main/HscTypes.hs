@@ -719,12 +719,12 @@ hptInstances hsc_env want_this_module
     in (concat insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
-hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
+hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
 
 
 -- | Get annotations from modules "below" this one (in the dependency sense)
-hptAnns :: HscEnv -> Maybe [(ModuleName, IsBootInterface)] -> [Annotation]
+hptAnns :: HscEnv -> Maybe [ModuleNameWithIsBoot] -> [Annotation]
 hptAnns hsc_env (Just deps) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env deps
 hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 
@@ -733,7 +733,7 @@ hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [(ModuleName, IsBootInterface)] -> [a]
+hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
 hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
@@ -742,7 +742,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      (mod, is_boot_mod) <- deps
+      ModuleNameWithIsBoot mod is_boot_mod <- deps
     , include_hi_boot || not is_boot_mod
 
         -- unsavoury: when compiling the base package with --make, we
@@ -1107,7 +1107,7 @@ mi_free_holes iface =
         -> renameFreeHoles (mkUniqDSet cands) (indefUnitIdInsts (indefModuleUnitId indef))
     _   -> emptyUniqDSet
   where
-    cands = map fst (dep_mods (mi_deps iface))
+    cands = map mnwib_moduleName $ dep_mods $ mi_deps iface
 
 -- | Given a set of free holes, and a unit identifier, rename
 -- the free holes according to the instantiation of the unit
@@ -2453,9 +2453,6 @@ type WhetherHasOrphans   = Bool
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
 
--- | Did this module originate from a *-boot file?
-type IsBootInterface = Bool
-
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy.
 --
@@ -2463,7 +2460,7 @@ type IsBootInterface = Bool
 --
 -- Invariant: none of the lists contain duplicates.
 data Dependencies
-  = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
+  = Deps { dep_mods   :: [ModuleNameWithIsBoot]
                         -- ^ All home-package modules transitively below this one
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
@@ -2653,7 +2650,7 @@ type PackageCompleteMatchMap = CompleteMatchMap
 -- their interface files
 data ExternalPackageState
   = EPS {
-        eps_is_boot :: !(ModuleNameEnv (ModuleName, IsBootInterface)),
+        eps_is_boot :: !(ModuleNameEnv ModuleNameWithIsBoot),
                 -- ^ In OneShot mode (only), home-package modules
                 -- accumulate in the external package state, and are
                 -- sucked in lazily.  For these home-pkg modules
