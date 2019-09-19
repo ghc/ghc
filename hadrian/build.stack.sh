@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# stop on first failure
+set -e
+
 # Make sure Hadrian is up-to-date
 cd hadrian
 stack build --no-library-profiling ${HADRIAN_NIX:+--nix}

@@ -31,8 +31,7 @@
 #  - ghc-boot
 #  - ghc-boot-th
 #  - ghc-prim
-#  - integer-gmp
-#  - integer-simple
+#  - ghc-bignum
 #  - template-haskell
 
 define foreachLibrary
@@ -43,8 +42,7 @@ $$(foreach hashline,libraries/ghc-boot-th#-#no-remote-repo#no-vcs           \
                     libraries/ghci#-#no-remote-repo#no-vcs                  \
                     libraries/base#-#no-remote-repo#no-vcs                  \
                     libraries/ghc-prim#-#no-remote-repo#no-vcs              \
-                    libraries/integer-gmp#-#no-remote-repo#no-vcs           \
-                    libraries/integer-simple#-#no-remote-repo#no-vcs        \
+                    libraries/ghc-bignum#-#no-remote-repo#no-vcs            \
                     libraries/template-haskell#-#no-remote-repo#no-vcs      \
                     $$(shell grep '^libraries/' packages | sed 's/  */#/g'),\
     $$(eval FEL_line    := $$(subst #,$$(space),$$(hashline)))              \

@@ -14,7 +14,7 @@ packageArgs = do
     stage        <- getStage
     rtsWays      <- getRtsWays
     path         <- getBuildPath
-    intLib       <- getIntegerPackage
+    bignum       <- getBignumBackend
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpBuildPath <- expr gmpBuildPath
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
@@ -26,15 +26,11 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName intLib)
+          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName ghcBignum)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
           , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
-
-        ------------------------------ bytestring ------------------------------
-        , package bytestring ?
-          builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -79,10 +75,7 @@ packageArgs = do
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , cross ? arg "-terminfo"
-            , notStage0 ? intLib == integerGmp ?
-              arg "integer-gmp"
-            , notStage0 ? intLib == integerSimple ?
-              arg "integer-simple" ]
+            ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
@@ -146,19 +139,31 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
-        ------------------------------ integerGmp ------------------------------
-        , package integerGmp ? mconcat
-          [ builder Cc ? arg includeGmp
+        ------------------------------ ghc-bignum ------------------------------
 
-          , builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            -- Windows is always built with inplace GMP until we have dynamic
-            -- linking working.
-            , windowsHost  ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
-            , arg ("--configure-option=CFLAGS=" ++ includeGmp)
-            , arg ("--gcc-options="             ++ includeGmp) ] ]
+
+        , package ghcBignum ? mconcat
+          [ -- select BigNum backend
+            builder (Cabal Flags) ? arg bignum
+
+            -- backend specific
+          , case bignum of
+               "gmp" -> mconcat
+                  [ builder Cc ? arg includeGmp
+                  , builder (Cabal Setup) ? mconcat
+                     [ arg "--configure-option=--with-gmp"
+                     , flag GmpInTree ?  arg "--configure-option=--with-intree-gmp"
+                     -- Windows is always built with inplace GMP until we have dynamic
+                     -- linking working.
+                     , windowsHost?  arg "--configure-option=--with-intree-gmp"
+                     , flag GmpFrameworkPref ?
+                       arg "--configure-option=--with-gmp-framework-preferred"
+                     , arg ("--configure-option=CFLAGS=" ++ includeGmp)
+                     , arg ("--gcc-options="             ++ includeGmp)
+                     ]
+                  ]
+               _ -> mempty
+          ]
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -167,19 +172,7 @@ packageArgs = do
         , package runGhc ?
           builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
-
-        --------------------------------- text ---------------------------------
-        -- The package @text@ is rather tricky. It's a boot library, and it
-        -- tries to determine on its own if it should link against @integer-gmp@
-        -- or @integer-simple@. For Stage0, we need to use the integer library
-        -- that the bootstrap compiler has (since @interger@ is not a boot
-        -- library) and therefore we copy it over into the Stage0 package-db.
-        -- Maybe we should stop doing this? And subsequently @text@ for Stage1
-        -- detects the same integer library again, even though we don't build it
-        -- in Stage1, and at that point the configuration is just wrong.
-        , package text ?
-          builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure ["+integer-simple", "-bytestring-builder"] ]
+        ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
