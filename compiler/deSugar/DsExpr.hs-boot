@@ -1,7 +1,7 @@
 module DsExpr where
 import GHC.Hs      ( HsExpr, LHsExpr, LHsLocalBinds, SyntaxExpr )
 import DsMonad     ( DsM )
-import CoreSyn     ( CoreExpr )
+import GHC.Core    ( CoreExpr )
 import GHC.Hs.Extension ( GhcTc)
 
 dsExpr  :: HsExpr GhcTc -> DsM CoreExpr

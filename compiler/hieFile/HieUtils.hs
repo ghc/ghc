@@ -6,7 +6,7 @@ module HieUtils where
 
 import GhcPrelude
 
-import CoreMap
+import GHC.Core.Map
 import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import IfaceType

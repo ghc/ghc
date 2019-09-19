@@ -64,7 +64,7 @@ import Hoopl.Collections
 import Hoopl.Graph
 import Hoopl.Label
 import CLabel
-import CoreSyn          ( Tickish(..) )
+import GHC.Core          ( Tickish(..) )
 import SrcLoc           ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
 -- The rest:

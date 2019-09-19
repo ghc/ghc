@@ -29,7 +29,7 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Foreign    (emitPrimCall)
 
 import MkGraph
-import CoreSyn          ( AltCon(..), tickishIsCode )
+import GHC.Core          ( AltCon(..), tickishIsCode )
 import BlockId
 import SMRep
 import Cmm

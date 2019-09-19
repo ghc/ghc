@@ -21,7 +21,7 @@ import Bag                        ( Bag, bagToList )
 import BasicTypes
 import BooleanFormula
 import Class                      ( FunDep )
-import CoreUtils                  ( exprType )
+import GHC.Core.Utils             ( exprType )
 import ConLike                    ( conLikeName )
 import Desugar                    ( deSugarExpr )
 import FieldLabel

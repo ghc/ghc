@@ -161,7 +161,7 @@ import Avail
 import Module
 import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
 import FamInstEnv
-import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
+import GHC.Core         ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
 import VarSet

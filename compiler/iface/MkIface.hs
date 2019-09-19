@@ -71,7 +71,7 @@ import FlagChecker
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import Annotations
-import CoreSyn
+import GHC.Core
 import Class
 import TyCon
 import CoAxiom

@@ -29,7 +29,7 @@ import PrelNames
 
 import Id
 import Type
-import MkCore ( mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
 import Name   ( Name )
 import VarEnv ( VarEnv )

@@ -150,7 +150,7 @@ module TcRnTypes(
 import GhcPrelude
 
 import GHC.Hs
-import CoreSyn
+import GHC.Core
 import HscTypes
 import TcEvidence
 import Type

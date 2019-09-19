@@ -54,7 +54,7 @@ import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
 import Maybes
-import CoreMap
+import GHC.Core.Map
 import Unique
 import Util
 import Var
