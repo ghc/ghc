@@ -320,7 +320,7 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if STAGE >= 2
+#if GHC_STAGE >= 2
 -- used by SHARED_GLOBAL_VAR
 import Foreign (Ptr)
 #endif
@@ -5737,7 +5737,7 @@ defaultGlobalDynFlags =
     llvmTargets = panic "v_unsafeGlobalDynFlags: llvmTargets not initialised"
     llvmPasses = panic "v_unsafeGlobalDynFlags: llvmPasses not initialised"
 
-#if STAGE < 2
+#if GHC_STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
 #else
 SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags
