@@ -382,8 +382,6 @@ $tab          { warnTab }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
   "_("         { token ITopenTypedHole }
-  "_$("        / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
-  "_$$("       / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -787,8 +785,6 @@ data Token
 
   -- Typed-holes
   | ITopenTypedHole              -- ^ _(
-  | ITopenTypedHoleEscape        -- ^ _$(
-  | ITopenTypedHoleTyEscape      -- ^ _$$(
 
   deriving Show
 
@@ -2890,19 +2886,18 @@ transitionalAlternativeLayoutWarning msg
    $$ text msg
 
 isALRopen :: Token -> Bool
-isALRopen ITcase                  = True
-isALRopen ITif                    = True
-isALRopen ITthen                  = True
-isALRopen IToparen                = True
-isALRopen ITobrack                = True
-isALRopen ITocurly                = True
+isALRopen ITcase          = True
+isALRopen ITif            = True
+isALRopen ITthen          = True
+isALRopen IToparen        = True
+isALRopen ITobrack        = True
+isALRopen ITocurly        = True
 -- GHC Extensions:
-isALRopen IToubxparen             = True
-isALRopen ITparenEscape           = True
-isALRopen ITparenTyEscape         = True
-isALRopen ITopenTypedHoleEscape   = True
-isALRopen ITopenTypedHoleTyEscape = True
-isALRopen _                       = False
+isALRopen IToubxparen     = True
+isALRopen ITparenEscape   = True
+isALRopen ITparenTyEscape = True
+isALRopen ITopenTypedHole = True
+isALRopen _               = False
 
 isALRclose :: Token -> Bool
 isALRclose ITof     = True

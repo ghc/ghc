@@ -2101,13 +2101,12 @@ hsHoleFSExpr hid fs =
       HsUnboundVar noExtField (TrueExprHole (mkVarOcc ("_(" ++ r ++")" ++ i)))
   where r = maybe "" (show . unpackFS . unLoc) fs
         i = maybe "" (show . unLoc) hid
-        unLoc (L _ i) = i
 
 hsHoleSpliceExpr :: Maybe (Located Int) -> Located (HsSplice GhcPs) -> HsExpr (GhcPass id)
 hsHoleSpliceExpr hid spl =
    HsUnboundVar noExtField $ TrueExprHole $
     mkVarOcc $ "_" ++ (showSDocUnsafe (ppr spl)) ++ i -- Splices are printed as $(...) already
-    where i = maybe "" (show . (\ (L _ i) -> i)) hid
+    where i = maybe "" (show . unLoc) hid
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
