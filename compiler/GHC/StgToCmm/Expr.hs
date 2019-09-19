@@ -51,7 +51,6 @@ import Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
-import Data.Function ( on )
 import Data.List     ( partition )
 
 ------------------------------------------------------------------------
@@ -672,8 +671,6 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                   -- Switch on pointer tag
                   emitSwitch ptag_expr (catchall : ptr) mb_deflt 1 maxpt
                   join_lbl <- newBlockId
-                  --dummy <- newBlockId
-                  --emitOutOfLine dummy (mkBranch join_lbl, infos_scp)
                   emit (mkBranch join_lbl)
                   -- Switch on info table tag
                   emitLabel infos_lbl
