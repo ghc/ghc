@@ -93,9 +93,10 @@ PLATFORM_H = ghc_boot_platform.h
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
-	@echo "#if !defined(__PLATFORM_H__)"                     >> $@
-	@echo "#define __PLATFORM_H__"                           >> $@
-	@echo                                                    >> $@
+	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
+	@echo "#define __PLATFORM_H__"                            >> $@
+	@echo "#define STAGE 1"                                   >> $@
+	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(BUILDPLATFORM)\""  >> $@
 	@echo "#define HostPlatform_NAME   \"$(HOSTPLATFORM)\""   >> $@
 	@echo                                                     >> $@
@@ -128,6 +129,7 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#if !defined(__PLATFORM_H__)"                      >> $@
 	@echo "#define __PLATFORM_H__"                            >> $@
+	@echo "#define STAGE 2"                                   >> $@
 	@echo                                                     >> $@
 	@echo "#define BuildPlatform_NAME  \"$(HOSTPLATFORM)\""   >> $@
 	@echo "#define HostPlatform_NAME   \"$(TARGETPLATFORM)\"" >> $@
@@ -326,11 +328,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif
 
 compiler_stage3_CONFIGURE_OPTS := $(compiler_stage2_CONFIGURE_OPTS)
-
-compiler_stage1_CONFIGURE_OPTS += --ghc-option=-DSTAGE=1
-compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DSTAGE=2
-compiler_stage3_CONFIGURE_OPTS += --ghc-option=-DSTAGE=3
-compiler_stage2_HADDOCK_OPTS += --optghc=-DSTAGE=2
 
 compiler/stage1/package-data.mk : compiler/ghc.mk
 compiler/stage2/package-data.mk : compiler/ghc.mk

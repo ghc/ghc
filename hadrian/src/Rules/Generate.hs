@@ -176,7 +176,8 @@ generateRules = do
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
 
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
-    priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
+    priority 2.0 $ generate (root -/- generatedDir -/- "stage1" -/- "ghcplatform.h") Stage1 generateGhcPlatformH
+    priority 2.0 $ generate (root -/- generatedDir -/- "stage2" -/- "ghcplatform.h") Stage2 generateGhcPlatformH
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
@@ -190,6 +191,8 @@ generateRules = do
   where
     file <~  gen = file %> \out -> generate out emptyTarget gen
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
+    generate file stage gen =
+        file %> \out -> generate out (semiEmptyTarget stage) gen >> makeExecutable out
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
@@ -225,6 +228,7 @@ cppify = replaceEq '-' '_' . replaceEq '.' '_'
 generateGhcPlatformH :: Expr String
 generateGhcPlatformH = do
     trackGenerateHs
+    stage <- getStage
     hostPlatform   <- getSetting HostPlatform
     hostArch       <- getSetting HostArch
     hostOs         <- getSetting HostOs
@@ -237,6 +241,7 @@ generateGhcPlatformH = do
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
+        , "#define STAGE " ++ show (fromEnum stage + 1)
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
         , "#define HostPlatform_TYPE   " ++ cppify targetPlatform
@@ -412,6 +417,7 @@ generateGhcBootPlatformH = do
     return $ unlines
         [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
+        , "#define STAGE " ++ show (fromEnum stage)
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform
