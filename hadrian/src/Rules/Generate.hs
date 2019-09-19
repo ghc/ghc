@@ -368,7 +368,7 @@ generateConfigHs = do
         , "cBooterVersion        = " ++ show cBooterVersion
         , ""
         , "cStage                :: String"
-        , "cStage                = show (STAGE :: Int)"
+        , "cStage                = show (GHC_STAGE :: Int)"
         ]
 
 -- | Generate @ghcautoconf.h@ header.
