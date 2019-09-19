@@ -51,7 +51,7 @@ derivedConstantsFiles =
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
     stage   <- getStage
-    isGmp   <- (== integerGmp) <$> getIntegerPackage
+    isGmp   <- (== "gmp") <$> getBignumBackend
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     gmpPath <- expr gmpBuildPath
     rtsPath <- expr (rtsBuildPath stage)
@@ -312,7 +312,7 @@ generateSettings = do
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
 
-        , ("integer library", pkgName <$> getIntegerPackage)
+        , ("BigNum backend", getBignumBackend)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
