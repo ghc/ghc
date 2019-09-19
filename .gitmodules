@@ -4,7 +4,7 @@
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = https://gitlab.haskell.org/ghc/packages/bytestring.git
+	url = https://gitlab.haskell.org/hsyl20/bytestring.git
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
@@ -68,7 +68,7 @@
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
-	url = https://gitlab.haskell.org/ghc/packages/text.git
+	url = https://gitlab.haskell.org/hsyl20/text.git
 	ignore = untracked
 [submodule "libraries/mtl"]
 	path = libraries/mtl
@@ -105,7 +105,7 @@
 	url = https://gitlab.haskell.org/ghc/libffi-tarballs.git
 	ignore = untracked
 [submodule "gmp-tarballs"]
-	path = libraries/integer-gmp/gmp/gmp-tarballs
+	path = libraries/ghc-bignum/gmp/gmp-tarballs
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
