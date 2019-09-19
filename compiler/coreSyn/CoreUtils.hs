@@ -2568,7 +2568,7 @@ rhsIsStatic platform is_dynamic_name cvt_literal rhs = is_static False rhs
                                               && is_static in_arg e
   is_static in_arg (Cast e _)             = is_static in_arg e
   is_static _      (Coercion {})          = True   -- Behaves just like a literal
-  is_static in_arg (Lit (LitNumber nt i _)) = case cvt_literal nt i of
+  is_static in_arg (Lit (LitNumber nt i)) = case cvt_literal nt i of
     Just e  -> is_static in_arg e
     Nothing -> True
   is_static _      (Lit (LitLabel {}))    = False

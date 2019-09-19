@@ -156,6 +156,12 @@ else
 RUNTEST_OPTS += -e config.have_readelf=False
 endif
 
+ifeq "$(BIGNUM_BACKEND)" "native"
+RUNTEST_OPTS += -e config.have_fast_bignum=False
+else
+RUNTEST_OPTS += -e config.have_fast_bignum=True
+endif
+
 ifeq "$(GhcDynamicByDefault)" "YES"
 RUNTEST_OPTS += -e config.ghc_dynamic_by_default=True
 CABAL_MINIMAL_BUILD = --enable-shared --disable-library-vanilla
