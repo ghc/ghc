@@ -674,8 +674,8 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
             pkg_deps = dep_pkgs deps
             (boot_deps, mod_deps) = partitionWith is_boot (dep_mods deps)
-                    where is_boot (m,True)  = Left m
-                          is_boot (m,False) = Right m
+                    where is_boot (ModuleNameWithIsBoot m True)  = Left m
+                          is_boot (ModuleNameWithIsBoot m False) = Right m
 
             boot_deps' = filter (not . (`elementOfUniqDSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
