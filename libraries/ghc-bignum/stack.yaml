@@ -1,0 +1,7 @@
+resolver: lts-14.6
+
+packages:
+- .
+
+ghc-options:
+   "$locals": -fhide-source-paths -freverse-errors

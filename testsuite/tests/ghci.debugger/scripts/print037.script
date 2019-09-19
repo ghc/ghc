@@ -1,11 +1,8 @@
 -- Test out printing of integers in GHCi
 
--- With @integer-gmp@, small integer literals get converted directly into
--- @S# i#@. This optimization means that small integers are always already
+-- With @ghc-bignum@, small integer literals get converted directly into
+-- @IS i#@. This optimization means that small integers are always already
 -- evaluated in the output for @:p@.
---
--- Since we want this test to work on @integer-simple@ too, we explicitly
--- force the literals.
 
 let smallNeg = -53 :: Integer
 :f smallNeg

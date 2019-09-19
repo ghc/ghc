@@ -3,7 +3,7 @@ module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    exceptions, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh,
+    exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
@@ -33,7 +33,7 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
-    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh
+    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, pretty, process, rts, runGhc, stm, templateHaskell
@@ -63,6 +63,7 @@ filepath            = lib  "filepath"
 genapply            = util "genapply"
 genprimopcode       = util "genprimopcode"
 ghc                 = prg  "ghc-bin"         `setPath` "ghc"
+ghcBignum           = lib  "ghc-bignum"
 ghcBoot             = lib  "ghc-boot"
 ghcBootTh           = lib  "ghc-boot-th"
 ghcCompact          = lib  "ghc-compact"
