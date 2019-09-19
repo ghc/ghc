@@ -19,9 +19,9 @@ import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePatVar )
 
 import GHC.Hs
-import MkCore
-import CoreSyn
-import CoreUtils (bindNonRec)
+import GHC.Core.Make
+import GHC.Core
+import GHC.Core.Utils (bindNonRec)
 
 import BasicTypes (Origin(FromSource))
 import DynFlags

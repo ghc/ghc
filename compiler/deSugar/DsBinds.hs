@@ -32,14 +32,14 @@ import DsUtils
 import Check ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
 import GHC.Hs           -- lots of things
-import CoreSyn          -- lots of things
-import CoreOpt          ( simpleOptExpr )
-import OccurAnal        ( occurAnalyseExpr )
-import MkCore
-import CoreUtils
-import CoreArity ( etaExpand )
-import CoreUnfold
-import CoreFVs
+import GHC.Core         -- lots of things
+import GHC.Core.SimpleOpt ( simpleOptExpr )
+import GHC.Core.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.Make
+import GHC.Core.Utils
+import GHC.Core.Arity ( etaExpand )
+import GHC.Core.Unfold
+import GHC.Core.FVs
 import Digraph
 
 import PrelNames
@@ -53,7 +53,7 @@ import Id
 import MkId(proxyHashId)
 import Name
 import VarSet
-import Rules
+import GHC.Core.Rules
 import VarEnv
 import Var( EvVar )
 import Outputable
@@ -429,7 +429,7 @@ thereby be completely lost.  Bad, bad, bad.
 Instead we want to generate
         M.f = ...f_lcl...
         f_lcl = M.f
-Now all is cool. The RULES are attached to M.f (by SimplCore),
+Now all is cool. The RULES are attached to M.f (by GHC.Core.Simplifier),
 and f_lcl is rapidly inlined away.
 
 This does not happen in the same way to polymorphic binds,
@@ -739,7 +739,7 @@ dsSpec mb_poly_rhs (dL->L loc (SpecPrag poly_id spec_co spec_inl))
     -- See Note [Activation pragmas for SPECIALISE]
     inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
              | not is_local_id  -- See Note [Specialising imported functions]
-                                 -- in OccurAnal
+                                 -- in GHC.Core.OccurAnal
              , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
              | otherwise                               = id_inl
      -- Get the INLINE pragma from SPECIALISE declaration, or,
@@ -1161,7 +1161,7 @@ dsEvBinds bs
 
 mk_ev_binds :: Bag (Id,CoreExpr) -> [CoreBind]
 -- We do SCC analysis of the evidence bindings, /after/ desugaring
--- them. This is convenient: it means we can use the CoreSyn
+-- them. This is convenient: it means we can use the GHC.Core
 -- free-variable functions rather than having to do accurate free vars
 -- for EvTerm.
 mk_ev_binds ds_binds

@@ -20,11 +20,11 @@ module DsCCall
 
 import GhcPrelude
 
-import CoreSyn
+import GHC.Core
 
 import DsMonad
-import CoreUtils
-import MkCore
+import GHC.Core.Utils
+import GHC.Core.Make
 import MkId
 import ForeignCall
 import DataCon

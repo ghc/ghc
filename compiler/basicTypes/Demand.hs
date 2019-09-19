@@ -862,7 +862,7 @@ Bottom line: we really don't want to have a binder whose demand is more
 deeply-nested than its type.  There are various ways to tackle this.
 When processing (x |> g1), we could "trim" the incoming demand U(U,U)
 to match x's type.  But I'm currently doing so just at the moment when
-we pin a demand on a binder, in DmdAnal.findBndrDmd.
+we pin a demand on a binder, in GHC.Core.DmdAnal.findBndrDmd.
 
 
 Note [Threshold demands]
@@ -1131,7 +1131,7 @@ We
 3 and 4 are implementd in bothDmdResult.
 -}
 
--- Equality needed for fixpoints in DmdAnal
+-- Equality needed for fixpoints in GHC.Core.DmdAnal
 instance Eq DmdType where
   (==) (DmdType fv1 ds1 res1)
        (DmdType fv2 ds2 res2) = nonDetUFMToList fv1 == nonDetUFMToList fv2
@@ -1256,7 +1256,7 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 -- * We can keep usage information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
--- See Note [IO hack in the demand analyser] in DmdAnal
+-- See Note [IO hack in the demand analyser] in GHC.Core.DmdAnal
 deferAfterIO :: DmdType -> DmdType
 deferAfterIO d@(DmdType _ _ res) =
     case d `lubDmdType` nopDmdType of
@@ -1616,7 +1616,7 @@ Here comes the subtle part: The threshold is encoded in the wrapped demand
 type's depth! So in mkStrictSigForArity we make sure to trim the list of
 argument demands to the given threshold arity. Call sites will make sure that
 this corresponds to the arity of the call demand that elicited the wrapped
-demand type. See also Note [What are demand signatures?] in DmdAnal.
+demand type. See also Note [What are demand signatures?] in GHC.Core.DmdAnal.
 
 Besides trimming argument demands, mkStrictSigForArity will also trim CPR
 information if necessary.
@@ -1820,7 +1820,7 @@ where f has usage signature
 Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
-binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
+binders \pqr and \xyz; see Note [Use one-shot information] in GHC.Core.OccurAnal.
 -}
 
 -- | Returns true if an application to n args

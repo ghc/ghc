@@ -127,7 +127,7 @@ import DynFlags
 import GHC.Platform
 import UniqSet
 import Util
-import PprCore ( {- instances -} )
+import GHC.Core.Pretty ( {- instances -} )
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type

@@ -31,7 +31,7 @@ import GHC.Hs.Binds
 
 -- others:
 import TcEvidence
-import CoreSyn
+import GHC.Core
 import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
 import NameSet
