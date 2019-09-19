@@ -241,7 +241,7 @@ generateGhcPlatformH = do
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
-        , "#define STAGE " ++ show (fromEnum stage + 1)
+        , "#define GHC_STAGE " ++ show (fromEnum stage + 1)
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
         , "#define HostPlatform_TYPE   " ++ cppify targetPlatform
@@ -371,7 +371,7 @@ generateConfigHs = do
         , "cBooterVersion        = " ++ show cBooterVersion
         , ""
         , "cStage                :: String"
-        , "cStage                = show (STAGE :: Int)"
+        , "cStage                = show (GHC_STAGE :: Int)"
         ]
 
 -- | Generate @ghcautoconf.h@ header.
@@ -417,7 +417,7 @@ generateGhcBootPlatformH = do
     return $ unlines
         [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
-        , "#define STAGE " ++ show (fromEnum stage)
+        , "#define GHC_STAGE " ++ show (fromEnum stage)
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform
