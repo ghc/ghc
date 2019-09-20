@@ -47,6 +47,9 @@ import Data.Semigroup (Semigroup((<>)))
 --------------------------------------------------------------------------------
 
 -- | A free variables traversal that checks whether the free variable set is empty.
+--
+-- Note that this does *not* account for variables free in the type/kind of
+-- variable occurrences.
 newtype NoFVs = NoFVs (VarSet -> Bool)
 
 instance Monoid NoFVs where
@@ -75,6 +78,9 @@ noFVs (NoFVs f) = f emptyVarSet
 --------------------------------------------------------------------------------
 
 -- | A free variables traversal that produces a non-deterministic 'TyCoVarSet'.
+--
+-- As described in Note [Closing over free variables kinds] this closes over
+-- the free variables of type variables' kinds.
 newtype NonDetFV = NonDetFV { runNonDetFV :: TyCoVarSet -> TyCoVarSet -> TyCoVarSet }
 
 instance Monoid NonDetFV where
@@ -105,8 +111,8 @@ nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
 -- Non-deterministic free coercion variable sets
 --------------------------------------------------------------------------------
 
--- | A free variables (restricted to coercion variables) traversal that
--- produces a non-deterministic 'CoVarSet'.
+-- | A free coercion variables traversal that produces a non-deterministic
+-- 'CoVarSet'.
 newtype NonDetCoFV = NonDetCoFV { runNonDetCoFV :: CoVarSet -> CoVarSet -> CoVarSet }
 
 instance Monoid NonDetCoFV where
@@ -146,6 +152,9 @@ emptyFVAccum :: FVAccum
 emptyFVAccum = FVAccum [] emptyVarSet
 
 -- | A free variables traversal that produces a deterministic 'DVarSet
+--
+-- As described in Note [Closing over free variables kinds] this closes over
+-- the free variables of type variables' kinds.
 newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> FVAccum -> FVAccum }
 
 instance Monoid FV where
