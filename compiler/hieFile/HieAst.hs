@@ -1021,7 +1021,7 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      XExpr x -> xfunc x
+      XExpr x -> toHie x
 
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)
