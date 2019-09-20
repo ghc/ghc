@@ -70,6 +70,7 @@ import NameSet
 import UniqSet
 import Unique (Uniquable (..))
 import Name
+import VarEnv
 import VarSet
 import Var
 import Type
