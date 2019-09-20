@@ -1002,8 +1002,20 @@ addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x =
     then pure delta
     else do
       vi  <- lift (initLookupVarInfo delta x)
-      vi' <- MaybeT (ensureInhabited delta vi)
+      vi' <- case splitTyConApp_maybe (vi_ty vi) of
+        Just (tc,_)
+          | lookupRecTc (delta_rec_tc delta) tc >= 1
+          , isAlgTyCon tc
+          -- not inhabited by inductive reasoning! If it was, some other
+          -- constructor would be inhabited.
+          -> mzero
+          | Just rec_tc' <- checkRecTc (delta_rec_tc delta) tc
+          -> MaybeT (ensureInhabited delta{ delta_rec_tc = rec_tc' } vi)
+        -- We ran out of fuel or it's not a TyCon app. Just assume it's
+        -- inhabited
+        _ -> pure vi
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') }
+
 
 {- Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

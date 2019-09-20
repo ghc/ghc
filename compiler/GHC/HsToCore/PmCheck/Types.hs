@@ -456,7 +456,7 @@ data VarInfo
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
 
-  , vi_pos :: [(PmAltCon, [Id])]
+  , vi_pos :: ![(PmAltCon, [Id])]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
   -- pattern matches involving pattern synonym
@@ -514,12 +514,20 @@ initTyState = TySt emptyBag
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints.
-data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
-                     , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
+data Delta
+  = MkDelta
+  { delta_ty_st  :: !TyState
+  -- ^ Type oracle; things like a~Int
+  , delta_tm_st  :: !TmState
+  -- ^ Term oracle; things like x~Nothing
+  , delta_rec_tc :: !RecTcChecker
+  -- ^ Only important for checking non-void constraints on recursive data types,
+  -- where we want to give up after a number of recursions.
+  }
 
 -- | An initial delta that is always satisfiable
 initDelta :: Delta
-initDelta = MkDelta initTyState initTmState
+initDelta = MkDelta initTyState initTmState (setRecTcMaxBound 1 initRecTc)
 
 instance Outputable Delta where
   ppr delta = vcat [
