@@ -14,7 +14,7 @@ import GhcPrelude
 
 import CoreSubst
 import Var              ( Var )
-import VarEnv           ( elemInScopeSet, mkInScopeSet )
+import VarEnv           ( elemInScopeSet )
 import Id               ( Id, idType, isDeadBinder
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
@@ -22,7 +22,7 @@ import Id               ( Id, idType, isDeadBinder
 import CoreUtils        ( mkAltExpr, eqExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
-import CoreFVs          ( exprFreeVars )
+import CoreFVs          ( mkExprInScopeSet )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable

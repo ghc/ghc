@@ -34,7 +34,7 @@ import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
 import CoreOpt          ( exprIsLambda_maybe )
-import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
+import CoreFVs          ( mkExprInScopeSet, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE,
