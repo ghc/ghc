@@ -1,0 +1,12 @@
+
+B2.hs:3:1: error:
+    Parse error: module header, import declaration
+    or top-level declaration expected.
+-fkeep-going in use, removing the following dependencies and continuing:
+      B1
+      B
+      A
+
+D.hs:3:1: error:
+    Parse error: module header, import declaration
+    or top-level declaration expected.

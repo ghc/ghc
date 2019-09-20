@@ -1041,6 +1041,18 @@ messages and in GHCi:
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
 
+.. ghc-flag:: -fkeep-going
+    :shortdesc: Continue compilation as far as possible on errors
+    :type: dynamic
+    :category: verbosity
+
+    :since: 8.10.1
+
+    Causes GHC to continue the compilation if a module has an error.
+    Any reverse dependencies are pruned immediately and the whole
+    compilation is still flagged as an error.  This option has no
+    effect if parallel compilation (:ghc-flag:`-j[⟨n⟩]`) is in use.
+
 .. ghc-flag:: -freverse-errors
     :shortdesc: Output errors in reverse order
     :type: dynamic
