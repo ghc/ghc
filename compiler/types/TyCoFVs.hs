@@ -57,10 +57,10 @@ import Data.Semigroup ((<>))
 The family of functions tyCoVarsOfType, tyCoVarsOfTypes etc, returns
 a VarSet that is closed over the types of its variables.  More precisely,
   if    S = tyCoVarsOfType( t )
-  and   (a:k) is in S
+  and   (a::k) is in S
   then  tyCoVarsOftype( k ) is a subset of S
 
-Example: The tyCoVars of this ((a:* -> k) Int) is {a, k}.
+Example: The tyCoVars of this (((a::Type) -> k) Int) is {a, k}.
 
 We could /not/ close over the kinds of the variable occurrences, and
 instead do so at call sites, but it seems that we always want to do
@@ -74,7 +74,7 @@ so we profiled several versions, exploring different implementation strategies.
    tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 
    This is not nice, because FV introduces some overhead to implement
-   determinism, and throught its "interesting var" function, neither of which
+   determinism, and through its "interesting var" function, neither of which
    we need here, so they are a complete waste.
 
 2. UnionVarSet version: instead of reusing the FV-based code, we simply used
