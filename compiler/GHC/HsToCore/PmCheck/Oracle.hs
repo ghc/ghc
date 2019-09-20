@@ -1005,7 +1005,7 @@ addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x =
       vi' <- case splitTyConApp_maybe (vi_ty vi) of
         Just (tc,_)
           | lookupRecTc (delta_rec_tc delta) tc >= 1
-          , isAlgTyCon tc
+          , isVanillaAlgTyCon tc
           -- not inhabited by inductive reasoning! If it was, some other
           -- constructor would be inhabited.
           -> mzero
