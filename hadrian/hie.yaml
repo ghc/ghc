@@ -1,0 +1,5 @@
+# This is a IDE configuration file which tells IDEs such as `ghcide` how
+# to set up a GHC API session for this project.
+#
+# The format is documented here - https://github.com/mpickering/hie-bios
+cradle: {cabal: {component: "exe:hadrian"}}
