@@ -350,7 +350,9 @@ checkValidType ctxt ty
                     -- So we do this check here.
 
                  FunSigCtxt {}  -> rank1
-                 InfSigCtxt _   -> ArbitraryRank        -- Inferred type
+                 InfSigCtxt {}  -> rank1 -- Inferred types should obey the
+                                         -- same rules as declared ones
+
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
                  PatSynCtxt _   -> rank1
@@ -668,7 +670,7 @@ check_type ve (CastTy ty _) = check_type ve ty
 check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
-  = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
+  = do  { traceTc "check_type" (ppr ty $$ ppr rank)
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message

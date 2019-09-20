@@ -1,0 +1,6 @@
+
+T17213.hs:5:1: error:
+    • Illegal polymorphic type: forall a. a -> a
+      Perhaps you intended to use RankNTypes
+    • When checking the inferred type
+        g :: (forall a. a -> a) -> Int
