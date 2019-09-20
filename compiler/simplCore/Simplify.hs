@@ -1379,17 +1379,13 @@ simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
   | isSimplified dup  -- Don't re-simplify if we've simplified it once
                       -- See Note [Avoiding exponential behaviour]
   = do  { tick (BetaReduction bndr)
-        ; (floats1, env') <- simplNonRecX env zapped_bndr arg
+        ; (floats1, env') <- simplNonRecX env bndr arg
         ; (floats2, expr') <- simplLam env' bndrs body cont
         ; return (floats1 `addFloats` floats2, expr') }
 
   | otherwise
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env zapped_bndr (arg, arg_se) (bndrs, body) cont }
-  where
-    zapped_bndr  -- See Note [Zap unfolding when beta-reducing]
-      | isId bndr = zapStableUnfolding bndr
-      | otherwise = bndr
+        ; simplNonRecE env bndr (arg, arg_se) (bndrs, body) cont }
 
       -- Discard a non-counting tick on a lambda.  This may change the
       -- cost attribution slightly (moving the allocation of the
@@ -1529,19 +1525,6 @@ simplify BIG True; maybe good things happen.  That is why
     - In rebuildCall we avoid simplifying arguments before we have to
       (see Note [Trying rewrite rules])
 
-
-Note [Zap unfolding when beta-reducing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Lambda-bound variables can have stable unfoldings, such as
-   $j = \x. \b{Unf=Just x}. e
-See Note [Case binders and join points] below; the unfolding for lets
-us optimise e better.  However when we beta-reduce it we want to
-revert to using the actual value, otherwise we can end up in the
-stupid situation of
-          let x = blah in
-          let b{Unf=Just x} = y
-          in ...b...
-Here it'd be far better to drop the unfolding and use the actual RHS.
 
 ************************************************************************
 *                                                                      *
@@ -3182,25 +3165,21 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
   | otherwise
   = do  { let rhs_ty'  = exprType rhs'
               scrut_ty = idType case_bndr
-              case_bndr_w_unf
-                = case con of
-                      DEFAULT    -> case_bndr
-                      DataAlt dc -> setIdUnfolding case_bndr unf
-                          where
-                                 -- See Note [Case binders and join points]
-                             unf = mkInlineUnfolding rhs
-                             rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
-
-                      LitAlt {} -> WARN( True, text "mkDupableAlt"
+              (final_bndrs', rhs'')
+                | isDeadBinder case_bndr = (filter abstract_over bndrs', rhs')
+                | otherwise = case con of
+                      DEFAULT    -> ([case_bndr], rhs')
+                      DataAlt dc -> (bndrs', mkLet (NonRec
+                                            case_bndr
+                                            (mkConApp2 dc (tyConAppArgs scrut_ty) bndrs')
+                                          ) rhs')
+                      LitAlt {}  -> WARN( True, text "mkDupableAlt"
                                                 <+> ppr case_bndr <+> ppr con )
-                                   case_bndr
+                                    ([case_bndr], rhs')
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
 
-              final_bndrs'
-                | isDeadBinder case_bndr = filter abstract_over bndrs'
-                | otherwise              = bndrs' ++ [case_bndr_w_unf]
-
+              -- See Note [Case binders and join points]
               abstract_over bndr
                   | isTyVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
@@ -3215,7 +3194,7 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
               really_final_bndrs     = map one_shot final_bndrs'
               one_shot v | isId v    = setOneShotLambda v
                          | otherwise = v
-              join_rhs   = mkLams really_final_bndrs rhs'
+              join_rhs   = mkLams really_final_bndrs rhs''
 
         ; join_bndr <- newJoinId final_bndrs' rhs_ty'
 
@@ -3275,29 +3254,20 @@ we won't see that 'c' has already been scrutinised.  This actually
 happens in the 'tabulate' function in wave4main, and makes a significant
 difference to allocation.
 
-An alternative plan is this:
+Instead, we pass 'c#' and reconstruct 'c' inside the join point:
 
    $j = \c# -> let c = I# c# in ...c....
 
-but that is bad if 'c' is *not* later scrutinised.
+If 'c' is not used at all, we don't create the let binding.
 
-So instead we do both: we pass 'c' and 'c#' , and record in c's inlining
-(a stable unfolding) that it's really I# c#, thus
+Previously we were passing both 'c' and 'c#', and recording
+in c's inlining (a stable unfolding) that it's really I# c#, thus
 
    $j = \c# -> \c[=I# c#] -> ...c....
 
-Absence analysis may later discard 'c'.
-
-NB: take great care when doing strictness analysis;
-    see Note [Lambda-bound unfoldings] in DmdAnal.
-
-Also note that we can still end up passing stuff that isn't used.  Before
-strictness analysis we have
-   let $j x y c{=(x,y)} = (h c, ...)
-   in ...
-After strictness analysis we see that h is strict, we end up with
-   let $j x y c{=(x,y)} = ($wh x y, ...)
-and c is unused.
+This avoided extra reboxing and made sure that case-of-known
+constructor fired on c. However, stable unfoldings on lambda-bound
+variables caused problems elsewhere, as described in #17530.
 
 Note [Duplicated env]
 ~~~~~~~~~~~~~~~~~~~~~
