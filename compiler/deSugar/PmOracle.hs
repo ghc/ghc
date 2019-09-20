@@ -46,6 +46,7 @@ import UniqDFM
 import Var           (EvVar)
 import Name
 import CoreSyn
+import CoreFVs ( exprFreeVars )
 import CoreOpt (exprIsConApp_maybe)
 import CoreUtils (exprType)
 import MkCore (mkListExpr, mkCharExpr)
@@ -1670,7 +1671,7 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
       | Just (_in_scope, _empty_floats@[], dc, _arg_tys, args)
-            <- exprIsConApp_maybe empty_in_scope e
+            <- exprIsConApp_maybe in_scope_env e
       = do { arg_ids <- traverse bind_expr args
            ; data_con_app x dc arg_ids }
       -- TODO: Think about how to recognize PatSyns
@@ -1680,8 +1681,13 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
       = pure ()
       where
-        empty_in_scope = (emptyInScopeSet, const NoUnfolding)
-        expr_ty = exprType e
+        expr_ty       = exprType e
+        expr_in_scope = mkInScopeSet (exprFreeVars e)
+        in_scope_env  = (expr_in_scope, const NoUnfolding)
+        -- It's inconvenient to get hold of a global in-scope set
+        -- here, but it'll only be needed if exprIsConApp_maybe ends
+        -- up substituting inside a forall or lambda (i.e. seldom)
+        -- so using exprFreeVars seems fine.   See MR !1647.
 
         bind_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
         bind_expr e = do
