@@ -14,7 +14,7 @@ module TyCoFVs
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
-        typeFVs,
+        typeFVs, coFVs,
         almostDevoidCoVarOfCo,
         injectiveVarsOfType, injectiveVarsOfTypes,
 
