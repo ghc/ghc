@@ -653,6 +653,7 @@ data GeneralFlag
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
    | Opt_KeepCAFs
+   | Opt_KeepGoing
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -4206,6 +4207,7 @@ fFlagsDeps = [
   flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
   flagSpec "irrefutable-tuples"               Opt_IrrefutableTuples,
+  flagSpec "keep-going"                       Opt_KeepGoing,
   flagSpec "kill-absence"                     Opt_KillAbsence,
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
