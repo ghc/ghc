@@ -33,7 +33,10 @@
    https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx.
    Anything else such as raw device paths we leave untouched.  The main benefit
    of doing any of this is that we can break the MAX_PATH restriction and also
-   access raw handles that we couldn't before.  */
+   access raw handles that we couldn't before.
+
+   The resulting string is dynamically allocated and so callers are expected to
+   free this string.  */
 wchar_t* FS(create_device_name) (const wchar_t* filename) {
   const wchar_t* win32_dev_namespace  = L"\\\\.\\";
   const wchar_t* win32_file_namespace = L"\\\\?\\";
@@ -64,6 +67,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
   if (nResult > 1)
     {
       temp = _wcsdup (result);
+      free (result);
       result = malloc (nResult * sizeof (wchar_t));
       if (GetLongPathNameW (temp, result, nResult) == 0)
         {
@@ -77,6 +81,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
      Win32 will no longer resolve them.  */
   nResult = GetFullPathNameW (result, 0, NULL, NULL) + 1;
   temp = _wcsdup (result);
+  free (result);
   result = malloc (nResult * sizeof (wchar_t));
   if (GetFullPathNameW (temp, nResult, result, NULL) == 0)
     {
@@ -101,6 +106,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
   /* Create new string.  */
   int bLen = wcslen (result) + wcslen (ns) + 1;
   temp = _wcsdup (result);
+  free (result);
   result = malloc (bLen * sizeof (wchar_t));
   if (swprintf (result, bLen, L"%ls%ls", ns, temp) <= 0)
     {
@@ -118,6 +124,9 @@ cleanup:
 }
 
 static int setErrNoFromWin32Error (void);
+/* Sets errno to the right error value and returns -1 to indicate the failure.
+   This function should only be called when the creation of the fd actually
+   failed and you want to return -1 for the fd.  */
 static
 int setErrNoFromWin32Error () {
   switch (GetLastError()) {
@@ -137,13 +146,13 @@ int setErrNoFromWin32Error () {
       break;
     case ERROR_NOT_ENOUGH_MEMORY:
     case ERROR_OUTOFMEMORY:
-      return ENOMEM;
+      errno = ENOMEM;
       break;
     case ERROR_INVALID_HANDLE:
-      return EBADF;
+      errno = EBADF;
       break;
     case ERROR_INVALID_FUNCTION:
-      return EFAULT;
+      errno = EFAULT;
       break;
     default:
       errno = EINVAL;
@@ -414,6 +423,11 @@ static __time64_t ftToPosix(FILETIME ft)
   date.LowPart = ft.dwLowDateTime;
 
   // 100-nanoseconds = milliseconds * 10000
+  /* A UNIX timestamp contains the number of seconds from Jan 1, 1970, while the
+     FILETIME documentation says: Contains a 64-bit value representing the
+     number of 100-nanosecond intervals since January 1, 1601 (UTC).
+
+     Between Jan 1, 1601 and Jan 1, 1970 there are 11644473600 seconds */
   adjust.QuadPart = 11644473600000 * 10000;
 
   // removes the diff between 1970 and 1601
