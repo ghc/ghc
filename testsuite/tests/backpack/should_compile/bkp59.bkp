@@ -1,0 +1,38 @@
+-- default method, backpack
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeApplications #-}
+unit common where
+  module Class where
+    class Show (T x) => C x where
+      type T x
+      type T x = ()
+      def :: T x
+    class D x where
+unit consumer-abs where
+  dependency common
+  signature Instance where
+    import Class
+    data I = I Int
+    instance C I where
+      --type T I = ()
+  module Downstream where
+    import Class
+    import Instance
+    asdf :: C I => String
+    asdf = show $ def @I
+unit consumer-impl where
+  dependency common
+  module Impl where
+    import Class
+    data I = I Int
+    instance C I where
+      type T I = ()
+      def = ()
+unit tie where
+  dependency consumer-impl
+  dependency consumer-abs[Instance=consumer-impl:Impl]
+  module Tie where
+    import Downstream
+    main = print asdf

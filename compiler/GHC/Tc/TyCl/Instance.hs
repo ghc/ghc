@@ -512,9 +512,18 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
+                    ; is_boot <- tcIsHsBootOrSig
+                    ; let atItems = classATItems clas
                     ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
-                                        (classATItems clas)
-
+                                        (if is_boot then [] else atItems)
+                      -- Don't default type family instances, but rather omit, in hsig/hs-boot.
+                      -- Since hsig/hs-boot files are essentially large binders we want omission
+                      -- of the definition to result in no restriction, rather than for example
+                      -- attempting to "pattern match" with the invisible defaults and generate
+                      -- equalities. Without further handling, this would just result in a panic
+                      -- anyway.
+                      -- See https://github.com/ghc-proposals/ghc-proposals/pull/320 for
+                      -- additional discussion.
                     ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
 
 
@@ -539,8 +548,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               all_insts                      = tyfam_insts ++ datafam_insts
 
          -- In hs-boot files there should be no bindings
-        ; is_boot <- tcIsHsBootOrSig
         ; let no_binds = isEmptyLHsBinds binds && null uprags
+        ; is_boot <- tcIsHsBootOrSig
         ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
         ; return ( [inst_info], all_insts, deriv_infos ) }
