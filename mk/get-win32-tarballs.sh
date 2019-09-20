@@ -262,6 +262,10 @@ case $1 in
         show_hashes_for_binaries
         exit 1
         ;;
+    # This routine will download the latest ghc-jailbreak and unpack binutils and
+    # the ghc tarballs and patches every .exe in each.  Along with this is copies
+    # two dlls in every folder that it patches a .exe in.  Afterwards it re-creates
+    # the tarballs and generates a new signature file.
     patch)
         export -f patch_tarball
         export -f patch_single_file
