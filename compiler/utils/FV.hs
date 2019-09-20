@@ -241,7 +241,7 @@ delFVs vars (FV fv) = FV $ \fv_cand !in_scope acc ->
 mapUnionFV :: (a -> FV) -> [a] -> FV
 mapUnionFV = foldMap
 
-unionFV :: FV -> FV -> FV
+unionFV :: FVM fv => fv -> fv -> fv
 unionFV = (<>)
 
 mkFVs :: [Var] -> FV
