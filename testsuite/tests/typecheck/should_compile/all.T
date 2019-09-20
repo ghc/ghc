@@ -719,3 +719,5 @@ test('T17775-viewpats-c', normal, compile_fail, [''])
 test('T17775-viewpats-d', normal, compile_fail, [''])
 test('T18412', normal, compile, [''])
 test('T18470', normal, compile, [''])
+
+test('ClassDefaultInHsBoot', [extra_files(['ClassDefaultInHsBootA1.hs','ClassDefaultInHsBootA2.hs','ClassDefaultInHsBootA2.hs-boot','ClassDefaultInHsBootA3.hs'])], multimod_compile, ['ClassDefaultInHsBoot', '-v0'])
