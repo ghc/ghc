@@ -117,7 +117,7 @@ mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ exprFVs e
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
 -- for why export it.
 exprFVs :: CoreExpr -> FV
-exprFVs = filterFV isLocalVar . expr_fvs
+exprFVs = runLocalFV . expr_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
@@ -171,8 +171,8 @@ exprsFreeVarsList = fvVarList . exprsFVs
 
 -- | Find all locally defined free Ids in a binding group
 bindFreeVars :: CoreBind -> VarSet
-bindFreeVars (NonRec b r) = fvVarSet $ filterFV isLocalVar $ rhs_fvs (b,r)
-bindFreeVars (Rec prs)    = fvVarSet $ filterFV isLocalVar $
+bindFreeVars (NonRec b r) = localFvVarSet $ rhs_fvs (b,r)
+bindFreeVars (Rec prs)    = localFvVarSet $
                                 addBndrs (map fst prs)
                                      (mapUnionFV rhs_fvs prs)
 
@@ -442,7 +442,7 @@ orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs })
-  = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
+  = localFvVarSet $ addBndrs bndrs (expr_fvs rhs)
       -- See Note [Rule free var hack]
 
 -- | Those variables free in the both the left right hand sides of a rule
@@ -482,7 +482,7 @@ idRuleRhsVars is_active id
       = delOneFromUniqSet_Directly fvs (getUnique fn)
             -- Note [Rule free var hack]
       where
-        fvs = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
+        fvs = localFvVarSet $ addBndrs bndrs (expr_fvs rhs)
     get_fvs _ = noFVs
 
 -- | Those variables free in the right hand side of several rules

@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module FV
   ( -- | An abstraction over free variable computations
@@ -27,6 +29,14 @@ module FV
     -- * Non-deterministic free coercion variable computation
   , NonDetCoFV
   , nonDetCoFVSet
+    -- * Filtered free variable computations
+  , FilteredFV
+    -- ** Filtered to local variables
+  , LocalFV
+  , runLocalFV
+  , LocalNonDetFV
+  , runLocalNonDetFV
+  , localFvVarSet
   ) where
 
 import GhcPrelude
@@ -39,6 +49,7 @@ import {-# SOURCE #-} TyCoFVs (typeFVs)
 import Var
 import VarSet
 
+import Data.Proxy
 import Data.Semigroup (Semigroup((<>)))
 
 
@@ -235,3 +246,46 @@ unionFV = (<>)
 
 mkFVs :: [Var] -> FV
 mkFVs = foldMap unitFV
+
+--------------------------------------------------------------------------------
+-- Filtered free variable sets
+--------------------------------------------------------------------------------
+
+-- | A free variable traversal filtered by a statically known "is interesting"
+-- predicate (namely 'fvIsInteresting').
+newtype FilteredFV pred fv = FilteredFV { runFilteredFV :: fv }
+                          deriving (Monoid, Semigroup)
+
+class FVFilterPred pred where
+  fvIsInteresting :: Proxy pred -> InterestingVarFun
+
+instance (FVM fv, Monoid fv, FVFilterPred pred) => FVM (FilteredFV pred fv) where
+  coholeFV = FilteredFV . coholeFV
+  unitFV v
+    | fvIsInteresting proxy v = FilteredFV (unitFV v)
+    | otherwise = mempty
+    where proxy = Proxy :: Proxy pred
+  bindVar v fv = FilteredFV (bindVar v (runFilteredFV fv))
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+-- | A 'FVFilterPred' selecting locally defined 'Id's and 'TyVar's.
+data LocalVars
+
+instance FVFilterPred LocalVars where
+  fvIsInteresting _ = isLocalVar
+
+
+type LocalFV = FilteredFV LocalVars FV
+type LocalNonDetFV = FilteredFV LocalVars NonDetFV
+
+runLocalFV :: LocalFV -> FV
+runLocalFV = runFilteredFV
+
+runLocalNonDetFV :: LocalNonDetFV -> NonDetFV
+runLocalNonDetFV = runFilteredFV
+
+localFvVarSet :: LocalNonDetFV -> VarSet
+localFvVarSet = nonDetFVSet . runFilteredFV
