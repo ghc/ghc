@@ -166,11 +166,11 @@ test-suite spec
     Haddock.Backends.Hyperlinker.Types
 
   build-depends: ghc             ^>= 8.8
-               , ghc-paths       ^>= 0.1.0.9
+               , ghc-paths       ^>= 0.1.0.12
                , haddock-library ^>= 1.8.0
                , xhtml           ^>= 3000.2.2
-               , hspec           >= 2.4.4 && < 2.7
-               , QuickCheck      >= 2.11  && < 2.13
+               , hspec           >= 2.4.4 && < 2.8
+               , QuickCheck      >= 2.11  && < 2.14
 
   -- Versions for the dependencies below are transitively pinned by
   -- the non-reinstallable `ghc` package and hence need no version
@@ -186,7 +186,7 @@ test-suite spec
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover >= 2.4.4 && < 2.7
+    hspec-discover:hspec-discover >= 2.4.4 && < 2.8
 
 source-repository head
   type:     git
