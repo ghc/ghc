@@ -487,6 +487,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
         ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
 
+        ; is_boot <- tcIsHsBootOrSig
+
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)
              <- tcExtendNameTyVarEnv tv_skol_prs $
@@ -501,7 +503,12 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
                     ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
-                                        (classATItems clas)
+                      -- Don't default type family instances, but rather omit,
+                      -- in hsig/hs-boot. There's no way to opt out of this, and
+                      -- it's meaningful restriction on possible instantiations,
+                      -- unlike default methods. Plus, type families sneaking in
+                      -- like this breaks the current implementation.
+                                        (if is_boot then [] else classATItems clas)
 
                     ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
 
@@ -527,7 +534,6 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               all_insts                      = tyfam_insts ++ datafam_insts
 
          -- In hs-boot files there should be no bindings
-        ; is_boot <- tcIsHsBootOrSig
         ; let no_binds = isEmptyLHsBinds binds && null uprags
         ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
