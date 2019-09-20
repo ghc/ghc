@@ -629,9 +629,8 @@ addTickHsExpr (HsProc x pat cmdtop) =
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
 addTickHsExpr (XExpr (HsHipHop w e)) =
-        liftM2 (\w' -> XExpr . HsHipHop w')
-                (return w)
-                (addTickHsExpr e)       -- Explicitly no tick on inside
+  -- Explicitly no tick on inside
+  XExpr . HsHipHop w <$> addTickHsExpr e
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
