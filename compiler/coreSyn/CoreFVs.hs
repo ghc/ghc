@@ -174,7 +174,7 @@ bindFreeVars :: CoreBind -> VarSet
 bindFreeVars (NonRec b r) = localFvVarSet $ rhs_fvs (b,r)
 bindFreeVars (Rec prs)    = localFvVarSet $
                                 addBndrs (map fst prs)
-                                     (mapUnionFV rhs_fvs prs)
+                                     (foldMap rhs_fvs prs)
 
 -- | Finds free variables in an expression selected by a predicate
 exprSomeFreeVars :: InterestingVarFun   -- ^ Says which 'Var's are interesting
@@ -247,28 +247,27 @@ exprsSomeFreeVarsDSet fv_cand e =
 --                          | otherwise                    = set
 --      SLPJ Feb06
 
-addBndr :: CoreBndr -> FV -> FV
+addBndr :: FVM fv => CoreBndr -> fv -> fv
 addBndr bndr fv
-  = varTypeTyCoFVs bndr `unionFV` bindVar bndr fv
+  = typeFVs (varType bndr) `unionFV` bindVar bndr fv
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
 
-addBndrs :: [CoreBndr] -> FV -> FV
+addBndrs :: FVM fv => [CoreBndr] -> fv -> fv
 addBndrs bndrs fv = foldr addBndr fv bndrs
 
-expr_fvs :: CoreExpr -> FV
-expr_fvs (Type ty) = tyCoFVsOfType ty
-expr_fvs (Coercion co) = tyCoFVsOfCo co
+expr_fvs :: FVM fv => CoreExpr -> fv
+expr_fvs (Type ty) = typeFVs ty
+expr_fvs (Coercion co) = coFVs co
 expr_fvs (Var var) = FV.unitFV var
-expr_fvs (Lit _) = emptyFV
+expr_fvs (Lit _) = mempty
 expr_fvs (Tick t expr) = tickish_fvs t `unionFV` expr_fvs expr
 expr_fvs (App fun arg) = expr_fvs fun `unionFV` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
-expr_fvs (Cast expr co) = expr_fvs expr `unionFV` tyCoFVsOfCo co
+expr_fvs (Cast expr co) = expr_fvs expr `unionFV` coFVs co
 
 expr_fvs (Case scrut bndr ty alts)
-  = expr_fvs scrut `unionFV` tyCoFVsOfType ty `unionFV` addBndr bndr
-      (mapUnionFV alt_fvs alts)
+  = expr_fvs scrut `unionFV` typeFVs ty `unionFV` addBndr bndr (foldMap alt_fvs alts)
   where
     alt_fvs (_, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
 
@@ -277,21 +276,21 @@ expr_fvs (Let (NonRec bndr rhs) body)
 
 expr_fvs (Let (Rec pairs) body)
   = addBndrs (map fst pairs)
-             (mapUnionFV rhs_fvs pairs `unionFV` expr_fvs body)
+             (foldMap rhs_fvs pairs `unionFV` expr_fvs body)
 
 ---------
-rhs_fvs :: (Id, CoreExpr) -> FV
-rhs_fvs (bndr, rhs) = expr_fvs rhs `unionFV`
-                      bndrRuleAndUnfoldingFVs bndr
-        -- Treat any RULES as extra RHSs of the binding
+rhs_fvs :: FVM fv => (Id, CoreExpr) -> fv
+rhs_fvs (bndr, rhs)
+  = expr_fvs rhs `unionFV` bndrRuleAndUnfoldingFVs bndr
+    -- Treat any RULES as extra RHSs of the binding
 
 ---------
-exprs_fvs :: [CoreExpr] -> FV
-exprs_fvs exprs = mapUnionFV expr_fvs exprs
+exprs_fvs :: FVM fv => [CoreExpr] -> fv
+exprs_fvs exprs = foldMap expr_fvs exprs
 
-tickish_fvs :: Tickish Id -> FV
-tickish_fvs (Breakpoint _ ids) = FV.mkFVs ids
-tickish_fvs _ = emptyFV
+tickish_fvs :: FVM fv => Tickish Id -> fv
+tickish_fvs (Breakpoint _ ids) = foldMap FV.unitFV ids
+tickish_fvs _ = mempty
 
 {-
 ************************************************************************
