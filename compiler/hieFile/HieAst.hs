@@ -1023,6 +1023,12 @@ instance ( a ~ GhcPass p
         ]
       XExpr x -> toHie x
 
+instance ToHie NoExtField where
+    toHie e = pure []
+
+instance ToHie NoExtCon where
+    toHie = noExtCon
+
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)
          , Data (HsTupArg a)
