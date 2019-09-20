@@ -155,13 +155,13 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
-mkFullIface :: HscEnv -> PartialModIface -> Maybe (NameEnv Name) -> IO ModIface
-mkFullIface hsc_env partial_iface mb_caf_infos = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
+mkFullIface hsc_env partial_iface mb_non_cafs = do
     let decls
           | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
           = mi_decls partial_iface
           | otherwise
-          = updateDeclCafInfos (mi_decls partial_iface) mb_caf_infos
+          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
@@ -172,13 +172,13 @@ mkFullIface hsc_env partial_iface mb_caf_infos = do
 
     return full_iface
 
-updateDeclCafInfos :: [IfaceDecl] -> Maybe (NameEnv Name) -> [IfaceDecl]
+updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
 updateDeclCafInfos decls Nothing = decls
-updateDeclCafInfos decls (Just caffyNames) = map update_decl decls
+updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
   where
     update_decl decl
       | IfaceId nm ty details id_info <- decl
-      , Nothing <- lookupNameEnv caffyNames nm
+      , elemNameSet nm non_cafs
       = IfaceId nm ty details $
         case id_info of
           NoInfo -> HasInfo [HsNoCafRefs]

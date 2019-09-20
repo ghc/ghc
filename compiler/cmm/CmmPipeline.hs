@@ -30,8 +30,6 @@ import Control.Monad
 import Outputable
 import GHC.Platform
 
-import NameEnv
-
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
@@ -43,19 +41,15 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo0 prog = withTimingSilent (return dflags) (text "Cmm pipeline") forceRes $
+cmmPipeline hsc_env srtInfo prog = withTimingSilent (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env (moduleSRTMap srtInfo0)) prog
-     (srtInfo0, cmms, new_cafs) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo0 tops
-
-     let srtInfo1 =
-           srtInfo0 { caffyNames =
-             extendNameEnvList (caffyNames srtInfo0) (map (\x->(x,x)) new_cafs) }
+     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env (moduleSRTMap srtInfo)) prog
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
 
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-     return (srtInfo1, cmms)
+     return (srtInfo, cmms)
 
   where forceRes (info, group) =
           info `seq` foldr (\decl r -> decl `seq` r) () group

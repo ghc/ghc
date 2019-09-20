@@ -132,6 +132,7 @@ import CostCentre
 import ProfInit
 import TyCon
 import Name
+import NameSet
 import SimplStg         ( stg2stg )
 import Cmm
 import CmmParse         ( parseCmmFile )
@@ -842,8 +843,8 @@ finish summary tc_result mb_old_hash = do
                 -- This `force` saves 2M residency in test T10370
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          let iface_gen :: Maybe (NameEnv Name) -> IO (ModIface, Bool)
-              iface_gen mb_caf_infos = do
+          let iface_gen :: Maybe NameSet -> IO (ModIface, Bool)
+              iface_gen mb_non_cafs = do
                   -- BUILD THE NEW ModIface and ModDetails and emit external
                   -- core if necessary.
                   -- This has to happen *after* code gen so that the back-end
@@ -853,7 +854,7 @@ finish summary tc_result mb_old_hash = do
                   -- less of the environment alive here but don't do so
                   -- currently.
                   dumpIfaceStats hsc_env
-                  final_iface <- mkFullIface hsc_env partial_iface mb_caf_infos
+                  final_iface <- mkFullIface hsc_env partial_iface mb_non_cafs
                   let no_change = mb_old_hash == Just (mi_iface_hash (mi_exts final_iface))
                   return (final_iface, no_change)
 
@@ -1429,8 +1430,7 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)],
-                      NameEnv Name)
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], NameSet)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1557,7 +1557,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup (NameEnv Name))
+            -> IO (Stream IO CmmGroup NameSet)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1584,11 +1584,11 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroup (NameEnv Name)
+        pipeline_stream :: Stream IO CmmGroup NameSet
         pipeline_stream =
           {-# SCC "cmmPipeline" #-}
           Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
-            <&> caffyNames
+            <&> (srtMapNonCAFs . moduleSRTMap)
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)

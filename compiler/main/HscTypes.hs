@@ -170,6 +170,7 @@ import FamInstEnv
 import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
+import NameSet
 import VarSet
 import Var
 import Id
@@ -239,7 +240,7 @@ data HscStatus
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
                             -- ^ Module info
-        , hscs_iface_gen  :: Maybe (NameEnv Name) -> IO (ModIface, Bool)
+        , hscs_iface_gen  :: Maybe NameSet -> IO (ModIface, Bool)
                             -- ^ Function to generate iface after codegen.
         }
 -- Should HscStatus contain the HomeModInfo?
