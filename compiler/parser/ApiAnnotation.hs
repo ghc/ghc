@@ -261,6 +261,7 @@ data AnnKeywordId
     | AnnOpenPE  -- ^ '$('
     | AnnOpenPTE -- ^ '$$('
     | AnnOpenHoleP -- ^ '_('
+    | AnnCloseHoleP -- ^ ')0'
     | AnnOpenHolePE -- ^ '_$('
     | AnnOpenHolePTE -- ^ '_$$('
     | AnnOpenS   -- ^ '['

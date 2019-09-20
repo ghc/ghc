@@ -381,9 +381,10 @@ $tab          { warnTab }
   "$("        / { ifExtension ThBit }       { token ITparenEscape }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
-  "_("        { token ITopenTypedHole }
-  "_$("       / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
-  "_$$("      / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
+  "_("                    { token ITopenTypedHole }
+  \) $decdigit $decdigit* { skip_one_decimal ITcloseTypedHole }
+  "_$("        / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
+  "_$$("       / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -787,6 +788,7 @@ data Token
 
   -- Typed-holes
   | ITopenTypedHole              -- ^ _(
+  | ITcloseTypedHole Integer     -- ^ )0
   | ITopenTypedHoleEscape        -- ^ _$(
   | ITopenTypedHoleTyEscape      -- ^ _$$(
 
@@ -954,6 +956,10 @@ skip_one_varid f span buf len
 skip_two_varid :: (FastString -> Token) -> Action
 skip_two_varid f span buf len
   = return (L span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
+
+skip_one_decimal :: (Integer -> Token) -> Action
+skip_one_decimal f span buf len
+  = return $ L span $! f (parseUnsignedInteger (stepOn buf) (len-1) 10 octDecDigit)
 
 strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
@@ -2914,6 +2920,7 @@ isALRclose ITcbrack = True
 isALRclose ITccurly = True
 -- GHC Extensions:
 isALRclose ITcubxparen = True
+isALRclose (ITcloseTypedHole _) = True
 isALRclose _        = False
 
 isNonDecreasingIndentation :: ALRLayout -> Bool

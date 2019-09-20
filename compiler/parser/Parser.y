@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 244 -- shift/reduce conflicts
+%expect 242 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -154,7 +154,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 143 contains 15 shift/reduce conflicts.
+state 145 contains 15 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype
         exp -> infixexp . '-<' exp
@@ -179,7 +179,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 148 contains 67 shift/reduce conflicts.
+state 150 contains 70 shift/reduce conflicts.
 
     *** exp10 -> fexp .
         fexp -> fexp . aexp
@@ -197,7 +197,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 203 contains 27 shift/reduce conflicts.
+state 206 contains 27 shift/reduce conflicts.
 
         aexp2 -> TH_TY_QUOTE . tyvar
         aexp2 -> TH_TY_QUOTE . gtycon
@@ -216,7 +216,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 299 contains 1 shift/reduce conflicts.
+state 306 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp
 
@@ -234,7 +234,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 309 contains 1 shift/reduce conflict.
+state 316 contains 1 shift/reduce conflict.
 
     *** type -> btype .
         type -> btype . '->' ctype
@@ -245,7 +245,7 @@ Same as state 61 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 353 contains 1 shift/reduce conflicts.
+state 361 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(' commas . ')'
@@ -260,7 +260,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 408 contains 1 shift/reduce conflicts.
+state 419 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(#' commas . '#)'
@@ -272,17 +272,17 @@ Same as State 354 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 416 contains 67 shift/reduce conflicts.
+state 427 contains 70 shift/reduce conflicts.
 
     *** exp10 -> '-' fexp .
         fexp -> fexp . aexp
         fexp -> fexp . TYPEAPP atype
 
-Same as 149 but with a unary minus.
+Same as 150 but with a unary minus.
 
 -------------------------------------------------------------------------------
 
-state 481 contains 1 shift/reduce conflict.
+state 492 contains 1 shift/reduce conflict.
 
         oqtycon -> '(' qtyconsym . ')'
     *** qtyconop -> qtyconsym .
@@ -296,7 +296,7 @@ parenthesized infix type expression of length 1.
 
 -------------------------------------------------------------------------------
 
-state 678 contains 1 shift/reduce conflicts.
+state 695 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .
         dbind -> ipvar . '=' exp
@@ -311,7 +311,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 756 contains 1 shift/reduce conflicts.
+state 775 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp
 
@@ -328,7 +328,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 992 contains 1 shift/reduce conflicts.
+state 1013 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp
         transformqual -> 'then' 'group' . 'by' exp 'using' exp
@@ -338,7 +338,7 @@ state 992 contains 1 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 1089 contains 1 shift/reduce conflicts.
+state 1111 contains 1 shift/reduce conflicts.
 
         rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
     *** rule_foralls -> 'forall' rule_vars '.' .
@@ -360,7 +360,7 @@ Shift means the parser only allows the former. Also see conflict 753 above.
 
 -------------------------------------------------------------------------------
 
-state 1390 contains 1 shift/reduce conflict.
+state 1411 contains 1 shift/reduce conflict.
 
     *** atype -> tyvar .
         tv_bndr -> '(' tyvar . '::' kind ')'
@@ -617,6 +617,7 @@ TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
  '_('           { L _ ITopenTypedHole }
+ CLOSE_HOLE     { L _ (ITcloseTypedHole _) }
  '_$('          { L _ ITopenTypedHoleEscape }
  '_$$('         { L _ ITopenTypedHoleTyEscape }
 
@@ -2853,34 +2854,34 @@ aexp2   :: { ECP }
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
 extended_typed_hole :: { forall b. DisambECP b => PV (Located b) }
-        : '_(' maybe_hole_content ')' maybe_hole_id { amms
-                                                       (mkHsExtHolePV (maybe (comb2 $1 $3) (comb2 $1) $>) $4 $2)
-                                                       [mj AnnOpenHoleP $1, mj AnnCloseP $3 ] }
-        | typed_hole_splice           maybe_hole_id { mkHsExtHoleSplicePV (maybe (comb2 $1 $1) (comb2 $1) $>) $2 $1 }
+        : '_(' maybe_hole_content hole_close { amms (mkHsExtHolePV (comb2 $1 $>) $3 $2)
+                                                 [mj AnnOpenHoleP $1, mj AnnCloseHoleP $3 ] }
+        | typed_hole_splice                  { mkHsExtHoleSplicePV (getLoc $ snd $1) (fst $1) (snd $1) }
+
 
 infix_extended_typed_hole :: { forall b. DisambInfixOp b => PV (Located b) }
-        : '`' '_(' maybe_hole_content ')' maybe_hole_id '`' { amms (mkHsExtInfixHolePV (comb2 $1 $>) $5 $3)
-                                                               [mj AnnBackquote $1, mj AnnOpenHoleP $2,
-                                                                mj AnnCloseP $4, mj AnnBackquote $6] }
-        | '`' typed_hole_splice           maybe_hole_id '`' { amms (mkHsExtInfixHoleSplicePV (comb2 $1 $>) $3 $2)
-                                                               [mj AnnBackquote $1, mj AnnBackquote $4] }
+        : '`' '_(' maybe_hole_content hole_close '`' { amms (mkHsExtInfixHolePV (comb2 $1 $>) $4 $3)
+                                                             [mj AnnBackquote $1, mj AnnOpenHoleP $2,
+                                                              mj AnnCloseHoleP $4, mj AnnBackquote $5] }
+        | '`' typed_hole_splice      '`'             { amms (mkHsExtInfixHoleSplicePV
+                                                             (comb2 $1 $>) (fst $2) (snd $2))
+                                                             [mj AnnBackquote $1, mj AnnBackquote $3 ] }
 
 
--- We only have $(...) and not $..., since otherwise we wouldn't be able to know
--- if _$abc0 was $abc with identifier 0, or $abc0.
-typed_hole_splice :: { Located (HsSplice GhcPs) }
-    : '_$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
-                                ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
-                                    [mj AnnOpenHolePE $1,mj AnnCloseP $3] }
-    | '_$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
-                                 ams (sLL $1 $> $ mkTypedSplice HasParens $2)
-                                    [mj AnnOpenHolePTE $1,mj AnnCloseP $3] }
+typed_hole_splice :: { (Located (Maybe Integer), Located (HsSplice GhcPs) ) }
+        : '_$('  exp hole_close    {% runECP_P $2
+                                    >>= \ $2 -> ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
+                                                    [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3]
+                                    >>= \ $2 -> return ($3, $2) }
+        | '_$$('  exp hole_close   {% runECP_P $2
+                                    >>= \ $2 -> ams (sLL $1 $> $ mkTypedSplice HasParens $2)
+                                                    [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3]
+                                    >>= \ $2 -> return ($3, $2) }
 
+hole_close :: { Located (Maybe Integer) }
+  : ')'           {% ams (sL1 $1 Nothing) [mj AnnCloseHoleP $1] }
+  | CLOSE_HOLE     {% ams (sL1 $1 $ Just $ getCLOSE_HOLE $1) [mj AnnCloseHoleP $1] }
 
-maybe_hole_id :: { Maybe (Located Int) }
-  : INTEGER     {% ajs (Just $ sL1 $1 $ fromInteger $ il_value $ getINTEGER $1)
-                  [mj AnnVal $1] }
-  | {- empty -} { Nothing }
 
 maybe_hole_content :: { Maybe (Located FastString) }
   : STRING        {% ajs (Just $ sL1 $1 $ getSTRING $1) [mj AnnValStr $1] }
@@ -3830,6 +3831,7 @@ getPRIMFLOAT    (dL->L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (dL->L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (dL->L _ (ITidEscape x)) = x
 getTH_ID_TY_SPLICE (dL->L _ (ITidTyEscape x)) = x
+getCLOSE_HOLE   (dL->L _ (ITcloseTypedHole x)) = x
 getINLINE       (dL->L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
