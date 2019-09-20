@@ -12,6 +12,9 @@ module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , TypedHole (..), HoleFit (..), HoleFitCandidate (..)
                     , CandPlugin, FitPlugin
                     , HoleFitPlugin (..), HoleFitPluginR (..)
+
+                    -- Re-exported from HsSyn
+                    , ExtendedHole (..), pprExtendedHoleContent
                     ) where
 
 import GhcPrelude
@@ -38,7 +41,7 @@ import DynFlags
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
-import HsExpr (ExtendedHole(..))
+import HsExpr (ExtendedHole(..), pprExtendedHoleContent)
 
 import Control.Arrow ( (&&&) )
 

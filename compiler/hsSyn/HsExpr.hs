@@ -250,6 +250,9 @@ instance Data p => Data (ExtendedHole p) where
                   ExtendedHole {} -> "HsExpr.ExtendedHole"
                   ExtendedHoleSplice {} -> "HsExpr.ExtendedHoleSplice"
 
+instance HasOccName (ExtendedHole p) where
+    occName = extendedHoleOcc
+
 {-
 Note [OutOfScope and GlobalRdrEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

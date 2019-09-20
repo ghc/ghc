@@ -33,7 +33,7 @@ import Class
 import DataCon
 import TcEvidence
 import TcEvTerm
-import HsExpr  ( UnboundVar(..), pprExtendedHoleContent )
+import HsExpr  ( UnboundVar(..) )
 import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
@@ -1187,15 +1187,11 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
     hole_ty   = ctEvPred (ctEvidence ct)
     hole_kind = tcTypeKind hole_ty
     tyvars    = tyCoVarsOfTypeList hole_ty
-    hole_content = case hole of
-                    ExtendedExprHole eh ->
-                      text "Hole content:" <+> pprExtendedHoleContent eh
-                    _ -> empty
     hole_msg =
        if isExprHole hole
        then vcat [ hang (text "Found hole:")
                       2 (pp_with_type occ hole_ty)
-                 , tyvars_msg, expr_hole_hint, hole_content ]
+                 , tyvars_msg, expr_hole_hint ]
        else vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
                       2 (text "standing for" <+> quotes pp_hole_type_with_kind)
                  , tyvars_msg, type_hole_hint ]
