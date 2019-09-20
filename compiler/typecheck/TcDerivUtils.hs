@@ -48,6 +48,7 @@ import TcRnMonad
 import TcType
 import THNames (liftClassKey)
 import TyCon
+import Multiplicity
 import Type
 import Util
 import VarSet
@@ -715,7 +716,7 @@ cond_stdOK deriv_ctxt permissive dflags tc rep_tc
       = bad "has existential type variables in its type"
       | not (null theta) -- 4.
       = bad "has constraints in its type"
-      | not (permissive || all isTauTy (dataConOrigArgTys con)) -- 5.
+      | not (permissive || all isTauTy (map scaledThing $ dataConOrigArgTys con)) -- 5.
       = bad "has a higher-rank type"
       | otherwise
       = IsValid
@@ -749,7 +750,7 @@ cond_args cls _ _ rep_tc
                              2 (text "for type" <+> quotes (ppr ty)))
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
-                        , arg_ty <- dataConOrigArgTys con
+                        , Scaled _ arg_ty <- dataConOrigArgTys con
                         , isLiftedType_maybe arg_ty /= Just True
                         , not (ok_ty arg_ty) ]
 

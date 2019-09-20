@@ -159,10 +159,12 @@ import TyCon    ( TyCon, TyConFlavour, tyConKind )
 import TyCoRep  ( coHoleCoVar )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
-import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
+import DataCon  ( DataCon, dataConDisplayType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
+import Multiplicity
+import UsageEnv
 import TcType
 import Annotations
 import InstEnv
@@ -830,6 +832,9 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
+
+        tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
+
 
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
                                       -- and for tidying types
@@ -3489,12 +3494,13 @@ pprSigSkolInfo ctxt ty
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sep [ text "a pattern with constructor:"
-        , nest 2 $ ppr dc <+> dcolon
-          <+> pprType (dataConUserType dc) <> comma ]
-          -- pprType prints forall's regardless of -fprint-explicit-foralls
-          -- which is what we want here, since we might be saying
-          -- type variable 't' is bound by ...
+  = sdocWithDynFlags (\dflags ->
+      sep [ text "a pattern with constructor:"
+          , nest 2 $ ppr dc <+> dcolon
+            <+> pprType (dataConDisplayType dflags dc) <> comma ])
+            -- pprType prints forall's regardless of -fprint-explicit-foralls
+            -- which is what we want here, since we might be saying
+            -- type variable 't' is bound by ...
 
 pprPatSkolInfo (PatSynCon ps)
   = sep [ text "a pattern with pattern synonym:"
@@ -3649,6 +3655,8 @@ data CtOrigin
   | InstProvidedOrigin Module ClsInst
         -- Skolem variable arose when we were testing if an instance
         -- is solvable or not.
+  | NonLinearPatternOrigin
+  | UsageEnvironmentOf Name
 
 -- | Flag to see whether we're type-checking terms or kind-checking types
 data TypeOrKind = TypeLevel | KindLevel
@@ -3805,7 +3813,7 @@ pprCtOrigin (UnboundOccurrenceOf name)
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
-       2 (parens (text "type" <+> quotes (ppr ty)))
+       2 (parens (text "type" <+> quotes (ppr (scaledThing ty))))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 
@@ -3882,6 +3890,8 @@ pprCtO AnnOrigin             = text "an annotation"
 pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO StaticOrigin          = text "a static form"
+pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
+pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO _                     = panic "pprCtOrigin"
 
 {-

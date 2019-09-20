@@ -2,6 +2,8 @@
 :l Test
 let a = O (id 'a')
 let b = O (id "abc")
+seq a ()
+seq b ()
 :p a
 :p b
 seq _t1 ()

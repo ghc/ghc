@@ -14,6 +14,7 @@ f
 let ten = 10 :: Integer
 :f ten
 let i = Just ten
+:f i
 :p i
 
 case i of Just j -> Control.Exception.evaluate j

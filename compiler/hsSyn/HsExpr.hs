@@ -11,6 +11,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- | Abstract Haskell syntax for expressions.
@@ -1488,7 +1489,7 @@ data MatchGroup p body
 
 data MatchGroupTc
   = MatchGroupTc
-       { mg_arg_tys :: [Type]  -- Types of the arguments, t1..tn
+       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 
@@ -1770,9 +1771,10 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
             -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | BindStmt (XBindStmt idL idR body) -- Post typechecking,
-                                -- result type of the function passed to bind;
-                                -- that is, S in (>>=) :: Q -> (R -> S) -> T
+  | BindStmt (XBindStmt idL idR body) -- Post typechecking, multiplicity of the
+                                -- argument and result type of the function
+                                -- passed to bind; that is, (P, S) in
+                                -- (>>=) :: Q :_-> (R :P-> S) :_-> T
              (LPat idL)
              body
              (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind in Stmts]
@@ -1892,7 +1894,7 @@ type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExtField
 
 type instance XBindStmt        (GhcPass _) GhcPs b = NoExtField
 type instance XBindStmt        (GhcPass _) GhcRn b = NoExtField
-type instance XBindStmt        (GhcPass _) GhcTc b = Type
+type instance XBindStmt        (GhcPass _) GhcTc b = (Mult, Type)
 
 type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExtField
 type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExtField

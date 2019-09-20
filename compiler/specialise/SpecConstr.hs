@@ -35,6 +35,7 @@ import Coercion         hiding( substCo )
 import Rules
 import Type             hiding ( substTy )
 import TyCon            ( tyConName )
+import Multiplicity
 import Id
 import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )
@@ -1015,7 +1016,7 @@ ignoreTyCon env tycon
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
-forceSpecFunTy env = any (forceSpecArgTy env) . fst . splitFunTys
+forceSpecFunTy env = any (forceSpecArgTy env) . map scaledThing . fst . splitFunTys
 
 forceSpecArgTy :: ScEnv -> Type -> Bool
 forceSpecArgTy env ty
@@ -1720,7 +1721,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 
               spec_join_arity | isJoinId fn = Just (length spec_lam_args)
                               | otherwise   = Nothing
-              spec_id    = mkLocalIdOrCoVar spec_name
+              spec_id    = mkLocalIdOrCoVar spec_name Omega
                                             (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
@@ -1982,6 +1983,7 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
               good_pats :: [CallPat]
               good_pats = catMaybes mb_pats
 
+
               -- Remove patterns we have already done
               new_pats = filterOut is_done good_pats
               is_done p = any (samePat p . os_pat) done_specs
@@ -2096,7 +2098,7 @@ callToPats env bndr_occs call@(Call _ args con_env)
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
 
-              sanitise id   = id `setIdType` expandTypeSynonyms (idType id)
+              sanitise id   = updateIdTypeAndMult expandTypeSynonyms id
                 -- See Note [Free type variables of the qvar types]
 
               -- Bad coercion variables: see Note [SpecConstr and casts]
@@ -2259,7 +2261,7 @@ argToPat _env _in_scope _val_env arg _arg_occ
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty
   = do { uniq <- getUniqueM
-       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq ty
+       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq Omega ty
        ; return (False, varToCoreExpr id) }
 
 argsToPats :: ScEnv -> InScopeSet -> ValueEnv
