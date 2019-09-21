@@ -180,7 +180,7 @@ tyCoVarsOfType ty = nonDetFVSet (typeFVs ty)
 
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = nonDetFVSet $ foldMap typeFVs tys
+tyCoVarsOfTypes tys = nonDetFVSet $ mconcat $ fmap typeFVs tys
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of types]
@@ -188,14 +188,14 @@ tyCoVarsOfCo co = nonDetFVSet (coFVs co)
 
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = nonDetFVSet (foldMap coFVs cos)
+tyCoVarsOfCos cos = nonDetFVSet (cosFVs cos)
 
 
 -- | Generates an in-scope set from the free variables in a list of types
 -- and a list of coercions
 mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
 mkTyCoInScopeSet tys cos
-  = mkInScopeSet (nonDetFVSet $ foldMap typeFVs tys <> foldMap coFVs cos)
+  = mkInScopeSet (nonDetFVSet $ foldMap typeFVs tys <> cosFVs cos)
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -374,18 +374,21 @@ tyCoFVsOfCo :: Coercion -> FV
 tyCoFVsOfCo = coFVs
 
 tyCoFVsOfCos :: [Coercion] -> FV
-tyCoFVsOfCos = foldMap coFVs
+tyCoFVsOfCos = cosFVs
+
+cosFVs :: FVM m => [Coercion] -> m
+cosFVs cos = mconcat $ fmap coFVs cos
 
 coFVs :: FVM m => Coercion -> m
 coFVs (Refl ty) = typeFVs ty
 coFVs (GRefl _ ty mco) = typeFVs ty <> mcoFVs mco
 coFVs (CoVarCo cv) = unitFV cv
-coFVs (TyConAppCo _ _ cos) = foldMap coFVs cos
+coFVs (TyConAppCo _ _ cos) = cosFVs cos
 coFVs (AppCo co arg) = coFVs co <> coFVs arg
 coFVs (ForAllCo tv kind_co co) = tyCoFVsVarBndr tv (coFVs co) <> coFVs kind_co
 coFVs (FunCo _ co1 co2) = coFVs co1 <> coFVs co2
 coFVs (HoleCo hole) = coholeFV hole
-coFVs (AxiomInstCo _ _ cos) = foldMap coFVs cos
+coFVs (AxiomInstCo _ _ cos) = cosFVs cos
 coFVs (UnivCo p _ t1 t2) = provFVs p <> typeFVs t1 <> typeFVs t2
 coFVs (SymCo co) = coFVs co
 coFVs (TransCo co1 co2) = coFVs co1 <> coFVs co2
@@ -394,7 +397,7 @@ coFVs (LRCo _ co) = coFVs co
 coFVs (InstCo co arg) = coFVs co <> coFVs arg
 coFVs (KindCo co) = coFVs co
 coFVs (SubCo co) = coFVs co
-coFVs (AxiomRuleCo _ cos) = foldMap coFVs cos
+coFVs (AxiomRuleCo _ cos) = cosFVs cos
 {-# SPECIALISE coFVs :: Coercion -> FV #-}
 {-# SPECIALISE coFVs :: Coercion -> NonDetFV #-}
 {-# SPECIALISE coFVs :: Coercion -> LocalFV #-}
@@ -439,13 +442,13 @@ coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = nonDetCoFVSet (typeFVs ty)
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
-coVarsOfTypes tys = nonDetCoFVSet (foldMap typeFVs tys)
+coVarsOfTypes tys = nonDetCoFVSet (mconcat $ fmap typeFVs tys)
 
 coVarsOfCo :: Coercion -> CoVarSet
 coVarsOfCo co = nonDetCoFVSet (coFVs co)
 
 coVarsOfCos :: [Coercion] -> CoVarSet
-coVarsOfCos cos = nonDetCoFVSet (foldMap coFVs cos)
+coVarsOfCos cos = nonDetCoFVSet (cosFVs cos)
 
 ----- Whether a covar is /Almost Devoid/ in a type or coercion ----
 
