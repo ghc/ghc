@@ -66,7 +66,7 @@ import GhcPrelude
 import CoreSyn
 import Id
 import IdInfo
-import NameSet
+import NameSet hiding (unitFV)
 import UniqSet
 import Unique (Uniquable (..))
 import Name
@@ -117,7 +117,7 @@ mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ exprFVs e
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
 -- for why export it.
 exprFVs :: CoreExpr -> FV
-exprFVs = runLocalFV . expr_fvs
+exprFVs = localFVs . expr_fvs
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a deterministic set.
@@ -634,17 +634,17 @@ idFVs id = ASSERT( isId id)
 bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
 bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
 
-bndrRuleAndUnfoldingFVs :: Id -> FV
+bndrRuleAndUnfoldingFVs :: FVM fv => Id -> fv
 bndrRuleAndUnfoldingFVs id
   | isId id   = idRuleFVs id `unionFV` idUnfoldingFVs id
-  | otherwise = emptyFV
+  | otherwise = mempty
 
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars id = fvVarSet $ idRuleFVs id
 
-idRuleFVs :: Id -> FV
+idRuleFVs :: FVM fv => Id -> fv
 idRuleFVs id = ASSERT( isId id)
-  FV.mkFVs (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
+  foldMap unitFV (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
 
 idUnfoldingVars :: Id -> VarSet
 -- Produce free vars for an unfolding, but NOT for an ordinary
@@ -654,20 +654,20 @@ idUnfoldingVars :: Id -> VarSet
 -- we might get out-of-scope variables
 idUnfoldingVars id = fvVarSet $ idUnfoldingFVs id
 
-idUnfoldingFVs :: Id -> FV
-idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` emptyFV
+idUnfoldingFVs :: FVM fv => Id -> fv
+idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` mempty
 
 stableUnfoldingVars :: Unfolding -> Maybe VarSet
 stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf
 
-stableUnfoldingFVs :: Unfolding -> Maybe FV
+stableUnfoldingFVs :: FVM fv => Unfolding -> Maybe fv
 stableUnfoldingFVs unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
          | isStableSource src
-         -> Just (filterFV isLocalVar $ expr_fvs rhs)
+         -> Just (localFVs $ expr_fvs rhs)
       DFunUnfolding { df_bndrs = bndrs, df_args = args }
-         -> Just (filterFV isLocalVar $ FV.delFVs (mkVarSet bndrs) $ exprs_fvs args)
+         -> Just (localFVs $ foldr bindVar (exprs_fvs args) bndrs)
             -- DFuns are top level, so no fvs from types of bndrs
       _other -> Nothing
 
