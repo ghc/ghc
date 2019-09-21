@@ -1,4 +1,4 @@
-import T14373
+data BigFam = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P
 
 {-# NOINLINE earlySwitch #-}
 earlySwitch A = True
