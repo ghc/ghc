@@ -33,9 +33,8 @@ module FV
   , FilteredFV
     -- ** Filtered to local variables
   , LocalFV
-  , runLocalFV
   , LocalNonDetFV
-  , runLocalNonDetFV
+  , localFVs
   , localFvVarSet
   ) where
 
@@ -281,11 +280,8 @@ instance FVFilterPred LocalVars where
 type LocalFV = FilteredFV LocalVars FV
 type LocalNonDetFV = FilteredFV LocalVars NonDetFV
 
-runLocalFV :: LocalFV -> FV
-runLocalFV = runFilteredFV
-
-runLocalNonDetFV :: LocalNonDetFV -> NonDetFV
-runLocalNonDetFV = runFilteredFV
+localFVs :: FilteredFV LocalVars fv -> fv
+localFVs = runFilteredFV
 
 localFvVarSet :: LocalNonDetFV -> VarSet
 localFvVarSet = nonDetFVSet . runFilteredFV
