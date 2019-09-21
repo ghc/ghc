@@ -327,6 +327,8 @@ typeFVs (CastTy ty co)     = typeFVs ty <> coFVs co
 typeFVs (CoercionTy co)    = coFVs co
 {-# SPECIALISE typeFVs :: Type -> FV #-}
 {-# SPECIALISE typeFVs :: Type -> NonDetFV #-}
+{-# SPECIALISE typeFVs :: Type -> LocalFV #-}
+{-# SPECIALISE typeFVs :: Type -> LocalNonDetFV #-}
 
 -- | Free vars of (forall b. <thing with fvs>)
 tyCoFVsBndr :: FVM m => TyCoVarBinder -> m -> m
@@ -395,6 +397,8 @@ coFVs (SubCo co) = coFVs co
 coFVs (AxiomRuleCo _ cos) = foldMap coFVs cos
 {-# SPECIALISE coFVs :: Coercion -> FV #-}
 {-# SPECIALISE coFVs :: Coercion -> NonDetFV #-}
+{-# SPECIALISE coFVs :: Coercion -> LocalFV #-}
+{-# SPECIALISE coFVs :: Coercion -> LocalNonDetFV #-}
 
 mcoFVs :: FVM m => MCoercion -> m
 mcoFVs MRefl = mempty
