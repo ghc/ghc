@@ -242,6 +242,7 @@ instance H.Builder Builder where
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
                 Autoreconf dir -> cmd echo [Cwd dir] ["sh", path] buildArgs
+
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
@@ -249,23 +250,12 @@ instance H.Builder Builder where
                     let env = AddEnv "CONFIG_SHELL" bash
                     cmd echo env [Cwd dir] ["sh", path] buildOptions buildArgs
 
-                HsCpp    -> captureStdout
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
                     stdin <- readFile' input
                     Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
                     writeFileChanged output stdout
-
-                Make dir -> cmd echo path ["-C", dir] buildArgs
-
-                Xelatex -> do
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
 
                 GhcPkg Copy _ -> do
                     Stdout pkgDesc <- cmd [path]
@@ -280,8 +270,20 @@ instance H.Builder Builder where
                     Exit _ <- cmd echo [path] (buildArgs ++ [input])
                     return ()
 
+                HsCpp    -> captureStdout
+
+                Make dir -> cmd echo path ["-C", dir] buildArgs
+
                 Makeinfo -> do
                   cmd echo [path] "--no-split" [ "-o", output] [input]
+
+                Xelatex -> do
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
 
                 _  -> cmd echo [path] buildArgs
 
