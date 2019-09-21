@@ -176,7 +176,7 @@ instance Monoid FV where
 
 instance Semigroup FV where
   f <> g = FV $ oneShot $ \fv_cand -> oneShot $ \in_scope -> oneShot $ \acc ->
-    runFV f fv_cand in_scope (runFV g fv_cand in_scope acc)
+    runFV f fv_cand in_scope $! (runFV g fv_cand in_scope $! acc)
   {-# INLINE (<>) #-}
 
 whenIsInteresting :: Var -> FV -> FV
