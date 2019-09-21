@@ -5,5 +5,3 @@ mixedSwitch A = True
 mixedSwitch B = False
 mixedSwitch C = False
 mixedSwitch P = True
-
-main = print $ mixedSwitch B
