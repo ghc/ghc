@@ -111,22 +111,23 @@ instance NFData   HaddockMode
 data Builder = Alex
              | Ar ArMode Stage
              | Autoreconf FilePath
-             | DeriveConstants
              | Cabal ConfigurationInfo Stage
              | Cc CcMode Stage
              | Configure FilePath
+             | DeriveConstants
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
              | GhcPkg GhcPkgMode Stage
              | Haddock HaddockMode
              | Happy
-             | Hpc
              | Hp2Ps
+             | Hpc
              | HsCpp
              | Hsc2Hs Stage
              | Ld Stage
              | Make FilePath
+             | Makeinfo
              | Nm
              | Objdump
              | Patch
@@ -137,7 +138,6 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
-             | Makeinfo
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -311,6 +311,7 @@ systemBuilderPath builder = case builder of
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
     Make _          -> fromKey "make"
+    Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromKey "nm"
     Objdump         -> fromKey "objdump"
     Patch           -> fromKey "patch"
@@ -320,7 +321,6 @@ systemBuilderPath builder = case builder of
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
     Xelatex         -> fromKey "xelatex"
-    Makeinfo        -> fromKey "makeinfo"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."
