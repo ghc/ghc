@@ -96,6 +96,9 @@ newtype NonDetFV = NonDetFV { runNonDetFV :: TyCoVarSet -> TyCoVarSet -> TyCoVar
 instance Monoid NonDetFV where
   mempty = NonDetFV $ \_ acc -> acc
   {-# INLINE mempty #-}
+  mconcat xs = NonDetFV $ oneShot $ \is -> oneShot $ \acc0 ->
+    foldl' (\acc f -> runNonDetFV f is acc) acc0 xs
+  {-# INLINE mconcat #-}
 
 instance Semigroup NonDetFV where
   NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
@@ -103,7 +106,7 @@ instance Semigroup NonDetFV where
 
 instance FVM NonDetFV where
   coholeFV hole = unitFV $ coHoleCoVar hole
-  unitFV v = NonDetFV $ \is acc ->
+  unitFV v = NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
     if | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
