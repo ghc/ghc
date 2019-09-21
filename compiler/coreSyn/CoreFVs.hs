@@ -457,7 +457,7 @@ ruleFVs (Rule { ru_fn = _do_not_include
                   -- See Note [Rule free var hack]
               , ru_bndrs = bndrs
               , ru_rhs = rhs, ru_args = args })
-  = filterFV isLocalVar $ addBndrs bndrs (exprs_fvs (rhs:args))
+  = localFVs $ addBndrs bndrs (exprs_fvs (rhs:args))
 
 -- | Those variables free in the both the left right hand sides of rules
 -- returned as FV computation
@@ -491,19 +491,19 @@ rulesFreeVars rules = mapUnionVarSet ruleFreeVars rules
 ruleLhsFreeIds :: CoreRule -> VarSet
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns them as a non-deterministic set
-ruleLhsFreeIds = fvVarSet . ruleLhsFVIds
+ruleLhsFreeIds = nonDetFVSet . ruleLhsFVIds
 
 ruleLhsFreeIdsList :: CoreRule -> [Var]
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns them as a determinisitcally ordered list
 ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
 
-ruleLhsFVIds :: CoreRule -> FV
+ruleLhsFVIds :: FVM fv => CoreRule -> fv
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns an FV computation
 ruleLhsFVIds (BuiltinRule {}) = emptyFV
 ruleLhsFVIds (Rule { ru_bndrs = bndrs, ru_args = args })
-  = filterFV isLocalId $ addBndrs bndrs (exprs_fvs args)
+  = localFVs $ addBndrs bndrs (exprs_fvs args)
 
 {-
 Note [Rule free var hack]  (Not a hack any more)
