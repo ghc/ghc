@@ -29,7 +29,7 @@ module PmTypes (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), Delta(..), initDelta,
+        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta
     ) where
 
 #include "HsVersions.h"
@@ -57,7 +57,7 @@ import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
-import TcRnTypes (pprEvVarWithType)
+import TcType (evVarPred)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -441,7 +441,7 @@ instance Outputable a => Outputable (SharedDIdEnv a) where
 -- equal, thus represent the same set of values.
 --
 -- See Note [TmState invariants].
-newtype TmState = TS (SharedDIdEnv VarInfo)
+newtype TmState = TmSt (SharedDIdEnv VarInfo)
   -- Deterministic so that we generate deterministic error messages
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
@@ -498,7 +498,7 @@ data VarInfo
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TS state) = ppr state
+  ppr (TmSt state) = ppr state
 
 -- | Not user-facing.
 instance Outputable VarInfo where
@@ -507,23 +507,34 @@ instance Outputable VarInfo where
 
 -- | Initial state of the oracle.
 initTmState :: TmState
-initTmState = TS emptySDIE
+initTmState = TmSt emptySDIE
+
+-- | The type oracle state. A poor man's inert set: The invariant is that all
+-- constraints in there are mutually compatible.
+newtype TyState = TySt (Bag EvVar)
+
+-- | Not user-facing.
+instance Outputable TyState where
+  ppr (TySt evs)
+    = braces $ hcat $ punctuate comma $ map (ppr . evVarPred) $ bagToList evs
+
+initTyState :: TyState
+initTyState = TySt emptyBag
 
 -- | Term and type constraints to accompany each value vector abstraction.
 -- For efficiency, we store the term oracle state instead of the term
 -- constraints.
-data Delta = MkDelta { delta_ty_cs :: Bag EvVar  -- Type oracle; things like a~Int
-                     , delta_tm_cs :: TmState }  -- Term oracle; things like x~Nothing
+data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
+                     , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
 
 -- | An initial delta that is always satisfiable
 initDelta :: Delta
-initDelta = MkDelta emptyBag initTmState
+initDelta = MkDelta initTyState initTmState
 
 instance Outputable Delta where
   ppr delta = vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
-      ppr (delta_tm_cs delta),
-      ppr (pprEvVarWithType <$> delta_ty_cs delta)
-      --ppr (delta_ty_cs delta)
+      ppr (delta_tm_st delta),
+      ppr (delta_ty_st delta)
     ]

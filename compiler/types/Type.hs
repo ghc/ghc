@@ -2825,6 +2825,10 @@ occCheckExpand :: [Var] -> Type -> Maybe Type
 -- of the given type variable.  If the type is already syntactically
 -- free of the variable, then the same type is returned.
 occCheckExpand vs_to_avoid ty
+  | null vs_to_avoid  -- Efficient shortcut
+  = Just ty           -- Can happen, eg. CoreUtils.mkSingleAltCase
+
+  | otherwise
   = go (mkVarSet vs_to_avoid, emptyVarEnv) ty
   where
     go :: (VarSet, VarEnv TyCoVar) -> Type -> Maybe Type
