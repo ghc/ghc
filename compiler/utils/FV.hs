@@ -98,7 +98,7 @@ instance Monoid NonDetFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetFV where
-  NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> g is $! f is $! acc
+  NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
   {-# INLINE (<>) #-}
 
 instance FVM NonDetFV where
@@ -107,7 +107,7 @@ instance FVM NonDetFV where
     if | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
-  bindVar v (NonDetFV f) = NonDetFV $ \is acc -> f (extendVarSet is v) $! acc
+  bindVar v (NonDetFV f) = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -130,7 +130,7 @@ instance Monoid NonDetCoFV where
   {-# INLINE mempty #-}
 
 instance Semigroup NonDetCoFV where
-  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! g is $! acc
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
   {-# INLINE (<>) #-}
 
 instance FVM NonDetCoFV where
@@ -222,7 +222,7 @@ filterFV fv_cand2 (FV fv) = FV $ \fv_cand1 in_scope acc ->
 {-# INLINE filterFV #-}
 
 -- | Return no free variables.
-emptyFV :: FV
+emptyFV :: FVM fv => fv
 emptyFV = mempty
 {-# INLINE emptyFV #-}
 
