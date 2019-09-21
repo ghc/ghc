@@ -62,11 +62,12 @@ test('T15155l', when(unregisterised(), skip),
 
 test('T16449_1', normal, compile, [''])
 
-#test('T14373', [extra_files(['T14373.hs', 'T14373a.hs'])],
-#     multimod_compile, [''])
 test('T14373', [],
-     multimod_compile, ['T14373a', '-fasm -O2 -c -ddump-cmm-from-stg -dsuppress-uniques'])
+     multimod_compile_filter, ['T14373', '-fasm -O2 -c -ddump-cmm-from-stg -dsuppress-uniques',
+     'grep -e "const T14373\.._closure+.;"'])
 test('T14373a', [],
-     multimod_compile, ['T14373a', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques'])
+     multimod_compile_filter, ['T14373a', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques',
+     'grep -e "switch \[" -e "case " -e "default: " | sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g"'])
 test('T14373b', [],
-     multimod_compile, ['T14373b', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques'])
+     multimod_compile_filter, ['T14373b', '-fasm -O2 -ddump-cmm-from-stg -dsuppress-uniques',
+     'grep -e "switch \[" -e "case " -e "default: " | sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g"'])
