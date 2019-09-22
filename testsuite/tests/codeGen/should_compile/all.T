@@ -82,3 +82,10 @@ test('T14373b', [],
 test('T14373c', [],
      multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
+
+switch_skeleton_and_entries_only = ('grep -e "switch \[" -e "case " -e "default: " -e "Default_entry(" -e "R1 = .*_closure+2;"'
+                                    '| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;|R1 = XYZ_closure+2;|g"')
+
+test('T14373d', [],
+     multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
+     switch_skeleton_and_entries_only])
