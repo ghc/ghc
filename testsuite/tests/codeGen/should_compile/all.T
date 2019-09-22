@@ -75,5 +75,5 @@ test('T14373b', [],
      multimod_compile_filter, ['T14373b', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
 test('T14373c', [],
-     multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg',
-     switch_skeleton_only])
+     multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg -ddump-asm',
+     'cat'])
