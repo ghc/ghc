@@ -130,7 +130,7 @@ closureIdentity( const StgClosure *p )
     case HEAP_BY_RETAINER:
         // AFAIK, the only closures in the heap which might not have a
         // valid retainer set are DEAD_WEAK closures.
-        if (isRetainerSetFieldValid(p))
+        if (isTravDataValid(p))
             return retainerSetOf(p);
         else
             return NULL;
@@ -638,7 +638,7 @@ closureSatisfiesConstraints( const StgClosure* p )
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
        // these aren't reached by the retainer profiler's traversal.
-       if (isRetainerSetFieldValid((StgClosure *)p)) {
+       if (isTravDataValid((StgClosure *)p)) {
            rs = retainerSetOf((StgClosure *)p);
            if (rs != NULL) {
                for (i = 0; i < rs->num; i++) {

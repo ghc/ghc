@@ -276,7 +276,7 @@ rtsPackageArgs = package rts ? do
             , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
             -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "**/RetainerProfile.c", "**/StgCRun.c"
+            , inputs [ "**/StgCRun.c"
                      , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
