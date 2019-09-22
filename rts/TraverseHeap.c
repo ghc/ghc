@@ -195,6 +195,9 @@ closeTraverseStack( traverseState *ts )
     ts->firstStack = NULL;
 }
 
+/**
+ * Returns the largest stack size encountered during the traversal.
+ */
 int
 getTraverseStackMaxSize(traverseState *ts)
 {
