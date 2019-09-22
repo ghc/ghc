@@ -38,7 +38,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O<br>-H64m<br></td>
     <td>-O2<br>-H64m</td>
     <td></td>
-    <td></td>
+    <td>-haddock</td>
     <td></td>
     <td></td>
     <td></td>
