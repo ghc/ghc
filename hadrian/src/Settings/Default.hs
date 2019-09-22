@@ -195,7 +195,7 @@ defaultSourceArgs = SourceArgs
     { hsDefault  = mconcat [ stage0    ? arg "-O"
                            , notStage0 ? arg "-O2"
                            , arg "-H32m" ]
-    , hsLibrary  = mempty
+    , hsLibrary  = notStage0 ? arg "-haddock"
     , hsCompiler = mempty
     , hsGhc      = mempty }
 
