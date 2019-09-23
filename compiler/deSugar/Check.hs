@@ -1039,7 +1039,7 @@ acceptAllResults = foldMap acceptSingleClauseResult
 approximateResults :: DynFlags -> [SingleClauseResult] -> PartialResult
 approximateResults dflags scrs
   | let accept = acceptAllResults scrs
-  , length (presultUncovered accept) <= maxPmCheckModels dflags
+  , presultUncovered accept `lengthAtMost` maxPmCheckModels dflags
   = accept
   | otherwise
   = foldMap approximateSingleClauseResult scrs
