@@ -408,7 +408,7 @@ These flags dump various phases of GHC's C-\\- pipeline.
     :shortdesc: Write output from main C-\\- pipeline passes to files
     :type: dynamic
 
-    If used in conjunction with `-ddump-to-file`, writes dump
+    If used in conjunction with :ghc-flag:`-ddump-to-file`, writes dump
     output from main C-\\- pipeline stages to files (each stage per file).
 
 .. ghc-flag:: -ddump-cmm-from-stg
