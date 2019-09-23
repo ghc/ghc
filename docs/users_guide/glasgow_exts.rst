@@ -6099,15 +6099,18 @@ a class: ::
         enum = []
 
 The type of the ``enum`` method is ``[a]``, and this is also the type of
-the default method. You can lift this restriction and give another type
-to the default method using the extension :extension:`DefaultSignatures`. For
-instance, if you have written a generic implementation of enumeration in
-a class ``GEnum`` with method ``genum`` in terms of ``GHC.Generics``,
-you can specify a default method that uses that generic implementation: ::
+the default method. You can change the type of the default method by
+requiring a different context using the extension
+:extension:`DefaultSignatures`. For instance, if you have written a
+generic implementation of enumeration in a class ``GEnum`` with method
+``genum``, you can specify a default method that uses that generic
+implementation. But your default implementation can only be used if the
+constraints are satisfied, therefore you need to change the type of the
+default method ::
 
       class Enum a where
         enum :: [a]
-        default enum :: (Generic a, GEnum (Rep a)) => [a]
+        default enum :: (GEnum a) => [a]
         enum = map to genum
 
 We reuse the keyword ``default`` to signal that a signature applies to
@@ -6115,7 +6118,7 @@ the default method only; when defining instances of the ``Enum`` class,
 the original type ``[a]`` of ``enum`` still applies. When giving an
 empty instance, however, the default implementation ``(map to genum)`` is
 filled-in, and type-checked with the type
-``(Generic a, GEnum (Rep a)) => [a]``.
+``(Generic a) => [a]``.
 
 The type signature for a default method of a type class must take on the same
 form as the corresponding main method's type signature. Otherwise, the
