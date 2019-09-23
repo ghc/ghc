@@ -21,13 +21,17 @@ import Data.Kind
 f :: a -> b
 f = undefined
 
+id' :: a -> a
+id' x = x
+{-# NOINLINE id' #-}
+
 -- More tests
 
 {-# RULES
 "example3" forall (a :: Type -> Type) (b :: a Int) c. forall x y. g @(Proxy b) @(Proxy c) x y = ()
 "example4" forall (a :: Bool) (b :: Proxy a). forall x. g @(Proxy b) @() x = id @()
 "example5" forall (a :: Type). forall. h @a = id @a
-"example5" forall k (c :: k). forall (x :: Proxy c). id @(Proxy c) x = x
+"example5" forall k (c :: k). forall (x :: Proxy c). id' @(Proxy c) x = x
   #-}
 
 {-# NOINLINE g #-}
