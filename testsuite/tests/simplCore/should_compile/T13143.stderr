@@ -7,7 +7,7 @@ Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall a. GHC.Prim.Void# -> a
-[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Unf=OtherCon []]
+[GblId, Arity=1, Str=<B,A>b, Unf=OtherCon []]
 T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 end Rec }
 
@@ -15,7 +15,6 @@ end Rec }
 f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
  Str=<B,A>b,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
@@ -26,7 +25,6 @@ f = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T13143.$trModule4 = "main"#
@@ -34,7 +32,6 @@ T13143.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule3 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -43,7 +40,6 @@ T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T13143.$trModule2 = "T13143"#
@@ -51,7 +47,6 @@ T13143.$trModule2 = "T13143"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -60,7 +55,6 @@ T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule :: GHC.Types.Module
 [GblId,
- Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
