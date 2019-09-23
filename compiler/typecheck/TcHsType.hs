@@ -1865,12 +1865,14 @@ kcDeclHeader_cusk name flav
        ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
              all_kinds     = res_kind : map tyVarKind spec_req_tkvs
 
-       ; candidates <- candidateQTyVarsOfKinds all_kinds
+       ; candidates' <- candidateQTyVarsOfKinds all_kinds
              -- 'candidates' are all the variables that we are going to
              -- skolemise and then quantify over.  We do not include spec_req_tvs
              -- because they are /already/ skolems
 
-       ; let inf_candidates = candidates `delCandidates` spec_req_tkvs
+       ; let non_tc_candidates = filter (not . isTcTyVar) (nonDetEltsUniqSet (tyCoVarsOfTypes all_kinds))
+             candidates = candidates' { dv_kvs = dv_kvs candidates' `extendDVarSetList` non_tc_candidates }
+             inf_candidates = candidates `delCandidates` spec_req_tkvs
 
        ; inferred <- quantifyTyVars inf_candidates
                      -- NB: 'inferred' comes back sorted in dependency order
