@@ -489,12 +489,8 @@ cafAnal
   -> CmmGraph
   -> CAFEnv
 cafAnal contLbls topLbl cmmGraph =
-    srtTrace2 "cafAnal" (text "topLbl:" <+> ppr topLbl $$
-                         text "ret:" <+> ppr ret) ret
-  where
-    ret =
-      analyzeCmmBwd cafLattice
-        (cafTransfers contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+  analyzeCmmBwd cafLattice
+    (cafTransfers contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet

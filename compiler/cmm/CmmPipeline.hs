@@ -45,8 +45,8 @@ cmmPipeline hsc_env srtInfo prog = withTimingSilent (return dflags) (text "Cmm p
   do let dflags = hsc_dflags hsc_env
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
 
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
      return (srtInfo, cmms)

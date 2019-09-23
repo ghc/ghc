@@ -1200,7 +1200,6 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       mapM (uncurry (compileForeign hsc_env')) foreign_files
                     setForeignOs (maybe [] return stub_o ++ foreign_os)
 
-                    -- pprTrace "runPhase" (text "Updating ModIface SRTs:" $$ nest 4 (ppr (map snd (mi_decls iface')))) $
                     return (RealPhase next_phase, outputFilename)
 
 -----------------------------------------------------------------------------
