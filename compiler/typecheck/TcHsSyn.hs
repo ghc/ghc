@@ -80,6 +80,7 @@ import Outputable
 import Util
 import UniqFM
 import CoreSyn
+import CoreUtils
 
 import {-# SOURCE #-} TcSplice (runTopSplice)
 
@@ -1090,7 +1091,9 @@ zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; t1'         <- zonkTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; return (env, WpCast co') }
+                              ; return (env, mkWpCastR co') }
+                -- NB: Use mkWpCastR, which eliminates Refl coercions.
+                -- Not doing so led to #17223.
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
 zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg
@@ -1590,7 +1593,8 @@ zonkCoreExpr env (Type ty)
     = Type <$> zonkTcTypeToTypeX env ty
 
 zonkCoreExpr env (Cast e co)
-    = Cast <$> zonkCoreExpr env e <*> zonkCoToCo env co
+    = mkCast <$> zonkCoreExpr env e <*> zonkCoToCo env co
+      -- NB: Use mkCast, not Cast. This eliminates coercions that have become Refl.
 zonkCoreExpr env (Tick t e)
     = Tick t <$> zonkCoreExpr env e -- Do we need to zonk in ticks?
 
