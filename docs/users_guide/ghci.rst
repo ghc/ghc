@@ -2566,7 +2566,7 @@ commonly used commands.
 
     The ``:loc-at`` command requires :ghci-cmd:`:set +c` to be set.
 
-.. ghci-cmd:: :instances ⟨type⟩
+.. ghci-cmd:: :instances; ⟨type⟩
 
     Displays all the class instances available to the argument ⟨type⟩.
     The command will match ⟨type⟩ with the first parameter of every
