@@ -542,7 +542,8 @@ nameTyCt (TyCt pred_ty) = do
       idname  = mkInternalName unique occname noSrcSpan
   return (mkLocalId idname pred_ty)
 
--- | Check whether a set of type constraints is satisfiable.
+-- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
+-- find a contradiction (e.g. @Int ~ Bool@).
 tyOracle :: TyState -> Bag TyCt -> DsM (Maybe TyState)
 tyOracle (TySt inert) cts
   = do { evs <- traverse nameTyCt cts
