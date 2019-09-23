@@ -443,29 +443,23 @@ newtype SRTEntry = SRTEntry CLabel
 -- ---------------------------------------------------------------------
 -- CAF analysis
 
-addCAF :: SRTMap -> CLabel -> CAFSet -> CAFSet
-addCAF srtMap l s
+addCAF :: CLabel -> CAFSet -> CAFSet
+addCAF l s
   | Just _ <- hasHaskellName l
   , let caf_label = mkCAFLabel l
-  = case Map.lookup caf_label srtMap of
-      Nothing ->
-        -- Imported or CAFFY, either way hasCAF will give us accurate
-        -- CafInfo
-        if hasCAF l then Set.insert caf_label s else s
-      Just (Just _) ->
-        Set.insert caf_label s
-      Just Nothing ->
-        s
-
+    -- For imported Ids hasCAF will have accurate CafInfo
+    -- Locals are initialized as CAFFY. We turn labels with empty SRTs into
+    -- non-CAFFYs in doSRTs
+  , hasCAF l
+  = Set.insert caf_label s
   | otherwise
   = s
 
 cafAnalData
-  :: SRTMap
-  -> CmmStatics
+  :: CmmStatics
   -> CAFSet
 
-cafAnalData srtMap (Statics _lbl statics) =
+cafAnalData (Statics _lbl statics) =
     foldl' analyzeStatic Set.empty statics
   where
     analyzeStatic s CmmUninitialised{} =
@@ -474,9 +468,9 @@ cafAnalData srtMap (Statics _lbl statics) =
       s
     analyzeStatic s (CmmStaticLit lit) =
       case lit of
-        CmmLabel c -> addCAF srtMap c s
-        CmmLabelOff c _ -> addCAF srtMap c s
-        CmmLabelDiffOff c1 c2 _ _ -> addCAF srtMap c1 $! addCAF srtMap c2 s
+        CmmLabel c -> addCAF c s
+        CmmLabelOff c _ -> addCAF c s
+        CmmLabelDiffOff c1 c2 _ _ -> addCAF c1 $! addCAF c2 s
         _ -> s
 
 -- |
@@ -492,16 +486,15 @@ cafAnal
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
-  -> SRTMap
   -> CmmGraph
   -> CAFEnv
-cafAnal contLbls topLbl srtMap cmmGraph =
+cafAnal contLbls topLbl cmmGraph =
     srtTrace2 "cafAnal" (text "topLbl:" <+> ppr topLbl $$
                          text "ret:" <+> ppr ret) ret
   where
     ret =
       analyzeCmmBwd cafLattice
-        (cafTransfers contLbls (g_entry cmmGraph) topLbl srtMap) cmmGraph mapEmpty
+        (cafTransfers contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -512,8 +505,8 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: LabelSet -> Label -> CLabel -> SRTMap -> TransferFun CAFSet
-cafTransfers contLbls entry topLbl srtMap
+cafTransfers :: LabelSet -> Label -> CLabel -> TransferFun CAFSet
+cafTransfers contLbls entry topLbl
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
         joined = cafsInNode xNode $! live'
@@ -531,7 +524,7 @@ cafTransfers contLbls entry topLbl srtMap
         successorFact s
           -- If this is a loop back to the entry, we can refer to the
           -- entry label.
-          | s == entry = Just (addCAF srtMap topLbl Set.empty)
+          | s == entry = Just (addCAF topLbl Set.empty)
           -- If this is a continuation, we want to refer to the
           -- SRT for the continuation's info table
           | s `setMember` contLbls
@@ -546,9 +539,9 @@ cafTransfers contLbls entry topLbl srtMap
         addCaf :: CmmExpr -> Set CAFLabel -> Set CAFLabel
         addCaf expr !set =
           case expr of
-              CmmLit (CmmLabel c) -> addCAF srtMap c set
-              CmmLit (CmmLabelOff c _) -> addCAF srtMap c set
-              CmmLit (CmmLabelDiffOff c1 c2 _ _) -> addCAF srtMap c1 $! addCAF srtMap c2 set
+              CmmLit (CmmLabel c) -> addCAF c set
+              CmmLit (CmmLabelOff c _) -> addCAF c set
+              CmmLit (CmmLabelDiffOff c1 c2 _ _) -> addCAF c1 $! addCAF c2 set
               _ -> set
     in
       srtTrace2 "cafTransfers" (text "block:" <+> ppr block $$
