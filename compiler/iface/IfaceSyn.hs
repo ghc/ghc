@@ -735,8 +735,8 @@ pprClassStandaloneKindSig :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
 pprClassStandaloneKindSig ss clas =
   pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
 
-classResKind :: IfaceKind
-classResKind =
+constraintIfaceKind :: IfaceKind
+constraintIfaceKind =
   IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
 
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
@@ -831,7 +831,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifBinders = binders
                             , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
-         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders classResKind)
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
   where
     -- See Note [Suppressing binder signatures] in IfaceType
@@ -848,7 +848,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                                 ifMinDef = minDef
                               }})
   = vcat [ pprClassRoles ss clas binders roles
-         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders classResKind)
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef minDef)])]

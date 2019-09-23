@@ -1705,6 +1705,7 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
 
+-- | No scoped type variables (to be used with mkTcTyCon).
 noTcTyConScopedTyVars :: [(Name, TcTyVar)]
 noTcTyConScopedTyVars = []
 

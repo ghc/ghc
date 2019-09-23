@@ -183,7 +183,7 @@ cvtDec (TH.SigD nm typ)
 cvtDec (TH.KiSigD nm ki)
   = do  { nm' <- tconNameL nm
         ; ki' <- cvtType ki
-        ; let sig' = StandaloneKindSig noExtField nm' (mkLHsSigWcType ki')
+        ; let sig' = StandaloneKindSig noExtField nm' (mkLHsSigType ki')
         ; returnJustL $ Hs.KindSigD noExtField sig' }
 
 cvtDec (TH.InfixD fx nm)

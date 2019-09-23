@@ -520,7 +520,8 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
 deriveClause :: TyCon
-             -> [(Name, TcTyVar)]
+             -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
+                                   -- See Note [Scoped tyvars in a TcTyCon] in types/TyCon
              -> Maybe (LDerivStrategy GhcRn)
              -> [LHsSigType GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]

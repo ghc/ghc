@@ -1,7 +1,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE NamedWildCards, PolyKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 module SAKS_Fail003 where
 
-type T :: _w
+type T :: _
 data T = MkT

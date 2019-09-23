@@ -1083,6 +1083,17 @@ hsLTyVarBndrsToTypes :: LHsQTyVars (GhcPass p) -> [LHsType (GhcPass p)]
 hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
 hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
 
+-- | Get the kind signature of a type, ignoring parentheses:
+--
+--   hsTyKindSig   `Maybe                    `   =   Nothing
+--   hsTyKindSig   `Maybe ::   Type -> Type  `   =   Just  `Type -> Type`
+--   hsTyKindSig   `Maybe :: ((Type -> Type))`   =   Just  `Type -> Type`
+--
+-- This is used to extract the result kind of type synonyms with a CUSK:
+--
+--  type S = (F :: res_kind)
+--                 ^^^^^^^^
+--
 hsTyKindSig :: LHsType pass -> Maybe (LHsKind pass)
 hsTyKindSig lty =
   case unLoc lty of

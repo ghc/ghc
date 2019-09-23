@@ -20,6 +20,7 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
+  StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
@@ -1261,6 +1262,37 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
             _                            -> (ppDerivStrategy dcs, empty)
   ppr (XHsDerivingClause x) = ppr x
 
+-- | Located Standalone Kind Signature
+type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
+
+data StandaloneKindSig pass
+  = StandaloneKindSig (XStandaloneKindSig pass)
+      (Located (IdP pass))  -- Why a single binder? See #16754
+      (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
+  | XStandaloneKindSig (XXStandaloneKindSig pass)
+
+type instance XStandaloneKindSig (GhcPass p) = NoExtField
+type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
+
+standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
+standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
+standaloneKindSigName (XStandaloneKindSig nec) = noExtCon nec
+
+{- Note [Wildcards in standalone kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Standalone kind signatures enable polymorphic recursion, and it is unclear how
+to reconcile this with partial type signatures, so we disallow wildcards in
+them.
+
+We reject wildcards in 'rnStandaloneKindSignature' by returning False for
+'StandaloneKindSigCtx' in 'wildCardsAllowed'.
+
+The alternative design is to have special treatment for partial standalone kind
+signatures, much like we have special treatment for partial type signatures in
+terms. However, partial standalone kind signatures are not a proper replacement
+for CUSKs, so this would be a separate feature.
+-}
+
 data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
@@ -1270,6 +1302,7 @@ data NewOrData
 newOrDataToFlavour :: NewOrData -> TyConFlavour
 newOrDataToFlavour NewType  = NewtypeFlavour
 newOrDataToFlavour DataType = DataTypeFlavour
+
 
 -- | Located data Constructor Declaration
 type LConDecl pass = Located (ConDecl pass)
@@ -1434,6 +1467,11 @@ pp_data_defn _ (XHsDataDefn x) = ppr x
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsDataDefn p) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
+
+instance (p ~ GhcPass pass, OutputableBndrId p)
+       => Outputable (StandaloneKindSig p) where
+  ppr (StandaloneKindSig _ v ki) = text "type" <+> ppr v <+> text "::" <+> ppr ki
+  ppr (XStandaloneKindSig nec) = noExtCon nec
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"

@@ -163,7 +163,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
        ; (tyclss, data_deriv_info) <-
            tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
-           do { kisig_env <- tcStandaloneKindSigs kisigs
+           do { kisig_env <- mkNameEnv <$> traverse tcStandaloneKindSig kisigs
               ; tcTyClDecls tyclds kisig_env role_annots }
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
@@ -202,9 +202,6 @@ tcTyClGroup (XTyClGroup nec) = noExtCon nec
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
-
-tcStandaloneKindSigs :: [LStandaloneKindSig GhcRn] -> TcM KindSigEnv
-tcStandaloneKindSigs kisigs = mkNameEnv <$> traverse tcStandaloneKindSig kisigs
 
 tcTyClDecls
   :: [LTyClDecl GhcRn]
@@ -324,7 +321,7 @@ Consider
     data T (a :: *) = MkT (S a)   -- Has CUSK
     data S a = MkS (T Int) (S a)  -- No CUSK
 
-Via getInitialKinds we get
+Via inferInitialKinds we get
   T :: * -> *
   S :: kappa -> *
 
@@ -361,7 +358,7 @@ General type functions can be recursive, and hence, appear in `alg_decls'.
 
 The kind of an open type family is solely determinded by its kind signature;
 hence, only kind signatures participate in the construction of the initial
-kind environment (as constructed by `getInitialKind'). In fact, we ignore
+kind environment (as constructed by `inferInitialKind'). In fact, we ignore
 instances of families altogether in the following. However, we need to include
 the kinds of *associated* families into the construction of the initial kind
 environment. (This is handled by `allDecls').
@@ -380,7 +377,7 @@ TcTyCons are used for two distinct purposes
 2.  When checking a type/class declaration (in module TcTyClsDecls), we come
     upon knowledge of the eventual tycon in bits and pieces.
 
-      S1) First, we use getInitialKinds to look over the user-provided
+      S1) First, we use inferInitialKinds to look over the user-provided
           kind signature of a tycon (including, for example, the number
           of parameters written to the tycon) to get an initial shape of
           the tycon's kind.  We record that shape in a TcTyCon.
@@ -406,7 +403,7 @@ TcTyCons are used for two distinct purposes
 
 4.  tyConScopedTyVars.  A challenging piece in all of this is that we
     end up taking three separate passes over every declaration:
-      - one in getInitialKind (this pass look only at the head, not the body)
+      - one in inferInitialKind (this pass look only at the head, not the body)
       - one in kcTyClDecls (to kind-check the body)
       - a final one in tcTyClDecls (to desugar)
 
@@ -446,7 +443,7 @@ We do the following steps:
             MkB :-> DataConPE
 
   2. kcTyCLGroup
-      - Do getInitialKinds, which will signal a promotion
+      - Do inferInitialKinds, which will signal a promotion
         error if B is used in any of the kinds needed to initialise
         B's kind (e.g. (a :: Type)) here
 
@@ -551,7 +548,7 @@ kcTyClGroup kisig_env decls
                                   -- be one level in
                solveEqualities $
                do {  -- Step 1: Bind kind variables for all decls
-                    mono_tcs <- getInitialKinds kindless_decls
+                    mono_tcs <- inferInitialKinds kindless_decls
 
                   ; traceTc "kcTyClGroup: initial kinds" $
                     ppr_tc_kinds mono_tcs
@@ -792,7 +789,7 @@ paths for
     kind signature (CUSK). Handed by the kcDeclHeader.
 
   * Declarations without a kind signature (standalone or CUSK) are handled by
-    kcTyClDecl; see Note [Inferring kinds for type declarations].
+    kcInferDeclHeader; see Note [Inferring kinds for type declarations].
 
 Note that neither code path worries about point (4) above, as this
 is nicely handled by not mangling the res_kind. (Mangling res_kinds is done
@@ -837,7 +834,7 @@ that do not have a CUSK.  Consider
 
 We do kind inference as follows:
 
-* Step 1: getInitialKinds, and in particular kcInferDeclHeader.
+* Step 1: inferInitialKinds, and in particular kcInferDeclHeader.
   Make a unification variable for each of the Required and Specified
   type varialbes in the header.
 
@@ -1013,17 +1010,17 @@ mk_prom_err_env decl
     -- Works for family declarations too
 
 --------------
-getInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
+inferInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- Returns a TcTyCon for each TyCon bound by the decls,
 -- each with its initial kind
 
-getInitialKinds decls
-  = do { traceTc "getInitialKinds {" empty
-       ; tcs <- concatMapM (addLocM getInitialKind) decls
-       ; traceTc "getInitialKinds done }" empty
+inferInitialKinds decls
+  = do { traceTc "inferInitialKinds {" empty
+       ; tcs <- concatMapM (addLocM inferInitialKind) decls
+       ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
 
-getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
+inferInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 -- Allocate a fresh kind variable for each TyCon and Class
 -- For each tycon, return a TcTyCon with kind k
 -- where k is the kind of tc, derived from the LHS
@@ -1036,9 +1033,9 @@ getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 --   * The kind signatures on type-variable binders
 --   * The result kinds signature on a TyClDecl
 --
--- No family instances are passed to getInitialKinds
+-- No family instances are passed to inferInitialKinds
 
-getInitialKind
+inferInitialKind
     (ClassDecl { tcdLName = dL->L _ name
                , tcdTyVars = ktvs
                , tcdATs = ats })
@@ -1046,11 +1043,12 @@ getInitialKind
                   return constraintKind
        ; let parent_tv_prs = tcTyConScopedTyVars tycon
             -- See Note [Don't process associated types in kcInferDeclHeader]
-       ; inner_tcs <- tcExtendNameTyVarEnv parent_tv_prs $
-                      getFamDeclInitialKinds (Just tycon) ats
+       ; inner_tcs <-
+           tcExtendNameTyVarEnv parent_tv_prs $
+           mapM (addLocM (get_fam_decl_initial_kind (Just tycon))) ats
        ; return (tycon : inner_tcs) }
 
-getInitialKind
+inferInitialKind
     (DataDecl { tcdLName = dL->L _ name
               , tcdTyVars = ktvs
               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
@@ -1062,16 +1060,39 @@ getInitialKind
                   Nothing -> dataDeclDefaultResultKind new_or_data
         ; return [tc] }
 
-getInitialKind (FamDecl { tcdFam = decl })
-  = do { tc <- getFamDeclInitialKind Nothing decl
+inferInitialKind (FamDecl { tcdFam = decl })
+  = do { tc <- get_fam_decl_initial_kind Nothing decl
        ; return [tc] }
 
-getInitialKind (SynDecl { tcdLName = dL->L _ name, tcdTyVars = ktvs })
+inferInitialKind (SynDecl { tcdLName = dL->L _ name, tcdTyVars = ktvs })
   = do  { tc <- kcInferDeclHeader name TypeSynonymFlavour ktvs newMetaKindVar
         ; return [tc] }
 
-getInitialKind (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-getInitialKind (XTyClDecl nec) = noExtCon nec
+inferInitialKind (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
+inferInitialKind (XTyClDecl nec) = noExtCon nec
+
+get_fam_decl_initial_kind
+  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyDecl GhcRn
+  -> TcM TcTyCon
+get_fam_decl_initial_kind mb_parent_tycon
+    FamilyDecl { fdLName     = (dL->L _ name)
+               , fdTyVars    = ktvs
+               , fdResultSig = (dL->L _ resultSig)
+               , fdInfo      = info }
+  = kcInferDeclHeader name flav ktvs $
+    case resultSig of
+      KindSig _ ki                              -> tcLHsKindSig ctxt ki
+      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
+      _ -- open type families have * return kind by default
+        | tcFlavourIsOpen flav              -> return liftedTypeKind
+               -- closed type families have their return kind inferred
+               -- by default
+        | otherwise                         -> newMetaKindVar
+  where
+    flav = getFamFlav mb_parent_tycon info
+    ctxt = TyFamResKindCtxt name
+get_fam_decl_initial_kind _ (XFamilyDecl nec) = noExtCon nec
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
@@ -1218,36 +1239,6 @@ dataDeclDefaultResultKind takes care to produce the appropriate result kind.
 -}
 
 ---------------------------------
-getFamDeclInitialKinds
-  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
-  -> [LFamilyDecl GhcRn]
-  -> TcM [TcTyCon]
-getFamDeclInitialKinds mb_parent_tycon decls
-  = mapM (addLocM (getFamDeclInitialKind mb_parent_tycon)) decls
-
-getFamDeclInitialKind
-  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyDecl GhcRn
-  -> TcM TcTyCon
-getFamDeclInitialKind mb_parent_tycon
-    FamilyDecl { fdLName     = (dL->L _ name)
-               , fdTyVars    = ktvs
-               , fdResultSig = (dL->L _ resultSig)
-               , fdInfo      = info }
-  = kcInferDeclHeader name flav ktvs $
-    case resultSig of
-      KindSig _ ki                              -> tcLHsKindSig ctxt ki
-      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
-      _ -- open type families have * return kind by default
-        | tcFlavourIsOpen flav              -> return liftedTypeKind
-               -- closed type families have their return kind inferred
-               -- by default
-        | otherwise                         -> newMetaKindVar
-  where
-    flav = getFamFlav mb_parent_tycon info
-    ctxt  = TyFamResKindCtxt name
-getFamDeclInitialKind _ (XFamilyDecl nec) = noExtCon nec
-
 getFamFlav
   :: Maybe TyCon      -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyInfo pass
@@ -1286,7 +1277,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcM ()
 -- This function is used solely for its side effect on kind variables
 -- NB kind signatures on the type variables and
 --    result kind signature have already been dealt with
---    by getInitialKind, so we can ignore them here.
+--    by inferInitialKind, so we can ignore them here.
 
 kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
                      , tcdDataDefn = defn })
@@ -1297,7 +1288,7 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
          -- See Note [Implementation of UnliftedNewtypes] STEP 2
        ; kcConDecls new_or_data (tyConResKind tyCon) cons
        }
-    -- hs_tvs and dd_kindSig already dealt with in getInitialKind
+    -- hs_tvs and dd_kindSig already dealt with in inferInitialKind
     -- This must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
     -- so (a) we don't need to bring the hs_tvs into scope, because the
@@ -1317,7 +1308,7 @@ kcTyClDecl (SynDecl { tcdLName = dL->L _ name, tcdRhs = rhs })
   = bindTyClTyVars name $ \ _ res_kind ->
     discardResult $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
-        -- in getInitialKinds.
+        -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
                       , tcdCtxt = ctxt, tcdSigs = sigs })
@@ -1615,7 +1606,7 @@ Expected behavior of UnliftedNewtypes:
 What follows is a high-level overview of the implementation of the
 proposal.
 
-STEP 1: Getting the initial kind, as done by getInitialKind. We have
+STEP 1: Getting the initial kind, as done by inferInitialKind. We have
 two sub-cases (assuming we have a newtype and -XUnliftedNewtypes is enabled):
 
 * With a CUSK: no change in kind-checking; the tycon is given the kind
@@ -1636,7 +1627,7 @@ enabled (we use r0 to denote a unification variable):
 
 newtype Foo rep = MkFoo (forall (a :: TYPE rep). a)
 + kcConDecl unifies (TYPE r0) with (TYPE rep), where (TYPE r0)
-  is the kind that getInitialKind invented for (Foo rep).
+  is the kind that inferInitialKind invented for (Foo rep).
 
 data Color = Red | Blue
 type family Interpret (x :: Color) :: RuntimeRep where
@@ -2233,7 +2224,7 @@ tcDataDefn err_ctxt
            (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                        , dd_ctxt = ctxt
                        , dd_kindSig = mb_ksig  -- Already in tc's kind
-                                               -- via getInitialKinds
+                                               -- via inferInitialKinds
                        , dd_cons = cons
                        , dd_derivs = derivs })
  =  do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons

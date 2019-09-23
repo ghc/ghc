@@ -371,7 +371,7 @@ rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let unitId = thisPackage $ hsc_dflags topEnv
@@ -383,7 +383,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
                                , fd_fe = spec }
@@ -608,7 +608,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
   = do { (inst_ty', inst_fvs)
-           <- rnHsSigType (GenericCtx $ text "an instance declaration") inst_ty
+           <- rnHsSigType (GenericCtx $ text "an instance declaration") TypeLevel inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
        ; cls <-
            case hsTyGetAppHead_maybe head_ty' of
@@ -973,7 +973,7 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; (mds', ty', fvs)
            <- rnLDerivStrategy DerivDeclCtx mds $
-              rnHsSigWcType BindUnlessForall DerivDeclCtx TypeLevel ty
+              rnHsSigWcType BindUnlessForall DerivDeclCtx ty
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
@@ -1387,7 +1387,7 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
-        ; (new_ki, fvs) <- rnHsSigWcType BindUnlessForall doc KindLevel ki
+        ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
   where
@@ -1792,7 +1792,7 @@ rnLHsDerivingClause doc
                               , deriv_clause_strategy = dcs
                               , deriv_clause_tys = (dL->L loc' dct) }))
   = do { (dcs', dct', fvs)
-           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc) dct
+           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc TypeLevel) dct
        ; warnNoDerivStrat dcs' loc
        ; pure ( cL loc (HsDerivingClause { deriv_clause_ext = noExtField
                                          , deriv_clause_strategy = dcs'
@@ -1834,7 +1834,7 @@ rnLDerivStrategy doc mds thing_inside
         AnyclassStrategy -> boring_case AnyclassStrategy
         NewtypeStrategy  -> boring_case NewtypeStrategy
         ViaStrategy via_ty ->
-          do (via_ty', fvs1) <- rnHsSigType doc via_ty
+          do (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, _, _) = splitLHsSigmaTy via_body

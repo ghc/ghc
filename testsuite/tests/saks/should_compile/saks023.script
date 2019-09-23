@@ -1,5 +1,5 @@
-:set -XStandaloneKindSignatures -XExplicitForAll -XNoStarIsType
+:set -XStandaloneKindSignatures -XExplicitForAll -XPolyKinds -XNoStarIsType
 import Data.Kind (Type)
-type T :: forall x -> Type; data T a
+type T :: forall (x :: Type) -> Type; data T a
 :kind T
    -- must output forall x, not forall a!

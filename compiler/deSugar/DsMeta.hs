@@ -353,7 +353,7 @@ repRoleD _ = panic "repRoleD"
 repKiSigD :: LStandaloneKindSig GhcRn -> DsM (SrcSpan, Core TH.DecQ)
 repKiSigD (dL->L loc kisig) =
   case kisig of
-    StandaloneKindSig _ v ki -> rep_wc_ty_sig kiSigDName loc ki v
+    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName loc ki v
     XStandaloneKindSig nec -> noExtCon nec
 
 -------------------------

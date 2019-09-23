@@ -1069,22 +1069,6 @@ data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
 
--- | Located Standalone Kind Signature
-type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
-
-data StandaloneKindSig pass
-  = StandaloneKindSig (XStandaloneKindSig pass)
-               (Located (IdP pass))
-               (LHsSigWcType pass)
-  | XStandaloneKindSig (XXStandaloneKindSig pass)
-
-type instance XStandaloneKindSig (GhcPass p) = NoExtField
-type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
-
-standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
-standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
-standaloneKindSigName (XStandaloneKindSig nec) = noExtCon nec
-
 -- | Type checker Specialisation Pragmas
 --
 -- 'TcSpecPrags' conveys @SPECIALISE@ pragmas from the type checker to the desugarer
@@ -1226,11 +1210,6 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)
   ppr (XFixitySig x) = ppr x
-
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (StandaloneKindSig p) where
-  ppr (StandaloneKindSig _ v ki) = text "type" <+> ppr v <+> text "::" <+> ppr ki
-  ppr (XStandaloneKindSig nec) = noExtCon nec
 
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = text "{-#" <+> doc <+> text "#-}"

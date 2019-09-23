@@ -247,9 +247,7 @@ mkStandaloneKindSig
   -> P (LStandaloneKindSig GhcPs)
 mkStandaloneKindSig loc lhs rhs =
   do { v <- checkLhs lhs
-     ; return $ cL loc $
-        StandaloneKindSig noExtField v (mkLHsSigWcType rhs)
-     }
+     ; return $ cL loc $ StandaloneKindSig noExtField v (mkLHsSigType rhs) }
   where
     checkLhs (unLoc->HsTyVar _ NotPromoted v@(unLoc->name))
       | isUnqual name, isTcOcc (rdrNameOcc name)
