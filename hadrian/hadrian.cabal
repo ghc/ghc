@@ -12,7 +12,7 @@ cabal-version:       >=1.10
 
 source-repository head
     type:     git
-    location: https://github.com/snowleopard/hadrian
+    location: https://gitlab.haskell.org/ghc/ghc
 
 executable hadrian
     main-is:             Main.hs
