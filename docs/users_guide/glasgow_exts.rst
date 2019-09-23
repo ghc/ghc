@@ -6103,7 +6103,9 @@ the default method. You can lift this restriction and give another type
 to the default method using the extension :extension:`DefaultSignatures`. For
 instance, if you have written a generic implementation of enumeration in
 a class ``GEnum`` with method ``genum`` in terms of ``GHC.Generics``,
-you can specify a default method that uses that generic implementation: ::
+you can specify a default method that uses that generic implementation. But your
+default implementation can only be used if the constraints are satisfied,
+therefore you need to change the type of the default method ::
 
       class Enum a where
         enum :: [a]
