@@ -1005,7 +1005,7 @@ addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x =
       vi' <- case splitTyConApp_maybe (vi_ty vi) of
         Just (tc,_)
           | lookupRecTc (delta_rec_tc delta) tc >= 1
-          , isVanillaAlgTyCon tc
+          , isVanillaDataTyCon tc
           -- not inhabited by inductive reasoning! If it was, some other
           -- constructor would be inhabited.
           -> mzero
@@ -1254,8 +1254,13 @@ provideEvidenceForEquation = go init_ts
 
 -- | Checks if every data con of the type 'isVanillaDataCon'.
 isVanillaDataType :: Type -> Bool
-isVanillaDataType ty = fromMaybe False $ do
-  (tc, _) <- splitTyConApp_maybe ty
+isVanillaDataType ty = case splitTyConApp_maybe ty of
+  Just (tc, _) -> isVanillaDataTyCon tc
+  Nothing      -> False
+
+-- | Checks if every data con of the type constructor 'isVanillaDataCon'.
+isVanillaDataTyCon :: TyCon -> Bool
+isVanillaDataTyCon tc = fromMaybe False $ do
   dcs <- tyConDataCons_maybe tc
   pure (all isVanillaDataCon dcs)
 
