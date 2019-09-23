@@ -30,12 +30,13 @@ module Coercion (
         mkAxInstRHS, mkUnbranchedAxInstRHS,
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
-        mkSymCo, mkTransCo, mkTransMCo,
+        mkSymCo, mkSymMCo, mkTransCo, mkTransMCo,
         mkNthCo, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
-        mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
+        mkUnsafeCo, mkHoleCo, mkUnivCo,
+        mkSubCo, mkSubMCo,
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, maybeSubCo, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
@@ -981,6 +982,10 @@ mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
 mkSymCo co                        = SymCo co
 
+mkSymMCo :: MCoercion -> MCoercion
+mkSymMCo MRefl    = MRefl
+mkSymMCo (MCo co) = MCo (mkSymCo co)
+
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
 mkTransCo :: Coercion -> Coercion -> Coercion
@@ -1204,6 +1209,10 @@ mkSubCo (FunCo Nominal arg res)
           (downgradeRole Representational Nominal res)
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
+
+mkSubMCo :: MCoercion -> MCoercion
+mkSubMCo MRefl = MRefl
+mkSubMCo (MCo co) = MCo (mkSubCo co)
 
 -- | Changes a role, but only a downgrade. See Note [Role twiddling functions]
 downgradeRole_maybe :: Role   -- ^ desired role

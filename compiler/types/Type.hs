@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -76,7 +76,7 @@ module Type (
         modifyJoinResTy, setJoinResTy,
 
         -- Analyzing types
-        TyCoMapper(..), mapType, mapCoercion,
+        TyCoMapper(..), mapType, mapCoercion, mapCoercion_maybe,
 
         -- (Newtypes)
         newTyConInstRhs,
@@ -266,7 +266,8 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
                               , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
                               , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
                               , decomposePiCos, coercionKind, coercionType
-                              , isReflexiveCo, seqCo )
+                              , mkTransMCo, isReflexiveCo, seqCo, coVarTypes
+                              , mkSubMCo, mkSymMCo )
 
 -- others
 import Util
@@ -538,7 +539,7 @@ data TyCoMapper env m
   = TyCoMapper
       { tcm_tyvar :: env -> TyVar -> m Type
       , tcm_covar :: env -> CoVar -> m Coercion
-      , tcm_hole  :: env -> CoercionHole -> m Coercion
+      , tcm_hole  :: env -> CoercionHole -> m MCoercion
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in TyCoRep.
 
@@ -588,8 +589,7 @@ mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
            ; inner' <- mapType mapper env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
-{-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
-mapCoercion :: Monad m
+mapCoercion :: forall m env. Monad m
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_covar = covar
                                , tcm_hole = cohole
@@ -601,6 +601,7 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_mco MRefl    = return MRefl
     go_mco (MCo co) = MCo <$> (go co)
 
+    go :: Coercion -> m Coercion
     go (Refl ty) = Refl <$> mapType mapper env ty
     go (GRefl r ty mco) = mkGReflCo r <$> mapType mapper env ty <*> (go_mco mco)
     go (TyConAppCo r tc args)
@@ -619,12 +620,17 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go (CoVarCo cv) = covar env cv
     go (AxiomInstCo ax i args)
       = mkAxiomInstCo ax i <$> mapM go args
-    go (HoleCo hole) = cohole env hole
+    go (HoleCo hole) = do { mco <- cohole env hole
+                          ; case mco of
+                              MCo co -> return co
+                              MRefl -> Refl <$> (mapType mapper env ty)
+                                    where
+                                      Pair ty _ty = coVarTypes (coHoleCoVar hole) }
     go (UnivCo p r t1 t2)
       = mkUnivCo <$> go_prov p <*> pure r
                  <*> mapType mapper env t1 <*> mapType mapper env t2
-    go (SymCo co) = mkSymCo <$> go co
-    go (TransCo c1 c2) = mkTransCo <$> go c1 <*> go c2
+    go (SymCo co)          = mkSymCo <$> go co
+    go (TransCo c1 c2)     = mkTransCo <$> go c1 <*> go c2
     go (AxiomRuleCo r cos) = AxiomRuleCo r <$> mapM go cos
     go (NthCo r i co)      = mkNthCo r i <$> go co
     go (LRCo lr co)        = mkLRCo lr <$> go co
@@ -636,6 +642,34 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+
+{-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
+mapCoercion_maybe :: forall m env. Monad m
+                  => TyCoMapper env m -> env -> Coercion -> m MCoercion
+
+mapCoercion_maybe mapper@(TyCoMapper { tcm_hole = cohole })
+                  env co
+  = go co
+  where
+    go_mco :: MCoercion -> m MCoercion
+    go_mco MRefl    = return MRefl
+    go_mco (MCo co) = go co
+
+    go :: Coercion -> m MCoercion
+    go (Refl {})       = return MRefl     -- Never looks at the type
+    go (HoleCo hole)   = cohole env hole
+    go (SymCo co)      = mkSymMCo <$> go co
+    go (SubCo co)      = mkSubMCo <$> go co
+    go (TransCo c1 c2) = mkTransMCo <$> go c1 <*> go c2
+    go (GRefl Nominal ty mco)
+      = do { mco' <- go_mco mco
+           ; case mco' of
+               MRefl -> return MRefl  -- Don't look at 'ty' in this case
+               MCo _ -> do { ty' <- mapType mapper env ty
+                            ; return (MCo (GRefl Nominal ty' mco')) } }
+
+    -- Special cases done: revert to the Coercion version
+    go co = MCo <$> mapCoercion mapper env co
 
 {-
 ************************************************************************

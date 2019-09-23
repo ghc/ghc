@@ -38,7 +38,7 @@ module TcHsSyn (
         zonkTcTypeToType,  zonkTcTypeToTypeX,
         zonkTcTypesToTypes, zonkTcTypesToTypesX,
         zonkTyVarOcc,
-        zonkCoToCo,
+        zonkCoToMCo,
         zonkEvBinds, zonkTcEvBinds,
         zonkTcMethInfoToMethInfoX,
         lookupTyVarOcc
@@ -1089,8 +1089,11 @@ zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; (env2, c2') <- zonkCoFn env1 c2
                                      ; t1'         <- zonkTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
-zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; return (env, WpCast co') }
+zonkCoFn env (WpCast co) = do { mco' <- zonkCoToMCo env co
+                              ; let wrap' = case mco' of
+                                              MRefl   -> WpHole
+                                              MCo co' -> WpCast co'
+                              ; return (env, wrap') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
 zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg
@@ -1590,7 +1593,12 @@ zonkCoreExpr env (Type ty)
     = Type <$> zonkTcTypeToTypeX env ty
 
 zonkCoreExpr env (Cast e co)
-    = Cast <$> zonkCoreExpr env e <*> zonkCoToCo env co
+    = do { e' <- zonkCoreExpr env e
+         ; mco' <- zonkCoToMCo env co
+         ; case mco' of
+             MRefl   -> return e'
+             MCo co' -> return (Cast e' co') }
+
 zonkCoreExpr env (Tick t e)
     = Tick t <$> zonkCoreExpr env e -- Do we need to zonk in ticks?
 
@@ -1851,12 +1859,12 @@ zonkCoVarOcc (ZonkEnv { ze_tv_env = tyco_env }) cv
   | otherwise
   = do { cv' <- zonkCoVar cv; return (mkCoVarCo cv') }
 
-zonkCoHole :: ZonkEnv -> CoercionHole -> TcM Coercion
+zonkCoHole :: ZonkEnv -> CoercionHole -> TcM MCoercion
 zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
   = do { contents <- readTcRef ref
        ; case contents of
-           Just co -> do { co' <- zonkCoToCo env co
-                         ; checkCoercionHole cv co' }
+           Just co -> do { mco' <- zonkCoToMCo env co
+                         ; checkCoercionHole cv mco' }
 
               -- This next case should happen only in the presence of
               -- (undeferred) type errors. Originally, I put in a panic
@@ -1868,7 +1876,7 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
                                    , text "Type-correct unfilled coercion hole"
                                      <+> ppr hole )
                          ; cv' <- zonkCoVar cv
-                         ; return $ mkCoVarCo cv' } }
+                         ; return $ MCo $ mkCoVarCo cv' } }
                              -- This will be an out-of-scope variable, but keeping
                              -- this as a coercion hole led to #15787
 
@@ -1904,6 +1912,9 @@ zonkTcTypesToTypesX env tys = mapM (zonkTcTypeToTypeX env) tys
 
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper
+
+zonkCoToMCo :: ZonkEnv -> Coercion -> TcM MCoercion
+zonkCoToMCo = mapCoercion_maybe zonk_tycomapper
 
 zonkTcMethInfoToMethInfoX :: ZonkEnv -> TcMethInfo -> TcM MethInfo
 zonkTcMethInfoToMethInfoX ze (name, ty, gdm_spec)

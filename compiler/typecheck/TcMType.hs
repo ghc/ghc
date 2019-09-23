@@ -331,31 +331,40 @@ unpackCoercionHole_maybe :: CoercionHole -> TcM (Maybe Coercion)
 unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 -- | Check that a coercion is appropriate for filling a hole. (The hole
--- itself is needed only for printing.
+-- variable itself is needed only for printing.)
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
-checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
-checkCoercionHole cv co
+checkCoercionHole :: CoVar -> MCoercion -> TcM MCoercion
+checkCoercionHole cv mco
   | debugIsOn
   = do { cv_ty <- zonkTcType (varType cv)
                   -- co is already zonked, but cv might not be
        ; return $
-         ASSERT2( ok cv_ty
-                , (text "Bad coercion hole" <+>
-                   ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
-                                            , ppr cv_ty ]) )
-         co }
+         ASSERT2( ok cv_ty, bad_msg cv_ty ) mco }
   | otherwise
-  = return co
-
+  = return mco
   where
-    (Pair t1 t2, role) = coercionKindRole co
-    ok cv_ty | EqPred cv_rel cv_t1 cv_t2 <- classifyPredType cv_ty
-             =  t1 `eqType` cv_t1
-             && t2 `eqType` cv_t2
-             && role == eqRelRole cv_rel
-             | otherwise
-             = False
+    ok :: Type -> Bool
+    ok cv_ty
+      = case mco of
+          MRefl  | EqPred NomEq cv_t1 cv_t2 <- classifyPredType cv_ty
+                 -> cv_t1 `eqType` cv_t2
+
+          MCo co | (Pair t1 t2, role) <- coercionKindRole co
+                 , EqPred cv_rel cv_t1 cv_t2 <- classifyPredType cv_ty
+                 ->  t1 `eqType` cv_t1
+                  && t2 `eqType` cv_t2
+                  && role == eqRelRole cv_rel
+
+          _ -> False
+
+    bad_msg cv_ty
+      = hang (text "Bad coercion hole" <+> ppr cv)
+           2 (vcat [ text "Co var type:" <+> ppr cv_ty
+                   , text "mco:" <+> ppr mco
+                   , case mco of
+                       MRefl -> empty
+                       MCo co -> text "type:" <+> ppr (coercionKindRole co) ])
 
 {-
 ************************************************************************
@@ -2087,14 +2096,14 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
   , tcm_tycon      = zonkTcTyCon }
   where
-    hole :: () -> CoercionHole -> TcM Coercion
+    hole :: () -> CoercionHole -> TcM MCoercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
       = do { contents <- readTcRef ref
            ; case contents of
-               Just co -> do { co' <- zonkCo co
-                             ; checkCoercionHole cv co' }
+               Just co -> do { mco' <- zonkMCo co
+                             ; checkCoercionHole cv mco' }
                Nothing -> do { cv' <- zonkCoVar cv
-                             ; return $ HoleCo (hole { ch_co_var = cv' }) } }
+                             ; return $ MCo $ HoleCo (hole { ch_co_var = cv' }) } }
 
 zonkTcTyCon :: TcTyCon -> TcM TcTyCon
 -- Only called on TcTyCons
@@ -2114,6 +2123,9 @@ zonkTcType = mapType zonkTcTypeMapper ()
 -- | "Zonk" a coercion -- really, just zonk any types in the coercion
 zonkCo :: Coercion -> TcM Coercion
 zonkCo = mapCoercion zonkTcTypeMapper ()
+
+zonkMCo :: Coercion -> TcM MCoercion
+zonkMCo = mapCoercion_maybe zonkTcTypeMapper ()
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis
