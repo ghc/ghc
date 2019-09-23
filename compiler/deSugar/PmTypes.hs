@@ -509,8 +509,8 @@ instance Outputable VarInfo where
 initTmState :: TmState
 initTmState = TmSt emptySDIE
 
--- | The type oracle state. A poor man's inert set: The invariant is that all
--- constraints in there are mutually compatible.
+-- | The type oracle state. A poor man's 'TcSMonad.InsertSet': The invariant is
+-- that all constraints in there are mutually compatible.
 newtype TyState = TySt (Bag EvVar)
 
 -- | Not user-facing.
