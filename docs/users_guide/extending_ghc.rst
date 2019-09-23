@@ -234,7 +234,7 @@ be reset with the :ghc-flag:`-fclear-plugins` option.
     Clear the list of plugins previously specified with
     :ghc-flag:`-fplugin <-fplugin=⟨module⟩>`. This is useful in GHCi where
     simply removing the :ghc-flag:`-fplugin <-fplugin=⟨module⟩>` options from
-    the command line is not possible. Instead `:set -fclear-plugins` can be
+    the command line is not possible. Instead ``:set -fclear-plugins`` can be
     used.
 
 
@@ -634,7 +634,7 @@ plugins is to make it easier to implement development tools.
 There are several different access points that you can use for defining plugins
 that access the representations. All these fields receive the list of
 ``CommandLineOption`` strings that are passed to the compiler using the
-:ghc-flag:`-fplugin-opt` flags.
+:ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` flags.
 
 ::
 
@@ -834,7 +834,7 @@ output:
     typeCheckPlugin (tc):
     {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
 
-.. _hole-fit-plugins
+.. _hole-fit-plugins:
 
 Hole fit plugins
 ~~~~~~~~~~~~~~~~
@@ -921,7 +921,7 @@ communication between the candidate and fit plugin.
 
 The plugin is then defined as by providing a value for the ``holeFitPlugin``
 field, a function that takes the ``CommandLineOption`` strings that are passed
-to the compiler using the :ghc-flag:`-fplugin-opt` flags and returns a
+to the compiler using the :ghc-flag:`-fplugin-opt=⟨module⟩:⟨args⟩` flags and returns a
 ``HoleFitPluginR``. This function can be used to pass the ``CommandLineOption``
 strings along to the candidate and fit plugins respectively.
 

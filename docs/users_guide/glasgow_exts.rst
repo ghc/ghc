@@ -9203,8 +9203,8 @@ signature" for a type constructor? These are the forms:
      data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
 -  For a newtype, the rules are the same as they are for a data type
-   unless `UnliftedNewtypes <#unboxed-newtypes>`__ is enabled.
-   With `UnliftedNewtypes <#unboxed-newtypes>`__, the type constructor
+   unless :extension:`UnliftedNewtypes` is enabled.
+   With :extension:`UnliftedNewtypes`, the type constructor
    only has a CUSK if a kind signature is present. As with a datatype
    with a top-level ``::``, all kind variables must introduced after
    the ``::`` must be explicitly quantified ::

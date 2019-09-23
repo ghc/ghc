@@ -10,7 +10,7 @@ following sections.
 Highlights
 ----------
 
-- The `UnliftedNewtypes` extension.
+- The :extension:`UnliftedNewtypes` extension.
 
 Full details
 ------------
@@ -53,8 +53,8 @@ Language
 
     data Proxy :: forall k -> k -> Type
 
-  See the `section on explicit kind quantification
-  <#explicit-kind-quantification>`__ for more details.
+  See the :ref:`section on explicit kind quantification
+  <explicit-kind-quantification>` for more details.
 
 - Type variables in associated type family default declarations can now be
   explicitly bound with a ``forall`` when :extension:`ExplicitForAll` is
@@ -87,7 +87,7 @@ Language
 
 - A new extension :extension:`UnliftedNewtypes` that relaxes restrictions
   around what kinds of types can appear inside of the data constructor
-  for a `newtype`. This was proposed in
+  for a ``newtype``. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
 
 Compiler
@@ -97,10 +97,10 @@ Compiler
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
 
-- Calls to `memset` and `memcpy` are now unrolled more aggressively
+- Calls to ``memset`` and ``memcpy`` are now unrolled more aggressively
   and the produced code is more efficient on `x86_64` with added
-  support for 64-bit `MOV`s. In particular, `setByteArray#` and
-  `copyByteArray#` calls that were not optimized before, now will
+  support for 64-bit ``MOV``\s. In particular, ``setByteArray#`` and
+  ``copyByteArray#`` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 - GHC's runtime linker no longer uses global state. This allows programs
   that use the GHC API to safely use multiple GHC sessions in a single
@@ -108,10 +108,10 @@ Compiler
   global state.
 
 - When loading modules that use :extension:`UnboxedTuples` into GHCi,
-  it will now automatically enable `-fobject-code` for these modules
+  it will now automatically enable :ghc-flag:`-fobject-code` for these modules
   and all modules they depend on. Before this change, attempting to
   load these modules into the interpreter would just fail, and the
-  only convenient workaround was to enable `-fobject-code` for all
+  only convenient workaround was to enable :ghc-flag:`-fobject-code` for all
   modules.
 
 - The eventlog now contains events for biographical and retainer profiling.
@@ -122,7 +122,7 @@ Compiler
 GHCi
 ~~~~
 
-- Added a command `:instances` to show the class instances available for a type.
+- Added a command :ghci-cmd:`:instances` to show the class instances available for a type.
 
 - Added new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
   disable and re-enable breakpoints.
@@ -142,8 +142,8 @@ Template Haskell
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
-- Add new `bitReverse#` primops that, for a `Word` of 8, 16, 32 or 64 bits,
-  reverse the order of its bits e.g. `0b110001` becomes `0b100011`.
+- Add new ``bitReverse#`` primops that, for a ``Word`` of 8, 16, 32 or 64 bits,
+  reverse the order of its bits e.g. ``0b110001`` becomes ``0b100011``.
   These primitives use optimized machine instructions when available.
 
 ``ghc`` library

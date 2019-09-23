@@ -16,7 +16,7 @@ Foreign function interface (FFI)
 
 GHC (mostly) conforms to the Haskell Foreign Function Interface as specified
 in the Haskell Report. Refer to the `relevant chapter
-<https://www.haskell.org/onlinereport/haskell2010/haskellch8.html>_`
+<https://www.haskell.org/onlinereport/haskell2010/haskellch8.html>`__
 of the Haskell Report for more details.
 
 FFI support is enabled by default, but can be enabled or disabled
@@ -105,8 +105,8 @@ OK: ::
 
 .. _ffi-foralls:
 
-Explicit ``forall``s in foreign types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Explicit "forall"s in foreign types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The type variables in the type of a foreign declaration may be quantified with
 an explicit ``forall`` by using the :extension:`ExplicitForAll` language
