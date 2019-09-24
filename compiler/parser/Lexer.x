@@ -381,10 +381,18 @@ $tab          { warnTab }
   "$("        / { ifExtension ThBit }       { token ITparenEscape }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
-  "_("                    { token ITopenTypedHole }
-  \) $decdigit $decdigit* { skip_one_decimal ITcloseTypedHole }
-  "_$("        / { ifExtension ThBit }       { token ITopenTypedHoleEscape }
-  "_$$("       / { ifExtension ThBit }       { token ITopenTypedHoleTyEscape }
+  "_("        / { ifExtension EthBit }     { token ITopenTypedHole }
+  \) $decdigit $decdigit*
+    / { ifExtension EthBit }
+    { skip_one_decimal ITcloseTypedHole }
+  "_$("
+    / { ifExtension EthBit `alexAndPred`
+        ifExtension ThBit }
+    { token ITopenTypedHoleEscape }
+  "_$$("
+    / { ifExtension EthBit `alexAndPred`
+        ifExtension ThBit }
+    { token ITopenTypedHoleTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -2350,6 +2358,7 @@ data ExtBits
   | MultiWayIfBit
   | GadtSyntaxBit
   | ImportQualifiedPostBit
+  | EthBit --Extended typed-holes
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2437,6 +2446,7 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
+      .|. EthBit                      `xoptBit` LangExt.ExtendedTypedHoles
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
