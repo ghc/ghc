@@ -26,6 +26,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
     * :ghc-flag:`-Wduplicate-exports`
+    * :ghc-flag:`-Wderiving-defaults`
     * :ghc-flag:`-Woverflowed-literals`
     * :ghc-flag:`-Wempty-enumerations`
     * :ghc-flag:`-Wmissing-fields`
@@ -639,6 +640,23 @@ of ``-W(no-)*``.
 
     Causes a warning to be emitted if an enumeration is empty, e.g.
     ``[5 .. 3]``.
+
+.. ghc-flag:: -Wderiving-defaults
+    :shortdesc: warn about default deriving when using both
+        DeriveAnyClass and GeneralizedNewtypeDeriving
+    :type: dynamic
+    :reverse: -Wno-deriving-defaults
+    :category:
+
+    :since: 8.10
+
+    Causes a warning when both :ref:`DeriveAnyClass` and
+    :ref:`GeneralizedNewtypeDeriving` are enabled and no explicit
+    deriving strategy is in use.  For example, this would result a
+    warning: ::
+
+        class C a
+        newtype T a = MkT a deriving C
 
 .. ghc-flag:: -Wduplicate-constraints
     :shortdesc: warn when a constraint appears duplicated in a type signature
