@@ -1092,7 +1092,10 @@ getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
        ; tc <- kcDeclHeader (InitialKindCheck msig) name flav ktvs $
                case famResultKindSignature resultSig of
                  Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                 Nothing -> return AnyKind
+                 Nothing ->
+                   case msig of
+                     Nothing -> return (TheKind liftedTypeKind)
+                     Just _  -> return AnyKind
        ; return [tc] }
 
 getInitialKind strategy
@@ -1103,10 +1106,13 @@ getInitialKind strategy
        ; tc <- kcDeclHeader strategy name TypeSynonymFlavour ktvs $
                case strategy of
                  InitialKindInfer -> return AnyKind
-                 InitialKindCheck _ ->
+                 InitialKindCheck msig ->
                    case hsTyKindSig rhs of
                      Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                     Nothing -> return AnyKind
+                     Nothing ->
+                       case msig of
+                         Nothing -> return (TheKind liftedTypeKind)
+                         Just _  -> return AnyKind
        ; return [tc] }
 
 getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
