@@ -2331,7 +2331,7 @@ The resulting arity of G is 3+1=4. (length vis_tcbs = 3,
 -}
 
 {- Note [discardResult in kcCheckDeclHeader_sig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use 'unifyKind' to check inline kind annotations in declaration headers
 against the signature.
 
