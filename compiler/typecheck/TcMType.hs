@@ -347,7 +347,7 @@ checkCoercionHole cv mco
     ok :: Type -> Bool
     ok cv_ty
       = case mco of
-          MRefl  | EqPred NomEq cv_t1 cv_t2 <- classifyPredType cv_ty
+          MRefl  | EqPred _ cv_t1 cv_t2 <- classifyPredType cv_ty
                  -> cv_t1 `eqType` cv_t2
 
           MCo co | (Pair t1 t2, role) <- coercionKindRole co

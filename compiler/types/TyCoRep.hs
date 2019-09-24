@@ -1168,11 +1168,12 @@ instance Outputable Coercion where
 -- | A semantically more meaningful type to represent what may or may not be a
 -- useful 'Coercion'.
 data MCoercion
-  = MRefl
-    -- A trivial Reflexivity coercion
-  | MCo Coercion
-    -- Other coercions
+  = MRefl          -- A trivial Reflexivity coercion,
+                   --   could be Nominal or Representational
+
+  | MCo Coercion   -- Other coercions; maybe reflexive maybe not
   deriving Data.Data
+
 type MCoercionR = MCoercion
 type MCoercionN = MCoercion
 
