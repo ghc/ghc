@@ -1316,43 +1316,43 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
 # output variable GccVersion.
-AC_DEFUN([FP_GCC_VERSION],
-[AC_REQUIRE([AC_PROG_CC])
-if test -z "$CC"
-then
-  AC_MSG_ERROR([gcc is required])
-fi
-GccLT46=NO
-AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-[
-    # Be sure only to look at the first occurrence of the "version " string;
-    # Some Apple compilers emit multiple messages containing this string.
-    fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
-                        [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
-])
-AC_SUBST([GccVersion], [$fp_cv_gcc_version])
-AC_SUBST(GccLT46)
+AC_DEFUN([FP_GCC_VERSION], [
+  AC_REQUIRE([AC_PROG_CC])
+  if test -z "$CC"
+  then
+    AC_MSG_ERROR([gcc is required])
+  fi
+  GccLT46=NO
+  AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
+  [
+      # Be sure only to look at the first occurrence of the "version " string;
+      # Some Apple compilers emit multiple messages containing this string.
+      fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
+      FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
+                          [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
+      FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
+  ])
+  AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+  AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
 dnl
 AC_DEFUN([FP_CC_LLVM_BACKEND],
-[AC_REQUIRE([AC_PROG_CC])
-AC_MSG_CHECKING([whether C compiler has an LLVM back end])
-$CC -x c /dev/null -dM -E > conftest.txt 2>&1
-if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
-  AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])
-  CcLlvmBackend=YES
-  AC_MSG_RESULT([yes])
-else
-  CcLlvmBackend=NO
-  AC_MSG_RESULT([no])
-fi
-AC_SUBST(CcLlvmBackend)
+  [AC_REQUIRE([AC_PROG_CC])
+   AC_MSG_CHECKING([whether C compiler has an LLVM back end])
+   $CC -x c /dev/null -dM -E > conftest.txt 2>&1
+   if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
+     AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])
+     CcLlvmBackend=YES
+     AC_MSG_RESULT([yes])
+   else
+     CcLlvmBackend=NO
+     AC_MSG_RESULT([no])
+   fi
+   AC_SUBST(CcLlvmBackend)
 
-rm -f conftest.txt
+   rm -f conftest.txt
 ])
 
 # FP_GCC_SUPPORTS__ATOMICS
