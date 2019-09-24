@@ -1890,7 +1890,7 @@ reachableBackwards mod summaries
   = [ node_payload node | node <- reachableG (transposeG graph) root ]
   where -- the rest just sets up the graph:
         (graph, lookup_node) = moduleGraphNodes False summaries
-        root  = expectJust "reachableBackwards" (lookup_node HsBootFile mod)
+        root  = expectJust "reachableBackwards" (lookup_node True mod)
 
 -- ---------------------------------------------------------------------------
 --
@@ -1933,7 +1933,7 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node HsSrcFile root_mod
+            let root | Just node <- lookup_node False root_mod
                      , graph `hasVertexG` node
                      = node
                      | otherwise
@@ -1949,18 +1949,18 @@ summaryNodeSummary :: SummaryNode -> ModSummary
 summaryNodeSummary = node_payload
 
 moduleGraphNodes :: Bool -> [ModSummary]
-  -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
+  -> (Graph SummaryNode, IsBootInterface -> ModuleName -> Maybe SummaryNode)
 moduleGraphNodes drop_hs_boot_nodes summaries =
   (graphFromEdgedVerticesUniq nodes, lookup_node)
   where
     numbered_summaries = zip summaries [1..]
 
-    lookup_node :: HscSource -> ModuleName -> Maybe SummaryNode
+    lookup_node :: IsBootInterface -> ModuleName -> Maybe SummaryNode
     lookup_node hs_src mod = Map.lookup
-      (ModuleNameWithIsBoot mod $ hscSourceToIsBoot hs_src)
+      (ModuleNameWithIsBoot mod hs_src)
       node_map
 
-    lookup_key :: HscSource -> ModuleName -> Maybe Int
+    lookup_key :: IsBootInterface -> ModuleName -> Maybe Int
     lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
 
     node_map :: NodeMap SummaryNode
@@ -1979,11 +1979,11 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
              -- Drop the hi-boot ones if told to do so
             , not (isBootSummary s && drop_hs_boot_nodes)
             , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_home_srcimps s)) ++
-                             out_edge_keys HsSrcFile   (map unLoc (ms_home_imps s)) ++
+                             out_edge_keys False       (map unLoc (ms_home_imps s)) ++
                              (-- see [boot-edges] below
                               if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile
                               then []
-                              else case lookup_key HsBootFile (ms_mod_name s) of
+                              else case lookup_key True (ms_mod_name s) of
                                     Nothing -> []
                                     Just k  -> [k]) ]
 
@@ -1996,10 +1996,10 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     -- most up to date information.
 
     -- Drop hs-boot nodes by using HsSrcFile as the key
-    hs_boot_key | drop_hs_boot_nodes = HsSrcFile
-                | otherwise          = HsBootFile
+    hs_boot_key | drop_hs_boot_nodes = False -- is regular mod or signature
+                | otherwise          = True -- is boot
 
-    out_edge_keys :: HscSource -> [ModuleName] -> [Int]
+    out_edge_keys :: IsBootInterface -> [ModuleName] -> [Int]
     out_edge_keys hi_boot ms = mapMaybe (lookup_key hi_boot) ms
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
         -- IsBoot; else False
