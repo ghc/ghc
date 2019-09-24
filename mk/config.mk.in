@@ -526,7 +526,6 @@ GccVersion            = @GccVersion@
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
-GccLT46         = @GccLT46@
 
 # Do we have a C compiler using an LLVM back end?
 CcLlvmBackend   = @CcLlvmBackend@
