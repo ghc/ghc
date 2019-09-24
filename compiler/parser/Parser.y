@@ -1134,9 +1134,16 @@ ty_decl :: { LTyClDecl GhcPs }
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
-  : 'type' type '::' ktypedoc
-      {% amms (mkStandaloneKindSig (comb2 $1 $3) $2 $4)
+  : 'type' sks_vars '::' ktypedoc
+      {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4)
               [mj AnnType $1,mu AnnDcolon $3] }
+
+-- See also: sig_vars
+sks_vars :: { Located [Located RdrName] }  -- Returned in reverse order
+  : sks_vars ',' oqtycon
+      {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
+         return (sLL $1 $> ($3 : unLoc $1)) }
+  | oqtycon { sL1 $1 [$1] }
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst

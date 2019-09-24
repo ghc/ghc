@@ -1,3 +1,2 @@
 
-saks_fail007.hs:7:6: error:
-    Invalid left-hand side in a standalone kind signature: May a
+saks_fail007.hs:7:12: error: parse error on input ‘::’

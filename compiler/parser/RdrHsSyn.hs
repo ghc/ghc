@@ -242,19 +242,26 @@ mkTySynonym loc lhs rhs
 
 mkStandaloneKindSig
   :: SrcSpan
-  -> LHsType GhcPs  -- LHS
-  -> LHsKind GhcPs  -- RHS
+  -> Located [Located RdrName] -- LHS
+  -> LHsKind GhcPs             -- RHS
   -> P (LStandaloneKindSig GhcPs)
 mkStandaloneKindSig loc lhs rhs =
-  do { v <- checkLhs lhs
+  do { vs <- mapM check_lhs_name (unLoc lhs)
+     ; v <- check_singular_lhs (reverse vs)
      ; return $ cL loc $ StandaloneKindSig noExtField v (mkLHsSigType rhs) }
   where
-    checkLhs (unLoc->HsTyVar _ NotPromoted v@(unLoc->name))
-      | isUnqual name, isTcOcc (rdrNameOcc name)
-      = return v
-    checkLhs _ =
-      addFatalError (getLoc lhs) $
-        hang (text "Invalid left-hand side in a standalone kind signature:") 2 (ppr lhs)
+    check_lhs_name v@(unLoc->name) =
+      if isUnqual name && isTcOcc (rdrNameOcc name)
+      then return v
+      else addFatalError (getLoc v) $
+           hang (text "Expected an unqualified type constructor:") 2 (ppr v)
+    check_singular_lhs vs =
+      case vs of
+        [] -> panic "mkStandaloneKindSig: empty left-hand side"
+        [v] -> return v
+        _ -> addFatalError (getLoc lhs) $
+             hang (text "Standalone kind signatures do not support multiple names at the moment:") 2
+                  (pprWithCommas ppr vs)
 
 mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
                -> LHsType GhcPs
