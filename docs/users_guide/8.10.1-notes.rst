@@ -90,6 +90,16 @@ Language
   for a ``newtype``. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
 
+- New flag :ghc-flag:`-Wderiving-defaults` that controls a warning
+  message when both :extension:`DeriveAnyClass` and
+  :extension:`GeneralizedNewtypeDeriving` are enabled and no explicit
+  deriving strategy is in use. The warning is enabled by default and
+  has been present in earlier GHC versions but without the option of
+  disabling it.  For example, this code would trigger the warning: ::
+
+    class C a
+    newtype T a = MkT a deriving C
+
 Compiler
 ~~~~~~~~
 
