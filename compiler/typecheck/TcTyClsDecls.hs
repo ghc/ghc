@@ -1072,7 +1072,7 @@ inferInitialKind (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
 inferInitialKind (XTyClDecl nec) = noExtCon nec
 
 get_fam_decl_initial_kind
-  :: Maybe TyCon -- ^ Just cls <=> this is an associated family of class cls
+  :: Maybe TcTyCon -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyDecl GhcRn
   -> TcM TcTyCon
 get_fam_decl_initial_kind mb_parent_tycon
@@ -1152,7 +1152,7 @@ checkInitialKind _ (XTyClDecl nec) = noExtCon nec
 
 -- See Note [Standalone kind signatures for associated types]
 check_initial_kind_assoc_fam
-  :: TyCon -- parent class
+  :: TcTyCon -- parent class
   -> FamilyDecl GhcRn
   -> TcM TcTyCon
 check_initial_kind_assoc_fam cls
@@ -1240,7 +1240,7 @@ dataDeclDefaultResultKind takes care to produce the appropriate result kind.
 
 ---------------------------------
 getFamFlav
-  :: Maybe TyCon      -- ^ Just cls <=> this is an associated family of class cls
+  :: Maybe TcTyCon    -- ^ Just cls <=> this is an associated family of class cls
   -> FamilyInfo pass
   -> TyConFlavour
 getFamFlav mb_parent_tycon info =
