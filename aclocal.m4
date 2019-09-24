@@ -1318,19 +1318,25 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 # (unsubstituted) output variable GccVersion.
 AC_DEFUN([FP_GCC_VERSION], [
   AC_REQUIRE([AC_PROG_CC])
-  if test -z "$CC"
-  then
-    AC_MSG_ERROR([gcc is required])
+  if test -z "$CC"; then
+    AC_MSG_ERROR([C compiler is required])
   fi
-  AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-  [
-      # Be sure only to look at the first occurrence of the "version " string;
-      # Some Apple compilers emit multiple messages containing this string.
-      fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-      FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
-                          [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
-  ])
-  GccVersion="$fp_cv_gcc_version"
+
+  if $CC --version | grep --quiet gcc; then
+    AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
+    [
+        # Be sure only to look at the first occurrence of the "version " string;
+        # Some Apple compilers emit multiple messages containing this string.
+        AC_MSG_CHECKING([version of gcc])
+        fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
+        AC_MSG_RESULT([$fp_cv_gcc_version])
+        FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
+                            [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
+    ])
+    AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+  else
+    AC_MSG_NOTICE([\$CC is not gcc; assuming it's a reasonably new C compiler])
+  fi
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
@@ -1555,13 +1561,12 @@ AC_SUBST([GhcPkgCmd])
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_GCC_VERSION])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
-[fp_cv_gcc_extra_opts=
- FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
-  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
-  [])
- FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.0],
-  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-builtin"],
-  [])
+[
+ if test "$Unregisterised" = "YES"; then
+   # These used to be conditioned on gcc version but we no longer support
+   # GCC versions which lack support for these flags
+   fp_cv_gcc_extra_opts="-fwrapv -fno-builtin"
+ fi
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 ])
