@@ -1475,11 +1475,6 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
                  in  hang (text "Patterns not matched:") 4
                        (vcat (take maxPatterns us) $$ dots maxPatterns us)
 
-    -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
-    -- which we only know the type and have no inhabitants at hand)
-    warnEmptyCase ty = pprContext False ctx (text "are non-exhaustive") $ \_ ->
-      hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
-
     approx_msg = vcat
       [ hang
           (text "Pattern match checker ran into -fmax-pmcheck-models="
