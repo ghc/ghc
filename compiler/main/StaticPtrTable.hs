@@ -125,13 +125,13 @@ Here is a running example:
 import GhcPrelude
 
 import CLabel
-import CoreSyn
-import CoreUtils (collectMakeStaticArgs)
+import GHC.Core
+import GHC.Core.Utils (collectMakeStaticArgs)
 import DataCon
 import DynFlags
 import HscTypes
 import Id
-import MkCore (mkStringExprFSWith)
+import GHC.Core.Make (mkStringExprFSWith)
 import Module
 import Name
 import Outputable

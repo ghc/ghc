@@ -50,7 +50,7 @@ import IfaceSyn
 import DataCon
 import Id
 import IdInfo
-import CoreSyn
+import GHC.Core
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )

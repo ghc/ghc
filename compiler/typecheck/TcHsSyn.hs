@@ -79,7 +79,7 @@ import Bag
 import Outputable
 import Util
 import UniqFM
-import CoreSyn
+import GHC.Core
 
 import {-# SOURCE #-} TcSplice (runTopSplice)
 
