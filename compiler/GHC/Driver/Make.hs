@@ -2016,12 +2016,7 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     lookup_key = fmap summaryNodeKey . lookup_node
 
     node_map :: NodeMap SummaryNode
-    node_map = Map.fromList [ ( GWIB
-                                  { gwib_mod = moduleName $ ms_mod s
-                                  , gwib_isBoot = hscSourceToIsBoot $ ms_hsc_src s
-                                  }
-                              , node
-                              )
+    node_map = Map.fromList [ (mkHomeBuildModule s, node)
                             | node <- nodes
                             , let s = summaryNodeSummary node
                             ]
