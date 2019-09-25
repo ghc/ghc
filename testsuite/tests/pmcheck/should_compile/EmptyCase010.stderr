@@ -3,31 +3,31 @@ EmptyCase010.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            (Baz MkGC1)
-            (Baz (MkGC2 _))
+            Baz MkGC1
+            Baz (MkGC2 _)
 
 EmptyCase010.hs:28:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (Baz MkGC1)
+    In a case alternative: Patterns not matched: Baz MkGC1
 
 EmptyCase010.hs:37:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            (Baz MkGD1)
-            (Baz MkGD3)
+            Baz MkGD1
+            Baz MkGD3
 
 EmptyCase010.hs:41:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (Baz MkGD3)
+    In a case alternative: Patterns not matched: Baz MkGD3
 
 EmptyCase010.hs:45:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            (Baz MkGD1)
-            (Baz MkGD2)
-            (Baz MkGD3)
+            Baz MkGD1
+            Baz MkGD2
+            Baz MkGD3
 
 EmptyCase010.hs:57:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -35,7 +35,7 @@ EmptyCase010.hs:57:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase010.hs:69:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (Baz MkDC2)
+    In a case alternative: Patterns not matched: Baz MkDC2
 
 EmptyCase010.hs:73:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
