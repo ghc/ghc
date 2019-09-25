@@ -6,8 +6,6 @@ Pattern Matching Coverage Checking.
 
 {-# LANGUAGE CPP            #-}
 {-# LANGUAGE GADTs          #-}
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
 {-# LANGUAGE MultiWayIf     #-}
@@ -86,19 +84,28 @@ The algorithm is based on the paper:
 %************************************************************************
 -}
 
-data PmPat where
-  -- | For the arguments' meaning see 'HsPat.ConPatOut'.
-  PmCon  :: { pm_con_con     :: PmAltCon
-            , pm_con_arg_tys :: [Type]
-            , pm_con_tvs     :: [TyVar]
-            , pm_con_dicts   :: [EvVar]
-            , pm_con_args    :: [PmPat] } -> PmPat
+data PmPat
+  = -- | For the arguments' meaning see 'HsPat.ConPatOut'.
+    PmCon {
+      pm_con_con     :: PmAltCon,
+      pm_con_arg_tys :: [Type],
+      pm_con_tvs     :: [TyVar],
+      pm_con_dicts   :: [EvVar],
+      pm_con_args    :: [PmPat]
+    }
 
-  PmVar  :: { pm_var_id   :: Id } -> PmPat
+    -- | Possibly strict variable pattern match
+  | PmVar {
+      pm_var_id     :: Id
+    }
 
-  PmGrd  :: { pm_grd_pv   :: PatVec -- ^ Always has 'patVecArity' 1.
-            , pm_grd_expr :: CoreExpr } -> PmPat
-     -- (PmGrd pat expr) matches expr against pat, binding the variables in pat
+    -- | @PmGrd pat expr@ matches @expr@ against @pat@,
+    --   binding the variables in @pat@
+  | PmGrd {
+      pm_grd_pv   :: PatVec,
+      -- ^ Always has 'patVecArity' 1.
+      pm_grd_expr :: CoreExpr
+    }
 
 -- | Should not be user-facing.
 instance Outputable PmPat where
