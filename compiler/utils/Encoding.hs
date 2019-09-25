@@ -45,6 +45,7 @@ import Numeric
 import GHC.IO
 import GHC.ST
 
+import Control.DeepSeq
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import Data.ByteString.Short.Internal (ShortByteString(..))
@@ -157,11 +158,12 @@ utf8DecodeLazy# indexWord8# len#
                 return (C# c# : rest)
 
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
-utf8DecodeStringLazy fp offset (I# len#)
-  = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
+utf8DecodeStringLazy fp offset i@(I# len#)
+  = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr -> do
       let ptr# = unPtr (ptr `plusPtr` offset)
-          index# = indexWord8OffAddr# ptr# in
-      utf8DecodeLazy# index# len#
+          index# = indexWord8OffAddr# ptr#
+      res <- utf8DecodeLazy# index# len#
+      return $!! res
 
 countUTF8Chars :: Ptr Word8 -> Int -> IO Int
 countUTF8Chars ptr len = go ptr 0
