@@ -78,7 +78,10 @@ test('cgrun069',
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
-test('cgrun071', [when(have_cpu_feature('sse4_2'), extra_hc_opts('-msse4.2'))], compile_and_run, [''])
+test('cgrun071',
+     [when(have_cpu_feature('sse4_2'), extra_hc_opts('-msse4.2')),
+      when(arch('i386'), expect_broken_for(17247, ['optasm', 'profthreaded', 'profasm', 'dyn', 'threaded2']))],
+     compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
