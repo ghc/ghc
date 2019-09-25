@@ -73,6 +73,7 @@ import ConLike( ConLike(..) )
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
+import Control.Arrow ( first )
 import Control.Monad
 import Data.Foldable
 import Data.Function ( on )
@@ -786,7 +787,7 @@ These design choices are implemented by two completely different code
 paths for
 
   * Declarations with a standalone kind signature or a complete user-specified
-    kind signature (CUSK). Handled by the kcCheckDeclHeader.
+    kind signature (CUSK). Handled by kcCheckDeclHeader_sig and kcCheckDeclHeader_cusk.
 
   * Declarations without a kind signature (standalone or CUSK) are handled by
     kcInferDeclHeader; see Note [Inferring kinds for type declarations].
@@ -1015,7 +1016,7 @@ inferInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- each with its initial kind
 
 inferInitialKinds decls
-  = do { traceTc "inferInitialKinds {" $ ppr (map (tcdName . unLoc) decls)
+  = do { traceTc "inferInitialKinds {" (ppr (map (tcdName . unLoc) decls))
        ; tcs <- concatMapM infer_initial_kind decls
        ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
@@ -1024,15 +1025,16 @@ inferInitialKinds decls
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
-checkInitialKinds :: [(LTyClDecl GhcRn, SAKS_or_CUSK)] -> TcM [TcTyCon]
+checkInitialKinds :: [(LTyClDecl GhcRn, Maybe Kind)] -> TcM [TcTyCon]
 checkInitialKinds decls
-  = do { traceTc "checkInitialKinds {" $ ppr (mapFst (tcdName . unLoc) decls)
+  = do { traceTc "checkInitialKinds {" (ppr (map (first (tcdName . unLoc)) decls))
        ; tcs <- concatMapM check_initial_kind decls
-       ; traceTc "checkInitialKinds done }" empty
+       ; traceTc "checkInitialKinds }" empty
        ; return tcs }
   where
-    check_initial_kind (ldecl, msig) =
-      addLocM (getInitialKind (InitialKindCheck msig)) ldecl
+    check_initial_kind (ldecl, m_ki) = addLocM (getInitialKind strategy) ldecl
+      where strategy = case m_ki of Nothing -> InitialKindCUSK
+                                    Just ki -> InitialKindStandalone ki
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
 -- depending on the 'InitialKindStrategy'.
@@ -1061,13 +1063,8 @@ getInitialKind strategy
             -- See Note [Don't process associated types in getInitialKind]
        ; inner_tcs <-
            tcExtendNameTyVarEnv parent_tv_prs $
-           mapM (addLocM (getAssocFamInitialKind cls)) ats
+           mapM (addLocM (getFamDeclInitialKind strategy (Just cls))) ats
        ; return (cls : inner_tcs) }
-  where
-    getAssocFamInitialKind cls =
-      case strategy of
-        InitialKindInfer -> get_fam_decl_initial_kind (Just cls)
-        InitialKindCheck _ -> check_initial_kind_assoc_fam cls
 
 getInitialKind strategy
     (DataDecl { tcdLName = dL->L _ name
@@ -1082,25 +1079,8 @@ getInitialKind strategy
                   Nothing -> dataDeclDefaultResultKind new_or_data
         ; return [tc] }
 
-getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
-  = do { tc <- get_fam_decl_initial_kind Nothing decl
-       ; return [tc] }
-
-getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
-  FamilyDecl { fdLName     = unLoc -> name
-             , fdTyVars    = ktvs
-             , fdResultSig = unLoc -> resultSig
-             , fdInfo      = info } } )
-  = do { let flav = getFamFlav Nothing info
-             ctxt = TyFamResKindCtxt name
-       ; tc <- kcDeclHeader (InitialKindCheck msig) name flav ktvs $
-               case famResultKindSignature resultSig of
-                 Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                 Nothing ->
-                   case msig of
-                     CUSK -> return (TheKind liftedTypeKind)
-                     SAKS _ -> return AnyKind
-       ; return [tc] }
+getInitialKind strategy (FamDecl { tcdFam = decl })
+  = (:[]) <$> getFamDeclInitialKind strategy Nothing decl
 
 getInitialKind strategy
     (SynDecl { tcdLName = dL->L _ name
@@ -1110,55 +1090,56 @@ getInitialKind strategy
        ; tc <- kcDeclHeader strategy name TypeSynonymFlavour ktvs $
                case hsTyKindSig rhs of
                  Just rhs_sig -> TheKind <$> tcLHsKindSig ctxt rhs_sig
-                 Nothing -> return AnyKind
+                 Nothing      -> return AnyKind
+
        ; return [tc] }
 
 getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-getInitialKind _ (FamDecl {tcdFam = XFamilyDecl nec}) = noExtCon nec
 getInitialKind _ (XTyClDecl nec) = noExtCon nec
 
-get_fam_decl_initial_kind
-  :: Maybe TcTyCon -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyDecl GhcRn
-  -> TcM TcTyCon
-get_fam_decl_initial_kind mb_parent_tycon
+-- Associated type families cannot have standalone kind signatures. So
+-- if we have an associated type here (i.e., the parent tycon is Just cls)
+-- then we understand an InitialKindStrategy of InitialKindStandalone _ to mean
+-- that the associated type has a CUSK.
+-- See Note [Standalone kind signatures for associated types]
+getFamDeclInitialKind :: InitialKindStrategy
+                      -> Maybe TcTyCon -- ^ Just cls <=> this is an associated family
+                      -> FamilyDecl GhcRn
+                      -> TcM TcTyCon
+getFamDeclInitialKind strategy mb_parent_tycon
     FamilyDecl { fdLName     = (dL->L _ name)
                , fdTyVars    = ktvs
                , fdResultSig = (dL->L _ resultSig)
                , fdInfo      = info }
-  = kcDeclHeader InitialKindInfer name flav ktvs $
-    case resultSig of
-      KindSig _ ki                              -> TheKind <$> tcLHsKindSig ctxt ki
-      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> TheKind <$> tcLHsKindSig ctxt ki
-      _ -- open type families have * return kind by default
-        | tcFlavourIsOpen flav              -> return (TheKind liftedTypeKind)
-               -- closed type families have their return kind inferred
-               -- by default
-        | otherwise                         -> return AnyKind
+  = kcDeclHeader strategy' name flav ktvs $
+    case famResultKindSignature resultSig of
+      Just hs_ki -> TheKind <$> tcLHsKindSig ctxt hs_ki
+      Nothing    -> return default_kind
+
   where
     flav = getFamFlav mb_parent_tycon info
     ctxt = TyFamResKindCtxt name
-get_fam_decl_initial_kind _ (XFamilyDecl nec) = noExtCon nec
 
--- See Note [Standalone kind signatures for associated types]
-check_initial_kind_assoc_fam
-  :: TcTyCon -- parent class
-  -> FamilyDecl GhcRn
-  -> TcM TcTyCon
-check_initial_kind_assoc_fam cls
-  FamilyDecl
-    { fdLName     = unLoc -> name
-    , fdTyVars    = ktvs
-    , fdResultSig = unLoc -> resultSig
-    , fdInfo      = info }
-  = kcDeclHeader (InitialKindCheck CUSK) name flav ktvs $
-    case famResultKindSignature resultSig of
-      Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-      Nothing -> return (TheKind liftedTypeKind)
-  where
-    ctxt = TyFamResKindCtxt name
-    flav = getFamFlav (Just cls) info
-check_initial_kind_assoc_fam _ (XFamilyDecl nec) = noExtCon nec
+    strategy'
+      | Just _ <- mb_parent_tycon
+      , InitialKindStandalone _ <- strategy
+      = InitialKindCUSK
+
+      | otherwise
+      = strategy
+
+    default_kind
+      | InitialKindStandalone _ <- strategy'   -- NB: strategy', not strategy
+      = AnyKind
+
+      | tcFlavourIsOpen flav
+      = TheKind liftedTypeKind    -- an open family without a standalone signature
+                                  -- defaults to have a return kind of Type
+
+      | otherwise         -- closed type families infer their return kind
+      = AnyKind
+
+getFamDeclInitialKind _ _ (XFamilyDecl nec) = noExtCon nec
 
 {- Note [Standalone kind signatures for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

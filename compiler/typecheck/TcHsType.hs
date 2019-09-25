@@ -1793,18 +1793,9 @@ newWildTyVar
 
 -- See Note [kcCheckDeclHeader vs kcInferDeclHeader]
 data InitialKindStrategy
-  = InitialKindCheck SAKS_or_CUSK
+  = InitialKindStandalone Kind
+  | InitialKindCUSK
   | InitialKindInfer
-
--- Does the declaration have a standalone kind signature (SAKS) or a complete
--- user-specified kind (CUSK)?
-data SAKS_or_CUSK
-  = SAKS Kind  -- Standalone kind signature, fully zonked! (zonkTcTypeToType)
-  | CUSK       -- Complete user-specified kind (CUSK)
-
-instance Outputable SAKS_or_CUSK where
-  ppr (SAKS k) = text "SAKS" <+> ppr k
-  ppr CUSK = text "CUSK"
 
 -- See Note [kcCheckDeclHeader vs kcInferDeclHeader]
 kcDeclHeader
@@ -1814,8 +1805,9 @@ kcDeclHeader
   -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
-kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
-kcDeclHeader InitialKindInfer = kcInferDeclHeader
+kcDeclHeader (InitialKindStandalone ki) = kcCheckDeclHeader_sig ki
+kcDeclHeader InitialKindCUSK            = kcCheckDeclHeader_cusk
+kcDeclHeader InitialKindInfer           = kcInferDeclHeader
 
 {- Note [kcCheckDeclHeader vs kcInferDeclHeader]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1834,16 +1826,6 @@ of a type constructor.
 -}
 
 ------------------------------
-kcCheckDeclHeader
-  :: SAKS_or_CUSK
-  -> Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
-  -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
-kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
-kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
-
 kcCheckDeclHeader_cusk
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
