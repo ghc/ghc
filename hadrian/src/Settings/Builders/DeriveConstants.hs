@@ -29,6 +29,7 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
 includeCcArgs :: Args
 includeCcArgs = do
     root <- getBuildRoot
+    stage <- getStage
     mconcat [ cArgs
             , cWarnings
             , getSettingList $ ConfCcArgs Stage1
@@ -36,5 +37,6 @@ includeCcArgs = do
             , arg "-Irts"
             , arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
+            , arg $ "-I" ++ root -/- stageString stage -/- generatedDir
             , notM ghcWithSMP ? arg "-DNOSMP"
             , arg "-fcommon" ]

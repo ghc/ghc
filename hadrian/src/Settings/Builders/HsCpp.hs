@@ -12,6 +12,7 @@ hsCppBuilderArgs = builder HsCpp ? do
             , arg "-P"
             , arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
+            , arg $ "-I" ++ root -/- stageString stage -/- generatedDir
             , arg $ "-I" ++ ghcPath
             , arg "-x", arg "c"
             , arg =<< getInput ]

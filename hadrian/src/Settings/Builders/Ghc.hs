@@ -210,6 +210,7 @@ includeGhcArgs = do
     path    <- getBuildPath
     root    <- getBuildRoot
     context <- getContext
+    stage   <- getStage
     srcDirs <- getContextData srcDirs
     autogen <- expr $ autogenPath context
     let cabalMacros = autogen -/- "cabal_macros.h"
@@ -219,6 +220,8 @@ includeGhcArgs = do
             , arg $ "-i" ++ autogen
             , pure [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
-            , arg $      "-I" ++ root -/- generatedDir
-            , arg $ "-optc-I" ++ root -/- generatedDir
-            , pure ["-optP-include", "-optP" ++ cabalMacros] ]
+            ] <>
+            (notStage0 ? mconcat
+            [ arg $ "-optc-I" ++ root -/- generatedDir
+            , arg $ "-optc-I" ++ root -/- stageString stage -/- generatedDir
+            , pure ["-optP-include", "-optP" ++ cabalMacros] ])

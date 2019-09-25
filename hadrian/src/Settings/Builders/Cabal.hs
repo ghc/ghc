@@ -101,6 +101,7 @@ configureArgs = do
     top  <- expr topDirectory
     root <- getBuildRoot
     pkg  <- getPackage
+    stage <- getStage
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
@@ -108,6 +109,7 @@ configureArgs = do
         cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , getStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ top -/- root -/- generatedDir
+                           , arg $ "-I" ++ top -/- root -/- stageString stage -/- generatedDir
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
                            , arg $ top -/- pkgPath pkg
@@ -141,7 +143,9 @@ bootPackageConstraints = stage0 ? do
 cppArgs :: Args
 cppArgs = do
     root <- getBuildRoot
+    stage <- getStage
     arg $ "-I" ++ root -/- generatedDir
+    arg $ "-I" ++ root -/- stageString stage -/- generatedDir
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of

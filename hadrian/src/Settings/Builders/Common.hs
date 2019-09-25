@@ -24,13 +24,15 @@ cIncludeArgs = do
     pkg     <- getPackage
     root    <- getBuildRoot
     path    <- getBuildPath
+    stage   <- getStage
     incDirs <- getContextData includeDirs
     depDirs <- getContextData depIncludeDirs
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
     mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
-            , arg $ "-I" ++ root -/- generatedDir
+            , notStage0 ? arg ("-I" ++ root -/- generatedDir)
+            , notStage0 ? arg ("-I" ++ root -/- stageString stage -/- generatedDir)
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
             , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)

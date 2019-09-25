@@ -420,7 +420,7 @@ generateGhcBootPlatformH = do
     return $ unlines
         [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
-        , "#define GHC_STAGE " ++ show (fromEnum stage)
+        , "#define GHC_STAGE " ++ show (fromEnum stage + 1)
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform
