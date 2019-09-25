@@ -121,11 +121,14 @@ rnUnboundVar v
 rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
+       ; dflags <- getDynFlags
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;
            Just (Left name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
+                                       -- Note [Empty lists] in GHC.Hs.Expr
+              , xopt LangExt.OverloadedLists dflags
               -> rnExpr (ExplicitList noExtField Nothing [])
 
               | otherwise
