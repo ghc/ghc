@@ -1,0 +1,5 @@
+
+saks_fail025.hs:7:6: error:
+    Standalone kind signatures do not support multiple names at the moment:
+      A, B, C
+    See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details.

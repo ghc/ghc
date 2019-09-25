@@ -6,10 +6,12 @@
 bkpfail42.bkp:9:9: error:
     • Type constructor ‘F’ has conflicting definitions in the module
       and its hsig file
-      Main module: type family F a :: *
-                     where F a = Int
-      Hsig file:  type family F a :: *
-                    where F a = Bool
+      Main module: type F :: * -> *
+                   type family F a where
+                       F a = Int
+      Hsig file:  type F :: * -> *
+                  type family F a where
+                      F a = Bool
     • while merging the signatures from:
         • p[A=<A>]:A
         • ...and the local signature for A

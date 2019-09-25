@@ -242,6 +242,7 @@ extraConstraintWildCardsAllowed env
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
       DerivDeclCtx {}     -> True
+      StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in GHC/Hs/Decls
       _                   -> False
 
 -- | Finds free type and kind variables in a type,
@@ -295,19 +296,22 @@ of the HsWildCardBndrs structure, and we are done.
 *                                                       *
 ****************************************************** -}
 
-rnHsSigType :: HsDocContext -> LHsSigType GhcPs
+rnHsSigType :: HsDocContext
+            -> TypeOrKind
+            -> LHsSigType GhcPs
             -> RnM (LHsSigType GhcRn, FreeVars)
 -- Used for source-language type signatures
 -- that cannot have wildcards
-rnHsSigType ctx (HsIB { hsib_body = hs_ty })
+rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
        ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
-    do { (body', fvs) <- rnLHsType ctx hs_ty
+    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
+
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
                 , fvs ) } }
-rnHsSigType _ (XHsImplicitBndrs nec) = noExtCon nec
+rnHsSigType _ _ (XHsImplicitBndrs nec) = noExtCon nec
 
 rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
                            -- E.g.  f :: forall a. a->b
@@ -563,9 +567,9 @@ rnHsTyKi env t@(HsKindSig _ ty k)
   = do { checkPolyKinds env t
        ; kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
-       ; (ty', fvs1) <- rnLHsTyKi env ty
-       ; (k', fvs2)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
-       ; return (HsKindSig noExtField ty' k', fvs1 `plusFV` fvs2) }
+       ; (ty', lhs_fvs) <- rnLHsTyKi env ty
+       ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; return (HsKindSig noExtField ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -734,6 +738,7 @@ wildCardsAllowed env
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True
+       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in GHC/Hs/Decls
        _                   -> False
 
 
