@@ -616,10 +616,10 @@ TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
- '_('           { L _ ITopenTypedHole }
- CLOSE_HOLE     { L _ (ITcloseTypedHole _) }
- '_$('          { L _ ITopenTypedHoleEscape }
- '_$$('         { L _ ITopenTypedHoleTyEscape }
+'_('           { L _ ITopenTypedHole }
+CLOSE_HOLE     { L _ (ITcloseTypedHole _) }
+'_$('          { L _ ITopenTypedHoleEscape }
+'_$$('         { L _ ITopenTypedHoleTyEscape }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
@@ -2868,7 +2868,7 @@ infix_extended_typed_hole :: { forall b. DisambInfixOp b => PV (Located b) }
                                                              [mj AnnBackquote $1, mj AnnBackquote $3 ] }
 
 
-typed_hole_splice :: { (Located (Maybe Integer), Located (HsSplice GhcPs) ) }
+typed_hole_splice :: { (Located (Maybe FastString), Located (HsSplice GhcPs) ) }
         : '_$('  exp hole_close    {% runECP_P $2
                                     >>= \ $2 -> ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
                                                     [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3]
@@ -2878,7 +2878,7 @@ typed_hole_splice :: { (Located (Maybe Integer), Located (HsSplice GhcPs) ) }
                                                     [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3]
                                     >>= \ $2 -> return ($3, $2) }
 
-hole_close :: { Located (Maybe Integer) }
+hole_close :: { Located (Maybe FastString) }
   : ')'           {% ams (sL1 $1 Nothing) [mj AnnCloseHoleP $1] }
   | CLOSE_HOLE     {% ams (sL1 $1 $ Just $ getCLOSE_HOLE $1) [mj AnnCloseHoleP $1] }
 

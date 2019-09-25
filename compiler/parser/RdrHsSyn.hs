@@ -1839,8 +1839,14 @@ class DisambInfixOp b where
   mkHsVarOpPV :: Located RdrName -> PV (Located b)
   mkHsConOpPV :: Located RdrName -> PV (Located b)
   mkHsInfixHolePV :: SrcSpan -> PV (Located b)
-  mkHsExtInfixHolePV :: SrcSpan -> Located (Maybe Integer) -> Maybe (Located FastString) -> PV (Located b)
-  mkHsExtInfixHoleSplicePV :: SrcSpan -> Located (Maybe Integer) -> Located (HsSplice GhcPs) -> PV (Located b)
+  mkHsExtInfixHolePV :: SrcSpan
+                     -> Located (Maybe FastString)
+                     -> Maybe (Located FastString)
+                     -> PV (Located b)
+  mkHsExtInfixHoleSplicePV :: SrcSpan
+                           -> Located (Maybe FastString)
+                           -> Located (HsSplice GhcPs)
+                           -> PV (Located b)
 
 instance p ~ GhcPs => DisambInfixOp (HsExpr p) where
   mkHsVarOpPV v = return $ cL (getLoc v) (HsVar noExtField v)
@@ -1910,8 +1916,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | Disambiguate a wildcard
   mkHsWildCardPV :: SrcSpan -> PV (Located b)
   -- | An extended hole _(...), _$(...) or _$$(...)
-  mkHsExtHolePV :: SrcSpan -> Located (Maybe Integer) -> Maybe (Located FastString) -> PV (Located b)
-  mkHsExtHoleSplicePV :: SrcSpan -> Located (Maybe Integer) -> Located (HsSplice GhcPs) -> PV (Located b)
+  mkHsExtHolePV :: SrcSpan -> Located (Maybe FastString) -> Maybe (Located FastString) -> PV (Located b)
+  mkHsExtHoleSplicePV :: SrcSpan -> Located (Maybe FastString) -> Located (HsSplice GhcPs) -> PV (Located b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV :: SrcSpan -> Located b -> LHsType GhcPs -> PV (Located b)
   -- | Disambiguate "[a,b,c]" (list syntax)
@@ -2097,19 +2103,19 @@ hsHoleExpr :: HsExpr (GhcPass id)
 hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
 
 -- See Note [Extended Typed-Holes]
-hsExtHoleExpr :: Located (Maybe Integer)
+hsExtHoleExpr :: Located (Maybe FastString)
               -> Maybe (Located FastString)
               -> HsExpr (GhcPass id)
 hsExtHoleExpr hid fs =
       HsExtendedHole noExtField (ExtendedHole (mkVarOcc ("_(...)" ++ i)) fs)
-  where i = maybe "" show $ unLoc hid
+  where i = maybe "" unpackFS $ unLoc hid
 
-hsExtHoleSpliceExpr :: Located (Maybe Integer)
+hsExtHoleSpliceExpr :: Located (Maybe FastString)
                     -> Located (HsSplice (GhcPass p))
                     -> HsExpr (GhcPass p)
 hsExtHoleSpliceExpr hid lspl@(L _ spl) =
    HsExtendedHole noExtField $ ExtendedHoleSplice (mkVarOcc $ pat ++ i) lexpr
-    where i = maybe "" show $ unLoc hid
+    where i = maybe "" unpackFS $ unLoc hid
           lexpr = mapLoc (HsSpliceE noExtField) lspl
           pat = case spl of
                   HsUntypedSplice{} -> "_$(...)"

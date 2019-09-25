@@ -382,9 +382,9 @@ $tab          { warnTab }
   "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
   "_("        / { ifExtension EthBit }     { token ITopenTypedHole }
-  \) $decdigit $decdigit*
+  \) $idchar $idchar*
     / { ifExtension EthBit }
-    { skip_one_decimal ITcloseTypedHole }
+    { skip_one_varid ITcloseTypedHole }
   "_$("
     / { ifExtension EthBit `alexAndPred`
         ifExtension ThBit }
@@ -796,7 +796,7 @@ data Token
 
   -- Typed-holes
   | ITopenTypedHole              -- ^ _(
-  | ITcloseTypedHole Integer     -- ^ )0
+  | ITcloseTypedHole FastString  -- ^ )0 or )varid
   | ITopenTypedHoleEscape        -- ^ _$(
   | ITopenTypedHoleTyEscape      -- ^ _$$(
 
@@ -964,10 +964,6 @@ skip_one_varid f span buf len
 skip_two_varid :: (FastString -> Token) -> Action
 skip_two_varid f span buf len
   = return (L span $! f (lexemeToFastString (stepOn (stepOn buf)) (len-2)))
-
-skip_one_decimal :: (Integer -> Token) -> Action
-skip_one_decimal f span buf len
-  = return $ L span $! f (parseUnsignedInteger (stepOn buf) (len-1) 10 octDecDigit)
 
 strtoken :: (String -> Token) -> Action
 strtoken f span buf len =
