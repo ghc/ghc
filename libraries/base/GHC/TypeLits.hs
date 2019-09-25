@@ -13,9 +13,15 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
 
-{-| This module is an internal GHC module.  It declares the constants used
-in the implementation of type-level natural numbers.  The programmer interface
-for working with type-level naturals should be defined in a separate library.
+{-| There are two kinds of data representable at the type level using
+GHC's @DataKinds@ extension to the Haskell language: natural numbers
+(the 'Nat' kind) and type-level strings (the 'Symbol' kind).
+
+For now, this module is the API for working with type-level literals.
+However, please note that it is a work in progress and is subject to change.
+Once the design of the @DataKinds@ feature is more stable, this will be
+considered only an internal GHC module, and the programmer interface for
+working with type-level data will be defined in a separate library.
 
 @since 4.6.0.0
 -}
