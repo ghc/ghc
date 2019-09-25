@@ -927,35 +927,63 @@ In some cases we want to deeply instantiate before filling in
 an InferResult, and in some cases not.  That's why InferReult
 has the ir_inst flag.
 
-* ir_inst = True: deeply instantiate
+ir_inst = True: deeply instantiate
+----------------------------------
 
-  Consider
+1. Consider
     f x = (*)
-  We want to instantiate the type of (*) before returning, else we
-  will infer the type
-    f :: forall {a}. a -> forall b. Num b => b -> b -> b
-  This is surely confusing for users.
+   We want to instantiate the type of (*) before returning, else we
+   will infer the type
+     f :: forall {a}. a -> forall b. Num b => b -> b -> b
+   This is surely confusing for users.
 
-  And worse, the monomorphism restriction won't work properly. The MR is
-  dealt with in simplifyInfer, and simplifyInfer has no way of
-  instantiating. This could perhaps be worked around, but it may be
-  hard to know even when instantiation should happen.
+   And worse, the monomorphism restriction won't work properly. The MR is
+   dealt with in simplifyInfer, and simplifyInfer has no way of
+   instantiating. This could perhaps be worked around, but it may be
+   hard to know even when instantiation should happen.
 
-  Another reason.  Consider
+2. Another reason.  Consider
        f :: (?x :: Int) => a -> a
        g y = let ?x = 3::Int in f
-  Here want to instantiate f's type so that the ?x::Int constraint
-  gets discharged by the enclosing implicit-parameter binding.
+   Here want to instantiate f's type so that the ?x::Int constraint
+   gets discharged by the enclosing implicit-parameter binding.
 
-* ir_inst = False: do not instantiate
+ir_inst = False: do not instantiate
+-----------------------------------
 
-  Consider this (which uses visible type application):
+1. Consider this (which uses visible type application):
 
     (let { f :: forall a. a -> a; f x = x } in f) @Int
 
-  We'll call TcExpr.tcInferFun to infer the type of the (let .. in f)
-  And we don't want to instantite the type of 'f' when we reach it,
-  else the outer visible type application won't work
+   We'll call TcExpr.tcInferFun to infer the type of the (let .. in f)
+   And we don't want to instantite the type of 'f' when we reach it,
+   else the outer visible type application won't work
+
+2. :type +v. When we say
+
+     :type +v const @Int
+
+   we really want `forall b. Int -> b -> Int`. Note that this is *not*
+   instantiated.
+
+3. Pattern bindings. For example:
+
+     foo x
+       | blah <- const @Int
+       = (blah x False, blah x 'z')
+
+   Note that `blah` is polymorphic. (This isn't a terribly compelling
+   reason, but the choice of ir_inst does matter here.)
+
+Discussion
+----------
+We thought that we should just remove the ir_inst flag, in favor of
+always instantiating. Essentially: motivations (1) and (3) for ir_inst = False
+are not terribly exciting. However, motivation (2) is quite important.
+Furthermore, there really was not much of a simplification of the code
+in removing ir_inst, and working around it to enable flows like what we
+see in (2) is annoying. This was done in #17173.
+
 -}
 
 {- *********************************************************************
