@@ -96,6 +96,7 @@ data PmPat
 
     -- | Possibly strict variable pattern match
   | PmVar {
+      pm_var_strict :: Bool,
       pm_var_id     :: Id
     }
 
@@ -111,7 +112,7 @@ data PmPat
 instance Outputable PmPat where
   ppr (PmCon alt _arg_tys _con_tvs _con_dicts con_args)
     = cparen (notNull con_args) (hsep [ppr alt, hsep (map ppr con_args)])
-  ppr (PmVar vid) = ppr vid
+  ppr (PmVar bang vid) = (if bang then char '!' else empty) <> ppr vid
   ppr (PmGrd pv ge) = hsep (map ppr pv) <+> text "<-" <+> ppr ge
 
 -- data T a where
@@ -484,17 +485,18 @@ mkPmLitPattern lit@(PmLit _ val)
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVars [ty]
-  VarPat _ id  -> return [PmVar (unLoc id)]
+  VarPat _ id  -> return [PmVar False (unLoc id)]
   ParPat _ p   -> translatePat fam_insts (unLoc p)
   LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
-
-  -- ignore strictness annotations for now
-  BangPat _ p  -> translatePat fam_insts (unLoc p)
+  BangPat _ p  -> map_single strictenPmPat <$> translatePat fam_insts (unLoc p)
+    where
+      map_single f [x] = [f x]
+      map_single _ xs  = xs
 
   -- (x@pat)   ===>   x (pat <- x)
   AsPat _ (dL->L _ x) p -> do
     pat <- translatePat fam_insts (unLoc p)
-    pure [PmVar x, PmGrd pat (Var x)]
+    pure [PmVar False x, PmGrd pat (Var x)]
 
   SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
@@ -513,8 +515,8 @@ translatePat fam_insts pat = case pat of
     (xp, xe) <- mkPmId2Forms pat_ty
     let ke1 = HsOverLit noExtField (unLoc k1)
         ke2 = HsOverLit noExtField k2
-    g1 <- mkGuardSyntaxExpr [truePattern] ge    [unLoc xe, ke1]
-    g2 <- mkGuardSyntaxExpr [PmVar n]     minus [ke2]
+    g1 <- mkGuardSyntaxExpr [truePattern]   ge    [unLoc xe, ke1]
+    g2 <- mkGuardSyntaxExpr [PmVar False n] minus [ke2]
     return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
@@ -635,30 +637,30 @@ translateConPatVec fam_insts _univ_tys _ex_tvs _ (InfixCon p1 p2)
   = concat <$> translatePatVec fam_insts (map unLoc [p1,p2])
 translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- Nothing matched. Make up some fresh term variables
-  | null fs        = mkPmVars arg_tys
+  | null fs        = mkPmVarsStrictened str_arg_tys
     -- The data constructor was not defined using record syntax. For the
     -- pattern to be in record syntax it should be empty (e.g. Just {}).
     -- So just like the previous case.
-  | null orig_lbls = ASSERT(null matched_lbls) mkPmVars arg_tys
+  | null orig_lbls = ASSERT(null matched_lbls) mkPmVarsStrictened str_arg_tys
     -- Some of the fields appear, in the original order (there may be holes).
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
   | matched_lbls `subsetOf` orig_lbls
   = ASSERT(orig_lbls `equalLength` arg_tys)
-      let translateOne (lbl, ty) = case lookup lbl matched_pats of
+      let translateOne (lbl, (str_mark, ty)) = case lookup lbl matched_pats of
             Just p  -> translatePat fam_insts p
-            Nothing -> mkPmVars [ty]
-      in  concatMapM translateOne (zip orig_lbls arg_tys)
+            Nothing -> mkPmVarsStrictened [(str_mark, ty)]
+      in  concatMapM translateOne (zip orig_lbls str_arg_tys)
     -- The fields that appear are not in the correct order. Make up fresh
     -- variables for all fields and add guards after matching, to force the
     -- evaluation in the correct order.
   | otherwise = do
-      arg_var_pats    <- mkPmVars arg_tys
+      arg_var_pats    <- mkPmVarsStrictened str_arg_tys
       translated_pats <- forM matched_pats $ \(x,pat) -> do
         pvec <- translatePat fam_insts pat
         return (x, pvec)
 
-      let zipped = zip orig_lbls [ x | PmVar x <- arg_var_pats ]
+      let zipped = zip orig_lbls [ x | PmVar _ x <- arg_var_pats ]
           guards = map (\(name,pvec) -> case lookup name zipped of
                             Just x  -> PmGrd pvec (Var x)
                             Nothing -> panic "translateConPatVec: lookup")
@@ -666,8 +668,12 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 
       return (arg_var_pats ++ guards)
   where
-    -- The actual argument types (instantiated)
-    arg_tys = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    -- The actual argument types (instantiated), with strictness marks
+    str_arg_tys = zip str_marks arg_tys
+    arg_tys     = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    str_marks
+      | RealDataCon dc <- c = dataConRepStrictness dc
+      | otherwise           = zipWith const (repeat NotMarkedStrict) arg_tys
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -863,13 +869,29 @@ mkGuardSyntaxExpr pv f args = do
   core_args <- traverse dsExpr args
   PmGrd pv <$> dsSyntaxExpr f core_args
 
--- | Generate a variable pattern of a given type
+-- | Generate a lazy variable pattern of a given type
 mkPmVar :: Type -> DsM PmPat
-mkPmVar ty = PmVar <$> mkPmId ty
+mkPmVar ty = PmVar False <$> mkPmId ty
 
--- | Generate many variable patterns, given a list of types
+-- | Generate many lazy variable patterns, given a list of types
 mkPmVars :: [Type] -> DsM PatVec
 mkPmVars tys = mapM mkPmVar tys
+
+-- | Generate many possibly strict variable patterns, given a list of types and
+-- their strictness
+mkPmVarsStrictened :: [(StrictnessMark, Type)] -> DsM PatVec
+mkPmVarsStrictened marks_and_tys = mapM mk_pm_var marks_and_tys
+  where
+    mk_pm_var (mark, ty) = PmVar (isMarkedStrict mark) <$> mkPmId ty
+
+-- | Applicable when there's a surrounding BangPat or it's a strict constructor
+-- field.
+strictenPmPat :: PmPat -> PmPat
+strictenPmPat (PmVar _ x) = PmVar True x
+-- PmCon is strict anyway
+strictenPmPat p@PmCon{}   = p
+-- PmGrd isn't really applicable because of patternArity 0
+strictenPmPat p@PmGrd{}   = p
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern
@@ -877,7 +899,7 @@ mkPmVars tys = mapM mkPmVar tys
 mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar x, noLoc (HsVar noExtField (noLoc x)))
+  return (PmVar False x, noLoc (HsVar noExtField (noLoc x)))
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -1073,7 +1095,7 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
-pmcheck (PmVar x : ps) guards (y : vva) n delta = do
+pmcheck (PmVar strict x : ps) guards (y : vva) n delta = do
   delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
   pmcheckI ps guards vva n delta'
 
@@ -1110,7 +1132,7 @@ pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
 
 addPositiveInfoFromPmCon :: Delta -> Id -> PmAltCon -> [EvVar] -> PatVec -> DsM (Maybe (Delta, ValVec))
 addPositiveInfoFromPmCon delta x con dicts field_pats = do
-  let mk_id (PmVar x) = pure (Just x)
+  let mk_id (PmVar _ x) = pure (Just x)
       mk_id p@PmCon{} = Just <$> mkPmId (pmPatType p)
       mk_id PmGrd{}   = pure Nothing -- PmGrds have arity 0, so just forget about them
   field_vas <- catMaybes <$> traverse mk_id field_pats
@@ -1232,7 +1254,7 @@ computeCovered (PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) vva delta = do
   x <- mkPmId (exprType e)
   delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
   computeCovered (pv ++ ps) (x : vva) delta'
-computeCovered (PmVar x : ps) (y : vva) delta = do
+computeCovered (PmVar _ x : ps) (y : vva) delta = do
   delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
   computeCovered ps vva delta'
 computeCovered (p : ps) (x : vva) delta
