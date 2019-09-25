@@ -1940,7 +1940,9 @@ genCCall dflags is32Bit (PrimTarget (MO_PopCnt width)) dest_regs@[dst]
          args@[src] bid = do
     sse4_2 <- sse4_2Enabled
     let platform = targetPlatform dflags
-    if sse4_2
+    -- N.B. 64-bit population count is not supported on 32-bit platforms, even
+    -- with SSE4.2. Fall back to C implementation in this case
+    if sse4_2 && not (is32Bit && width == W64)
         then do code_src <- getAnyReg src
                 src_r <- getNewRegNat format
                 let dst_r = getRegisterReg platform  (CmmLocal dst)
