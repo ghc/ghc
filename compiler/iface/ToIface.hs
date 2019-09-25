@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE Strict #-}
 
 -- | Functions for converting Core things to interface file things.
 module ToIface
