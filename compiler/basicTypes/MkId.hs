@@ -1595,6 +1595,14 @@ running the simplifier.
 when we serialize an expression to the interface format. See
 Note [Inlining and hs-boot files] in ToIface
 
+Note that noinline as currently implemented can hide some simplifications since
+it hides strictness from the demand analyser. Specifically, the demand analyser
+will treat 'noinline f x' as lazy in 'x', even if the demand signature of 'f'
+specifies that it is strict in its argument. We considered fixing this this by adding a
+special case to the demand analyser to address #16588. However, the special
+case seemed like a large and expensive hammer to address a rare case and
+consequently we rather opted to use a more minimal solution.
+
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the context of making left-folds fuse somewhat okish (see ticket #7994
