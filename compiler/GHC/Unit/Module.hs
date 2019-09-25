@@ -47,8 +47,6 @@ module GHC.Unit.Module
     , installedModuleEq
 
       -- * Boot modules
-    , ModuleNameWithIsBoot
-    , ModuleWithIsBoot
     , GenWithIsBoot(..)
     ) where
 
