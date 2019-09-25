@@ -390,6 +390,7 @@ data HsExpr p
   --         'ApiAnnotation.AnnClose'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
+  -- Note [ExplicitTuple]
   | ExplicitTuple
         (XExplicitTuple p)
         [LHsTupArg p]
@@ -468,6 +469,7 @@ data HsExpr p
   --              'ApiAnnotation.AnnClose' @']'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
+  -- See Note [Empty lists]
   | ExplicitList
                 (XExplicitList p)  -- Gives type of components of list
                 (Maybe (SyntaxExpr p))
@@ -841,6 +843,71 @@ in the ParsedSource.
 There are unfortunately enough differences between the ParsedSource and the
 RenamedSource that the API Annotations cannot be used directly with
 RenamedSource, so this allows a simple mapping to be used based on the location.
+
+Note [ExplicitTuple]
+~~~~~~~~~~~~~~~~~~~~
+An ExplicitTuple is never just a data constructor like (,,,).
+That is, the `[LHsTupArg p]` argument of `ExplicitTuple` has at least
+one `Present` member (and is thus never empty).
+
+A tuple data constructor like () or (,,,) is parsed as an `HsVar`, not an
+`ExplicitTuple`, and stays that way. This is important for two reasons:
+
+  1. We don't need -XTupleSections for (,,,)
+  2. The type variables in (,,,) can be instantiated with visible type application.
+     That is,
+
+       (,,)     :: forall a b c. a -> b -> c -> (a,b,c)
+       (True,,) :: forall {b} {c}. b -> c -> (Bool,b,c)
+
+     Note that the tuple section has *inferred* arguments, while the data
+     constructor has *specified* ones.
+     (See Note [Required, Specified, and Inferred for types] in TcTyClsDecls
+     for background.)
+
+Sadly, the grammar for this is actually ambiguous, and it's only thanks to the
+preference of a shift in a shift/reduce conflict that the parser works as this
+Note details. Search for a reference to this Note in Parser.y for further
+explanation.
+
+Note [Empty lists]
+~~~~~~~~~~~~~~~~~~
+An empty list could be considered either a data constructor (stored with
+HsVar) or an ExplicitList. This Note describes how empty lists flow through the
+various phases and why.
+
+Parsing
+-------
+An empty list is parsed by the sysdcon nonterminal. It thus comes to life via
+HsVar nilDataCon (defined in TysWiredIn). A freshly-parsed (HsExpr GhcPs) empty list
+is never a ExplicitList.
+
+Renaming
+--------
+If -XOverloadedLists is enabled, we must type-check the empty list as if it
+were a call to fromListN. (This is true regardless of the setting of
+-XRebindableSyntax.) This is very easy if the empty list is an ExplicitList,
+but an annoying special case if it's an HsVar. So the renamer changes a
+HsVar nilDataCon to an ExplicitList [], but only if -XOverloadedLists is on.
+(Why not always? Read on, dear friend.) This happens in the HsVar case of rnExpr.
+
+Type-checking
+-------------
+We want to accept an expression like [] @Int. To do this, we must infer that
+[] :: forall a. [a]. This is easy if [] is a HsVar with the right DataCon inside.
+However, the type-checking for explicit lists works differently: [x,y,z] is never
+polymorphic. Instead, we unify the types of x, y, and z together, and use the
+unified type as the argument to the cons and nil constructors. Thus, treating
+[] as an empty ExplicitList in the type-checker would prevent [] @Int from working.
+
+However, if -XOverloadedLists is on, then [] @Int really shouldn't be allowed:
+it's just like fromListN 0 [] @Int. Since
+  fromListN :: forall list. IsList list => Int -> [Item list] -> list
+that expression really should be rejected. Thus, the renamer's behaviour is
+exactly what we want: treat [] as a datacon when -XNoOverloadedLists, and as
+an empty ExplicitList when -XOverloadedLists.
+
+See also #13680, which requested [] @Int to work.
 -}
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p) where
