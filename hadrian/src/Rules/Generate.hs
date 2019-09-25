@@ -78,7 +78,7 @@ generatedDependencies = do
     root     <- getBuildRoot
     stage    <- getStage
     rtsPath  <- expr (rtsBuildPath stage)
-    includes <- expr includesDependencies
+    includes <- expr (includesDependencies stage)
     mconcat [ package compiler ? compilerDependencies
             , package ghcPrim  ? ghcPrimDependencies
             , package rts      ? return (fmap (rtsPath -/-) libffiHeaderFiles
@@ -121,7 +121,7 @@ generatePackageCode context@(Context stage pkg _) = do
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
-            includes <- includesDependencies
+            includes <- includesDependencies stage
             need $ [primopsSource] ++ includes
             build $ target context HsCpp [primopsSource] [file]
 
@@ -134,7 +134,7 @@ generatePackageCode context@(Context stage pkg _) = do
         -- TODO: This should be fixed properly, e.g. generated here on demand.
         (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
         (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir -/- stageString stage))
         (root -/- "**" -/- dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
  where
     pattern <~ mdir = pattern %> \file -> do
@@ -176,8 +176,8 @@ generateRules = do
     (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
 
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
-    priority 2.0 $ generate (root -/- generatedDir -/- "stage1" -/- "ghcplatform.h") Stage1 generateGhcPlatformH
-    priority 2.0 $ generate (root -/- generatedDir -/- "stage2" -/- "ghcplatform.h") Stage2 generateGhcPlatformH
+    priority 2.0 $ genPlatformH root Stage0
+    priority 2.0 $ genPlatformH root Stage1
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
@@ -191,8 +191,11 @@ generateRules = do
   where
     file <~  gen = file %> \out -> generate out emptyTarget gen
     file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
-    generate file stage gen =
-        file %> \out -> generate out (semiEmptyTarget stage) gen >> makeExecutable out
+    genPlatformH root stage = file %> \out -> do
+        generate out (semiEmptyTarget stage) generateGhcPlatformH
+        makeExecutable out
+      where
+        file = root -/- stageString stage -/- generatedDir -/- "ghcplatform.h"
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
@@ -241,7 +244,7 @@ generateGhcPlatformH = do
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
-        , "#define STAGE " ++ show (fromEnum stage + 1)
+        , "#define GHC_STAGE " ++ show (fromEnum stage + 1)
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
         , "#define HostPlatform_TYPE   " ++ cppify targetPlatform
@@ -417,7 +420,7 @@ generateGhcBootPlatformH = do
     return $ unlines
         [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
-        , "#define STAGE " ++ show (fromEnum stage)
+        , "#define GHC_STAGE " ++ show (fromEnum stage)
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
         , "#define HostPlatform_NAME   " ++ show hostPlatform

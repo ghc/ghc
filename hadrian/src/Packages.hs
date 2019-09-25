@@ -223,5 +223,5 @@ generatedGhcDependencies stage = do
     let context = vanillaContext stage compiler
     bh <- buildPath   context <&> (-/- "ghc_boot_platform.h")
     ch <- contextPath context <&> (-/- "ghc_boot_platform.h")
-    is <- includesDependencies
+    is <- includesDependencies stage
     return $ is ++ [bh, ch]

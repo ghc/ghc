@@ -122,10 +122,15 @@ ghcBinDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
     , "ghci-usage.txt"
     ]
 
-includesDependencies :: Action [FilePath]
-includesDependencies = do
-    path <- generatedPath
-    return $ (path -/-) <$> [ "ghcautoconf.h", "ghcplatform.h", "ghcversion.h" ]
+includesDependencies :: Stage -> Action [FilePath]
+includesDependencies stage = do
+    root <- buildRoot
+    generated <- generatedPath
+    return $
+      [ generated -/- "ghcautoconf.h"
+      , generated -/- "ghcversion.h"
+      ]
+      ++ [ root -/- stageString stage -/- generatedDir -/- "ghcplatform.h" ]
 
 -- | Files the `haddock` binary depends on
 haddockDeps :: Stage -> Action [FilePath]
