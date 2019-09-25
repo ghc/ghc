@@ -13,9 +13,14 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
 
-{-| There are two kinds of data representable at the type level using
-GHC's @DataKinds@ extension to the Haskell language: natural numbers
-(the 'Nat' kind) and type-level strings (the 'Symbol' kind).
+{-|
+
+GHC's @DataKinds@ language extension lifts data constructors, natural
+numbers, and strings to the type level. This module provides the
+primitives needed for working with type-level numbers (the 'Nat' kind)
+and strings (the 'Symbol') kind. It also defines the 'TypeError' type
+family, a feature that makes use of type-level strings to support user
+defined type errors.
 
 For now, this module is the API for working with type-level literals.
 However, please note that it is a work in progress and is subject to change.
