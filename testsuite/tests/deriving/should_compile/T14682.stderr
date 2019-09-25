@@ -18,7 +18,7 @@ Derived class instances:
                      <a1, Language.Haskell.TH.Syntax.lift a1>]
     Language.Haskell.TH.Syntax.liftTyped (T14682.Foo a1 a2)
       = [|| T14682.Foo a1 a2 ||]
-
+  
   instance Data.Data.Data T14682.Foo where
     Data.Data.gfoldl k z (T14682.Foo a1 a2)
       = ((z T14682.Foo `k` a1) `k` a2)
@@ -54,22 +54,22 @@ Derived class instances:
     (GHC.Classes.>) a b = (GHC.Classes.<) b a
     (GHC.Classes.>=) a b = GHC.Classes.not ((GHC.Classes.<) a b)
   
-  instance GHC.Arr.Ix T14682.Foo where
-    GHC.Arr.range (T14682.Foo a1 a2, T14682.Foo b1 b2)
+  instance GHC.Ix.Ix T14682.Foo where
+    GHC.Ix.range (T14682.Foo a1 a2, T14682.Foo b1 b2)
       = [T14682.Foo c1 c2 |
-           c1 <- GHC.Arr.range (a1, b1), c2 <- GHC.Arr.range (a2, b2)]
-    GHC.Arr.unsafeIndex
+           c1 <- GHC.Ix.range (a1, b1), c2 <- GHC.Ix.range (a2, b2)]
+    GHC.Ix.unsafeIndex
       (T14682.Foo a1 a2, T14682.Foo b1 b2)
       (T14682.Foo c1 c2)
-      = (GHC.Arr.unsafeIndex (a2, b2) c2
+      = (GHC.Ix.unsafeIndex (a2, b2) c2
            GHC.Num.+
-             (GHC.Arr.unsafeRangeSize (a2, b2)
-                GHC.Num.* GHC.Arr.unsafeIndex (a1, b1) c1))
-    GHC.Arr.inRange
+             (GHC.Ix.unsafeRangeSize (a2, b2)
+                GHC.Num.* GHC.Ix.unsafeIndex (a1, b1) c1))
+    GHC.Ix.inRange
       (T14682.Foo a1 a2, T14682.Foo b1 b2)
       (T14682.Foo c1 c2)
-      = (GHC.Arr.inRange (a1, b1) c1
-           GHC.Classes.&& GHC.Arr.inRange (a2, b2) c2)
+      = (GHC.Ix.inRange (a1, b1) c1
+           GHC.Classes.&& GHC.Ix.inRange (a2, b2) c2)
   
   T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX ::
     T14682.Foo -> GHC.Prim.Int#
@@ -175,19 +175,19 @@ GHC.Classes.Ord [T14682.Foo]
 
 
 ==================== Filling in method body ====================
-GHC.Arr.Ix [T14682.Foo]
-  GHC.Arr.index = GHC.Arr.$dmindex @(T14682.Foo)
+GHC.Ix.Ix [T14682.Foo]
+  GHC.Ix.index = GHC.Ix.$dmindex @(T14682.Foo)
 
 
 
 ==================== Filling in method body ====================
-GHC.Arr.Ix [T14682.Foo]
-  GHC.Arr.rangeSize = GHC.Arr.$dmrangeSize @(T14682.Foo)
+GHC.Ix.Ix [T14682.Foo]
+  GHC.Ix.rangeSize = GHC.Ix.$dmrangeSize @(T14682.Foo)
 
 
 
 ==================== Filling in method body ====================
-GHC.Arr.Ix [T14682.Foo]
-  GHC.Arr.unsafeRangeSize = GHC.Arr.$dmunsafeRangeSize @(T14682.Foo)
+GHC.Ix.Ix [T14682.Foo]
+  GHC.Ix.unsafeRangeSize = GHC.Ix.$dmunsafeRangeSize @(T14682.Foo)
 
 
