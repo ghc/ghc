@@ -506,6 +506,8 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        ; expr' <- tcPolyExpr expr (arg_tys' `getNth` (alt - 1))
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
+-- This will see the empty list only when -XOverloadedLists.
+-- See Note [Empty lists] in GHC.Hs.Expr.
 tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { res_ty <- expTypeToType res_ty
@@ -1176,16 +1178,6 @@ tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
   where
     n_val_args = count isHsValArg args
 
-tcApp _ (L loc (ExplicitList _ Nothing [])) [HsTypeArg _ ty_arg] res_ty
-  -- See Note [Visible type application for the empty list constructor]
-  = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
-       ; let list_ty = TyConApp listTyCon [ty_arg']
-       ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
-                          list_ty res_ty
-       ; let expr :: LHsExpr GhcTcId
-             expr = L loc $ ExplicitList ty_arg' Nothing []
-       ; return (idHsWrapper, expr, []) }
-
 tcApp m_herald fun args res_ty
   = do { (tc_fun, fun_ty) <- tcInferFun fun
        ; tcFunApp m_herald fun tc_fun fun_ty args res_ty }
@@ -1236,26 +1228,6 @@ mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
-
-{-
-Note [Visible type application for the empty list constructor]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Getting the expression [] @Int to typecheck is slightly tricky since [] isn't
-an ordinary data constructor. By default, when tcExpr typechecks a list
-expression, it wraps the expression in a coercion, which gives it a type to the
-effect of p[a]. It isn't until later zonking that the type becomes
-forall a. [a], but that's too late for visible type application.
-
-The workaround is to check for empty list expressions that have a visible type
-argument in tcApp, and if so, directly typecheck [] @ty data constructor name.
-This avoids the intermediate coercion and produces an expression of type [ty],
-as one would intuitively expect.
-
-Unfortunately, this workaround isn't terribly robust, since more involved
-expressions such as (let in []) @Int won't work. Until a more elegant fix comes
-along, however, this at least allows direct type application on [] to work,
-which is better than before.
--}
 
 ----------------
 tcInferFun :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
