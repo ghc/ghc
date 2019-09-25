@@ -1977,7 +1977,7 @@ AC_DEFUN([GHC_LLVM_TARGET], [
     # for the LLVM Target. Otherwise these would be
     # turned into just `-linux` and fail to be found
     # in the `llvm-targets` file.
-    *-android*|*-gnueabi*)
+    *-android*|*-gnueabi*|*-musleabi*)
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       llvm_target_os="$3"
       ;;
