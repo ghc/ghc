@@ -928,6 +928,11 @@ mkBuildModule ms = ModuleWithIsBoot
   (ms_mod ms)
   (isBootSummary ms)
 
+mkHomeBuildModule :: ModSummary -> ModuleNameWithIsBoot
+mkHomeBuildModule ms = ModuleNameWithIsBoot
+  (moduleName $ ms_mod ms)
+  (isBootSummary ms)
+
 -- | The entry point to the parallel upsweep.
 --
 -- See also the simpler, sequential 'upsweep'.
@@ -1365,20 +1370,20 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
   keep_going this_mods old_hpt done mods mod_index nmods uids_to_check done_holes = do
     let sum_deps ms (AcyclicSCC mod) =
-          if any (flip elem . map (unLoc . snd) $ ms_imps mod) ms
-            then ms_mod_name mod:ms
+          if any (flip elem $ unfilteredEdges False mod) ms
+            then mkHomeBuildModule mod:ms
             else ms
         sum_deps ms _ = ms
         dep_closure = foldl' sum_deps this_mods mods
         dropped_ms = drop (length this_mods) (reverse dep_closure)
-        prunable (AcyclicSCC mod) = elem (ms_mod_name mod) dep_closure
+        prunable (AcyclicSCC mod) = elem (mkHomeBuildModule mod) dep_closure
         prunable _ = False
         mods' = filter (not . prunable) mods
         nmods' = nmods - length dropped_ms
 
     when (not $ null dropped_ms) $ do
         dflags <- getSessionDynFlags
-        liftIO $ fatalErrorMsg dflags (keepGoingPruneErr dropped_ms)
+        liftIO $ fatalErrorMsg dflags (keepGoingPruneErr $ mnwib_moduleName <$> dropped_ms)
     (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods' uids_to_check done_holes
     return (Failed, done')
 
@@ -1403,7 +1408,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
    = do dflags <- getSessionDynFlags
         liftIO $ fatalErrorMsg dflags (cyclicModuleErr ms)
         if gopt Opt_KeepGoing dflags
-          then keep_going (map ms_mod_name ms) old_hpt done mods mod_index nmods
+          then keep_going (mkHomeBuildModule <$> ms) old_hpt done mods mod_index nmods
                           uids_to_check done_holes
           else return (Failed, done)
 
@@ -1457,7 +1462,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
           Nothing -> do
                 dflags <- getSessionDynFlags
                 if gopt Opt_KeepGoing dflags
-                  then keep_going [ms_mod_name mod] old_hpt done mods mod_index nmods
+                  then keep_going [mkHomeBuildModule mod] old_hpt done mods mod_index nmods
                                   uids_to_check done_holes
                   else return (Failed, done)
           Just mod_info -> do
@@ -1890,7 +1895,7 @@ reachableBackwards mod summaries
   = [ node_payload node | node <- reachableG (transposeG graph) root ]
   where -- the rest just sets up the graph:
         (graph, lookup_node) = moduleGraphNodes False summaries
-        root  = expectJust "reachableBackwards" (lookup_node True mod)
+        root  = expectJust "reachableBackwards" (lookup_node $ ModuleNameWithIsBoot mod True)
 
 -- ---------------------------------------------------------------------------
 --
@@ -1933,7 +1938,7 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node False root_mod
+            let root | Just node <- lookup_node $ ModuleNameWithIsBoot root_mod False
                      , graph `hasVertexG` node
                      = node
                      | otherwise
@@ -1948,45 +1953,15 @@ summaryNodeKey = node_key
 summaryNodeSummary :: SummaryNode -> ModSummary
 summaryNodeSummary = node_payload
 
-moduleGraphNodes :: Bool -> [ModSummary]
-  -> (Graph SummaryNode, IsBootInterface -> ModuleName -> Maybe SummaryNode)
-moduleGraphNodes drop_hs_boot_nodes summaries =
-  (graphFromEdgedVerticesUniq nodes, lookup_node)
+unfilteredEdges :: Bool -> ModSummary -> [ModuleNameWithIsBoot]
+unfilteredEdges drop_hs_boot_nodes ms =
+    (flip ModuleNameWithIsBoot hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
+    (flip ModuleNameWithIsBoot False       . unLoc <$> ms_home_imps ms) ++
+    [ ModuleNameWithIsBoot (ms_mod_name ms) True
+    | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
+      -- see [boot-edges] below
+    ]
   where
-    numbered_summaries = zip summaries [1..]
-
-    lookup_node :: IsBootInterface -> ModuleName -> Maybe SummaryNode
-    lookup_node hs_src mod = Map.lookup
-      (ModuleNameWithIsBoot mod hs_src)
-      node_map
-
-    lookup_key :: IsBootInterface -> ModuleName -> Maybe Int
-    lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
-
-    node_map :: NodeMap SummaryNode
-    node_map = Map.fromList [ ( ModuleNameWithIsBoot
-                                  (moduleName $ ms_mod s)
-                                  (hscSourceToIsBoot $ ms_hsc_src s)
-                              , node
-                              )
-                            | node <- nodes
-                            , let s = summaryNodeSummary node ]
-
-    -- We use integers as the keys for the SCC algorithm
-    nodes :: [SummaryNode]
-    nodes = [ DigraphNode s key out_keys
-            | (s, key) <- numbered_summaries
-             -- Drop the hi-boot ones if told to do so
-            , not (isBootSummary s && drop_hs_boot_nodes)
-            , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_home_srcimps s)) ++
-                             out_edge_keys False       (map unLoc (ms_home_imps s)) ++
-                             (-- see [boot-edges] below
-                              if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile
-                              then []
-                              else case lookup_key True (ms_mod_name s) of
-                                    Nothing -> []
-                                    Just k  -> [k]) ]
-
     -- [boot-edges] if this is a .hs and there is an equivalent
     -- .hs-boot, add a link from the former to the latter.  This
     -- has the effect of detecting bogus cases where the .hs-boot
@@ -1999,8 +1974,35 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     hs_boot_key | drop_hs_boot_nodes = False -- is regular mod or signature
                 | otherwise          = True -- is boot
 
-    out_edge_keys :: IsBootInterface -> [ModuleName] -> [Int]
-    out_edge_keys hi_boot ms = mapMaybe (lookup_key hi_boot) ms
+moduleGraphNodes :: Bool -> [ModSummary]
+  -> (Graph SummaryNode, ModuleNameWithIsBoot -> Maybe SummaryNode)
+moduleGraphNodes drop_hs_boot_nodes summaries =
+  (graphFromEdgedVerticesUniq nodes, lookup_node)
+  where
+    numbered_summaries = zip summaries [1..]
+
+    lookup_node :: ModuleNameWithIsBoot -> Maybe SummaryNode
+    lookup_node = flip Map.lookup node_map
+
+    lookup_key :: ModuleNameWithIsBoot -> Maybe Int
+    lookup_key = fmap summaryNodeKey . lookup_node
+
+    node_map :: NodeMap SummaryNode
+    node_map = Map.fromList [ (mkHomeBuildModule s, node)
+                            | node <- nodes
+                            , let s = summaryNodeSummary node
+                            ]
+
+    -- We use integers as the keys for the SCC algorithm
+    nodes :: [SummaryNode]
+    nodes = [ DigraphNode s key $ out_edge_keys $ unfilteredEdges drop_hs_boot_nodes s
+            | (s, key) <- numbered_summaries
+             -- Drop the hi-boot ones if told to do so
+            , not (isBootSummary s && drop_hs_boot_nodes)
+            ]
+
+    out_edge_keys :: [ModuleNameWithIsBoot] -> [Int]
+    out_edge_keys = mapMaybe lookup_key
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
         -- IsBoot; else False
 
