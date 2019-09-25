@@ -664,7 +664,7 @@ tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
 tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
 tyClDeclLName decl = tcdLName decl
 
-tcdName :: TyClDecl pass -> (IdP pass)
+tcdName :: TyClDecl pass -> IdP pass
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass

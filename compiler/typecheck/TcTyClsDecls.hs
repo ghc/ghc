@@ -533,10 +533,10 @@ kcTyClGroup kisig_env decls
 
               get_kind d
                 | Just ki <- lookupNameEnv kisig_env (tcdName (unLoc d))
-                = Right (d, Just ki)
+                = Right (d, SAKS ki)
 
                 | cusks_enabled && hsDeclHasCusk (unLoc d)
-                = Right (d, Nothing)
+                = Right (d, CUSK)
 
                 | otherwise = Left d
 
@@ -786,7 +786,7 @@ These design choices are implemented by two completely different code
 paths for
 
   * Declarations with a standalone kind signature or a complete user-specified
-    kind signature (CUSK). Handed by the kcCheckDeclHeader.
+    kind signature (CUSK). Handled by the kcCheckDeclHeader.
 
   * Declarations without a kind signature (standalone or CUSK) are handled by
     kcInferDeclHeader; see Note [Inferring kinds for type declarations].
@@ -1015,7 +1015,7 @@ inferInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- each with its initial kind
 
 inferInitialKinds decls
-  = do { traceTc "inferInitialKinds {" empty
+  = do { traceTc "inferInitialKinds {" $ ppr (map (tcdName . unLoc) decls)
        ; tcs <- concatMapM infer_initial_kind decls
        ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
@@ -1024,14 +1024,18 @@ inferInitialKinds decls
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
-checkInitialKinds :: [(LTyClDecl GhcRn, Maybe Kind)] -> TcM [TcTyCon]
-checkInitialKinds = concatMapM check_initial_kind
+checkInitialKinds :: [(LTyClDecl GhcRn, SAKS_or_CUSK)] -> TcM [TcTyCon]
+checkInitialKinds decls
+  = do { traceTc "checkInitialKinds {" $ ppr (mapFst (tcdName . unLoc) decls)
+       ; tcs <- concatMapM check_initial_kind decls
+       ; traceTc "checkInitialKinds done }" empty
+       ; return tcs }
   where
-    check_initial_kind (dL -> L l d, msig) =
-      setSrcSpan l (getInitialKind (InitialKindCheck msig) d)
+    check_initial_kind (ldecl, msig) =
+      addLocM (getInitialKind (InitialKindCheck msig)) ldecl
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
--- depending on the InitialKindStrategy.
+-- depending on the 'InitialKindStrategy'.
 getInitialKind :: InitialKindStrategy -> TyClDecl GhcRn -> TcM [TcTyCon]
 
 -- Allocate a fresh kind variable for each TyCon and Class
@@ -1094,8 +1098,8 @@ getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
                  Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
                  Nothing ->
                    case msig of
-                     Nothing -> return (TheKind liftedTypeKind)
-                     Just _  -> return AnyKind
+                     CUSK -> return (TheKind liftedTypeKind)
+                     SAKS _ -> return AnyKind
        ; return [tc] }
 
 getInitialKind strategy
@@ -1104,15 +1108,9 @@ getInitialKind strategy
              , tcdRhs = rhs })
   = do { let ctxt = TySynKindCtxt name
        ; tc <- kcDeclHeader strategy name TypeSynonymFlavour ktvs $
-               case strategy of
-                 InitialKindInfer -> return AnyKind
-                 InitialKindCheck msig ->
-                   case hsTyKindSig rhs of
-                     Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                     Nothing ->
-                       case msig of
-                         Nothing -> return (TheKind liftedTypeKind)
-                         Just _  -> return AnyKind
+               case hsTyKindSig rhs of
+                 Just rhs_sig -> TheKind <$> tcLHsKindSig ctxt rhs_sig
+                 Nothing -> return AnyKind
        ; return [tc] }
 
 getInitialKind _ (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
@@ -1153,7 +1151,7 @@ check_initial_kind_assoc_fam cls
     , fdTyVars    = ktvs
     , fdResultSig = unLoc -> resultSig
     , fdInfo      = info }
-  = kcDeclHeader (InitialKindCheck Nothing) name flav ktvs $
+  = kcDeclHeader (InitialKindCheck CUSK) name flav ktvs $
     case famResultKindSignature resultSig of
       Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
       Nothing -> return (TheKind liftedTypeKind)
@@ -2258,7 +2256,7 @@ tcDataDefn err_ctxt
                                   stupid_theta tc_rhs
                                   (VanillaAlgTyCon tc_rep_nm)
                                   gadt_syntax) }
-       ; ATcTyCon tctc <- tcLookup tc_name
+       ; tctc <- tcLookupTcTyCon tc_name
             -- 'tctc' is a 'TcTyCon' and has the 'tcTyConScopedTyVars' that we need
             -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        ; let deriv_info = DerivInfo { di_rep_tc = tycon

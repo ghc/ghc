@@ -260,8 +260,9 @@ mkStandaloneKindSig loc lhs rhs =
         [] -> panic "mkStandaloneKindSig: empty left-hand side"
         [v] -> return v
         _ -> addFatalError (getLoc lhs) $
-             hang (text "Standalone kind signatures do not support multiple names at the moment:") 2
-                  (pprWithCommas ppr vs)
+             vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
+                       2 (pprWithCommas ppr vs)
+                  , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details." ]
 
 mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
                -> LHsType GhcPs

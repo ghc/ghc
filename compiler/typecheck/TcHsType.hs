@@ -39,6 +39,7 @@ module TcHsType (
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
         InitialKindStrategy(..),
+        SAKS_or_CUSK(..),
         kcDeclHeader,
         tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
@@ -1790,10 +1791,22 @@ newWildTyVar
 *                                                                      *
 ********************************************************************* -}
 
+-- See Note [kcCheckDeclHeader vs kcInferDeclHeader]
 data InitialKindStrategy
-  = InitialKindCheck (Maybe Kind)
+  = InitialKindCheck SAKS_or_CUSK
   | InitialKindInfer
 
+-- Does the declaration have a standalone kind signature (SAKS) or a complete
+-- user-specified kind (CUSK)?
+data SAKS_or_CUSK
+  = SAKS Kind  -- Standalone kind signature, fully zonked! (zonkTcTypeToType)
+  | CUSK       -- Complete user-specified kind (CUSK)
+
+instance Outputable SAKS_or_CUSK where
+  ppr (SAKS k) = text "SAKS" <+> ppr k
+  ppr CUSK = text "CUSK"
+
+-- See Note [kcCheckDeclHeader vs kcInferDeclHeader]
 kcDeclHeader
   :: InitialKindStrategy
   -> Name              -- ^ of the thing being checked
@@ -1822,15 +1835,14 @@ of a type constructor.
 
 ------------------------------
 kcCheckDeclHeader
-  :: Maybe Kind        -- ^  Just sig  <=>  Standalone kind signature, fully zonked! (zonkTcTypeToType)
-                       --    Nothing   <=>  Complete user-specified kind (CUSK)
+  :: SAKS_or_CUSK
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
   -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind
+  -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
-kcCheckDeclHeader (Just sig) = kcCheckDeclHeader_sig sig
-kcCheckDeclHeader Nothing    = kcCheckDeclHeader_cusk
+kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
+kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
 
 kcCheckDeclHeader_cusk
   :: Name              -- ^ of the thing being checked
@@ -1974,7 +1986,7 @@ kcCheckDeclHeader_sig
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
   -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind
+  -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
   addTyConFlavCtxt name flav $
@@ -2299,7 +2311,8 @@ invisible binders of the standalone kind signature to split off:
 This decision is made in 'split_invis':
 
 * If a user-written result kind signature is not provided, as in F,
-  then split off all invisible binders.
+  then split off all invisible binders. This is why we need special treatment
+  for AnyKind.
 * If a user-written result kind signature is provided, as in G,
   then do as checkExpectedKind does and split off (n_sig - n_res) binders.
   That is, split off such an amount of binders that the remainder of the
