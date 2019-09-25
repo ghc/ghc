@@ -271,8 +271,10 @@ tcRnModuleTcRnM hsc_env mod_sum
                       ; tcg_env <- tcRnExports explicit_mod_hdr export_ies
                                      tcg_env
                       ; traceRn "rn4b: after exports" empty
-                      ; -- Check main is exported(must be after tcRnExports)
-                        checkMainExported tcg_env
+                      ; -- When a module header is specified,
+                        -- check that the main module exports a main function.
+                        -- (must be after tcRnExports)
+                        when explicit_mod_hdr $ checkMainExported tcg_env
                       ; -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
@@ -1801,11 +1803,10 @@ checkMainExported tcg_env
       Just main_name ->
          do { dflags <- getDynFlags
             ; let main_mod = mainModIs dflags
-            ; when (ghcLink dflags /= LinkInMemory) $      -- #11647
-                checkTc (main_name `elem`
+            ; checkTc (main_name `elem`
                            concatMap availNames (tcg_exports tcg_env)) $
-                   text "The" <+> ppMainFn (nameRdrName main_name) <+>
-                   text "is not exported by module" <+> quotes (ppr main_mod) }
+                text "The" <+> ppMainFn (nameRdrName main_name) <+>
+                text "is not exported by module" <+> quotes (ppr main_mod) }
 
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn
