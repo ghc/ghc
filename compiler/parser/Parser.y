@@ -258,6 +258,8 @@ from the Haskell98 data constructor for a tuple.  Shift resolves in
 favor of sysdcon, which is good because a tuple section will get rejected
 if -XTupleSections is not specified.
 
+See also Note [ExplicitTuple] in GHC.Hs.Expr.
+
 -------------------------------------------------------------------------------
 
 state 408 contains 1 shift/reduce conflicts.
@@ -2923,6 +2925,9 @@ texp :: { ECP }
                              amms (mkHsViewPatPV (comb2 $1 $>) $1 $3) [mu AnnRarrow $2] }
 
 -- Always at least one comma or bar.
+-- Though this can parse just commas (without any expressions), it won't
+-- in practice, because (,,,) is parsed as a name. See Note [ExplicitTuple]
+-- in GHC.Hs.Expr.
 tup_exprs :: { forall b. DisambECP b => PV ([AddAnn],SumOrTuple b) }
            : texp commas_tup_tail
                            { runECP_PV $1 >>= \ $1 ->
@@ -2967,6 +2972,7 @@ tup_tail :: { forall b. DisambECP b => PV [Located (Maybe (Located b))] }
 
 -- The rules below are little bit contorted to keep lexps left-recursive while
 -- avoiding another shift/reduce-conflict.
+-- Never empty.
 list :: { forall b. DisambECP b => SrcSpan -> PV (Located b) }
         : texp    { \loc -> runECP_PV $1 >>= \ $1 ->
                             mkHsExplicitListPV loc [$1] }
