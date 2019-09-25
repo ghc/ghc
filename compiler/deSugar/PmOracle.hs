@@ -187,7 +187,12 @@ mkOneConFull arg_tys con = do
   -- to the type oracle
   let ty_cs = map TyCt (substTheta subst (eqSpecPreds eq_spec ++ thetas))
   -- Figure out the types of strict constructor fields
-  let arg_is_banged      = map isBanged $ conLikeImplBangs con
+  let arg_is_banged
+        | RealDataCon dc <- con
+        , isNewTyCon (dataConTyCon dc)
+        = [True]
+        | otherwise
+        = map isBanged $ conLikeImplBangs con
       strict_field_tm_cs = map TmVarNonVoid $ filterByList arg_is_banged vars
   return (vars, listToBag ty_cs, listToBag strict_field_tm_cs, ex_tvs')
 
