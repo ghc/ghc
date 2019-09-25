@@ -1008,6 +1008,9 @@ addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env } x =
           , isVanillaDataTyCon tc
           -- not inhabited by inductive reasoning! If it was, some other
           -- constructor would be inhabited.
+          , False
+          -- ... but this seems to go wrong in a couple of cases, so we don't
+          -- do this for now.
           -> mzero
           | Just rec_tc' <- checkRecTc (delta_rec_tc delta) tc
           -> MaybeT (ensureInhabited delta{ delta_rec_tc = rec_tc' } vi)
