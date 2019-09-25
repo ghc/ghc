@@ -1,7 +1,6 @@
-
-F.hs-boot:5:1: error:
-    ‘F.F’ is exported by the hs-boot file, but not exported by the module
-
-F.hs-boot:6:10: error:
-    instance O.O F.F
-      is defined in the hs-boot file, but not in the module itself
+Unexpected non-cycle [ModSummary {
+                         ms_hs_date = 2019-08-30 19:14:42.079199066 UTC
+                         ms_mod = F[boot],
+                         ms_textual_imps = [(Nothing, Prelude), (Nothing, O)]
+                         ms_srcimps = []
+                      }]

@@ -1,9 +1,6 @@
-[1 of 3] Compiling T12042[boot]     ( T12042.hs-boot, T12042.o-boot )
-[2 of 3] Compiling T12042a          ( T12042a.hs, T12042a.o )
-[3 of 3] Compiling T12042           ( T12042.hs, T12042.o )
-
-T12042.hs-boot:2:1: error:
-    Type constructor ‘S’ has conflicting definitions in the module
-    and its hs-boot file
-    Main module: type S = R
-    Boot file:   data S
+Unexpected non-cycle [ModSummary {
+                         ms_hs_date = 2019-08-30 19:14:42.664205898 UTC
+                         ms_mod = T12042[boot],
+                         ms_textual_imps = [(Nothing, Prelude)]
+                         ms_srcimps = []
+                      }]

@@ -1,6 +1,6 @@
-
-T3823B.hs:8:7: error:
-    Couldn't match expected type ‘A’ with actual type ‘Bool’
-    In the first argument of ‘y’, namely ‘a’
-    In the expression: y a
-    In an equation for ‘b’: b = y a
+Unexpected non-cycle [ModSummary {
+                         ms_hs_date = 2019-08-30 19:14:42.460203516 UTC
+                         ms_mod = T3823A[boot],
+                         ms_textual_imps = [(Nothing, Prelude)]
+                         ms_srcimps = []
+                      }]

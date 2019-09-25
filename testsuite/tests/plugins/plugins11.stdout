@@ -1,9 +1,0 @@
-parsePlugin()
-interfacePlugin: Prelude
-interfacePlugin: GHC.Float
-interfacePlugin: GHC.Base
-typeCheckPlugin (rn)
-interfacePlugin: GHC.Types
-typeCheckPlugin (tc)
-interfacePlugin: GHC.Integer.Type
-interfacePlugin: GHC.Natural

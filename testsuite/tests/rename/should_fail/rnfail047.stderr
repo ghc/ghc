@@ -1,3 +1,6 @@
-
-RnFail047_A.hs-boot:5:1: error:
-    ‘RnFail047_A.y’ is exported by the hs-boot file, but not exported by the module
+Unexpected non-cycle [ModSummary {
+                         ms_hs_date = 2019-08-30 19:14:42.467203598 UTC
+                         ms_mod = RnFail047_A[boot],
+                         ms_textual_imps = [(Nothing, Prelude)]
+                         ms_srcimps = []
+                      }]
