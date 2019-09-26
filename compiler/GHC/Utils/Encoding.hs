@@ -13,14 +13,16 @@
 
 module GHC.Utils.Encoding (
         -- * UTF-8
-        utf8DecodeChar#,
+        utf8DecodeCharAddr#,
         utf8PrevChar,
         utf8CharStart,
         utf8DecodeChar,
         utf8DecodeByteString,
+        utf8DecodeShortByteString,
         utf8DecodeStringLazy,
         utf8EncodeChar,
         utf8EncodeString,
+        utf8EncodeShortByteString,
         utf8EncodedLength,
         countUTF8Chars,
 
@@ -36,14 +38,15 @@ module GHC.Utils.Encoding (
 import GHC.Prelude
 
 import Foreign
-import Foreign.ForeignPtr.Unsafe
 import Data.Char
 import qualified Data.Char as Char
 import Numeric
 import GHC.IO
+import GHC.ST
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
+import Data.ByteString.Short.Internal (ShortByteString(..))
 
 import GHC.Exts
 
@@ -60,23 +63,23 @@ import GHC.Exts
 -- before decoding them (see "GHC.Data.StringBuffer").
 
 {-# INLINE utf8DecodeChar# #-}
-utf8DecodeChar# :: Addr# -> (# Char#, Int# #)
-utf8DecodeChar# a# =
-  let !ch0 = word2Int# (indexWord8OffAddr# a# 0#) in
+utf8DecodeChar# :: (Int# -> Word#) -> (# Char#, Int# #)
+utf8DecodeChar# indexWord8# =
+  let !ch0 = word2Int# (indexWord8# 0#) in
   case () of
     _ | isTrue# (ch0 <=# 0x7F#) -> (# chr# ch0, 1# #)
 
       | isTrue# ((ch0 >=# 0xC0#) `andI#` (ch0 <=# 0xDF#)) ->
-        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8# 1#) in
         if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
         (# chr# (((ch0 -# 0xC0#) `uncheckedIShiftL#` 6#) +#
                   (ch1 -# 0x80#)),
            2# #)
 
       | isTrue# ((ch0 >=# 0xE0#) `andI#` (ch0 <=# 0xEF#)) ->
-        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8# 1#) in
         if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
-        let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
+        let !ch2 = word2Int# (indexWord8# 2#) in
         if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
         (# chr# (((ch0 -# 0xE0#) `uncheckedIShiftL#` 12#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 6#)  +#
@@ -84,11 +87,11 @@ utf8DecodeChar# a# =
            3# #)
 
      | isTrue# ((ch0 >=# 0xF0#) `andI#` (ch0 <=# 0xF8#)) ->
-        let !ch1 = word2Int# (indexWord8OffAddr# a# 1#) in
+        let !ch1 = word2Int# (indexWord8# 1#) in
         if isTrue# ((ch1 <# 0x80#) `orI#` (ch1 >=# 0xC0#)) then fail 1# else
-        let !ch2 = word2Int# (indexWord8OffAddr# a# 2#) in
+        let !ch2 = word2Int# (indexWord8# 2#) in
         if isTrue# ((ch2 <# 0x80#) `orI#` (ch2 >=# 0xC0#)) then fail 2# else
-        let !ch3 = word2Int# (indexWord8OffAddr# a# 3#) in
+        let !ch3 = word2Int# (indexWord8# 3#) in
         if isTrue# ((ch3 <# 0x80#) `orI#` (ch3 >=# 0xC0#)) then fail 3# else
         (# chr# (((ch0 -# 0xF0#) `uncheckedIShiftL#` 18#) +#
                  ((ch1 -# 0x80#) `uncheckedIShiftL#` 12#) +#
@@ -106,9 +109,18 @@ utf8DecodeChar# a# =
         -- confusing parse error later on.  Instead we use '\0' which
         -- will signal a lexer error immediately.
 
+utf8DecodeCharAddr# :: Addr# -> (# Char#, Int# #)
+utf8DecodeCharAddr# a# =
+    utf8DecodeChar# (indexWord8OffAddr# a#)
+
+utf8DecodeCharByteArray# :: ByteArray# -> Int# -> (# Char#, Int# #)
+utf8DecodeCharByteArray# ba# off# =
+    utf8DecodeChar# (\i# -> indexWord8Array# ba# (i# +# off#))
+
 utf8DecodeChar :: Ptr Word8 -> (Char, Int)
-utf8DecodeChar (Ptr a#) =
-  case utf8DecodeChar# a# of (# c#, nBytes# #) -> ( C# c#, I# nBytes# )
+utf8DecodeChar !(Ptr a#) =
+  case utf8DecodeCharAddr# a# of
+    (# c#, nBytes# #) -> ( C# c#, I# nBytes# )
 
 -- UTF-8 is cleverly designed so that we can always figure out where
 -- the start of the current character is, given any position in a
@@ -124,73 +136,100 @@ utf8CharStart p = go p
                         then go (p `plusPtr` (-1))
                         else return p
 
+{-# INLINE utf8DecodeLazy# #-}
+utf8DecodeLazy# :: (IO ()) -> (Int# -> Word#) -> Int# -> IO [Char]
+utf8DecodeLazy# retain indexWord8# len#
+  = unpack 0#
+  where
+    unpack i#
+        | isTrue# (i# >=# len#) = retain >> return []
+        | otherwise =
+            case utf8DecodeChar# (\j# -> indexWord8# (i# +# j#)) of
+              (# c#, nBytes# #) -> do
+                rest <- unsafeDupableInterleaveIO $ unpack (i# +# nBytes#)
+                return (C# c# : rest)
+
 utf8DecodeByteString :: ByteString -> [Char]
-utf8DecodeByteString (BS.PS ptr offset len)
-  = utf8DecodeStringLazy ptr offset len
+utf8DecodeByteString (BS.PS fptr offset len)
+  = utf8DecodeStringLazy fptr offset len
 
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
-utf8DecodeStringLazy fptr offset len
-  = unsafeDupablePerformIO $ unpack start
+utf8DecodeStringLazy fp offset (I# len#)
+  = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
+      let !(Ptr a#) = ptr `plusPtr` offset
+          index# = indexWord8OffAddr# a# in
+      utf8DecodeLazy# (touchForeignPtr fp) index# len#
+
+utf8DecodeShortByteString :: ShortByteString -> [Char]
+utf8DecodeShortByteString (SBS ba#)
+  = unsafeDupablePerformIO $
+      let index# = indexWord8Array# ba#
+          len# = sizeofByteArray# ba# in
+      utf8DecodeLazy# (return ()) index# len#
+
+countUTF8Chars :: ShortByteString -> IO Int
+countUTF8Chars (SBS ba) = go 0# 0#
   where
-    !start = unsafeForeignPtrToPtr fptr `plusPtr` offset
-    !end = start `plusPtr` len
+    len# = sizeofByteArray# ba
+    go i# n#
+      | isTrue# (i# >=# len#) =
+          return (I# n#)
+      | otherwise = do
+          case utf8DecodeCharByteArray# ba i# of
+            (# _, nBytes# #) -> go (i# +# nBytes#) (n# +# 1#)
 
-    unpack p
-        | p >= end  = touchForeignPtr fptr >> return []
-        | otherwise =
-            case utf8DecodeChar# (unPtr p) of
-                (# c#, nBytes# #) -> do
-                  rest <- unsafeDupableInterleaveIO $ unpack (p `plusPtr#` nBytes#)
-                  return (C# c# : rest)
-
-countUTF8Chars :: Ptr Word8 -> Int -> IO Int
-countUTF8Chars ptr len = go ptr 0
-  where
-        !end = ptr `plusPtr` len
-
-        go p !n
-           | p >= end = return n
-           | otherwise  = do
-                case utf8DecodeChar# (unPtr p) of
-                  (# _, nBytes# #) -> go (p `plusPtr#` nBytes#) (n+1)
-
-unPtr :: Ptr a -> Addr#
-unPtr (Ptr a) = a
-
-plusPtr# :: Ptr a -> Int# -> Ptr a
-plusPtr# ptr nBytes# = ptr `plusPtr` (I# nBytes#)
-
-utf8EncodeChar :: Char -> Ptr Word8 -> IO (Ptr Word8)
-utf8EncodeChar c ptr =
+{-# INLINE utf8EncodeChar #-}
+utf8EncodeChar :: (Int# -> Word# -> State# s -> State# s)
+               -> Char -> ST s Int
+utf8EncodeChar write# c =
   let x = ord c in
   case () of
     _ | x > 0 && x <= 0x007f -> do
-          poke ptr (fromIntegral x)
-          return (ptr `plusPtr` 1)
+          write 0 x
+          return 1
         -- NB. '\0' is encoded as '\xC0\x80', not '\0'.  This is so that we
         -- can have 0-terminated UTF-8 strings (see GHC.Base.unpackCStringUtf8).
       | x <= 0x07ff -> do
-          poke ptr (fromIntegral (0xC0 .|. ((x `shiftR` 6) .&. 0x1F)))
-          pokeElemOff ptr 1 (fromIntegral (0x80 .|. (x .&. 0x3F)))
-          return (ptr `plusPtr` 2)
+          write 0 (0xC0 .|. ((x `shiftR` 6) .&. 0x1F))
+          write 1 (0x80 .|. (x .&. 0x3F))
+          return 2
       | x <= 0xffff -> do
-          poke ptr (fromIntegral (0xE0 .|. (x `shiftR` 12) .&. 0x0F))
-          pokeElemOff ptr 1 (fromIntegral (0x80 .|. (x `shiftR` 6) .&. 0x3F))
-          pokeElemOff ptr 2 (fromIntegral (0x80 .|. (x .&. 0x3F)))
-          return (ptr `plusPtr` 3)
+          write 0 (0xE0 .|. (x `shiftR` 12) .&. 0x0F)
+          write 1 (0x80 .|. (x `shiftR` 6) .&. 0x3F)
+          write 2 (0x80 .|. (x .&. 0x3F))
+          return 3
       | otherwise -> do
-          poke ptr (fromIntegral (0xF0 .|. (x `shiftR` 18)))
-          pokeElemOff ptr 1 (fromIntegral (0x80 .|. ((x `shiftR` 12) .&. 0x3F)))
-          pokeElemOff ptr 2 (fromIntegral (0x80 .|. ((x `shiftR` 6) .&. 0x3F)))
-          pokeElemOff ptr 3 (fromIntegral (0x80 .|. (x .&. 0x3F)))
-          return (ptr `plusPtr` 4)
+          write 0 (0xF0 .|. (x `shiftR` 18))
+          write 1 (0x80 .|. ((x `shiftR` 12) .&. 0x3F))
+          write 2 (0x80 .|. ((x `shiftR` 6) .&. 0x3F))
+          write 3 (0x80 .|. (x .&. 0x3F))
+          return 4
+  where
+    {-# INLINE write #-}
+    write (I# off#) (I# c#) = ST $ \s ->
+      case write# off# (int2Word# c#) s of
+        s -> (# s, () #)
 
 utf8EncodeString :: Ptr Word8 -> String -> IO ()
-utf8EncodeString ptr str = go ptr str
-  where go !_   []     = return ()
-        go ptr (c:cs) = do
-          ptr' <- utf8EncodeChar c ptr
-          go ptr' cs
+utf8EncodeString (Ptr a#) str = go a# str
+  where go !_   []   = return ()
+        go a# (c:cs) = do
+          I# off# <- stToIO $ utf8EncodeChar (writeWord8OffAddr# a#) c
+          go (a# `plusAddr#` off#) cs
+
+utf8EncodeShortByteString :: String -> IO ShortByteString
+utf8EncodeShortByteString str = stToIO $ ST $ \s ->
+  let !(I# len#) = utf8EncodedLength str in
+  case newByteArray# len# s of { (# s, mba# #) ->
+  let ST f_go = go mba# 0# str in
+  case f_go s of { (# s, () #) ->
+  case unsafeFreezeByteArray# mba# s of { (# s, ba# #) ->
+  (# s, SBS ba# #) }}}
+  where
+    go _ _ [] = return ()
+    go mba# i# (c:cs) = do
+      I# off# <- utf8EncodeChar (\j# -> writeWord8Array# mba# (i# +# j#)) c
+      go mba# (i# +# off#) cs
 
 utf8EncodedLength :: String -> Int
 utf8EncodedLength str = go 0 str
