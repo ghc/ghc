@@ -1141,7 +1141,7 @@ badRuleLhsErr name lhs bad_e
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar _ uv -> notInScopeErr (mkRdrUnqual (unboundVarOcc uv))
+            HsUnboundVar _ uv -> notInScopeErr (mkRdrUnqual uv)
             _                 -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************

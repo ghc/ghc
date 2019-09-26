@@ -2102,7 +2102,7 @@ patSynErr l e explanation =
      ; return (cL l hsHoleExpr) }
 
 hsHoleExpr :: HsExpr (GhcPass id)
-hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
+hsHoleExpr = HsUnboundVar noExtField (mkVarOcc "_")
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p

@@ -136,7 +136,7 @@ module TcRnTypes(
 
         -- Misc other types
         TcId, TcIdSet,
-        Hole(..), holeOcc,
+        HoleSort(..),
         NameShape(..),
 
         -- Role annotations
@@ -197,7 +197,7 @@ import CostCentreState
 
 import Control.Monad (ap, msum)
 import qualified Control.Monad.Fail as MonadFail
-import Data.Set      ( Set )
+import Data.Set ( Set )
 import qualified Data.Set as S
 
 import Data.List ( sort )
@@ -572,10 +572,6 @@ data TcGblEnv
           -- ^ @True@ <=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
-
-        tcg_th_top_level_locs :: TcRef (Set RealSrcSpan),
-          -- ^ Locations of the top-level splices; used for providing details on
-          -- scope in error messages for out-of-scope variables
 
         tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
@@ -1785,7 +1781,8 @@ data Ct
        -- Treated as an "insoluble" constraint
        -- See Note [Insoluble constraints]
       cc_ev   :: CtEvidence,
-      cc_hole :: Hole
+      cc_occ  :: OccName,   -- The name of this hole
+      cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
     }
 
   | CQuantCan QCInst       -- A quantified constraint
@@ -1808,27 +1805,19 @@ instance Outputable QCInst where
   ppr (QCI { qci_ev = ev }) = ppr ev
 
 ------------
--- | An expression or type hole
-data Hole = ExprHole UnboundVar
-            -- ^ Either an out-of-scope variable or a "true" hole in an
-            -- expression (TypedHoles)
-          | TypeHole OccName
-            -- ^ A hole in a type (PartialTypeSignatures)
-
-instance Outputable Hole where
-  ppr (ExprHole ub)  = ppr ub
-  ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
-
-holeOcc :: Hole -> OccName
-holeOcc (ExprHole uv)  = unboundVarOcc uv
-holeOcc (TypeHole occ) = occ
+-- | Used to indicate which sort of hole we have.
+data HoleSort = ExprHole
+                 -- ^ Either an out-of-scope variable or a "true" hole in an
+                 -- expression (TypedHoles)
+              | TypeHole
+                 -- ^ A hole in a type (PartialTypeSignatures)
 
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 CHoleCan constraints are used for two kinds of holes,
 distinguished by cc_hole:
 
-  * For holes in expressions (including variables not in scope)
+  * For holes in expressions
     e.g.   f x = g _ x
 
   * For holes in type signatures
@@ -1945,7 +1934,7 @@ instance Outputable Ct where
          CIrredCan { cc_insol = insol }
             | insol     -> text "CIrredCan(insol)"
             | otherwise -> text "CIrredCan(sol)"
-         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr hole
+         CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
@@ -2227,17 +2216,18 @@ isHoleCt (CHoleCan {}) = True
 isHoleCt _ = False
 
 isOutOfScopeCt :: Ct -> Bool
--- We treat expression holes representing out-of-scope variables a bit
--- differently when it comes to error reporting
-isOutOfScopeCt (CHoleCan { cc_hole = ExprHole (OutOfScope {}) }) = True
+-- A Hole that does not have a leading underscore is
+-- simply an out-of-scope variable, and we treat that
+-- a bit differently when it comes to error reporting
+isOutOfScopeCt (CHoleCan { cc_occ = occ }) = not (startsWithUnderscore occ)
 isOutOfScopeCt _ = False
 
 isExprHoleCt :: Ct -> Bool
-isExprHoleCt (CHoleCan { cc_hole = ExprHole {} }) = True
+isExprHoleCt (CHoleCan { cc_hole = ExprHole }) = True
 isExprHoleCt _ = False
 
 isTypeHoleCt :: Ct -> Bool
-isTypeHoleCt (CHoleCan { cc_hole = TypeHole {} }) = True
+isTypeHoleCt (CHoleCan { cc_hole = TypeHole }) = True
 isTypeHoleCt _ = False
 
 
@@ -3709,7 +3699,7 @@ lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
-exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
+exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf uv
 exprCtOrigin (HsConLikeOut {})    = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld _ f)    = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel _ _ l)  = OverLabelOrigin l

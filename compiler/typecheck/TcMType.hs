@@ -183,13 +183,14 @@ newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
 
 -- | Create a new 'CHoleCan' 'Ct'.
-newHoleCt :: Hole -> Id -> Type -> TcM Ct
+newHoleCt :: HoleSort -> Id -> Type -> TcM Ct
 newHoleCt hole ev ty = do
   loc <- getCtLocM HoleOrigin Nothing
   pure $ CHoleCan { cc_ev = CtWanted { ctev_pred = ty
                                      , ctev_dest = EvVarDest ev
                                      , ctev_nosh = WDeriv
                                      , ctev_loc  = loc }
+                  , cc_occ = getOccName ev
                   , cc_hole = hole }
 
 ----------------------------------------------
