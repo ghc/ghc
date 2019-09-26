@@ -274,7 +274,8 @@ test('hs_try_putmvar003',
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
      only_ways(['threaded1','threaded2']),
      extra_clean(['hs_try_putmvar003_c.o']),
-     extra_run_opts('1 16 32 100')
+     extra_run_opts('1 16 32 100'),
+     fragile_for(16361, ['threaded1'])
      ],
      compile_and_run,
      ['hs_try_putmvar003_c.c'])
