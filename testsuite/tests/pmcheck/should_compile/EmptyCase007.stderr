@@ -9,12 +9,11 @@ EmptyCase007.hs:25:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase007.hs:33:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched: Foo2 ((_ :: Char), (_ :: Bool))
+    In a case alternative: Patterns not matched: Foo2 (_, _)
 
 EmptyCase007.hs:37:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: Foo2 (_ :: Char)
+    In a case alternative: Patterns not matched: Foo2 _
 
 EmptyCase007.hs:44:17: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -25,4 +24,4 @@ EmptyCase007.hs:48:7: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns not matched:
             Foo2 []
-            Foo2 ((_ :: FA Int):(_ :: [FA Int]))
+            Foo2 (_:_)

@@ -3,28 +3,12 @@ T11822.hs:33:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘mkTreeNode’:
         Patterns not matched:
-            (_ :: prefix)
-            Data.Sequence.Internal.Seq
-            (_ :: Data.Sequence.Internal.FingerTree
-                    (Data.Sequence.Internal.Elem SiblingDependencies))
-            (_ :: Set prefix) p
+            (_ :: prefix) (Data.Sequence.Internal.Seq _) (_ :: Set prefix) p
                 where p is not one of {0}
-            (_ :: prefix)
-            Data.Sequence.Internal.Seq
-            (_ :: Data.Sequence.Internal.FingerTree
-                    (Data.Sequence.Internal.Elem SiblingDependencies))
-            (_ :: Set prefix) p
+            (_ :: prefix) (Data.Sequence.Internal.Seq _) (_ :: Set prefix) p
                 where p is not one of {0}
-            (_ :: prefix)
-            Data.Sequence.Internal.Seq
-            (_ :: Data.Sequence.Internal.FingerTree
-                    (Data.Sequence.Internal.Elem SiblingDependencies))
-            (_ :: Set prefix) p
+            (_ :: prefix) (Data.Sequence.Internal.Seq _) (_ :: Set prefix) p
                 where p is not one of {0}
-            (_ :: prefix)
-            Data.Sequence.Internal.Seq
-            (_ :: Data.Sequence.Internal.FingerTree
-                    (Data.Sequence.Internal.Elem SiblingDependencies))
-            (_ :: Set prefix) p
+            (_ :: prefix) (Data.Sequence.Internal.Seq _) (_ :: Set prefix) p
                 where p is not one of {0}
             ...
