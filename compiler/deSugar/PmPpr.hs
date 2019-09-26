@@ -10,6 +10,7 @@ module PmPpr (
 
 import GhcPrelude
 
+import BasicTypes
 import Id
 import VarEnv
 import UniqDFM
@@ -47,8 +48,8 @@ pprUncovered delta vas
     init_prec
       -- No outer parentheses when it's a unary pattern by assuming lowest
       -- precedence
-      | [_] <- vas   = minBound
-      | otherwise    = FunAppPrec
+      | [_] <- vas   = topPrec
+      | otherwise    = funPrec
     ppr_action       = mapM (pprPmVar init_prec) vas
     (vec, renamings) = runPmPpr delta ppr_action
     refuts           = prettifyRefuts delta renamings
@@ -92,13 +93,6 @@ substitution to the vectors before printing them out (see function `pprOne' in
 Check.hs) to be more precise.
 -}
 
-data PrecedenceClass
-  = TypeAnnotPrec -- ^ Precedence of the @::@ type annotation operator for wildcards
-  | InfixOpPrec   -- ^ Precedence of an infix operator application
-  | FunAppPrec    -- ^ Precedence of an application expression
-  | VarPrec       -- ^ Precedence class of variables (highest)
-  deriving (Eq, Ord, Bounded)
-
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
 prettifyRefuts :: Delta -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
@@ -140,7 +134,7 @@ checkRefuts x = do
 -- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
-pprPmVar :: PrecedenceClass -> Id -> PmPprM SDoc
+pprPmVar :: PprPrec -> Id -> PmPprM SDoc
 pprPmVar prec x = do
   delta <- ask
   case lookupSolution delta x of
@@ -149,39 +143,39 @@ pprPmVar prec x = do
       where
         -- if we have no info about the parameter and would just print a
         -- wildcard, also show its type.
-        typed_wildcard = cparen (prec > TypeAnnotPrec)
+        typed_wildcard = cparen (prec > sigPrec)
                                 (underscore <+> text "::" <+> ppr (idType x))
 
-pprPmAltCon :: PrecedenceClass -> PmAltCon -> [Id] -> PmPprM SDoc
+pprPmAltCon :: PprPrec -> PmAltCon -> [Id] -> PmPprM SDoc
 pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)
 pprPmAltCon prec  (PmAltConLike cl) args = do
   delta <- ask
   pprConLike delta prec cl args
 
-pprConLike :: Delta -> PrecedenceClass -> ConLike -> [Id] -> PmPprM SDoc
+pprConLike :: Delta -> PprPrec -> ConLike -> [Id] -> PmPprM SDoc
 pprConLike delta _prec cl args
   | Just pm_expr_list <- pmExprAsList delta (PmAltConLike cl) args
   = case pm_expr_list of
       NilTerminated list ->
-        brackets . fsep . punctuate comma <$> mapM (pprPmVar VarPrec) list
+        brackets . fsep . punctuate comma <$> mapM (pprPmVar appPrec) list
       WcVarTerminated pref x ->
-        parens   . fcat . punctuate colon <$> mapM (pprPmVar VarPrec) (toList pref ++ [x])
+        parens   . fcat . punctuate colon <$> mapM (pprPmVar appPrec) (toList pref ++ [x])
 pprConLike _delta _prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
-  = hash_parens . fsep . punctuate comma <$> mapM (pprPmVar VarPrec) args
+  = hash_parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
   | isTupleDataCon con
-  = parens . fsep . punctuate comma <$> mapM (pprPmVar VarPrec) args
+  = parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
 pprConLike _delta prec cl args
   | conLikeIsInfix cl = case args of
-      [x, y] -> do x' <- pprPmVar InfixOpPrec x
-                   y' <- pprPmVar InfixOpPrec y
-                   return (cparen (prec > InfixOpPrec) (x' <+> ppr cl <+> y'))
+      [x, y] -> do x' <- pprPmVar opPrec x
+                   y' <- pprPmVar opPrec y
+                   return (cparen (prec > opPrec) (x' <+> ppr cl <+> y'))
       -- can it be infix but have more than two arguments?
       list   -> pprPanic "pprConLike:" (ppr list)
   | null args = return (ppr cl)
-  | otherwise = do args' <- mapM (pprPmVar FunAppPrec) args
-                   return (cparen (prec > FunAppPrec) (fsep (ppr cl : args')))
+  | otherwise = do args' <- mapM (pprPmVar funPrec) args
+                   return (cparen (prec > funPrec) (fsep (ppr cl : args')))
 
 -- | The result of 'pmExprAsList'.
 data PmExprList
