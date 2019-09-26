@@ -43,13 +43,13 @@ import SrcLoc
 import Util
 import Outputable
 import DataCon
+import PatSyn (patSynArity)
 import BasicTypes (Boxity(..))
 import Var (EvVar)
 import Coercion
 import TcEvidence
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import MatchLit (dsLit, dsOverLit)
-import IOEnv
 import DsMonad
 import Bag
 import TyCoRep
@@ -58,8 +58,8 @@ import DsUtils       (isTrueLHsExpr)
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List     (find)
-import Control.Monad (forM, when, forM_)
+import Data.List     (find, isSubsequenceOf)
+import Control.Monad (forM, when, forM_, zipWithM)
 import qualified Data.Semigroup as Semi
 
 {-
@@ -96,7 +96,7 @@ data PmPat
 
     -- | Possibly strict variable pattern match
   | PmVar {
-      _pm_var_mark :: StrictnessMark,
+      _pm_var_bang :: HsImplBang,
       pm_var_id    :: Id
     }
 
@@ -112,7 +112,7 @@ data PmPat
 instance Outputable PmPat where
   ppr (PmCon alt _arg_tys _con_tvs _con_dicts con_args)
     = cparen (notNull con_args) (hsep [ppr alt, hsep (map ppr con_args)])
-  ppr (PmVar bang vid) = ppr bang <> ppr vid
+  ppr (PmVar bang vid) = (if isBanged bang then char '!' else empty) <> ppr vid
   ppr (PmGrd pv ge) = hsep (map ppr pv) <+> text "<-" <+> ppr ge
 
 -- data T a where
@@ -485,7 +485,7 @@ mkPmLitPattern lit@(PmLit _ val)
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVars [ty]
-  VarPat _ id  -> return [PmVar NotMarkedStrict (unLoc id)]
+  VarPat _ id  -> return [PmVar HsLazy (unLoc id)]
   ParPat _ p   -> translatePat fam_insts (unLoc p)
   LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
   BangPat _ p  -> map_single strictenPmPat <$> translatePat fam_insts (unLoc p)
@@ -496,7 +496,7 @@ translatePat fam_insts pat = case pat of
   -- (x@pat)   ===>   x (pat <- x)
   AsPat _ (dL->L _ x) p -> do
     pat <- translatePat fam_insts (unLoc p)
-    pure [PmVar NotMarkedStrict x, PmGrd pat (Var x)]
+    pure [PmVar HsLazy x, PmGrd pat (Var x)]
 
   SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
@@ -515,8 +515,8 @@ translatePat fam_insts pat = case pat of
     (xp, xe) <- mkPmId2Forms pat_ty
     let ke1 = HsOverLit noExtField (unLoc k1)
         ke2 = HsOverLit noExtField k2
-    g1 <- mkGuardSyntaxExpr [truePattern]             ge    [unLoc xe, ke1]
-    g2 <- mkGuardSyntaxExpr [PmVar NotMarkedStrict n] minus [ke2]
+    g1 <- mkGuardSyntaxExpr [truePattern]    ge    [unLoc xe, ke1]
+    g2 <- mkGuardSyntaxExpr [PmVar HsLazy n] minus [ke2]
     return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
@@ -631,31 +631,31 @@ translatePatVec fam_insts pats = mapM (translatePat fam_insts) pats
 translateConPatVec :: FamInstEnvs -> [Type] -> [TyVar]
                    -> ConLike -> HsConPatDetails GhcTc
                    -> DsM PatVec
-translateConPatVec fam_insts _univ_tys _ex_tvs _ (PrefixCon ps)
-  = concat <$> translatePatVec fam_insts (map unLoc ps)
-translateConPatVec fam_insts _univ_tys _ex_tvs _ (InfixCon p1 p2)
-  = concat <$> translatePatVec fam_insts (map unLoc [p1,p2])
+translateConPatVec fam_insts _univ_tys _ex_tvs c (PrefixCon ps)
+  = addBangs c . concat <$> translatePatVec fam_insts (map unLoc ps)
+translateConPatVec fam_insts _univ_tys _ex_tvs c (InfixCon p1 p2)
+  = addBangs c . concat <$> translatePatVec fam_insts (map unLoc [p1,p2])
 translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- Nothing matched. Make up some fresh term variables
-  | null fs        = mkPmVarsStrictened str_arg_tys
+  | null fs        = addBangs c <$> mkPmVars arg_tys
     -- The data constructor was not defined using record syntax. For the
     -- pattern to be in record syntax it should be empty (e.g. Just {}).
     -- So just like the previous case.
-  | null orig_lbls = ASSERT(null matched_lbls) mkPmVarsStrictened str_arg_tys
+  | null orig_lbls = ASSERT(null matched_lbls) addBangs c <$> mkPmVars arg_tys
     -- Some of the fields appear, in the original order (there may be holes).
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
-  | matched_lbls `subsetOf` orig_lbls
+  | matched_lbls `isSubsequenceOf` orig_lbls
   = ASSERT(orig_lbls `equalLength` arg_tys)
-      let translateOne (lbl, (str_mark, ty)) = case lookup lbl matched_pats of
+      let translateOne lbl ty = case lookup lbl matched_pats of
             Just p  -> translatePat fam_insts p
-            Nothing -> mkPmVarsStrictened [(str_mark, ty)]
-      in  concatMapM translateOne (zip orig_lbls str_arg_tys)
+            Nothing -> mkPmVars [ty]
+      in  addBangs c . concat <$> zipWithM translateOne orig_lbls arg_tys
     -- The fields that appear are not in the correct order. Make up fresh
     -- variables for all fields and add guards after matching, to force the
     -- evaluation in the correct order.
   | otherwise = do
-      arg_var_pats    <- mkPmVarsStrictened str_arg_tys
+      arg_var_pats    <- addBangs c <$> mkPmVars arg_tys
       translated_pats <- forM matched_pats $ \(x,pat) -> do
         pvec <- translatePat fam_insts pat
         return (x, pvec)
@@ -669,11 +669,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated), with strictness marks
-    str_arg_tys = zip str_marks arg_tys
     arg_tys     = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
-    str_marks
-      | RealDataCon dc <- c = dataConRepStrictness dc
-      | otherwise           = zipWith const (repeat NotMarkedStrict) arg_tys
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -681,12 +677,18 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
                    | (dL->L _ x) <- fs]
     matched_lbls = [ name | (name, _pat) <- matched_pats ]
 
-    subsetOf :: Eq a => [a] -> [a] -> Bool
-    subsetOf []     _  = True
-    subsetOf (_:_)  [] = False
-    subsetOf (x:xs) (y:ys)
-      | x == y    = subsetOf    xs  ys
-      | otherwise = subsetOf (x:xs) ys
+addBangs :: ConLike -> PatVec -> PatVec
+addBangs c ps = go ps bangs
+  where
+    bangs = case c of
+      RealDataCon dc -> dataConImplBangs dc
+      PatSynCon ps   -> take (patSynArity ps) (repeat HsLazy)
+
+    go (PmVar _ x:ps) (bang:bangs) = PmVar bang x : go ps bangs
+    go (p@PmGrd{}:ps) bangs        = p            : go ps bangs
+    go (p@PmCon{}:ps) (_   :bangs) = p            : go ps bangs
+    go []             []           = []
+    go _              _            = panic "addBangs"
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
@@ -871,23 +873,16 @@ mkGuardSyntaxExpr pv f args = do
 
 -- | Generate a lazy variable pattern of a given type
 mkPmVar :: Type -> DsM PmPat
-mkPmVar ty = PmVar NotMarkedStrict <$> mkPmId ty
+mkPmVar ty = PmVar HsLazy <$> mkPmId ty
 
 -- | Generate many lazy variable patterns, given a list of types
 mkPmVars :: [Type] -> DsM PatVec
 mkPmVars tys = mapM mkPmVar tys
 
--- | Generate many possibly strict variable patterns, given a list of types and
--- their strictness
-mkPmVarsStrictened :: [(StrictnessMark, Type)] -> DsM PatVec
-mkPmVarsStrictened marks_and_tys = mapM mk_pm_var marks_and_tys
-  where
-    mk_pm_var (mark, ty) = PmVar mark <$> mkPmId ty
-
 -- | Applicable when there's a surrounding BangPat or it's a strict constructor
 -- field.
 strictenPmPat :: PmPat -> PmPat
-strictenPmPat (PmVar _ x) = PmVar MarkedStrict x
+strictenPmPat (PmVar _ x) = PmVar HsStrict x
 -- PmCon is strict anyway
 strictenPmPat p@PmCon{}   = p
 -- PmGrd isn't really applicable because of patternArity 0
@@ -899,7 +894,7 @@ strictenPmPat p@PmGrd{}   = p
 mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar NotMarkedStrict x, noLoc (HsVar noExtField (noLoc x)))
+  return (PmVar HsLazy x, noLoc (HsVar noExtField (noLoc x)))
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -1095,9 +1090,9 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
-pmcheck (PmVar mark x : ps) guards (y : vva) n delta = do
+pmcheck (PmVar bang x : ps) guards (y : vva) n delta = do
   delta_lzy <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
-  if isMarkedStrict mark
+  if isBanged bang
     then do
       pr <- assertNonVoid delta_lzy x >>= \case
               Nothing        -> pure mempty
