@@ -107,8 +107,8 @@ module TcRnMonad(
   emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
-  getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
+  recordThUse, recordThSpliceUse,
+  keepAlive, getStage, getStageAndBindLevel, setStage,
   addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
@@ -183,8 +183,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
-import Data.Set ( Set )
-import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
@@ -214,7 +212,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
@@ -274,8 +271,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
-                tcg_th_top_level_locs
-                                   = th_locs_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
@@ -1681,7 +1676,8 @@ emitAnonWildCardHoleConstraint tv
        ; emitInsolubles $ unitBag $
          CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc }
-                  , cc_hole = TypeHole (mkTyVarOcc "_") } }
+                  , cc_occ = mkTyVarOcc "_"
+                  , cc_hole = TypeHole } }
 
 emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitNamedWildCardHoleConstraints wcs
@@ -1693,7 +1689,8 @@ emitNamedWildCardHoleConstraints wcs
     do_one ct_loc (name, tv)
        = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc' }
-                  , cc_hole = TypeHole (occName name) }
+                  , cc_occ = occName name
+                  , cc_hole = TypeHole }
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
@@ -1767,22 +1764,6 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
-
--- | When generating an out-of-scope error message for a variable matching a
--- binding in a later inter-splice group, the typechecker uses the splice
--- locations to provide details in the message about the scope of that binding.
-recordTopLevelSpliceLoc :: SrcSpan -> TcM ()
-recordTopLevelSpliceLoc (RealSrcSpan real_loc)
-  = do { env <- getGblEnv
-       ; let locs_var = tcg_th_top_level_locs env
-       ; locs0 <- readTcRef locs_var
-       ; writeTcRef locs_var (Set.insert real_loc locs0) }
-recordTopLevelSpliceLoc (UnhelpfulSpan _) = return ()
-
-getTopLevelSpliceLocs :: TcM (Set RealSrcSpan)
-getTopLevelSpliceLocs
-  = do { env <- getGblEnv
-       ; readTcRef (tcg_th_top_level_locs env) }
 
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name
