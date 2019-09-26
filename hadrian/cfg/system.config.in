@@ -169,6 +169,9 @@ use-system-ffi    = @UseSystemLibFFI@
 ffi-include-dir   = @FFIIncludeDir@
 ffi-lib-dir       = @FFILibDir@
 
+libdw-include-dir   = @LibdwIncludeDir@
+libdw-lib-dir       = @LibdwLibDir@
+
 # Optional Dependencies:
 #=======================
 

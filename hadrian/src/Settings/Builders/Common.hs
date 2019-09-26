@@ -29,12 +29,14 @@ cIncludeArgs = do
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
+    libdwIncludeDir   <- getSetting FfiIncludeDir
     libPath <- expr $ stageLibPath stage
     mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
             , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+            , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
             -- Add @incDirs@ in the build directory, since some files generated
             -- with @autoconf@ may end up in the build directory.
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
