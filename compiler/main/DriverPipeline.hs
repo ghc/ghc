@@ -157,10 +157,14 @@ compileOne' m_tc_result mHscMessage
 
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
-   (status, hmi0) <- hscIncrementalCompile
+   -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
+   (status, hmi_details, m_iface) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
+
+   -- Build HMI from the results of the Core pipeline.
+   let coreHmi m_linkable = HomeModInfo (expectIface m_iface) hmi_details m_linkable
 
    let flags = hsc_dflags hsc_env0
      in do unless (gopt Opt_KeepHiFiles flags) $
@@ -174,23 +178,23 @@ compileOne' m_tc_result mHscMessage
         (HscUpToDate, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust maybe_old_linkable || isNoLink (ghcLink dflags) )
-            return (expectHm hmi0) { hm_linkable = maybe_old_linkable }
+            return $! coreHmi maybe_old_linkable
         (HscNotGeneratingCode, HscNothing) ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
-            in return (expectHm hmi0) { hm_linkable = mb_linkable }
+            in return $! coreHmi mb_linkable
         (HscNotGeneratingCode, _) -> panic "compileOne HscNotGeneratingCode"
         (_, HscNothing) -> panic "compileOne HscNothing"
         (HscUpdateBoot, HscInterpreted) -> do
-            return (expectHm hmi0)
+            return $! coreHmi Nothing
         (HscUpdateBoot, _) -> do
             touchObjectFile dflags object_filename
-            return (expectHm hmi0)
+            return $! coreHmi Nothing
         (HscUpdateSig, HscInterpreted) ->
-            let linkable = LM (ms_hs_date summary) this_mod []
-            in return (expectHm hmi0) { hm_linkable = Just linkable }
+            let !linkable = LM (ms_hs_date summary) this_mod []
+            in return $! coreHmi (Just linkable)
         (HscUpdateSig, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule) basename dflags
@@ -209,8 +213,8 @@ compileOne' m_tc_result mHscMessage
                               (Just location)
                               []
             o_time <- getModificationUTCTime object_filename
-            let linkable = LM o_time this_mod [DotO object_filename]
-            return (expectHm hmi0) { hm_linkable = Just linkable }
+            let !linkable = LM o_time this_mod [DotO object_filename]
+            return $! coreHmi $ Just linkable
         (HscRecomp cgguts summary iface_gen, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run
             -- so we generate a interface without codeGen info.
@@ -236,9 +240,9 @@ compileOne' m_tc_result mHscMessage
               -- with the filesystem's clock.  It's just as accurate:
               -- if the source is modified, then the linkable will
               -- be out of date.
-            let linkable = LM unlinked_time (ms_mod summary)
+            let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
+            return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp cgguts summary iface_gen, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
@@ -262,20 +266,13 @@ compileOne' m_tc_result mHscMessage
             iface <- (expectJust "Iface callback") <$> readIORef if_ref
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
-            let linkable = LM o_time this_mod [DotO object_filename]
-            return (expectHmBuilder iface hmi0) { hm_linkable = Just linkable, hm_iface = iface }
+            let !linkable = LM o_time this_mod [DotO object_filename]
+            return $! HomeModInfo iface hmi_details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
 
-       expectHm :: Either HomeModInfo (ModIface -> HomeModInfo) -> HomeModInfo
-       expectHm (Left x) = x
-       expectHm (Right _) =
-         panic "hscIncrementalCompile should return a HomeMod for this status"
-
-       expectHmBuilder :: ModIface -> Either HomeModInfo (ModIface -> HomeModInfo) -> HomeModInfo
-       expectHmBuilder iface (Right f) = f iface
-       expectHmBuilder _ (Left _) =
-         panic "hscIncrementalCompile should return a function for this status"
+       expectIface :: Maybe ModIface -> ModIface
+       expectIface = expectJust "compileOne': Interface expected "
 
        this_mod    = ms_mod summary
        location    = ms_location summary
@@ -1143,7 +1140,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
+        (result, _, _) <- liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
         return (HscOut src_flavour mod_name result,

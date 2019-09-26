@@ -875,6 +875,9 @@ data FindResult
 type ModIface = ModIface_ ModIfaceExts
 type PartialModIface = ModIface_ ()
 
+-- | Extends a PartialModIface with information which is either:
+-- * Computed after codegen
+-- * Or computed just before writing the iface to disk. (Hashes)
 data ModIfaceExts = ModIfaceExts
   { mi_iface_hash :: !Fingerprint
     -- ^ Hash of the whole interface
@@ -912,6 +915,9 @@ data ModIfaceExts = ModIfaceExts
     -- name, if it has one.
   }
 
+-- | Selects a IfaceDecl representation.
+-- For fully instantiated interfaces we also maintain
+-- a fingerprint used for recompilation checks.
 type family IfaceDeclExts a where
   IfaceDeclExts () = IfaceDecl
   IfaceDeclExts ModIfaceExts = (Fingerprint, IfaceDecl)

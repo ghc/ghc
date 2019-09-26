@@ -716,8 +716,8 @@ genericHscFrontend' mod_summary
 --------------------------------------------------------------
 
 -- | Used by both OneShot and batch mode. Runs the pipeline HsSyn and Core parts
--- of the pipeline either returning a HomeModInfo if we are done at that point
--- or a function to build one if the backend also has to be run.
+-- of the pipeline. If we return a interface this implies we won't run any backend
+-- and the interface is fully built at this point.
 hscIncrementalCompile :: Bool
                       -> Maybe TcGblEnv
                       -> Maybe Messager
@@ -728,7 +728,7 @@ hscIncrementalCompile :: Bool
                       -> (Int,Int)
                       -- HomeModInfo does not contain linkable, since we haven't
                       -- code-genned yet
-                      -> IO (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
+                      -> IO (HscStatus, ModDetails, Maybe ModIface)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
@@ -757,22 +757,19 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- file on disk was good enough.
         Left iface -> do
             -- Knot tying!  See Note [Knot-tying typecheckIface]
-            hmi <- liftIO . fixIO $ \hmi' -> do
+            details <- liftIO . fixIO $ \details' -> do
                 let hsc_env' =
                         hsc_env {
                             hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                        (ms_mod_name mod_summary) hmi'
+                                        (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
                         }
                 -- NB: This result is actually not that useful
                 -- in one-shot mode, since we're not going to do
                 -- any further typechecking.  It's much more useful
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
-                return HomeModInfo{
-                    hm_details = details,
-                    hm_iface = iface,
-                    hm_linkable = Nothing }
-            return (HscUpToDate, Left hmi)
+                return details
+            return (HscUpToDate, details, Just iface)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
@@ -795,7 +792,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
+       -> Hsc (HscStatus, ModDetails, Maybe ModIface)
 finish summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
@@ -803,7 +800,7 @@ finish summary tc_result mb_old_hash = do
       hsc_src = ms_hsc_src summary
       should_desugar =
         ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
-      mk_simple_iface :: Hsc (HscStatus, Either HomeModInfo (ModIface -> HomeModInfo))
+      mk_simple_iface :: Hsc (HscStatus, ModDetails, Maybe ModIface)
       mk_simple_iface = do
         let hsc_status =
               case (target, hsc_src) of
@@ -815,8 +812,7 @@ finish summary tc_result mb_old_hash = do
           hscSimpleIface hsc_env tc_result mb_old_hash
 
         liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
-        return (hsc_status, Left HomeModInfo
-                {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
+        return (hsc_status, details, Just iface)
 
   -- we usually desugar even when we are not generating code, otherwise
   -- we would miss errors thrown by the desugaring (see #10600). The only
@@ -839,28 +835,23 @@ finish summary tc_result mb_old_hash = do
           let !partial_iface =
                 {-# SCC "HscMain.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
+                -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details desugared_guts)
 
           let iface_gen :: IO (ModIface, Bool)
               iface_gen = do
-                  -- BUILD THE NEW ModIface and ModDetails and emit external
-                  -- core if necessary.
+                  -- Build a fully instantiated ModIface.
                   -- This has to happen *after* code gen so that the back-end
-                  -- info has been set. Not yet clear if it matters waiting
-                  -- until after code output.
-                  -- This captures hsc_env, we might get away with keeping
-                  -- less of the environment alive here but don't do so
-                  -- currently.
+                  -- info has been set.
+                  -- This captures hsc_env, but it seems we keep it alive in other
+                  -- ways as well so we don't bother extracting only the relevant parts.
                   dumpIfaceStats hsc_env
                   final_iface <- mkFullIface hsc_env partial_iface
                   let no_change = mb_old_hash == Just (mi_iface_hash (mi_exts final_iface))
                   return (final_iface, no_change)
 
-          return (HscRecomp cg_guts summary iface_gen,
-                  Right $ \iface -> HomeModInfo
-                              { hm_details = details
-                              , hm_iface = iface
-                              , hm_linkable = Nothing })
+          return ( HscRecomp cg_guts summary iface_gen
+                 , details, Nothing )
     else mk_simple_iface
 
 
@@ -1374,12 +1365,6 @@ hscSimpleIface' tc_result mb_old_iface = do
 --------------------------------------------------------------
 -- BackEnd combinators
 --------------------------------------------------------------
-
-
---------------------------------------------------------------
--- BackEnd combinators
---------------------------------------------------------------
-
 {-
 Note [Interface file extensions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

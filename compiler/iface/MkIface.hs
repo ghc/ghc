@@ -135,7 +135,10 @@ import qualified Data.Semigroup
 ************************************************************************
 -}
 
-mkPartialIface :: HscEnv -> ModDetails -> ModGuts -> PartialModIface
+mkPartialIface :: HscEnv
+               -> ModDetails
+               -> ModGuts
+               -> PartialModIface
 mkPartialIface hsc_env mod_details
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
@@ -155,6 +158,8 @@ mkPartialIface hsc_env mod_details
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
+-- | Fully instantiate a interface
+-- Adds fingerprints and potentially code generator produced information.
 mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
 mkFullIface hsc_env partial_iface = do
     full_iface <-
