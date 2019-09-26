@@ -363,6 +363,9 @@ UseSystemLibFFI=@UseSystemLibFFI@
 FFILibDir=@FFILibDir@
 FFIIncludeDir=@FFIIncludeDir@
 
+LibdwLibDir=@LibdwLibDir@
+LibdwIncludeDir=@LibdwIncludeDir@
+
 # GHC needs arch-specific tweak at least in
 #     rts/Libdw.c:set_initial_registers()
 GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 s390x),@UseLibdw@,NO))
