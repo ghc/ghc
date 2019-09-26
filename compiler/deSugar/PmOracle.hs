@@ -21,6 +21,7 @@ module PmOracle (
         addRefutableAltCon, -- Add a negative term equality
         addTmCt,            -- Add a positive term equality x ~ e
         addVarCoreCt,       -- Add a positive term equality x ~ core_expr
+        assertNonVoid,      -- A temporary way to assert that a variable is *currently* non-void
         provideEvidenceForEquation,
     ) where
 
@@ -859,6 +860,18 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   let (univ_tvs,_,_,_,_,con_res_ty) = patSynSig ps
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
+
+-- | Kind of tries to add a non-void contraint to 'Delta', but doesn't really
+-- commit to upholding that constraint in the future. This will be rectified
+-- in a follow-up patch. The status quo should work good enough for now.
+assertNonVoid :: Delta -> Id -> DsM (Maybe Delta)
+assertNonVoid delta@MkDelta{ delta_tm_st = TmSt env } x = do
+  vi  <- initLookupVarInfo delta x
+  ensureInhabited delta vi >>= \case
+    -- vi' has probably constructed and then thinned out some PossibleMatches.
+    -- We want to cache that work
+    Just vi' -> pure (Just delta{ delta_tm_st = TmSt (setEntrySDIE env x vi')})
+    Nothing  -> pure Nothing
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- Returns (Just vi) guarantees that at least one member

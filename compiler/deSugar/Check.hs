@@ -96,8 +96,8 @@ data PmPat
 
     -- | Possibly strict variable pattern match
   | PmVar {
-      pm_var_strict :: Bool,
-      pm_var_id     :: Id
+      _pm_var_mark :: StrictnessMark,
+      pm_var_id    :: Id
     }
 
     -- | @PmGrd pat expr@ matches @expr@ against @pat@,
@@ -112,7 +112,7 @@ data PmPat
 instance Outputable PmPat where
   ppr (PmCon alt _arg_tys _con_tvs _con_dicts con_args)
     = cparen (notNull con_args) (hsep [ppr alt, hsep (map ppr con_args)])
-  ppr (PmVar bang vid) = (if bang then char '!' else empty) <> ppr vid
+  ppr (PmVar bang vid) = ppr bang <> ppr vid
   ppr (PmGrd pv ge) = hsep (map ppr pv) <+> text "<-" <+> ppr ge
 
 -- data T a where
@@ -485,7 +485,7 @@ mkPmLitPattern lit@(PmLit _ val)
 translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PatVec
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVars [ty]
-  VarPat _ id  -> return [PmVar False (unLoc id)]
+  VarPat _ id  -> return [PmVar NotMarkedStrict (unLoc id)]
   ParPat _ p   -> translatePat fam_insts (unLoc p)
   LazyPat _ _  -> mkPmVars [hsPatType pat] -- like a variable
   BangPat _ p  -> map_single strictenPmPat <$> translatePat fam_insts (unLoc p)
@@ -496,7 +496,7 @@ translatePat fam_insts pat = case pat of
   -- (x@pat)   ===>   x (pat <- x)
   AsPat _ (dL->L _ x) p -> do
     pat <- translatePat fam_insts (unLoc p)
-    pure [PmVar False x, PmGrd pat (Var x)]
+    pure [PmVar NotMarkedStrict x, PmGrd pat (Var x)]
 
   SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
@@ -515,8 +515,8 @@ translatePat fam_insts pat = case pat of
     (xp, xe) <- mkPmId2Forms pat_ty
     let ke1 = HsOverLit noExtField (unLoc k1)
         ke2 = HsOverLit noExtField k2
-    g1 <- mkGuardSyntaxExpr [truePattern]   ge    [unLoc xe, ke1]
-    g2 <- mkGuardSyntaxExpr [PmVar False n] minus [ke2]
+    g1 <- mkGuardSyntaxExpr [truePattern]             ge    [unLoc xe, ke1]
+    g2 <- mkGuardSyntaxExpr [PmVar NotMarkedStrict n] minus [ke2]
     return [xp, g1, g2]
 
   -- (fun -> pat)   ===>   x (pat <- fun x)
@@ -871,7 +871,7 @@ mkGuardSyntaxExpr pv f args = do
 
 -- | Generate a lazy variable pattern of a given type
 mkPmVar :: Type -> DsM PmPat
-mkPmVar ty = PmVar False <$> mkPmId ty
+mkPmVar ty = PmVar NotMarkedStrict <$> mkPmId ty
 
 -- | Generate many lazy variable patterns, given a list of types
 mkPmVars :: [Type] -> DsM PatVec
@@ -882,12 +882,12 @@ mkPmVars tys = mapM mkPmVar tys
 mkPmVarsStrictened :: [(StrictnessMark, Type)] -> DsM PatVec
 mkPmVarsStrictened marks_and_tys = mapM mk_pm_var marks_and_tys
   where
-    mk_pm_var (mark, ty) = PmVar (isMarkedStrict mark) <$> mkPmId ty
+    mk_pm_var (mark, ty) = PmVar mark <$> mkPmId ty
 
 -- | Applicable when there's a surrounding BangPat or it's a strict constructor
 -- field.
 strictenPmPat :: PmPat -> PmPat
-strictenPmPat (PmVar _ x) = PmVar True x
+strictenPmPat (PmVar _ x) = PmVar MarkedStrict x
 -- PmCon is strict anyway
 strictenPmPat p@PmCon{}   = p
 -- PmGrd isn't really applicable because of patternArity 0
@@ -899,7 +899,7 @@ strictenPmPat p@PmGrd{}   = p
 mkPmId2Forms :: Type -> DsM (PmPat, LHsExpr GhcTc)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar False x, noLoc (HsVar noExtField (noLoc x)))
+  return (PmVar NotMarkedStrict x, noLoc (HsVar noExtField (noLoc x)))
 
 {-
 Note [Filtering out non-matching COMPLETE sets]
@@ -1095,9 +1095,15 @@ pmcheck (p@PmGrd { pm_grd_pv = pv, pm_grd_expr = e } : ps) guards vva n delta = 
   pmcheckI (pv ++ ps) guards (x : vva) n delta'
 
 -- Var: Add x :-> y to the oracle and recurse
-pmcheck (PmVar strict x : ps) guards (y : vva) n delta = do
-  delta' <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
-  pmcheckI ps guards vva n delta'
+pmcheck (PmVar mark x : ps) guards (y : vva) n delta = do
+  delta_lzy <- expectJust "x is fresh" <$> addTmCt delta (TmVarVar x y)
+  if isMarkedStrict mark
+    then do
+      pr <- assertNonVoid delta_lzy x >>= \case
+              Nothing        -> pure mempty
+              Just delta_str -> pmcheckI ps guards vva n delta_str
+      pure (forceIfCanDiverge delta x pr)
+    else pmcheckI ps guards vva n delta_lzy
 
 -- ConVar
 pmcheck (p : ps) guards (x : vva) n delta
