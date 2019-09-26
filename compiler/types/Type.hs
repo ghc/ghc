@@ -17,7 +17,7 @@ module Type (
         TyThing(..), Type, ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
         KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
-        KnotTied,
+        KnotTied, ErrorPriority(..),
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -281,7 +281,6 @@ import Unique ( nonDetCmpUnique )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
-import GHC.TypeLits     ( ErrorPriority(..) )
 
 -- $type_classification
 -- #type_classification#
@@ -880,6 +879,11 @@ isLitTy :: Type -> Maybe TyLit
 isLitTy ty | Just ty1 <- coreView ty = isLitTy ty1
 isLitTy (LitTy l)                    = Just l
 isLitTy _                            = Nothing
+
+
+-- | This data type should reflect the one in GHC.TypeLits
+data ErrorPriority = HighPriority | LowPriority
+  deriving (Eq, Ord)
 
 errorPriorityTyConToErrorPriority :: TyCon -> Maybe ErrorPriority
 errorPriorityTyConToErrorPriority tc

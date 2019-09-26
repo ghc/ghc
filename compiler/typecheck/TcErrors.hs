@@ -68,7 +68,6 @@ import {-# SOURCE #-} TcHoleErrors ( findValidHoleFits )
 
 -- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-import GHC.TypeLits ( ErrorPriority (..) )
 
 
 {-

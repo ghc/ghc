@@ -41,7 +41,7 @@ module GHC.TypeLits
 
   -- * User-defined type errors
   , TypeErrorPriority
-  , type TypeError
+  , TypeError
   , ErrorPriority(..)
   , ErrorMessage(..)
 

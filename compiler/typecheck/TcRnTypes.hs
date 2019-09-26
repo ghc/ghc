@@ -207,7 +207,6 @@ import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
-import GHC.TypeLits  ( ErrorPriority (..) )
 
 import {-# SOURCE #-} TcHoleFitTypes ( HoleFitPlugin )
 
