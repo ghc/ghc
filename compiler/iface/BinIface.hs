@@ -10,14 +10,31 @@
 
 -- | Binary interface file support.
 module BinIface (
+        -- * Public API for interface file serialisation
         writeBinIface,
         readBinIface,
         getSymtabName,
         getDictFastString,
+        getSymbolTable,
+        putName,
+        putDictionary,
+        putFastString,
+        putSymbolTable,
+        BinSymbolTable(..),
+        BinDictionary(..),
         CheckHiWay(..),
         TraceBinIFaceReading(..),
         getWithUserData,
-        putWithUserData
+        putWithUserData,
+
+        -- * Internal serialisation functions
+        getSymbolTable,
+        putName,
+        putDictionary,
+        putFastString,
+        putSymbolTable,
+        BinSymbolTable(..),
+        BinDictionary(..)
 
     ) where
 
