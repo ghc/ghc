@@ -108,6 +108,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+       extra-lib-dirs: @LibdwLibDir@
+       include-dirs: @LibdwIncludeDir@
     if flag(libnuma)
        extra-libraries: numa
     if !flag(smp)
