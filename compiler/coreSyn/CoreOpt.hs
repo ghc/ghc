@@ -1113,7 +1113,7 @@ dealWithStringLiteral fun str co
   = let strFS = mkFastStringByteString str
 
         char = mkConApp charDataCon [mkCharLit (headFS strFS)]
-        charTail = bytesFS (tailFS strFS)
+        charTail = BS.tail (bytesFS strFS)
 
         -- In singleton strings, just add [] instead of unpackCstring# ""#.
         rest = if BS.null charTail
