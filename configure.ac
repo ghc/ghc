@@ -1245,15 +1245,36 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
+AC_ARG_WITH([libdw-libs],
+  [AC_HELP_STRING([--with-libdw-libs=ARG],
+    [Find libraries for libdw in ARG [default=system default]])
+  ],
+  [LIBDW_LDFLAGS="-L$withval"])
+
+AC_ARG_WITH([libdw-includes],
+  [AC_HELP_STRING([--with-libdw-includes=ARG],
+    [Find includes for libdw in ARG [default=system default]])
+  ],
+  [LIBDW_CFLAGS="-I$withval"])
+
 UseLibdw=NO
 USE_LIBDW=0
 AC_ARG_ENABLE(dwarf-unwind,
     [AC_HELP_STRING([--enable-dwarf-unwind],
         [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
 if test "$enable_dwarf_unwind" = "yes" ; then
+  CFLAGS2="$CFLAGS"
+  CFLAGS="$LIBDW_CFLAGS $CFLAGS"
+  LDFLAGS2="$LDFLAGS"
+  LDFLAGS="$LIBDW_LDFLAGS $LDFLAGS"
+
   AC_CHECK_LIB(dw, dwfl_attach_state,
-      [UseLibdw=YES],
+      [AC_CHECK_HEADERS([dw.h], [dwfl_attach_state], [])
+       UseLibdw=YES],
       [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
+
+  CFLAGS="$CFLAGS2"
+  LDFLAGS="$LDFLAGS2"
 fi
 
 AC_SUBST(UseLibdw)
