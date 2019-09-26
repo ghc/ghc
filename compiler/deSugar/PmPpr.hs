@@ -50,7 +50,7 @@ pprUncovered delta vas
       -- precedence
       | [_] <- vas   = topPrec
       | otherwise    = appPrec
-    ppr_action       = mapM (pprPmVar TopLevel init_prec) vas
+    ppr_action       = mapM (pprPmVar init_prec) vas
     (vec, renamings) = runPmPpr delta ppr_action
     refuts           = prettifyRefuts delta renamings
 
@@ -133,9 +133,14 @@ checkRefuts x = do
 
 -- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
--- underscores. On the top-level with a type signature, even.
-pprPmVar :: TopLevelFlag -> PprPrec -> Id -> PmPprM SDoc
-pprPmVar top_lvl prec x = do
+-- underscores. Even with a type signature, if it's not too noisy.
+pprPmVar :: PprPrec -> Id -> PmPprM SDoc
+-- Type signature is "too noisy" by my definition if it needs to parenthesize.
+-- I like           "not matched: _ :: Proxy (DIdEnv SDoc)",
+-- but I don't like "not matched: (_ :: stuff) (_:_) (_ :: Proxy (DIdEnv SDoc))"
+-- The useful information in the latter case is the constructor that we missed,
+-- not the types of the wildcards in the places that aren't matched as a result.
+pprPmVar prec x = do
   delta <- ask
   case lookupSolution delta x of
     Just (alt, args) -> pprPmAltCon prec alt args
@@ -144,14 +149,10 @@ pprPmVar top_lvl prec x = do
         -- if we have no info about the parameter and would just print a
         -- wildcard, also show its type.
         typed_wildcard
-          | isTopLevel top_lvl
-          = cparen (prec > sigPrec)
-                   (underscore <+> text "::" <+> ppr (idType x))
+          | prec <= sigPrec
+          = underscore <+> text "::" <+> ppr (idType x)
           | otherwise
           = underscore
-
-pprPmVarLcl :: PprPrec -> Id -> PmPprM SDoc
-pprPmVarLcl = pprPmVar NotTopLevel
 
 pprPmAltCon :: PprPrec -> PmAltCon -> [Id] -> PmPprM SDoc
 pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)
@@ -164,24 +165,24 @@ pprConLike delta _prec cl args
   | Just pm_expr_list <- pmExprAsList delta (PmAltConLike cl) args
   = case pm_expr_list of
       NilTerminated list ->
-        brackets . fsep . punctuate comma <$> mapM (pprPmVarLcl appPrec) list
+        brackets . fsep . punctuate comma <$> mapM (pprPmVar appPrec) list
       WcVarTerminated pref x ->
-        parens   . fcat . punctuate colon <$> mapM (pprPmVarLcl appPrec) (toList pref ++ [x])
+        parens   . fcat . punctuate colon <$> mapM (pprPmVar appPrec) (toList pref ++ [x])
 pprConLike _delta _prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
-  = hash_parens . fsep . punctuate comma <$> mapM (pprPmVarLcl appPrec) args
+  = hash_parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
   | isTupleDataCon con
-  = parens . fsep . punctuate comma <$> mapM (pprPmVarLcl appPrec) args
+  = parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
 pprConLike _delta prec cl args
   | conLikeIsInfix cl = case args of
-      [x, y] -> do x' <- pprPmVarLcl funPrec x
-                   y' <- pprPmVarLcl funPrec y
+      [x, y] -> do x' <- pprPmVar funPrec x
+                   y' <- pprPmVar funPrec y
                    return (cparen (prec > opPrec) (x' <+> ppr cl <+> y'))
       -- can it be infix but have more than two arguments?
       list   -> pprPanic "pprConLike:" (ppr list)
   | null args = return (ppr cl)
-  | otherwise = do args' <- mapM (pprPmVarLcl appPrec) args
+  | otherwise = do args' <- mapM (pprPmVar appPrec) args
                    return (cparen (prec > funPrec) (fsep (ppr cl : args')))
 
 -- | The result of 'pmExprAsList'.
