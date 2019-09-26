@@ -616,10 +616,10 @@ TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
-'_('           { L _ ITopenTypedHole }
-CLOSE_HOLE     { L _ (ITcloseTypedHole _) }
-'_$('          { L _ ITopenTypedHoleEscape }
-'_$$('         { L _ ITopenTypedHoleTyEscape }
+'_('            { L _ ITopenTypedHole }
+CLOSE_HOLE      { L _ (ITcloseTypedHole _) }
+'_$('           { L _ ITopenTypedHoleEscape }
+'_$$('          { L _ ITopenTypedHoleTyEscape }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
