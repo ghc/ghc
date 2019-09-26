@@ -8,7 +8,7 @@ EmptyCase001.hs:14:8: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns not matched:
             []
-            ((_ :: Char):(_ :: [Char]))
+            (_:_)
 
 EmptyCase001.hs:18:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

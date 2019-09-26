@@ -8,9 +8,9 @@ pmc007.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
         Patterns not matched:
-            ('a':'b':(_ :: Char):(_ :: [Char]))
-            ('a':'c':(_ :: Char):(_ :: [Char]))
-            ('a':p:(_ :: [Char])) where p is not one of {'b', 'c'}
+            ('a':'b':_:_)
+            ('a':'c':_:_)
+            ('a':p:_) where p is not one of {'b', 'c'}
             ['a']
             ...
 
@@ -18,8 +18,8 @@ pmc007.hs:18:11: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            ('a':'b':(_ :: Char):(_ :: [Char]))
-            ('a':'c':(_ :: Char):(_ :: [Char]))
-            ('a':p:(_ :: [Char])) where p is not one of {'b', 'c'}
+            ('a':'b':_:_)
+            ('a':'c':_:_)
+            ('a':p:_) where p is not one of {'b', 'c'}
             ['a']
             ...

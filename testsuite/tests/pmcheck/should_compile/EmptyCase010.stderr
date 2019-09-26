@@ -4,7 +4,7 @@ EmptyCase010.hs:24:7: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns not matched:
             Baz MkGC1
-            Baz MkGC2 (_ :: T)
+            Baz (MkGC2 _)
 
 EmptyCase010.hs:28:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

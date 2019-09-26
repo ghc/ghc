@@ -1,7 +1,7 @@
 
 EmptyCase005.hs:24:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: Void3 (_ :: Void)
+    In a case alternative: Patterns not matched: Void3 _
 
 EmptyCase005.hs:67:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -19,7 +19,7 @@ EmptyCase005.hs:73:8: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase005.hs:79:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: MkTInt (_ :: Char)
+    In a case alternative: Patterns not matched: MkTInt _
 
 EmptyCase005.hs:91:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

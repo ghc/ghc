@@ -8,5 +8,5 @@ EmptyCase006.hs:26:7: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns not matched:
             Foo1 MkGA1
-            Foo1 MkGA2 (_ :: GA a)
+            Foo1 (MkGA2 _)
             Foo1 MkGA3
