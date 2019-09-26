@@ -177,6 +177,12 @@ Compiler
   been patched to no longer have have the MAX_PATH limit.  Windows users should no longer
   have any issues with long path names.
 
+- Introduce ``DynFlags`` plugins, that allow users to modidy the ``DynFlags``
+  that GHC is going to use when processing a set of files, from plugins.
+  They can be used for applying tiny configuration changes, registering hooks
+  and much more. See the :ref:`user guide <dynflags_plugins>` for
+  more details as well as an example.
+
 GHCi
 ~~~~
 
