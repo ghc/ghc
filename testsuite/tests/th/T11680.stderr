@@ -5,25 +5,17 @@ T11680.hs:20:7: error:
     • Variable not in scope: abce :: [a]
     • Perhaps you meant ‘abcd’ (line 23)
 
-T11680.hs:31:7: error:
-    • Variable not in scope: foo :: Int
-    • ‘foo’ (line 100) is not in scope before the splice on line 96
+T11680.hs:31:7: error: Variable not in scope: foo :: Int
 
 T11680.hs:39:7: error:
     • Variable not in scope: bar :: ()
-    • ‘bar’ (line 110) is not in scope
-        before the splice on lines 106-108
-      Perhaps you meant one of these: ‘bat’ (line 42), ‘baz’ (line 45)
+    • Perhaps you meant one of these: ‘bat’ (line 42), ‘baz’ (line 45)
 
-T11680.hs:50:7: error:
-    • Variable not in scope: ns :: [Double]
-    • ‘ns’ (splice on lines 106-108) is not in scope before line 106
+T11680.hs:50:7: error: Variable not in scope: ns :: [Double]
 
 T11680.hs:55:7: error:
     • Variable not in scope: intercalate
-    • ‘intercalate’ (line 114) is not in scope
-        before the splice on lines 106-108
-      Perhaps you meant ‘List.intercalate’ (imported from Data.List)
+    • Perhaps you meant ‘List.intercalate’ (imported from Data.List)
 
 T11680.hs:59:7: error:
     • Variable not in scope: nub
@@ -33,17 +25,4 @@ T11680.hs:64:7: error: Variable not in scope: x :: t0 -> Int
 
 T11680.hs:69:7: error:
     • Variable not in scope: cat :: ()
-    • ‘cat’ (splice on lines 79-86) is not in scope before line 79
-      Perhaps you meant ‘bat’ (line 42)
-
-T11680.hs:79:3: error:
-    • Variable not in scope: cab
-    • Perhaps you meant ‘cap’ (line 79)
-
-T11680.hs:79:3: error:
-    • Variable not in scope: cab
-    • Perhaps you meant one of these: ‘cat’ (line 79), ‘cap’ (line 79)
-
-T11680.hs:91:8: error:
-    • Variable not in scope: cat :: ()
-    • Perhaps you meant one of these: ‘bat’ (line 42), ‘cap’ (line 79)
+    • Perhaps you meant ‘bat’ (line 42)
