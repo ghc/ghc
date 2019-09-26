@@ -367,6 +367,23 @@ cabal for instance,) you can then use it by just specifying
 ``-fplugin=DoNothing.Plugin`` on the command line, and during the
 compilation you should see GHC say 'Hello'.
 
+Running multiple plugins is also supported, by passing
+multiple ``-fplugin=...`` options. GHC will load the plugins
+in the order in which they are specified on the command line
+and, when appropriate, compose their effects in the same
+order. That is, if we had two Core plugins, ``Plugin1`` and
+``Plugin2``, each defining an ``install`` function like
+the one above, then GHC would first run ``Plugin1.install``
+on the default ``[CoreToDo]``, take the result and feed it to
+``Plugin2.install``. ``-fplugin=Plugin1 -fplugin=Plugin2``
+will update the Core pipeline by applying
+``Plugin1.install opts1 >=> Plugin2.install opts2`` (where
+``opts1`` and ``opts2`` are the options passed to each plugin
+using ``-fplugin-opt=...``). This is not specific to Core
+plugins but holds for all the types of plugins that can be
+composed or sequenced in some way: the first plugin to appear
+on the GHC command line will always act first.
+
 .. _core-plugins-in-more-detail:
 
 Core plugins in more detail
@@ -1265,3 +1282,92 @@ were passed to it, and then exits.
 Provided you have compiled this plugin and registered it in a package,
 you can just use it by specifying ``--frontend DoNothing.FrontendPlugin``
 on the command line to GHC.
+
+.. _dynflags_plugins:
+
+DynFlags plugins
+~~~~~~~~~~~~~~~~
+
+A DynFlags plugin allows you to modify the ``DynFlags`` that GHC
+is going to use when processing a given (set of) file(s).
+``DynFlags`` is a record containing all sorts of configuration
+and command line data, from verbosity level to the integer library
+to use, including compiler hooks, plugins and pretty-printing options.
+DynFlags plugins allow plugin authors to update any of those values
+before GHC starts doing any actual work, effectively meaning that
+the updates specified by the plugin will be taken into account and
+influence GHC's behaviour.
+
+One of the motivating examples was the ability to register
+compiler hooks from a plugin. For example, one might want to modify
+the way Template Haskell code is executed. This is achievable by
+updating the ``hooks`` field of the ``DynFlags`` type, recording
+our custom "meta hook" in the right place. A simple application of
+this idea can be seen below:
+
+::
+
+    module DynFlagsPlugin (plugin) where
+
+    import BasicTypes
+    import GhcPlugins
+    import GHC.Hs.Expr
+    import GHC.Hs.Extension
+    import GHC.Hs.Lit
+    import Hooks
+    import TcRnMonad
+
+    plugin :: Plugin
+    plugin = defaultPlugin { dynflagsPlugin = hooksP }
+
+    hooksP :: [CommandLineOption] -> DynFlags -> IO DynFlags
+    hooksP opts dflags = return $ dflags
+      { hooks = (hooks dflags)
+        { runMetaHook = Just (fakeRunMeta opts) }
+      }
+
+    -- This meta hook doesn't actually care running code in splices,
+    -- it just replaces any expression splice with the "0"
+    -- integer literal, and errors out on all other types of
+    -- meta requests.
+    fakeRunMeta :: [CommandLineOption] -> MetaHook TcM
+    fakeRunMeta opts (MetaE r) _ = do
+      liftIO . putStrLn $ "Options = " ++ show opts
+      pure $ r zero
+
+      where zero :: LHsExpr GhcPs
+            zero = L noSrcSpan $ HsLit NoExtField $
+              HsInt NoExtField (mkIntegralLit (0 :: Int))
+
+    fakeRunMeta _ _ _ = error "fakeRunMeta: unimplemented"
+
+This simple plugin takes over the execution of Template Haskell code,
+replacing any expression splice it encounters by ``0`` (at type
+``Int``), and errors out on any other type of splice.
+
+Therefore, if we run GHC against the following code using the plugin
+from above:
+
+::
+
+    {-# OPTIONS -fplugin=DynFlagsPlugin #-}
+    {-# LANGUAGE TemplateHaskell #-}
+    module Main where
+
+    main :: IO ()
+    main = print $( [|1|] )
+
+This will not actually evaluate ``[|1|]``, but instead replace it
+with the ``0 :: Int`` literal.
+
+Just like the other types of plugins, you can write ``DynFlags`` plugins
+that can take and make use of some options that you can then specify
+using the ``-fplugin-opt`` flag. In the ``DynFlagsPlugin`` code from
+above, the said options would be available in the ``opts`` argument of
+``hooksP``.
+
+Finally, since those ``DynFlags`` updates happen after the plugins are loaded,
+you cannot from a ``DynFlags`` plugin register other plugins by just adding them
+to the ``plugins`` field of ``DynFlags``. In order to achieve this, you would
+have to load them yourself and store the result into the ``cachedPlugins``
+field of ``DynFlags``.
