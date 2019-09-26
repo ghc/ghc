@@ -69,8 +69,12 @@ initializePlugins hsc_env df
   = return df -- no need to reload plugins
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
-       return $ df { cachedPlugins = loadedPlugins }
+       let df' = df { cachedPlugins = loadedPlugins }
+       df'' <- withPlugins df' runDflagsPlugin df'
+       return df''
+
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
+        runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env

@@ -92,6 +92,13 @@ data Plugin = Plugin {
   , holeFitPlugin :: HoleFitPlugin
     -- ^ An optional plugin to handle hole fits, which may re-order
     --   or change the list of valid hole fits and refinement hole fits.
+  , dynflagsPlugin :: [CommandLineOption] -> DynFlags -> IO DynFlags
+    -- ^ An optional plugin to update 'DynFlags', right after
+    --   plugin loading. This can be used to register hooks
+    --   or tweak any field of 'DynFlags' before doing
+    --   actual work on a module.
+    --
+    --   @since 8.10.1
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -201,6 +208,7 @@ defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , holeFitPlugin         = const Nothing
+      , dynflagsPlugin        = const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return

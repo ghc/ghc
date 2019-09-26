@@ -1,0 +1,9 @@
+cabal-version:       >=1.10
+name:                hooks-plugin
+version:             0.1
+build-type:          Simple
+
+library
+  exposed-modules:     Hooks.Plugin
+  build-depends:       base, ghc
+  default-language:    Haskell2010
