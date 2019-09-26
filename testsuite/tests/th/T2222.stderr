@@ -1,4 +1,4 @@
-inside b: p_0
+inside b: GHC.Integer.Type.Integer
 inside d: GHC.Types.Bool
 type of c: GHC.Types.Bool
 inside f: GHC.Types.Bool
