@@ -248,6 +248,10 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
+
+            -- We use this IORef the get out the iface from the otherwise
+            -- opaque pipeline once it's created. Otherwise we would have
+            -- to thread it through runPipeline.
             if_ref <- newIORef Nothing :: IO (IORef (Maybe ModIface))
             let iface_gen' = do
                     res@(iface, _no_change) <- iface_gen
