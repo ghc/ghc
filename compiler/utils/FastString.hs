@@ -32,11 +32,15 @@
 module FastString
        (
         -- * ByteString
-        bytesFS,            -- :: FastString -> ByteString
-        fastStringToByteString, -- = bytesFS (kept for haddock)
+        bytesFS,
+        fastStringToByteString,
         mkFastStringByteString,
         fastZStringToByteString,
         unsafeMkByteString,
+
+        -- * ShortByteString
+        fastStringToShortByteString,
+        mkFastStringShortByteString,
 
         -- * FastZString
         FastZString,
@@ -52,7 +56,6 @@ module FastString
         mkFastString,
         mkFastStringBytes,
         mkFastStringByteList,
-        mkFastStringForeignPtr,
         mkFastString#,
 
         -- ** Deconstruction
@@ -67,7 +70,6 @@ module FastString
         nullFS,
         appendFS,
         headFS,
-        tailFS,
         concatFS,
         consFS,
         nilFS,
@@ -108,10 +110,12 @@ import Control.Concurrent.MVar
 import Control.DeepSeq
 import Control.Monad
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
-import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
+import qualified Data.ByteString.Short    as SBS
+import qualified Data.ByteString.Short.Internal as SBS
 import Foreign.C
 import GHC.Exts
 import System.IO
@@ -121,6 +125,7 @@ import Data.Char
 import Data.Semigroup as Semi
 
 import GHC.IO
+import GHC.ST
 
 import Foreign
 
@@ -132,12 +137,14 @@ import GHC.Base         ( unpackCString#, unpackNBytes# )
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
-bytesFS :: FastString -> ByteString
-bytesFS f = fs_bs f
+bytesFS, fastStringToByteString :: FastString -> ByteString
+bytesFS = fastStringToByteString
 
 {-# DEPRECATED fastStringToByteString "Use `bytesFS` instead" #-}
-fastStringToByteString :: FastString -> ByteString
-fastStringToByteString = bytesFS
+fastStringToByteString f = SBS.fromShort $ fs_sbs f
+
+fastStringToShortByteString :: FastString -> ShortByteString
+fastStringToShortByteString = fs_sbs
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
@@ -147,9 +154,7 @@ unsafeMkByteString :: String -> ByteString
 unsafeMkByteString = BSC.pack
 
 hashFastString :: FastString -> Int
-hashFastString (FastString _ bs _)
-    = inlinePerformIO $ BS.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-      return $ hashStr (castPtr ptr) len
+hashFastString (FastString _ sbs _) = hashStr sbs
 
 -- -----------------------------------------------------------------------------
 
@@ -180,7 +185,7 @@ of this string which is used by the compiler internally.
 -}
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
-      fs_bs   :: {-# UNPACK #-} !ByteString,
+      fs_sbs  :: {-# UNPACK #-} !ShortByteString,
       fs_zenc :: FastZString
       -- ^ Lazily computed z-encoding of this string.
       --
@@ -230,9 +235,6 @@ cmpFS :: FastString -> FastString -> Ordering
 cmpFS f1@(FastString u1 _ _) f2@(FastString u2 _ _) =
   if u1 == u2 then EQ else
   compare (bytesFS f1) (bytesFS f2)
-
-foreign import ccall unsafe "memcmp"
-  memcmp :: Ptr a -> Ptr b -> Int -> IO Int
 
 -- -----------------------------------------------------------------------------
 -- Construction
@@ -403,12 +405,12 @@ The procedure goes like this:
 -}
 
 mkFastStringWith
-    :: (Int -> IORef Int-> IO FastString) -> Ptr Word8 -> Int -> IO FastString
-mkFastStringWith mk_fs !ptr !len = do
+    :: (Int -> IORef Int-> IO FastString) -> ShortByteString -> IO FastString
+mkFastStringWith mk_fs sbs = do
   FastStringTableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
   bucket <- IO $ readArray# buckets# idx#
-  res <- bucket_match bucket len ptr
+  res <- bucket_match bucket sbs
   case res of
     Just found -> return found
     Nothing -> do
@@ -422,13 +424,13 @@ mkFastStringWith mk_fs !ptr !len = do
     !(FastStringTable uid n_zencs segments#) = stringTable
     get_uid = atomicModifyIORef' uid $ \n -> (n+1,n)
 
-    !(I# hash#) = hashStr ptr len
+    !(I# hash#) = hashStr sbs
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
     insert fs = do
       FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
-      res <- bucket_match bucket len ptr
+      res <- bucket_match bucket sbs
       case res of
         -- The FastString was added by another thread after previous read and
         -- before we acquired the write lock.
@@ -440,102 +442,74 @@ mkFastStringWith mk_fs !ptr !len = do
           modifyIORef' counter succ
           return fs
 
-bucket_match :: [FastString] -> Int -> Ptr Word8 -> IO (Maybe FastString)
-bucket_match [] _ _ = return Nothing
-bucket_match (v@(FastString _ bs _):ls) len ptr
-      | len == BS.length bs = do
-         b <- BS.unsafeUseAsCString bs $ \buf ->
-             cmpStringPrefix ptr (castPtr buf) len
-         if b then return (Just v)
-              else bucket_match ls len ptr
-      | otherwise =
-         bucket_match ls len ptr
+bucket_match :: [FastString] -> ShortByteString -> IO (Maybe FastString)
+bucket_match [] _ = return Nothing
+bucket_match (fs@(FastString {fs_sbs=fs_sbs}) : ls) sbs
+  | fs_sbs == sbs = return (Just fs)
+  | otherwise     =  bucket_match ls sbs
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
     -- NB: Might as well use unsafeDupablePerformIO, since mkFastStringWith is
     -- idempotent.
-    unsafeDupablePerformIO $
-        mkFastStringWith (copyNewFastString ptr len) ptr len
+    unsafeDupablePerformIO $ do
+        sbs <- newSBSFromPtr ptr len
+        mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
--- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
--- between this and 'mkFastStringBytes' is that we don't have to copy
--- the bytes if the string is new to the table.
-mkFastStringForeignPtr :: Ptr Word8 -> ForeignPtr Word8 -> Int -> IO FastString
-mkFastStringForeignPtr ptr !fp len
-    = mkFastStringWith (mkNewFastString fp len) ptr len
+newSBSFromPtr :: Ptr a -> Int -> IO ShortByteString
+newSBSFromPtr (Ptr src#) (I# len#) =
+  stToIO $ ST $ \s ->
+    case newByteArray# len# s of { (# s, dst# #) ->
+    case copyAddrToByteArray# src# dst# 0# len# s of { s ->
+    case unsafeFreezeByteArray# dst# s of { (# s, ba# #) ->
+    (# s, SBS.SBS ba# #) }}}
 
--- | Create a 'FastString' from an existing 'ForeignPtr'; the difference
--- between this and 'mkFastStringBytes' is that we don't have to copy
--- the bytes if the string is new to the table.
+-- | Create a 'FastString' by copying an existing 'ByteString'
 mkFastStringByteString :: ByteString -> FastString
 mkFastStringByteString bs =
-    inlinePerformIO $
-      BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
-        let ptr' = castPtr ptr
-        mkFastStringWith (mkNewFastStringByteString bs) ptr' len
+  let sbs = SBS.toShort bs in
+  inlinePerformIO $
+      mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+-- | Create a 'FastString' from an existing 'ShortByteString' without
+-- copying.
+mkFastStringShortByteString :: ShortByteString -> FastString
+mkFastStringShortByteString sbs =
+  inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString
 mkFastString str =
   inlinePerformIO $ do
-    let l = utf8EncodedLength str
-    buf <- mallocForeignPtrBytes l
-    withForeignPtr buf $ \ptr -> do
-      utf8EncodeString ptr str
-      mkFastStringForeignPtr ptr buf l
+    sbs <- utf8EncodeShortByteString str
+    mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
 
 -- | Creates a 'FastString' from a UTF-8 encoded @[Word8]@
 mkFastStringByteList :: [Word8] -> FastString
-mkFastStringByteList str = mkFastStringByteString (BS.pack str)
+mkFastStringByteList str = mkFastStringShortByteString (SBS.pack str)
 
--- | Creates a (lazy) Z-encoded 'FastString' from a 'String' and account
--- the number of forced z-strings into the passed 'IORef'.
-mkZFastString :: IORef Int -> ByteString -> FastZString
-mkZFastString n_zencs bs = unsafePerformIO $ do
+-- | Creates a (lazy) Z-encoded 'FastString' from a 'ShortByteString' and
+-- account the number of forced z-strings into the passed 'IORef'.
+mkZFastString :: IORef Int -> ShortByteString -> FastZString
+mkZFastString n_zencs sbs = unsafePerformIO $ do
   atomicModifyIORef' n_zencs $ \n -> (n+1, ())
-  return $ mkFastZStringString (zEncodeString (utf8DecodeByteString bs))
+  return $ mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
 
-mkNewFastString :: ForeignPtr Word8 -> Int -> Int
-                -> IORef Int -> IO FastString
-mkNewFastString fp len uid n_zencs = do
-  let bs = BS.fromForeignPtr fp 0 len
-      zstr = mkZFastString n_zencs bs
-  return (FastString uid bs zstr)
+mkNewFastStringShortByteString :: ShortByteString -> Int
+                               -> IORef Int -> IO FastString
+mkNewFastStringShortByteString sbs uid n_zencs = do
+  let zstr = mkZFastString n_zencs sbs
+  return (FastString uid sbs zstr)
 
-mkNewFastStringByteString :: ByteString -> Int
-                          -> IORef Int -> IO FastString
-mkNewFastStringByteString bs uid n_zencs = do
-  let zstr = mkZFastString n_zencs bs
-  return (FastString uid bs zstr)
-
-copyNewFastString :: Ptr Word8 -> Int -> Int -> IORef Int -> IO FastString
-copyNewFastString ptr len uid n_zencs = do
-  fp <- copyBytesToForeignPtr ptr len
-  let bs = BS.fromForeignPtr fp 0 len
-      zstr = mkZFastString n_zencs bs
-  return (FastString uid bs zstr)
-
-copyBytesToForeignPtr :: Ptr Word8 -> Int -> IO (ForeignPtr Word8)
-copyBytesToForeignPtr ptr len = do
-  fp <- mallocForeignPtrBytes len
-  withForeignPtr fp $ \ptr' -> copyBytes ptr' ptr len
-  return fp
-
-cmpStringPrefix :: Ptr Word8 -> Ptr Word8 -> Int -> IO Bool
-cmpStringPrefix ptr1 ptr2 len =
- do r <- memcmp ptr1 ptr2 len
-    return (r == 0)
-
-
-hashStr  :: Ptr Word8 -> Int -> Int
- -- use the Addr to produce a hash value between 0 & m (inclusive)
-hashStr (Ptr a#) (I# len#) = loop 0# 0#
+hashStr  :: ShortByteString -> Int
+ -- produce a hash value between 0 & m (inclusive)
+hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
    where
+    !(I# len#) = SBS.length sbs
     loop h n | isTrue# (n ==# len#) = I# h
              | otherwise  = loop h2 (n +# 1#)
           where
-            !c = ord# (indexCharOffAddr# a# n)
+            !c = indexInt8Array# ba# n
             !h2 = (h *# 16777619#) `xorI#` c
 
 -- -----------------------------------------------------------------------------
@@ -543,17 +517,15 @@ hashStr (Ptr a#) (I# len#) = loop 0# 0#
 
 -- | Returns the length of the 'FastString' in characters
 lengthFS :: FastString -> Int
-lengthFS (FastString _uid bs _zstr) = inlinePerformIO $
-  let (fp, off, len) = BS.toForeignPtr bs in
-  withForeignPtr fp $ \ptr -> countUTF8Chars (ptr `plusPtr` off) len
+lengthFS (FastString _uid sbs _zstr) = inlinePerformIO $ countUTF8Chars sbs
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool
-nullFS f = BS.null (fs_bs f)
+nullFS f = SBS.null (fs_sbs f)
 
 -- | Unpacks and decodes the FastString
 unpackFS :: FastString -> String
-unpackFS (FastString _ bs _) = utf8DecodeByteString bs
+unpackFS (FastString _ sbs _) = utf8DecodeShortByteString sbs
 
 -- | Returns a Z-encoded version of a 'FastString'.  This might be the
 -- original, if it was already Z-encoded.  The first time this
@@ -568,22 +540,12 @@ appendFS fs1 fs2 = mkFastStringByteString
                  $ BS.append (bytesFS fs1) (bytesFS fs2)
 
 concatFS :: [FastString] -> FastString
-concatFS = mkFastStringByteString . BS.concat . map fs_bs
+concatFS = mkFastStringShortByteString . mconcat . map fs_sbs
 
 headFS :: FastString -> Char
-headFS (FastString _ bs _)
-  | BS.null bs = panic "headFS: Empty FastString"
-headFS (FastString _ bs _) =
-  inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
-         return (fst (utf8DecodeChar (castPtr ptr)))
-
-tailFS :: FastString -> FastString
-tailFS (FastString _ bs _)
-  | BS.null bs = panic "tailFS: Empty FastString"
-tailFS (FastString _ bs _) =
-    inlinePerformIO $ BS.unsafeUseAsCString bs $ \ptr ->
-    do let (_, n) = utf8DecodeChar (castPtr ptr)
-       return $! mkFastStringByteString (BS.drop n bs)
+headFS (FastString _ sbs _)
+  | SBS.null sbs = panic "headFS: Empty FastString"
+headFS fs = head $ unpackFS fs
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
