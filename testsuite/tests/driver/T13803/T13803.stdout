@@ -1,5 +1,5 @@
 [1 of 5] Compiling D                ( D.hs, D.o )
 [2 of 5] Compiling E[boot]          ( E.hs-boot, E.o-boot )
 [3 of 5] Compiling Y[boot]          ( Y.hs-boot, Y.o-boot )
-[4 of 5] Compiling E                ( E.hs, E.o )
-[5 of 5] Compiling Y                ( Y.hs, Y.o )
+[4 of 5] Compiling Y                ( Y.hs, Y.o )
+[5 of 5] Compiling E                ( E.hs, E.o )

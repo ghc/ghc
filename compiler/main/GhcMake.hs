@@ -915,7 +915,7 @@ type BuildModule = (Module, IsBoot)
 -- | 'Bool' indicating if a module is a boot module or not.  We need to treat
 -- boot modules specially when building compilation graphs, since they break
 -- cycles.  Regular source files and signature files are treated equivalently.
-data IsBoot = IsBoot | NotBoot
+data IsBoot = NotBoot | IsBoot
     deriving (Ord, Eq, Show, Read)
 
 -- | Tests if an 'HscSource' is a boot file, primarily for constructing
