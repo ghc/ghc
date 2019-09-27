@@ -524,7 +524,7 @@ releaseCapability_ (Capability* cap,
     ASSERT_RETURNING_TASKS(cap,task);
     ASSERT_LOCK_HELD(&cap->lock);
 
-    cap->running_task = NULL;
+    RELAXED_STORE(&cap->running_task, NULL);
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
@@ -695,7 +695,7 @@ static Capability * waitForWorkerCapability (Task *task)
             cap->n_spare_workers--;
         }
 
-        cap->running_task = task;
+        RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
         break;
     }
@@ -762,8 +762,7 @@ static Capability * waitForReturnCapability (Task *task)
  * ------------------------------------------------------------------------- */
 static bool capability_is_busy(const Capability * cap)
 {
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->running_task, "capability_is_busy");
-    return cap->running_task != NULL;
+    return RELAXED_LOAD(&cap->running_task) != NULL;
 }
 
 
@@ -1037,7 +1036,7 @@ bool
 tryGrabCapability (Capability *cap, Task *task)
 {
     int r;
-    if (cap->running_task != NULL) return false;
+    if (RELAXED_LOAD(&cap->running_task) != NULL) return false;
     r = TRY_ACQUIRE_LOCK(&cap->lock);
     if (r != 0) return false;
     if (cap->running_task != NULL) {
