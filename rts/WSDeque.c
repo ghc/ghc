@@ -134,11 +134,13 @@ popWSDeque (WSDeque *q)
 
     // very important that the following read of q->top does not occur
     // before the earlier write to q->bottom.
-    store_load_barrier();
+    //store_load_barrier();
 
-    t = q->top; /* using topBound would give an *upper* bound, we
-                   need a lower bound. We use the real top here, but
-                   can update the topBound value */
+    t = ACQUIRE_LOAD(&q->top);
+    //t = q->top;
+       /* using topBound would give an *upper* bound, we
+          need a lower bound. We use the real top here, but
+          can update the topBound value */
     q->topBound = t;
     currSize = (long)b - (long)t;
     if (currSize < 0) { /* was empty before decrementing b, set b
@@ -185,9 +187,11 @@ stealWSDeque_ (WSDeque *q)
 
     // NB. these loads must be ordered, otherwise there is a race
     // between steal and pop.
-    t = q->top;
-    load_load_barrier();
-    b = q->bottom;
+    t = SEQ_CST_LOAD(&q->top);
+    b = SEQ_CST_LOAD(&q->bottom);
+    //t = q->top;
+    //load_load_barrier();
+    //b = q->bottom;
 
     // NB. b and t are unsigned; we need a signed value for the test
     // below, because it is possible that t > b during a
@@ -198,9 +202,10 @@ stealWSDeque_ (WSDeque *q)
     // NB. the load of q->bottom must be ordered before the load of
     // q->elements[t & q-> moduloSize]. See comment "KG:..." below
     // and Ticket #13633.
-    load_load_barrier();
+    //load_load_barrier();
     /* now access array, see pushBottom() */
-    stolen = q->elements[t & q->moduloSize];
+    //stolen = q->elements[t & q->moduloSize];
+    stolen = SEQ_CST_LOAD(&q->elements[t & q->moduloSize]);
 
     /* now decide whether we have won */
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
@@ -290,8 +295,9 @@ pushWSDeque (WSDeque* q, void * elem)
        there (in case there is just added element in the queue). This
        issue concretely hit me on ARMv7 multi-core CPUs
      */
-    write_barrier();
-    q->bottom = b + 1;
+    //write_barrier();
+    //q->bottom = b + 1;
+    RELEASE_STORE(&q->bottom, b+1);
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return true;
