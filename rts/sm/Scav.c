@@ -1740,7 +1740,7 @@ scavenge_static(void)
      * and put it on the scavenged_static_objects list.
      */
     gct->static_objects = *STATIC_LINK(info,p);
-    *STATIC_LINK(info,p) = gct->scavenged_static_objects;
+    RELAXED_STORE(STATIC_LINK(info,p), gct->scavenged_static_objects);
     gct->scavenged_static_objects = flagged_p;
 
     switch (info -> type) {
