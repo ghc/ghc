@@ -49,7 +49,7 @@ import GhcPrelude
 import {-# SOURCE #-} Match  ( matchSimply )
 import {-# SOURCE #-} DsExpr ( dsLExpr )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcType( tcSplitTyConApp )
 import CoreSyn
@@ -243,8 +243,7 @@ wrapBind new old body   -- NB: this function must deal with term
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = Case (Var var) var (exprType body)
-                        [(DEFAULT, [], body)]
+seqVar var body = mkDefaultCase (Var var) var body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)
@@ -747,7 +746,7 @@ is_triv_pat _            = False
 *                                                                      *
   Creating big tuples and their types for full Haskell expressions.
   They work over *Ids*, and create tuples replete with their types,
-  which is whey they are not in HsUtils.
+  which is whey they are not in GHC.Hs.Utils.
 *                                                                      *
 ********************************************************************* -}
 

@@ -504,7 +504,6 @@ rts/sm/Compact_CC_OPTS += -Wno-inline
 # emits warnings about call-clobbered registers on x86_64
 rts/StgCRun_CC_OPTS += -w
 
-rts/RetainerProfile_CC_OPTS += -w
 # On Windows:
 rts/win32/ConsoleHandler_CC_OPTS += -w
 rts/win32/ThrIOManager_CC_OPTS += -w

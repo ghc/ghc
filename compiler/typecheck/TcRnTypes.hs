@@ -149,7 +149,7 @@ module TcRnTypes(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import CoreSyn
 import HscTypes
 import TcEvidence
@@ -167,7 +167,7 @@ import TcType
 import Annotations
 import InstEnv
 import FamInstEnv
-import {-# SOURCE #-} PmOracle (Delta)
+import {-# SOURCE #-} PmTypes (Delta)
 import IOEnv
 import RdrName
 import Name
@@ -832,12 +832,6 @@ data TcLclEnv           -- Changes as we move inside an expression
 
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
                                       -- and for tidying types
-
-        tcl_tyvars :: TcRef TcTyVarSet, -- The "global tyvars"
-                        -- Namely, the in-scope TyVars bound in tcl_env,
-                        -- plus the tyvars mentioned in the types of Ids bound
-                        -- in tcl_lenv.
-                        -- Why mutable? see notes with tcGetGlobalTyCoVars
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
         tcl_errs :: TcRef Messages              -- Place to accumulate errors

@@ -23,7 +23,7 @@ import CoreSyn
 import DsCCall
 import DsMonad
 
-import HsSyn
+import GHC.Hs
 import DataCon
 import CoreUnfold
 import Id

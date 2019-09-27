@@ -24,7 +24,7 @@ import GhcPrelude
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 import THNames( liftStringName, liftName )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcRnMonad
 import TcUnify
@@ -1088,7 +1088,7 @@ arithSeqEltType (Just fl) res_ty
 ************************************************************************
 -}
 
--- HsArg is defined in HsTypes.hs
+-- HsArg is defined in GHC.Hs.Types
 
 wrapHsArgs :: (NoGhcTc (GhcPass id) ~ GhcRn)
            => LHsExpr (GhcPass id)
@@ -2237,7 +2237,7 @@ particular update is sufficiently obvious for the signature to be
 omitted. Moreover, this might change the behaviour of typechecker in
 non-obvious ways.
 
-See also Note [HsRecField and HsRecUpdField] in HsPat.
+See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
 -}
 
 -- Given a RdrName that refers to multiple record fields, and the type

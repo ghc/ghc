@@ -275,7 +275,7 @@ traceEventIO msg =
 -- When looking at a profile for the execution of a program we often want to
 -- be able to mark certain points or phases in the execution and see that
 -- visually in the profile.
-
+--
 -- For example, a program might have several distinct phases with different
 -- performance or resource behaviour in each phase. To properly interpret the
 -- profile graph we really want to see when each phase starts and ends.

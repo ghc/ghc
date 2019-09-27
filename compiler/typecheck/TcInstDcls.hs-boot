@@ -5,7 +5,7 @@
 
 module TcInstDcls ( tcInstDecls1 ) where
 
-import HsSyn
+import GHC.Hs
 import TcRnTypes
 import TcEnv( InstInfo )
 import TcDeriv

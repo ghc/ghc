@@ -271,7 +271,7 @@ case $1 in
         export -f patch_single_file
 
         echo "Downloading ghc-jailbreak..."
-        curl -f -L https://mistuke.blob.core.windows.net/binaries/ghc-jailbreak-0.2.tar.gz \
+        curl -f -L https://mistuke.blob.core.windows.net/binaries/ghc-jailbreak-0.3.tar.gz \
             -o ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz --create-dirs -#
         tar -C ghc-tarballs/ghc-jailbreak/ -xf ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz
 

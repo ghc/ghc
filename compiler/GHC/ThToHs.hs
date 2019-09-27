@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-This module converts Template Haskell syntax into HsSyn
+This module converts Template Haskell syntax into Hs syntax
 -}
 
 {-# LANGUAGE DeriveFunctor #-}
@@ -12,13 +12,18 @@ This module converts Template Haskell syntax into HsSyn
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
-                convertToHsType,
-                thRdrNameGuesses ) where
+module GHC.ThToHs
+   ( convertToHsExpr
+   , convertToPat
+   , convertToHsDecls
+   , convertToHsType
+   , thRdrNameGuesses
+   )
+where
 
 import GhcPrelude
 
-import HsSyn as Hs
+import GHC.Hs as Hs
 import PrelNames
 import RdrName
 import qualified Name
@@ -941,7 +946,7 @@ cvtl e = wrapL (cvt e)
                                        do { s' <- cvtl s; y' <- cvtl y
                                           ; wrapParL (HsPar noExtField) $
                                                           SectionR noExtField s' y' }
-                                            -- See Note [Sections in HsSyn] in HsExpr
+                                            -- See Note [Sections in HsSyn] in GHC.Hs.Expr
     cvt (InfixE (Just x) s Nothing ) = ensureValidOpExp s $
                                        do { x' <- cvtl x; s' <- cvtl s
                                           ; wrapParL (HsPar noExtField) $
@@ -1928,7 +1933,7 @@ thRdrName.  To achieve (b) we want the binders to be Exact RdrNames.
 Achieving (a) is a bit awkward, because
    - We must check for duplicate and shadowed names on Names,
      not RdrNames, *after* renaming.
-     See Note [Collect binders only after renaming] in HsUtils
+     See Note [Collect binders only after renaming] in GHC.Hs.Utils
 
    - But to achieve (a) we must distinguish between the Exact
      RdrNames arising from TH and the Unqual RdrNames that would

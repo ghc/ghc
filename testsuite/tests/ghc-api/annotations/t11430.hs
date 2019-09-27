@@ -17,7 +17,7 @@ import FastString
 import ForeignCall
 import MonadUtils
 import Outputable
-import HsDecls
+import GHC.Hs.Decls
 import Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
