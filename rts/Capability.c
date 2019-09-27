@@ -749,6 +749,22 @@ static Capability * waitForReturnCapability (Task *task)
 #if defined(THREADED_RTS)
 
 /* ----------------------------------------------------------------------------
+ * capability_is_busy (Capability *cap)
+ *
+ * A predicate for determining whether the given Capability is currently running
+ * a Task. This can be safely called without holding the Capability's lock
+ * although the result may be inaccurate if it races with the scheduler.
+ * Consequently there is a TSAN suppression for it.
+ *
+ * ------------------------------------------------------------------------- */
+static bool capability_is_busy(const Capability * cap)
+{
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->running_task, "capability_is_busy");
+    return cap->running_task != NULL;
+}
+
+
+/* ----------------------------------------------------------------------------
  * find_capability_for_task
  *
  * Given a Task, identify a reasonable Capability to run it on. We try to
@@ -765,7 +781,11 @@ static Capability * find_capability_for_task(const Task * task)
     } else {
         // Try last_free_capability first
         Capability *cap = last_free_capability[task->node];
-        if (cap->running_task == NULL) {
+
+        // N.B. There is a data race here since we are loking at
+        // cap->running_task without taking cap->lock. However, this is
+        // benign since the result is merely guiding our search heuristic.
+        if (!capability_is_busy(cap)) {
             return cap;
         } else {
             // The last_free_capability is already busy, search for a free
