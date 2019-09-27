@@ -308,6 +308,7 @@ defFullHelpText =
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++
+  "   :instances <type>           display the class instances available for <type>\n" ++
   "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
   "   :kind[!] <type>             show the kind of <type>\n" ++
   "                               (!: also print the normalised type)\n" ++
