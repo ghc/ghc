@@ -259,6 +259,7 @@ schedule (Capability *initialCapability, Task *task)
     //   * We might be left with threads blocked in foreign calls,
     //     we should really attempt to kill these somehow (TODO).
 
+    TSAN_ANNOTATE_BENIGN_RACE(&sched_state, "sched_state in schedule");
     switch (sched_state) {
     case SCHED_RUNNING:
         break;
@@ -1122,6 +1123,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
 static bool
 scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 {
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->context_switch, "cap->context_switch in scheduleHandleHeapOverflow");
     if (cap->r.rHpLim == NULL || cap->context_switch) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
