@@ -843,7 +843,7 @@ freeGroup(bdescr *p)
       prev = p - 1;
       if (prev->blocks == 0) prev = prev->link; // find the head
 
-      if (prev->free == (P_)-1)
+      if (RELAXED_LOAD(&prev->free) == (P_)-1)
       {
           ln = log_2(prev->blocks);
           dbl_link_remove(prev, &free_list[node][ln]);

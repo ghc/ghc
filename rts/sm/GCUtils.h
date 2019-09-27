@@ -67,7 +67,9 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
         bd = new_bd;
         gct->mut_lists[gen_no] = bd;
     }
-    *bd->free++ = (StgWord)p;
+    RELAXED_STORE(bd->free, (StgWord) p);
+    //__atomic_fetch_add(&bd->free, 1, __ATOMIC_RELAXED);
+    bd->free++;
 }
 
 #include "EndPrivate.h"
