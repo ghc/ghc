@@ -833,7 +833,7 @@ scavenge_block (bdescr *bd)
 
   if (p > bd->free)  {
       gct->copied += ws->todo_free - bd->free;
-      bd->free = p;
+      RELAXED_STORE(&bd->free, p);
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",

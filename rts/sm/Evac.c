@@ -345,9 +345,9 @@ evacuate_large(StgPtr p)
   ws = &gct->gens[new_gen_no];
   new_gen = &generations[new_gen_no];
 
-  bd->flags |= BF_EVACUATED;
+  __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_RELAXED);
   if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
-      bd->flags |= BF_NONMOVING;
+      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
   }
   initBdescr(bd, new_gen, new_gen->to);
 
@@ -355,7 +355,7 @@ evacuate_large(StgPtr p)
   // these objects, because they aren't allowed to contain any outgoing
   // pointers.  For these blocks, we skip the scavenge stage and put
   // them straight on the scavenged_large_objects list.
-  if (bd->flags & BF_PINNED) {
+  if (RELAXED_LOAD(&bd->flags) & BF_PINNED) {
       ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
 
       if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
@@ -436,7 +436,7 @@ evacuate_compact (StgPtr p)
     bd = Bdescr((StgPtr)str);
     gen_no = bd->gen_no;
 
-    if (bd->flags & BF_NONMOVING) {
+    if (RELAXED_LOAD(&bd->flags) & BF_NONMOVING) {
         // We may have evacuated the block to the nonmoving generation. If so
         // we need to make sure it is added to the mark queue since the only
         // reference to it may be from the moving heap.
@@ -501,7 +501,7 @@ evacuate_compact (StgPtr p)
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
     if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
-        bd->flags |= BF_NONMOVING;
+      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
     }
     initBdescr(bd, new_gen, new_gen->to);
 
@@ -639,10 +639,10 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
+  if ((RELAXED_LOAD(&bd->flags) & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
       // Pointer to non-moving heap. Non-moving heap is collected using
       // mark-sweep so this object should be marked and then retained in sweep.
-      if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
+      if (RTS_UNLIKELY(RELAXED_LOAD(&bd->flags) & BF_NONMOVING)) {
           // NOTE: large objects in nonmoving heap are also marked with
           // BF_NONMOVING. Those are moved to scavenged_large_objects list in
           // mark phase.
@@ -657,11 +657,11 @@ loop:
       // happen often, but allowing it makes certain things a bit
       // easier; e.g. scavenging an object is idempotent, so it's OK to
       // have an object on the mutable list multiple times.
-      if (bd->flags & BF_EVACUATED) {
+      if (RELAXED_LOAD(&bd->flags) & BF_EVACUATED) {
           // We aren't copying this object, so we have to check
           // whether it is already in the target generation.  (this is
           // the write barrier).
-          if (bd->gen_no < gct->evac_gen_no) {
+          if (RELAXED_LOAD(&bd->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
               TICK_GC_FAILED_PROMOTION();
           }
@@ -672,14 +672,14 @@ loop:
       // right thing for objects that are half way in the middle of the first
       // block of a compact (and would be treated as large objects even though
       // they are not)
-      if (bd->flags & BF_COMPACT) {
+      if (RELAXED_LOAD(&bd->flags) & BF_COMPACT) {
           evacuate_compact((P_)q);
           return;
       }
 
       /* evacuate large objects by re-linking them onto a different list.
        */
-      if (bd->flags & BF_LARGE) {
+      if (RELAXED_LOAD(&bd->flags) & BF_LARGE) {
           evacuate_large((P_)q);
 
           // We may have evacuated the block to the nonmoving generation. If so
@@ -988,7 +988,7 @@ evacuate_BLACKHOLE(StgClosure **p)
     // blackholes can't be in a compact
     ASSERT((bd->flags & BF_COMPACT) == 0);
 
-    if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
+    if (RTS_UNLIKELY(RELAXED_LOAD(&bd->flags) & BF_NONMOVING)) {
         if (major_gc && !deadlock_detect_gc)
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
         return;
@@ -1144,7 +1144,7 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if (bd->flags & (BF_EVACUATED | BF_NONMOVING)) {
+        if (RELAXED_LOAD(&bd->flags) & (BF_EVACUATED | BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
