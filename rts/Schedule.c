@@ -671,8 +671,11 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // Capability keeps forcing a GC and the other Capabilities make no
     // progress at all.
 
+    // We would usually need to hold cap->lock to look at n_returning_tasks but
+    // we don't here since this is just an approximate predicate.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->n_returning_tasks, "shouldYieldCapability");
     return ((pending_sync && !didGcLast) ||
-            cap->n_returning_tasks != 0 ||
+            RELAXED_LOAD(&cap->n_returning_tasks) != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
                                      ? peekRunQueue(cap)->bound != NULL
                                      : peekRunQueue(cap)->bound != task->incall)));
@@ -758,7 +761,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         cap0 = capabilities[i];
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
-                || cap0->n_returning_tasks != 0
+                || RELAXED_LOAD(&cap0->n_returning_tasks) != 0
                 || !emptyInbox(cap0)) {
                 // it already has some work, we just grabbed it at
                 // the wrong moment.  Or maybe it's deadlocked!
