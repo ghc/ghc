@@ -80,12 +80,12 @@ newWSDeque (uint32_t size)
                                   "newWSDeque");
     q->elements = stgMallocBytes(realsize * sizeof(StgClosurePtr), /* dataspace */
                                  "newWSDeque:data space");
-    q->top=0;
-    q->bottom=0;
-    q->topBound=0; /* read by writer, updated each time top is read */
-
     q->size = realsize;  /* power of 2 */
     q->moduloSize = realsize - 1; /* n % size == n & moduloSize  */
+
+    q->top=0;
+    q->bottom=0;
+    RELEASE_STORE(&q->topBound, 0); /* read by writer, updated each time top is read */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return q;
@@ -126,24 +126,26 @@ popWSDeque (WSDeque *q)
 
     ASSERT_WSDEQUE_INVARIANTS(q);
 
-    b = q->bottom;
+    b = RELAXED_LOAD(&q->bottom);
 
     // "decrement b as a test, see what happens"
     b--;
-    q->bottom = b;
+    RELAXED_STORE(&q->bottom, b);
 
     // very important that the following read of q->top does not occur
     // before the earlier write to q->bottom.
-    store_load_barrier();
+    //store_load_barrier();
 
-    t = q->top; /* using topBound would give an *upper* bound, we
-                   need a lower bound. We use the real top here, but
-                   can update the topBound value */
+    t = ACQUIRE_LOAD(&q->top);
+    //t = q->top;
+       /* using topBound would give an *upper* bound, we
+          need a lower bound. We use the real top here, but
+          can update the topBound value */
     q->topBound = t;
     currSize = (long)b - (long)t;
     if (currSize < 0) { /* was empty before decrementing b, set b
                            consistently and abort */
-        q->bottom = t;
+        RELAXED_STORE(&q->bottom, t);
         return NULL;
     }
 
@@ -159,11 +161,11 @@ popWSDeque (WSDeque *q)
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
         removed = NULL; /* no success, but continue adjusting bottom */
     }
-    q->bottom = t+1; /* anyway, empty now. Adjust bottom consistently. */
+    RELAXED_STORE(&q->bottom, t+1); /* anyway, empty now. Adjust bottom consistently. */
     q->topBound = t+1; /* ...and cached top value as well */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
-    ASSERT(q->bottom >= q->top);
+    ASSERT(RELAXED_LOAD(&q->bottom) >= RELAXED_LOAD(&q->top));
 
     // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
 
@@ -185,9 +187,11 @@ stealWSDeque_ (WSDeque *q)
 
     // NB. these loads must be ordered, otherwise there is a race
     // between steal and pop.
-    t = q->top;
-    load_load_barrier();
-    b = q->bottom;
+    t = SEQ_CST_LOAD(&q->top);
+    b = SEQ_CST_LOAD(&q->bottom);
+    //t = q->top;
+    //load_load_barrier();
+    //b = q->bottom;
 
     // NB. b and t are unsigned; we need a signed value for the test
     // below, because it is possible that t > b during a
@@ -198,9 +202,10 @@ stealWSDeque_ (WSDeque *q)
     // NB. the load of q->bottom must be ordered before the load of
     // q->elements[t & q-> moduloSize]. See comment "KG:..." below
     // and Ticket #13633.
-    load_load_barrier();
+    //load_load_barrier();
     /* now access array, see pushBottom() */
-    stolen = q->elements[t & q->moduloSize];
+    //stolen = q->elements[t & q->moduloSize];
+    stolen = SEQ_CST_LOAD(&q->elements[t & q->moduloSize]);
 
     /* now decide whether we have won */
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
@@ -249,14 +254,14 @@ pushWSDeque (WSDeque* q, void * elem)
        q->topBound (accessed only by writer) instead.
        This is why we do not just call empty(q) here.
     */
-    b = q->bottom;
+    b = RELAXED_LOAD(&q->bottom);
     t = q->topBound;
     if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) {
         /* NB. 1. sz == q->size - 1, thus ">="
            2. signed comparison, it is possible that t > b
         */
         /* could be full, check the real top value in this case */
-        t = q->top;
+        t = RELAXED_LOAD(&q->top);
         q->topBound = t;
         if (b - t >= sz) { /* really no space left :-( */
             /* reallocate the array, copying the values. Concurrent steal()s
@@ -281,7 +286,7 @@ pushWSDeque (WSDeque* q, void * elem)
         }
     }
 
-    q->elements[b & sz] = elem;
+    RELAXED_STORE(&q->elements[b & sz], elem);
     /*
        KG: we need to put write barrier here since otherwise we might
        end with elem not added to q->elements, but q->bottom already
@@ -290,8 +295,7 @@ pushWSDeque (WSDeque* q, void * elem)
        there (in case there is just added element in the queue). This
        issue concretely hit me on ARMv7 multi-core CPUs
      */
-    write_barrier();
-    q->bottom = b + 1;
+    RELEASE_STORE(&q->bottom, b + 1);
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return true;
