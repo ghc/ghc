@@ -73,6 +73,7 @@ void
 handleProfTick(void)
 {
 #if defined(PROFILING)
+    TSAN_ANNOTATE_BENIGN_RACE(&do_prof_ticks, "do_prof_ticks");
     total_ticks++;
     if (do_prof_ticks) {
         uint32_t n;
@@ -83,6 +84,7 @@ handleProfTick(void)
     }
 #endif
 
+    TSAN_ANNOTATE_BENIGN_RACE(&do_heap_prof_ticks, "do_heap_prof_ticks");
     if (do_heap_prof_ticks) {
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
