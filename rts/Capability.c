@@ -777,7 +777,7 @@ static Capability * find_capability_for_task(const Task * task)
         }
     }
 }
-#endif
+#endif /* THREADED_RTS */
 
 /* ----------------------------------------------------------------------------
  * waitForCapability (Capability **pCap, Task *task)
