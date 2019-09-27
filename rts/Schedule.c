@@ -674,7 +674,7 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // We would usually need to hold cap->lock to look at n_returning_tasks but
     // we don't here since this is just an approximate predicate.
     TSAN_ANNOTATE_BENIGN_RACE(&cap->n_returning_tasks, "shouldYieldCapability");
-    return ((pending_sync && !didGcLast) ||
+    return ((RELAXED_LOAD(&pending_sync) && !didGcLast) ||
             RELAXED_LOAD(&cap->n_returning_tasks) != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
                                      ? peekRunQueue(cap)->bound != NULL
@@ -1508,7 +1508,7 @@ static bool requestSync (
                           sync->type);
                 ASSERT(*pcap);
                 yieldCapability(pcap,task,true);
-                sync = pending_sync;
+                sync = SEQ_CST_LOAD(&pending_sync);
             } while (sync != NULL);
         }
 
@@ -1539,7 +1539,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
     Capability *tmpcap;
     uint32_t i;
 
-    ASSERT(pending_sync != NULL);
+    ASSERT(SEQ_CST_LOAD(&pending_sync) != NULL);
     for (i=0; i < n_capabilities; i++) {
         debugTrace(DEBUG_sched, "grabbing all the capabilies (%d/%d)",
                    i, n_capabilities);
