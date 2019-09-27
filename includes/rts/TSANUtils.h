@@ -19,7 +19,7 @@
 #define TSAN_ANNOTATE_HAPPENS_AFTER(addr)                   \
   AnnotateHappensAfter(__FILE__, __LINE__, (void*)(addr))
 #define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)                \
-  AnnotateBenignRaceSized(__FILE__, __LINE__, (void*)(addr), sizeof(void*), desc)
+  AnnotateBenignRaceSized(__FILE__, __LINE__, (void*)(addr), sizeof(*addr), desc)
 void AnnotateHappensBefore(const char* f, int l, void* addr);
 void AnnotateHappensAfter(const char* f, int l, void* addr);
 void AnnotateBenignRaceSized(const char *file,
