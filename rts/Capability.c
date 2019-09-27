@@ -796,7 +796,7 @@ static Capability * find_capability_for_task(const Task * task)
                   i += n_numa_nodes) {
                 // visits all the capabilities on this node, because
                 // cap[i]->node == i % n_numa_nodes
-                if (!capabilities[i]->running_task) {
+                if (!RELAXED_LOAD(&capabilities[i]->running_task)) {
                     return capabilities[i];
                 }
             }
@@ -846,7 +846,7 @@ void waitForCapability (Capability **pCap, Task *task)
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
         // It's free; just grab it
-        cap->running_task = task;
+        RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
     } else {
         newReturningTask(cap,task);
