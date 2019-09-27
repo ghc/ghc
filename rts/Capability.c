@@ -591,7 +591,7 @@ releaseCapability_ (Capability* cap,
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
-    last_free_capability[cap->node] = cap;
+    RELAXED_STORE(&last_free_capability[cap->node], cap);
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
@@ -784,7 +784,7 @@ static Capability * find_capability_for_task(const Task * task)
                             enabled_capabilities];
     } else {
         // Try last_free_capability first
-        Capability *cap = last_free_capability[task->node];
+        Capability *cap = RELAXED_LOAD(&last_free_capability[task->node]);
 
         // N.B. There is a data race here since we are loking at
         // cap->running_task without taking cap->lock. However, this is
@@ -804,7 +804,7 @@ static Capability * find_capability_for_task(const Task * task)
             }
 
             // Can't find a free one, use last_free_capability.
-            return last_free_capability[task->node];
+            return RELAXED_LOAD(&last_free_capability[task->node]);
         }
     }
 }
