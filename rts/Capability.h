@@ -182,10 +182,10 @@ struct Capability_ {
 #endif
 
 // These properties should be true when a Task is holding a Capability
-#define ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task)                     \
-  ASSERT(cap->running_task != NULL && cap->running_task == task);       \
-  ASSERT(task->cap == cap);                                             \
-  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
+#define ASSERT_FULL_CAPABILITY_INVARIANTS(_cap,_task)                   \
+  ASSERT(_cap->running_task != NULL && _cap->running_task == _task);    \
+  ASSERT(_task->cap == _cap);                                           \
+  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(_cap,_task)
 
 // This assert requires cap->lock to be held, so it can't be part of
 // ASSERT_PARTIAL_CAPABILITY_INVARIANTS()

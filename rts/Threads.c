@@ -354,9 +354,11 @@ unblock:
    migrateThread
    ------------------------------------------------------------------------- */
 
+// Precondition: The caller must own the `from` capability.
 void
 migrateThread (Capability *from, StgTSO *tso, Capability *to)
 {
+    ASSERT_FULL_CAPABILITY_INVARIANTS(from, getTask());
     traceEventMigrateThread (from, tso, to->no);
     // ThreadMigrating tells the target cap that it needs to be added to
     // the run queue when it receives the MSG_TRY_WAKEUP.
