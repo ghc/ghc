@@ -155,6 +155,7 @@ library
                       rts/Ticky.h
                       rts/Time.h
                       rts/Timer.h
+                      rts/TSANUtils.h
                       rts/Types.h
                       rts/Utils.h
                       rts/prof/CCS.h
