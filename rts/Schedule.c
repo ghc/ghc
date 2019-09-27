@@ -682,7 +682,7 @@ scheduleYield (Capability **pcap, Task *task)
     if (!shouldYieldCapability(cap,task,false) &&
         (!emptyRunQueue(cap) ||
          !emptyInbox(cap) ||
-         sched_state >= SCHED_INTERRUPTING)) {
+         RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING)) {
         return;
     }
 
