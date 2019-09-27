@@ -746,6 +746,46 @@ static Capability * waitForReturnCapability (Task *task)
 
 #endif /* THREADED_RTS */
 
+#if defined(THREADED_RTS)
+
+/* ----------------------------------------------------------------------------
+ * find_capability_for_task
+ *
+ * Given a Task, identify a reasonable Capability to run it on. We try to
+ * find an idle capability if possible.
+ *
+ * ------------------------------------------------------------------------- */
+
+static Capability * find_capability_for_task(const Task * task)
+{
+    if (task->preferred_capability != -1) {
+        // Does the task have a preferred capability? If so, use it
+        return capabilities[task->preferred_capability %
+                            enabled_capabilities];
+    } else {
+        // Try last_free_capability first
+        Capability *cap = last_free_capability[task->node];
+        if (cap->running_task == NULL) {
+            return cap;
+        } else {
+            // The last_free_capability is already busy, search for a free
+            // capability on this node.
+            for (uint32_t i = task->node; i < enabled_capabilities;
+                  i += n_numa_nodes) {
+                // visits all the capabilities on this node, because
+                // cap[i]->node == i % n_numa_nodes
+                if (!capabilities[i]->running_task) {
+                    return capabilities[i];
+                }
+            }
+
+            // Can't find a free one, use last_free_capability.
+            return last_free_capability[task->node];
+        }
+    }
+}
+#endif /* THREADED_RTS */
+
 /* ----------------------------------------------------------------------------
  * waitForCapability (Capability **pCap, Task *task)
  *
@@ -768,38 +808,13 @@ void waitForCapability (Capability **pCap, Task *task)
     *pCap = &MainCapability;
 
 #else
-    uint32_t i;
     Capability *cap = *pCap;
 
     if (cap == NULL) {
-        if (task->preferred_capability != -1) {
-            cap = capabilities[task->preferred_capability %
-                               enabled_capabilities];
-        } else {
-            // Try last_free_capability first
-            cap = last_free_capability[task->node];
-            if (cap->running_task) {
-                // Otherwise, search for a free capability on this node.
-                cap = NULL;
-                for (i = task->node; i < enabled_capabilities;
-                     i += n_numa_nodes) {
-                    // visits all the capabilities on this node, because
-                    // cap[i]->node == i % n_numa_nodes
-                    if (!capabilities[i]->running_task) {
-                        cap = capabilities[i];
-                        break;
-                    }
-                }
-                if (cap == NULL) {
-                    // Can't find a free one, use last_free_capability.
-                    cap = last_free_capability[task->node];
-                }
-            }
-        }
+        cap = find_capability_for_task(task);
 
         // record the Capability as the one this Task is now associated with.
         task->cap = cap;
-
     } else {
         ASSERT(task->cap == cap);
     }
