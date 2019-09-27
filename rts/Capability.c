@@ -891,7 +891,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
     if (gcAllowed)
     {
-        PendingSync *sync = RELAXED_LOAD(&pending_sync);
+        PendingSync *sync = ACQUIRE_LOAD(&pending_sync);
 
         if (sync && sync->type == SYNC_GC_PAR) {
             if (! sync->idle[cap->no]) {
