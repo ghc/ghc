@@ -981,8 +981,9 @@ allocateMightFail (Capability *cap, W_ n)
         ACQUIRE_SM_LOCK
         bd = allocGroupOnNode(cap->node,req_blocks);
         dbl_link_onto(bd, &g0->large_objects);
-        g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-        g0->n_new_large_words += n;
+        __atomic_fetch_add(&g0->n_large_blocks, bd->blocks, __ATOMIC_RELAXED);
+            // might be larger than req_blocks
+        __atomic_fetch_add(&g0->n_large_words, n, __ATOMIC_RELAXED);
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         bd->flags = BF_LARGE;
