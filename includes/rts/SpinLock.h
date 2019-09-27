@@ -46,7 +46,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
         for (uint32_t i = 0; i < SPIN_COUNT; i++) {
             StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
             if (r != 0) return;
-            IF_PROF_SPIN(p->spin++);
+            IF_PROF_SPIN(__atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED));
             busy_wait_nop();
         }
         IF_PROF_SPIN(p->yield++);
@@ -57,17 +57,15 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
+    __atomic_store_n(&p->lock, 1, __ATOMIC_RELEASE);
 }
 
 // initialise spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-    write_barrier();
-    p->lock = 1;
     IF_PROF_SPIN(p->spin = 0);
     IF_PROF_SPIN(p->yield = 0);
+    __atomic_store_n(&p->lock, 1, __ATOMIC_RELEASE)
 }
 
 #else /* !THREADED_RTS */
