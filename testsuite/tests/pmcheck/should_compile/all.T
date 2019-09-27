@@ -56,6 +56,8 @@ test('T14098', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T14813', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T14899', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T15305', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T15385', normal, compile,
@@ -82,7 +84,21 @@ test('T17096', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
 test('T17112', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17207', expect_broken(17207), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17208', expect_broken(17208), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17215', expect_broken(17215), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17216', expect_broken(17216), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17218', expect_broken(17218), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17219', expect_broken(17219), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17234', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17248', expect_broken(17248), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
