@@ -55,23 +55,23 @@ handle_tick(int unused STG_UNUSED)
    * -I), tell the scheduler to wake up and do a GC, to check
    * for threads that are deadlocked.
    */
-  switch (recent_activity) {
+  switch (SEQ_CST_LOAD(&recent_activity)) {
   case ACTIVITY_YES:
-      recent_activity = ACTIVITY_MAYBE_NO;
+      SEQ_CST_STORE(&recent_activity, ACTIVITY_MAYBE_NO);
       ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
                     RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
       if (ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
-              recent_activity = ACTIVITY_INACTIVE;
+              SEQ_CST_STORE(&recent_activity, ACTIVITY_INACTIVE);
 #if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call stopTimer() when it has done
               // the GC.
 #endif
           } else {
-              recent_activity = ACTIVITY_DONE_GC;
+              SEQ_CST_STORE(&recent_activity, ACTIVITY_DONE_GC);
               // disable timer signals (see #1623, #5991, #9105)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
