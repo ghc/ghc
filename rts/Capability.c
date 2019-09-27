@@ -730,7 +730,7 @@ static Capability * waitForReturnCapability (Task *task)
                 RELEASE_LOCK(&cap->lock);
                 continue;
             }
-            cap->running_task = task;
+            RELAXED_STORE(&cap->running_task, task);
             popReturningTask(cap);
             RELEASE_LOCK(&cap->lock);
             break;
