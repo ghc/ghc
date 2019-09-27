@@ -30,5 +30,5 @@ void AnnotateBenignRaceSized(const char *file,
 #else
 #define TSAN_ANNOTATE_HAPPENS_BEFORE(addr)
 #define TSAN_ANNOTATE_HAPPENS_AFTER(addr)
-#define TSAN_ANNOTATE_BENIGN_RACE(addr)
+#define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)
 #endif
