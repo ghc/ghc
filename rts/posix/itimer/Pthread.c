@@ -120,6 +120,9 @@ static void *itimer_thread_func(void *_handle_tick)
     }
 #endif
 
+    // Benign race: If we don't see that exited was set in one iteration we will
+    // see it next time.
+    TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
     while (!exited) {
         if (USE_TIMERFD_FOR_ITIMER) {
             if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
@@ -134,6 +137,7 @@ static void *itimer_thread_func(void *_handle_tick)
         }
 
         // first try a cheap test
+        TSAN_ANNOTATE_BENIGN_RACE(&stopped, "itimer_thread_func");
         if (stopped) {
             OS_ACQUIRE_LOCK(&mutex);
             // should we really stop?
