@@ -70,7 +70,7 @@ import BasicTypes ( Origin )
 import DataCon
 import ConLike
 import TyCon
-import PmTypes
+import GHC.HsToCore.PmCheck.Types
 import Id
 import Module
 import Outputable
