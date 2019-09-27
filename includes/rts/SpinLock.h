@@ -50,7 +50,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
             __atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED);
             busy_wait_nop();
         }
-        p->yield++;
+        __atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED);
         yieldThread();
     } while (1);
 }
