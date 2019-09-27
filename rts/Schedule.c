@@ -273,7 +273,7 @@ schedule (Capability *initialCapability, Task *task)
         // other Capability did the final GC, or we did it above,
         // either way we can fall through to the SCHED_SHUTTING_DOWN
         // case now.
-        ASSERT(sched_state == SCHED_SHUTTING_DOWN);
+        ASSERT(RELAXED_LOAD(&sched_state) == SCHED_SHUTTING_DOWN);
         // fall through
 
     case SCHED_SHUTTING_DOWN:
@@ -363,7 +363,7 @@ schedule (Capability *initialCapability, Task *task)
     // killed, kill it now.  This sometimes happens when a finalizer
     // thread is created by the final GC, or a thread previously
     // in a foreign call returns.
-    if (sched_state >= SCHED_INTERRUPTING &&
+    if (RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING &&
         !(t->what_next == ThreadComplete || t->what_next == ThreadKilled)) {
         deleteThread(t);
     }
