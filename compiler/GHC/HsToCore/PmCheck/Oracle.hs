@@ -100,22 +100,6 @@ mkPmId ty = getUniqueM >>= \unique ->
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
 
-initIM :: Type -> DsM (Maybe PossibleMatches)
-initIM ty = case splitTyConApp_maybe ty of
-  Nothing -> pure Nothing
-  Just (tc, tc_args) -> do
-    -- Look into the representation type of a data family instance, too.
-    env <- dsGetFamInstEnvs
-    let (tc', _tc_args', _co) = tcLookupDataFamInst env tc tc_args
-    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc'
-    let rdcs = maybeToList mb_rdcs
-    -- NB: tc, because COMPLETE sets are associated with the parent data family
-    -- TyCon
-    pragmas <- dsGetCompleteMatches tc
-    let fams = mapM dsLookupConLike . completeMatchConLikes
-    pscs <- mapM fams pragmas
-    pure (PM tc . fmap mkUniqDSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
-
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
 markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqDSet` con) ms)
 markMatched _   NoPM = NoPM
@@ -632,7 +616,7 @@ Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
 'addRefutableAltCon' is subtle.
 * Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
   - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
-    @x /~ [True,False]@. This is vacuous by matter of comparing to the vanilla
+    @x /~ [True,False]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
   - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
 * Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addVarConCt')
@@ -646,7 +630,7 @@ Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
     (ex. Just and Nothing), the info is redundant and can be
     discarded.
   - (COMPLETE) If K=Nothing and we had @x /~ Just@, then we get
-    @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the vanilla
+    @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
 
 Note that merging VarInfo in equate can be done by calling out to 'addVarConCt' and
@@ -698,11 +682,28 @@ initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
   -- of a COMPLETE set.
   res <- pmTopNormaliseType ty_st ty
   let ty' = normalisedSourceType res
-  mb_pm <- initIM ty'
-  -- tracePm "initPossibleMatches" (ppr vi $$ ppr ty' $$ ppr res $$ ppr mb_pm)
-  case mb_pm of
-    Nothing -> pure vi
-    Just pm -> pure vi{ vi_ty = ty', vi_cache = pm }
+  case splitTyConApp_maybe ty' of
+    Nothing -> pure vi{ vi_ty = ty' }
+    Just (tc, tc_args) -> do
+      -- See Note [COMPLETE sets on data families]
+      (tc_rep, tc_fam) <- case tyConFamInst_maybe tc of
+        Just (tc_fam, _) -> pure (tc, tc_fam)
+        Nothing -> do
+          env <- dsGetFamInstEnvs
+          let (tc_rep, _tc_rep_args, _co) = tcLookupDataFamInst env tc tc_args
+          pure (tc_rep, tc)
+      -- Note that the common case here is tc_rep == tc_fam
+      let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc_rep
+      let rdcs = maybeToList mb_rdcs
+      -- NB: tc_fam, because COMPLETE sets are associated with the parent data
+      -- family TyCon
+      pragmas <- dsGetCompleteMatches tc_fam
+      let fams = mapM dsLookupConLike . completeMatchConLikes
+      pscs <- mapM fams pragmas
+      -- pprTrace "initPossibleMatches" (ppr ty $$ ppr ty' $$ ppr tc_rep <+> ppr tc_fam <+> ppr tc_args $$ ppr (rdcs ++ pscs)) (return ())
+      case NonEmpty.nonEmpty (rdcs ++ pscs) of
+        Nothing -> pure vi{ vi_ty = ty' } -- Didn't find any COMPLETE sets
+        Just cs -> pure vi{ vi_ty = ty', vi_cache = PM tc_rep (mkUniqDSet <$> cs) }
 initPossibleMatches _     vi                                   = pure vi
 
 -- | @initLookupVarInfo ts x@ looks up the 'VarInfo' for @x@ in @ts@ and tries
@@ -711,6 +712,49 @@ initPossibleMatches _     vi                                   = pure vi
 initLookupVarInfo :: Delta -> Id -> DsM VarInfo
 initLookupVarInfo MkDelta{ delta_tm_st = ts, delta_ty_st = ty_st } x
   = initPossibleMatches ty_st (lookupVarInfo ts x)
+
+{- Note [COMPLETE sets on data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+User-defined COMPLETE sets involving data families are attached to the family
+TyCon, whereas the built-in COMPLETE set is attached to a data family instance's
+representation TyCon. This matters for COMPLETE sets involving both DataCons
+and PatSyns (from #17207):
+
+  data family T a
+  data family instance T () = A | B
+  pattern C = B
+  {-# COMPLETE A, C #-}
+  f :: T () -> ()
+  f A = ()
+  f C = ()
+
+The match on A is actually wrapped in a CoPat, matching impedance between T ()
+and its representation TyCon, which we translate as
+@x | let y = x |> co, A <- y@ in PmCheck.
+
+Which TyCon should we use for looking up the COMPLETE set? The representation
+TyCon from the match on A would only reveal the built-in COMPLETE set, while the
+data family TyCon would only give the user-defined one. But when initialising
+the PossibleMatches for a given Type, we want to do so only once, because
+merging different COMPLETE sets after the fact is very complicated and possibly
+inefficient.
+
+So in fact, we just *drop* the coercion arising from the CoPat when handling
+handling the constraint @y ~ x |> co@ in addVarCoreCt, just equating @y ~ x@.
+We then handle the fallout in initPossibleMatches, which has to get a hand at
+both the representation TyCon tc_rep and the parent data family TyCon tc_fam.
+It considers three cases after having established that the Type is a TyConApp:
+
+1. The TyCon is a vanilla data type constructor
+2. The TyCon is tc_rep
+3. The TyCon is tc_fam
+
+1. is simple and subsumed by the handling of the other two.
+We check for case 2. by 'tyConFamInst_maybe' and get the tc_fam out.
+Otherwise (3.), we try to lookup the data family instance at that particular
+type to get out the tc_rep. In case 1., this will just return the original
+TyCon, so tc_rep = tc_fam afterwards.
+-}
 
 ------------------------------------------------
 -- * Exported utility functions querying 'Delta'
@@ -1511,6 +1555,9 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
     -- literals and constructor applications as possible.
     core_expr :: Id -> CoreExpr -> StateT Delta (MaybeT DsM) ()
     -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
+    -- This is the right thing for casts involving data family instances and
+    -- their representation TyCon, though (which are not visible in source
+    -- syntax). See Note [COMPLETE sets on data families]
     core_expr x (Cast e _co) = core_expr x e
     core_expr x (Tick _t e) = core_expr x e
     core_expr x e
