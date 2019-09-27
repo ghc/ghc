@@ -84,7 +84,9 @@ test('T17096', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
 test('T17112', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17207', expect_broken(17207), compile,
+test('T17207', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17207b', expect_broken(17207), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17208', expect_broken(17208), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
