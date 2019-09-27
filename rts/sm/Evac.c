@@ -295,14 +295,14 @@ evacuate_large(StgPtr p)
   ws = &gct->gens[new_gen_no];
   new_gen = &generations[new_gen_no];
 
-  bd->flags |= BF_EVACUATED;
+  __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_RELAXED);
   initBdescr(bd, new_gen, new_gen->to);
 
   // If this is a block of pinned or compact objects, we don't have to scan
   // these objects, because they aren't allowed to contain any outgoing
   // pointers.  For these blocks, we skip the scavenge stage and put
   // them straight on the scavenged_large_objects list.
-  if (bd->flags & BF_PINNED) {
+  if (RELAXED_LOAD(&bd->flags) & BF_PINNED) {
       ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
 
       if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
@@ -563,18 +563,18 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT)) != 0) {
+  if ((RELAXED_LOAD(&bd->flags) & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT)) != 0) {
       // pointer into to-space: just return it.  It might be a pointer
       // into a generation that we aren't collecting (> N), or it
       // might just be a pointer into to-space.  The latter doesn't
       // happen often, but allowing it makes certain things a bit
       // easier; e.g. scavenging an object is idempotent, so it's OK to
       // have an object on the mutable list multiple times.
-      if (bd->flags & BF_EVACUATED) {
+      if (RELAXED_LOAD(&bd->flags) & BF_EVACUATED) {
           // We aren't copying this object, so we have to check
           // whether it is already in the target generation.  (this is
           // the write barrier).
-          if (bd->gen_no < gct->evac_gen_no) {
+          if (RELAXED_LOAD(&bd->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
               TICK_GC_FAILED_PROMOTION();
           }
@@ -585,14 +585,14 @@ loop:
       // right thing for objects that are half way in the middle of the first
       // block of a compact (and would be treated as large objects even though
       // they are not)
-      if (bd->flags & BF_COMPACT) {
+      if (RELAXED_LOAD(&bd->flags) & BF_COMPACT) {
           evacuate_compact((P_)q);
           return;
       }
 
       /* evacuate large objects by re-linking them onto a different list.
        */
-      if (bd->flags & BF_LARGE) {
+      if (RELAXED_LOAD(&bd->flags) & BF_LARGE) {
           evacuate_large((P_)q);
           return;
       }
