@@ -1,0 +1,40 @@
+#!/bin/sh
+
+SIZE=${1:-20}
+MODULE=G
+
+# See #17264.
+#
+# Generates a function with many guards, inspired by Luc Mangaret's S series
+#
+#   module G where
+#
+#   data T = A | B
+#
+#   f :: Int -> (T, T)
+#   f n = (A, A)
+#
+#   g :: ()
+#   g
+#     | (A, A) <- f 1 = ()
+#     | (A, A) <- f 2 = ()
+#     | (A, A) <- f 3 = ()
+#     | (A, A) <- f 4 = ()
+#
+# Note how each guard splits into 2 uncovered Deltas
+
+cat > $MODULE.hs <<END
+module $MODULE where
+
+data T = A | B
+
+f :: Int -> (T, T)
+f _ = (A, A)
+
+g :: ()
+g
+END
+
+for i in $(seq -w 1 $SIZE); do
+  echo "  | (A, A) <- f $i = ()" >> $MODULE.hs
+done
