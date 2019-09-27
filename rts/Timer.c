@@ -55,6 +55,7 @@ handle_tick(int unused STG_UNUSED)
    * -I), tell the scheduler to wake up and do a GC, to check
    * for threads that are deadlocked.
    */
+  TSAN_ANNOTATE_BENIGN_RACE(&recent_activity, "recent_activity in handle_tick");
   switch (recent_activity) {
   case ACTIVITY_YES:
       recent_activity = ACTIVITY_MAYBE_NO;
