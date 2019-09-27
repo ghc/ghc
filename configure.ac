@@ -1317,8 +1317,14 @@ AC_SUBST(BUILD_MAN)
 AC_SUBST(BUILD_SPHINX_HTML)
 AC_SUBST(BUILD_SPHINX_PDF)
 
+dnl ** Determine library versions
+dnl The packages below should include all packages needed by
+dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
+LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(parallel)
+LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
