@@ -839,14 +839,20 @@ of ``-W(no-)*``.
 
     :default: 100
 
-    Pattern match checking can be exponential in some cases. This limit makes
-    sure we scale polynomially in the number of patterns, by forgetting refined
-    information gained from a partially successful match. For example, when
-    matching ``x`` against ``Just 4``, we split each incoming matching model
-    into two sub-models: One where ``x`` is not ``Nothing`` and one where ``x``
-    is ``Just y`` but ``y`` is not ``4``. When the number of incoming models
-    exceeds the limit, we continue checking the next clause with the original,
-    unrefined model.
+    The pattern match checker works by assigning symbolic values to each
+    pattern. We call each such assignment a 'model'. Now, each pattern match
+    clause leads to potentially multiple splits of that model, encoding
+    different ways for the pattern match to fail. For example, when matching
+    ``x`` against ``Just 4``, we split each incoming matching model into two
+    uncovered sub-models: One where ``x`` is ``Nothing`` and one where ``x`` is
+    ``Just y`` but ``y`` is not ``4``.
+
+    This can be exponential in the arity of the pattern and in the number of
+    guards in some cases. The :ghc-flag:`-fmax-pmcheck-models` limit makes sure
+    we scale polynomially in the number of patterns, by forgetting refined
+    information gained from a partially successful match. For the above example,
+    if we had a limit of 1, we would continue checking the next clause with the
+    original, unrefined model.
 
 .. ghc-flag:: -Wincomplete-record-updates
     :shortdesc: warn when a record update could fail
