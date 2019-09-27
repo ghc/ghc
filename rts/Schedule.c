@@ -639,7 +639,7 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // Capability keeps forcing a GC and the other Capabilities make no
     // progress at all.
 
-    return ((pending_sync && !didGcLast) ||
+    return ((RELAXED_LOAD(&pending_sync) && !didGcLast) ||
             RELAXED_LOAD(&cap->n_returning_tasks) != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
                                      ? peekRunQueue(cap)->bound != NULL
@@ -1391,7 +1391,7 @@ static void stopAllCapabilities (Capability **pCap, Task *task)
 
     acquireAllCapabilities(*pCap,task);
 
-    pending_sync = 0;
+    RELAXED_STORE(&pending_sync, 0);
 }
 #endif
 
@@ -1431,7 +1431,7 @@ static bool requestSync (
                        sync->type);
             ASSERT(*pcap);
             yieldCapability(pcap,task,true);
-            sync = pending_sync;
+            sync = RELAXED_LOAD(&pending_sync);
         } while (sync != NULL);
 
         // NOTE: task->cap might have changed now
@@ -1461,7 +1461,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
     Capability *tmpcap;
     uint32_t i;
 
-    ASSERT(pending_sync != NULL);
+    ASSERT(RELAXED_LOAD(&pending_sync) != NULL);
     for (i=0; i < n_capabilities; i++) {
         debugTrace(DEBUG_sched, "grabbing all the capabilies (%d/%d)",
                    i, n_capabilities);
@@ -1802,7 +1802,7 @@ delete_threads_and_gc:
 #if defined(THREADED_RTS)
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
-    pending_sync = 0;
+    RELAXED_STORE(&pending_sync, 0);
     GarbageCollect(collect_gen, heap_census, gc_type, cap, idle_cap);
 #else
     GarbageCollect(collect_gen, heap_census, 0, cap, NULL);
