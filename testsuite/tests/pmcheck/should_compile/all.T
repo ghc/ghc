@@ -136,6 +136,37 @@ test('CaseOfKnownCon', [], compile,
 test('TooManyDeltas', [], compile,
      ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
+# Series (inspired) by Luke Maranget
+
+test('PmSeriesS',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genS.py 10'),
+       extra_files(['genS.py']),
+     ],
+     multimod_compile,
+     ['S', '-v0'])
+test('PmSeriesT',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genT.py 10'),
+       extra_files(['genT.py']),
+     ],
+     multimod_compile,
+     ['T', '-v0'])
+test('PmSeriesV',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genV.py 6'),
+       extra_files(['genV.py']),
+     ],
+     multimod_compile,
+     ['V', '-v0'])
+test('PmSeriesG',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('./genG 20'),
+       extra_files(['genG']),
+     ],
+     multimod_compile,
+     ['G', '-v0'])
+
 # EmptyCase
 test('T10746', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
