@@ -473,7 +473,7 @@ startWorkerTask (Capability *cap)
   // else get in, because the new worker Task has nowhere to go to
   // sleep so that it could be woken up again.
   ASSERT_LOCK_HELD(&cap->lock);
-  cap->running_task = task;
+  RELAXED_STORE(&cap->running_task, task);
 
   // Set the name of the worker thread to the original process name followed by
   // ":w", but only if we're on Linux where the program_invocation_short_name
