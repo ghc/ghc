@@ -207,9 +207,9 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
 
     // if somebody else reads the forwarding pointer, we better make
     // sure there's a closure at the end of it.
-    write_barrier();
-    *p = TAG_CLOSURE(tag,(StgClosure*)to);
-    src->header.info = (const StgInfoTable *)MK_FORWARDING_PTR(to);
+    RELEASE_STORE(p, TAG_CLOSURE(tag,(StgClosure*)to));
+    RELAXED_STORE(&src->header.info, \
+                  (const StgInfoTable *)MK_FORWARDING_PTR(to));
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
@@ -390,7 +390,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
         return;
     }
 
-    StgWord link = (StgWord)*link_field;
+    StgWord link = RELAXED_LOAD((StgWord*) link_field);
 
     // See Note [STATIC_LINK fields] for how the link field bits work
     if (((link & STATIC_BITS) | prev_static_flag) != 3) {
@@ -703,7 +703,7 @@ loop:
 
   gen_no = bd->dest_no;
 
-  info = q->header.info;
+  info = RELAXED_LOAD(&q->header.info);
   if (IS_FORWARDING_PTR(info))
   {
     /* Already evacuated, just return the forwarding address.
