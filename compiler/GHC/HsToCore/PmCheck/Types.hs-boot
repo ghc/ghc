@@ -1,4 +1,4 @@
-module PmTypes where
+module GHC.HsToCore.PmCheck.Types where
 
 import GhcPrelude ()
 

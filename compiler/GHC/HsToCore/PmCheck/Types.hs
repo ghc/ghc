@@ -8,9 +8,9 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE TupleSections #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
--- to be imported from "TcRnTypes". The exposed API is that of "PmOracle" and
--- "Check".
-module PmTypes (
+-- to be imported from "TcRnTypes". The exposed API is that of
+-- "GHC.HsToCore.PmCheck.Oracle" and "GHC.HsToCore.PmCheck".
+module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
 
