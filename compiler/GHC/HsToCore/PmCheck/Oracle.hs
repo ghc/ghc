@@ -10,7 +10,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 -- 'addTmCt', 'addVarCoreCt', 'addRefutableAltCon' and 'addTypeEvidence' for
 -- adding facts to the oracle, and 'provideEvidenceForEquation' to turn a
 -- 'Delta' into a concrete evidence for an equation.
-module PmOracle (
+module GHC.HsToCore.PmCheck.Oracle (
 
         DsM, tracePm, mkPmId,
         Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
@@ -28,7 +28,7 @@ module PmOracle (
 
 import GhcPrelude
 
-import PmTypes
+import GHC.HsToCore.PmCheck.Types
 
 import DynFlags
 import Outputable

@@ -25,7 +25,7 @@ import GHC.Hs
 import TcHsSyn
 import TcEvidence
 import TcRnMonad
-import Check
+import GHC.HsToCore.PmCheck
 import CoreSyn
 import Literal
 import CoreUtils
