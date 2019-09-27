@@ -25,7 +25,7 @@ import CoreUtils (bindNonRec)
 
 import BasicTypes (Origin(FromSource))
 import DynFlags
-import Check (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
+import GHC.HsToCore.PmCheck (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import DsMonad
 import DsUtils
 import Type   ( Type )

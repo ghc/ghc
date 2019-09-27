@@ -333,10 +333,10 @@ Library
         CoreStats
         MkCore
         PprCore
-        PmOracle
-        PmPpr
-        PmTypes
-        Check
+        GHC.HsToCore.PmCheck.Oracle
+        GHC.HsToCore.PmCheck.Ppr
+        GHC.HsToCore.PmCheck.Types
+        GHC.HsToCore.PmCheck
         Coverage
         Desugar
         DsArrows

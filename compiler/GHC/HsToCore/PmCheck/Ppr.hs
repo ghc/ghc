@@ -2,7 +2,7 @@
 
 -- | Provides factilities for pretty-printing 'Delta's in a way appropriate for
 -- user facing pattern match warnings.
-module PmPpr (
+module GHC.HsToCore.PmCheck.Ppr (
         pprUncovered
     ) where
 
@@ -23,8 +23,8 @@ import Util
 import Maybes
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
-import PmTypes
-import PmOracle
+import GHC.HsToCore.PmCheck.Types
+import GHC.HsToCore.PmCheck.Oracle
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.

@@ -29,7 +29,7 @@ import {-# SOURCE #-}   Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
-import Check ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
+import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
 import GHC.Hs           -- lots of things
 import CoreSyn          -- lots of things
