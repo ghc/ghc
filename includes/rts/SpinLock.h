@@ -49,7 +49,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
             IF_PROF_SPIN(__atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED));
             busy_wait_nop();
         }
-        IF_PROF_SPIN(p->yield++);
+        IF_PROF_SPIN(__atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED));
         yieldThread();
     } while (1);
 }
