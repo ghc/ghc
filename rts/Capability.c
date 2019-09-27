@@ -213,7 +213,7 @@ newReturningTask (Capability *cap, Task *task)
         cap->returning_tasks_hd = task;
     }
     cap->returning_tasks_tl = task;
-    cap->n_returning_tasks++;
+    RELAXED_STORE(&cap->n_returning_tasks, RELAXED_LOAD(&cap->n_returning_tasks)+1);
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
