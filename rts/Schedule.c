@@ -1391,7 +1391,7 @@ static void stopAllCapabilities (Capability **pCap, Task *task)
 
     acquireAllCapabilities(*pCap,task);
 
-    RELAXED_LOAD(&pending_sync, 0);
+    RELAXED_STORE(&pending_sync, 0);
 }
 #endif
 
