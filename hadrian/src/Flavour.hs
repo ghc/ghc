@@ -1,6 +1,8 @@
 module Flavour
   ( Flavour (..), werror
   , DocTargets, DocTarget(..)
+    -- * Flavour transformers
+  , addArgs
   , splitSections, splitSectionsIf
   ) where
 
@@ -61,10 +63,13 @@ type DocTargets = Set DocTarget
 data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
   deriving (Eq, Ord, Show, Bounded, Enum)
 
+addArgs :: Args -> Flavour -> Flavour
+addArgs args' fl = fl { args = args fl <> args' }
+
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
-werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+werror = addArgs $ builder Ghc ? notStage0 ? arg "-Werror"
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate. You can
@@ -74,8 +79,7 @@ werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
 --   building it. If the given flavour doesn't build
 --   anything in a @dyn@-enabled way, then 'splitSections' is a no-op.
 splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
-splitSectionsIf pkgPredicate fl = fl { args = args fl <> splitSectionsArg }
-
+splitSectionsIf pkgPredicate = addArgs splitSectionsArg
   where splitSectionsArg = do
           way <- getWay
           pkg <- getPackage
