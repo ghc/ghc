@@ -657,7 +657,7 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // We would usually need to hold cap->lock to look at n_returning_tasks but
     // we don't here since this is just an approximate predicate (right?).
     TSAN_ANNOTATE_BENIGN_RACE(&cap->n_returning_tasks, "shouldYieldCapability");
-    return ((pending_sync && !didGcLast) ||
+    return ((RELAXED_LOAD(&pending_sync) && !didGcLast) ||
             cap->n_returning_tasks != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
                                      ? peekRunQueue(cap)->bound != NULL
