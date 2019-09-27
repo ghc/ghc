@@ -928,7 +928,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          * we won't eagerly start a full GC just because we don't have
          * any threads to run currently.
          */
-        if (recent_activity != ACTIVITY_INACTIVE) return;
+        if (RELAXED_LOAD(&recent_activity) != ACTIVITY_INACTIVE) return;
 #endif
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
@@ -1883,7 +1883,6 @@ delete_threads_and_gc:
         // the GC might have taken long enough for the timer to set
         // recent_activity = ACTIVITY_MAYBE_NO or ACTIVITY_INACTIVE,
         // but we aren't necessarily deadlocked:
-        recent_activity = ACTIVITY_YES;
         RELAXED_STORE(&recent_activity, ACTIVITY_YES);
         break;
 
