@@ -885,8 +885,9 @@ allocateMightFail (Capability *cap, W_ n)
         ACQUIRE_SM_LOCK
         bd = allocGroupOnNode(cap->node,req_blocks);
         dbl_link_onto(bd, &g0->large_objects);
-        g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-        g0->n_new_large_words += n;
+        __atomic_fetch_add(&g0->n_large_blocks, bd->blocks, __ATOMIC_RELAXED);
+            // might be larger than req_blocks
+        __atomic_fetch_add(&g0->n_large_words, n, __ATOMIC_RELAXED);
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
         bd->flags = BF_LARGE;
@@ -1289,9 +1290,9 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
-        W_ blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-                  + gen->n_large_blocks
-                  + gen->n_compact_blocks;
+        W_ blocks = RELAXED_LOAD(&gen->n_blocks) // or: gen->n_words / BLOCK_SIZE_W (?)
+                  + RELAXED_LOAD(&gen->n_large_blocks)
+                  + RELAXED_LOAD(&gen->n_compact_blocks);
 
         // we need at least this much space
         needed += blocks;
