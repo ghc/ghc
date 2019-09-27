@@ -590,7 +590,7 @@ releaseCapability_ (Capability* cap,
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
-    last_free_capability[cap->node] = cap;
+    RELAXED_STORE(&last_free_capability[cap->node], cap);
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
