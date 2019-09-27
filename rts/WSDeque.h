@@ -103,8 +103,8 @@ EXTERN_INLINE long dequeElements   (WSDeque *q);
 EXTERN_INLINE long
 dequeElements (WSDeque *q)
 {
-    StgWord t = q->top;
-    StgWord b = q->bottom;
+    StgWord t = RELAXED_LOAD(&q->top);
+    StgWord b = RELAXED_LOAD(&q->bottom);
     // try to prefer false negatives by reading top first
     return ((long)b - (long)t);
 }
@@ -118,6 +118,6 @@ looksEmptyWSDeque (WSDeque *q)
 EXTERN_INLINE void
 discardElements (WSDeque *q)
 {
-    q->top = q->bottom;
+    RELAXED_STORE(&q->top, RELAXED_LOAD(&q->bottom));
 //    pool->topBound = pool->top;
 }
