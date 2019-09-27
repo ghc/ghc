@@ -421,10 +421,10 @@ run_thread:
 #endif
 
     // reset the interrupt flag before running Haskell code
-    cap->interrupt = 0;
+    RELAXED_STORE(&cap->interrupt, false);
 
     cap->in_haskell = true;
-    cap->idle = 0;
+    RELAXED_STORE(&cap->idle, false);
 
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
