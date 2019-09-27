@@ -546,7 +546,7 @@ releaseCapability_ (Capability* cap,
     // be currently in waitForCapability() waiting for this
     // capability, in which case simply setting it as free would not
     // wake up the waiting task.
-    PendingSync *sync = pending_sync;
+    PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
     if (sync && (sync->type != SYNC_GC_PAR || sync->idle[cap->no])) {
         debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
         return;
@@ -908,7 +908,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
     if (gcAllowed)
     {
-        PendingSync *sync = pending_sync;
+        PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
 
         if (sync) {
             switch (sync->type) {
