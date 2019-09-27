@@ -505,6 +505,9 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  * The current Task (cap->task) releases the Capability.  The Capability is
  * marked free, and if there is any work to do, an appropriate Task is woken up.
  *
+ * The caller must hold cap->lock and will still hold it after
+ * releaseCapability returns.
+ *
  * N.B. May need to take all_tasks_mutex.
  *
  * ------------------------------------------------------------------------- */
@@ -520,6 +523,7 @@ releaseCapability_ (Capability* cap,
 
     ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT_RETURNING_TASKS(cap,task);
+    ASSERT_LOCK_HELD(&cap->lock);
 
     cap->running_task = NULL;
 
