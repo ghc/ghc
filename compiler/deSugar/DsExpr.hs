@@ -25,7 +25,7 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
-import Check ( checkGuardMatches )
+import GHC.HsToCore.PmCheck ( checkGuardMatches )
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
