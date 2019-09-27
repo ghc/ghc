@@ -85,7 +85,7 @@ STATIC_INLINE bool
 globalWorkToDo (void)
 {
     return RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING
-        || recent_activity == ACTIVITY_INACTIVE; // need to check for deadlock
+      || RELAXED_LOAD(&recent_activity) == ACTIVITY_INACTIVE; // need to check for deadlock
 }
 #endif
 
