@@ -456,6 +456,7 @@ stopCapability (Capability *cap)
     // It may not work - the thread might be updating HpLim itself
     // at the same time - so we also have the context_switch/interrupted
     // flags as a sticky way to tell the thread to stop.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->r.rHpLim, "stopCapability");
     cap->r.rHpLim = NULL;
 }
 
@@ -463,6 +464,7 @@ INLINE_HEADER void
 interruptCapability (Capability *cap)
 {
     stopCapability(cap);
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->interrupt, "interruptCapability");
     cap->interrupt = 1;
 }
 
@@ -470,6 +472,7 @@ INLINE_HEADER void
 contextSwitchCapability (Capability *cap)
 {
     stopCapability(cap);
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->context_switch, "contextSwitchCapability");
     cap->context_switch = 1;
 }
 
