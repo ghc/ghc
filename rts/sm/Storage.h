@@ -73,7 +73,7 @@ INLINE_HEADER
 bool doYouWantToGC(Capability *cap)
 {
     return ((cap->r.rCurrentNursery->link == NULL && !getNewNursery(cap)) ||
-            g0->n_new_large_words >= large_alloc_lim);
+            RELAXED_LOAD(&g0->n_new_large_words) >= large_alloc_lim);
 }
 
 /* -----------------------------------------------------------------------------
