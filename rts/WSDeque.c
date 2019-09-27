@@ -126,11 +126,11 @@ popWSDeque (WSDeque *q)
 
     ASSERT_WSDEQUE_INVARIANTS(q);
 
-    b = q->bottom;
+    b = RELAXED_LOAD(&q->bottom);
 
     // "decrement b as a test, see what happens"
     b--;
-    q->bottom = b;
+    RELAXED_STORE(&q->bottom, b);
 
     // very important that the following read of q->top does not occur
     // before the earlier write to q->bottom.
@@ -145,7 +145,7 @@ popWSDeque (WSDeque *q)
     currSize = (long)b - (long)t;
     if (currSize < 0) { /* was empty before decrementing b, set b
                            consistently and abort */
-        q->bottom = t;
+        RELAXED_STORE(&q->bottom, t);
         return NULL;
     }
 
@@ -161,7 +161,7 @@ popWSDeque (WSDeque *q)
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
         removed = NULL; /* no success, but continue adjusting bottom */
     }
-    q->bottom = t+1; /* anyway, empty now. Adjust bottom consistently. */
+    RELAXED_STORE(&q->bottom, t+1); /* anyway, empty now. Adjust bottom consistently. */
     q->topBound = t+1; /* ...and cached top value as well */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
