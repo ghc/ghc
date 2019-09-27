@@ -410,6 +410,10 @@ load_load_barrier(void) {
 // a busy wait loop for example.
 #define VOLATILE_LOAD(p) (*((StgVolatilePtr)(p)))
 
+// Relaxed atomic operations.
+#define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
+#define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
@@ -419,6 +423,9 @@ EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE void write_barrier     () {} /* nothing */
 EXTERN_INLINE void store_load_barrier() {} /* nothing */
 EXTERN_INLINE void load_load_barrier () {} /* nothing */
+
+#define RELAXED_LOAD(ptr) *ptr
+#define RELAXED_STORE(ptr,val) *ptr = val
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord
