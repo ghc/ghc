@@ -655,6 +655,7 @@ shouldYieldCapability (Capability *cap, Task *task, bool didGcLast)
     // Capability keeps forcing a GC and the other Capabilities make no
     // progress at all.
 
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->n_returning_tasks, "n_returning_tasks in shouldYieldCapability");
     return ((pending_sync && !didGcLast) ||
             cap->n_returning_tasks != 0 ||
             (!emptyRunQueue(cap) && (task->incall->tso == NULL
