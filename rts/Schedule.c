@@ -429,7 +429,7 @@ run_thread:
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
 
-    switch (recent_activity)
+    switch (SEQ_CST_LOAD(&recent_activity))
     {
     case ACTIVITY_DONE_GC: {
         // ACTIVITY_DONE_GC means we turned off the timer signal to
@@ -450,7 +450,7 @@ run_thread:
         // wakeUpRts().
         break;
     default:
-        recent_activity = ACTIVITY_YES;
+        SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
     }
 
     traceEventRunThread(cap, t);
@@ -939,7 +939,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          * we won't eagerly start a full GC just because we don't have
          * any threads to run currently.
          */
-        if (recent_activity != ACTIVITY_INACTIVE) return;
+        if (SEQ_CST_LOAD(&recent_activity) != ACTIVITY_INACTIVE) return;
 #endif
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
@@ -1875,14 +1875,14 @@ delete_threads_and_gc:
 
     traceSparkCounters(cap);
 
-    switch (recent_activity) {
+    switch (SEQ_CST_LOAD(&recent_activity)) {
     case ACTIVITY_INACTIVE:
         if (force_major) {
             // We are doing a GC because the system has been idle for a
             // timeslice and we need to check for deadlock.  Record the
             // fact that we've done a GC and turn off the timer signal;
             // it will get re-enabled if we run any threads after the GC.
-            recent_activity = ACTIVITY_DONE_GC;
+            SEQ_CST_STORE(&recent_activity, ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
             stopTimer();
 #endif
@@ -1894,7 +1894,7 @@ delete_threads_and_gc:
         // the GC might have taken long enough for the timer to set
         // recent_activity = ACTIVITY_MAYBE_NO or ACTIVITY_INACTIVE,
         // but we aren't necessarily deadlocked:
-        recent_activity = ACTIVITY_YES;
+        SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
         break;
 
     case ACTIVITY_DONE_GC:
