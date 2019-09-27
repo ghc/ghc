@@ -98,21 +98,29 @@ mkPmId ty = getUniqueM >>= \unique ->
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
 
-initIM :: Type -> DsM (Maybe PossibleMatches)
-initIM ty = case splitTyConApp_maybe ty of
+initPM :: Type -> DsM (Maybe PossibleMatches)
+initPM ty = case splitTyConApp_maybe ty of
   Nothing -> pure Nothing
   Just (tc, tc_args) -> do
-    -- Look into the representation type of a data family instance, too.
-    env <- dsGetFamInstEnvs
-    let (tc', _tc_args', _co) = tcLookupDataFamInst env tc tc_args
-    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc'
+    -- In case of a data family, we are interested in the vanilla COMPLETE set
+    -- (which is attached to the representation TyCon) *and* the user-defined
+    -- COMPLETE sets attached to the data family TyCon.
+    (tc_rep, tc_fam) <- case tyConFamInst_maybe tc of
+      Just (tc_fam, _) -> pure (tc, tc_fam)
+      Nothing -> do
+        env <- dsGetFamInstEnvs
+        let (tc_rep, _tc_rep_args, _co) = tcLookupDataFamInst env tc tc_args
+        pure (tc_rep, tc)
+    -- Note that the common case here is tc_rep == tc_fam
+    let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc_rep
     let rdcs = maybeToList mb_rdcs
-    -- NB: tc, because COMPLETE sets are associated with the parent data family
-    -- TyCon
-    pragmas <- dsGetCompleteMatches tc
+    -- NB: tc_fam, because COMPLETE sets are associated with the parent data
+    -- family TyCon
+    pragmas <- dsGetCompleteMatches tc_fam
     let fams = mapM dsLookupConLike . completeMatchConLikes
     pscs <- mapM fams pragmas
-    pure (PM tc . fmap mkUniqDSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
+    -- pprTrace "initPM" (ppr ty $$ ppr tc_rep <+> ppr tc_fam <+> ppr tc_args $$ ppr (rdcs ++ pscs)) (return ())
+    pure (PM tc_rep . fmap mkUniqDSet <$> NonEmpty.nonEmpty (rdcs ++ pscs))
 
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
 markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqDSet` con) ms)
@@ -696,7 +704,7 @@ initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
   -- of a COMPLETE set.
   res <- pmTopNormaliseType ty_st ty
   let ty' = normalisedSourceType res
-  mb_pm <- initIM ty'
+  mb_pm <- initPM ty'
   -- tracePm "initPossibleMatches" (ppr vi $$ ppr ty' $$ ppr res $$ ppr mb_pm)
   case mb_pm of
     Nothing -> pure vi
