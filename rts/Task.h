@@ -345,4 +345,13 @@ serialisableTaskId (Task *task)
 #endif
 }
 
+// Debugging assertion to verify that the given task owns the given capability.
+#if defined(DEBUG)
+#define ASSERT_TASK_OWNS_CAPABILITY(task_, cap_) \
+  ASSERT(task_->cap == cap_); \
+  ASSERT(cap_->running_task == task_);
+#else
+#define ASSERT_TASK_OWNS_CAPABILITY(task_, cap_)
+#endif
+
 #include "EndPrivate.h"
