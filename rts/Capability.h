@@ -480,8 +480,8 @@ contextSwitchCapability (Capability *cap)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {
-    return (cap->inbox == (Message*)END_TSO_QUEUE &&
-            cap->putMVars == NULL);
+    return (RELAXED_LOAD(&cap->inbox) == (Message*)END_TSO_QUEUE &&
+            RELAXED_LOAD(&cap->putMVars) == NULL);
 }
 
 #endif
