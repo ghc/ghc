@@ -1125,8 +1125,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
 static bool
 scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 {
-    TSAN_ANNOTATE_BENIGN_RACE(&cap->context_switch, "cap->context_switch in scheduleHandleHeapOverflow");
-    if (cap->r.rHpLim == NULL || cap->context_switch) {
+    if (cap->r.rHpLim == NULL || RELAXED_LOAD(&cap->context_switch)) {
         // Sometimes we miss a context switch, e.g. when calling
         // primitives in a tight loop, MAYBE_GC() doesn't check the
         // context switch flag, and we end up waiting for a GC.
