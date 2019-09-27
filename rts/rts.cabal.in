@@ -43,6 +43,11 @@ flag logging
   default: False
 flag dynamic
   default: False
+flag thread-sanitizer
+  description:
+    Enable checking for data races using the ThreadSanitizer (TSAN)
+    mechanism supported by GCC and Clang.
+  default: False
 
 library
     -- rts is a wired in package and
@@ -77,6 +82,10 @@ library
         extra-dynamic-library-flavours: _l _thr_l
     if flag(dynamic)
       extra-dynamic-library-flavours: _thr
+
+    if flag(thread-sanitizer)
+      cc-options: -fsanitize=thread
+      ld-options: -fsanitize=thread
 
     exposed: True
     exposed-modules:
