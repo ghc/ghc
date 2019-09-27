@@ -196,11 +196,11 @@ ioManagerDie (void)
     }
 
     for (i=0; i < n_capabilities; i++) {
-        fd = capabilities[i]->io_manager_control_wr_fd;
+        fd = RELAXED_LOAD(&capabilities[i]->io_manager_control_wr_fd);
         if (0 <= fd) {
             r = write(fd, &byte, 1);
             if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-            capabilities[i]->io_manager_control_wr_fd = -1;
+            RELAXED_STORE(&capabilities[i]->io_manager_control_wr_fd, -1);
         }
     }
 }
