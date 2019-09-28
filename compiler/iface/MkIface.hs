@@ -113,7 +113,7 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
-import CgTypes -- (LambdaFormInfo, CgIfaceInfo )
+import GHC.StgToCmm.CgTypes -- (LambdaFormInfo, CgIfaceInfo )
 
 import Control.Monad
 import Data.Function

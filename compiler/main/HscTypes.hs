@@ -208,7 +208,7 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
-import CgTypes          ( LambdaFormInfo, CgIfaceInfoList )
+import GHC.StgToCmm.CgTypes          ( LambdaFormInfo, CgIfaceInfoList )
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )

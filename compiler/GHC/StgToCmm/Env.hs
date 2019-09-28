@@ -51,7 +51,7 @@ import UniqFM
 import Util
 import VarEnv
 
-import CgTypes ( whnfLF )
+import GHC.StgToCmm.CgTypes ( whnfLF )
 
 import Data.Maybe
 

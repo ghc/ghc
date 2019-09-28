@@ -52,7 +52,7 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import CoreLint
-import CgTypes
+import GHC.StgToCmm.CgTypes
 import MkCore
 import Id
 import MkId

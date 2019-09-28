@@ -9,7 +9,7 @@
 -- In particular we export here any information which might be written to or
 -- read from interface files.
 
-module CgTypes
+module GHC.StgToCmm.CgTypes
   ( LambdaFormInfo(..), StandardFormInfo(..), CgIfaceInfo, CgIfaceInfoList
   , exportLF
   , whnfLF

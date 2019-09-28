@@ -65,7 +65,7 @@ import GhcPrelude hiding( sequence, succ )
 
 import Cmm
 import GHC.StgToCmm.Closure
-import CgTypes ( CgIfaceInfo )
+import GHC.StgToCmm.CgTypes ( CgIfaceInfo )
 
 import DynFlags
 import Hoopl.Collections

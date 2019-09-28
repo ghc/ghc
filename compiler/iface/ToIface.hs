@@ -55,7 +55,7 @@ import DataCon
 import Id
 import IdInfo
 import CoreSyn
-import CgTypes
+import GHC.StgToCmm.CgTypes
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )

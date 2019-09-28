@@ -26,7 +26,7 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
-import CgTypes ( exportLF )
+import GHC.StgToCmm.CgTypes ( exportLF )
 
 import Cmm
 import CmmUtils

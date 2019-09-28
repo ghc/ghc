@@ -10,7 +10,7 @@ import FamInstEnv  ( FamInst )
 import CoreSyn     ( CoreRule )
 import HscTypes    ( CompleteMatch )
 import Annotations ( Annotation )
-import CgTypes     ( LambdaFormInfo )
+import GHC.StgToCmm.CgTypes     ( LambdaFormInfo )
 
 tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules        :: Bool -> [IfaceRule] -> IfL [CoreRule]

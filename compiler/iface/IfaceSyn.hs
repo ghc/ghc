@@ -78,7 +78,7 @@ import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
-import CgTypes
+import GHC.StgToCmm.CgTypes
 
 import Control.Monad
 import System.IO.Unsafe

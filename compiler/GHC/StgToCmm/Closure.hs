@@ -70,7 +70,7 @@ module GHC.StgToCmm.Closure (
 
 import GhcPrelude
 
-import CgTypes
+import GHC.StgToCmm.CgTypes
 import StgSyn
 import SMRep
 import Cmm

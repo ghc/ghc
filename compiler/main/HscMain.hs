@@ -126,7 +126,7 @@ import TidyPgm
 import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import CgTypes          ( LambdaFormInfo, CgIfaceInfo, CgIfaceInfoList )
+import GHC.StgToCmm.CgTypes          ( LambdaFormInfo, CgIfaceInfo, CgIfaceInfoList )
 import StgSyn
 import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
@@ -1591,7 +1591,7 @@ doCodeGen hsc_env this_mod data_tycons
                   "STG for code gen:" (pprGenStgTopBindings stg_binds_w_fvs)
     let cmm_stream :: Stream IO CmmGroup [(Name,LambdaFormInfo)]
         cmm_stream = {-# SCC "StgCmm" #-}
-            StgCmm.codeGen dflags this_mod data_tycons
+            StgToCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
                            import_lf_info
 
