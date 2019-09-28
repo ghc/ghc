@@ -249,8 +249,8 @@ todo_block_full (uint32_t size, gen_workspace *ws)
         return p;
     }
 
-    gct->copied += ws->todo_free - bd->free;
-    bd->free = ws->todo_free;
+    gct->copied += ws->todo_free - RELAXED_LOAD(&bd->free);
+    RELAXED_STORE(&bd->free, ws->todo_free);
 
     ASSERT(bd->u.scan >= bd->start && bd->u.scan <= bd->free);
 
@@ -331,8 +331,8 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
             }
         }
         // blocks in to-space get the BF_EVACUATED flag.
-        bd->flags = BF_EVACUATED;
-        bd->u.scan = bd->start;
+        RELAXED_STORE(&bd->flags, BF_EVACUATED);
+        RELAXED_STORE(&bd->u.scan, RELAXED_LOAD(&bd->start));
         initBdescr(bd, ws->gen, ws->gen->to);
     }
 
@@ -345,7 +345,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
                      // See Note [big objects]
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d",
-               bd->free, ws->gen->no);
+               RELAXED_LOAD(&bd->free), ws->gen->no);
 
     return ws->todo_free;
 }
