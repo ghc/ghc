@@ -794,9 +794,9 @@ freeGroup(bdescr *p)
 
   node = p->node;
 
-  p->free = (void *)-1;  /* indicates that this block is free */
-  p->gen = NULL;
-  p->gen_no = 0;
+  RELAXED_STORE(&p->free, (void *) -1);  /* indicates that this block is free */
+  RELAXED_STORE(&p->gen, NULL);
+  RELAXED_STORE(&p->gen_no, 0);
   /* fill the block group with garbage if sanity checking is on */
   IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
@@ -822,7 +822,8 @@ freeGroup(bdescr *p)
   {
       bdescr *next;
       next = p + p->blocks;
-      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p)) && next->free == (P_)-1)
+      if (next <= LAST_BDESCR(MBLOCK_ROUND_DOWN(p))
+          && RELAXED_LOAD(&next->free) == (P_)-1)
       {
           p->blocks += next->blocks;
           ln = log_2(next->blocks);
