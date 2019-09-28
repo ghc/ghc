@@ -69,7 +69,8 @@ executeMessage (Capability *cap, Message *m)
 
 loop:
     write_barrier(); // allow m->header to be modified by another thread
-    i = m->header.info;
+    // TODO: Is the above barrier actually needed? Why is it a write barrier? Something is fishy here.
+    i = ACQUIRE_LOAD(&m->header.info);
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
@@ -336,7 +337,7 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     const StgInfoTable *info;
     StgClosure *p;
 
-    info = bh->header.info;
+    info = RELAXED_LOAD(&bh->header.info);
 
     if (info != &stg_BLACKHOLE_info &&
         info != &stg_CAF_BLACKHOLE_info &&
