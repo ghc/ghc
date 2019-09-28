@@ -741,7 +741,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
         cap0 = capabilities[i];
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
-                || cap0->n_returning_tasks != 0
+                || RELAXED_LOAD(&cap0->n_returning_tasks) != 0
                 || !emptyInbox(cap0)) {
                 // it already has some work, we just grabbed it at
                 // the wrong moment.  Or maybe it's deadlocked!
