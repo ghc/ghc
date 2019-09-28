@@ -1036,7 +1036,10 @@ bool
 tryGrabCapability (Capability *cap, Task *task)
 {
     int r;
+    // N.B. This is benign as we will check again after taking the lock.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->running_task, "tryGrabCapability (cap->running_task)");
     if (RELAXED_LOAD(&cap->running_task) != NULL) return false;
+
     r = TRY_ACQUIRE_LOCK(&cap->lock);
     if (r != 0) return false;
     if (cap->running_task != NULL) {
@@ -1044,7 +1047,7 @@ tryGrabCapability (Capability *cap, Task *task)
         return false;
     }
     task->cap = cap;
-    cap->running_task = task;
+    RELAXED_STORE(&cap->running_task, task);
     RELEASE_LOCK(&cap->lock);
     return true;
 }
