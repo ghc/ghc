@@ -86,8 +86,8 @@ Capability * rts_unsafeGetMyCapability (void)
 STATIC_INLINE bool
 globalWorkToDo (void)
 {
-    return sched_state >= SCHED_INTERRUPTING
-        || recent_activity == ACTIVITY_INACTIVE; // need to check for deadlock
+    return RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING
+      || RELAXED_LOAD(&recent_activity) == ACTIVITY_INACTIVE; // need to check for deadlock
 }
 #endif
 
