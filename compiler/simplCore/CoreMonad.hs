@@ -26,7 +26,7 @@ module CoreMonad (
     CoreM, runCoreM,
 
     -- ** Reading from the monad
-    getHscEnv, getRuleBase, getModule,
+    getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
     getVisibleOrphanMods,
     getPrintUnqualified, getSrcSpanM,
@@ -690,9 +690,6 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 ************************************************************************
 -}
 
-getHscEnv :: CoreM HscEnv
-getHscEnv = read cr_hsc_env
-
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
 
@@ -712,6 +709,9 @@ addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
 instance HasDynFlags CoreM where
     getDynFlags = fmap hsc_dflags getHscEnv
+
+instance HasHscEnv CoreM where
+    getHscEnv = read cr_hsc_env
 
 instance HasModule CoreM where
     getModule = read cr_module

@@ -74,7 +74,6 @@ module HscMain
       -- We want to make sure that we export enough to be able to redefine
       -- hscFileFrontEnd in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule'
-    , getHscEnv
     , hscSimpleIface', hscNormalIface'
     , oneShotMsg
     , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
@@ -218,9 +217,6 @@ clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
 logWarnings :: WarningMessages -> Hsc ()
 logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
-
-getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
