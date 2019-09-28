@@ -78,7 +78,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* See Note [Heap memory barriers] in SMP.h */
     write_barrier();
     OVERWRITING_CLOSURE(p1);
-    ((StgInd *)p1)->indirectee = p2;
+    RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
     write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
