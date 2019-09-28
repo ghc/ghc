@@ -1739,8 +1739,9 @@ scavenge_static(void)
     /* Take this object *off* the static_objects list,
      * and put it on the scavenged_static_objects list.
      */
-    gct->static_objects = *STATIC_LINK(info,p);
-    RELAXED_STORE(STATIC_LINK(info,p), gct->scavenged_static_objects);
+    StgClosure **link = STATIC_LINK(info,p);
+    gct->static_objects = RELAXED_LOAD(link);
+    RELAXED_STORE(link, gct->scavenged_static_objects);
     gct->scavenged_static_objects = flagged_p;
 
     switch (info -> type) {
