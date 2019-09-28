@@ -445,7 +445,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     Capability *cap = regTableToCapability(reg);
     StgInd *bh;
 
-    orig_info = caf->header.info;
+    orig_info = RELAXED_LOAD(&caf->header.info);
 
 #if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
@@ -504,7 +504,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Ensure that above writes are visible before we introduce reference as CAF indirectee.
     write_barrier();
 
-    caf->indirectee = (StgClosure *)bh;
+    RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
     write_barrier();
     SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
 
@@ -1203,8 +1203,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
-        mvar->header.info = &stg_MUT_VAR_DIRTY_info;
+    if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
+        SET_INFO((StgClosure*) p, &stg_MUT_VAR_DIRTY_info);
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure_(reg, old);
@@ -1225,8 +1225,8 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 {
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (p->header.info == &stg_TVAR_CLEAN_info) {
-        p->header.info = &stg_TVAR_DIRTY_info;
+    if (RELAXED_LOAD(&p->header.info) == &stg_TVAR_CLEAN_info) {
+        SET_INFO((StgClosure*) p, &stg_TVAR_DIRTY_info);
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, old);
@@ -1242,8 +1242,8 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
@@ -1255,8 +1255,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
@@ -1268,8 +1268,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 
@@ -1287,8 +1287,8 @@ dirty_STACK (Capability *cap, StgStack *stack)
         updateRemembSetPushStack(cap, stack);
     }
 
-    if (! (stack->dirty & STACK_DIRTY)) {
-        stack->dirty = STACK_DIRTY;
+    if (RELAXED_LOAD(&stack->dirty) == 0) {
+        RELAXED_STORE(&stack->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)stack);
     }
 
