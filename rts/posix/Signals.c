@@ -155,7 +155,6 @@ ioManagerWakeup (void)
 {
     int r;
     const int wakeup_fd = RELAXED_LOAD(&io_manager_wakeup_fd);
-    TSAN_ANNOTATE_BENIGN_RACE(&io_manager_wakeup_fd, "ioManagerWakeup (TODO)");
     // Wake up the IO Manager thread by sending a byte down its pipe
     if (wakeup_fd >= 0) {
 #if defined(HAVE_EVENTFD)
