@@ -7,6 +7,7 @@ Handles @deriving@ clauses on @data@ declarations.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module TcDeriv ( tcDeriving, DerivInfo(..) ) where
@@ -98,10 +99,6 @@ data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
         -- GivenTheta ds => the exact context for the instance is supplied
         --                  by the programmer; it is ds_theta
         -- See Note [Inferring the instance context] in TcDerivInfer
-
-earlyDSLoc :: EarlyDerivSpec -> SrcSpan
-earlyDSLoc (InferTheta spec) = ds_loc spec
-earlyDSLoc (GivenTheta spec) = ds_loc spec
 
 splitEarlyDerivSpec :: [EarlyDerivSpec]
                     -> ([DerivSpec [ThetaOrigin]], [DerivSpec ThetaType])
@@ -216,13 +213,10 @@ tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
 tcDeriving deriv_infos deriv_decls
   = recoverM (do { g <- getGblEnv
                  ; return (g, emptyBag, emptyValBindsOut)}) $
-    do  {       -- Fish the "deriving"-related information out of the TcEnv
-                -- And make the necessary "equations".
-          is_boot <- tcIsHsBootOrSig
-        ; traceTc "tcDeriving" (ppr is_boot)
-
-        ; early_specs <- makeDerivSpecs is_boot deriv_infos deriv_decls
-        ; traceTc "tcDeriving 1" (ppr early_specs)
+    do  { -- Fish the "deriving"-related information out of the TcEnv
+          -- And make the necessary "equations".
+          early_specs <- makeDerivSpecs deriv_infos deriv_decls
+        ; traceTc "tcDeriving" (ppr early_specs)
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
         ; insts1 <- mapM genInst given_specs
@@ -260,8 +254,7 @@ tcDeriving deriv_infos deriv_decls
         ; inst_infos2 <- apply_inst_infos mk_inst_infos2 final_specs
         ; let inst_infos = inst_infos1 ++ inst_infos2
 
-        ; (inst_info, rn_binds, rn_dus) <-
-            renameDeriv is_boot inst_infos binds
+        ; (inst_info, rn_binds, rn_dus) <- renameDeriv inst_infos binds
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -297,19 +290,10 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
       equals <+> ppr rhs
   where rhs = famInstRHS fi
 
-renameDeriv :: Bool
-            -> [InstInfo GhcPs]
+renameDeriv :: [InstInfo GhcPs]
             -> Bag (LHsBind GhcPs, LSig GhcPs)
             -> TcM (Bag (InstInfo GhcRn), HsValBinds GhcRn, DefUses)
-renameDeriv is_boot inst_infos bagBinds
-  | is_boot     -- If we are compiling a hs-boot file, don't generate any derived bindings
-                -- The inst-info bindings will all be empty, but it's easier to
-                -- just use rn_inst_info to change the type appropriately
-  = do  { (rn_inst_infos, fvs) <- mapAndUnzipM rn_inst_info inst_infos
-        ; return ( listToBag rn_inst_infos
-                 , emptyValBindsOut, usesOnly (plusFVs fvs)) }
-
-  | otherwise
+renameDeriv inst_infos bagBinds
   = discardWarnings $
     -- Discard warnings about unused bindings etc
     setXOptM LangExt.EmptyCase $
@@ -489,11 +473,10 @@ in derived code.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 -}
 
-makeDerivSpecs :: Bool
-               -> [DerivInfo]
+makeDerivSpecs :: [DerivInfo]
                -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
-makeDerivSpecs is_boot deriv_infos deriv_decls
+makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
                      [ deriveClause rep_tc scoped_tvs dcs preds err_ctxt
                      | DerivInfo { di_rep_tc = rep_tc
@@ -505,17 +488,7 @@ makeDerivSpecs is_boot deriv_infos deriv_decls
                          <- clauses
                      ]
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
-        ; let eqns = concat eqns1 ++ catMaybes eqns2
-
-        ; if is_boot then   -- No 'deriving' at all in hs-boot files
-              do { unless (null eqns) (add_deriv_err (head eqns))
-                 ; return [] }
-          else return eqns }
-  where
-    add_deriv_err eqn
-       = setSrcSpan (earlyDSLoc eqn) $
-         addErr (hang (text "Deriving not permitted in hs-boot file")
-                    2 (text "Use an instance declaration instead"))
+        ; return $ concat eqns1 ++ catMaybes eqns2 }
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
@@ -1339,14 +1312,14 @@ mkDataTypeEqn
        let bale_out msg = do err <- derivingThingErrM False msg
                              lift $ failWithTc err
        case mb_strat of
-         Just StockStrategy    -> mk_eqn_stock    mk_originative_eqn bale_out
-         Just AnyclassStrategy -> mk_eqn_anyclass mk_originative_eqn bale_out
+         Just StockStrategy    -> mk_eqn_stock    bale_out
+         Just AnyclassStrategy -> mk_eqn_anyclass bale_out
          Just (ViaStrategy ty) -> mk_eqn_via ty
          -- GeneralizedNewtypeDeriving makes no sense for non-newtypes
          Just NewtypeStrategy  -> bale_out gndNonNewtypeErr
          -- Lacking a user-requested deriving strategy, we will try to pick
          -- between the stock or anyclass strategies
-         Nothing -> mk_eqn_no_mechanism mk_originative_eqn bale_out
+         Nothing               -> mk_eqn_no_mechanism bale_out
 
 -- Derive an instance by way of an originative deriving strategy
 -- (stock or anyclass).
@@ -1460,6 +1433,8 @@ mk_coerce_based_eqn mk_mechanism coerced_ty
        lift $ traceTc "newtype deriving:" $
          ppr tycon <+> ppr (rep_tys coerced_ty) <+> ppr inferred_thetas
        let mechanism = mk_mechanism coerced_ty
+
+           bale_out :: SDoc -> DerivM a
            bale_out msg = do err <- derivingThingErrMechanism mechanism msg
                              lift $ failWithTc err
        atf_coerce_based_error_checks cls bale_out
@@ -1492,7 +1467,7 @@ mk_coerce_based_eqn mk_mechanism coerced_ty
 -- See Note [GND and associated type families]
 atf_coerce_based_error_checks
   :: Class
-  -> (SDoc -> DerivM ())
+  -> (forall a. SDoc -> DerivM a)
   -> DerivM ()
 atf_coerce_based_error_checks cls bale_out
   = let cls_tyvars = classTyVars cls
@@ -1540,10 +1515,9 @@ atf_coerce_based_error_checks cls bale_out
            <+> text "in a kind, which is not (yet) allowed")
     in unless ats_look_sensible $ bale_out cant_derive_err
 
-mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-             -> (SDoc -> DerivM EarlyDerivSpec)
+mk_eqn_stock :: (forall a. SDoc -> DerivM a)
              -> DerivM EarlyDerivSpec
-mk_eqn_stock go_for_it bale_out
+mk_eqn_stock bale_out
   = do DerivEnv { denv_tc      = tc
                 , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
@@ -1552,17 +1526,16 @@ mk_eqn_stock go_for_it bale_out
        dflags <- getDynFlags
        case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
                                            tc rep_tc of
-         CanDeriveStock gen_fn -> go_for_it $ DerivSpecStock gen_fn
+         CanDeriveStock gen_fn -> mk_originative_eqn $ DerivSpecStock gen_fn
          StockClassError msg   -> bale_out msg
          _                     -> bale_out (nonStdErr cls)
 
-mk_eqn_anyclass :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-                -> (SDoc -> DerivM EarlyDerivSpec)
+mk_eqn_anyclass :: (forall a. SDoc -> DerivM a)
                 -> DerivM EarlyDerivSpec
-mk_eqn_anyclass go_for_it bale_out
+mk_eqn_anyclass bale_out
   = do dflags <- getDynFlags
        case canDeriveAnyClass dflags of
-         IsValid      -> go_for_it DerivSpecAnyClass
+         IsValid      -> mk_originative_eqn DerivSpecAnyClass
          NotValid msg -> bale_out msg
 
 mk_eqn_newtype :: Type -- The newtype's representation type
@@ -1573,10 +1546,9 @@ mk_eqn_via :: Type -- The @via@ type
            -> DerivM EarlyDerivSpec
 mk_eqn_via = mk_coerce_based_eqn DerivSpecVia
 
-mk_eqn_no_mechanism :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-                    -> (SDoc -> DerivM EarlyDerivSpec)
+mk_eqn_no_mechanism :: (forall a. SDoc -> DerivM a)
                     -> DerivM EarlyDerivSpec
-mk_eqn_no_mechanism go_for_it bale_out
+mk_eqn_no_mechanism bale_out
   = do DerivEnv { denv_tc      = tc
                 , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
@@ -1599,8 +1571,8 @@ mk_eqn_no_mechanism go_for_it bale_out
            -- checkOriginativeSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            StockClassError msg     -> bale_out msg
-           CanDeriveStock gen_fn   -> go_for_it $ DerivSpecStock gen_fn
-           CanDeriveAnyClass       -> go_for_it DerivSpecAnyClass
+           CanDeriveStock gen_fn   -> mk_originative_eqn $ DerivSpecStock gen_fn
+           CanDeriveAnyClass       -> mk_originative_eqn DerivSpecAnyClass
 
 {-
 ************************************************************************
@@ -1625,7 +1597,11 @@ mkNewTypeEqn
 
        let newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
            deriveAnyClass    = xopt LangExt.DeriveAnyClass             dflags
-           bale_out        = bale_out' newtype_deriving
+
+           bale_out :: SDoc -> DerivM a
+           bale_out = bale_out' newtype_deriving
+
+           bale_out' :: Bool -> SDoc -> DerivM a
            bale_out' b msg = do err <- derivingThingErrM b msg
                                 lift $ failWithTc err
 
@@ -1705,8 +1681,8 @@ mkNewTypeEqn
 
        MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
        case mb_strat of
-         Just StockStrategy    -> mk_eqn_stock    mk_originative_eqn bale_out
-         Just AnyclassStrategy -> mk_eqn_anyclass mk_originative_eqn bale_out
+         Just StockStrategy    -> mk_eqn_stock    bale_out
+         Just AnyclassStrategy -> mk_eqn_anyclass bale_out
          Just NewtypeStrategy  ->
            -- Since the user explicitly asked for GeneralizedNewtypeDeriving,
            -- we don't need to perform all of the checks we normally would,
