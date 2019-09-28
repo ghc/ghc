@@ -145,9 +145,9 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
     to = alloc_for_copy(size,gen_no);
 
     from = (StgPtr)src;
-    to[0] = (W_)info;
+    RELAXED_STORE(&to[0], (W_)info);
     for (i = 1; i < size; i++) { // unroll for small i
-        to[i] = from[i];
+        RELAXED_STORE(&to[i], from[i]);
     }
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
@@ -172,7 +172,11 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #endif
             return evacuate(p); // does the failed_to_evac stuff
         } else {
-            *p = TAG_CLOSURE(tag,(StgClosure*)to);
+            // This doesn't need to have RELEASE ordering since we are guaranteed
+            // to scavenge the to-space object on the current core therefore
+            // no-one else will follow this pointer (FIXME: Is this true in
+            // light of the selector optimization?).
+            RELAXED_STORE(p, TAG_CLOSURE(tag,(StgClosure*)to));
         }
     }
 #else
@@ -262,9 +266,8 @@ spin:
         to[i] = from[i];
     }
 
-    write_barrier();
-    *p = (StgClosure *)to;
-    src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
+    RELEASE_STORE(p, (StgClosure *) to);
+    RELEASE_STORE(&src->header.info, (const StgInfoTable*)MK_FORWARDING_PTR(to));
 
 #if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
@@ -307,8 +310,8 @@ evacuate_large(StgPtr p)
   gen_workspace *ws;
 
   bd = Bdescr(p);
-  gen = bd->gen;
-  gen_no = bd->gen_no;
+  gen = RELAXED_LOAD(&bd->gen);
+  gen_no = RELAXED_LOAD(&bd->gen_no);
   ACQUIRE_SPIN_LOCK(&gen->sync);
 
   // already evacuated?
@@ -582,7 +585,7 @@ evacuate(StgClosure **p)
   const StgInfoTable *info;
   StgWord tag;
 
-  q = *p;
+  q = RELAXED_LOAD(p);
 
 loop:
   /* The tag and the pointer are split, to be merged after evacing */
@@ -725,7 +728,7 @@ loop:
       StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
       *p = TAG_CLOSURE(tag,e);
       if (gen_no < gct->evac_gen_no) {  // optimisation
-          if (Bdescr((P_)e)->gen_no < gct->evac_gen_no) {
+          if (RELAXED_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
               TICK_GC_FAILED_PROMOTION();
           }
@@ -815,7 +818,7 @@ loop:
       const StgInfoTable *i;
       r = ((StgInd*)q)->indirectee;
       if (GET_CLOSURE_TAG(r) == 0) {
-          i = r->header.info;
+          i = RELAXED_LOAD(&r->header.info);
           if (IS_FORWARDING_PTR(i)) {
               r = (StgClosure *)UN_FORWARDING_PTR(i);
               i = r->header.info;
@@ -1016,7 +1019,7 @@ evacuate_BLACKHOLE(StgClosure **p)
         return;
     }
     gen_no = bd->dest_no;
-    info = q->header.info;
+    info = RELAXED_LOAD(&q->header.info);
     if (IS_FORWARDING_PTR(info))
     {
         StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
@@ -1226,7 +1229,7 @@ selector_loop:
     // from-space during marking, for example.  We rely on the property
     // that evacuate() doesn't mind if it gets passed a to-space pointer.
 
-    info = (StgInfoTable*)selectee->header.info;
+    info = RELAXED_LOAD((StgInfoTable**) &selectee->header.info);
 
     if (IS_FORWARDING_PTR(info)) {
         // We don't follow pointers into to-space; the constructor
@@ -1333,10 +1336,10 @@ selector_loop:
           // establish whether this BH has been updated, and is now an
           // indirection, as in evacuate().
           if (GET_CLOSURE_TAG(r) == 0) {
-              i = r->header.info;
+              i = RELAXED_LOAD(&r->header.info);
               if (IS_FORWARDING_PTR(i)) {
                   r = (StgClosure *)UN_FORWARDING_PTR(i);
-                  i = r->header.info;
+                  i = RELAXED_LOAD(&r->header.info);
               }
               if (i == &stg_TSO_info
                   || i == &stg_WHITEHOLE_info
