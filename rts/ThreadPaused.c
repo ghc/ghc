@@ -331,7 +331,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             if (cur_bh_info != bh_info) {
                 bh_info = cur_bh_info;
 #if defined(PROF_SPIN)
-                ++whitehole_threadPaused_spin;
+                NONATOMIC_ADD(&whitehole_threadPaused_spin, 1);
 #endif
                 busy_wait_nop();
                 goto retry;
