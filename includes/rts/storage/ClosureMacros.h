@@ -46,7 +46,7 @@
    -------------------------------------------------------------------------- */
 
 INLINE_HEADER void SET_INFO(StgClosure *c, const StgInfoTable *info) {
-    c->header.info = info;
+    RELAXED_STORE(&c->header.info, info);
 }
 INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
     return c->header.info;
