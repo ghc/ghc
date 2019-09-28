@@ -129,7 +129,7 @@ download_tarballs() {
 
 download_i386() {
     mingw_arch="i686"
-    tarball_dest_dir="mingw-w64/x86"
+    tarball_dest_dir="mingw-w64/i686"
     download_tarballs
 }
 
@@ -228,12 +228,13 @@ usage() {
     echo
     echo "Where <action> is one of,"
     echo ""
-    echo "    download     download the necessary tarballs for the given architecture"
-    echo "    fetch        download the necessary tarballs for the given architecture but doesn't verify their md5."
-    echo "    verify       verify the existence and correctness of the necessary tarballs"
-    echo "    patch        jailbreak the binaries in the tarballs and remove MAX_PATH limitations."
-    echo "    hash         generate md5 hashes for inclusion in win32-tarballs.md5sum"
-    echo "    sync         upload packages downloaded with 'fetch mirror' to haskell.org"
+    echo "    download   download the necessary tarballs for the given architecture"
+    echo "    fetch      download the necessary tarballs for the given architecture but doesn't verify their md5."
+    echo "    grab       download the necessary tarballs using patched toolchains for the given architecture but doesn't verify their md5."
+    echo "    verify     verify the existence and correctness of the necessary tarballs"
+    echo "    patch      jailbreak the binaries in the tarballs and remove MAX_PATH limitations."
+    echo "    hash       generate md5 hashes for inclusion in win32-tarballs.md5sum"
+    echo "    sync       upload packages downloaded with 'fetch mirror' to haskell.org"
     echo ""
     echo "and <arch> is one of i386, x86_64,all or mirror (which includes sources)"
 }
@@ -245,6 +246,10 @@ case $1 in
         sigs=0
         ;;
     fetch)
+        download=1
+        verify=0
+        ;;
+    grab)
         download=1
         verify=0
         pkg_variant="any"
