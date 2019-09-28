@@ -247,7 +247,7 @@ exitStablePtrTable(void)
 STATIC_INLINE void
 freeSpEntry(spEntry *sp)
 {
-    sp->addr = (P_)stable_ptr_free;
+    RELAXED_STORE(&sp->addr, (P_)stable_ptr_free);
     stable_ptr_free = sp;
 }
 
@@ -279,7 +279,7 @@ getStablePtr(StgPtr p)
   if (!stable_ptr_free) enlargeStablePtrTable();
   sp = stable_ptr_free - stable_ptr_table;
   stable_ptr_free  = (spEntry*)(stable_ptr_free->addr);
-  stable_ptr_table[sp].addr = p;
+  RELAXED_STORE(&stable_ptr_table[sp].addr, p);
   stablePtrUnlock();
   return (StgStablePtr)(sp);
 }
