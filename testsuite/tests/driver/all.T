@@ -143,7 +143,7 @@ test('rtsopts002', normal, makefile_test, [])
 
 test('withRtsOpts', [], makefile_test, [])
 
-test('T3389', when(arch('i386'), expect_broken_for(17256, prof_ways)), compile_and_run, [''])
+test('T3389', when(arch('i386'), expect_broken_for(17256, ['hpc'] + prof_ways)), compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
 
 # T4437: A test to ensure that Cabal's language extension list remains
