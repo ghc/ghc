@@ -93,9 +93,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     StgWord size;
     uint32_t n, i;
 
-    ASSERT(n_finalizers == 0);
+    ASSERT(SEQ_CST_LOAD(&n_finalizers) == 0);
 
-    finalizer_list = list;
+    SEQ_CST_STORE(&finalizer_list, list);
 
     // Traverse the list and
     //  * count the number of Haskell finalizers
@@ -130,7 +130,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 
-    n_finalizers = i;
+    SEQ_CST_STORE(&n_finalizers, i);
 
     // No Haskell finalizers to run?
     if (n == 0) return;
@@ -216,7 +216,7 @@ static volatile StgWord finalizer_lock = 0;
 //
 bool runSomeFinalizers(bool all)
 {
-    if (n_finalizers == 0)
+    if (RELAXED_LOAD(&n_finalizers) == 0)
         return false;
 
     if (cas(&finalizer_lock, 0, 1) != 0) {
@@ -242,17 +242,15 @@ bool runSomeFinalizers(bool all)
         if (!all && count >= finalizer_chunk) break;
     }
 
-    finalizer_list = w;
-    n_finalizers -= count;
+    RELAXED_STORE(&finalizer_list, w);
+    NONATOMIC_ADD(&n_finalizers, -count);
 
     if (task != NULL) {
         task->running_finalizers = false;
     }
 
     debugTrace(DEBUG_sched, "ran %d C finalizers", count);
-
-    write_barrier();
-    finalizer_lock = 0;
-
-    return n_finalizers != 0;
+    bool ret = n_finalizers != 0;
+    RELEASE_STORE(&finalizer_lock, 0);
+    return ret;
 }
