@@ -1,0 +1,11 @@
+-- Testing :doc command simply
+
+:load ghci065
+
+:doc Data1
+:doc Val2a
+:doc Val2b
+
+:doc func1
+:doc func2
+:doc func3
