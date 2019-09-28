@@ -57,8 +57,7 @@ runAllCFinalizers(StgWeak *list)
         // If there's no major GC between the time that the finalizer for the
         // object from the oldest generation is manually called and shutdown
         // we end up running the same finalizer twice. See #7170.
-        const StgInfoTable *winfo = w->header.info;
-        load_load_barrier();
+        const StgInfoTable *winfo = ACQUIRE_LOAD(&w->header.info);
         if (winfo != &stg_DEAD_WEAK_info) {
             runCFinalizers((StgCFinalizerList *)w->cfinalizers);
         }
@@ -93,10 +92,10 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     StgWord size;
     uint32_t n, i;
 
-    // This assertion does not hold with non-moving collection because
-    // non-moving collector does not wait for the list to be consumed (by
-    // doIdleGcWork()) before appending the list with more finalizers.
-    ASSERT(RtsFlags.GcFlags.useNonmoving || n_finalizers == 0);
+    // n_finalizers is not necessarily zero under non-moving collection
+    // because non-moving collector does not wait for the list to be consumed
+    // (by doIdleGcWork()) before appending the list with more finalizers.
+    ASSERT(RtsFlags.GcFlags.useNonmoving || SEQ_CST_LOAD(&n_finalizers) == 0);
 
     // Append finalizer_list with the new list. TODO: Perhaps cache tail of the
     // list for faster append. NOTE: We can't append `list` here! Otherwise we
@@ -105,7 +104,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     while (*tl) {
         tl = &(*tl)->link;
     }
-    *tl = list;
+    SEQ_CST_STORE(tl, list);
 
     // Traverse the list and
     //  * count the number of Haskell finalizers
@@ -140,7 +139,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 
-    n_finalizers += i;
+    SEQ_CST_ADD(&n_finalizers, i);
 
     // No Haskell finalizers to run?
     if (n == 0) return;
@@ -226,7 +225,7 @@ static volatile StgWord finalizer_lock = 0;
 //
 bool runSomeFinalizers(bool all)
 {
-    if (n_finalizers == 0)
+    if (RELAXED_LOAD(&n_finalizers) == 0)
         return false;
 
     if (cas(&finalizer_lock, 0, 1) != 0) {
@@ -252,17 +251,15 @@ bool runSomeFinalizers(bool all)
         if (!all && count >= finalizer_chunk) break;
     }
 
-    finalizer_list = w;
-    n_finalizers -= count;
+    RELAXED_STORE(&finalizer_list, w);
+    SEQ_CST_ADD(&n_finalizers, -count);
 
     if (task != NULL) {
         task->running_finalizers = false;
     }
 
     debugTrace(DEBUG_sched, "ran %d C finalizers", count);
-
-    write_barrier();
-    finalizer_lock = 0;
-
-    return n_finalizers != 0;
+    bool ret = n_finalizers != 0;
+    RELEASE_STORE(&finalizer_lock, 0);
+    return ret;
 }
