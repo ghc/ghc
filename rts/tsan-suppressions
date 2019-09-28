@@ -1,0 +1,6 @@
+# This is a known race but is benign
+race:capability_is_busy
+
+# This appears to be a TSAN bug
+race:eventfd
+race:write
