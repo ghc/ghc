@@ -416,7 +416,7 @@ recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
         cap->mut_lists[gen] = bd;
     }
     RELAXED_STORE(bd->free, (StgWord) p);
-    NONATOMIC_ADD(&bd->free, sizeof(StgWord));
+    NONATOMIC_ADD(&bd->free, 1);
 }
 
 EXTERN_INLINE void
