@@ -148,7 +148,7 @@ parse dflags fpath bs = case unP (go False []) initState of
 
 -- | Get the input
 getInput :: P (StringBuffer, RealSrcLoc)
-getInput = P $ \p @ PState { buffer = buf, loc = srcLoc } -> POk p (buf, srcLoc)
+getInput = P $ \p@PState { buffer = buf, loc = srcLoc } -> POk p (buf, srcLoc)
 
 -- | Set the input
 setInput :: (StringBuffer, RealSrcLoc) -> P ()

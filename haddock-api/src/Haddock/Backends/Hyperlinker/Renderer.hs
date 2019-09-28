@@ -88,14 +88,14 @@ renderWithAst srcs Node{..} toks = anchored $ case toks of
     -- order to make sure these get hyperlinked properly, we intercept these
     -- special sequences of tokens and merge them into just one identifier or
     -- operator token.
-    [BacktickTok s1, tok @ Token{ tkType = TkIdentifier }, BacktickTok s2]
+    [BacktickTok s1, tok@Token{ tkType = TkIdentifier }, BacktickTok s2]
           | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
           , realSrcSpanEnd s2   == realSrcSpanEnd nodeSpan
           -> richToken srcs nodeInfo
                        (Token{ tkValue = "`" <> tkValue tok <> "`"
                              , tkType = TkOperator
                              , tkSpan = nodeSpan })
-    [OpenParenTok s1, tok @ Token{ tkType = TkOperator }, CloseParenTok s2]
+    [OpenParenTok s1, tok@Token{ tkType = TkOperator }, CloseParenTok s2]
           | realSrcSpanStart s1 == realSrcSpanStart nodeSpan
           , realSrcSpanEnd s2   == realSrcSpanEnd nodeSpan
           -> richToken srcs nodeInfo
