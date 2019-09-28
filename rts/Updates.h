@@ -84,7 +84,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         updateRemembSetPushThunk(cap, (StgThunk*)p1);
     }
-    ((StgInd *)p1)->indirectee = p2;
+    RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
     write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
