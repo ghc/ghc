@@ -412,8 +412,7 @@ markWeakPtrList ( void )
 #if defined(DEBUG)
             {   // careful to do this assertion only reading the info ptr
                 // once, because during parallel GC it might change under our feet.
-                const StgInfoTable *info;
-                info = w->header.info;
+                const StgInfoTable *info = RELAXED_LOAD(&w->header.info);
                 ASSERT(IS_FORWARDING_PTR(info)
                        || info == &stg_DEAD_WEAK_info
                        || INFO_PTR_TO_STRUCT(info)->type == WEAK);
