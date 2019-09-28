@@ -191,9 +191,10 @@ enlargeStablePtrTable(void)
 
     /* When using the threaded RTS, the update of stable_ptr_table is assumed to
      * be atomic, so that another thread simultaneously dereferencing a stable
-     * pointer will always read a valid address.
+     * pointer will always read a valid address. Release ordering to ensure
+     * that the new table is visible to others.
      */
-    stable_ptr_table = new_stable_ptr_table;
+    RELEASE_STORE(&stable_ptr_table, new_stable_ptr_table);
 
     initSpEntryFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
 }
@@ -247,7 +248,7 @@ exitStablePtrTable(void)
 STATIC_INLINE void
 freeSpEntry(spEntry *sp)
 {
-    sp->addr = (P_)stable_ptr_free;
+    RELAXED_STORE(&sp->addr, (P_)stable_ptr_free);
     stable_ptr_free = sp;
 }
 
@@ -279,7 +280,7 @@ getStablePtr(StgPtr p)
   if (!stable_ptr_free) enlargeStablePtrTable();
   sp = stable_ptr_free - stable_ptr_table;
   stable_ptr_free  = (spEntry*)(stable_ptr_free->addr);
-  stable_ptr_table[sp].addr = p;
+  RELAXED_STORE(&stable_ptr_table[sp].addr, p);
   stablePtrUnlock();
   return (StgStablePtr)(sp);
 }
