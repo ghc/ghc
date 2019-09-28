@@ -47,10 +47,10 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
         for (i = 0; i < SPIN_COUNT; i++) {
             r = cas((StgVolatilePtr)&(p->lock), 1, 0);
             if (r != 0) return;
-            __atomic_fetch_add(&p->spin, 1, __ATOMIC_RELAXED);
+            NONATOMIC_ADD(&p->spin, 1);
             busy_wait_nop();
         }
-        __atomic_fetch_add(&p->yield, 1, __ATOMIC_RELAXED);
+        NONATOMIC_ADD(&p->yield, 1);
         yieldThread();
     } while (1);
 }
