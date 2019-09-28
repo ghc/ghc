@@ -378,7 +378,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     Capability *cap = regTableToCapability(reg);
     StgInd *bh;
 
-    orig_info = caf->header.info;
+    orig_info = RELAXED_LOAD(&caf->header.info);
 
 #if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
@@ -409,12 +409,11 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
-    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
-    write_barrier();
 
-    caf->indirectee = (StgClosure *)bh;
-    write_barrier();
-    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
+    // RELEASE ordering to ensure that above writes are visible before we
+    // introduce reference as CAF indirectee.
+    RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
+    SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;
 }
@@ -1085,9 +1084,9 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
-        recordClosureMutated(cap,p);
+    if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
+        SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
+        recordClosureMutated(cap, (StgClosure *) mvar);
     }
 }
 
@@ -1096,8 +1095,8 @@ dirty_TVAR(Capability *cap, StgTVar *p)
 {
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (p->header.info == &stg_TVAR_CLEAN_info) {
-        p->header.info = &stg_TVAR_DIRTY_info;
+    if (RELAXED_LOAD(&p->header.info) == &stg_TVAR_CLEAN_info) {
+        SET_INFO((StgClosure*) p, &stg_TVAR_DIRTY_info);
         recordClosureMutated(cap,(StgClosure*)p);
     }
 }
@@ -1110,8 +1109,8 @@ dirty_TVAR(Capability *cap, StgTVar *p)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->_link = target;
@@ -1120,8 +1119,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->block_info.prev = target;
@@ -1130,8 +1129,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    if (tso->dirty == 0) {
-        tso->dirty = 1;
+    if (RELAXED_LOAD(&tso->dirty) == 0) {
+        RELAXED_STORE(&tso->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)tso);
     }
 }
@@ -1139,8 +1138,8 @@ dirty_TSO (Capability *cap, StgTSO *tso)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
-    if (stack->dirty == 0) {
-        stack->dirty = 1;
+    if (RELAXED_LOAD(&stack->dirty) == 0) {
+        RELAXED_STORE(&stack->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)stack);
     }
 }
