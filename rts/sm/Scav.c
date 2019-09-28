@@ -200,9 +200,9 @@ scavenge_compact(StgCompactNFData *str)
 
     gct->eager_promotion = saved_eager;
     if (gct->failed_to_evac) {
-        ((StgClosure *)str)->header.info = &stg_COMPACT_NFDATA_DIRTY_info;
+        RELAXED_STORE(&((StgClosure *)str)->header.info, &stg_COMPACT_NFDATA_DIRTY_info);
     } else {
-        ((StgClosure *)str)->header.info = &stg_COMPACT_NFDATA_CLEAN_info;
+        RELAXED_STORE(&((StgClosure *)str)->header.info, &stg_COMPACT_NFDATA_CLEAN_info);
     }
 }
 
@@ -463,9 +463,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            mvar->header.info = &stg_MVAR_DIRTY_info;
+            RELAXED_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
         } else {
-            mvar->header.info = &stg_MVAR_CLEAN_info;
+            RELAXED_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
         }
         p += sizeofW(StgMVar);
         break;
@@ -480,9 +480,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            tvar->header.info = &stg_TVAR_DIRTY_info;
+            RELAXED_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
         } else {
-            tvar->header.info = &stg_TVAR_CLEAN_info;
+            RELAXED_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
         }
         p += sizeofW(StgTVar);
         break;
@@ -614,9 +614,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_CLEAN_info);
         }
         p += sizeofW(StgMutVar);
         break;
@@ -633,9 +633,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
         } else {
-            bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
         }
         p += sizeofW(StgBlockingQueue);
         break;
@@ -685,9 +685,9 @@ scavenge_block (bdescr *bd)
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->eager_promotion = saved_eager_promotion;
@@ -702,9 +702,9 @@ scavenge_block (bdescr *bd)
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -727,9 +727,9 @@ scavenge_block (bdescr *bd)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->failed_to_evac = true; // always put it on the mutable list.
@@ -748,9 +748,9 @@ scavenge_block (bdescr *bd)
         }
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -888,9 +888,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                mvar->header.info = &stg_MVAR_DIRTY_info;
+                RELAXED_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
             } else {
-                mvar->header.info = &stg_MVAR_CLEAN_info;
+                RELAXED_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
             }
             break;
         }
@@ -904,9 +904,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                tvar->header.info = &stg_TVAR_DIRTY_info;
+                RELAXED_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
             } else {
-                tvar->header.info = &stg_TVAR_CLEAN_info;
+                RELAXED_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
             }
             break;
         }
@@ -1010,9 +1010,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_VAR_CLEAN_info);
             }
             break;
         }
@@ -1029,9 +1029,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager_promotion;
 
             if (gct->failed_to_evac) {
-                bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+                RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
             } else {
-                bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+                RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
             }
             break;
         }
@@ -1077,9 +1077,9 @@ scavenge_mark_stack(void)
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
             }
 
             gct->eager_promotion = saved_eager_promotion;
@@ -1096,9 +1096,9 @@ scavenge_mark_stack(void)
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+                RELAXED_STORE(&((StgClosure *) q)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
             }
             break;
         }
@@ -1123,9 +1123,9 @@ scavenge_mark_stack(void)
             gct->eager_promotion = saved_eager;
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+                RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+                RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
             }
 
             gct->failed_to_evac = true; // mutable anyhow.
@@ -1144,9 +1144,9 @@ scavenge_mark_stack(void)
             }
 
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+                RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
             } else {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+                RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
             }
             break;
         }
@@ -1250,9 +1250,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            mvar->header.info = &stg_MVAR_DIRTY_info;
+            RELAXED_STORE(&mvar->header.info, &stg_MVAR_DIRTY_info);
         } else {
-            mvar->header.info = &stg_MVAR_CLEAN_info;
+            RELAXED_STORE(&mvar->header.info, &stg_MVAR_CLEAN_info);
         }
         break;
     }
@@ -1266,9 +1266,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            tvar->header.info = &stg_TVAR_DIRTY_info;
+            RELAXED_STORE(&tvar->header.info, &stg_TVAR_DIRTY_info);
         } else {
-            tvar->header.info = &stg_TVAR_CLEAN_info;
+            RELAXED_STORE(&tvar->header.info, &stg_TVAR_CLEAN_info);
         }
         break;
     }
@@ -1330,9 +1330,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_MUT_VAR_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_MUT_VAR_CLEAN_info);
         }
         break;
     }
@@ -1349,9 +1349,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
         } else {
-            bq->header.info = &stg_BLOCKING_QUEUE_CLEAN_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_CLEAN_info);
         }
         break;
     }
@@ -1397,9 +1397,9 @@ scavenge_one(StgPtr p)
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->eager_promotion = saved_eager_promotion;
@@ -1414,9 +1414,9 @@ scavenge_one(StgPtr p)
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -1441,9 +1441,9 @@ scavenge_one(StgPtr p)
         gct->eager_promotion = saved_eager;
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_CLEAN_info);
         }
 
         gct->failed_to_evac = true;
@@ -1462,9 +1462,9 @@ scavenge_one(StgPtr p)
         }
 
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info);
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+            RELAXED_STORE(&((StgClosure *)q)->header.info, &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info);
         }
         break;
     }
@@ -1646,9 +1646,9 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 scavenge_mut_arr_ptrs_marked((StgMutArrPtrs *)p);
 
                 if (gct->failed_to_evac) {
-                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
+                    RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_DIRTY_info);
                 } else {
-                    ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
+                    RELAXED_STORE(&((StgClosure *)p)->header.info, &stg_MUT_ARR_PTRS_CLEAN_info);
                 }
 
                 gct->eager_promotion = saved_eager_promotion;
