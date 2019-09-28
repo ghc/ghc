@@ -134,10 +134,10 @@ sigNameNoLoc _                             = []
 
 -- | Was this signature given by the user?
 isUserLSig :: LSig name -> Bool
-isUserLSig (L _(TypeSig {}))    = True
-isUserLSig (L _(ClassOpSig {})) = True
-isUserLSig (L _(PatSynSig {}))  = True
-isUserLSig _                    = False
+isUserLSig (L _ (TypeSig {}))    = True
+isUserLSig (L _ (ClassOpSig {})) = True
+isUserLSig (L _ (PatSynSig {}))  = True
+isUserLSig _                     = False
 
 
 isClassD :: HsDecl a -> Bool
