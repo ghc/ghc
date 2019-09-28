@@ -14,12 +14,12 @@
 #endif
 
 #ifdef TSAN_ENABLED
-#define TSAN_ANNOTATE_HAPPENS_BEFORE(addr)                  \
-  AnnotateHappensBefore(__FILE__, __LINE__, (void*)(addr))
-#define TSAN_ANNOTATE_HAPPENS_AFTER(addr)                   \
-  AnnotateHappensAfter(__FILE__, __LINE__, (void*)(addr))
-#define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)                \
-  AnnotateBenignRaceSized(__FILE__, __LINE__, (void*)(addr), sizeof(*addr), desc)
+#define TSAN_ANNOTATE_HAPPENS_BEFORE(addr)                              \
+    AnnotateHappensBefore(__FILE__, __LINE__, (void*)(addr))
+#define TSAN_ANNOTATE_HAPPENS_AFTER(addr)                               \
+    AnnotateHappensAfter(__FILE__, __LINE__, (void*)(addr))
+#define TSAN_ANNOTATE_BENIGN_RACE_SIZED(addr,size,desc)                 \
+    AnnotateBenignRaceSized(__FILE__, __LINE__, (void*)(addr), size, desc)
 void AnnotateHappensBefore(const char* f, int l, void* addr);
 void AnnotateHappensAfter(const char* f, int l, void* addr);
 void AnnotateBenignRaceSized(const char *file,
@@ -30,5 +30,8 @@ void AnnotateBenignRaceSized(const char *file,
 #else
 #define TSAN_ANNOTATE_HAPPENS_BEFORE(addr)
 #define TSAN_ANNOTATE_HAPPENS_AFTER(addr)
-#define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)
+#define TSAN_ANNOTATE_BENIGN_RACE_SIZED(addr,size,desc)
 #endif
+
+#define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)                            \
+    TSAN_ANNOTATE_BENIGN_RACE_SIZED((void*)(addr), sizeof(*addr), desc)
