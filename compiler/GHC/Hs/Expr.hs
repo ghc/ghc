@@ -1154,6 +1154,10 @@ parenthesizeHsExpr p le@(L loc e)
   | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
 
+stripParensHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+stripParensHsExpr (L _ (HsPar _ e)) = stripParensHsExpr e
+stripParensHsExpr e = e
+
 isAtomicHsExpr :: HsExpr id -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})        = True
@@ -2304,8 +2308,7 @@ type instance XXSplice       (GhcPass _) = NoExtCon
 -- type captures explicitly how it was originally written, for use in the pretty
 -- printer.
 data SpliceDecoration
-  = HasParens -- ^ $( splice ) or $$( splice )
-  | HasDollar -- ^ $splice or $$splice
+  = HasDollar -- ^ $splice or $$splice
   | NoParens  -- ^ bare splice
   deriving (Data, Eq, Show)
 
@@ -2462,14 +2465,10 @@ ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
 pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
-pprSplice (HsTypedSplice _ HasParens  n e)
-  = ppr_splice (text "$$(") n e (text ")")
 pprSplice (HsTypedSplice _ HasDollar n e)
   = ppr_splice (text "$$") n e empty
 pprSplice (HsTypedSplice _ NoParens n e)
   = ppr_splice empty n e empty
-pprSplice (HsUntypedSplice _ HasParens  n e)
-  = ppr_splice (text "$(") n e (text ")")
 pprSplice (HsUntypedSplice _ HasDollar n e)
   = ppr_splice (text "$")  n e empty
 pprSplice (HsUntypedSplice _ NoParens n e)

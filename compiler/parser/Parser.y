@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 237 -- shift/reduce conflicts
+%expect 232 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -610,10 +610,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
 '|]'            { L _ (ITcloseQuote _) }
 '[||'           { L _ (ITopenTExpQuote _) }
 '||]'           { L _ ITcloseTExpQuote  }
-TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
-'$('            { L _ ITparenEscape   }     -- $( exp )
-TH_ID_TY_SPLICE { L _ (ITidTyEscape _)  }   -- $$x
-'$$('           { L _ ITparenTyEscape   }   -- $$( exp )
+PREFIX_DOLLAR   { L _ ITdollar }
+PREFIX_DOLLAR_DOLLAR { L _ ITdollardollar }
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
@@ -2857,22 +2855,15 @@ splice_exp :: { LHsExpr GhcPs }
         | splice_typed   { mapLoc (HsSpliceE noExtField) $1 }
 
 splice_untyped :: { Located (HsSplice GhcPs) }
-        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
-                                                           (getTH_ID_SPLICE $1)))))
-                                       [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
-                                   ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
-                                       [mj AnnOpenPE $1,mj AnnCloseP $3] }
+        : PREFIX_DOLLAR aexp2   {% runECP_P $2 >>= \ $2 ->
+                                   ams (sLL $1 $> $ mkUntypedSplice HasDollar $2)
+                                       [mj AnnDollar $1] }
 
 splice_typed :: { Located (HsSplice GhcPs) }
-        : TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkTypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
-                                                        (getTH_ID_TY_SPLICE $1)))))
-                                       [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
-                                    ams (sLL $1 $> $ mkTypedSplice HasParens $2)
-                                       [mj AnnOpenPTE $1,mj AnnCloseP $3] }
+        : PREFIX_DOLLAR_DOLLAR aexp2
+                                {% runECP_P $2 >>= \ $2 ->
+                                   ams (sLL $1 $> $ mkTypedSplice HasDollar $2)
+                                       [mj AnnDollarDollar $1] }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
         : cmdargs acmd                  { $2 : $1 }
@@ -3787,8 +3778,6 @@ getPRIMINTEGER  (dL->L _ (ITprimint  _ x)) = x
 getPRIMWORD     (dL->L _ (ITprimword _ x)) = x
 getPRIMFLOAT    (dL->L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (dL->L _ (ITprimdouble x)) = x
-getTH_ID_SPLICE (dL->L _ (ITidEscape x)) = x
-getTH_ID_TY_SPLICE (dL->L _ (ITidTyEscape x)) = x
 getINLINE       (dL->L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
