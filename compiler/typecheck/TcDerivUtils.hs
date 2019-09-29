@@ -10,7 +10,7 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 
 module TcDerivUtils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec,
+        DerivSpec(..), pprDerivSpec, DerivInstTys(..),
         DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
         isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
         DerivContext(..), OriginativeDerivStatus(..),
@@ -90,6 +90,7 @@ mkDerivOrigin standalone_wildcard
 
 -- | Contains all of the information known about a derived instance when
 -- determining what its @EarlyDerivSpec@ should be.
+-- See @Note [DerivEnv and DerivSpecMechanism]@.
 data DerivEnv = DerivEnv
   { denv_overlap_mode :: Maybe OverlapMode
     -- ^ Is this an overlapping instance?
@@ -97,19 +98,8 @@ data DerivEnv = DerivEnv
     -- ^ Universally quantified type variables in the instance
   , denv_cls          :: Class
     -- ^ Class for which we need to derive an instance
-  , denv_cls_tys      :: [Type]
-    -- ^ Other arguments to the class except the last
-  , denv_tc           :: TyCon
-    -- ^ Type constructor for which the instance is requested
-    --   (last arguments to the type class)
-  , denv_tc_args      :: [Type]
-    -- ^ Arguments to the type constructor
-  , denv_rep_tc       :: TyCon
-    -- ^ The representation tycon for 'denv_tc'
-    --   (for data family instances)
-  , denv_rep_tc_args  :: [Type]
-    -- ^ The representation types for 'denv_tc_args'
-    --   (for data family instances)
+  , denv_inst_tys     :: [Type]
+    -- ^ All arguments to to 'denv_cls' in the derived instance.
   , denv_ctxt         :: DerivContext
     -- ^ @'SupplyContext' theta@ for standalone deriving (where @theta@ is the
     --   context of the instance).
@@ -125,22 +115,14 @@ instance Outputable DerivEnv where
   ppr (DerivEnv { denv_overlap_mode = overlap_mode
                 , denv_tvs          = tvs
                 , denv_cls          = cls
-                , denv_cls_tys      = cls_tys
-                , denv_tc           = tc
-                , denv_tc_args      = tc_args
-                , denv_rep_tc       = rep_tc
-                , denv_rep_tc_args  = rep_tc_args
+                , denv_inst_tys     = inst_tys
                 , denv_ctxt         = ctxt
                 , denv_strat        = mb_strat })
     = hang (text "DerivEnv")
          2 (vcat [ text "denv_overlap_mode" <+> ppr overlap_mode
                  , text "denv_tvs"          <+> ppr tvs
                  , text "denv_cls"          <+> ppr cls
-                 , text "denv_cls_tys"      <+> ppr cls_tys
-                 , text "denv_tc"           <+> ppr tc
-                 , text "denv_tc_args"      <+> ppr tc_args
-                 , text "denv_rep_tc"       <+> ppr rep_tc
-                 , text "denv_rep_tc_args"  <+> ppr rep_tc_args
+                 , text "denv_inst_tys"     <+> ppr inst_tys
                  , text "denv_ctxt"         <+> ppr ctxt
                  , text "denv_strat"        <+> ppr mb_strat ])
 
@@ -150,7 +132,6 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
                           , ds_theta               :: theta
                           , ds_cls                 :: Class
                           , ds_tys                 :: [Type]
-                          , ds_tc                  :: TyCon
                           , ds_overlap             :: Maybe OverlapMode
                           , ds_standalone_wildcard :: Maybe SrcSpan
                               -- See Note [Inferring the instance context]
@@ -160,10 +141,6 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
         --       df :: forall tvs. theta => C tys
         -- The Name is the name for the DFun we'll build
         -- The tyvars bind all the variables in the theta
-        -- For type families, the tycon in
-        --       in ds_tys is the *family* tycon
-        --       in ds_tc is the *representation* type
-        -- For non-family tycons, both are the same
 
         -- the theta is either the given and final theta, in standalone deriving,
         -- or the not-yet-simplified list of constraints together with their origin
@@ -180,7 +157,7 @@ Example:
      axiom :RTList a = Tree a
 
      DS { ds_tvs = [a,s], ds_cls = C, ds_tys = [s, T [a]]
-        , ds_tc = :RTList, ds_mechanism = DerivSpecNewtype (Tree a) }
+        , ds_mechanism = DerivSpecNewtype (Tree a) }
 -}
 
 pprDerivSpec :: Outputable theta => DerivSpec theta -> SDoc
@@ -200,41 +177,95 @@ pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, ds_cls = c,
 instance Outputable theta => Outputable (DerivSpec theta) where
   ppr = pprDerivSpec
 
--- What action to take in order to derive a class instance.
--- See Note [Deriving strategies] in TcDeriv
+-- | Information about the arguments to the class in a stock- or
+-- newtype-derived instance.
+-- See @Note [DerivEnv and DerivSpecMechanism]@.
+data DerivInstTys = DerivInstTys
+  { dit_cls_tys     :: [Type]
+    -- ^ Other arguments to the class except the last
+  , dit_tc          :: TyCon
+    -- ^ Type constructor for which the instance is requested
+    --   (last arguments to the type class)
+  , dit_tc_args     :: [Type]
+    -- ^ Arguments to the type constructor
+  , dit_rep_tc      :: TyCon
+    -- ^ The representation tycon for 'dit_tc'
+    --   (for data family instances). Otherwise the same as 'dit_tc'.
+  , dit_rep_tc_args :: [Type]
+    -- ^ The representation types for 'dit_tc_args'
+    --   (for data family instances). Otherwise the same as 'dit_tc_args'.
+  }
+
+instance Outputable DerivInstTys where
+  ppr (DerivInstTys { dit_cls_tys = cls_tys, dit_tc = tc, dit_tc_args = tc_args
+                    , dit_rep_tc = rep_tc, dit_rep_tc_args = rep_tc_args })
+    = hang (text "DITTyConHead")
+         2 (vcat [ text "dit_cls_tys"     <+> ppr cls_tys
+                 , text "dit_tc"          <+> ppr tc
+                 , text "dit_tc_args"     <+> ppr tc_args
+                 , text "dit_rep_tc"      <+> ppr rep_tc
+                 , text "dit_rep_tc_args" <+> ppr rep_tc_args ])
+
+-- | What action to take in order to derive a class instance.
+-- See @Note [DerivEnv and DerivSpecMechanism]@, as well as
+-- @Note [Deriving strategies]@ in "TcDeriv".
 data DerivSpecMechanism
-  = DerivSpecStock   -- "Standard" classes
-      (SrcSpan -> TyCon
-               -> [Type]
-               -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
-      -- This function returns three things:
+    -- | \"Standard\" classes
+  = DerivSpecStock
+    { dsm_stock_dit    :: DerivInstTys
+      -- ^ Information about the arguments to the class in the derived
+      -- instance, including what type constructor the last argument is
+      -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
+    , dsm_stock_gen_fn ::
+        SrcSpan -> TyCon
+                -> [Type]
+                -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
+      -- ^ This function returns three things:
       --
       -- 1. @LHsBinds GhcPs@: The derived instance's function bindings
       --    (e.g., @compare (T x) (T y) = compare x y@)
+      --
       -- 2. @BagDerivStuff@: Auxiliary bindings needed to support the derived
       --    instance. As examples, derived 'Generic' instances require
       --    associated type family instances, and derived 'Eq' and 'Ord'
       --    instances require top-level @con2tag@ functions.
-      --    See Note [Auxiliary binders] in TcGenDeriv.
+      --    See @Note [Auxiliary binders]@ in "TcGenDeriv".
+      --
       -- 3. @[Name]@: A list of Names for which @-Wunused-binds@ should be
       --    suppressed. This is used to suppress unused warnings for record
       --    selectors when deriving 'Read', 'Show', or 'Generic'.
-      --    See Note [Deriving and unused record selectors].
+      --    See @Note [Deriving and unused record selectors]@.
+    }
 
-  | DerivSpecNewtype -- -XGeneralizedNewtypeDeriving
-      Type -- The newtype rep type
+    -- | @GeneralizedNewtypeDeriving@
+  | DerivSpecNewtype
+    { dsm_newtype_dit    :: DerivInstTys
+      -- ^ Information about the arguments to the class in the derived
+      -- instance, including what type constructor the last argument is
+      -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
+    , dsm_newtype_rep_ty :: Type
+      -- ^ The newtype rep type.
+    }
 
-  | DerivSpecAnyClass -- -XDeriveAnyClass
+    -- | @DeriveAnyClass@
+  | DerivSpecAnyClass
 
-  | DerivSpecVia -- -XDerivingVia
-      Type -- The @via@ type
+    -- | @DerivingVia@
+  | DerivSpecVia
+    { dsm_via_cls_tys :: [Type]
+      -- ^ All arguments to the class besides the last one.
+    , dsm_via_inst_ty :: Type
+      -- ^ The last argument to the class.
+    , dsm_via_ty      :: Type
+      -- ^ The @via@ type
+    }
 
 -- | Convert a 'DerivSpecMechanism' to its corresponding 'DerivStrategy'.
 derivSpecMechanismToStrategy :: DerivSpecMechanism -> DerivStrategy GhcTc
-derivSpecMechanismToStrategy DerivSpecStock{}   = StockStrategy
-derivSpecMechanismToStrategy DerivSpecNewtype{} = NewtypeStrategy
-derivSpecMechanismToStrategy DerivSpecAnyClass  = AnyclassStrategy
-derivSpecMechanismToStrategy (DerivSpecVia t)   = ViaStrategy t
+derivSpecMechanismToStrategy DerivSpecStock{}               = StockStrategy
+derivSpecMechanismToStrategy DerivSpecNewtype{}             = NewtypeStrategy
+derivSpecMechanismToStrategy DerivSpecAnyClass              = AnyclassStrategy
+derivSpecMechanismToStrategy (DerivSpecVia{dsm_via_ty = t}) = ViaStrategy t
 
 isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia
   :: DerivSpecMechanism -> Bool
@@ -251,10 +282,116 @@ isDerivSpecVia (DerivSpecVia{}) = True
 isDerivSpecVia _                = False
 
 instance Outputable DerivSpecMechanism where
-  ppr (DerivSpecStock{})   = text "DerivSpecStock"
-  ppr (DerivSpecNewtype t) = text "DerivSpecNewtype" <> colon <+> ppr t
-  ppr DerivSpecAnyClass    = text "DerivSpecAnyClass"
-  ppr (DerivSpecVia t)     = text "DerivSpecVia" <> colon <+> ppr t
+  ppr (DerivSpecStock{dsm_stock_dit = dit})
+    = hang (text "DerivSpecStock")
+         2 (vcat [ text "dsm_stock_dit" <+> ppr dit ])
+  ppr (DerivSpecNewtype { dsm_newtype_dit = dit, dsm_newtype_rep_ty = rep_ty })
+    = hang (text "DerivSpecNewtype")
+         2 (vcat [ text "dsm_newtype_dit"    <+> ppr dit
+                 , text "dsm_newtype_rep_ty" <+> ppr rep_ty ])
+  ppr DerivSpecAnyClass = text "DerivSpecAnyClass"
+  ppr (DerivSpecVia { dsm_via_cls_tys = cls_tys, dsm_via_inst_ty = inst_ty
+                    , dsm_via_ty = via_ty })
+    = hang (text "DerivSpecVia")
+         2 (vcat [ text "dsm_via_cls_tys" <+> ppr cls_tys
+                 , text "dsm_via_inst_ty" <+> ppr inst_ty
+                 , text "dsm_via_ty"      <+> ppr via_ty ])
+
+{-
+Note [DerivEnv and DerivSpecMechanism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+DerivEnv contains all of the bits and pieces that are common to every
+deriving strategy. (See Note [Deriving strategies] in TcDeriv.) Some deriving
+strategies impose stricter requirements on the types involved in the derived
+instance than others, and these differences are factored out into the
+DerivSpecMechanism type. Suppose that the derived instance looks like this:
+
+  instance ... => C arg_1 ... arg_n
+
+Each deriving strategy imposes restrictions on arg_1 through arg_n as follows:
+
+* stock (DerivSpecStock):
+
+  Stock deriving requires that:
+
+  - n must be a positive number. This is checked by
+    TcDeriv.expectNonNullaryClsArgs
+  - arg_n must be an application of an algebraic type constructor. Here,
+    "algebraic type constructor" means:
+
+    + An ordinary data type constructor, or
+    + A data family type constructor such that the arguments it is applied to
+      give rise to a data family instance.
+
+    This is checked by TcDeriv.expectAlgTyConApp.
+
+  This extra structure is witnessed by the DerivInstTys data type, which stores
+  arg_1 through arg_(n-1) (dit_cls_tys), the algebraic type constructor
+  (dit_tc), and its arguments (dit_tc_args). If dit_tc is an ordinary data type
+  constructor, then dit_rep_tc/dit_rep_tc_args are the same as
+  dit_tc/dit_tc_args. If dit_tc is a data family type constructor, then
+  dit_rep_tc is the representation type constructor for the data family
+  instance, and dit_rep_tc_args are the arguments to the representation type
+  constructor in the corresponding instance.
+
+* newtype (DerivSpecNewtype):
+
+  Newtype deriving imposes the same DerivInstTys requirements as stock
+  deriving. This is necessary because we need to know what the underlying type
+  that the newtype wraps is, and this information can only be learned by
+  knowing dit_rep_tc.
+
+* anyclass (DerivSpecAnyclass):
+
+  DeriveAnyClass is the most permissive deriving strategy of all, as it
+  essentially imposes no requirements on the derived instance. This is because
+  DeriveAnyClass simply derives an empty instance, so it does not need any
+  particular knowledge about the types involved. It can do several things
+  that stock/newtype deriving cannot do (#13154):
+
+  - n can be 0. That is, one is allowed to anyclass-derive an instance with
+    no arguments to the class, such as in this example:
+
+      class C
+      deriving anyclass instance C
+
+  - One can derive an instance for a type that is not headed by a type
+    constructor, such as in the following example:
+
+      class C (n :: Nat)
+      deriving instance C 0
+      deriving instance C 1
+      ...
+
+  - One can derive an instance for a data family with no data family instances,
+    such as in the following example:
+
+      data family Foo a
+      class C a
+      deriving anyclass instance C (Foo a)
+
+* via (DerivSpecVia):
+
+  Like newtype deriving, DerivingVia requires that n must be a positive number.
+  This is because when one derives something like this:
+
+    deriving via Foo instance C Bar
+
+  Then the generated code must specifically mention Bar. However, in
+  contrast with newtype deriving, DerivingVia does *not* require Bar to be
+  an application of an algebraic type constructor. This is because the
+  generated code simply defers to invoking `coerce`, which does not need to
+  know anything in particular about Bar (besides that it is representationally
+  equal to Foo). This allows DerivingVia to do some things that are not
+  possible with newtype deriving, such as deriving instances for data families
+  without data instances (#13154):
+
+    data family Foo a
+    newtype ByBar a = ByBar a
+    class Baz a where ...
+    instance Baz (ByBar a) where ...
+    deriving via ByBar (Foo a) instance Baz (Foo a)
+-}
 
 -- | Whether GHC is processing a @deriving@ clause or a standalone deriving
 -- declaration.
@@ -920,12 +1057,9 @@ if DeriveAnyClass is enabled.
 This is not restricted to Generics; any class can be derived, simply giving
 rise to an empty instance.
 
-Unfortunately, it is not clear how to determine the context (when using a
-deriving clause; in standalone deriving, the user provides the context).
-GHC uses the same heuristic for figuring out the class context that it uses for
-Eq in the case of *-kinded classes, and for Functor in the case of
-* -> *-kinded classes. That may not be optimal or even wrong. But in such
-cases, standalone deriving can still be used.
+See Note [Gathering and simplifying constraints for DeriveAnyClass] in
+TcDerivInfer for an explanation hof how the instance context is inferred for
+DeriveAnyClass.
 
 Note [Check that the type variable is truly universal]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

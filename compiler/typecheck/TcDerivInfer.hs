@@ -72,23 +72,26 @@ inferConstraints :: DerivSpecMechanism
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
 inferConstraints mechanism
-  = do { DerivEnv { denv_tvs         = tvs
-                  , denv_tc          = tc
-                  , denv_tc_args     = tc_args
-                  , denv_cls         = main_cls
-                  , denv_cls_tys     = cls_tys } <- ask
+  = do { DerivEnv { denv_tvs      = tvs
+                  , denv_cls      = main_cls
+                  , denv_inst_tys = inst_tys } <- ask
        ; wildcard <- isStandaloneWildcardDeriv
        ; let infer_constraints :: DerivM ([ThetaOrigin], [TyVar], [TcType])
              infer_constraints =
                case mechanism of
-                 DerivSpecStock{}
-                   -> inferConstraintsStock
+                 DerivSpecStock{dsm_stock_dit = dit}
+                   -> inferConstraintsStock dit
                  DerivSpecAnyClass
-                   -> infer_constraints_simple $ inferConstraintsAnyclass
-                 DerivSpecNewtype rep_ty
-                   -> infer_constraints_simple $ inferConstraintsCoerceBased rep_ty
-                 DerivSpecVia     via_ty
-                   -> infer_constraints_simple $ inferConstraintsCoerceBased via_ty
+                   -> infer_constraints_simple inferConstraintsAnyclass
+                 DerivSpecNewtype { dsm_newtype_dit =
+                                      DerivInstTys{dit_cls_tys = cls_tys}
+                                  , dsm_newtype_rep_ty = rep_ty }
+                   -> infer_constraints_simple $
+                      inferConstraintsCoerceBased cls_tys rep_ty
+                 DerivSpecVia { dsm_via_cls_tys = cls_tys
+                              , dsm_via_ty = via_ty }
+                   -> infer_constraints_simple $
+                      inferConstraintsCoerceBased cls_tys via_ty
 
              -- Most deriving strategies do not need to do anything special to
              -- the type variables and arguments to the class in the derived
@@ -101,9 +104,6 @@ inferConstraints mechanism
              infer_constraints_simple infer_thetas = do
                thetas <- infer_thetas
                pure (thetas, tvs, inst_tys)
-
-             inst_ty  = mkTyConApp tc tc_args
-             inst_tys = cls_tys ++ [inst_ty]
 
              -- Constraints arising from superclasses
              -- See Note [Superclasses of derived instance]
@@ -147,20 +147,19 @@ inferConstraints mechanism
 -- to be well kinded, so we return @[]@/@[Type, f, g]@ for the
 -- 'TyVar's/'TcType's, /not/ @[k]@/@[k, f, g]@.
 -- See Note [Inferring the instance context].
-inferConstraintsStock :: DerivM ([ThetaOrigin], [TyVar], [TcType])
-inferConstraintsStock
-  = do DerivEnv { denv_tvs         = tvs
-                , denv_tc          = tc
-                , denv_tc_args     = tc_args
-                , denv_rep_tc      = rep_tc
-                , denv_rep_tc_args = rep_tc_args
-                , denv_cls         = main_cls
-                , denv_cls_tys     = cls_tys } <- ask
+inferConstraintsStock :: DerivInstTys
+                      -> DerivM ([ThetaOrigin], [TyVar], [TcType])
+inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
+                                    , dit_tc          = tc
+                                    , dit_tc_args     = tc_args
+                                    , dit_rep_tc      = rep_tc
+                                    , dit_rep_tc_args = rep_tc_args })
+  = do DerivEnv { denv_tvs      = tvs
+                , denv_cls      = main_cls
+                , denv_inst_tys = inst_tys } <- ask
        wildcard <- isStandaloneWildcardDeriv
 
-       let inst_ty  = mkTyConApp tc tc_args
-           inst_tys = cls_tys ++ [inst_ty]
-
+       let inst_ty    = mkTyConApp tc tc_args
            tc_binders = tyConBinders rep_tc
            choose_level bndr
              | isNamedTyConBinder bndr = KindLevel
@@ -339,16 +338,11 @@ inferConstraintsStock
 -- derived instance context.
 inferConstraintsAnyclass :: DerivM [ThetaOrigin]
 inferConstraintsAnyclass
-  = do { DerivEnv { denv_tc      = tc
-                  , denv_tc_args = tc_args
-                  , denv_cls     = cls
-                  , denv_cls_tys = cls_tys } <- ask
+  = do { DerivEnv { denv_cls      = cls
+                  , denv_inst_tys = inst_tys } <- ask
        ; wildcard <- isStandaloneWildcardDeriv
 
-       ; let inst_ty  = mkTyConApp tc tc_args
-             inst_tys = cls_tys ++ [inst_ty]
-
-             gen_dms = [ (sel_id, dm_ty)
+       ; let gen_dms = [ (sel_id, dm_ty)
                        | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
 
              cls_tvs = classTyVars cls
@@ -384,13 +378,12 @@ inferConstraintsAnyclass
 -- We would infer the following constraints ('ThetaOrigin's):
 --
 -- > (Num Int, Coercible Age Int)
-inferConstraintsCoerceBased :: Type -> DerivM [ThetaOrigin]
-inferConstraintsCoerceBased rep_ty = do
-  DerivEnv { denv_tvs     = tvs
-           , denv_tc      = tycon
-           , denv_tc_args = tc_args
-           , denv_cls     = cls
-           , denv_cls_tys = cls_tys } <- ask
+inferConstraintsCoerceBased :: [Type] -> Type
+                            -> DerivM [ThetaOrigin]
+inferConstraintsCoerceBased cls_tys rep_ty = do
+  DerivEnv { denv_tvs      = tvs
+           , denv_cls      = cls
+           , denv_inst_tys = inst_tys } <- ask
   sa_wildcard <- isStandaloneWildcardDeriv
   let -- The following functions are polymorphic over the representation
       -- type, since we might either give it the underlying type of a
@@ -402,8 +395,6 @@ inferConstraintsCoerceBased rep_ty = do
               -- rep_pred is the representation dictionary, from where
               -- we are going to get all the methods for the final
               -- dictionary
-      inst_ty    = mkTyConApp tycon tc_args
-      inst_tys   = cls_tys ++ [inst_ty]
       deriv_origin = mkDerivOrigin sa_wildcard
 
       -- Next we collect constraints for the class methods
