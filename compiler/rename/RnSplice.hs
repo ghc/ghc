@@ -753,7 +753,7 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
     spliceDebugDoc loc
       = let code = case mb_src of
                      Nothing -> ending
-                     Just e  -> nest 2 (ppr e) : ending
+                     Just e  -> nest 2 (ppr (stripParensHsExpr e)) : ending
             ending = [ text "======>", nest 2 gen ]
         in  hang (ppr loc <> colon <+> text "Splicing" <+> text sd)
                2 (sep code)
