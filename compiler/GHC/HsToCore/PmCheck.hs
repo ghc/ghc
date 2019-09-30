@@ -11,7 +11,7 @@ Pattern Matching Coverage Checking.
 {-# LANGUAGE MultiWayIf     #-}
 {-# LANGUAGE LambdaCase     #-}
 
-module Check (
+module GHC.HsToCore.PmCheck (
         -- Checking and printing
         checkSingle, checkMatches, checkGuardMatches,
         needToRunPmCheck, isMatchContextPmChecked,
@@ -24,9 +24,9 @@ module Check (
 
 import GhcPrelude
 
-import PmTypes
-import PmOracle
-import PmPpr
+import GHC.HsToCore.PmCheck.Types
+import GHC.HsToCore.PmCheck.Oracle
+import GHC.HsToCore.PmCheck.Ppr
 import BasicTypes (Origin, isGenerated)
 import CoreSyn (CoreExpr, Expr(Var))
 import CoreUtils (exprType)
@@ -331,7 +331,7 @@ checkMatches dflags ctxt vars matches = do
                                (vcat (map ppr matches)))
   res <- case matches of
     -- Check EmptyCase separately
-    -- See Note [Checking EmptyCase Expressions] in PmOracle
+    -- See Note [Checking EmptyCase Expressions] in GHC.HsToCore.PmCheck.Oracle
     [] | [var] <- vars -> checkEmptyCase' var
     _normal_match      -> checkMatches' vars matches
   dsPmWarn dflags ctxt res
@@ -388,7 +388,7 @@ checkMatches' vars matches
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
---   in "PmOracle" for details.
+--   in "GHC.HsToCore.PmCheck.Oracle" for details.
 checkEmptyCase' :: Id -> DsM PmResult
 checkEmptyCase' x = do
   delta         <- getPmDelta
@@ -458,9 +458,9 @@ mkPmLitPattern :: PmLit -> PatVec
 mkPmLitPattern lit@(PmLit _ val)
   -- We translate String literals to list literals for better overlap reasoning.
   -- It's a little unfortunate we do this here rather than in
-  -- 'PmOracle.trySolve' and 'PmOracle.addRefutableAltCon', but it's so much
+  -- 'GHC.HsToCore.PmCheck.Oracle.trySolve' and 'GHC.HsToCore.PmCheck.Oracle.addRefutableAltCon', but it's so much
   -- simpler here.
-  -- See Note [Representation of Strings in TmState] in PmOracle
+  -- See Note [Representation of Strings in TmState] in GHC.HsToCore.PmCheck.Oracle
   | PmLitString s <- val
   , let mk_char_lit c = mkPmLitPattern (PmLit charTy (PmLitChar c))
   = foldr (\c p -> mkListPatVec charTy (mk_char_lit c) p)
@@ -890,7 +890,7 @@ the paper. This Note serves as a reference for these new features.
   variables. The information about the shape of a variable is encoded in
   the oracle state 'Delta' instead.
 * Handling of uninhabited fields like `!Void`.
-  See Note [Strict argument type constraints] in PmOracle.
+  See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle.
 * Efficient handling of literal splitting, large enumerations and accurate
   redundancy warnings for `COMPLETE` groups through the oracle.
 -}
@@ -1161,7 +1161,7 @@ pmcheck (_:_) _ [] _ _ = panic "pmcheck: cons-nil"
 addPmConCts :: Delta -> Id -> PmAltCon -> [EvVar] -> PatVec -> DsM (Maybe (Delta, ValVec))
 addPmConCts delta x con dicts field_pats = do
   -- mk_id will re-use the variable name if possible. The x ~ x is easily
-  -- discharged by the oracle at no overhead (see 'PmOracle.addVarVarCt').
+  -- discharged by the oracle at no overhead (see 'GHC.HsToCore.PmCheck.Oracle.addVarVarCt').
   let mk_id (PmVar _ x) = pure (Just x)
       mk_id p@PmCon{} = Just <$> mkPmId (pmPatType p)
       mk_id PmGrd{}   = pure Nothing -- PmGrds have arity 0, so just forget about them
