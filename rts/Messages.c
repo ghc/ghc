@@ -173,8 +173,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on "
                   "blackhole %p", (W_)msg->tso->id, msg->bh);
 
-    info = bh->header.info;
-    load_load_barrier();  // See Note [Heap memory barriers] in SMP.h
+    info = ACQUIRE_LOAD(&bh->header.info);
 
     // If we got this message in our inbox, it might be that the
     // BLACKHOLE has already been updated, and GC has shorted out the
@@ -194,11 +193,8 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
-    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
-    // and turns this into an infinite loop.
-    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
-    info = p->header.info;
-    load_load_barrier();  // See Note [Heap memory barriers] in SMP.h
+    p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
+    info = RELAXED_LOAD(&p->header.info);
 
     if (info == &stg_IND_info)
     {
@@ -262,11 +258,11 @@ loop:
         }
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
-        write_barrier(); // make the BQ visible, see Note [Heap memory barriers].
+        // RELEASE to make the BQ visible, see Note [Heap memory barriers].
+        RELEASE_STORE(&((StgInd*)bh)->indirectee, (StgClosure *)bq);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure(cap, (StgClosure*)p);
         }
-        ((StgInd*)bh)->indirectee = (StgClosure *)bq;
         recordClosureMutated(cap,bh); // bh was mutated
 
         debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d",
@@ -349,10 +345,8 @@ StgTSO * blackHoleOwner (StgClosure *bh)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
-    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
-    // and turns this into an infinite loop.
-    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
-    info = p->header.info;
+    p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
+    info = RELAXED_LOAD(&p->header.info);
 
     if (info == &stg_IND_info) goto loop;
 
@@ -364,7 +358,7 @@ loop:
              info == &stg_BLOCKING_QUEUE_DIRTY_info)
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)p;
-        return bq->owner;
+        return RELAXED_LOAD(&bq->owner);
     }
 
     return NULL; // not blocked
