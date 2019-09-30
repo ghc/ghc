@@ -1459,7 +1459,7 @@ static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
     cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
+    RELAXED_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
 }
 
 /* ----------------------------------------------------------------------------
@@ -1545,7 +1545,7 @@ collect_pinned_object_blocks (void)
 
     for (n = 0; n < n_capabilities; n++) {
         prev = NULL;
-        for (bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
+        for (bd = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks); bd != NULL; bd = bd->link) {
             prev = bd;
         }
         if (prev != NULL) {
@@ -1553,8 +1553,8 @@ collect_pinned_object_blocks (void)
             if (g0->large_objects != NULL) {
                 g0->large_objects->u.back = prev;
             }
-            g0->large_objects = capabilities[n]->pinned_object_blocks;
-            capabilities[n]->pinned_object_blocks = 0;
+            g0->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
+            RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
         }
     }
 }
