@@ -243,7 +243,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
-            bh_info = bh->header.info;
+            bh_info = RELAXED_LOAD(&bh->header.info);
             IF_NONMOVING_WRITE_BARRIER_ENABLED {
                 updateRemembSetPushClosure(cap, (StgClosure *) bh);
             }
