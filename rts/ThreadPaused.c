@@ -351,9 +351,8 @@ threadPaused(Capability *cap, StgTSO *tso)
             }
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
-            write_barrier();
-            SET_INFO(bh,&stg_BLACKHOLE_info);
+            RELAXED_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+            SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:
             recordClosureMutated(cap,bh);
