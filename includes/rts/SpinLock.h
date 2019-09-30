@@ -57,7 +57,7 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-    __atomic_store_n(&p->lock, 1, __ATOMIC_RELEASE);
+    RELEASE_STORE(&p->lock, 1);
 }
 
 // initialise spin lock
@@ -65,7 +65,7 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
 {
     IF_PROF_SPIN(p->spin = 0);
     IF_PROF_SPIN(p->yield = 0);
-    __atomic_store_n(&p->lock, 1, __ATOMIC_RELEASE)
+    RELEASE_STORE(&p->lock, 1);
 }
 
 #else /* !THREADED_RTS */
