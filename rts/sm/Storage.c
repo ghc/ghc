@@ -985,8 +985,8 @@ allocateMightFail (Capability *cap, W_ n)
         __atomic_fetch_add(&g0->n_large_words, n, __ATOMIC_RELAXED);
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
-        bd->flags = BF_LARGE;
-        bd->free = bd->start + n;
+        RELAXED_STORE(&bd->flags, BF_LARGE);
+        RELAXED_STORE(&bd->free, bd->start + n);
         cap->total_allocated += n;
         return bd->start;
     }
