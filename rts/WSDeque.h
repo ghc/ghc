@@ -45,12 +45,12 @@ typedef struct WSDeque_ {
    current thread, or (b) when there's only one thread running, or no
    stealing going on (e.g. during GC).
 */
-#define ASSERT_WSDEQUE_INVARIANTS(p)         \
-  ASSERT((p)->size > 0);                        \
-  ASSERT((p)->topBound <= (p)->top);            \
-  ASSERT((p)->elements != NULL);                \
-  ASSERT(*((p)->elements) || 1);                \
-  ASSERT(*((p)->elements - 1  + ((p)->size)) || 1);
+#define ASSERT_WSDEQUE_INVARIANTS(p)                                  \
+    ASSERT((p)->size > 0);                                            \
+    ASSERT(RELAXED_LOAD(&(p)->topBound) <= RELAXED_LOAD(&(p)->top));  \
+    ASSERT(RELAXED_LOAD(&(p)->elements) != NULL);                     \
+    ASSERT(RELAXED_LOAD(&(p)->elements[0]) || 1);                     \
+    ASSERT(RELAXED_LOAD(&(p)->elements[(p)->size - 1]) || 1);
 
 // No: it is possible that top > bottom when using pop()
 //  ASSERT((p)->bottom >= (p)->top);

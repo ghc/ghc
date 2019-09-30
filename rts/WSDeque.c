@@ -80,12 +80,12 @@ newWSDeque (uint32_t size)
                                   "newWSDeque");
     q->elements = stgMallocBytes(realsize * sizeof(StgClosurePtr), /* dataspace */
                                  "newWSDeque:data space");
-    q->top=0;
-    q->bottom=0;
-    q->topBound=0; /* read by writer, updated each time top is read */
-
     q->size = realsize;  /* power of 2 */
     q->moduloSize = realsize - 1; /* n % size == n & moduloSize  */
+
+    q->top=0;
+    q->bottom=0;
+    RELEASE_STORE(&q->topBound, 0); /* read by writer, updated each time top is read */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return q;
@@ -165,7 +165,7 @@ popWSDeque (WSDeque *q)
     q->topBound = t+1; /* ...and cached top value as well */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
-    ASSERT(q->bottom >= q->top);
+    ASSERT(RELAXED_LOAD(&q->bottom) >= RELAXED_LOAD(&q->top));
 
     // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
 
