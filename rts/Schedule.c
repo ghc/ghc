@@ -823,7 +823,11 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 appendToRunQueue(free_caps[i],t);
                 traceEventMigrateThread (cap, t, free_caps[i]->no);
 
-                if (t->bound) { t->bound->task->cap = free_caps[i]; }
+                if (t->bound) {
+                    // N.B. we typically would need to hold 't->bound->task->lock' to change 'cap'
+                    // but this is safe because TODO.
+                    RELAXED_STORE(&t->bound->task->cap, free_caps[i]);
+                }
                 t->cap = free_caps[i];
                 n--; // we have one fewer threads now
                 i++; // move on to the next free_cap
