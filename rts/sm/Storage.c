@@ -501,12 +501,11 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     }
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
-    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
-    write_barrier();
 
+    // RELEASE ordering to ensure that above writes are visible before we
+    // introduce reference as CAF indirectee.
     RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
-    write_barrier();
-    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
+    SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;
 }
