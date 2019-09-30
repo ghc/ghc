@@ -58,22 +58,15 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-
-  //write_barrier();
-  //p->lock = 1;
-  __atomic_store_n(&p->lock, 1, __ATOMIC_RELEASE);
+  RELEASE_STORE(&p->lock, 1);
 }
 
 // initialise spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-  //write_barrier();
-  //p->lock = 1;
-  //p->spin = 0;
-  //p->yield = 0;
-  __atomic_store_n(&p->lock, 1, __ATOMIC_RELAXED);
-  __atomic_store_n(&p->spin, 1, __ATOMIC_RELAXED);
-  __atomic_store_n(&p->yield, 1, __ATOMIC_RELEASE);
+  RELAXED_STORE(&p->spin, 0);
+  RELAXED_STORE(&p->yield, 0);
+  RELEASE_STORE(&p->lock, 1);
 }
 
 #else
@@ -96,17 +89,13 @@ INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 // release spin lock
 INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
 {
-  //write_barrier();
-  //(*p) = 1;
-  __atomic_store_n(p, 1, __ATOMIC_RELEASE);
+  RELEASE_STORE(p, 1);
 }
 
 // init spin lock
 INLINE_HEADER void initSpinLock(SpinLock * p)
 {
-  //write_barrier();
-  //(*p) = 1;
-  __atomic_store_n(p, 1, __ATOMIC_RELEASE);
+  RELEASE_STORE(p, 1);
 }
 
 #endif /* PROF_SPIN */
