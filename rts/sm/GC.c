@@ -1397,7 +1397,7 @@ static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
     cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    cap->mut_lists[gen_no] = allocBlockOnNode_sync(cap->node);
+    RELAXED_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
 }
 
 /* ----------------------------------------------------------------------------
@@ -1639,7 +1639,7 @@ collect_pinned_object_blocks (void)
         bdescr *last = NULL;
         if (use_nonmoving && gen == oldest_gen) {
             // Mark objects as belonging to the nonmoving heap
-            for (bdescr *bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
+            for (bdescr *bd = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks); bd != NULL; bd = bd->link) {
                 bd->flags |= BF_NONMOVING;
                 bd->gen = oldest_gen;
                 bd->gen_no = oldest_gen->no;
@@ -1658,8 +1658,8 @@ collect_pinned_object_blocks (void)
             if (gen->large_objects != NULL) {
                 gen->large_objects->u.back = last;
             }
-            gen->large_objects = capabilities[n]->pinned_object_blocks;
-            capabilities[n]->pinned_object_blocks = NULL;
+            g0->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
+            RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
         }
     }
 }
