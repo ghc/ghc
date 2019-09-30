@@ -407,14 +407,14 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     // Allocate the blackhole indirection closure
     bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    //RELAXED_STORE(&bh->indirectee, (StgClosure *)cap->r.rCurrentTSO); // this shouldn't be needed
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
-    // Ensure that above writes are visible before we introduce reference as CAF indirectee.
-    write_barrier();
 
+    // RELEASE ordering to ensure that above writes are visible before we
+    // introduce reference as CAF indirectee.
     RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
-    write_barrier();
-    SET_INFO((StgClosure*)caf,&stg_IND_STATIC_info);
+    SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;
 }
