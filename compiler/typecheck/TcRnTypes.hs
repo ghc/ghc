@@ -753,7 +753,7 @@ data SelfBootInfo
 
 {- Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We gather two sorts of usage information
+We gather three sorts of usage information
 
  * tcg_dus (defs/uses)
       Records *defined* Names (local, top-level)
@@ -775,6 +775,28 @@ We gather two sorts of usage information
       is recorded *after* the filtering done by pickGREs.  So it reflect
       /how that occurrence is in scope/.   See Note [GRE filtering] in
       RdrName.
+
+  * tcg_keep
+      This is primary used to locally defined top-level names alive so
+      that the simplifier does not discard them (see, for example,
+      Note [Keeping things alive for Template Haskell] in RnSplice).
+      It also serves another role in TcCanonical, where it marks newtype
+      constructors as used in the Coercible solver. For instance, in this
+      program (#10347):
+
+          module T10347 (N, mkN) where
+
+          import Data.Coerce
+
+          newtype N a = MkN Int
+
+          mkN :: Int -> N a
+          mkN = coerce
+
+      We wish to record `MkN` as used, since it is (morally) used to perform
+      the coercion in `mkN`. To do so, the Coercible solver updates tcg_keep's
+      TcRef whenever it encounters a use of `coerce` that crosses newtype
+      boundaries.
 
 
 ************************************************************************
