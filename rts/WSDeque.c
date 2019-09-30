@@ -254,14 +254,14 @@ pushWSDeque (WSDeque* q, void * elem)
        q->topBound (accessed only by writer) instead.
        This is why we do not just call empty(q) here.
     */
-    b = q->bottom;
+    b = RELAXED_LOAD(&q->bottom);
     t = q->topBound;
     if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) {
         /* NB. 1. sz == q->size - 1, thus ">="
            2. signed comparison, it is possible that t > b
         */
         /* could be full, check the real top value in this case */
-        t = q->top;
+        t = RELAXED_LOAD(&q->top);
         q->topBound = t;
         if (b - t >= sz) { /* really no space left :-( */
             /* reallocate the array, copying the values. Concurrent steal()s
@@ -286,7 +286,7 @@ pushWSDeque (WSDeque* q, void * elem)
         }
     }
 
-    q->elements[b & sz] = elem;
+    RELAXED_STORE(&q->elements[b & sz], elem);
     /*
        KG: we need to put write barrier here since otherwise we might
        end with elem not added to q->elements, but q->bottom already
@@ -295,9 +295,7 @@ pushWSDeque (WSDeque* q, void * elem)
        there (in case there is just added element in the queue). This
        issue concretely hit me on ARMv7 multi-core CPUs
      */
-    //write_barrier();
-    //q->bottom = b + 1;
-    RELEASE_STORE(&q->bottom, b+1);
+    RELEASE_STORE(&q->bottom, b + 1);
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     return true;
