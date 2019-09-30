@@ -726,7 +726,7 @@ loop:
      * check if gen is too low.
      */
       StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
-      *p = TAG_CLOSURE(tag,e);
+      RELAXED_STORE(p, TAG_CLOSURE(tag,e));
       if (gen_no < gct->evac_gen_no) {  // optimisation
           if (RELAXED_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
