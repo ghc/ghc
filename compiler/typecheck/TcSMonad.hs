@@ -19,7 +19,7 @@ module TcSMonad (
     nestTcS, nestImplicTcS, setEvBindsTcS,
     checkConstraintsTcS, checkTvConstraintsTcS,
 
-    runTcPluginTcS, addUsedGRE, addUsedGREs,
+    runTcPluginTcS, addUsedGRE, addUsedGREs, keepAlive,
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
@@ -3066,6 +3066,8 @@ addUsedGREs gres = wrapTcS  $ TcM.addUsedGREs gres
 addUsedGRE :: Bool -> GlobalRdrElt -> TcS ()
 addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
 
+keepAlive :: Name -> TcS ()
+keepAlive = wrapTcS . TcM.keepAlive
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

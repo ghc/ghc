@@ -345,25 +345,6 @@ renameDeriv inst_infos bagBinds
               ; return (inst_info { iBinds = binds' }, fvs) }
 
 {-
-Note [Newtype deriving and unused constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (see #1954):
-
-  module Bug(P) where
-  newtype P a = MkP (IO a) deriving Monad
-
-If you compile with -Wunused-binds you do not expect the warning
-"Defined but not used: data constructor MkP". Yet the newtype deriving
-code does not explicitly mention MkP, but it should behave as if you
-had written
-  instance Monad P where
-     return x = MkP (return x)
-     ...etc...
-
-So we want to signal a user of the data constructor 'MkP'.
-This is the reason behind the [Name] part of the return type
-of genInst.
-
 Note [Staging of tcDeriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's a tricky corner case for deriving (adapted from #2721):
@@ -2102,15 +2083,7 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
   where
     gen_newtype_or_via ty = do
       (binds, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys ty
-      return (binds, faminsts, maybeToList unusedConName)
-
-    unusedConName :: Maybe Name
-    unusedConName
-      | isDerivSpecNewtype mechanism
-        -- See Note [Newtype deriving and unused constructors]
-      = Just $ getName $ head $ tyConDataCons tycon
-      | otherwise
-      = Nothing
+      return (binds, faminsts, [])
 
 {-
 Note [Bindings for Generalised Newtype Deriving]
