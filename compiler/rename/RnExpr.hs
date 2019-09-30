@@ -215,15 +215,17 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 
 ------------------------------------------
 -- See Note [Extended Typed-Holes]
-rnExpr (HsExtendedHole ext hole) =
-    case hole of
-      ExtendedHole nm fs ->
-        return (HsExtendedHole ext (ExtendedHole nm fs), emptyFVs)
-      ExtendedHoleSplice nm (L l (HsSpliceE _ spl)) ->
+rnExpr (HsExtendedHole ext (ExtendedHole nm cont)) =
+    case cont of
+      ExtHNoContent -> return (HsExtendedHole ext (ExtendedHole nm ExtHNoContent), emptyFVs)
+      ExtHRawExpr (L l expr) ->
+        do (rne, fvs) <- rnExpr expr
+           return (HsExtendedHole ext (ExtendedHole nm (ExtHRawExpr (L l rne))), fvs)
+      ExtHTHSplice (L l spl) ->
+        -- Here we run the splice and replace the hole content with the resulting
+        -- expression.
         do (expr, fvs) <- rnSpliceExpr spl
-           return (HsExtendedHole ext $ ExtendedHoleSplice nm (L l expr), fvs)
-      ExtendedHoleSplice nm exp ->
-        pprPanic "rnExpr: non-splice in ExtendedHoleSplice " $ (ppr nm) <+> text ": " <+> (ppr exp)
+           return (HsExtendedHole ext $ ExtendedHole nm (ExtHRawExpr (L l expr)), fvs)
 
 ---------------------------------------------
 --      Sections

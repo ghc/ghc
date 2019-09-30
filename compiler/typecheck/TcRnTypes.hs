@@ -1798,7 +1798,7 @@ data Hole = ExprHole UnboundVar
             -- expression (TypedHoles)
           | TypeHole OccName
             -- ^ A hole in a type (PartialTypeSignatures)
-          | ExtendedExprHole (ExtendedHole GhcTcId)
+          | ExtendedExprHole (ExtendedHole GhcTcId) (Maybe TcType)
             -- ^ A extended hole (_(...)) in an expression extended holes
 
 isExprHole :: Hole -> Bool
@@ -1809,12 +1809,12 @@ isExprHole _ = False
 instance Outputable Hole where
   ppr (ExprHole ub)  = ppr ub
   ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
-  ppr (ExtendedExprHole eh) = ppr eh
+  ppr (ExtendedExprHole eh mbTy) = ppr eh <+> (text " where (...) :: " <+> (ppr mbTy))
 
 holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
 holeOcc (TypeHole occ) = occ
-holeOcc (ExtendedExprHole eh) = extendedHoleOcc eh
+holeOcc (ExtendedExprHole eh _) = extendedHoleOcc eh
 
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

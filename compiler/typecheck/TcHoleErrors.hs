@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MagicHash #-}
 module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , tcCheckHoleFit, tcSubsumes
                     , withoutUnification
@@ -14,7 +15,9 @@ module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , HoleFitPlugin (..), HoleFitPluginR (..)
 
                     -- Re-exported from HsSyn
-                    , ExtendedHole (..), pprExtendedHoleContent
+                    , ExtendedHole (..)
+                    -- Facilities to extract values from extended holes.
+                    , runExtHExpr
                     ) where
 
 import GhcPrelude
@@ -41,7 +44,22 @@ import DynFlags
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
-import HsExpr (ExtendedHole(..), pprExtendedHoleContent)
+
+-- Safe running of LHsExpr
+import PrelNames  ( toDynName )
+import HsUtils ( mkHsApp )
+import Data.Dynamic ( Dynamic )
+import HsExtension
+import SrcLoc (getLoc, GenLocated (..))
+
+import HscMain (hscCompileCoreExpr)
+import GHCi (wormhole)
+import DsExpr (dsLExpr)
+import DsMonad (initDsTc)
+import GHC.Exts (unsafeCoerce#)
+import CoreUtils (exprType)
+
+import HsExpr (ExtendedHole(..), LHsExpr, HsExpr(..) )
 
 import Control.Arrow ( (&&&) )
 
@@ -56,7 +74,7 @@ import TcUnify       ( tcSubType_NC )
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import HsDoc           ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface(..) )
+import HscTypes        ( ModIface(..), lookupId )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
@@ -547,10 +565,9 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
      ; traceTc "Hole is extended by: " $  case ct of
-        (CHoleCan { cc_hole = ExtendedExprHole eh}) ->
+        (CHoleCan { cc_hole = hole@(ExtendedExprHole eh _)}) ->
           case eh of
-            ExtendedHole _ fs -> ppr fs
-            ExtendedHoleSplice _ expr -> ppr expr
+            ExtendedHole _ cont -> ppr cont <+> text "with" <+> ppr hole
         _ -> text "Nothing"
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
@@ -1008,3 +1025,29 @@ fromPureHFPlugin plug =
   HoleFitPluginR { hfPluginInit = newTcRef ()
                  , hfPluginRun = const plug
                  , hfPluginStop = const $ return () }
+
+
+-- | Takes a Haskell expression that evaluates to Dynamic and runs it,
+--   returning a Dynamic that resolves to the value of the given type.
+--   when passed to fromDyn.
+runExtHExpr :: LHsExpr GhcTc -> TcM Dynamic
+runExtHExpr lexpr =
+  do { hsc_env <- getTopEnv
+     ; dflags <- getDynFlags
+     -- De-sugar the expression
+     ; ds_expr <- initDsTc (dsLExpr lexpr)
+     ; src_span <- getSrcSpanM
+     -- We should assert that `zonkTcType (exprType ds_expr)` is Dynamic!
+     -- Otherwise the unsafeCoerce# later might fail.
+     ; either_hval <- tryM $ liftIO $
+        hscCompileCoreExpr hsc_env src_span ds_expr
+     ; case either_hval of
+        Left exn -> error $ show exn
+        Right fhv -> do { hv <- liftIO $ wormhole dflags fhv
+                        -- My lord... is that legal?
+                        -- I will make it legal.
+                        -- Actually safe here, since any expression
+                        -- contained in ExtendedExprHole is wrapped
+                        -- by `toDyn`.
+                        ; return (unsafeCoerce# hv :: Dynamic) } }
+

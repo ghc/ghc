@@ -225,30 +225,33 @@ They can carry either a string (which is then fed to hole plugins) or a template
 haskell splice, which is run and the contents then handed to hole plugins.
 -}
 
-data ExtendedHole p
-  = ExtendedHole OccName (Maybe (Located FastString))
-  | ExtendedHoleSplice OccName (LHsExpr p)
+data ExtHoleContent p = ExtHNoContent
+                      | ExtHRawExpr (LHsExpr p)
+                      | ExtHTHSplice (Located (HsSplice p))
+
+
+data ExtendedHole p = ExtendedHole OccName (ExtHoleContent p)
 
 instance Outputable (ExtendedHole p) where
   ppr (ExtendedHole occ _) = text "ExtendedHole" <> parens (ppr occ)
-  ppr (ExtendedHoleSplice occ _) = text "ExtendedHoleSplice" <> parens (ppr occ)
 
 extendedHoleOcc :: ExtendedHole p -> OccName
 extendedHoleOcc (ExtendedHole occ _) = occ
-extendedHoleOcc (ExtendedHoleSplice occ _) = occ
 
-pprExtendedHoleContent :: (p ~ GhcPass pass, OutputableBndrId p)
-                       => ExtendedHole p -> SDoc
-pprExtendedHoleContent (ExtendedHole _ fs) = ppr fs
-pprExtendedHoleContent (ExtendedHoleSplice _ expr) = ppr expr
+
+pprExtHoleContent :: (p ~ GhcPass pass, OutputableBndrId p)
+                  => ExtHoleContent p -> SDoc
+pprExtHoleContent (ExtHRawExpr p)  = text "RawExpr: " <> ppr p
+pprExtHoleContent (ExtHTHSplice p) = text "THSplice: " <> ppr p
+pprExtHoleContent ExtHNoContent    = text "NoContent"
+
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ExtHoleContent p) where
+    ppr = pprExtHoleContent
 
 instance Data p => Data (ExtendedHole p) where
   gunfold _ _ _ = panic "ExtendedHole"
   toConstr  a   = mkConstr (dataTypeOf a) "ExtendedHole" [] Data.Prefix
-  dataTypeOf a  = mkDataType dtName [toConstr a]
-    where dtName = case a of
-                  ExtendedHole {} -> "HsExpr.ExtendedHole"
-                  ExtendedHoleSplice {} -> "HsExpr.ExtendedHoleSplice"
+  dataTypeOf a  = mkDataType "HsExpr.ExtendedHole" [toConstr a]
 
 instance HasOccName (ExtendedHole p) where
     occName = extendedHoleOcc
