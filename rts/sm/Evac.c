@@ -204,9 +204,9 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     to = alloc_for_copy(size,gen_no);
 
     from = (StgPtr)src;
-    to[0] = (W_)info;
+    RELAXED_STORE(&to[0], (W_)info);
     for (i = 1; i < size; i++) { // unroll for small i
-        to[i] = from[i];
+        RELAXED_STORE(&to[i], from[i]);
     }
 
     // if somebody else reads the forwarding pointer, we better make
@@ -756,15 +756,17 @@ loop:
       if (info == Czh_con_info &&
           // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&
           (StgChar)w <= MAX_CHARLIKE) {
-          *p =  TAG_CLOSURE(tag,
-                            (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
-                           );
+          RELAXED_STORE(p, \
+                        TAG_CLOSURE(tag, \
+                                    (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
+                                   ));
       }
       else if (info == Izh_con_info &&
           (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
-          *p = TAG_CLOSURE(tag,
-                             (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
-                             );
+          RELAXED_STORE(p, \
+                        TAG_CLOSURE(tag, \
+                                    (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
+                                   ));
       }
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
@@ -1280,19 +1282,19 @@ selector_loop:
               // evaluating until we find the real value, and then
               // update the whole chain to point to the value.
           val_loop:
-              info_ptr = (StgWord)UNTAG_CLOSURE(val)->header.info;
+              info_ptr = RELAXED_LOAD((StgWord*) &UNTAG_CLOSURE(val)->header.info);
               if (!IS_FORWARDING_PTR(info_ptr))
               {
                   info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
                   switch (info->type) {
                   case IND:
                   case IND_STATIC:
-                      val = ((StgInd *)val)->indirectee;
+                      val = RELAXED_LOAD(&((StgInd *)val)->indirectee);
                       goto val_loop;
                   case THUNK_SELECTOR:
                       // Use payload to make a list of thunk selectors, to be
                       // used in unchain_thunk_selectors
-                      ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+                      RELAXED_STORE(&((StgClosure*)p)->payload[0], (StgClosure *)prev_thunk_selector);
                       prev_thunk_selector = p;
                       p = (StgSelector*)val;
                       goto selector_chain;
