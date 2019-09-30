@@ -253,7 +253,7 @@ static void *unlock_tvar(Capability *cap,
   ASSERT(smp_locked == trec);
   if (force_update) {
     StgClosure *old_value = s -> current_value;
-    s -> current_value = c;
+    RELEASE_STORE(&s->current_value, c);
     dirty_TVAR(cap, s, old_value);
   }
 }
@@ -292,7 +292,7 @@ static StgClosure *lock_tvar(Capability *cap,
   TRACE("%p : lock_tvar(%p)", trec, s);
   do {
     do {
-      result = s -> current_value;
+      result = RELAXED_LOAD(&s->current_value);
     } while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info);
   } while (cas((void *)&(s -> current_value),
                (StgWord)result, (StgWord)trec) != (StgWord)result);
@@ -312,7 +312,7 @@ static void unlock_tvar(Capability *cap,
                         StgBool force_update STG_UNUSED) {
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(s -> current_value == (StgClosure *)trec);
-  s -> current_value = c;
+  RELEASE_STORE(&s-> current_value, c);
   dirty_TVAR(cap, s, (StgClosure *) trec);
 }
 
@@ -887,15 +887,20 @@ void stmPreGCHook (Capability *cap) {
 
 #define TOKEN_BATCH_SIZE 1024
 
+#if defined(THREADED_RTS)
+
 static volatile StgInt64 max_commits = 0;
 
-#if defined(THREADED_RTS)
 static volatile StgWord token_locked = false;
+
+static StgInt64 getMaxCommits(void) {
+  return RELAXED_LOAD(&max_commits);
+}
 
 static void getTokenBatch(Capability *cap) {
   while (cas((void *)&token_locked, false, true) == true) { /* nothing */ }
-  max_commits += TOKEN_BATCH_SIZE;
-  TRACE("%p : cap got token batch, max_commits=%" FMT_Int64, cap, max_commits);
+  NONATOMIC_ADD(&max_commits, TOKEN_BATCH_SIZE);
+  TRACE("%p : cap got token batch, max_commits=%" FMT_Int64, cap, RELAXED_LOAD(&max_commits));
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
   token_locked = false;
 }
@@ -907,6 +912,10 @@ static void getToken(Capability *cap) {
   cap -> transaction_tokens --;
 }
 #else
+static StgInt64 getMaxCommits(void) {
+    return 0;
+}
+
 static void getToken(Capability *cap STG_UNUSED) {
   // Nothing
 }
@@ -1062,7 +1071,7 @@ static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeade
 /*......................................................................*/
 
 StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
-  StgInt64 max_commits_at_start = max_commits;
+  StgInt64 max_commits_at_start = getMaxCommits();
 
   TRACE("%p : stmCommitTransaction()", trec);
   ASSERT(trec != NO_TREC);
@@ -1088,7 +1097,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
       result = check_read_only(trec);
       TRACE("%p : read-check %s", trec, result ? "succeeded" : "failed");
 
-      max_commits_at_end = max_commits;
+      max_commits_at_end = getMaxCommits();
       max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
                                 (n_capabilities * TOKEN_BATCH_SIZE));
       if (((max_concurrent_commits >> 32) > 0) || shake()) {
@@ -1269,12 +1278,12 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
 
 static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *tvar) {
   StgClosure *result;
-  result = tvar -> current_value;
+  result = ACQUIRE_LOAD(&tvar->current_value);
 
 #if defined(STM_FG_LOCKS)
   while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info) {
     TRACE("%p : read_current_value(%p) saw %p", trec, tvar, result);
-    result = tvar -> current_value;
+    result = ACQUIRE_LOAD(&tvar->current_value);
   }
 #endif
 
