@@ -65,6 +65,8 @@
 #include "sm/NonMoving.h" // for nonmoving_set_closure_mark_bit
 #include "sm/NonMovingScav.h"
 
+#include <string.h> /* for memset */
+
 static void scavenge_large_bitmap (StgPtr p,
                                    StgLargeBitmap *large_bitmap,
                                    StgWord size );
@@ -1582,6 +1584,10 @@ static void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
+#if defined(DEBUG)
+    MutListScavStats stats; // Local accumulator
+    zeroMutListScavStats(&stats);
+#endif
 
     uint32_t gen_no = gen->no;
     gct->evac_gen_no = gen_no;
@@ -1597,31 +1603,31 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             case MUT_VAR_CLEAN:
                 // can happen due to concurrent writeMutVars
             case MUT_VAR_DIRTY:
-                mutlist_MUTVARS++; break;
+                stats.n_MUTVAR++; break;
             case MUT_ARR_PTRS_CLEAN:
             case MUT_ARR_PTRS_DIRTY:
             case MUT_ARR_PTRS_FROZEN_CLEAN:
             case MUT_ARR_PTRS_FROZEN_DIRTY:
-                mutlist_MUTARRS++; break;
+                stats.n_MUTARR++; break;
             case MVAR_CLEAN:
                 barf("MVAR_CLEAN on mutable list");
             case MVAR_DIRTY:
-                mutlist_MVARS++; break;
+                stats.n_MVAR++; break;
             case TVAR:
-                mutlist_TVAR++; break;
+                stats.n_TVAR++; break;
             case TREC_CHUNK:
-                mutlist_TREC_CHUNK++; break;
+                stats.n_TREC_CHUNK++; break;
             case MUT_PRIM:
                 pinfo = ((StgClosure*)p)->header.info;
                 if (pinfo == &stg_TVAR_WATCH_QUEUE_info)
-                    mutlist_TVAR_WATCH_QUEUE++;
+                    stats.n_TVAR_WATCH_QUEUE++;
                 else if (pinfo == &stg_TREC_HEADER_info)
-                    mutlist_TREC_HEADER++;
+                    stats.n_TREC_HEADER++;
                 else
-                    mutlist_OTHERS++;
+                    stats.n_OTHERS++;
                 break;
             default:
-                mutlist_OTHERS++; break;
+                stats.n_OTHERS++; break;
             }
 #endif
 
@@ -1670,6 +1676,13 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             }
         }
     }
+
+#if defined(DEBUG)
+    // For lack of a better option we protect mutlist_scav_stats with oldest_gen->sync
+    ACQUIRE_SPIN_LOCK(&oldest_gen->sync);
+    addMutListScavStats(&stats, &mutlist_scav_stats);
+    RELEASE_SPIN_LOCK(&oldest_gen->sync);
+#endif
 }
 
 void
