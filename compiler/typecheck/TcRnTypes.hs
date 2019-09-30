@@ -553,29 +553,11 @@ data TcGblEnv
           --      (mkIfaceTc, as well as in HscMain)
           --    - To create the Dependencies field in interface (mkDependencies)
 
-        tcg_dus       :: DefUses,   -- ^ What is defined in this module and what is used.
-        tcg_used_gres :: TcRef [GlobalRdrElt],  -- ^ Records occurrences of imported entities
-          -- One entry for each occurrence; but may have different GREs for
-          -- the same Name See Note [Tracking unused binding and imports]
-
-        tcg_keep :: TcRef NameSet,
-          -- ^ Locally-defined top-level names to keep alive.
-          --
-          -- "Keep alive" means give them an Exported flag, so that the
-          -- simplifier does not discard them as dead code, and so that they
-          -- are exposed in the interface file (but not to export to the
-          -- user).
-          --
-          -- Some things, like dict-fun Ids and default-method Ids are "born"
-          -- with the Exported flag on, for exactly the above reason, but some
-          -- we only discover as we go.  Specifically:
-          --
-          --   * The to/from functions for generic data types
-          --
-          --   * Top-level variables appearing free in the RHS of an orphan
-          --     rule
-          --
-          --   * Top-level variables appearing free in a TH bracket
+          -- These three fields track unused bindings and imports
+          -- See Note [Tracking unused binding and imports]
+        tcg_dus       :: DefUses,
+        tcg_used_gres :: TcRef [GlobalRdrElt],
+        tcg_keep      :: TcRef NameSet,
 
         tcg_th_used :: TcRef Bool,
           -- ^ @True@ <=> Template Haskell syntax used.
@@ -750,9 +732,11 @@ data SelfBootInfo
 
 {- Note [Tracking unused binding and imports]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We gather two sorts of usage information
+We gather three sorts of usage information
 
- * tcg_dus (defs/uses)
+ * tcg_dus :: DefUses (defs/uses)
+      Records what is defined in this module and what is used.
+
       Records *defined* Names (local, top-level)
           and *used*    Names (local or imported)
 
@@ -763,7 +747,9 @@ We gather two sorts of usage information
    This usage info is mainly gathered by the renamer's
    gathering of free-variables
 
- * tcg_used_gres
+ * tcg_used_gres :: TcRef [GlobalRdrElt]
+      Records occurrences of imported entities.
+
       Used only to report unused import declarations
 
       Records each *occurrence* an *imported* (not locally-defined) entity.
@@ -772,6 +758,46 @@ We gather two sorts of usage information
       is recorded *after* the filtering done by pickGREs.  So it reflect
       /how that occurrence is in scope/.   See Note [GRE filtering] in
       RdrName.
+
+  * tcg_keep :: TcRef NameSet
+      Records names of the type constructors, data constructors, and Ids that
+      are used by the constraint solver.
+
+      The typechecker may use find that some imported or
+      locally-defined things are used, even though they
+      do not appear to be mentioned in the source code:
+
+      (a) The to/from functions for generic data types
+
+      (b) Top-level variables appearing free in the RHS of an
+          orphan rule
+
+      (c) Top-level variables appearing free in a TH bracket
+          See Note [Keeping things alive for Template Haskell]
+          in RnSplice
+
+      (d) The data constructor of a newtype that is used
+          to solve a Coercible instance (e.g. #10347). Example
+              module T10347 (N, mkN) where
+                import Data.Coerce
+                newtype N a = MkN Int
+                mkN :: Int -> N a
+                mkN = coerce
+
+          Then we wish to record `MkN` as used, since it is (morally)
+          used to perform the coercion in `mkN`. To do so, the
+          Coercible solver updates tcg_keep's TcRef whenever it
+          encounters a use of `coerce` that crosses newtype boundaries.
+
+      The tcg_keep field is used in two distinct ways:
+
+      * Desugar.addExportFlagsAndRules.  Where things like (a-c) are locally
+        defined, we should give them an an Exported flag, so that the
+        simplifier does not discard them as dead code, and so that they are
+        exposed in the interface file (but not to export to the user).
+
+      * RnNames.reportUnusedNames.  Where newtype data constructors like (d)
+        are imported, we don't want to report them as unused.
 
 
 ************************************************************************
