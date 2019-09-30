@@ -112,14 +112,8 @@ static W_ g0_pcnt_kept = 30; // percentage of g0 live at last minor GC
 
 /* Mut-list stats */
 #if defined(DEBUG)
-uint32_t mutlist_MUTVARS,
-    mutlist_MUTARRS,
-    mutlist_MVARS,
-    mutlist_TVAR,
-    mutlist_TVAR_WATCH_QUEUE,
-    mutlist_TREC_CHUNK,
-    mutlist_TREC_HEADER,
-    mutlist_OTHERS;
+// For lack of a better option we protect mutlist_scav_stats with oldest_gen->sync
+MutListScavStats mutlist_scav_stats;
 #endif
 
 /* Thread-local data for each GC thread
@@ -184,6 +178,36 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
+
+/* -----------------------------------------------------------------------------
+   Statistics from mut_list scavenging
+   -------------------------------------------------------------------------- */
+
+#if defined(DEBUG)
+void
+zeroMutListScavStats(MutListScavStats *src)
+{
+    memset(src, 0, sizeof(MutListScavStats));
+}
+
+void
+addMutListScavStats(const MutListScavStats *src,
+                    MutListScavStats *dest)
+{
+#define ADD_STATS(field) dest->field += src->field;
+    ADD_STATS(n_MUTVAR);
+    ADD_STATS(n_MUTARR);
+    ADD_STATS(n_MVAR);
+    ADD_STATS(n_TVAR);
+    ADD_STATS(n_TREC_CHUNK);
+    ADD_STATS(n_TVAR_WATCH_QUEUE);
+    ADD_STATS(n_TREC_HEADER);
+    ADD_STATS(n_OTHERS);
+#undef ADD_STATS
+}
+#endif /* DEBUG */
+
+
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
 
@@ -242,14 +266,7 @@ GarbageCollect (uint32_t collect_gen,
   stablePtrLock();
 
 #if defined(DEBUG)
-  mutlist_MUTVARS = 0;
-  mutlist_MUTARRS = 0;
-  mutlist_MVARS = 0;
-  mutlist_TVAR = 0;
-  mutlist_TVAR_WATCH_QUEUE = 0;
-  mutlist_TREC_CHUNK = 0;
-  mutlist_TREC_HEADER = 0;
-  mutlist_OTHERS = 0;
+  zeroMutListScavStats(&mutlist_scav_stats);
 #endif
 
   // attribute any costs to CCS_GC
@@ -582,10 +599,14 @@ GarbageCollect (uint32_t collect_gen,
         debugTrace(DEBUG_gc,
                    "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
                    (unsigned long)(mut_list_size * sizeof(W_)),
-                   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS,
-                   mutlist_TVAR, mutlist_TVAR_WATCH_QUEUE,
-                   mutlist_TREC_CHUNK, mutlist_TREC_HEADER,
-                   mutlist_OTHERS);
+                   mutlist_scav_stats.n_MUTVAR,
+                   mutlist_scav_stats.n_MUTARR,
+                   mutlist_scav_stats.n_MVAR,
+                   mutlist_scav_stats.n_TVAR,
+                   mutlist_scav_stats.n_TVAR_WATCH_QUEUE,
+                   mutlist_scav_stats.n_TREC_CHUNK,
+                   mutlist_scav_stats.n_TREC_HEADER,
+                   mutlist_scav_stats.n_OTHERS);
     }
 
     bdescr *next, *prev;
