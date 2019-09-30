@@ -243,7 +243,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
             bh = ((StgUpdateFrame *)frame)->updatee;
-            bh_info = bh->header.info;
+            bh_info = ACQUIRE_LOAD(&bh->header.info);
             IF_NONMOVING_WRITE_BARRIER_ENABLED {
                 updateRemembSetPushClosure(cap, (StgClosure *) bh);
             }
@@ -287,7 +287,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             // suspended by this mechanism. See Note [AP_STACKs must be eagerly
             // blackholed] for details.
             if (((bh_info == &stg_BLACKHOLE_info)
-                 && ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+                 && (RELAXED_LOAD(&((StgInd*)bh)->indirectee) != (StgClosure*)tso))
                 || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
@@ -351,9 +351,8 @@ threadPaused(Capability *cap, StgTSO *tso)
             }
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
-            write_barrier();
-            SET_INFO(bh,&stg_BLACKHOLE_info);
+            RELAXED_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
+            SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:
             recordClosureMutated(cap,bh);
