@@ -14,7 +14,7 @@ module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , HoleFitPlugin (..), HoleFitPluginR (..)
 
                     -- Re-exported from HsSyn
-                    , ExtendedHole (..), pprExtendedHoleContent
+                    , ExtendedHole (..)
                     ) where
 
 import GhcPrelude
@@ -41,7 +41,7 @@ import DynFlags
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
-import HsExpr (ExtendedHole(..), pprExtendedHoleContent)
+import HsExpr (ExtendedHole(..))
 
 import Control.Arrow ( (&&&) )
 
@@ -549,8 +549,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
      ; traceTc "Hole is extended by: " $  case ct of
         (CHoleCan { cc_hole = ExtendedExprHole eh}) ->
           case eh of
-            ExtendedHole _ fs -> ppr fs
-            ExtendedHoleSplice _ expr -> ppr expr
+            ExtendedHole _ cont -> ppr cont
         _ -> text "Nothing"
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
