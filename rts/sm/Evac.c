@@ -821,7 +821,7 @@ loop:
           i = RELAXED_LOAD(&r->header.info);
           if (IS_FORWARDING_PTR(i)) {
               r = (StgClosure *)UN_FORWARDING_PTR(i);
-              i = r->header.info;
+              i = RELAXED_LOAD(&r->header.info);
           }
           if (i == &stg_TSO_info
               || i == &stg_WHITEHOLE_info
@@ -872,8 +872,8 @@ loop:
 
   case IND:
     // follow chains of indirections, don't evacuate them
-    q = ((StgInd*)q)->indirectee;
-    *p = q;
+    q = RELAXED_LOAD(&((StgInd*)q)->indirectee);
+    RELAXED_STORE(p, q);
     goto loop;
 
   case RET_BCO:
@@ -1025,7 +1025,7 @@ evacuate_BLACKHOLE(StgClosure **p)
         StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
         *p = e;
         if (gen_no < gct->evac_gen_no) {  // optimisation
-            if (Bdescr((P_)e)->gen_no < gct->evac_gen_no) {
+            if (RELAXED_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
                 gct->failed_to_evac = true;
                 TICK_GC_FAILED_PROMOTION();
             }
@@ -1094,13 +1094,11 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
             // XXX we do not have BLACKHOLEs any more; replace with
             // a THUNK_SELECTOR again.  This will go into a loop if it is
             // entered, and should result in a NonTermination exception.
-            ((StgThunk *)p)->payload[0] = val;
-            write_barrier();
-            SET_INFO((StgClosure *)p, &stg_sel_0_upd_info);
+            RELAXED_STORE(&((StgThunk *)p)->payload[0], val);
+            SET_INFO_RELEASE((StgClosure *)p, &stg_sel_0_upd_info);
         } else {
-            ((StgInd *)p)->indirectee = val;
-            write_barrier();
-            SET_INFO((StgClosure *)p, &stg_IND_info);
+            RELAXED_STORE(&((StgInd *)p)->indirectee, val);
+            SET_INFO_RELEASE((StgClosure *)p, &stg_IND_info);
         }
 
         // For the purposes of LDV profiling, we have created an
@@ -1302,7 +1300,7 @@ selector_loop:
                       break;
                   }
               }
-              ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+              RELAXED_STORE(&((StgClosure*)p)->payload[0], (StgClosure *)prev_thunk_selector);
               prev_thunk_selector = p;
 
               *q = val;
