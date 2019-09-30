@@ -240,7 +240,7 @@ static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
   ASSERT(smp_locked == trec);
-  result = s -> current_value;
+  result = RELAXED_LOAD(&s->current_value);
   return result;
 }
 
@@ -265,7 +265,7 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
   StgClosure *result;
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   ASSERT(smp_locked == trec);
-  result = s -> current_value;
+  result = RELAXED_LOAD(&s->current_value);
   TRACE("%p : %d", result ? "success" : "failure");
   return (result == expected);
 }
@@ -311,8 +311,8 @@ static void unlock_tvar(Capability *cap,
                         StgClosure *c,
                         StgBool force_update STG_UNUSED) {
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
-  ASSERT(s -> current_value == (StgClosure *)trec);
-  RELEASE_STORE(&s-> current_value, c);
+  ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
+  RELEASE_STORE(&s->current_value, c);
   dirty_TVAR(cap, s, (StgClosure *) trec);
 }
 
@@ -532,8 +532,8 @@ static void build_watch_queue_entries_for_trec(Capability *cap,
     StgTVarWatchQueue *fq;
     s = e -> tvar;
     TRACE("%p : adding tso=%p to watch queue for tvar=%p", trec, tso, s);
-    ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
-    NACQ_ASSERT(s -> current_value == e -> expected_value);
+    ACQ_ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
+    NACQ_ASSERT(RELAXED_LOAD(&s->current_value) == e -> expected_value);
     fq = s -> first_watch_queue_entry;
     q = alloc_stg_tvar_watch_queue(cap, (StgClosure*) tso);
     q -> next_queue_entry = fq;
@@ -569,7 +569,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
           trec,
           q -> closure,
           s);
-    ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
+    ACQ_ASSERT(RELAXED_LOAD(&s->current_value) == (StgClosure *)trec);
     nq = q -> next_queue_entry;
     pq = q -> prev_queue_entry;
     if (nq != END_STM_WATCH_QUEUE) {
@@ -727,7 +727,7 @@ static StgBool entry_is_read_only(TRecEntry *e) {
 static StgBool tvar_is_locked(StgTVar *s, StgTRecHeader *h) {
   StgClosure *c;
   StgBool result;
-  c = s -> current_value;
+  c = RELAXED_LOAD(&s->current_value);
   result = (c == (StgClosure *) h);
   return result;
 }
@@ -800,13 +800,13 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
         ASSERT(config_use_read_phase);
         IF_STM_FG_LOCKS({
           TRACE("%p : will need to check %p", trec, s);
-          if (s -> current_value != e -> expected_value) {
+          if (RELAXED_LOAD(&s->current_value) != e -> expected_value) {
             TRACE("%p : doesn't match", trec);
             result = false;
             BREAK_FOR_EACH;
           }
           e -> num_updates = s -> num_updates;
-          if (s -> current_value != e -> expected_value) {
+          if (RELAXED_LOAD(&s->current_value) != e -> expected_value) {
             TRACE("%p : doesn't match (race)", trec);
             result = false;
             BREAK_FOR_EACH;
