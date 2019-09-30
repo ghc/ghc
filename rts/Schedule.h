@@ -180,10 +180,13 @@ popRunQueue (Capability *cap)
     StgTSO *t = cap->run_queue_hd;
     ASSERT(t != END_TSO_QUEUE);
     cap->run_queue_hd = t->_link;
-    if (t->_link != END_TSO_QUEUE) {
-        t->_link->block_info.prev = END_TSO_QUEUE;
+
+    StgTSO *link = RELAXED_LOAD(&t->_link);
+    if (link != END_TSO_QUEUE) {
+        link->block_info.prev = END_TSO_QUEUE;
     }
-    t->_link = END_TSO_QUEUE; // no write barrier req'd
+    RELAXED_STORE(&t->_link, END_TSO_QUEUE); // no write barrier req'd
+
     if (cap->run_queue_hd == END_TSO_QUEUE) {
         cap->run_queue_tl = END_TSO_QUEUE;
     }
