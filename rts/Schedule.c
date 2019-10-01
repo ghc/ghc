@@ -1133,7 +1133,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
         // primitives in a tight loop, MAYBE_GC() doesn't check the
         // context switch flag, and we end up waiting for a GC.
         // See #1984, and concurrent/should_run/1984
-        cap->context_switch = 0;
+        RELAXED_STORE(&cap->context_switch, 0);
         appendToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);
@@ -1234,8 +1234,8 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
     // the CPU because the tick always arrives during GC).  This way
     // penalises threads that do a lot of allocation, but that seems
     // better than the alternative.
-    if (cap->context_switch != 0) {
-        cap->context_switch = 0;
+    if (RELAXED_LOAD(&cap->context_switch) != 0) {
+        RELAXED_STORE(&cap->context_switch, 0);
         appendToRunQueue(cap,t);
     } else {
         pushOnRunQueue(cap,t);
