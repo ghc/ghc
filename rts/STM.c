@@ -228,7 +228,7 @@ static void lock_stm(StgTRecHeader *trec) {
 static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
   TRACE("%p : unlock_stm()", trec);
   ASSERT(smp_locked == trec);
-  smp_locked = 0;
+  SEQ_CST_STORE(&smp_locked, 0);
 }
 
 static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED,
@@ -248,7 +248,7 @@ static void *unlock_tvar(Capability *cap,
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(smp_locked == trec);
   if (force_update) {
-    RELEASE_STORE(&s->current_value, c);
+    RELAXED_STORE(&s->current_value, c);
     dirty_TVAR(cap,s);
   }
 }
@@ -782,13 +782,16 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
         ASSERT(config_use_read_phase);
         IF_STM_FG_LOCKS({
           TRACE("%p : will need to check %p", trec, s);
-          if (RELAXED_LOAD(&s->current_value) != e -> expected_value) {
+          // The memory ordering here must ensure that we have two distinct
+          // reads to current_value, with the read from num_updates between
+          // them.
+          if (SEQ_CST_LOAD(&s->current_value) != e -> expected_value) {
             TRACE("%p : doesn't match", trec);
             result = false;
             BREAK_FOR_EACH;
           }
-          e->num_updates = RELAXED_LOAD(&s->num_updates);
-          if (RELAXED_LOAD(&s->current_value) != e -> expected_value) {
+          e->num_updates = SEQ_CST_LOAD(&s->num_updates);
+          if (SEQ_CST_LOAD(&s->current_value) != e -> expected_value) {
             TRACE("%p : doesn't match (race)", trec);
             result = false;
             BREAK_FOR_EACH;
@@ -829,11 +832,16 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
       if (entry_is_read_only(e)) {
         TRACE("%p : check_read_only for TVar %p, saw %ld", trec, s, e -> num_updates);
 
+        // We must first load current_value then num_updates; this is inverse of
+        // the order of the stores in stmCommitTransaction.
+        StgClosure *current_value = SEQ_CST_LOAD(&s->current_value);
+        StgInt num_updates = SEQ_CST_LOAD(&s->num_updates);
+
         // Note we need both checks and in this order as the TVar could be
         // locked by another transaction that is committing but has not yet
         // incremented `num_updates` (See #7815).
-        if (RELAXED_LOAD(&s->current_value) != e->expected_value ||
-            RELAXED_LOAD(&s->num_updates) != e->num_updates) {
+        if (current_value != e->expected_value ||
+            num_updates != e->num_updates) {
           TRACE("%p : mismatch", trec);
           result = false;
           BREAK_FOR_EACH;
@@ -1103,6 +1111,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
           TRACE("%p : writing %p to %p, waking waiters", trec, e -> new_value, s);
           unpark_waiters_on(cap,s);
           IF_STM_FG_LOCKS({
+            // We have locked the TVar therefore nonatomic addition is sufficient
             NONATOMIC_ADD(&s->num_updates, 1);
           });
           unlock_tvar(cap, trec, s, e -> new_value, true);
