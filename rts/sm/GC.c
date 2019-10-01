@@ -1118,7 +1118,7 @@ inc_running (void)
 static StgWord
 dec_running (void)
 {
-    ASSERT(gc_running_threads != 0);
+    ASSERT(RELAXED_LOAD(&gc_running_threads) != 0);
     return atomic_dec(&gc_running_threads);
 }
 
@@ -1238,7 +1238,7 @@ gcWorkerThread (Capability *cap)
     //    measurements more accurate on Linux, perhaps because it syncs
     //    the CPU time across the multiple cores.  Without this, CPU time
     //    is heavily skewed towards GC rather than MUT.
-    RELAXED_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
@@ -1383,7 +1383,7 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS,
 
     for (i=0; i < n_gc_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        while (ACQUIRE_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE) {
+        while (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE) {
             busy_wait_nop();
         }
     }
@@ -1418,7 +1418,7 @@ static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
     cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    RELAXED_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
+    RELEASE_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
 }
 
 /* ----------------------------------------------------------------------------
@@ -1444,9 +1444,11 @@ prepare_collected_gen (generation *gen)
         // mutable list always has at least one block; this means we can avoid
         // a check for NULL in recordMutable().
         for (i = 0; i < n_capabilities; i++) {
-            freeChain(capabilities[i]->mut_lists[g]);
-            RELAXED_STORE(&capabilities[i]->mut_lists[g], \
-                          allocBlockOnNode(capNoToNumaNode(i)));
+            bdescr *old = RELAXED_LOAD(&capabilities[i]->mut_lists[g]);
+            freeChain(old);
+
+            bdescr *new = allocBlockOnNode(capNoToNumaNode(i));
+            RELAXED_STORE(&capabilities[i]->mut_lists[g], new);
         }
     }
 
