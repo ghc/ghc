@@ -100,6 +100,8 @@ struct Capability_ {
 
     // Context switch flag.  When non-zero, this means: stop running
     // Haskell code, and switch threads.
+    //
+    // Does not require lock to read or write.
     int context_switch;
 
     // Interrupt flag.  Like the context_switch flag, this also
@@ -110,6 +112,8 @@ struct Capability_ {
     // The interrupt flag is always reset before we start running
     // Haskell code, unlike the context_switch flag which is only
     // reset after we have executed the context switch.
+    //
+    // Does not require lock to read or write.
     int interrupt;
 
     // Total words allocated by this cap since rts start
