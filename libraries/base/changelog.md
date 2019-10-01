@@ -35,6 +35,8 @@
 
   * Add newtypes for `CSocklen` (`socklen_t`) and `CNfds` (`nfds_t`) to
     `System.Posix.Types`.
+  
+  * `reverse` can now fuse.
 
   * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
     and `(,,,) a b c`

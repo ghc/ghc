@@ -769,10 +769,53 @@ reverse                 :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 reverse                 =  foldl (flip (:)) []
 #else
-reverse l =  rev l []
-  where
-    rev []     a = a
-    rev (x:xs) a = rev xs (x:a)
+reverse = rev (:) []
+{-# INLINE reverse #-}
+
+rev :: (a -> b -> b) -> b -> [a] -> b
+rev c n = \lst -> -- Write as a lambda, so it inlines properly
+  let go l []     = l
+      go l (x:xs) = go (c x l) xs
+  in go n lst
+{-# NOINLINE [1] rev #-}
+
+-- See Note [Fusing reverse] for details
+{-# RULES
+"reverse" [~1]    forall xs. rev (:) [] xs  = build (\c n -> rev c n xs)
+"reverse/build"   forall c n (g::forall b. (a->b->b) -> b -> b).
+                    rev c n (build g)       = g (reverseFB c) (\x -> x) n
+"reverse/augment" forall c n (g::forall b. (a->b->b) -> b -> b) xs.
+                    rev c n (augment g xs)  = g (reverseFB c) (\n' -> rev c n' xs) n
+"reverse/nil"     forall c n.   rev c n []  = n
+"reverse/single"  forall c n x. rev c n [x] = x `c` n
+ #-}
+
+-- We inline this function directly, since it won't be
+-- used on the lhs of a rule. It is almost identical to the function
+-- used to express foldl via foldr.
+-- See Note [Inline FB functions] and Note [Fusing reverse].
+reverseFB :: (a -> b -> b) -> a -> (b -> b) -> b -> b
+reverseFB c = \con nil -> oneShot (\z -> nil (c con z))
+{-# INLINE reverseFold #-}
+
+
+{- Note [Fusing reverse]
+~~~~~~~~~~~~~~~~~~~~~~
+In order to fuse reverse, a logical step would be to use the report version
+of reverse, since it is already a fold and thus a good consumer.
+Wrapped in a buid expression, reverse would also be a good producer.
+In most cases this works fine, but problems arise when the produced list
+is again consumed by a left fold, for example
+    length (reverse xs).
+If xs is not a good producer, such an expression would perform worse
+than an implementation of reverse without fusion, as ghc cannot optimize
+two consecutive left folds expressed as right folds that well.
+We thus keep reverse in an explicit recursion to prevent this regression
+and fuse it manually to make it a good consumer.
+If reverse gets fused with its input, only then we will use functions
+to describe a left fold using a right fold.
+See Note [Left folds via right fold].
+-}
 #endif
 
 -- | 'and' returns the conjunction of a Boolean list.  For the result to be
