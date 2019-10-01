@@ -1289,6 +1289,8 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
+        // This can race with allocate()
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "calcNeeded(n_large_blocks)");
         W_ blocks = RELAXED_LOAD(&gen->n_blocks) // or: gen->n_words / BLOCK_SIZE_W (?)
                   + RELAXED_LOAD(&gen->n_large_blocks)
                   + RELAXED_LOAD(&gen->n_compact_blocks);
