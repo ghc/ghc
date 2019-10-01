@@ -730,6 +730,12 @@ following RTS options select which break-down to use:
     Biographical profiling is described in more detail below
     (:ref:`biography-prof`).
 
+.. rts-flag:: -ho
+
+    *Requires* :ghc-flag:`-prof`. Break down the graph by specific retainer
+    root. The root profiling mode is described in detail below
+    (:ref:`root-prof`).
+
 .. rts-flag:: -l
     :noindex:
 
@@ -948,6 +954,115 @@ states, the next step is usually to find the retainer(s):
 .. note::
     This two stage process is required because GHC cannot currently
     profile using both biographical and retainer information simultaneously.
+
+.. _root-prof:
+
+Root Profiling
+~~~~~~~~~~~~~~~~~~~~~~
+
+The root profiling mode aims to answer questions about the total size of
+specific "roots" in a program. In your program you specify a certain set of
+roots, the profiler will report how much memory is accessible from each root.
+Typical profiling modes such as ``-hy`` don't
+understand the relationship between different closures so you may end up trying
+to understand where, more generally allocations come from.
+
+A root is different from cost centre profiling because the allocations under
+a root may come from lots of different places. For example, consider a cache which
+is updated incrementally over the course of the program. In the root profiling mode
+you can attach a root to each cache and see how their size grows over the course
+of a program. In other profiling modes you can usually observe this indirectly
+by seeing an abundance of constructors but it's hard to be precise about what
+is causing the allocation.
+
+The ``setHeapRoots`` function can be imported from ``GHC.Profiling``. It is used
+to create the roots of the profile. Consider the following example program,
+the ultimate goal is to work out which part of ``HscEnv`` contributes the
+most allocations in total. In realistic applications you end up with data structures
+like ``HscEnv`` which are very deep and contribute significantly to total allocation
+of the program. The problem, the allocations are only identified by allocation
+of more primitive types such as ``[]`` so it's hard to pinpoint where the
+problem actually is.
+
+Therefore in order to investigate the ``HscEnv`` we create three different
+roots. One which points at the ``HscEnv``, one for ``EPS`` and one for ``FC``.
+
+
+.. code-block:: none
+   module Main where
+
+   import GHC.Profiling
+
+   data HscEnv = HscEnv { hsc_EPS :: EPS, hsc_FC :: FC, hsc_OTHER :: OTHER }
+   data EPS    = EPS    { eps_A, eps_B, eps_C :: Word }
+   data FC     = FC     { fc_A, fc_B, fc_C, fc_D :: Word }
+   data OTHER  = OTHER  { o_A, o_B, o_C :: Word }
+
+   main = do
+      setHeapRoots
+         [ Root "hsc" hsc
+         , Root "eps" (hsc_EPS hsc)
+         , Root "fc"  (hsc_FC hsc)
+         ]
+
+   hsc = HscEnv
+      { hsc_EPS   = EPS   x y   e
+      , hsc_FC    = FC    x y z f
+      , hsc_OTHER = OTHER x   z t
+   }
+
+
+   x = 1
+   y = 2
+   z = 3
+   e = 4
+   f = 5
+   t = 6
+
+One sample then would look like the following:
+
+.. code-block::
+   hsc         80
+   eps         0
+   fc          0
+   hsc-eps     48
+   hsc-fc      72
+   eps-fc      0
+   hsc-eps-fc  32
+
+- "hsc" is using 80 bytes of memory which are not shared with any of the
+  other roots.
+  - 1 word info ptr + 3 words payload of ``HscEnv``
+  - 1 word info ptr + 3 words payload of OTHER
+  - 1 word info ptr + 1 word payload of Word of `t`
+  - or (1 + 3 + 1 + 3 + 1 + 1 = 10 words) * 8 bytes = 80 bytes
+
+- "eps" and "fc" do not have any unshared memory usage since they are fully
+  contained in, and thus reachable from, "hsc",
+
+- "hsc" and "eps" share 48 bytes, i.e. 48 bytes worth of heap objects are
+  reachable from both the "hsc" and "eps" roots but not from "fc". Looking
+  at the definition, only `e` is not shared with anything else hence:
+
+  - 1 word info ptr + 3 words payload of EPS
+  - 1 word info ptr + 1 words payload of Word32 of ``e``
+  - or (1 + 3 + (1 + 1) = 6 words) * 8 bytes = 48 bytes. You get the idea.
+
+- "hsc" and "fc" share 72 bytes exclusively and
+
+- "hsc", "eps" and "fc" share 32 bytes exclusively.
+
+
+The sum of all these "bins" ``80 + 48 + 72 + 32 = 232`` is the total amount
+of memory reachable from the set of roots, hence it makes sense to display
+them stacked in a diagram as ``hp2ps`` does.
+
+
+
+.. NOTE::
+   The number of roots is currently limited to 20.
+
+
 
 .. _mem-residency:
 
