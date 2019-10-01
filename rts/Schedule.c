@@ -1334,7 +1334,7 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
               if (task->incall->ret) {
                   *(task->incall->ret) = NULL;
               }
-              if (sched_state >= SCHED_INTERRUPTING) {
+              if (RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING) {
                   if (heap_overflow) {
                       task->incall->rstat = HeapExhausted;
                   } else {
