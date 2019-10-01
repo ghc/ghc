@@ -2231,6 +2231,12 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     cap = rts_lock();
     task = cap->running_task;
 
+
+    // N.B. We must stop the interval timer while we are changing the
+    // capabilities array lest handle_tick may try to context switch
+    // an old capability. See #17289.
+    stopTimer();
+
     stopAllCapabilities(&cap, task);
 
     if (new_n_capabilities < enabled_capabilities)
@@ -2312,6 +2318,8 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 
     // Notify IO manager that the number of capabilities has changed.
     rts_evalIO(&cap, ioManagerCapabilitiesChanged_closure, NULL);
+
+    startTimer();
 
     rts_unlock(cap);
 
