@@ -16,7 +16,7 @@ checker.
 
 module TcHsSyn (
         -- * Extracting types from HsSyn
-        hsLitType, hsLPatType, hsPatType,
+        hsLitType, hsPatType,
 
         -- * Other HsSyn functions
         mkHsDictLet, mkHsApp,
@@ -96,15 +96,12 @@ import Control.Arrow ( second )
 
 -}
 
-hsLPatType :: OutPat GhcTc -> Type
-hsLPatType lpat = hsPatType (unLoc lpat)
-
 hsPatType :: Pat GhcTc -> Type
-hsPatType (ParPat _ pat)                = hsLPatType pat
+hsPatType (ParPat _ pat)                = hsPatType pat
 hsPatType (WildPat ty)                  = ty
 hsPatType (VarPat _ lvar)               = idType (unLoc lvar)
-hsPatType (BangPat _ pat)               = hsLPatType pat
-hsPatType (LazyPat _ pat)               = hsLPatType pat
+hsPatType (BangPat _ pat)               = hsPatType pat
+hsPatType (LazyPat _ pat)               = hsPatType pat
 hsPatType (LitPat _ lit)                = hsLitType lit
 hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
@@ -120,7 +117,10 @@ hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
-hsPatType p                             = pprPanic "hsPatType" (ppr p)
+-- XPat wraps a Located (Pat GhcTc) in GhcTc
+hsPatType (XPat lpat)                   = hsPatType (unLoc lpat)
+hsPatType ConPatIn{}                    = panic "hsPatType: ConPatIn"
+hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
 
 hsLitType :: HsLit (GhcPass p) -> TcType
 hsLitType (HsChar _ _)       = charTy
