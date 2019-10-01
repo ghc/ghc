@@ -176,7 +176,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
             // to scavenge the to-space object on the current core therefore
             // no-one else will follow this pointer (FIXME: Is this true in
             // light of the selector optimization?).
-            RELAXED_STORE(p, TAG_CLOSURE(tag,(StgClosure*)to));
+            RELEASE_STORE(p, TAG_CLOSURE(tag,(StgClosure*)to));
         }
     }
 #else
@@ -212,7 +212,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
     // if somebody else reads the forwarding pointer, we better make
     // sure there's a closure at the end of it.
     RELEASE_STORE(p, TAG_CLOSURE(tag,(StgClosure*)to));
-    RELAXED_STORE(&src->header.info, \
+    RELEASE_STORE(&src->header.info, \
                   (const StgInfoTable *)MK_FORWARDING_PTR(to));
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
@@ -250,7 +250,7 @@ spin:
             goto spin;
         }
     if (IS_FORWARDING_PTR(info)) {
-        src->header.info = (const StgInfoTable *)info;
+        RELEASE_STORE(&src->header.info, (const StgInfoTable *)info);
         evacuate(p); // does the failed_to_evac stuff
         return false;
     }
@@ -315,7 +315,7 @@ evacuate_large(StgPtr p)
   ACQUIRE_SPIN_LOCK(&gen->sync);
 
   // already evacuated?
-  if (bd->flags & BF_EVACUATED) {
+  if (RELAXED_LOAD(&bd->flags) & BF_EVACUATED) {
     /* Don't forget to set the gct->failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
@@ -348,9 +348,9 @@ evacuate_large(StgPtr p)
   ws = &gct->gens[new_gen_no];
   new_gen = &generations[new_gen_no];
 
-  __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_RELAXED);
+  __atomic_fetch_or(&bd->flags, BF_EVACUATED, __ATOMIC_ACQ_REL);
   if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
-      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_RELAXED);
+      __atomic_fetch_or(&bd->flags, BF_NONMOVING, __ATOMIC_ACQ_REL);
   }
   initBdescr(bd, new_gen, new_gen->to);
 
@@ -642,7 +642,8 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((RELAXED_LOAD(&bd->flags) & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
+  uint16_t flags = RELAXED_LOAD(&bd->flags);
+  if ((flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
       // Pointer to non-moving heap. Non-moving heap is collected using
       // mark-sweep so this object should be marked and then retained in sweep.
       if (RTS_UNLIKELY(RELAXED_LOAD(&bd->flags) & BF_NONMOVING)) {
@@ -660,7 +661,7 @@ loop:
       // happen often, but allowing it makes certain things a bit
       // easier; e.g. scavenging an object is idempotent, so it's OK to
       // have an object on the mutable list multiple times.
-      if (RELAXED_LOAD(&bd->flags) & BF_EVACUATED) {
+      if (flags & BF_EVACUATED) {
           // We aren't copying this object, so we have to check
           // whether it is already in the target generation.  (this is
           // the write barrier).
@@ -675,20 +676,20 @@ loop:
       // right thing for objects that are half way in the middle of the first
       // block of a compact (and would be treated as large objects even though
       // they are not)
-      if (RELAXED_LOAD(&bd->flags) & BF_COMPACT) {
+      if (flags & BF_COMPACT) {
           evacuate_compact((P_)q);
           return;
       }
 
       /* evacuate large objects by re-linking them onto a different list.
        */
-      if (RELAXED_LOAD(&bd->flags) & BF_LARGE) {
+      if (flags & BF_LARGE) {
           evacuate_large((P_)q);
 
           // We may have evacuated the block to the nonmoving generation. If so
           // we need to make sure it is added to the mark queue since the only
           // reference to it may be from the moving heap.
-          if (major_gc && bd->flags & BF_NONMOVING && !deadlock_detect_gc) {
+          if (major_gc && flags & BF_NONMOVING && !deadlock_detect_gc) {
               markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
           }
           return;
@@ -706,7 +707,7 @@ loop:
 
   gen_no = bd->dest_no;
 
-  info = RELAXED_LOAD(&q->header.info);
+  info = ACQUIRE_LOAD(&q->header.info);
   if (IS_FORWARDING_PTR(info))
   {
     /* Already evacuated, just return the forwarding address.
@@ -728,7 +729,8 @@ loop:
       StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
       RELAXED_STORE(p, TAG_CLOSURE(tag,e));
       if (gen_no < gct->evac_gen_no) {  // optimisation
-          if (RELAXED_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
+          // The ACQUIRE here is necessary to ensure that we 
+          if (ACQUIRE_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
               TICK_GC_FAILED_PROMOTION();
           }
@@ -820,10 +822,10 @@ loop:
       const StgInfoTable *i;
       r = ((StgInd*)q)->indirectee;
       if (GET_CLOSURE_TAG(r) == 0) {
-          i = RELAXED_LOAD(&r->header.info);
+          i = ACQUIRE_LOAD(&r->header.info);
           if (IS_FORWARDING_PTR(i)) {
               r = (StgClosure *)UN_FORWARDING_PTR(i);
-              i = RELAXED_LOAD(&r->header.info);
+              i = ACQUIRE_LOAD(&r->header.info);
           }
           if (i == &stg_TSO_info
               || i == &stg_WHITEHOLE_info
@@ -848,7 +850,7 @@ loop:
           ASSERT(i != &stg_IND_info);
       }
       q = r;
-      *p = r;
+      RELEASE_STORE(p, r);
       goto loop;
   }
 
@@ -989,9 +991,10 @@ evacuate_BLACKHOLE(StgClosure **p)
     ASSERT(GET_CLOSURE_TAG(q) == 0);
 
     bd = Bdescr((P_)q);
+    const uint16_t flags = RELAXED_LOAD(&bd->flags);
 
     // blackholes can't be in a compact
-    ASSERT((bd->flags & BF_COMPACT) == 0);
+    ASSERT((flags & BF_COMPACT) == 0);
 
     if (RTS_UNLIKELY(RELAXED_LOAD(&bd->flags) & BF_NONMOVING)) {
         if (major_gc && !deadlock_detect_gc)
@@ -1002,18 +1005,18 @@ evacuate_BLACKHOLE(StgClosure **p)
     // blackholes *can* be in a large object: when raiseAsync() creates an
     // AP_STACK the payload might be large enough to create a large object.
     // See #14497.
-    if (bd->flags & BF_LARGE) {
+    if (flags & BF_LARGE) {
         evacuate_large((P_)q);
         return;
     }
-    if (bd->flags & BF_EVACUATED) {
+    if (flags & BF_EVACUATED) {
         if (bd->gen_no < gct->evac_gen_no) {
             gct->failed_to_evac = true;
             TICK_GC_FAILED_PROMOTION();
         }
         return;
     }
-    if (bd->flags & BF_MARKED) {
+    if (flags & BF_MARKED) {
         if (!is_marked((P_)q,bd)) {
             mark((P_)q,bd);
             push_mark_stack((P_)q);
@@ -1021,13 +1024,13 @@ evacuate_BLACKHOLE(StgClosure **p)
         return;
     }
     gen_no = bd->dest_no;
-    info = RELAXED_LOAD(&q->header.info);
+    info = ACQUIRE_LOAD(&q->header.info);
     if (IS_FORWARDING_PTR(info))
     {
         StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
         *p = e;
         if (gen_no < gct->evac_gen_no) {  // optimisation
-            if (RELAXED_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
+            if (ACQUIRE_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
                 gct->failed_to_evac = true;
                 TICK_GC_FAILED_PROMOTION();
             }
@@ -1202,8 +1205,7 @@ selector_chain:
             //     need the write-barrier stuff.
             //   - undo the chain we've built to point to p.
             SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
-            write_barrier();
-            *q = (StgClosure *)p;
+            RELEASE_STORE(q, (StgClosure *) p);
             if (evac) evacuate(q);
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             return;
@@ -1256,7 +1258,7 @@ selector_loop:
                                           info->layout.payload.nptrs));
 
               // Select the right field from the constructor
-              StgClosure *val = selectee->payload[field];
+              StgClosure *val = RELAXED_LOAD(&selectee->payload[field]);
 
 #if defined(PROFILING)
               // For the purposes of LDV profiling, we have destroyed
@@ -1282,7 +1284,7 @@ selector_loop:
               // evaluating until we find the real value, and then
               // update the whole chain to point to the value.
           val_loop:
-              info_ptr = RELAXED_LOAD((StgWord*) &UNTAG_CLOSURE(val)->header.info);
+              info_ptr = ACQUIRE_LOAD((StgWord*) &UNTAG_CLOSURE(val)->header.info);
               if (!IS_FORWARDING_PTR(info_ptr))
               {
                   info = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
@@ -1324,19 +1326,19 @@ selector_loop:
       case IND:
       case IND_STATIC:
           // Again, we might need to untag a constructor.
-          selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
+          selectee = UNTAG_CLOSURE( RELAXED_LOAD(&((StgInd *)selectee)->indirectee) );
           goto selector_loop;
 
       case BLACKHOLE:
       {
           StgClosure *r;
           const StgInfoTable *i;
-          r = ((StgInd*)selectee)->indirectee;
+          r = ACQUIRE_LOAD(&((StgInd*)selectee)->indirectee);
 
           // establish whether this BH has been updated, and is now an
           // indirection, as in evacuate().
           if (GET_CLOSURE_TAG(r) == 0) {
-              i = RELAXED_LOAD(&r->header.info);
+              i = ACQUIRE_LOAD(&r->header.info);
               if (IS_FORWARDING_PTR(i)) {
                   r = (StgClosure *)UN_FORWARDING_PTR(i);
                   i = RELAXED_LOAD(&r->header.info);
@@ -1350,7 +1352,7 @@ selector_loop:
               ASSERT(i != &stg_IND_info);
           }
 
-          selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
+          selectee = UNTAG_CLOSURE( RELAXED_LOAD(&((StgInd *)selectee)->indirectee) );
           goto selector_loop;
       }
 
