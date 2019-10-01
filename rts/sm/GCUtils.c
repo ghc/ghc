@@ -330,10 +330,11 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
                 gct->free_blocks = bd->link;
             }
         }
-        // blocks in to-space get the BF_EVACUATED flag.
-        RELAXED_STORE(&bd->flags, BF_EVACUATED);
-        RELAXED_STORE(&bd->u.scan, RELAXED_LOAD(&bd->start));
         initBdescr(bd, ws->gen, ws->gen->to);
+        RELAXED_STORE(&bd->u.scan, RELAXED_LOAD(&bd->start));
+        // blocks in to-space get the BF_EVACUATED flag.
+        // RELEASE here to ensure that bd->gen is visible to other cores.
+        RELEASE_STORE(&bd->flags, BF_EVACUATED);
     }
 
     bd->link = NULL;
