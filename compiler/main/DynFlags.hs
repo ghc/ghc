@@ -3108,9 +3108,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "split-sections"
       (noArgM (\dflags -> do
         if platformHasSubsectionsViaSymbols (targetPlatform dflags)
-          then do addErr $
+          then do addWarn $
                     "-split-sections is not useful on this platform " ++
-                    "since it always uses subsections via symbols."
+                    "since it always uses subsections via symbols. Ignoring."
                   return dflags
           else return (gopt_set dflags Opt_SplitSections)))
 
