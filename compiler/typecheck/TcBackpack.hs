@@ -521,7 +521,6 @@ mergeSignatures
         -- tcg_dus?
         -- tcg_th_used           = tcg_th_used orig_tcg_env,
         -- tcg_th_splice_used    = tcg_th_splice_used orig_tcg_env
-        -- tcg_th_top_level_locs = tcg_th_top_level_locs orig_tcg_env
        }) $ do
     tcg_env <- getGblEnv
 

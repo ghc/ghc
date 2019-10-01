@@ -584,9 +584,8 @@ tc_rn_src_decls ds
           { Nothing -> return (tcg_env, tcl_env, lie1)
 
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl _ (dL->L loc splice) _, rest_ds) ->
-            do { recordTopLevelSpliceLoc loc
-
+          ; Just (SpliceDecl _ (dL->L _ splice) _, rest_ds) ->
+            do {
                  -- We need to simplify any constraints from the previous declaration
                  -- group, or else we might reify metavariables, as in #16980.
                ; ev_binds1 <- simplifyTop lie1
