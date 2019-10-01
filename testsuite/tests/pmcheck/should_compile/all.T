@@ -56,6 +56,8 @@ test('T14098', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T14813', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T14899', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T15305', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T15385', normal, compile,
@@ -82,7 +84,21 @@ test('T17096', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
 test('T17112', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17207', expect_broken(17207), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17208', expect_broken(17208), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17215', expect_broken(17215), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17216', expect_broken(17216), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17218', expect_broken(17218), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17219', expect_broken(17219), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17234', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17248', expect_broken(17248), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
@@ -119,6 +135,37 @@ test('CaseOfKnownCon', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('TooManyDeltas', [], compile,
      ['-fmax-pmcheck-models=0 -fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+
+# Series (inspired) by Luke Maranget
+
+test('PmSeriesS',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genS.py 10'),
+       extra_files(['genS.py']),
+     ],
+     multimod_compile,
+     ['S', '-v0'])
+test('PmSeriesT',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genT.py 10'),
+       extra_files(['genT.py']),
+     ],
+     multimod_compile,
+     ['T', '-v0'])
+test('PmSeriesV',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('$PYTHON ./genV.py 6'),
+       extra_files(['genV.py']),
+     ],
+     multimod_compile,
+     ['V', '-v0'])
+test('PmSeriesG',
+     [ collect_compiler_stats('bytes allocated',10),
+       pre_cmd('./genG 20'),
+       extra_files(['genG']),
+     ],
+     multimod_compile,
+     ['G', '-v0'])
 
 # EmptyCase
 test('T10746', [], compile,
