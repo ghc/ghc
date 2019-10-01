@@ -32,7 +32,7 @@ import BasicTypes
 import Inst
 import TcBinds          ( chooseInferredQuantifiers, tcLocalBinds )
 import TcSigs           ( tcUserTypeSig, tcInstSig )
-import TcSimplify       ( simplifyInfer, InferMode(..) )
+import TcSimplify       ( simplifyInfer, InferMode(..), simplifyTop )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE )
@@ -644,19 +644,37 @@ tcExpr (HsStatic fvs expr) res_ty
 tcExpr e@(HsExtendedHole _ (ExtendedHole occ cont)) res_ty
   = do { ty <- newOpenFlexiTyVarTy
        ; name <- newSysName occ
-       ; tEh <- case cont of
-                  ExtHNoContent -> return (ExtendedHole occ ExtHNoContent)
-                  ExtHRawExpr exp -> (ExtendedHole occ . ExtHRawExpr) <$> texp exp 
-                  ExtHTHSplice spl -> do tE <- texp $ mapLoc (HsSpliceE noExtField) spl
-                                         return (ExtendedHole occ $ ExtHRawExpr tE)
+       ; (mbTy, tEh) <- case cont of
+                  ExtHNoContent ->
+                    return (Nothing, ExtendedHole occ ExtHNoContent)
+                  ExtHRawExpr exp ->
+                    tcRunExtHExpr exp
+                  ExtHTHSplice spl ->
+                    pprPanic "Un-run splice in ExtendedHole!" $ ppr spl
        ; let ev = mkLocalId name ty
-       ; can <- newHoleCt (ExtendedExprHole tEh) ev ty
+       ; can <- newHoleCt (ExtendedExprHole tEh mbTy) ev ty
        ; emitInsoluble can
        ; tcWrapResultO HoleOrigin e (HsVar noExtField (noLoc ev)) ty res_ty }
-    where texp (L l expr) = do { nt <- newInferExpTypeNoInst
-                               ; tcE <- tcExpr expr nt
-                               ; return (L l tcE) }
-
+  where tcRunExtHExpr lexpr =
+            checkNoErrs $ -- We don't want any errors
+            unsetGOptM Opt_DeferTypeErrors $ -- We're running the code,
+                                             -- so we don't want to defer!
+              do { -- Taking a leaf out of InteractiveEval, we wrap the
+                   -- expression in a call to `toDyn`, moving the onus
+                   -- of making sure it works to the hole plugin writer,
+                   -- instead of presenting them with a segfault when
+                   -- unsafeCorecing.
+                 ; let (L l expr) = wrapInDyn lexpr
+                 ; nt <- newInferExpTypeNoInst
+                 -- We need to solve type class constraint (and report
+                 -- typeclass errors here.
+                 ; (tcE', wanted) <- captureConstraints $ tcExpr expr nt
+                 ; const_binds <- simplifyTop wanted
+                 ; ltcE' <- zonkTopLExpr (mkHsDictLet (EvBinds const_binds) (L l tcE'))
+                 ; et <- readExpType_maybe nt
+                 ; return (et, ExtendedHole occ $ ExtHRawExpr ltcE') }
+        wrapInDyn lexpr@(L loc _) =
+          mkHsApp (L loc $ HsVar noExtField $ L loc toDynName) lexpr
 
 {-
 ************************************************************************

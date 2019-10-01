@@ -218,8 +218,8 @@ rnExpr (HsSpliceE _ splice) = rnSpliceExpr splice
 rnExpr (HsExtendedHole ext (ExtendedHole nm cont)) =
     case cont of
       ExtHNoContent -> return (HsExtendedHole ext (ExtendedHole nm ExtHNoContent), emptyFVs)
-      ExtHRawExpr (L l exp) ->
-        do (rne, fvs) <- rnExpr exp
+      ExtHRawExpr (L l expr) ->
+        do (rne, fvs) <- rnExpr expr
            return (HsExtendedHole ext (ExtendedHole nm (ExtHRawExpr (L l rne))), fvs)
       ExtHTHSplice (L l spl) ->
         -- Here we run the splice and replace the hole content with the resulting

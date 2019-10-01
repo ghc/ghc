@@ -2175,7 +2175,7 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
               case cont of
                 ExtHNoContent -> "_()"
                 ExtHRawExpr _ -> "_(...)"
-                ExtHTHSplice (L _ spl) -> 
+                ExtHTHSplice (L _ spl) ->
                   case spl of
                     HsUntypedSplice{} -> "_$(...)"
                     HsTypedSplice{} -> "_$$(...)"
