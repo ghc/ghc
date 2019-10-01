@@ -930,7 +930,7 @@ dsDo stmts
                  (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
                do_arg (XApplicativeArg nec) = noExtCon nec
 
-               arg_tys = map hsLPatType pats
+               arg_tys = map hsPatType pats
 
            ; rhss' <- sequence rhss
 

@@ -16,7 +16,7 @@ import {-# SOURCE #-}   TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId, t
 
 import GHC.Hs
 import TcMatches
-import TcHsSyn( hsLPatType )
+import TcHsSyn( hsPatType )
 import TcType
 import TcMType
 import TcBinds
@@ -257,7 +257,7 @@ tc_cmd env
         ; let match' = L mtch_loc (Match { m_ext = noExtField
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
-              arg_tys = map hsLPatType pats'
+              arg_tys = map hsPatType pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
