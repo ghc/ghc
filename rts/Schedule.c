@@ -394,7 +394,7 @@ schedule (Capability *initialCapability, Task *task)
      */
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0
         && !emptyThreadQueues(cap)) {
-        cap->context_switch = 1;
+        RELAXED_STORE(&cap->context_switch, 1);
     }
 
 run_thread:
