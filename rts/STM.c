@@ -210,7 +210,7 @@ static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
                               StgClosure *expected) {
   StgClosure *result;
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
-  result = s -> current_value;
+  result = RELAXED_LOAD(&s->current_value);
   TRACE("%p : %s", trec, (result == expected) ? "success" : "failure");
   return (result == expected);
 }
@@ -805,7 +805,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
             result = false;
             BREAK_FOR_EACH;
           }
-          e -> num_updates = s -> num_updates;
+          e->num_updates = RELAXED_LOAD(&s->num_updates);
           if (RELAXED_LOAD(&s->current_value) != e -> expected_value) {
             TRACE("%p : doesn't match (race)", trec);
             result = false;
@@ -828,7 +828,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
 // check_read_only : check that we've seen an atomic snapshot of the
 // non-updated TVars accessed by a trec.  This checks that the last TRec to
 // commit an update to the TVar is unchanged since the value was stashed in
-// validate_and_acquire_ownership.  If no udpate is seen to any TVar than
+// validate_and_acquire_ownership.  If no update is seen to any TVar then
 // all of them contained their expected values at the start of the call to
 // check_read_only.
 //
@@ -850,8 +850,8 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
         // Note we need both checks and in this order as the TVar could be
         // locked by another transaction that is committing but has not yet
         // incremented `num_updates` (See #7815).
-        if (s -> current_value != e -> expected_value ||
-            s -> num_updates != e -> num_updates) {
+        if (RELAXED_LOAD(&s->current_value) != e->expected_value ||
+            RELAXED_LOAD(&s->num_updates) != e->num_updates) {
           TRACE("%p : mismatch", trec);
           result = false;
           BREAK_FOR_EACH;
@@ -902,7 +902,7 @@ static void getTokenBatch(Capability *cap) {
   NONATOMIC_ADD(&max_commits, TOKEN_BATCH_SIZE);
   TRACE("%p : cap got token batch, max_commits=%" FMT_Int64, cap, RELAXED_LOAD(&max_commits));
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
-  token_locked = false;
+  RELEASE_STORE(&token_locked, false);
 }
 
 static void getToken(Capability *cap) {
@@ -1122,7 +1122,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
           TRACE("%p : writing %p to %p, waking waiters", trec, e -> new_value, s);
           unpark_waiters_on(cap,s);
           IF_STM_FG_LOCKS({
-            s -> num_updates ++;
+            NONATOMIC_ADD(&s->num_updates, 1);
           });
           unlock_tvar(cap, trec, s, e -> new_value, true);
         }
