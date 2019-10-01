@@ -1417,7 +1417,7 @@ void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
 
     acquireAllCapabilities(pCap ? *pCap : NULL, task);
 
-    RELAXED_STORE(&pending_sync, 0);
+    SEQ_CST_STORE(&pending_sync, 0);
     signalCondition(&sync_finished_cond);
 }
 #endif
@@ -1479,7 +1479,7 @@ static bool requestSync (
                           sync->type);
                 ASSERT(*pcap);
                 yieldCapability(pcap,task,true);
-                sync = RELAXED_LOAD(&pending_sync);
+            sync = SEQ_CST_LOAD(&pending_sync);
             } while (sync != NULL);
         }
 
@@ -1854,7 +1854,7 @@ delete_threads_and_gc:
 #if defined(THREADED_RTS)
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
-    RELAXED_STORE(&pending_sync, 0);
+    SEQ_CST_STORE(&pending_sync, 0);
     signalCondition(&sync_finished_cond);
     GarbageCollect(collect_gen, heap_census, deadlock_detect, gc_type, cap, idle_cap);
 #else
