@@ -1461,8 +1461,10 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
-        // This can race with allocate() but only needs to be approximate
+        // This can race with allocate() and compactAllocateBlockInternal()
+        // but only needs to be approximate
         TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "calcNeeded(n_large_blocks)");
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_compact_blocks, "calcNeeded(n_compact_blocks)");
         W_ blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
         blocks += gen->n_large_blocks
                 + gen->n_compact_blocks;
