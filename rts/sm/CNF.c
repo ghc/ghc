@@ -245,6 +245,7 @@ compactAllocateBlockInternal(Capability            *cap,
     initBdescr(head, g, g);
     head->flags = BF_COMPACT;
     for (block = head + 1, n_blocks --; n_blocks > 0; block++, n_blocks--) {
+        initBdescr(block, g, g);
         block->link = head;
         block->blocks = 0;
         block->flags = BF_COMPACT;
