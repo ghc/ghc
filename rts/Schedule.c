@@ -202,7 +202,7 @@ schedule (Capability *initialCapability, Task *task)
   // Pre-condition: this task owns initialCapability.
   // The sched_mutex is *NOT* held
   // NB. on return, we still hold a capability.
-  ASSERT_TASK_OWNS_CAPABILITY(task, cap);
+  ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
 
   debugTrace (DEBUG_sched, "cap %d: schedule()", initialCapability->no);
 
@@ -212,7 +212,7 @@ schedule (Capability *initialCapability, Task *task)
   // Scheduler loop starts here:
 
   while (1) {
-    ASSERT_TASK_OWNS_CAPABILITY(task, cap);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
 
     // Check whether we have re-entered the RTS from Haskell without
     // going via suspendThread()/resumeThread (i.e. a 'safe' foreign
@@ -2636,9 +2636,9 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 #if defined(THREADED_RTS)
 void scheduleWorker (Capability *cap, Task *task)
 {
-    ASSERT_TASK_OWNS_CAPABILITY(task, cap);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
     cap = schedule(cap,task);
-    ASSERT_TASK_OWNS_CAPABILITY(task, cap);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
 
     // On exit from schedule(), we have a Capability, but possibly not
     // the same one we started with.
