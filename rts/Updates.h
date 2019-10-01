@@ -76,11 +76,9 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* not necessarily true: ASSERT( !closure_IND(p1) ); */
     /* occurs in RaiseAsync.c:raiseAsync() */
     /* See Note [Heap memory barriers] in SMP.h */
-    write_barrier();
     OVERWRITING_CLOSURE(p1);
     RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
-    write_barrier();
-    SET_INFO(p1, &stg_BLACKHOLE_info);
+    SET_INFO_RELEASE(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
     bd = Bdescr((StgPtr)p1);
     if (bd->gen_no != 0) {
