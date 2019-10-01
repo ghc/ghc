@@ -93,7 +93,7 @@ tracePm herald doc = do
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
-  let occname = mkVarOccFS $ fsLit "$pm"
+  let occname = mkVarOccFS $ fsLit "pm"
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 
@@ -1576,8 +1576,8 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       = do { arg_ids <- traverse bind_expr args
            ; data_con_app x dc arg_ids }
       -- See Note [Detecting pattern synonym applications in expressions]
-      | Var y <- e, not (isDataConWorkId x)
-      -- We don't consider (unsaturated!) DataCons as flexible variables
+      | Var y <- e, Nothing <- isDataConId_maybe x
+      -- We don't consider DataCons flexible variables
       = modifyT (\delta -> addVarVarCt delta (x, y))
       | otherwise
       -- Any other expression. Try to find other uses of a semantically
@@ -1635,9 +1635,9 @@ Compared to the situation where P and Q are DataCons, the lack of generativity
 means we could never flag Q as redundant.
 (also see Note [Undecidable Equality for PmAltCons] in PmTypes.)
 On the other hand, if we fail to recognise the pattern synonym, we flag the
-pattern match as incomplete. That wouldn't happen if had knowledge about the
-scrutinee, in which case the oracle basically knows "If it's a P, then its field
-is 15".
+pattern match as inexhaustive. That wouldn't happen if we had knowledge about
+the scrutinee, in which case the oracle basically knows "If it's a P, then its
+field is 15".
 
 This is a pretty narrow use case and I don't think we should to try to fix it
 until a user complains energetically.
