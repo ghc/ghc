@@ -790,7 +790,7 @@ freeGroup(bdescr *p)
   // not true in multithreaded GC:
   // ASSERT_SM_LOCK();
 
-  ASSERT(p->free != (P_)-1);
+  ASSERT(RELAXED_LOAD(&p->free) != (P_)-1);
 
   node = p->node;
 
