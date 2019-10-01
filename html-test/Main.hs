@@ -54,12 +54,6 @@ ingoredTests =
     -- we need a reliable way to deduplicate here.
     -- Happens since PR #688.
     "B"
-
-    -- ignore-exports flag broke with PR #688. We use
-    -- the Avails calculated by GHC now. Probably
-    -- requires a change to GHC to "ignore" a modules
-    -- export list reliably.
-  , "IgnoreExports"
   ]
 
 checkIgnore :: FilePath -> Bool
