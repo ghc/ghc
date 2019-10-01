@@ -91,7 +91,7 @@ tracePm herald doc = do
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
-  let occname = mkVarOccFS $ fsLit "$pm"
+  let occname = mkVarOccFS $ fsLit "pm"
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 
@@ -1513,7 +1513,7 @@ addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
       = do { arg_ids <- traverse bind_expr args
            ; data_con_app x dc arg_ids }
       -- TODO: Think about how to recognize PatSyns
-      | Var y <- e, not (isDataConWorkId x)
+      | Var y <- e, Nothing <- isDataConId_maybe x
       = modifyT (\delta -> addVarVarCt delta (x, y))
       | otherwise
       -- TODO: Use a CoreMap to identify the CoreExpr with a unique representant
