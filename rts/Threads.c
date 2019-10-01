@@ -277,8 +277,6 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
         msg = (MessageWakeup *)allocate(cap,sizeofW(MessageWakeup));
         msg->tso = tso;
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
-        // Ensure that writes constructing Message are committed before sending.
-        write_barrier();
         sendMessage(cap, tso->cap, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
                       (W_)tso->id, tso->cap->no);
@@ -385,8 +383,7 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
 
     for (msg = bq->queue; msg != (MessageBlackHole*)END_TSO_QUEUE;
          msg = msg->link) {
-        i = msg->header.info;
-        load_load_barrier();
+        i = ACQUIRE_LOAD(&msg->header.info);
         if (i != &stg_IND_info) {
             ASSERT(i == &stg_MSG_BLACKHOLE_info);
             tryWakeupThread(cap,msg->tso);
@@ -416,8 +413,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
 
-        const StgInfoTable *bqinfo = bq->header.info;
-        load_load_barrier();  // XXX: Is this needed?
+        const StgInfoTable *bqinfo = ACQUIRE_LOAD(&bq->header.info);
         if (bqinfo == &stg_IND_info) {
             // ToDo: could short it out right here, to avoid
             // traversing this IND multiple times.
@@ -425,8 +421,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
         }
 
         p = bq->bh;
-        const StgInfoTable *pinfo = p->header.info;
-        load_load_barrier();
+        const StgInfoTable *pinfo = ACQUIRE_LOAD(&p->header.info);
         if (pinfo != &stg_BLACKHOLE_info ||
             ((StgInd *)p)->indirectee != (StgClosure*)bq)
         {
@@ -450,8 +445,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
     StgTSO *owner;
     const StgInfoTable *i;
 
-    i = thunk->header.info;
-    load_load_barrier();
+    i = ACQUIRE_LOAD(&thunk->header.info);
     if (i != &stg_BLACKHOLE_info &&
         i != &stg_CAF_BLACKHOLE_info &&
         i != &__stg_EAGER_BLACKHOLE_info &&
@@ -471,8 +465,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
         return;
     }
 
-    i = v->header.info;
-    load_load_barrier();
+    i = ACQUIRE_LOAD(&v->header.info);
     if (i == &stg_TSO_info) {
         checkBlockingQueues(cap, tso);
         return;
@@ -798,8 +791,7 @@ loop:
         return true;
     }
 
-    qinfo = q->header.info;
-    load_load_barrier();
+    qinfo = ACQUIRE_LOAD(&q->header.info);
     if (qinfo == &stg_IND_info ||
         qinfo == &stg_MSG_NULL_info) {
         q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
@@ -816,15 +808,15 @@ loop:
     ASSERT(tso->block_info.closure == (StgClosure*)mvar);
     // save why_blocked here, because waking up the thread destroys
     // this information
-    StgWord why_blocked = tso->why_blocked;
+    StgWord why_blocked = RELAXED_LOAD(&tso->why_blocked);
 
     // actually perform the takeMVar
     StgStack* stack = tso->stackobj;
-    stack->sp[1] = (W_)value;
-    stack->sp[0] = (W_)&stg_ret_p_info;
+    RELAXED_STORE(&stack->sp[1], (W_)value);
+    RELAXED_STORE(&stack->sp[0], (W_)&stg_ret_p_info);
 
     // indicate that the MVar operation has now completed.
-    tso->_link = (StgTSO*)&stg_END_TSO_QUEUE_closure;
+    RELEASE_STORE(&tso->_link, (StgTSO*)&stg_END_TSO_QUEUE_closure);
 
     if ((stack->dirty & STACK_DIRTY) == 0) {
         dirty_STACK(cap, stack);
