@@ -131,7 +131,7 @@ loop:
     else if (i == &stg_WHITEHOLE_info)
     {
 #if defined(PROF_SPIN)
-        ++whitehole_executeMessage_spin;
+        NONATOMIC_ADD(&whitehole_executeMessage_spin, 1);
 #endif
         goto loop;
     }
@@ -301,7 +301,7 @@ loop:
         recordClosureMutated(cap,(StgClosure*)msg);
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
-            bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
+            RELAXED_STORE(&bq->header.info, &stg_BLOCKING_QUEUE_DIRTY_info);
             // No barrier is necessary here: we are only exposing the
             // closure to the GC. See Note [Heap memory barriers] in SMP.h.
             recordClosureMutated(cap,(StgClosure*)bq);
