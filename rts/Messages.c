@@ -240,8 +240,7 @@ loop:
         // We are about to make the newly-constructed message visible to other cores;
         // a barrier is necessary to ensure that all writes are visible.
         // See Note [Heap memory barriers] in SMP.h.
-        write_barrier();
-        owner->bq = bq;
+        RELEASE_STORE(&owner->bq, bq);
         dirty_TSO(cap, owner); // we modified owner->bq
 
         // If the owner of the blackhole is currently runnable, then
@@ -287,7 +286,7 @@ loop:
         }
 #endif
 
-        msg->link = bq->queue;
+        RELAXED_STORE(&msg->link, bq->queue);
         bq->queue = msg;
         // No barrier is necessary here: we are only exposing the
         // closure to the GC. See Note [Heap memory barriers] in SMP.h.
