@@ -2022,11 +2022,13 @@ forkProcess(HsStablePtr *entry
     ACQUIRE_LOCK(&sm_mutex);
     ACQUIRE_LOCK(&stable_ptr_mutex);
     ACQUIRE_LOCK(&stable_name_mutex);
-    ACQUIRE_LOCK(&task->lock);
 
     for (i=0; i < n_capabilities; i++) {
         ACQUIRE_LOCK(&capabilities[i]->lock);
     }
+
+    // Take task lock after capability lock to avoid order inversion (#17275).
+    ACQUIRE_LOCK(&task->lock);
 
 #if defined(THREADED_RTS)
     ACQUIRE_LOCK(&all_tasks_mutex);
