@@ -279,7 +279,7 @@ deBindComp pat core_list1 quals core_list2 = do
     let u3_ty@u1_ty = exprType core_list1       -- two names, same thing
 
         -- u1_ty is a [alpha] type, and u2_ty = alpha
-    let u2_ty = hsLPatType pat
+    let u2_ty = hsPatType pat
 
     let res_ty = exprType core_list2
         h_ty   = u1_ty `mkVisFunTy` res_ty
@@ -373,7 +373,7 @@ dfBindComp :: Id -> Id             -- 'c' and 'n'
            -> DsM CoreExpr
 dfBindComp c_id n_id (pat, core_list1) quals = do
     -- find the required type
-    let x_ty   = hsLPatType pat
+    let x_ty   = hsPatType pat
     let b_ty   = idType n_id
 
     -- create some new local id's
