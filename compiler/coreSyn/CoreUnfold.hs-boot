@@ -1,10 +1,12 @@
 module CoreUnfold (
-        mkUnfolding
+        mkUnfolding, mkInlineUnfolding
     ) where
 
 import GhcPrelude
 import CoreSyn
 import DynFlags
+
+mkInlineUnfolding :: CoreExpr -> Unfolding
 
 mkUnfolding :: DynFlags
             -> UnfoldingSource

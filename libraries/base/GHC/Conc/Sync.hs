@@ -117,6 +117,8 @@ import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
 
+import Unsafe.Coerce    ( unsafeCoerce# )
+
 infixr 0 `par`, `pseq`
 
 -----------------------------------------------------------------------------
@@ -621,6 +623,9 @@ data PrimMVar
 newStablePtrPrimMVar :: MVar () -> IO (StablePtr PrimMVar)
 newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
   case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
+    -- Coerce unlifted  m :: MVar# RealWorld ()
+    --     to lifted    PrimMVar
+    -- apparently because mkStablePtr is not levity-polymorphic
     (# s1, sp #) -> (# s1, StablePtr sp #)
 
 -----------------------------------------------------------------------------

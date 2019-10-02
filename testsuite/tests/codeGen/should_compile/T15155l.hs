@@ -1,8 +1,11 @@
 module T15155 (a, B(..), b) where
 
+import Debug.Trace
+
 newtype A = A Int
 newtype B = B A
 
 {-# NOINLINE a #-}
-a = A 42
+a = trace "evaluating a" A 42
+
 b = B a

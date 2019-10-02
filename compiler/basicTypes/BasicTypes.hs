@@ -325,6 +325,9 @@ isPromoted :: PromotionFlag -> Bool
 isPromoted IsPromoted  = True
 isPromoted NotPromoted = False
 
+instance Outputable PromotionFlag where
+  ppr NotPromoted = text "NotPromoted"
+  ppr IsPromoted  = text "IsPromoted"
 
 {-
 ************************************************************************

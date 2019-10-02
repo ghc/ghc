@@ -11,6 +11,7 @@ import GHC.MVar (MVar(..))
 import GHC.Prim
 import System.Environment
 import System.Exit
+import Unsafe.Coerce
 
 -- Measure C to Haskell callback throughput under a workload with
 -- several dimensions:
