@@ -358,7 +358,9 @@ data IfaceUnfolding
                                 -- Possibly could eliminate the Bool here, the information
                                 -- is also in the InlinePragma.
 
-  | IfCompulsory IfaceExpr      -- Only used for default methods, in fact
+  | IfCompulsory IfaceExpr      -- default methods and unsafeCoerce#
+                                -- for more about unsafeCoerce#, see
+                                -- Note [Wiring in unsafeCoerce#] in Desugar
 
   | IfInlineRule Arity          -- INLINE pragmas
                  Bool           -- OK to inline even if *un*-saturated
@@ -1615,7 +1617,6 @@ freeNamesIfCoercion (IfaceAxiomRuleCo _ax cos)
   = fnList freeNamesIfCoercion cos
 
 freeNamesIfProv :: IfaceUnivCoProv -> NameSet
-freeNamesIfProv IfaceUnsafeCoerceProv    = emptyNameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
