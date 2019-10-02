@@ -251,6 +251,13 @@ primop   IntMulOp    "*#"
    with commutable = True
         fixity = infixl 7
 
+primop   IntMul2Op    "timesInt2#" GenPrimOp
+   Int# -> Int# -> (# Int#, Int#, Int# #)
+   {Return a triple (isHighNeeded,high,low) where high and low are respectively
+   the high and low bits of the double-word result. isHighNeeded is a cheap way
+   to test if the high word is a sign-extension of the low word (isHighNeeded =
+   0#) or not (isHighNeeded = 1#).}
+
 primop   IntMulMayOfloOp  "mulIntMayOflo#"
    Dyadic   Int# -> Int# -> Int#
    {Return non-zero if there is any possibility that the upper word of a
