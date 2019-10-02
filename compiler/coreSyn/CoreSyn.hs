@@ -591,11 +591,7 @@ this exhaustive list can be empty!
   because x might raise an exception, and *that*'s what we want to see!
   (#6067 is an example.) To preserve semantics we'd have to say
      x `seq` error Bool "Inaccessible case"
-  but the 'seq' is just a case, so we are back to square 1.  Or I suppose
-  we could say
-     x |> UnsafeCoerce T Bool
-  but that loses all trace of the fact that this originated with an empty
-  set of alternatives.
+  but the 'seq' is just a case, so we are back to square 1.
 
 * We can use the empty-alternative construct to coerce error values from
   one type to another.  For example
