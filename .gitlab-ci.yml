@@ -946,14 +946,13 @@ source-tarball:
 .hackage:
   <<: *only-default
   stage: testing
-  image: ghcci/x86_64-linux-deb9:0.2
-  tags:
-    - x86_64-linux
-  dependencies: []
   variables:
-    HEAD_HACKAGE_PROJECT_ID: "78"
-  script:
-    - bash .gitlab/start-head.hackage.sh
+    GHC_PIPELINE_ID: $CI_PIPELINE_ID
+    EXTRA_HC_OPTS: "-dcore-lint"
+  trigger:
+    project: ghc/head.hackage
+    branch: master
+    strategy: depend
 
 hackage:
   extends: .hackage
