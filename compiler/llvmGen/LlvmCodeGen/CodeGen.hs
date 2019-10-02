@@ -833,6 +833,7 @@ cmmPrimOpFunctions mop = do
     MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
+    MO_S_Mul2    {}  -> unsupported
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
