@@ -300,7 +300,6 @@ toIfaceCoercionX fr co
                             fr' = fr `delVarSet` tv
 
     go_prov :: UnivCoProvenance -> IfaceUnivCoProv
-    go_prov UnsafeCoerceProv    = IfaceUnsafeCoerceProv
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str

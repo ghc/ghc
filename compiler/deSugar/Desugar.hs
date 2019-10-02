@@ -27,29 +27,32 @@ import TcRnTypes
 import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )
 import Id
+import IdInfo
 import Name
 import Type
+import TyCon       ( tyConDataCons )
 import Avail
 import CoreSyn
 import CoreFVs     ( exprsSomeFreeVarsList )
 import CoreOpt     ( simpleOptPgm, simpleOptExpr )
+import CoreUtils
+import CoreUnfold
 import PprCore
 import DsMonad
 import DsExpr
 import DsBinds
 import DsForeign
-import PrelNames   ( coercibleTyConKey )
-import TysPrim     ( eqReprPrimTyCon )
-import Unique      ( hasKey )
-import Coercion    ( mkCoVarCo )
-import TysWiredIn  ( coercibleDataCon )
+import PrelNames
+import TysPrim
+import Coercion
+import TysWiredIn
 import DataCon     ( dataConWrapId )
-import MkCore      ( mkCoreLet )
+import MkCore
 import Module
 import NameSet
 import NameEnv
 import Rules
-import BasicTypes       ( Activation(.. ), competesWith, pprRuleName )
+import BasicTypes
 import CoreMonad        ( CoreToDo(..) )
 import CoreLint         ( endPassIO )
 import VarSet
@@ -130,6 +133,7 @@ deSugar hsc_env
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $
                        do { ds_ev_binds <- dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr
+                          ; core_prs <- patchMagicDefns core_prs
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
@@ -543,3 +547,195 @@ firing.  But it's not clear what to do instead.  We could make the
 class method rules inactive in phase 2, but that would delay when
 subsequent transformations could fire.
 -}
+
+{-
+************************************************************************
+*                                                                      *
+*              Magic definitions
+*                                                                      *
+************************************************************************
+
+Note [Patching magic definitions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We sometimes need to have access to defined Ids in pure contexts. Usually, we
+simply "wire in" these entities, as we do for types in TysWiredIn and for Ids
+in MkId. However, it is sometimes *much* easier to define entities in Haskell,
+even if we need pure access; note that wiring-in an Id requires all entities
+used in its definition *also* to be wired in, transitively and recursively.
+This can be a pain.
+
+The little trick documented here allows us to have the best of both worlds.
+
+Motivating example: unsafeCoerce#. See [Wiring in unsafeCoerce#] for the
+details.
+
+The trick is to define the known-key Id normally and then magically update its
+definition here in the desugarer, in patchMagicDefns. This update can be done
+with full access to the DsM monad, and hence, dsLookupGlobal. We thus do not
+have to wire in all the entities used internally, a potentially big win.
+
+Because an Id stores its unfolding directly (as opposed to in the second
+component of a (Id, CoreExpr) pair), the patchMagicDefns function returns
+a new Id to use.
+
+Here are the moving parts:
+
+- patchMagicDefns checks whether we're in a module with magic definitions;
+  if so, patch the magic definitions. If not, skip.
+
+- patchMagicDefn just looks up in an environment to find a magic defn and
+  patches it in.
+
+- magicDefns holds the magic definitions.
+
+- magicDefnsEnv allows for quick access to magicDefns.
+
+- magicDefnModules, built also from magicDefns, contains the modules that
+  need careful attention.
+
+Note [Wiring in unsafeCoerce#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want (Haskell)
+
+  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                          (a :: TYPE r1) (b :: TYPE r2).
+                   a -> b
+  unsafeCoerce# x = case unsafeEqualityProof @r1 @r2 of
+    UnsafeRefl -> case unsafeEqualityProof @a @b of
+      UnsafeRefl -> x
+
+or (Core)
+
+  unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                          (a :: TYPE r1) (b :: TYPE r2).
+                   a -> b
+  unsafeCoerce# = \ @r1 @r2 @a @b (x :: a).
+    case unsafeEqualityProof @RuntimeRep @r1 @r2 of
+      UnsafeRefl (co1 :: r1 ~# r2) ->
+        case unsafeEqualityProof @(TYPE r2) @(a |> TYPE co1) @b of
+          UnsafeRefl (co2 :: (a |> TYPE co1) ~# b) ->
+            (x |> (GRefl :: a ~# (a |> TYPE co1)) ; co2)
+
+It looks like we can write this in Haskell directly, but we can't:
+the levity polymorphism checks defeat us. Note that `x` is a levity-
+polymorphic variable. So we must wire it in with a compulsory
+unfolding, like other levity-polymorphic primops.
+
+The challenge is that UnsafeEquality is a GADT, and wiring in a GADT
+is *hard*: it has a worker separate from its wrapper, with all manner
+of complications. (Simon and Richard tried to do this. We nearly wept.)
+
+The solution is documented in Note [Patching magic definitions]. We now
+simply look up the UnsafeEquality GADT in the environment, leaving us
+only to wire in unsafeCoerce# directly.
+
+Wrinkle:
+--------
+We must make absolutely sure that unsafeCoerce# is inlined. You might
+think that giving it a compulsory unfolding is enough. However,
+unsafeCoerce# is put in an interface file like any other definition.
+At optimization level 0, we enable -fignore-interface-pragmas, which
+ignores pragmas in interface files. We thus must check to see whether
+there is a compulsory unfolding, even with -fignore-interface-pragmas.
+This is done in TcIface.tcIdInfo.
+
+Test case: ghci/linker/dyn/T3372
+
+-}
+
+
+-- Postcondition: the returned Ids are in one-to-one correspondence as the
+-- input Ids; each returned Id has the same type as the passed-in Id.
+-- See Note [Patching magic definitions]
+patchMagicDefns :: OrdList (Id,CoreExpr)
+                -> DsM (OrdList (Id,CoreExpr))
+patchMagicDefns pairs
+  -- optimization: check whether we're in a magic module before looking
+  -- at all the ids
+  = do { this_mod <- getModule
+       ; if this_mod `elemModuleSet` magicDefnModules
+         then traverse patchMagicDefn pairs
+         else return pairs }
+
+patchMagicDefn :: (Id, CoreExpr) -> DsM (Id, CoreExpr)
+patchMagicDefn orig_pair@(orig_id, orig_rhs)
+  | Just mk_magic_pair <- lookupNameEnv magicDefnsEnv (getName orig_id)
+  = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
+       ; MASSERT( getUnique magic_id == getUnique orig_id )
+       ; MASSERT( varType magic_id `eqType` varType orig_id )
+       ; return magic_pair }
+  | otherwise
+  = return orig_pair
+
+magicDefns :: [(Name,    Id -> CoreExpr     -- old Id and RHS
+                      -> DsM (Id, CoreExpr) -- new Id and RHS
+               )]
+magicDefns = [ (unsafeCoercePrimName, mkUnsafeCoercePrimPair) ]
+
+magicDefnsEnv :: NameEnv (Id -> CoreExpr -> DsM (Id, CoreExpr))
+magicDefnsEnv = mkNameEnv magicDefns
+
+magicDefnModules :: ModuleSet
+magicDefnModules = mkModuleSet $ map (nameModule . getName . fst) magicDefns
+
+mkUnsafeCoercePrimPair :: Id -> CoreExpr -> DsM (Id, CoreExpr)
+mkUnsafeCoercePrimPair _old_id old_expr
+  = do { unsafe_equality_proof_id <- dsLookupGlobalId unsafeEqualityProofName
+       ; unsafe_equality_tc       <- dsLookupTyCon unsafeEqualityTyConName
+
+       ; let [unsafe_refl_data_con] = tyConDataCons unsafe_equality_tc
+
+             rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
+                          , openAlphaTyVar, openBetaTyVar
+                          , x ] $
+                   mkSingleAltCase scrut1
+                                   (mkWildValBinder scrut1_ty)
+                                   (DataAlt unsafe_refl_data_con)
+                                   [rr_cv] $
+                   mkSingleAltCase scrut2
+                                   (mkWildValBinder scrut2_ty)
+                                   (DataAlt unsafe_refl_data_con)
+                                   [ab_cv] $
+                   Var x `mkCast` x_co
+
+             [x, rr_cv, ab_cv] = mkTemplateLocals
+               [ openAlphaTy -- x :: a
+               , rr_cv_ty    -- rr_cv :: r1 ~# r2
+               , ab_cv_ty    -- ab_cv :: (alpha |> alpha_co ~# beta)
+               ]
+
+             -- Returns (scrutinee, scrutinee type, type of covar in AltCon)
+             unsafe_equality k a b
+               = ( mkTyApps (Var unsafe_equality_proof_id) [k,b,a]
+                 , mkTyConApp unsafe_equality_tc [k,b,a]
+                 , mkHeteroPrimEqPred k k a b
+                 )
+             -- NB: UnsafeRefl :: (b ~# a) -> UnsafeEquality a b, so we have to
+             -- carefully swap the arguments above
+
+             (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeRepTy
+                                                             runtimeRep1Ty
+                                                             runtimeRep2Ty
+             (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeRep2Ty)
+                                                             (openAlphaTy `mkCastTy` alpha_co)
+                                                             openBetaTy
+
+             -- alpha_co :: TYPE r1 ~# TYPE r2
+             -- alpha_co = TYPE rr_cv
+             alpha_co = mkTyConAppCo Nominal tYPETyCon [mkCoVarCo rr_cv]
+
+             -- x_co :: alpha ~R# beta
+             x_co = mkGReflCo Representational openAlphaTy (MCo alpha_co) `mkTransCo`
+                    mkSubCo (mkCoVarCo ab_cv)
+
+
+             info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                                `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+
+             id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
+       ; return (id, old_expr) }
+
+  where
+    ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
+                         , openAlphaTyVar, openBetaTyVar ] $
+         mkVisFunTy openAlphaTy openBetaTy

@@ -117,6 +117,8 @@ import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
 
+import Unsafe.Coerce    ( unsafeCoerce# )
+
 infixr 0 `par`, `pseq`
 
 -----------------------------------------------------------------------------
