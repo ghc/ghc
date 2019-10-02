@@ -58,6 +58,8 @@ $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$$$(haddock_INPLACE) $$$$(g
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
 	"$$(ghc-cabal_INPLACE)" hscolour $1 $2
 endif
+	# N.B. in a source tree from tarball the testsuite/ directory may not exist
+	mkdir -p $$(TOP)/testsuite/tests/perf/haddock
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
 		--verbosity=0 \
 		--odir="$1/$2/doc/html/$$($1_PACKAGE)" \
