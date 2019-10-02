@@ -44,17 +44,15 @@ T15723:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723B.hs -o T15723B.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dynamic -shared T15723B.o -o T15723B.so
 
-## check that there are two assembly equates
-# mentioning T15155.a_closure (def and use)
-T15155:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | grep -F ".equiv " \
-	| grep -F "T15155.a_closure" | wc -l | sed -e 's/ *//g' | grep "2" ; echo $$?
 
-## check that there are two "$def" aliases:
-#  - one that bitcasts to %T15155_a_closure_struct*
-#  - and the other which bitcasts from %T15155_a_closure_struct*
-##
+
+# Check that the static indirection b is compiled to an equiv directive
+T15155:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-asm T15155l.hs | \
+		grep -F ".equiv T15155.b_closure,T15155.a_closure"
+
+# Same as above, but in LLVM. Check that the static indirection b is compiled to
+# an alias.
 T15155l:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null \
-	| grep -F "= alias %T15155_" | grep -E "@T15155_[ab]_closure.def = " | grep -F "%T15155_a_closure_struct*" \
-	| wc -l | sed -e 's/ *//g' | grep "2"; echo $$?
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null | \
+		grep -F "@T15155_b_closure = alias i8, i8* @T15155_a_closure"

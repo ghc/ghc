@@ -54,7 +54,11 @@ test('break001', extra_files(['../Test2.hs']), ghci_script, ['break001.script'])
 test('break002', extra_files(['../Test2.hs']), ghci_script, ['break002.script'])
 test('break003', extra_files(['../Test3.hs']), ghci_script, ['break003.script'])
 test('break005', extra_files(['../QSort.hs']), ghci_script, ['break005.script'])
-test('break006', extra_files(['../Test3.hs']), ghci_script, ['break006.script'])
+test('break006',
+     [ when(compiler_debugged(), expect_broken(17833)),
+       extra_files(['../Test3.hs'])],
+     ghci_script,
+     ['break006.script'])
 test('break007', extra_files(['Break007.hs']), ghci_script, ['break007.script'])
 test('break008', extra_files(['../Test3.hs']), ghci_script, ['break008.script'])
 test('break009', [extra_files(['../Test6.hs']),
