@@ -2021,6 +2021,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_AtomicRead _  -> unsupported
                     MO_AtomicWrite _ -> unsupported
 
+                    MO_S_Mul2    {}  -> unsupported
                     MO_S_QuotRem {}  -> unsupported
                     MO_U_QuotRem {}  -> unsupported
                     MO_U_QuotRem2 {} -> unsupported
