@@ -5,6 +5,7 @@ module T5359a (linesT) where
 import GHC.Base hiding (empty)
 import GHC.Word
 import GHC.ST (ST(..), runST)
+import Unsafe.Coerce( unsafeCoerce# )
 
 nullT :: Text -> Bool
 nullT (Text _ _ len) = len <= 0
