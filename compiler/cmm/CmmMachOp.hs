@@ -583,6 +583,7 @@ data CallishMachOp
 
   | MO_UF_Conv Width
 
+  | MO_S_Mul2    Width
   | MO_S_QuotRem Width
   | MO_U_QuotRem Width
   | MO_U_QuotRem2 Width
