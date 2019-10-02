@@ -1,6 +1,8 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, DeriveDataTypeable,
-             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
+             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude,
+             TypeApplications, ScopedTypeVariables, KindSignatures, DataKinds,
+             TypeOperators, GADTs, PolyKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -96,6 +98,7 @@ import GHC.Word
 import GHC.Int
 import GHC.Ptr
 import GHC.Stack
+import GHC.Types
 
 import qualified Data.Coerce
 import Data.String
@@ -103,6 +106,7 @@ import Data.OldList
 import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
+import Data.Type.Equality
 import qualified Debug.Trace
 
 -- XXX This should really be in Data.Tuple, where the definitions are
@@ -246,5 +250,12 @@ atomicModifyMutVar#
   -> State# s
   -> (# State# s, c #)
 atomicModifyMutVar# mv f s =
-  case unsafeCoerce# (atomicModifyMutVar2# mv f s) of
+  case castTupleRepWith unsafeHeteroEqualityProof (atomicModifyMutVar2# mv f s) of
     (# s', _, ~(_, res) #) -> (# s', res #)
+
+castTupleRepWith
+  :: forall (a :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep]))
+            (b :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep])) .
+     (a :~~: b) -> a -> b
+castTupleRepWith HRefl x = x
+

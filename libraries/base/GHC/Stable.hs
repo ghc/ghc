@@ -2,6 +2,12 @@
 {-# LANGUAGE NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
+           , GADTs
+           , TypeApplications
+           , ScopedTypeVariables
+           , TypeOperators
+           , KindSignatures
+           , DataKinds
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -30,6 +36,8 @@ module GHC.Stable (
 
 import GHC.Ptr
 import GHC.Base
+import GHC.Prim
+import Data.Type.Equality
 
 -----------------------------------------------------------------------------
 -- Stable Pointers
@@ -84,9 +92,12 @@ foreign import ccall unsafe "hs_free_stable_ptr" freeStablePtr :: StablePtr a ->
 -- the member functions of the class 'Foreign.Storable.Storable' leads to
 -- undefined behaviour.
 --
-castStablePtrToPtr :: StablePtr a -> Ptr ()
-castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerce# s)
+castStablePtrToPtr :: forall a . StablePtr a -> Ptr ()
+castStablePtrToPtr (StablePtr s) =
+    Ptr (castAddrRepWith (unsafeEqualityProof @(StablePtr# a) @Addr#) s)
 
+castAddrRepWith :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . (a :~: b) -> a -> b
+castAddrRepWith Refl x = x
 
 -- |
 -- The inverse of 'castStablePtrToPtr', i.e., we have the identity
@@ -98,8 +109,9 @@ castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerce# s)
 -- only be applied to pointers that have been produced by
 -- 'castStablePtrToPtr'.
 --
-castPtrToStablePtr :: Ptr () -> StablePtr a
-castPtrToStablePtr (Ptr a) = StablePtr (unsafeCoerce# a)
+castPtrToStablePtr :: forall a . Ptr () -> StablePtr a
+castPtrToStablePtr (Ptr a) =
+    StablePtr (castAddrRepWith (unsafeEqualityProof @Addr# @(StablePtr# a)) a)
 
 -- | @since 2.01
 instance Eq (StablePtr a) where
