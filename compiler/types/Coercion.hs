@@ -35,7 +35,7 @@ module Coercion (
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
-        mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
+        mkHoleCo, mkUnivCo, mkSubCo,
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
@@ -637,8 +637,7 @@ it is not absolutely critical that setNominalRole_maybe be complete.
 
 Note that setNominalRole_maybe will never upgrade a phantom UnivCo. Phantom
 UnivCos are perfectly type-safe, whereas representational and nominal ones are
-not. Indeed, `unsafeCoerce` is implemented via a representational UnivCo.
-(Nominal ones are no worse than representational ones, so this function *will*
+not. (Nominal ones are no worse than representational ones, so this function *will*
 change a UnivCo Representational to a UnivCo Nominal.)
 
 Conal Elliott also came across a need for this function while working with the
@@ -935,14 +934,6 @@ mkAxInstLHS ax index tys cos
 -- | Instantiate the left-hand side of an unbranched axiom
 mkUnbranchedAxInstLHS :: CoAxiom Unbranched -> [Type] -> [Coercion] -> Type
 mkUnbranchedAxInstLHS ax = mkAxInstLHS ax 0
-
--- | Manufacture an unsafe coercion from thin air.
---   Currently (May 14) this is used only to implement the
---   @unsafeCoerce#@ primitive.  Optimise by pushing
---   down through type constructors.
-mkUnsafeCo :: Role -> Type -> Type -> Coercion
-mkUnsafeCo role ty1 ty2
-  = mkUnivCo UnsafeCoerceProv role ty1 ty2
 
 -- | Make a coercion from a coercion hole
 mkHoleCo :: CoercionHole -> Coercion
@@ -1281,8 +1272,7 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
-      | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
-                     PhantomProv _    -> False  -- should always be phantom
+      | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
       = Just $ UnivCo prov Nominal co1 co2
@@ -1388,7 +1378,6 @@ promoteCoercion co = case co of
     AxiomInstCo {} -> mkKindCo co
     AxiomRuleCo {} -> mkKindCo co
 
-    UnivCo UnsafeCoerceProv _ t1 t2   -> mkUnsafeCo Nominal (typeKind t1) (typeKind t2)
     UnivCo (PhantomProv kco) _ _ _    -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _) _ _ _       -> mkKindCo co
@@ -2145,7 +2134,6 @@ seqCo (SubCo co)                = seqCo co
 seqCo (AxiomRuleCo _ cs)        = seqCos cs
 
 seqProv :: UnivCoProvenance -> ()
-seqProv UnsafeCoerceProv    = ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()

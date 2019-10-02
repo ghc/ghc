@@ -1061,7 +1061,7 @@ visibleDataCons (SumTyCon{ data_cons = cs })  = cs
 data AlgTyConFlav
   = -- | An ordinary type constructor has no parent.
     VanillaAlgTyCon
-       TyConRepName
+       TyConRepName   -- For Typeable
 
     -- | An unboxed type constructor. The TyConRepName is a Maybe since we
     -- currently don't allow unboxed sums to be Typeable since there are too
@@ -1300,9 +1300,10 @@ This eta-reduction is implemented in BuildTyCl.mkNewTyConRhs.
 *                                                                      *
 ********************************************************************* -}
 
-type TyConRepName = Name -- The Name of the top-level declaration
-                         --    $tcMaybe :: Data.Typeable.Internal.TyCon
-                         --    $tcMaybe = TyCon { tyConName = "Maybe", ... }
+type TyConRepName = Name
+   -- The Name of the top-level declaration for the Typeable world
+   --    $tcMaybe :: Data.Typeable.Internal.TyCon
+   --    $tcMaybe = TyCon { tyConName = "Maybe", ... }
 
 tyConRepName_maybe :: TyCon -> Maybe TyConRepName
 tyConRepName_maybe (FunTyCon   { tcRepName = rep_nm })

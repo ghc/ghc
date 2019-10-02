@@ -463,6 +463,12 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- Unsafe coercion proofs
+        , unsafeEqualityProofName
+        , unsafeEqualityTyConName
+        , unsafeReflDataConName
+        , unsafeCoercePrimName
+        , unsafeCoerceName
     ]
 
 genericTyConNames :: [Name]
@@ -511,7 +517,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
-    dATA_COERCE, dEBUG_TRACE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -574,6 +580,7 @@ gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
+uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
 
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
@@ -1319,7 +1326,14 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
-
+-- Unsafe coercion proofs
+unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
+  unsafeCoerceName, unsafeReflDataConName :: Name
+unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
+unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
+unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
+unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
+unsafeCoerceName        = varQual uNSAFE_COERCE (fsLit "unsafeCoerce")  unsafeCoerceIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -1891,6 +1905,11 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
+-- Unsafe equality
+unsafeEqualityTyConKey :: Unique
+unsafeEqualityTyConKey = mkPreludeTyConUnique 191
+
+
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -2060,6 +2079,9 @@ typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
+-- Unsafe equality
+unsafeReflDataConKey :: Unique
+unsafeReflDataConKey      = mkPreludeDataConUnique 114
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 200-250
@@ -2111,11 +2133,10 @@ typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
 
-unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
-    returnIOIdKey, newStablePtrIdKey,
+concatIdKey, filterIdKey, zipIdKey,
+    bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
-unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
@@ -2408,6 +2429,12 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+
+-- Unsafe coercion proofs
+unsafeEqualityProofIdKey, unsafeCoercePrimIdKey, unsafeCoerceIdKey :: Unique
+unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
+unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
+unsafeCoerceIdKey        = mkPreludeMiscIdUnique 572
 
 {-
 ************************************************************************
