@@ -116,6 +116,7 @@ hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
+hsPatType (XPat lpat)                   = hsPatType (unLoc lpat)
 hsPatType p                             = pprPanic "hsPatType" (ppr p)
 
 hsLitType :: HsLit (GhcPass p) -> TcType
