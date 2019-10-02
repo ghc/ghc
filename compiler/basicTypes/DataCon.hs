@@ -1396,6 +1396,10 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 --                  scrutinee of type (T tys)
 --                  where T is the dcRepTyCon for the data con
 dataConCannotMatch tys con
+  -- See Note [unsafeCoerce magic] in Unsafe.Coerce
+  | dataConName con == unsafeReflDataConName ||
+    dataConName con == unsafeHReflDataConName
+                      = False
   | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common
   | otherwise         = typesCantMatch (concatMap predEqs inst_theta)
