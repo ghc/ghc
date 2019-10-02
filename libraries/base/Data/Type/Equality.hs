@@ -13,6 +13,8 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE Trustworthy            #-}
 
 -----------------------------------------------------------------------------
@@ -44,7 +46,11 @@ module Data.Type.Equality (
   TestEquality(..),
 
   -- * Boolean type-level equality
-  type (==)
+  type (==),
+
+  -- * Unsafe equality proofs, for unsafeCoerce and unsafeCoerce#
+  unsafeEqualityProof,
+  unsafeHeteroEqualityProof
   ) where
 
 import Data.Maybe
@@ -207,3 +213,15 @@ type family a == b where
 -- With the recursive version, `Succ n == Succ m` reduces to
 -- `Succ == Succ && n == m`, which can reduce to `'True && n == m` and
 -- finally to `n == m`.
+
+{-# NOINLINE unsafeEqualityProof #-}
+unsafeEqualityProof :: forall a b . a :~: b
+unsafeEqualityProof = case unsafeEqualityProof @a @b of Refl -> Refl
+
+{-# NOINLINE unsafeHeteroEqualityProof #-}
+unsafeHeteroEqualityProof :: forall a b . a :~~: b
+unsafeHeteroEqualityProof =
+  (case unsafeEqualityProof @k1 @k2 of
+    Refl -> case unsafeEqualityProof @a' @b' of
+      Refl -> HRefl)
+        :: forall k1 k2 (a' :: k1) (b' :: k2). a' :~~: b'

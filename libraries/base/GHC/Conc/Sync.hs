@@ -7,8 +7,15 @@
            , UnliftedFFITypes
            , StandaloneDeriving
            , RankNTypes
+           , TypeApplications
+           , ScopedTypeVariables
+           , KindSignatures
+           , DataKinds
+           , TypeOperators
+           , GADTs
   #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-missing-signatures -Wno-overlapping-patterns
+                -Wno-inaccessible-code #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -99,6 +106,7 @@ import Foreign.C
 
 import Data.Typeable
 import Data.Maybe
+import Data.Type.Equality
 
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
@@ -116,6 +124,7 @@ import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
+import GHC.Types
 
 infixr 0 `par`, `pseq`
 
@@ -625,8 +634,12 @@ data PrimMVar
 -- have to cheat by coercing.
 newStablePtrPrimMVar :: MVar () -> IO (StablePtr PrimMVar)
 newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
-  case makeStablePtr# (unsafeCoerce# m :: PrimMVar) s0 of
+  -- Unlifted-to-lifted coercion here!
+  case makeStablePtr# (castUnliftedToLiftedWith unsafeHeteroEqualityProof m :: PrimMVar) s0 of
     (# s1, sp #) -> (# s1, StablePtr sp #)
+
+castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . (a :~~: b) -> a -> b
+castUnliftedToLiftedWith HRefl x = x
 
 -----------------------------------------------------------------------------
 -- Transactional heap operations
