@@ -133,7 +133,7 @@ import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
-import GHC.Exts         ( unsafeCoerce# )
+import Unsafe.Coerce        ( unsafeCoerce )
 
 {-
 ************************************************************************
@@ -775,7 +775,7 @@ convertAnnotationWrapper fhv = do
     else do
       annotation_wrapper <- liftIO $ wormhole dflags fhv
       return $ Right $
-        case unsafeCoerce# annotation_wrapper of
+        case unsafeCoerce annotation_wrapper of
            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
                -- Got the value and dictionaries: build the serialized value and
                -- call it a day. We ensure that we seq the entire serialized value
@@ -1229,7 +1229,7 @@ runTH ty fhv = do
     then do
        -- Run it in the local TcM
       hv <- liftIO $ wormhole dflags fhv
-      r <- runQuasi (unsafeCoerce# hv :: TH.Q a)
+      r <- runQuasi (unsafeCoerce hv :: TH.Q a)
       return r
     else
       -- Run it on the server.  For an overview of how TH works with

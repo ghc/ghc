@@ -124,7 +124,6 @@ module TysWiredIn (
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
         doubleElemRepDataConTy
-
     ) where
 
 #include "HsVersions.h"
@@ -153,8 +152,7 @@ import RdrName
 import Name
 import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
-import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
-                          SourceText(..) )
+import BasicTypes
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -563,6 +561,13 @@ pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
                      -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
+--
+-- IMPORTANT NOTE:
+--    if you try to wire-in a /GADT/ data constructor you will
+--    find it hard (we did).  You will need wrapper and worker
+--    Names, a DataConBoxer, DataConRep, EqSpec, etc.
+--    Try hard not to wire-in GADT data types. You will live
+--    to regret doing so (we do).
 
 pcDataConWithFixity' declared_infix dc_name wrk_key rri
                      tyvars ex_tyvars user_tyvars arg_tys tycon
@@ -1511,12 +1516,7 @@ mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
 listTyCon :: TyCon
-listTyCon =
-  buildAlgTyCon listTyConName alpha_tyvar [Representational]
-                Nothing []
-                (mkDataTyConRhs [nilDataCon, consDataCon])
-                False
-                (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
+listTyCon = pcTyCon listTyConName Nothing [alphaTyVar] [nilDataCon, consDataCon]
 
 -- See also Note [Empty lists] in GHC.Hs.Expr.
 nilDataCon :: DataCon

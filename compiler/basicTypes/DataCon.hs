@@ -24,7 +24,7 @@ module DataCon (
         FieldLbl(..), FieldLabel, FieldLabelString,
 
         -- ** Type construction
-        mkDataCon, buildAlgTyCon, buildSynTyCon, fIRST_TAG,
+        mkDataCon, fIRST_TAG,
 
         -- ** Type deconstruction
         dataConRepType, dataConInstSig, dataConFullSig,
@@ -65,7 +65,6 @@ import GhcPrelude
 
 import {-# SOURCE #-} MkId( DataConBoxer )
 import Type
-import ForeignCall ( CType )
 import Coercion
 import Unify
 import TyCon
@@ -75,7 +74,6 @@ import Name
 import PrelNames
 import Predicate
 import Var
-import VarSet( emptyVarSet )
 import Outputable
 import Util
 import BasicTypes
@@ -1380,6 +1378,9 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 --                  scrutinee of type (T tys)
 --                  where T is the dcRepTyCon for the data con
 dataConCannotMatch tys con
+  -- See Note [unsafeCoerce magic] in Unsafe.Coerce
+  | dataConName con == unsafeReflDataConName
+                      = False
   | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common
   | otherwise         = typesCantMatch (concatMap predEqs inst_theta)
@@ -1463,38 +1464,3 @@ splitDataProductType_maybe ty
   | otherwise
   = Nothing
 
-{-
-************************************************************************
-*                                                                      *
-              Building an algebraic data type
-*                                                                      *
-************************************************************************
-
-buildAlgTyCon is here because it is called from TysWiredIn, which can
-depend on this module, but not on BuildTyCl.
--}
-
-buildAlgTyCon :: Name
-              -> [TyVar]               -- ^ Kind variables and type variables
-              -> [Role]
-              -> Maybe CType
-              -> ThetaType             -- ^ Stupid theta
-              -> AlgTyConRhs
-              -> Bool                  -- ^ True <=> was declared in GADT syntax
-              -> AlgTyConFlav
-              -> TyCon
-
-buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
-              gadt_syn parent
-  = mkAlgTyCon tc_name binders liftedTypeKind roles cType stupid_theta
-               rhs parent gadt_syn
-  where
-    binders = mkTyConBindersPreferAnon ktvs emptyVarSet
-
-buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
-              -> [Role] -> KnotTied Type -> TyCon
-buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
-  where
-    is_tau      = isTauTy rhs
-    is_fam_free = isFamFreeTy rhs

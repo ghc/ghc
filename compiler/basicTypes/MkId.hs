@@ -20,11 +20,12 @@ module MkId (
         mkPrimOpId, mkFCallId,
 
         unwrapNewTypeBody, wrapFamInstBody,
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), vanillaDataConBoxer,
+        mkDataConRep, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
-        unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
+        realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
@@ -44,6 +45,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import TyCoRep
 import FamInstEnv
 import Coercion
 import TcType
@@ -148,7 +150,6 @@ ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
   = [ realWorldPrimId
     , voidPrimId
-    , unsafeCoerceId
     , nullAddrId
     , seqId
     , magicDictId
@@ -598,6 +599,10 @@ newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
                        -- Bind these src-level vars, returning the
                        -- rep-level vars to bind in the pattern
 
+vanillaDataConBoxer :: DataConBoxer
+-- No transformation on arguments needed
+vanillaDataConBoxer = DCB (\_tys args -> return (args, []))
+
 {-
 Note [Inline partially-applied constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -662,7 +667,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                -- the strictness signature (#14290).
 
              mk_dmd str | isBanged str = evalDmd
-                        | otherwise           = topDmd
+                        | otherwise    = topDmd
 
              wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
                          activeDuringFinal
@@ -1311,19 +1316,14 @@ no curried identifier for them.  That's what mkCompulsoryUnfolding
 does.  If we had a way to get a compulsory unfolding from an interface
 file, we could do that, but we don't right now.
 
-unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
-just gets expanded into a type coercion wherever it occurs.  Hence we
-add it as a built-in Id with an unfolding here.
-
 The type variables we use here are "open" type variables: this means
 they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 -}
 
-unsafeCoerceName, nullAddrName, seqName,
+nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName :: Name
-unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
@@ -1353,28 +1353,6 @@ proxyHashId
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
     ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
-
-------------------------------------------------
-unsafeCoerceId :: Id
-unsafeCoerceId
-  = pcMiscPrelId unsafeCoerceName ty info
-  where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-
-    -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-    --                         (a :: TYPE r1) (b :: TYPE r2).
-    --                         a -> b
-    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
-                               (\ks -> map tYPE ks)
-
-    [_, _, a, b] = mkTyVarTys bndrs
-
-    ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
-
-    [x] = mkTemplateLocals [a]
-    rhs = mkLams (bndrs ++ [x]) $
-          Cast (Var x) (mkUnsafeCo Representational a b)
 
 ------------------------------------------------
 nullAddrId :: Id
@@ -1476,22 +1454,6 @@ coerceId = pcMiscPrelId coerceName ty info
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
-Note [Unsafe coerce magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We define a *primitive*
-   GHC.Prim.unsafeCoerce#
-and then in the base library we define the ordinary function
-   Unsafe.Coerce.unsafeCoerce :: forall (a:*) (b:*). a -> b
-   unsafeCoerce x = unsafeCoerce# x
-
-Notice that unsafeCoerce has a civilized (albeit still dangerous)
-polymorphic type, whose type args have kind *.  So you can't use it on
-unboxed values (unsafeCoerce 3#).
-
-In contrast unsafeCoerce# is even more dangerous because you *can* use
-it on unboxed things, (unsafeCoerce# 3#) :: Int. Its type is
-   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPE r1) (b: TYPE r2). a -> b
-
 Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.

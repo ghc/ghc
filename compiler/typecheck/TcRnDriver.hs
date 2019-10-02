@@ -2268,31 +2268,30 @@ leaking memory as it is repeatedly queried.
 -- statement in the form 'IO [()]'.
 tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
- = do { ioTyCon <- tcLookupTyCon ioTyConName ;
-        ret_id  <- tcLookupId returnIOName ;            -- return @ IO
-        let {
-            ret_ty      = mkListTy unitTy ;
-            io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
+ = do { ioTyCon <- tcLookupTyCon ioTyConName
+      ; ret_id  <- tcLookupId returnIOName             -- return @ IO
+      ; let ret_ty      = mkListTy unitTy
+            io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
-                                         (mkCheckExpType io_ret_ty) ;
-            names = collectLStmtsBinders stmts ;
-         } ;
+                                         (mkCheckExpType io_ret_ty)
+            names = collectLStmtsBinders stmts
 
         -- OK, we're ready to typecheck the stmts
-        traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
-        ((tc_stmts, ids), lie) <- captureTopConstraints $
+      ; traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty
+      ; ((tc_stmts, ids), lie) <- captureTopConstraints $
                                   tc_io_stmts $ \ _ ->
-                                  mapM tcLookupId names  ;
+                                  mapM tcLookupId names
                         -- Look up the names right in the middle,
                         -- where they will all be in scope
 
         -- Simplify the context
-        traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
-        const_binds <- checkNoErrs (simplifyInteractive lie) ;
+      ; traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty
+      ; const_binds <- checkNoErrs (simplifyInteractive lie)
                 -- checkNoErrs ensures that the plan fails if context redn fails
 
-        traceTc "TcRnDriver.tcGhciStmts: done" empty ;
-        let {   -- mk_return builds the expression
+      ; traceTc "TcRnDriver.tcGhciStmts: done" empty
+      ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoerceName
+      ; let     -- mk_return builds the expression
                 --      returnIO @ [()] [coerce () x, ..,  coerce () z]
                 --
                 -- Despite the inconvenience of building the type applications etc,
@@ -2305,14 +2304,12 @@ tcGhciStmts stmts
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
                        (noLoc $ ExplicitList unitTy Nothing
-                                                            (map mk_item ids)) ;
-            mk_item id = let ty_args = [idType id, unitTy] in
-                         nlHsApp (nlHsTyApp unsafeCoerceId
-                                   (map getRuntimeRep ty_args ++ ty_args))
-                                 (nlHsVar id) ;
+                                                            (map mk_item ids))
+            mk_item id = unsafe_coerce_id `nlHsTyApp` [idType id, unitTy]
+                                          `nlHsApp` nlHsVar id
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
-        } ;
-        return (ids, mkHsDictLet (EvBinds const_binds) $
+
+      ; return (ids, mkHsDictLet (EvBinds const_binds) $
                      noLoc (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
     }
 

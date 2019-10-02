@@ -225,7 +225,6 @@ tidyCo env@(_, subst) co
     go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
                                in cos1 `seqList` AxiomRuleCo ax cos1
 
-    go_prov UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p

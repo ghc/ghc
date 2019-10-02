@@ -103,9 +103,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import StringBuffer (stringToStringBuffer)
 import Control.Monad
-import GHC.Exts
 import Data.Array
 import Exception
+import Unsafe.Coerce ( unsafeCoerce )
 
 import TcRnDriver ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
@@ -1223,7 +1223,7 @@ dynCompileExpr expr = do
       to_dyn_expr = mkHsApp (L loc . HsVar noExtField . L loc $ getRdrName toDynName)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
-  return (unsafeCoerce# hval :: Dynamic)
+  return (unsafeCoerce hval :: Dynamic)
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
@@ -1252,7 +1252,7 @@ obtainTermFromVal hsc_env bound force ty x
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
   | otherwise
-  = cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
+  = cvObtainTerm hsc_env bound force ty (unsafeCoerce x)
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do

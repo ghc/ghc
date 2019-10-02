@@ -324,6 +324,9 @@ isPromoted :: PromotionFlag -> Bool
 isPromoted IsPromoted  = True
 isPromoted NotPromoted = False
 
+instance Outputable PromotionFlag where
+  ppr NotPromoted = text "NotPromoted"
+  ppr IsPromoted  = text "IsPromoted"
 
 {-
 ************************************************************************
@@ -843,6 +846,11 @@ tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
   = ifPprDebug (text "(%" <+> p <+> ptext (sLit "%)"))
                (parens p)
+
+instance Outputable TupleSort where
+  ppr BoxedTuple      = text "boxed"
+  ppr UnboxedTuple    = text "unboxed"
+  ppr ConstraintTuple = text "constraint"
 
 {-
 ************************************************************************
