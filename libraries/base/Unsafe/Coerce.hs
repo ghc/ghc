@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
+             ScopedTypeVariables  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -34,29 +35,7 @@ module Unsafe.Coerce (unsafeCoerce) where
 
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
-import GHC.Prim (unsafeCoerce#)
+import Data.Type.Equality
 
-local_id :: a -> a
-local_id x = x   -- See Note [Mega-hack for coerce]
-
-{- Note [Mega-hack for coerce]
-
-If we just say
-  unsafeCoerce x = unsafeCoerce# x
-then the simple-optimiser that the desugarer runs will eta-reduce to
-  unsafeCoerce :: forall (a:*) (b:*). a -> b
-  unsafeCoerce = unsafeCoerce#
-But we shouldn't be calling unsafeCoerce# in a higher
-order way; it has a compulsory unfolding
-   unsafeCoerce# a b x = x |> UnsafeCo a b
-and we really rely on it being inlined pronto. But the simple-optimiser doesn't.
-The identity function local_id delays the eta reduction just long enough
-for unsafeCoerce# to get inlined.
-
-Sigh. This is horrible, but then so is unsafeCoerce.
--}
-
-unsafeCoerce :: a -> b
-unsafeCoerce x = local_id (unsafeCoerce# x)
-  -- See Note [Unsafe coerce magic] in basicTypes/MkId
-  -- NB: Do not eta-reduce this definition (see above)
+unsafeCoerce :: forall a b . a -> b
+unsafeCoerce x = case unsafeEqualityProof @a @b of Refl -> x

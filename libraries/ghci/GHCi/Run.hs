@@ -363,4 +363,4 @@ getIdValFromApStack apStack (I# stackDepth) = do
         (# ok, result #) ->
             case ok of
               0# -> return Nothing -- AP_STACK not found
-              _  -> return (Just (unsafeCoerce# result))
+              _  -> return (Just (unsafeCoerce result))

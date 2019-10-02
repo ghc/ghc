@@ -462,6 +462,9 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- Unsafe coercion proofs
+        , unsafeEqualityProofName
+        , unsafeHeteroEqualityProofName
     ]
 
 genericTyConNames :: [Name]
@@ -1317,7 +1320,12 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
-
+-- Unsafe coercion proofs
+unsafeEqualityProofName, unsafeHeteroEqualityProofName :: Name
+unsafeEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeEqualityProof")
+                                  unsafeEqualityProofIdKey
+unsafeHeteroEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeHeteroEqualityProof")
+                                        unsafeHeteroEqualityProofIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -2406,6 +2414,11 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+
+-- Unsafe coercion proofs
+unsafeEqualityProofIdKey, unsafeHeteroEqualityProofIdKey :: Unique
+unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
+unsafeHeteroEqualityProofIdKey = mkPreludeMiscIdUnique 571
 
 {-
 ************************************************************************

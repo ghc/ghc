@@ -60,8 +60,8 @@ import Control.Monad
 import Data.Bits
 import GHC.Arr
 import GHC.Exts
-import GHC.Int
-import GHC.Word
+-- import GHC.Int
+-- import GHC.Word
 
 #include "ghcconfig.h"
 
@@ -71,8 +71,8 @@ class HasHeapRep (a :: TYPE rep) where
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
     getClosureData = getClosure
 
-instance HasHeapRep (a :: TYPE 'UnliftedRep) where
-    getClosureData x = getClosure (unsafeCoerce# x)
+-- instance HasHeapRep (a :: TYPE 'UnliftedRep) where
+--     getClosureData x = getClosure (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where
     getClosureData x = return $
@@ -82,17 +82,17 @@ instance Word# ~ a => HasHeapRep (a :: TYPE 'WordRep) where
     getClosureData x = return $
         WordClosure { ptipe = PWord, wordVal = W# x }
 
-instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
-    getClosureData x = return $
-        Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
+-- instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
+--     getClosureData x = return $
+--         Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
 
-instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
-    getClosureData x = return $
-        Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
+-- instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
+--     getClosureData x = return $
+--         Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
 
-instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
-    getClosureData x = return $
-        AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
+-- instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
+--     getClosureData x = return $
+--         AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
 
 instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
     getClosureData x = return $
