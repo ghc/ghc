@@ -168,7 +168,7 @@ getCoreToDo dflags
     simpl_gently = CoreDoSimplify max_iter
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
-                                  , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
+                                  , sm_rules = rules_on   -- Note [RULEs enabled in InitialPhase]
                                   , sm_inline = True
                                               -- See Note [Inline in InitialPhase]
                                   , sm_case_case = False })
@@ -382,9 +382,10 @@ when I made this change:
    perf/compiler/T9872b.run           T9872b [stat too good] (normal)
    perf/compiler/T9872d.run           T9872d [stat too good] (normal)
 
-Note [RULEs enabled in SimplGently]
+Note [RULEs enabled in InitialPhase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-RULES are enabled when doing "gentle" simplification.  Two reasons:
+RULES are enabled when doing "gentle" simplification in InitialPhase,
+or with -O0.  Two reasons:
 
   * We really want the class-op cancellation to happen:
         op (df d1 d2) --> $cop3 d1 d2
@@ -555,23 +556,25 @@ observe do_pass = doPassM $ \binds -> do
 ************************************************************************
 -}
 
-simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
+simplifyExpr :: HscEnv -- includes spec of what core-to-core passes to do
              -> CoreExpr
              -> IO CoreExpr
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
---
--- Also used by Template Haskell
-simplifyExpr dflags expr
+simplifyExpr hsc_env expr
   = withTiming dflags (text "Simplify [expr]") (const ()) $
-    do  {
-        ; us <-  mkSplitUniqSupply 's'
+    do  { eps <- hscEPS hsc_env ;
+        ; let rule_env  = mkRuleEnv (eps_rule_base eps) []
+              fi_env    = ( eps_fam_inst_env eps
+                          , extendFamInstEnvList emptyFamInstEnv $
+                            snd $ ic_instances $ hsc_IC hsc_env )
+              simpl_env = simplEnvForGHCi dflags
 
+        ; us <-  mkSplitUniqSupply 's'
         ; let sz = exprSize expr
 
-        ; (expr', counts) <- initSmpl dflags emptyRuleEnv
-                               emptyFamInstEnvs us sz
-                               (simplExprGently (simplEnvForGHCi dflags) expr)
+        ; (expr', counts) <- initSmpl dflags rule_env fi_env us sz $
+                             simplExprGently simpl_env expr
 
         ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics" (pprSimplCount counts)
@@ -582,6 +585,8 @@ simplifyExpr dflags expr
 
         ; return expr'
         }
+  where
+    dflags = hsc_dflags hsc_env
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- Simplifies an expression
@@ -592,7 +597,7 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 --      (b) the LHS and RHS of a RULE
 --      (c) Template Haskell splices
 --
--- The name 'Gently' suggests that the SimplMode is SimplGently,
+-- The name 'Gently' suggests that the SimplMode is InitialPhase,
 -- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
 -- enforce that; it just simplifies the expression twice
 

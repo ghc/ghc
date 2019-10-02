@@ -237,6 +237,12 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- only: see Note [Equality predicates in IfaceType]
                     deriving (Eq)
 
+instance Outputable IfaceTyConSort where
+  ppr IfaceNormalTyCon         = text "normal"
+  ppr (IfaceTupleTyCon n sort) = ppr sort <> colon <> ppr n
+  ppr (IfaceSumTyCon n)        = text "sum:" <> ppr n
+  ppr IfaceEqualityTyCon       = text "equality"
+
 {- Note [Free tyvars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
@@ -350,8 +356,7 @@ data IfaceCoercion
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 
 data IfaceUnivCoProv
-  = IfaceUnsafeCoerceProv
-  | IfacePhantomProv IfaceCoercion
+  = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
 
@@ -525,7 +530,6 @@ substIfaceType env ty
 
     go_cos = map go_co
 
-    go_prov IfaceUnsafeCoerceProv    = IfaceUnsafeCoerceProv
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
     go_prov (IfacePluginProv str)    = IfacePluginProv str
@@ -1562,11 +1566,6 @@ ppr_co _ (IfaceFreeCoVar covar) = ppr covar
 ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 
-ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
-  = maybeParen ctxt_prec appPrec $
-    text "UnsafeCo" <+> ppr r <+>
-    pprParendIfaceType ty1 <+> pprParendIfaceType ty2
-
 ppr_co _ (IfaceUnivCo prov role ty1 ty2)
   = text "Univ" <> (parens $
       sep [ ppr role <+> pprIfaceUnivCoProv prov
@@ -1610,8 +1609,6 @@ ppr_role r = underscore <> pp_role
 
 ------------------
 pprIfaceUnivCoProv :: IfaceUnivCoProv -> SDoc
-pprIfaceUnivCoProv IfaceUnsafeCoerceProv
-  = text "unsafe"
 pprIfaceUnivCoProv (IfacePhantomProv co)
   = text "phantom" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfaceProofIrrelProv co)
@@ -1622,6 +1619,11 @@ pprIfaceUnivCoProv (IfacePluginProv s)
 -------------------
 instance Outputable IfaceTyCon where
   ppr tc = pprPromotionQuote tc <> ppr (ifaceTyConName tc)
+
+instance Outputable IfaceTyConInfo where
+  ppr (IfaceTyConInfo { ifaceTyConIsPromoted = prom
+                      , ifaceTyConSort       = sort })
+    = angleBrackets $ ppr prom <> comma <+> ppr sort
 
 pprPromotionQuote :: IfaceTyCon -> SDoc
 pprPromotionQuote tc =
@@ -1954,26 +1956,24 @@ instance Binary IfaceCoercion where
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
-  put_ bh IfaceUnsafeCoerceProv = putByte bh 1
   put_ bh (IfacePhantomProv a) = do
-          putByte bh 2
+          putByte bh 1
           put_ bh a
   put_ bh (IfaceProofIrrelProv a) = do
-          putByte bh 3
+          putByte bh 2
           put_ bh a
   put_ bh (IfacePluginProv a) = do
-          putByte bh 4
+          putByte bh 3
           put_ bh a
 
   get bh = do
       tag <- getByte bh
       case tag of
-           1 -> return $ IfaceUnsafeCoerceProv
-           2 -> do a <- get bh
+           1 -> do a <- get bh
                    return $ IfacePhantomProv a
-           3 -> do a <- get bh
+           2 -> do a <- get bh
                    return $ IfaceProofIrrelProv a
-           4 -> do a <- get bh
+           3 -> do a <- get bh
                    return $ IfacePluginProv a
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 

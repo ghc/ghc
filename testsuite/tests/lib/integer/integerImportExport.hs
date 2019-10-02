@@ -6,6 +6,7 @@ import Data.List (group)
 import Data.Bits
 import Data.Word
 import Control.Monad
+import Unsafe.Coerce (unsafeCoerce#)
 
 import GHC.Word
 import GHC.Base
