@@ -40,7 +40,7 @@ import TysPrim
 import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
                    , tyConFamilySize )
-import DataCon     ( dataConTagZ, dataConTyCon, dataConWorkId )
+import DataCon     ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType, stripTicksTop, stripTicksTopT, mkTicks )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
@@ -777,23 +777,26 @@ but that is only a historical accident.
 mkBasicRule :: Name -> Int -> RuleM CoreExpr -> CoreRule
 -- Gives the Rule the same name as the primop itself
 mkBasicRule op_name n_args rm
-  = BuiltinRule { ru_name = occNameFS (nameOccName op_name),
-                  ru_fn = op_name,
+  = BuiltinRule { ru_name  = occNameFS (nameOccName op_name),
+                  ru_fn    = op_name,
                   ru_nargs = n_args,
-                  ru_try = \ dflags in_scope _ -> runRuleM rm dflags in_scope }
+                  ru_try   = runRuleM rm }
 
 newtype RuleM r = RuleM
-  { runRuleM :: DynFlags -> InScopeEnv -> [CoreExpr] -> Maybe r }
+  { runRuleM :: DynFlags -> InScopeEnv -> Id -> [CoreExpr] -> Maybe r }
   deriving (Functor)
 
 instance Applicative RuleM where
-    pure x = RuleM $ \_ _ _ -> Just x
+    pure x = RuleM $ \_ _ _ _ -> Just x
     (<*>) = ap
 
 instance Monad RuleM where
-  RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
-    Nothing -> Nothing
-    Just r -> runRuleM (g r) dflags iu e
+  RuleM f >>= g
+    = RuleM $ \dflags iu fn args ->
+              case f dflags iu fn args of
+                Nothing -> Nothing
+                Just r  -> runRuleM (g r) dflags iu fn args
+
 #if !MIN_VERSION_base(4,13,0)
   fail = MonadFail.fail
 #endif
@@ -802,14 +805,14 @@ instance MonadFail.MonadFail RuleM where
     fail _ = mzero
 
 instance Alternative RuleM where
-  empty = RuleM $ \_ _ _ -> Nothing
-  RuleM f1 <|> RuleM f2 = RuleM $ \dflags iu args ->
-    f1 dflags iu args <|> f2 dflags iu args
+  empty = RuleM $ \_ _ _ _ -> Nothing
+  RuleM f1 <|> RuleM f2 = RuleM $ \dflags iu fn args ->
+    f1 dflags iu fn args <|> f2 dflags iu fn args
 
 instance MonadPlus RuleM
 
 instance HasDynFlags RuleM where
-    getDynFlags = RuleM $ \dflags _ _ -> Just dflags
+    getDynFlags = RuleM $ \dflags _ _ _ -> Just dflags
 
 liftMaybe :: Maybe a -> RuleM a
 liftMaybe Nothing = mzero
@@ -835,15 +838,18 @@ removeOp32 = do
       mzero
 
 getArgs :: RuleM [CoreExpr]
-getArgs = RuleM $ \_ _ args -> Just args
+getArgs = RuleM $ \_ _ _ args -> Just args
 
 getInScopeEnv :: RuleM InScopeEnv
-getInScopeEnv = RuleM $ \_ iu _ -> Just iu
+getInScopeEnv = RuleM $ \_ iu _ _ -> Just iu
+
+getFunction :: RuleM Id
+getFunction = RuleM $ \_ _ fn _ -> Just fn
 
 -- return the n-th argument of this rule, if it is a literal
 -- argument indices start from 0
 getLiteral :: Int -> RuleM Literal
-getLiteral n = RuleM $ \_ _ exprs -> case drop n exprs of
+getLiteral n = RuleM $ \_ _ _ exprs -> case drop n exprs of
   (Lit l:_) -> Just l
   _ -> Nothing
 
@@ -1118,14 +1124,35 @@ is:
   by PrelRules.caseRules; see Note [caseRules for dataToTag]
 
 See #15696 for a long saga.
-
-
-************************************************************************
-*                                                                      *
-\subsection{Rules for seq# and spark#}
-*                                                                      *
-************************************************************************
 -}
+
+{- *********************************************************************
+*                                                                      *
+             unsafeEqualityProof
+*                                                                      *
+********************************************************************* -}
+
+-- unsafeEqualityProof k t t  ==>  UnsafeRefl (Refl t)
+-- That is, if the two types are equal, it's not unsafe!
+
+unsafeEqualityProofRule :: RuleM CoreExpr
+unsafeEqualityProofRule
+  = do { [Type rep, Type t1, Type t2] <- getArgs
+       ; guard (t1 `eqType` t2)
+       ; fn <- getFunction
+       ; let (_, ue) = splitForAllTys (idType fn)
+             tc      = tyConAppTyCon ue  -- tycon:    UnsafeEquality
+             (dc:_)  = tyConDataCons tc  -- data con: UnsafeRefl
+             -- UnsafeRefl :: forall (r :: RuntimeRep) (a :: TYPE r).
+             --               UnsafeEquality r a a
+       ; return (mkTyApps (Var (dataConWrapId dc)) [rep, t1]) }
+
+
+{- *********************************************************************
+*                                                                      *
+             Rules for seq# and spark#
+*                                                                      *
+********************************************************************* -}
 
 {- Note [seq# magic]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1218,13 +1245,11 @@ Then a rewrite would give
         ....and lower down...
         eqString = ...
 
-and lo, eqString is not in scope.  This only really matters when we get to code
-generation.  With -O we do a GlomBinds step that does a new SCC analysis on the whole
-set of bindings, which sorts out the dependency.  Without -O we don't do any rule
-rewriting so again we are fine.
-
-(This whole thing doesn't show up for non-built-in rules because their dependencies
-are explicit.)
+and lo, eqString is not in scope.  This only really matters when we
+get to code generation.  But the occurrence analyser does a GlomBinds
+step when necessary, that does a new SCC analysis on the whole set of
+bindings (see occurAnalysePgm), which sorts out the dependency, so all
+is fine.
 -}
 
 builtinRules :: [CoreRule]
@@ -1239,6 +1264,9 @@ builtinRules
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
                    ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
+
+     mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
+
      mkBasicRule divIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
         , leftZero zeroi
@@ -1248,6 +1276,7 @@ builtinRules
           dflags <- getDynFlags
           return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal dflags n
         ],
+
      mkBasicRule modIntName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
         , leftZero zeroi

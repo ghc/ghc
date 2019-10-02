@@ -28,7 +28,7 @@ import CoreSyn
 import CoreSubst
 import CoreUtils
 import CoreFVs
-import {-#SOURCE #-} CoreUnfold ( mkUnfolding )
+import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 import MkCore ( FloatBind(..) )
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )

@@ -56,6 +56,7 @@ import GHC.Data.Bitmap
 import OrdList
 import Maybes
 import VarEnv
+import PrelNames ( unsafeEqualityProofName )
 
 import Data.List
 import Foreign
@@ -634,11 +635,12 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
 -- ignore other kinds of tick
 schemeE d s p (AnnTick _ (_, rhs)) = schemeE d s p rhs
 
+-- no alts: scrut is guaranteed to diverge
 schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
-        -- no alts: scrut is guaranteed to diverge
 
+-- handle pairs with one void argument (e.g. state token)
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
-   | isUnboxedTupleCon dc -- handles pairs with one void argument (e.g. state token)
+   | isUnboxedTupleCon dc
         -- Convert
         --      case .... of x { (# V'd-thing, a #) -> ... }
         -- to
@@ -655,11 +657,13 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
                    _ -> Nothing
    = res
 
+-- handle unit tuples
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
-   , typePrimRep (idType bndr) `lengthAtMost` 1 -- handles unit tuples
+   , typePrimRep (idType bndr) `lengthAtMost` 1
    = doCase d s p scrut bind1 [(DEFAULT, [], rhs)] (Just bndr)
 
+-- handle nullary tuples
 schemeE d s p (AnnCase scrut bndr _ alt@[(DEFAULT, [], _)])
    | isUnboxedTupleType (idType bndr)
    , Just ty <- case typePrimRep (idType bndr) of
@@ -983,6 +987,7 @@ doCase
 doCase d s p (_,scrut) bndr alts is_unboxed_tuple
   | typePrimRep (idType bndr) `lengthExceeds` 1
   = multiValException
+
   | otherwise
   = do
      dflags <- getDynFlags
@@ -1883,6 +1888,7 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 --  b) type applications
 --  c) casts
 --  d) ticks (but not breakpoints)
+--  e) case unsafeEqualityProof of UnsafeRefl -> e  ==> e
 -- Type lambdas *can* occur in random expressions,
 -- whereas value lambdas cannot; that is why they are nuked here
 bcView (AnnCast (_,e) _)             = Just e
@@ -1890,7 +1896,18 @@ bcView (AnnLam v (_,e)) | isTyVar v  = Just e
 bcView (AnnApp (_,e) (_, AnnType _)) = Just e
 bcView (AnnTick Breakpoint{} _)      = Nothing
 bcView (AnnTick _other_tick (_,e))   = Just e
+bcView (AnnCase (_,e) _ _ alts)  -- Handle unsafe equality proof
+  | AnnVar id <- bcViewLoop e
+  , idName id == unsafeEqualityProofName
+  , [(_, _, (_, rhs))] <- alts
+  = Just rhs
 bcView _                             = Nothing
+
+bcViewLoop :: AnnExpr' Var ann -> AnnExpr' Var ann
+bcViewLoop e =
+    case bcView e of
+      Nothing -> e
+      Just e' -> bcViewLoop e'
 
 isVAtom :: AnnExpr' Var ann -> Bool
 isVAtom e | Just e' <- bcView e = isVAtom e'
