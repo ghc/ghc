@@ -91,7 +91,7 @@ tracePm herald doc = do
 -- | Generate a fresh `Id` of a given type
 mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
-  let occname = mkVarOccFS $ fsLit "$pm"
+  let occname = mkVarOccFS $ fsLit "pm"
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name ty)
 

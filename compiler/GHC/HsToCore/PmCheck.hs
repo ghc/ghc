@@ -58,6 +58,7 @@ import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (forM, when, forM_, zipWithM)
+import Data.List (elemIndex)
 import qualified Data.Semigroup as Semi
 
 {-
@@ -88,7 +89,7 @@ data PmGrd
     -- in this construct, the @x@ is just a use.
     -- For the arguments' meaning see 'GHC.Hs.Pat.ConPatOut'.
     PmCon {
-      pm_con_id      :: !Id,
+      pm_id          :: !Id,
       pm_con_con     :: !PmAltCon,
       pm_con_arg_tys :: ![Type],
       pm_con_tvs     :: ![TyVar],
@@ -98,13 +99,13 @@ data PmGrd
 
     -- | @PmBang x@ corresponds to a @seq x True@ guard.
   | PmBang {
-      _pm_bang_id    :: !Id
+      pm_id          :: !Id
     }
 
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
     -- /binds/ @x@.
   | PmLet {
-      pm_let_id   :: !Id,
+      pm_id       :: !Id,
       pm_let_expr :: !CoreExpr
     }
 
@@ -293,7 +294,7 @@ checkSingle' locn var p = do
   let grds' = PmLet x (Var var) : grds
   missing   <- getPmDelta
   tracePm "checkSingle': missing" (ppr missing)
-  PartialResult cs us ds pc <- pmcheckI grds' [] 1 missing
+  PartialResult cs us ds pc <- pmCheck grds' [] 1 missing
   dflags <- getDynFlags
   us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
   let uc = UncoveredPatterns [var] us'
@@ -370,7 +371,7 @@ checkMatches' vars matches
           limit                     = maxPmCheckModels dflags
           n_siblings                = length missing
           throttled_check delta     =
-            snd <$> throttle limit (pmcheckI grds' guards) n_siblings delta
+            snd <$> throttle limit (pmCheck grds' guards) n_siblings delta
 
       r@(PartialResult cs missing' ds pc1) <- runMany throttled_check missing
 
@@ -424,7 +425,7 @@ getNFirstUncovered vars n (delta:deltas) = do
 vanillaConGrd :: Id -> DataCon -> [Type] -> [Id] -> PmGrd
 -- ADT constructor pattern => no existentials, no local constraints
 vanillaConGrd scrut con arg_tys args =
-  PmCon { pm_con_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
+  PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
         , pm_con_arg_tys = arg_tys, pm_con_tvs = [], pm_con_dicts = []
         , pm_con_args = args }
 {-# INLINE vanillaConGrd #-}
@@ -462,7 +463,7 @@ mkPmLitPat (PmLit _ (PmLitString s)) = do
   mkListPat charTy chars
 mkPmLitPat lit = do
   x <- mkPmId (pmLitType lit)
-  let grd = PmCon { pm_con_id = x
+  let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
                   , pm_con_arg_tys = []
                   , pm_con_tvs = []
@@ -483,6 +484,7 @@ translatePat :: FamInstEnvs -> Pat GhcTc -> DsM PmPat
 translatePat fam_insts pat = case pat of
   WildPat  ty  -> mkPmVar ty
   VarPat _ id  -> pure (PmPat (unLoc id) [])
+  XPat     p   -> translatePat fam_insts (unLoc p)
   ParPat _ p   -> translatePat fam_insts (unLoc p)
   LazyPat _ _  -> mkPmVar (hsPatType pat) -- like a variable
   BangPat _ p  -> do
@@ -615,8 +617,7 @@ translatePat fam_insts pat = case pat of
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
-  SplicePat {} -> panic "Check.translatePat: SplicePat"
-  XPat      {} -> panic "Check.translatePat: XPat"
+  SplicePat {} -> panic "Check.translatePat: Sp licePat"
 
 translateListPat :: FamInstEnvs -> Type -> [LPat GhcTc] -> DsM PmPat
 translateListPat fam_insts elem_ty ps = do
@@ -632,34 +633,37 @@ translatePatVec fam_insts pats = mapM (translatePat fam_insts) pats
 translateConPatOut :: FamInstEnvs -> ConLike -> [Type] -> [TyVar] -> [EvVar]
                    -> HsConPatDetails GhcTc -> DsM PmPat
 translateConPatOut fam_insts con univ_tys ex_tvs dicts = \case
-    PrefixCon ps                 -> go_field_pats (zip orig_lbls ps)
-    InfixCon  p1 p2              -> go_field_pats (zip orig_lbls [p1,p2])
+    PrefixCon ps                 -> go_field_pats (zip [0..] ps)
+    InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
     RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
   where
     -- The actual argument types (instantiated)
     arg_tys     = conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
 
-    -- Some label information
-    orig_lbls    = map flSelector $ conLikeFieldLabels con
+    -- Extract record field patterns tagged by field index from a list of
+    -- LHsRecField
+    rec_field_ps fs = map (tagged_pat . unLoc) fs
+      where
+        tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hsRecFieldArg f)
+        -- Unfortunately the label info is empty when the DataCon wasn't defined
+        -- with record field labels, hence we translate to field index.
+        orig_lbls        = map flSelector $ conLikeFieldLabels con
+        lbl_to_index lbl = expectJust "lbl_to_index" $ elemIndex lbl orig_lbls
 
-    -- Extract labeled record field patterns from a list of LHsRecField
-    rec_field_ps fs = [ (getName (unLoc (hsRecFieldId x)), hsRecFieldArg x)
-                      | (dL->L _ x) <- fs ]
-
-    go_field_pats matched_pats = do
+    go_field_pats tagged_pats = do
       -- The fields that appear might not be in the correct order. So first
       -- do a PmCon match, then force according to field strictness and then
       -- force evaluation of the field patterns in the order given by
-      -- @matched_pats@.
+      -- the first field of @tagged_pats@.
       -- See Note [Field match order for RecCon]
 
       -- Translate the mentioned field patterns. We're doing this first to get
       -- the Ids for pm_con_args.
-      translated_pats <- forM matched_pats $ \(x,pat) -> do
+      translated_pats <- forM tagged_pats $ \(n, pat) -> do
         pvec <- translatePat fam_insts pat
-        pure (x, pvec)
+        pure (n, pvec)
 
-      let get_pat_id lbl ty = case lookup lbl translated_pats of
+      let get_pat_id n ty = case lookup n translated_pats of
             -- We account for the pm_pat_grds later, after possibly strict
             -- fields. Here we only care for the Ids. Note how we add the
             -- pm_pat_grds part only at the end.
@@ -667,7 +671,7 @@ translateConPatOut fam_insts con univ_tys ex_tvs dicts = \case
             Nothing  -> mkPmId ty
 
       -- 1. the constructor pattern match itself
-      arg_ids <- zipWithM get_pat_id orig_lbls arg_tys
+      arg_ids <- zipWithM get_pat_id [0..] arg_tys
       pat_id <- mkPmId (conLikeResTy con univ_tys)
       let con_pat = PmCon pat_id (PmAltConLike con) univ_tys ex_tvs dicts arg_ids
 
@@ -725,6 +729,7 @@ translateLet :: HsLocalBinds GhcTc -> DsM GrdVec
 translateLet _binds = return []
 
 -- | Translate a pattern guard
+--   @pat <- e ==>  let x = e;  <guards for pat <- x>@
 translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
 translateBind fam_insts (dL->L _ p) e = do
   PmPat x grds <- translatePat fam_insts p
@@ -732,6 +737,7 @@ translateBind fam_insts (dL->L _ p) e = do
   pure $ PmLet x rhs : grds
 
 -- | Translate a boolean guard
+--   @e ==>  let x = e; True <- x@
 translateBoolGuard :: LHsExpr GhcTc -> DsM GrdVec
 translateBoolGuard e
   | isJust (isTrueLHsExpr e) = return []
@@ -947,23 +953,23 @@ brows.
 {-
 %************************************************************************
 %*                                                                      *
-            Heart of the algorithm: Function pmcheck
+            Heart of the algorithm: Function pmCheck
 %*                                                                      *
 %************************************************************************
 
 Main functions are:
 
-* pmcheck :: PatVec -> [PatVec] -> ValVec -> Delta -> DsM PartialResult
+* pmCheck :: PatVec -> [PatVec] -> ValVec -> Delta -> DsM PartialResult
 
   This function implements functions `covered`, `uncovered` and
   `divergent` from the paper at once. Calls out to the auxilary function
-  `pmcheckGuards` for handling (possibly multiple) guarded RHSs when the whole
+  `pmCheckGuards` for handling (possibly multiple) guarded RHSs when the whole
   clause is checked. Slightly different from the paper because it does not even
   produce the covered and uncovered sets. Since we only care about whether a
   clause covers SOMETHING or if it may forces ANY argument, we only store a
   boolean in both cases, for efficiency.
 
-* pmcheckGuards :: [PatVec] -> ValVec -> Delta -> DsM PartialResult
+* pmCheckGuards :: [PatVec] -> ValVec -> Delta -> DsM PartialResult
 
   Processes the guards.
 -}
@@ -999,26 +1005,31 @@ throttle limit f n_siblings delta = do
 runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
 runMany f unc = mconcat <$> traverse f unc
 
--- | Print diagnostic info and actually call 'pmcheck'.
-pmcheckI :: GrdVec -> [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmcheckI ps guards n delta = do
+-- | Print diagnostic info and actually call 'pmCheck''.
+pmCheck :: GrdVec -> [GrdVec] -> Int -> Delta -> DsM PartialResult
+pmCheck ps guards n delta = do
   tracePm "pmCheck {" $ vcat [ ppr n <> colon
                            , hang (text "patterns:") 2 (ppr ps)
                            , hang (text "guards:") 2 (ppr guards)
                            , ppr delta ]
-  res <- pmcheck ps guards n delta
+  res <- pmCheck' ps guards n delta
   tracePm "}:" (ppr res) -- braces are easier to match by tooling
   return res
-{-# INLINE pmcheckI #-}
+
+-- | Lifts 'pmCheck' over a 'DsM (Maybe Delta)'.
+pmCheckM :: GrdVec -> [GrdVec] -> Int -> DsM (Maybe Delta) -> DsM PartialResult
+pmCheckM ps guards n m_mb_delta = m_mb_delta >>= \case
+  Nothing    -> pure mempty
+  Just delta -> pmCheck ps guards n delta
 
 -- | Check the list of mutually exclusive guards
-pmcheckGuards :: [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmcheckGuards []       _ delta = return (usimple delta)
-pmcheckGuards (gv:gvs) n delta = do
+pmCheckGuards :: [GrdVec] -> Int -> Delta -> DsM PartialResult
+pmCheckGuards []       _ delta = return (usimple delta)
+pmCheckGuards (gv:gvs) n delta = do
   dflags <- getDynFlags
   let limit = maxPmCheckModels dflags `div` 5
-  (n', PartialResult cs unc ds pc) <- throttle limit (pmcheckI gv []) n delta
-  (PartialResult css uncs dss pcs) <- runMany (pmcheckGuards gvs n') unc
+  (n', PartialResult cs unc ds pc) <- throttle limit (pmCheck gv []) n delta
+  (PartialResult css uncs dss pcs) <- runMany (pmCheckGuards gvs n') unc
   return $ PartialResult (cs `mappend` css)
                          uncs
                          (ds `mappend` dss)
@@ -1027,34 +1038,32 @@ pmcheckGuards (gv:gvs) n delta = do
 -- | Matching function: Check simultaneously a clause (takes separately the
 -- patterns and the list of guards) for exhaustiveness, redundancy and
 -- inaccessibility.
-pmcheck
+pmCheck'
   :: GrdVec   -- ^ Patterns of the clause
   -> [GrdVec] -- ^ (Possibly multiple) guards of the clause
   -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
               --   See 6. in Note [Countering exponential blowup]
   -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
   -> DsM PartialResult
-pmcheck [] guards n delta
+pmCheck' [] guards n delta
   | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmcheckGuards guards n delta
+  | otherwise   = pmCheckGuards guards n delta
 
--- Guard
-pmcheck (PmLet { pm_let_id = x, pm_let_expr = e } : ps) guards n delta = do
+-- let x = e: Add x ~ e to the oracle
+pmCheck' (PmLet { pm_id = x, pm_let_expr = e } : ps) guards n delta = do
   tracePm "PmLet" (vcat [ppr x, ppr e])
   -- x is fresh because it's bound by the let
   delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
-  pmcheckI ps guards n delta'
+  pmCheck ps guards n delta'
 
--- Bang: Add x /~ _|_ to the oracle and recurse
-pmcheck (PmBang x : ps) guards n delta = do
-  pr <- addTmCt delta (TmVarNonVoid x) >>= \case
-          Nothing        -> pure mempty
-          Just delta_str -> pmcheckI ps guards n delta_str
+-- Bang x: Add x /~ _|_ to the oracle
+pmCheck' (PmBang x : ps) guards n delta = do
+  pr <- pmCheckM ps guards n (addTmCt delta (TmVarNonVoid x))
   pure (forceIfCanDiverge delta x pr)
 
 -- ConVar
-pmcheck (p : ps) guards n delta
-  | PmCon{ pm_con_id = x, pm_con_con = con, pm_con_args = args
+pmCheck' (p : ps) guards n delta
+  | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
          , pm_con_dicts = dicts } <- p = do
   -- E.g   f (K p q) = <rhs>
   --       <next equation>
@@ -1063,14 +1072,12 @@ pmcheck (p : ps) guards n delta
   --    * one for <next equation>, recording that x is /not/ (K _ _)
 
   -- Stuff for <rhs>
-  pr_pos <- addPmConCts delta x con dicts args >>= \case
-    Nothing -> pure mempty
-    Just delta' ->
-      pmcheckI ps guards n delta'
+  pr_pos <- pmCheckM ps guards n (addPmConCts delta x con dicts args)
 
-  -- Stuff for <next equation>
   -- The var is forced regardless of whether @con@ was satisfiable
   let pr_pos' = forceIfCanDiverge delta x pr_pos
+
+  -- Stuff for <next equation>
   pr_neg <- addRefutableAltCon delta x con >>= \case
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
@@ -1179,7 +1186,7 @@ addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
            -> [Id]                  -- MatchVars (should have length 1)
            -> DsM a
            -> DsM a
--- Computes an approximation of the Covered set for p1 (which pmcheck currently
+-- Computes an approximation of the Covered set for p1 (which pmCheck currently
 -- discards).
 addPatTmCs ps xs k = do
   fam_insts <- dsGetFamInstEnvs
@@ -1188,22 +1195,22 @@ addPatTmCs ps xs k = do
       grds'                   = concatMap merge $ zip xs pv
   locallyExtendPmDelta (\delta -> computeCovered grds' delta) k
 
--- | A dead simple version of 'pmcheck' that only computes the Covered set.
+-- | A dead simple version of 'pmCheck' that only computes the Covered set.
 -- So it only cares about collecting positive info.
 -- We use it to collect info from a pattern when we check its RHS.
 -- See 'addPatTmCs'.
 computeCovered :: GrdVec -> Delta -> DsM (Maybe Delta)
--- The duplication with 'pmcheck' is really unfortunate, but it's simpler than
--- separating out the common cases with 'pmcheck', because that would make the
+-- The duplication with 'pmCheck' is really unfortunate, but it's simpler than
+-- separating out the common cases with 'pmCheck', because that would make the
 -- ConVar case harder to understand.
 computeCovered [] delta = pure (Just delta)
-computeCovered (PmLet { pm_let_id = x, pm_let_expr = e } : ps) delta = do
+computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) delta = do
   delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
   computeCovered ps delta'
 computeCovered (PmBang{} : ps) delta = do
   computeCovered ps delta
 computeCovered (p : ps) delta
-  | PmCon{ pm_con_id = x, pm_con_con = con, pm_con_args = args
+  | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
          , pm_con_dicts = dicts } <- p
   = addPmConCts delta x con dicts args >>= \case
       Nothing     -> pure Nothing
