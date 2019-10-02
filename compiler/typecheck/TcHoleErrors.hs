@@ -46,20 +46,16 @@ import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 
 
 -- Safe running of LHsExpr
-import PrelNames  ( toDynName )
-import HsUtils ( mkHsApp )
 import Data.Dynamic ( Dynamic )
 import HsExtension
-import SrcLoc (getLoc, GenLocated (..))
 
-import HscMain (hscCompileCoreExpr)
-import GHCi (wormhole)
-import DsExpr (dsLExpr)
-import DsMonad (initDsTc)
-import GHC.Exts (unsafeCoerce#)
-import CoreUtils (exprType)
+import HscMain  ( hscCompileCoreExpr )
+import GHCi     ( wormhole )
+import DsExpr   ( dsLExpr )
+import DsMonad  ( initDsTc )
+import GHC.Exts ( unsafeCoerce# )
 
-import HsExpr (ExtendedHole(..), LHsExpr, HsExpr(..) )
+import HsExpr (ExtendedHole(..), LHsExpr )
 
 import Control.Arrow ( (&&&) )
 
@@ -74,7 +70,7 @@ import TcUnify       ( tcSubType_NC )
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import HsDoc           ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface(..), lookupId )
+import HscTypes        ( ModIface(..) )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
