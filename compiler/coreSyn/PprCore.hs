@@ -461,6 +461,50 @@ pprIdBndrInfo info
           , (has_lbv , text "OS=" <> ppr lbv_info)
           ]
 
+instance Outputable IdInfo where
+  ppr info = showAttributes
+    [ (has_prag,         text "InlPrag=" <> pprInlineDebug prag_info)
+    , (has_occ,          text "Occ=" <> ppr occ_info)
+    , (has_dmd,          text "Dmd=" <> ppr dmd_info)
+    , (has_lbv ,         text "OS=" <> ppr lbv_info)
+    , (has_arity,        text "Arity=" <> int arity)
+    , (has_called_arity, text "CallArity=" <> int called_arity)
+    , (has_caf_info,     text "Caf=" <> ppr caf_info)
+    , (has_str_info,     text "Str=" <> pprStrictness str_info)
+    , (has_unf,          text "Unf=" <> ppr unf_info)
+    , (has_rules,        text "RULES:" <+> vcat (map pprRule rules))
+    ]
+    where
+      prag_info = inlinePragInfo info
+      has_prag  = not (isDefaultInlinePragma prag_info)
+
+      occ_info  = occInfo info
+      has_occ   = not (isManyOccs occ_info)
+
+      dmd_info  = demandInfo info
+      has_dmd   = not $ isTopDmd dmd_info
+
+      lbv_info  = oneShotInfo info
+      has_lbv   = not (hasNoOneShotInfo lbv_info)
+
+      arity = arityInfo info
+      has_arity = arity /= 0
+
+      called_arity = callArityInfo info
+      has_called_arity = called_arity /= 0
+
+      caf_info = cafInfo info
+      has_caf_info = not (mayHaveCafRefs caf_info)
+
+      str_info = strictnessInfo info
+      has_str_info = not (isTopSig str_info)
+
+      unf_info = unfoldingInfo info
+      has_unf = hasSomeUnfolding unf_info
+
+      rules = ruleInfoRules (ruleInfo info)
+      has_rules = not (null rules)
+
 {-
 -----------------------------------------------------
 --      IdDetails and IdInfo
@@ -617,4 +661,3 @@ instance Outputable id => Outputable (Tickish id) where
          _            -> hcat [text "scc<",     ppr cc, char '>']
   ppr (SourceNote span _) =
       hcat [ text "src<", pprUserRealSpan True span, char '>']
-
