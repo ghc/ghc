@@ -4,7 +4,7 @@
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = https://gitlab.haskell.org/ghc/packages/bytestring.git
+	url = https://gitlab.haskell.org/osa1/bytestring.git
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
@@ -44,7 +44,7 @@
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = https://gitlab.haskell.org/ghc/packages/array.git
+	url = https://gitlab.haskell.org/osa1/array.git
 	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
