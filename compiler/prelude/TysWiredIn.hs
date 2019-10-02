@@ -1483,6 +1483,7 @@ listTyCon =
                 False
                 (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
 
+-- See also Note [Empty lists] in GHC.Hs.Expr.
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 
