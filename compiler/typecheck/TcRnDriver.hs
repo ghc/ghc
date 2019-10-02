@@ -2298,9 +2298,12 @@ tcGhciStmts stmts
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
                        (noLoc $ ExplicitList unitTy Nothing
                                                             (map mk_item ids)) ;
-            mk_item id = let ty_args = [idType id, unitTy] in
+            mk_item id =
+                         {-
+                         let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
                                    (map getRuntimeRep ty_args ++ ty_args))
+                         -}
                                  (nlHsVar id) ;
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
