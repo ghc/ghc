@@ -93,292 +93,105 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 0 -- shift/reduce conflicts
+
+%nonassoc shift
+
+%nonassoc 'forall'
+          DOCNEXT
+          DOCPREV
+          '->'
+          '_'
+          'as'
+          'hiding'
+          'qualified'
+          'export'
+          'label'
+          'dynamic'
+          'safe'
+          'interruptible'
+          'unsafe'
+          'stdcall'
+          'ccall'
+          'capi'
+          'prim'
+          'javascript'
+          'group'
+          'stock'
+          'anyclass'
+          'via'
+          'unit'
+          'signature'
+          'dependency'
+          ':'
+          '~'
+          '-'
+          '!'
+          '*'
+          '.'
+          TYPEAPP
+          '['
+          '('
+          '(#'
+          '`'
+          SIMPLEQUOTE
+          VARID
+          CONID
+          VARSYM
+          CONSYM
+          QCONID
+          QVARSYM
+          QCONSYM
+          STRING
+          INTEGER
+          TH_ID_SPLICE
+          '$('
+          TH_QUASIQUOTE
+          TH_QQUASIQUOTE
+          'by'
+          'case'
+          'do'
+          'if'
+          'let'
+          'mdo'
+          'family'
+          'role'
+          'proc'
+          '\\'
+          '(|'
+          QVARID
+          IPDUPVARID
+          LABELVARID
+          CHAR
+          RATIONAL
+          PRIMCHAR
+          PRIMSTRING
+          PRIMINTEGER
+          PRIMWORD
+          PRIMFLOAT
+          PRIMDOUBLE
+          '[|'
+          '[p|'
+          '[t|'
+          '[d|'
+          '[||'
+          TH_ID_TY_SPLICE
+          '$$('
+          TH_TY_QUOTE
+          '::'
+          '-<'
+          '>-'
+          '-<<'
+          '>>-'
+          ')'
+          '#)'
+          '='
 
 {- Last updated: 04 June 2018
 
-If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
 
     happy -agc --strict compiler/parser/Parser.y -idetailed-info
-
-How is this section formatted? Look up the state the conflict is
-reported at, and copy the list of applicable rules (at the top, without the
-rule numbers).  Mark *** for the rule that is the conflicting reduction (that
-is, the interpretation which is NOT taken).  NB: Happy doesn't print a rule
-in a state if it is empty, but you should include it in the list (you can
-look these up in the Grammar section of the info file).
-
-Obviously the state numbers are not stable across modifications to the parser,
-the idea is to reproduce enough information on each conflict so you can figure
-out what happened if the states were renumbered.  Try not to gratuitously move
-productions around in this file.
-
--------------------------------------------------------------------------------
-
-state 0 contains 1 shift/reduce conflicts.
-
-    Conflicts: DOCNEXT (empty missing_module_keyword reduces)
-
-Ambiguity when the source file starts with "-- | doc". We need another
-token of lookahead to determine if a top declaration or the 'module' keyword
-follows. Shift parses as if the 'module' keyword follows.
-
--------------------------------------------------------------------------------
-
-state 60 contains 1 shift/reduce conflict.
-
-        context -> btype .
-    *** type -> btype .
-        type -> btype . '->' ctype
-
-    Conflicts: '->'
-
--------------------------------------------------------------------------------
-
-state 61 contains 47 shift/reduce conflicts.
-
-    *** btype -> tyapps .
-        tyapps -> tyapps . tyapp
-
-    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '[:' '(' '(#' '`' TYPEAPP
-      SIMPLEQUOTE VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
-      STRING INTEGER TH_ID_SPLICE '$(' TH_QUASIQUOTE TH_QQUASIQUOTE
-      and all the special ids.
-
-Example ambiguity:
-    'if x then y else z :: F a'
-
-Shift parses as (per longest-parse rule):
-    'if x then y else z :: (F a)'
-
--------------------------------------------------------------------------------
-
-state 143 contains 15 shift/reduce conflicts.
-
-        exp -> infixexp . '::' sigtype
-        exp -> infixexp . '-<' exp
-        exp -> infixexp . '>-' exp
-        exp -> infixexp . '-<<' exp
-        exp -> infixexp . '>>-' exp
-    *** exp -> infixexp .
-        infixexp -> infixexp . qop exp10
-
-    Conflicts: ':' '::' '-' '!' '-<' '>-' '-<<' '>>-'
-               '.' '`' '*' VARSYM CONSYM QVARSYM QCONSYM
-
-Examples of ambiguity:
-    'if x then y else z -< e'
-    'if x then y else z :: T'
-    'if x then y else z + 1' (NB: '+' is in VARSYM)
-
-Shift parses as (per longest-parse rule):
-    'if x then y else (z -< T)'
-    'if x then y else (z :: T)'
-    'if x then y else (z + 1)'
-
--------------------------------------------------------------------------------
-
-state 148 contains 67 shift/reduce conflicts.
-
-    *** exp10 -> fexp .
-        fexp -> fexp . aexp
-        fexp -> fexp . TYPEAPP atype
-
-    Conflicts: TYPEAPP and all the tokens that can start an aexp
-
-Examples of ambiguity:
-    'if x then y else f z'
-    'if x then y else f @ z'
-
-Shift parses as (per longest-parse rule):
-    'if x then y else (f z)'
-    'if x then y else (f @ z)'
-
--------------------------------------------------------------------------------
-
-state 203 contains 27 shift/reduce conflicts.
-
-        aexp2 -> TH_TY_QUOTE . tyvar
-        aexp2 -> TH_TY_QUOTE . gtycon
-    *** aexp2 -> TH_TY_QUOTE .
-
-    Conflicts: two single quotes is error syntax with specific error message.
-
-Example of ambiguity:
-    'x = '''
-    'x = ''a'
-    'x = ''T'
-
-Shift parses as (per longest-parse rule):
-    'x = ''a'
-    'x = ''T'
-
--------------------------------------------------------------------------------
-
-state 299 contains 1 shift/reduce conflicts.
-
-        rule -> STRING . rule_activation rule_forall infixexp '=' exp
-
-    Conflict: '[' (empty rule_activation reduces)
-
-We don't know whether the '[' starts the activation or not: it
-might be the start of the declaration with the activation being
-empty.  --SDM 1/4/2002
-
-Example ambiguity:
-    '{-# RULE [0] f = ... #-}'
-
-We parse this as having a [0] rule activation for rewriting 'f', rather
-a rule instructing how to rewrite the expression '[0] f'.
-
--------------------------------------------------------------------------------
-
-state 309 contains 1 shift/reduce conflict.
-
-    *** type -> btype .
-        type -> btype . '->' ctype
-
-    Conflict: '->'
-
-Same as state 61 but without contexts.
-
--------------------------------------------------------------------------------
-
-state 353 contains 1 shift/reduce conflicts.
-
-        tup_exprs -> commas . tup_tail
-        sysdcon_nolist -> '(' commas . ')'
-        commas -> commas . ','
-
-    Conflict: ')' (empty tup_tail reduces)
-
-A tuple section with NO free variables '(,,)' is indistinguishable
-from the Haskell98 data constructor for a tuple.  Shift resolves in
-favor of sysdcon, which is good because a tuple section will get rejected
-if -XTupleSections is not specified.
-
--------------------------------------------------------------------------------
-
-state 408 contains 1 shift/reduce conflicts.
-
-        tup_exprs -> commas . tup_tail
-        sysdcon_nolist -> '(#' commas . '#)'
-        commas -> commas . ','
-
-    Conflict: '#)' (empty tup_tail reduces)
-
-Same as State 354 for unboxed tuples.
-
--------------------------------------------------------------------------------
-
-state 416 contains 67 shift/reduce conflicts.
-
-    *** exp10 -> '-' fexp .
-        fexp -> fexp . aexp
-        fexp -> fexp . TYPEAPP atype
-
-Same as 149 but with a unary minus.
-
--------------------------------------------------------------------------------
-
-state 481 contains 1 shift/reduce conflict.
-
-        oqtycon -> '(' qtyconsym . ')'
-    *** qtyconop -> qtyconsym .
-
-    Conflict: ')'
-
-Example ambiguity: 'foo :: (:%)'
-
-Shift means '(:%)' gets parsed as a type constructor, rather than than a
-parenthesized infix type expression of length 1.
-
--------------------------------------------------------------------------------
-
-state 678 contains 1 shift/reduce conflicts.
-
-    *** aexp2 -> ipvar .
-        dbind -> ipvar . '=' exp
-
-    Conflict: '='
-
-Example ambiguity: 'let ?x ...'
-
-The parser can't tell whether the ?x is the lhs of a normal binding or
-an implicit binding.  Fortunately, resolving as shift gives it the only
-sensible meaning, namely the lhs of an implicit binding.
-
--------------------------------------------------------------------------------
-
-state 756 contains 1 shift/reduce conflicts.
-
-        rule -> STRING rule_activation . rule_forall infixexp '=' exp
-
-    Conflict: 'forall' (empty rule_forall reduces)
-
-Example ambiguity: '{-# RULES "name" forall = ... #-}'
-
-'forall' is a valid variable name---we don't know whether
-to treat a forall on the input as the beginning of a quantifier
-or the beginning of the rule itself.  Resolving to shift means
-it's always treated as a quantifier, hence the above is disallowed.
-This saves explicitly defining a grammar for the rule lhs that
-doesn't include 'forall'.
-
--------------------------------------------------------------------------------
-
-state 992 contains 1 shift/reduce conflicts.
-
-        transformqual -> 'then' 'group' . 'using' exp
-        transformqual -> 'then' 'group' . 'by' exp 'using' exp
-    *** special_id -> 'group' .
-
-    Conflict: 'by'
-
--------------------------------------------------------------------------------
-
-state 1089 contains 1 shift/reduce conflicts.
-
-        rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
-    *** rule_foralls -> 'forall' rule_vars '.' .
-
-    Conflict: 'forall'
-
-Example ambigutiy: '{-# RULES "name" forall a. forall ... #-}'
-
-Here the parser cannot tell whether the second 'forall' is the beginning of
-a term-level quantifier, for example:
-
-'{-# RULES "name" forall a. forall x. id @a x = x #-}'
-
-or a valid variable named 'forall', for example a function @:: Int -> Int@
-
-'{-# RULES "name" forall a. forall 0 = 0 #-}'
-
-Shift means the parser only allows the former. Also see conflict 753 above.
-
--------------------------------------------------------------------------------
-
-state 1390 contains 1 shift/reduce conflict.
-
-    *** atype -> tyvar .
-        tv_bndr -> '(' tyvar . '::' kind ')'
-
-    Conflict: '::'
-
-Example ambiguity: 'class C a where type D a = ( a :: * ...'
-
-Here the parser cannot tell whether this is specifying a default for the
-associated type like:
-
-'class C a where type D a = ( a :: * ); type D a'
-
-or it is an injectivity signature like:
-
-'class C a where type D a = ( r :: * ) | r -> a'
-
-Shift means the parser only allows the latter.
 
 -------------------------------------------------------------------------------
 -- API Annotations
@@ -558,8 +371,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  vccurly        { L _ ITvccurly } -- virtual close curly (from layout)
  '['            { L _ ITobrack }
  ']'            { L _ ITcbrack }
- '[:'           { L _ ITopabrack }
- ':]'           { L _ ITcpabrack }
  '('            { L _ IToparen }
  ')'            { L _ ITcparen }
  '(#'           { L _ IToubxparen }
@@ -775,7 +586,7 @@ maybedocheader :: { Maybe LHsDocString }
         | {- empty -}             { Nothing }
 
 missing_module_keyword :: { () }
-        : {- empty -}                           {% pushModuleContext }
+        : {- empty -} %prec shift               {% pushModuleContext }
 
 implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
@@ -1665,7 +1476,7 @@ rule    :: { LRuleDecl GhcPs }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
 rule_activation :: { ([AddAnn],Maybe Activation) }
-        : {- empty -}                           { ([],Nothing) }
+        : {- empty -} %prec shift               { ([],Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
 
 rule_explicit_activation :: { ([AddAnn]
@@ -1684,9 +1495,8 @@ rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr GhcPs], [LRuleBndr GhcPs]) }
                                                               >> return ([mu AnnForall $1,mj AnnDot $3,
                                                                           mu AnnForall $4,mj AnnDot $6],
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { ([mu AnnForall $1,mj AnnDot $3],
-                                                              Nothing, mkRuleBndrs $2) }
-        | {- empty -}                                      { ([], Nothing, []) }
+        | 'forall' rule_vars '.' %prec shift               { ([mu AnnForall $1,mj AnnDot $3], Nothing, mkRuleBndrs $2) }
+        | {- empty -} %prec shift                          { ([], Nothing, []) }
 
 rule_vars :: { [LRuleTyTmVar] }
         : rule_var rule_vars                    { $1 : $2 }
@@ -1964,7 +1774,7 @@ is connected to the first type too.
 -}
 
 type :: { LHsType GhcPs }
-        : btype                        { $1 }
+        : btype %prec shift            { $1 }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
                                               [mu AnnRarrow $2] }
@@ -2005,7 +1815,7 @@ constr_tyapp :: { Located TyEl }
         | docprev                       { sL1 $1 $ TyElDocPrev (unLoc $1) }
 
 btype :: { LHsType GhcPs }
-        : tyapps                        {% mergeOps $1 }
+        : tyapps %prec shift            {% mergeOps $1 }
 
 tyapps :: { [Located TyEl] } -- NB: This list is reversed
         : tyapp                         { [$1] }
@@ -2026,7 +1836,7 @@ tyapp :: { Located TyEl }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
+        | tyvar %prec shift              { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -2584,7 +2394,7 @@ exp   :: { ECP }
                                    ams (sLL $1 $> $ HsCmdArrApp noExtField $3 $1
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
-        | infixexp              { $1 }
+        | infixexp %prec shift  { $1 }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -2609,7 +2419,7 @@ infixexp_top :: { ECP }
                                               [mj AnnVal $2] }
 
 exp10_top :: { ECP }
-        : '-' fexp                      { ECP $
+        : '-' fexp %prec shift          { ECP $
                                            runECP_PV $2 >>= \ $2 ->
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
@@ -2627,7 +2437,7 @@ exp10_top :: { ECP }
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
-        | fexp                         { $1 }
+        | fexp %prec shift             { $1 }
 
 exp10 :: { ECP }
         : exp10_top            { $1 }
@@ -2775,7 +2585,7 @@ aexp1   :: { ECP }
 aexp2   :: { ECP }
         : qvar                          { ECP $ mkHsVarPV $! $1 }
         | qcon                          { ECP $ mkHsVarPV $! $1 }
-        | ipvar                         { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
+        | ipvar %prec shift             { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
         | overloaded_label              { ecpFromExp $ sL1 $1 (HsOverLabel noExtField Nothing $! unLoc $1) }
         | literal                       { ECP $ mkHsLitPV $! $1 }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
@@ -2817,7 +2627,7 @@ aexp2   :: { ECP }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
+        | TH_TY_QUOTE {- nothing -} %prec shift {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runECP_P $2 >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
@@ -2958,7 +2768,7 @@ tup_tail :: { forall b. DisambECP b => PV [Located (Maybe (Located b))] }
                                    return ((cL (gl $1) (Just $1)) : snd $2) }
           | texp                 { runECP_PV $1 >>= \ $1 ->
                                    return [cL (gl $1) (Just $1)] }
-          | {- empty -}          { return [noLoc Nothing] }
+          | {- empty -} %prec shift { return [noLoc Nothing] }
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -3477,7 +3287,7 @@ child.
 -}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
-        : qtyconsym                     { $1 }
+        : qtyconsym %prec shift         { $1 }
         | '`' qtycon '`'                {% ams (sLL $1 $> (unLoc $2))
                                                [mj AnnBackquote $1,mj AnnVal $2
                                                ,mj AnnBackquote $3] }
@@ -3649,7 +3459,7 @@ special_id
         | 'capi'                { sL1 $1 (fsLit "capi") }
         | 'prim'                { sL1 $1 (fsLit "prim") }
         | 'javascript'          { sL1 $1 (fsLit "javascript") }
-        | 'group'               { sL1 $1 (fsLit "group") }
+        | 'group' %prec shift   { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
         | 'via'                 { sL1 $1 (fsLit "via") }
@@ -3756,7 +3566,7 @@ moduleheader :: { Maybe LHsDocString }
 
 maybe_docprev :: { Maybe LHsDocString }
         : docprev                       { Just $1 }
-        | {- empty -}                   { Nothing }
+        | {- empty -} %prec shift       { Nothing }
 
 maybe_docnext :: { Maybe LHsDocString }
         : docnext                       { Just $1 }
