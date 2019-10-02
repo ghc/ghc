@@ -1450,8 +1450,7 @@ in nominal ways. If not, having w be representational is OK.
 %************************************************************************
 
 A UnivCo is a coercion whose proof does not directly express its role
-and kind (indeed for some UnivCos, like UnsafeCoerceProv, there /is/
-no proof).
+and kind (indeed for some UnivCos, like PluginProv, there /is/ no proof).
 
 The different kinds of UnivCo are described by UnivCoProvenance.  Really
 each is entirely separate, but they all share the need to represent their
@@ -1468,9 +1467,7 @@ role and kind, which is done in the UnivCo constructor.
 -- that they don't tell you what types they coercion between. (That info
 -- is in the 'UnivCo' constructor of 'Coercion'.
 data UnivCoProvenance
-  = UnsafeCoerceProv   -- ^ From @unsafeCoerce#@. These are unsound.
-
-  | PhantomProv KindCoercion -- ^ See Note [Phantom coercions]. Only in Phantom
+  = PhantomProv KindCoercion -- ^ See Note [Phantom coercions]. Only in Phantom
                              -- roled coercions
 
   | ProofIrrelProv KindCoercion  -- ^ From the fact that any two coercions are
@@ -1483,7 +1480,6 @@ data UnivCoProvenance
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
-  ppr UnsafeCoerceProv   = text "(unsafeCoerce#)"
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
@@ -1684,7 +1680,6 @@ coercionSize (SubCo co)          = 1 + coercionSize co
 coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
 
 provSize :: UnivCoProvenance -> Int
-provSize UnsafeCoerceProv    = 1
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1

@@ -1390,7 +1390,6 @@ collect_cand_qtvs_co bound = go_co
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
 
-    go_prov dv UnsafeCoerceProv    = return dv
     go_prov dv (PhantomProv co)    = go_co dv co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv
