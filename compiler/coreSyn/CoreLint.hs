@@ -84,7 +84,7 @@ Core Lint is the type-checker for Core. Using it, we get the following guarantee
 
 If all of:
 1. Core Lint passes,
-2. there are no unsafe coercions (i.e. UnsafeCoerceProv),
+2. there are no unsafe coercions (i.e. unsafeEqualityProof),
 3. all plugin-supplied coercions (i.e. PluginProv) are valid, and
 4. all case-matches are complete
 then running the compiled program will not seg-fault, assuming no bugs downstream
@@ -493,18 +493,23 @@ hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 
 -}
 
-lintUnfolding :: DynFlags
+lintUnfolding :: Bool           -- True <=> is a compulsory unfolding
+              -> DynFlags
               -> SrcLoc
               -> VarSet         -- Treat these as in scope
               -> CoreExpr
               -> Maybe MsgDoc   -- Nothing => OK
 
-lintUnfolding dflags locn vars expr
+lintUnfolding is_compulsory dflags locn vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
     in_scope = mkInScopeSet vars
-    (_warns, errs) = initL dflags defaultLintFlags in_scope linter
+    (_warns, errs) = initL dflags defaultLintFlags in_scope $
+                     if is_compulsory
+                       -- See Note [Checking for levity polymorphism]
+                     then noLPChecks linter
+                     else linter
     linter = addLoc (ImportedUnfolding locn) $
              lintCoreExpr expr
 
@@ -682,7 +687,10 @@ lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
   | isStableUnfolding uf
   , Just rhs <- maybeUnfoldingTemplate uf
-  = do { ty <- lintRhs bndr rhs
+  = do { ty <- if isCompulsoryUnfolding uf
+               then noLPChecks $ lintRhs bndr rhs
+                     -- See Note [Checking for levity polymorphism]
+               else lintRhs bndr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
@@ -697,6 +705,20 @@ However, the desugarer generates instance methods with INLINE pragmas
 that form a mutually recursive group.  Only after a round of
 simplification are they unravelled.  So we suppress the test for
 the desugarer.
+
+Note [Checking for levity polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We ordinarily want to check for bad levity polymorphism. See
+Note [Levity polymorphism invariants] in CoreSyn. However, we do *not*
+want to do this in a compulsory unfolding. Compulsory unfoldings arise
+only internally, for things like newtype wrappers, dictionaries, and
+(notably) unsafeCoerce#. These might legitimately be levity-polymorphic.
+
+It is vitally important that we do levity-polymorphism checks *after*
+performing the unfolding, but not beforehand. This is all safe because
+we will check any unfolding after it has been unfolded; checking the
+unfolding beforehand is merely an optimization, and one that actively
+hurts us here.
 
 ************************************************************************
 *                                                                      *
@@ -996,7 +1018,8 @@ lintCoreArg fun_ty (Type arg_ty)
 lintCoreArg fun_ty arg
   = do { arg_ty <- markAllJoinsBad $ lintCoreExpr arg
            -- See Note [Levity polymorphism invariants] in CoreSyn
-       ; lintL (not (isTypeLevPoly arg_ty))
+       ; flags <- getLintFlags
+       ; lintL (not (lf_check_levity_poly flags) || not (isTypeLevPoly arg_ty))
            (text "Levity-polymorphic argument:" <+>
              (ppr arg <+> dcolon <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))))
           -- check for levity polymorphism first, because otherwise isUnliftedType panics
@@ -1054,10 +1077,6 @@ lintTyKind :: OutTyVar -> OutType -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintTyKind tyvar arg_ty
-        -- Arg type might be boxed for a function with an uncommitted
-        -- tyvar; notably this is used so that we can give
-        --      error :: forall a:*. String -> a
-        -- and then apply it to both boxed and unboxed types.
   = do { arg_kind <- lintType arg_ty
        ; unless (arg_kind `eqType` tyvar_kind)
                 (addErrL (mkKindErrMsg tyvar arg_ty $$ (text "Linted Arg kind:" <+> ppr arg_kind))) }
@@ -1285,7 +1304,7 @@ lintIdBndr top_lvl bind_site id linterF
                     lintInTy (idType id)
 
           -- See Note [Levity polymorphism invariants] in CoreSyn
-       ; lintL (isJoinId id || not (isKindLevPoly k))
+       ; lintL (isJoinId id || not (lf_check_levity_poly flags) || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
 
@@ -1818,8 +1837,6 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
   = do { k1 <- lintType ty1
        ; k2 <- lintType ty2
        ; case prov of
-           UnsafeCoerceProv -> return ()  -- no extra checks
-
            PhantomProv kco    -> do { lintRole co Phantom r
                                     ; check_kinds kco k1 k2 }
 
@@ -2094,6 +2111,7 @@ data LintFlags
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
        , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
        , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
+       , lf_check_levity_poly :: Bool -- See Note [Checking for levity polymorphism]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -2111,6 +2129,7 @@ defaultLintFlags = LF { lf_check_global_ids = False
                       , lf_check_inline_loop_breakers = True
                       , lf_check_static_ptrs = AllowAnywhere
                       , lf_report_unsat_syns = True
+                      , lf_check_levity_poly = True
                       }
 
 newtype LintM a =
@@ -2245,6 +2264,13 @@ setReportUnsat :: Bool -> LintM a -> LintM a
 setReportUnsat ru thing_inside
   = LintM $ \ env errs ->
     let env' = env { le_flags = (le_flags env) { lf_report_unsat_syns = ru } }
+    in unLintM thing_inside env' errs
+
+-- See Note [Checking for levity polymorphism]
+noLPChecks :: LintM a -> LintM a
+noLPChecks thing_inside
+  = LintM $ \env errs ->
+    let env' = env { le_flags = (le_flags env) { lf_check_levity_poly = False } }
     in unLintM thing_inside env' errs
 
 getLintFlags :: LintM LintFlags
