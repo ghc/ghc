@@ -181,6 +181,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.gc              = false;
     RtsFlags.DebugFlags.block_alloc     = false;
     RtsFlags.DebugFlags.sanity          = false;
+    RtsFlags.DebugFlags.zeroongc        = false;
     RtsFlags.DebugFlags.stable          = false;
     RtsFlags.DebugFlags.stm             = false;
     RtsFlags.DebugFlags.prof            = false;
@@ -405,6 +406,7 @@ usage_text[] = {
 "  -Dg  DEBUG: gc",
 "  -Db  DEBUG: block",
 "  -DS  DEBUG: sanity",
+"  -DZ  DEBUG: zeroongc",
 "  -Dt  DEBUG: stable",
 "  -Dp  DEBUG: prof",
 "  -Da  DEBUG: apply",
@@ -1861,6 +1863,9 @@ static void read_debug_flags(const char* arg)
         case 'S':
             RtsFlags.DebugFlags.sanity = true;
             break;
+        case 'Z':
+            RtsFlags.DebugFlags.zeroongc = true;
+            break;
         case 't':
             RtsFlags.DebugFlags.stable = true;
             break;
@@ -1895,6 +1900,12 @@ static void read_debug_flags(const char* arg)
     // -Dx also turns on -v.  Use -l to direct trace
     // events to the .eventlog file instead.
     RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+
+   // sanity implies zeroongc
+   if(RtsFlags.DebugFlags.sanity){
+        RtsFlags.DebugFlags.zeroongc = true;
+   }
+
 }
 #endif
 

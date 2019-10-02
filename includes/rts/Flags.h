@@ -97,6 +97,7 @@ typedef struct _DEBUG_FLAGS {
     bool gc;             /* 'g' */
     bool block_alloc;    /* 'b' */
     bool sanity;         /* 'S'   warning: might be expensive! */
+    bool zeroongc;       /* 'Z' */
     bool stable;         /* 't' */
     bool prof;           /* 'p' */
     bool linker;         /* 'l'   the object linker */
