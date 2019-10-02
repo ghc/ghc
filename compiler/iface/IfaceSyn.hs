@@ -1615,7 +1615,6 @@ freeNamesIfCoercion (IfaceAxiomRuleCo _ax cos)
   = fnList freeNamesIfCoercion cos
 
 freeNamesIfProv :: IfaceUnivCoProv -> NameSet
-freeNamesIfProv IfaceUnsafeCoerceProv    = emptyNameSet
 freeNamesIfProv (IfacePhantomProv co)    = freeNamesIfCoercion co
 freeNamesIfProv (IfaceProofIrrelProv co) = freeNamesIfCoercion co
 freeNamesIfProv (IfacePluginProv _)      = emptyNameSet
