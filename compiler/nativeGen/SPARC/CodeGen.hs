@@ -681,6 +681,7 @@ outOfLineMachOp_table mop
         MO_AtomicRead w -> fsLit $ atomicReadLabel w
         MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
 
+        MO_S_Mul2    {}  -> unsupported
         MO_S_QuotRem {}  -> unsupported
         MO_U_QuotRem {}  -> unsupported
         MO_U_QuotRem2 {} -> unsupported
