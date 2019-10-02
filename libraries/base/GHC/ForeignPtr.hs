@@ -55,6 +55,8 @@ import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 
+import Unsafe.Coerce    ( unsafeCoerce# )
+
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the
 -- data structures usually managed by the Haskell storage manager.
@@ -463,4 +465,3 @@ finalizeForeignPtr (ForeignPtr _ foreignPtr) = foreignPtrFinalizer refFinalizers
                         (MallocPtr     _ ref) -> ref
                         PlainPtr _            ->
                             errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
-

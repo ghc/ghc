@@ -31,6 +31,8 @@ module GHC.Stable (
 import GHC.Ptr
 import GHC.Base
 
+import Unsafe.Coerce ( unsafeCoerce# )
+
 -----------------------------------------------------------------------------
 -- Stable Pointers
 
