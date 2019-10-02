@@ -8,8 +8,7 @@ T10945.hs:7:4: error:
           [SigD
              (mkName "m")
              (ForallT
-                [PlainTV (mkName "a")]
-                []
+                [PlainTV (mkName "a")] []
                 (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
            FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]]
       In the Template Haskell splice
@@ -17,8 +16,7 @@ T10945.hs:7:4: error:
              [SigD
                 (mkName "m")
                 (ForallT
-                   [PlainTV (mkName "a")]
-                   []
+                   [PlainTV (mkName "a")] []
                    (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
               FunD (mkName "m") [Clause [...] (NormalB (VarE (mkName "x"))) []]])
       In the expression:
@@ -26,7 +24,6 @@ T10945.hs:7:4: error:
              [SigD
                 (mkName "m")
                 (ForallT
-                   [PlainTV (mkName "a")]
-                   []
+                   [PlainTV (mkName "a")] []
                    (AppT (AppT ArrowT (VarT (mkName "a"))) (VarT (mkName "a")))),
-              FunD (mkName "m") [Clause ... (NormalB (VarE (mkName "x"))) ...]])
+              FunD (mkName "m") [Clause ... (NormalB (VarE (mkName "x"))) []]])
