@@ -1,10 +1,12 @@
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing
+                -Wno-overlapping-patterns -Wno-inaccessible-code #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, KindSignatures, DataKinds, TypeOperators, GADTs #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -27,6 +29,8 @@ import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO
 import Control.Exception ( ErrorCall(..) )
+import Data.Type.Equality
+import Unsafe.Coerce
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]
 createBCOs bcos = do
@@ -58,10 +62,15 @@ createBCO arr bco
         --       non-zero arity BCOs in an AP thunk.
         --
         if (resolvedBCOArity bco > 0)
-           then return (HValue (unsafeCoerce# bco#))
+           then return (HValue (castBCOToAny bco#))
            else case mkApUpd0# bco# of { (# final_bco #) ->
                   return (HValue final_bco) }
 
+castBCOToAny :: BCO# -> Any
+castBCOToAny x = castUnliftedToLiftedWith (unsafeHeteroEqualityProof @BCO# @Any) x
+
+castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . (a :~~: b) -> a -> b
+castUnliftedToLiftedWith HRefl x = x
 
 toWordArray :: UArray Int Word64 -> UArray Int Word
 toWordArray = amap fromIntegral
@@ -128,17 +137,17 @@ writePtrsArrayPtr (I# i) (Ptr a#) (PtrsArr arr) = IO $ \s ->
 -- without making a thunk turns out to be surprisingly tricky.
 {-# NOINLINE writeArrayAddr# #-}
 writeArrayAddr# :: MutableArray# s a -> Int# -> Addr# -> State# s -> State# s
-writeArrayAddr# marr i addr s = unsafeCoerce# writeArray# marr i addr s
+writeArrayAddr# marr i addr s = unsafeCoerce writeArray# marr i addr s
 
 writePtrsArrayBCO :: Int -> BCO# -> PtrsArr -> IO ()
 writePtrsArrayBCO (I# i) bco (PtrsArr arr) = IO $ \s ->
-  case (unsafeCoerce# writeArray#) arr i bco s of s' -> (# s', () #)
+  case unsafeCoerce writeArray# arr i bco s of s' -> (# s', () #)
 
 data BCO = BCO BCO#
 
 writePtrsArrayMBA :: Int -> MutableByteArray# s -> PtrsArr -> IO ()
 writePtrsArrayMBA (I# i) mba (PtrsArr arr) = IO $ \s ->
-  case (unsafeCoerce# writeArray#) arr i mba s of s' -> (# s', () #)
+  case unsafeCoerce writeArray# arr i mba s of s' -> (# s', () #)
 
 newBCO :: ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> IO BCO
 newBCO instrs lits ptrs arity bitmap = IO $ \s ->
