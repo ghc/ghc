@@ -44,11 +44,12 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import TyCoRep
 import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( mkCast, mkDefaultCase )
+import CoreUtils        ( mkCast, mkDefaultCase, exprType )
 import CoreUnfold
 import Literal
 import TyCon
@@ -1354,26 +1355,61 @@ proxyHashId
     ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
 
 ------------------------------------------------
-unsafeCoerceId :: Id
-unsafeCoerceId
-  = pcMiscPrelId unsafeCoerceName ty info
+unsafeEqualityProofId :: Id
+unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
   where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+    [kappa, alpha, beta] = mkTemplateKiTyVar liftedTypeKind (\kv -> [kv, kv])
 
-    -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-    --                         (a :: TYPE r1) (b :: TYPE r2).
-    --                         a -> b
-    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
-                               (\ks -> map tYPE ks)
+    ty = mkForAllTy kappa Inferred $
+         mkSpecForAllTys [alpha, beta] $
+         mkTyConApp unsafeEqualityTyCon (mkTyVarTys [kappa, alpha, beta])
 
-    [_, _, a, b] = mkTyVarTys bndrs
+    info = noCafIdInfo
 
-    ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
+unsafeCoerceId :: Id
+unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma   -- is this necessary with a compulsory unfolding?
+                       `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 
-    [x] = mkTemplateLocals [a]
-    rhs = mkLams (bndrs ++ [x]) $
-          Cast (Var x) (mkUnsafeCo Representational a b)
+    ty = mkSpecForAllTys [runtimeRep1TyVar, runtimeRep2TyVar, openAlphaTyVar, openBetaTyVar] $
+         mkVisFunTy openAlphaTy openBetaTy
+
+    -- returns (scrutinee, scrutinee type, type of covar in AltCon)
+    unsafe_equality tys@[k, a, b]
+      = ( mkTyApps (Var unsafeEqualityProofId) tys
+        , mkTyConApp unsafeEqualityTyCon tys
+        , mkTyConApp eqPrimTyCon [k, k, a, b]
+        )
+
+    (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality [runtimeRepTy, runtimeRep1Ty, runtimeRep2Ty]
+    (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality [ tYPE runtimeRep2Ty
+                                                    , openAlphaTy `mkCastTy` alpha_co
+                                                    , openBetaTy ]
+
+    -- alpha_co :: TYPE r1 ~# TYPE r2
+    -- alpha_co = TYPE rr_cv
+    alpha_co = mkTyConAppCo Nominal tYPETyCon [mkCoVarCo rr_cv]
+
+    -- x_co :: alpha ~R# beta
+    x_co = mkGReflCo Representational openAlphaTy (MCo alpha_co) `mkTransCo`
+           mkSubCo (mkCoVarCo ab_cv)
+
+    [x, rr_cv, ab_cv] = mkTemplateLocals [ openAlphaTy -- x :: a
+                                         , rr_cv_ty    -- rr_cv :: r1 ~# r2
+                                         , ab_cv_ty    -- ab_cv :: (alpha |> alpha_co ~# beta)
+                                         ]
+
+    rhs = mkLams [runtimeRep1TyVar, runtimeRep2TyVar, openAlphaTyVar, openBetaTyVar, x] $
+          mkSingleAltCase scrut1
+                          (mkWildValBinder scrut1_ty)
+                          (DataAlt unsafeReflDataCon)
+                          [rr_cv] $
+          mkSingleAltCase scrut2
+                          (mkWildValBinder scrut2_ty)
+                          (DataAlt unsafeReflDataCon)
+                          [ab_cv] $
+          Var x `mkCast` x_co
 
 ------------------------------------------------
 nullAddrId :: Id

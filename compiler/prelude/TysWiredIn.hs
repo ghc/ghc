@@ -123,7 +123,10 @@ module TysWiredIn (
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-        doubleElemRepDataConTy
+        doubleElemRepDataConTy,
+
+        -- * Unsafe coercion stuff
+        unsafeEqualityTyCon, unsafeReflDataCon
 
     ) where
 
@@ -235,6 +238,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
+                , unsafeEqualityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -1660,3 +1664,40 @@ extractPromotedList tys = go tys
 
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
+
+{-
+** *********************************************************************
+*                                                                      *
+            Unsafe coercion stuff
+*                                                                      *
+************************************************************************
+-}
+
+unsafeEqualityTyCon :: TyCon
+unsafeReflDataCon :: DataCon
+
+(unsafeEqualityTyCon, unsafeReflDataCon) = (tycon, datacon)
+  where
+    tycon_binders :: [TyConBinder]
+    tycon_binders = mkTemplateTyConBinders [runtimeRepTy] (\[k] -> [tYPE k, tYPE k])
+
+    tycon :: TyCon
+    tycon =
+      mkAlgTyCon
+        unsafeEqualityTyConName -- Name
+        tycon_binders -- [TyConBinder] (binders of the TyCon)
+        liftedTypeKind -- Kind (result kind)
+        (map (const Representational) tycon_binders) -- [Role]
+        Nothing -- CType
+        [] -- [PredType]
+        (mkDataTyConRhs [datacon]) -- AlgTyConRhs
+        (VanillaAlgTyCon (mkPrelTyConRepName unsafeEqualityTyConName)) -- AlgTyConFlav
+        True -- GADT syntax?
+
+    datacon :: DataCon
+    datacon =
+      pcDataCon
+        unsafeReflDataConName
+        (binderVars tycon_binders)
+        [mkTyConApp eqPrimTyCon (mkTyVarTys (binderVars tycon_binders))]
+        tycon
