@@ -1247,7 +1247,6 @@ tcIfaceCo = go
     go_var = tcIfaceLclId
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
-tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
@@ -1463,12 +1462,23 @@ tcIdInfo ignore_prags toplvl name ty info = do
     -- we start; default assumption is that it has CAFs
     let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
                   | otherwise       = vanillaIdInfo
-    if ignore_prags
-        then return init_info
-        else case info of
-                NoInfo -> return init_info
-                HasInfo info -> foldlM tcPrag init_info info
+
+    case info of
+      NoInfo       -> return init_info
+      HasInfo info -> let needed = needed_prags info in
+                      foldlM tcPrag init_info needed
   where
+    needed_prags :: [IfaceInfoItem] -> [IfaceInfoItem]
+    needed_prags items
+      | not ignore_prags = items
+      | otherwise        = filter need_prag items
+
+    need_prag :: IfaceInfoItem -> Bool
+      -- compulsory unfoldings are really compulsory.
+      -- See wrinkle in Note [Wiring in unsafeCoerce#] in Desugar
+    need_prag (HsUnfold _ (IfCompulsory {})) = True
+    need_prag _                              = False
+
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
@@ -1490,7 +1500,7 @@ tcJoinInfo IfaceNotJoinPoint   = Nothing
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   = do  { dflags <- getDynFlags
-        ; mb_expr <- tcPragExpr toplvl name if_expr
+        ; mb_expr <- tcPragExpr False toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
@@ -1504,13 +1514,13 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
-  = do  { mb_expr <- tcPragExpr toplvl name if_expr
+  = do  { mb_expr <- tcPragExpr True toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCompulsoryUnfolding expr) }
 
 tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
-  = do  { mb_expr <- tcPragExpr toplvl name if_expr
+  = do  { mb_expr <- tcPragExpr False toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
                     Just expr -> mkCoreUnfolding InlineStable True expr guidance )}
@@ -1532,17 +1542,20 @@ For unfoldings we try to do the job lazily, so that we never type check
 an unfolding that isn't going to be looked at.
 -}
 
-tcPragExpr :: TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
-tcPragExpr toplvl name expr
+tcPragExpr :: Bool  -- Is this unfolding compulsory?
+                    -- See Note [Checking for levity polymorphism] in CoreLint
+           -> TopLevelFlag -> Name -> IfaceExpr -> IfL (Maybe CoreExpr)
+tcPragExpr is_compulsory toplvl name expr
   = forkM_maybe doc $ do
     core_expr' <- tcIfaceExpr expr
 
     -- Check for type consistency in the unfolding
     -- See Note [Linting Unfoldings from Interfaces]
-    when (isTopLevel toplvl) $ whenGOptM Opt_DoCoreLinting $ do
+    when (isTopLevel toplvl) $
+      whenGOptM Opt_DoCoreLinting $ do
         in_scope <- get_in_scope
         dflags   <- getDynFlags
-        case lintUnfolding dflags noSrcLoc in_scope core_expr' of
+        case lintUnfolding is_compulsory dflags noSrcLoc in_scope core_expr' of
           Nothing       -> return ()
           Just fail_msg -> do { mod <- getIfModule
                               ; pprPanic "Iface Lint failure"
@@ -1552,7 +1565,8 @@ tcPragExpr toplvl name expr
                                         , text "Iface expr =" <+> ppr expr ]) }
     return core_expr'
   where
-    doc = text "Unfolding of" <+> ppr name
+    doc = ppWhen is_compulsory (text "Compulsory") <+>
+          text "Unfolding of" <+> ppr name
 
     get_in_scope :: IfL VarSet -- Totally disgusting; but just for linting
     get_in_scope
@@ -1683,7 +1697,7 @@ tcIfaceTyCon (IfaceTyCon name info)
   = do { thing <- tcIfaceGlobal name
        ; return $ case ifaceTyConIsPromoted info of
            NotPromoted -> tyThingTyCon thing
-           IsPromoted    -> promoteDataCon $ tyThingDataCon thing }
+           IsPromoted  -> promoteDataCon $ tyThingDataCon thing }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name

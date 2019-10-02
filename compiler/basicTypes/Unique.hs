@@ -394,12 +394,6 @@ mkPreludeTyConUnique i                = mkUnique '3' (2*i)
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
 
--- Data constructor keys occupy *two* slots.  The first is used for the
--- data constructor itself and its wrapper function (the function that
--- evaluates arguments as necessary and calls the worker). The second is
--- used for the worker function (the function that builds the constructor
--- representation).
-
 --------------------------------------------------
 -- Wired-in data constructor keys occupy *three* slots:
 --    * u: the DataCon itself

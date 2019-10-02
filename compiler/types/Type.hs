@@ -53,6 +53,7 @@ module Type (
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
+        buildSynTyCon,
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
@@ -239,6 +240,7 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind )
+import Name( Name )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
@@ -463,7 +465,6 @@ expandTypeSynonyms ty
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
-    go_prov _     UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
@@ -688,7 +689,6 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go (KindCo co)         = mkKindCo <$> go co
     go (SubCo co)          = mkSubCo <$> go co
 
-    go_prov UnsafeCoerceProv    = return UnsafeCoerceProv
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
@@ -1938,6 +1938,15 @@ isCoVarType ty
   | otherwise
   = False
 
+buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
+              -> [Role] -> KnotTied Type -> TyCon
+-- This function is here beucase here is where we have
+--   isFamFree and isTauTy
+buildSynTyCon name binders res_kind roles rhs
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+  where
+    is_tau      = isTauTy rhs
+    is_fam_free = isFamFreeTy rhs
 
 {-
 ************************************************************************
@@ -2736,7 +2745,6 @@ occCheckExpand vs_to_avoid ty
                                              ; return (mkAxiomRuleCo ax cs') }
 
     ------------------
-    go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
@@ -2790,7 +2798,6 @@ tyConsOfType ty
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co
 
-     go_prov UnsafeCoerceProv    = emptyUniqSet
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyUniqSet
