@@ -46,6 +46,7 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
+import Unsafe.Coerce
 
 ------------------------------------------------------------------------
 -- Boxes
@@ -84,7 +85,7 @@ instance Show Box where
 --
 -- > case list of x:_ -> asBox x
 asBox :: a -> Box
-asBox x = Box (unsafeCoerce# x)
+asBox x = Box (unsafeCoerce x)
 
 -- | Boxes can be compared, but this is not pure, as different heap objects can,
 -- after garbage collection, become the same object.
