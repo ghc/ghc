@@ -1,12 +1,11 @@
-resolver: lts-13.21
+resolver: lts-14.7
 
 extra-deps:
 - happy-1.19.12
-- shake-0.18.3@sha256:12949a47f07915a4338291a0146158d18abdd04c0dfd813778231ed68b4758df,14806
+- Cabal-3.0.0.0@sha256:1ba37b8d80e89213b17db7b8b9ea0108da55ca65f8c0cbb7433881a284c5cf67
 
 packages:
 - '.'
-- '../libraries/Cabal/Cabal'
 
 nix:
    enable: false
