@@ -17,6 +17,9 @@ import GHC.Hs
 import TcRnTypes
 import TcRnMonad
 import TcSimplify
+import Constraint
+import Predicate
+import Origin
 import TcMType
 import TcType
 import TcHsType

@@ -131,8 +131,8 @@ import DynFlags
 -- Turgid imports for showTypeCategory
 import PrelNames
 import TcType
-import Type
 import TyCon
+import Predicate
 
 import Data.Maybe
 import qualified Data.Char

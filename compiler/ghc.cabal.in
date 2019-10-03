@@ -225,6 +225,7 @@ Library
         Hooks
         Id
         IdInfo
+        Predicate
         Lexeme
         Literal
         Llvm
@@ -515,6 +516,8 @@ Library
         TcRnExports
         TcRnMonad
         TcRnTypes
+        Constraint
+        Origin
         TcRules
         TcSimplify
         TcHoleErrors

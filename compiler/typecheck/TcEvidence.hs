@@ -64,12 +64,12 @@ import PrelNames
 import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
 import VarSet
+import Predicate
 import Name
 import Pair
 
 import CoreSyn
 import Class ( classSCSelId )
-import Id ( isEvVar )
 import CoreFVs ( exprSomeFreeVars )
 
 import Util
@@ -118,7 +118,6 @@ mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
 mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: TcCoercionN -> TcCoercionR
-maybeTcSubCo           :: EqRel -> TcCoercion -> TcCoercion
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
 mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
 mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
@@ -156,7 +155,6 @@ mkTcForAllCos          = mkForAllCos
 mkTcNthCo              = mkNthCo
 mkTcLRCo               = mkLRCo
 mkTcSubCo              = mkSubCo
-maybeTcSubCo           = maybeSubCo
 tcDowngradeRole        = downgradeRole
 mkTcAxiomRuleCo        = mkAxiomRuleCo
 mkTcGReflRightCo       = mkGReflRightCo
@@ -176,6 +174,13 @@ isTcReflexiveCo        = isReflexiveCo
 
 tcCoToMCo :: TcCoercion -> TcMCoercion
 tcCoToMCo = coToMCo
+
+-- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
+-- Note that the input coercion should always be nominal.
+maybeTcSubCo :: EqRel -> TcCoercion -> TcCoercion
+maybeTcSubCo NomEq  = id
+maybeTcSubCo ReprEq = mkTcSubCo
+
 
 {-
 %************************************************************************
@@ -641,7 +646,7 @@ Instead we make a binding
     g1 :: a~Bool = g |> ax7 a
 and the constraint
     [G] g1 :: a~Bool
-See #7238 and Note [Bind new Givens immediately] in TcRnTypes
+See #7238 and Note [Bind new Givens immediately] in Constraint
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~

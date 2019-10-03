@@ -76,6 +76,8 @@ import TcExpr
 import TcRnMonad
 import TcRnExports
 import TcEvidence
+import Constraint
+import Origin
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
 import CoreFVs( orphNamesOfFamInst )

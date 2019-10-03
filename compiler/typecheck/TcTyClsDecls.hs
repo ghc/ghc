@@ -47,6 +47,7 @@ import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
 import Coercion
+import Origin
 import Type
 import TyCoRep   -- for checkValidRoles
 import Class

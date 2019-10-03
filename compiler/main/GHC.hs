@@ -311,6 +311,7 @@ import GhcMonad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import LoadIface        ( loadSysInterface )
 import TcRnTypes
+import Predicate
 import Packages
 import NameSet
 import RdrName

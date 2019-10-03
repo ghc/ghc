@@ -16,6 +16,7 @@ import GhcPrelude
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
+import Predicate
 import Module( Module, HasModule(..) )
 import Coercion( Coercion )
 import CoreMonad

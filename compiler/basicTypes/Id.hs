@@ -73,9 +73,6 @@ module Id (
         isConLikeId, isBottomingId, idIsFrom,
         hasNoBinding,
 
-        -- ** Evidence variables
-        DictId, isDictId, isEvVar,
-
         -- ** Join variables
         JoinId, isJoinId, isJoinId_maybe, idJoinArity,
         asJoinId, asJoinId_maybe, zapJoinId,
@@ -129,7 +126,7 @@ import IdInfo
 import BasicTypes
 
 -- Imported and re-exported
-import Var( Id, CoVar, DictId, JoinId,
+import Var( Id, CoVar, JoinId,
             InId,  InVar,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId, varType,
@@ -583,20 +580,6 @@ simple way to fix #14561.
 isDeadBinder :: Id -> Bool
 isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
                   | otherwise = False   -- TyVars count as not dead
-
-{-
-************************************************************************
-*                                                                      *
-              Evidence variables
-*                                                                      *
-************************************************************************
--}
-
-isEvVar :: Var -> Bool
-isEvVar var = isEvVarType (varType var)
-
-isDictId :: Id -> Bool
-isDictId id = isDictTy (idType id)
 
 {-
 ************************************************************************

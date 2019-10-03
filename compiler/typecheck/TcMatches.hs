@@ -33,6 +33,7 @@ import TcMType
 import TcType
 import TcBinds
 import TcUnify
+import Origin
 import Name
 import TysWiredIn
 import Id

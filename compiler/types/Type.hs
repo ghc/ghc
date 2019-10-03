@@ -52,10 +52,13 @@ module Type (
         mkLamType, mkLamTypes,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
+        mkFamilyTyConApp,
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
         isLitTy,
+
+        isPredTy,
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
@@ -65,7 +68,7 @@ module Type (
         userTypeError_maybe, pprUserTypeErrorTy,
 
         coAxNthLHS,
-        stripCoercionTy, splitCoercionType_maybe,
+        stripCoercionTy,
 
         splitPiTysInvisible, splitPiTysInvisibleN,
         invisibleTyBndrCount,
@@ -81,23 +84,6 @@ module Type (
 
         -- (Newtypes)
         newTyConInstRhs,
-
-        -- Pred types
-        mkFamilyTyConApp,
-        isDictLikeTy,
-        mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
-        equalityTyCon,
-        mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
-        mkClassPred,
-        isClassPred, isEqPrimPred, isEqPred, isEqPredClass,
-        isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
-        isCTupleClass,
-
-        -- Deconstructing predicate types
-        PredTree(..), EqRel(..), eqRelRole, classifyPredType,
-        getClassPredTys, getClassPredTys_maybe,
-        getEqPredTys, getEqPredTys_maybe, getEqPredRole,
-        predTypeEqRel,
 
         -- ** Binders
         sameVis,
@@ -117,11 +103,11 @@ module Type (
         funTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy, isDictTy, isPredTy, isCoercionTy,
+        isTyVarTy, isFunTy, isCoercionTy,
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
         isPiTy, isTauTy, isFamFreeTy,
-        isCoVarType, isEvVarType,
+        isCoVarType,
 
         isValidJoinPointType,
         tyConAppNeedsKindSig,
@@ -253,7 +239,6 @@ import VarEnv
 import VarSet
 import UniqSet
 
-import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
@@ -1191,6 +1176,18 @@ splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe ty                           = repSplitTyConApp_maybe ty
 
+-- | Split a type constructor application into its type constructor and
+-- applied types. Note that this may fail in the case of a 'FunTy' with an
+-- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
+-- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
+-- type before using this function.
+--
+-- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
+tcSplitTyConApp_maybe ty                         = repSplitTyConApp_maybe ty
+
 -------------------
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- ^ Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
@@ -1790,327 +1787,6 @@ binderRelevantType_maybe :: TyCoBinder -> Maybe Type
 binderRelevantType_maybe (Named {})  = Nothing
 binderRelevantType_maybe (Anon _ ty) = Just ty
 
-{-
-%************************************************************************
-%*                                                                      *
-                         Pred
-*                                                                      *
-************************************************************************
-
-Predicates on PredType
-
-Note [Evidence for quantified constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The superclass mechanism in TcCanonical.makeSuperClasses risks
-taking a quantified constraint like
-   (forall a. C a => a ~ b)
-and generate superclass evidence
-   (forall a. C a => a ~# b)
-
-This is a funny thing: neither isPredTy nor isCoVarType are true
-of it.  So we are careful not to generate it in the first place:
-see Note [Equality superclasses in quantified constraints]
-in TcCanonical.
--}
-
--- | Split a type constructor application into its type constructor and
--- applied types. Note that this may fail in the case of a 'FunTy' with an
--- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
--- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
--- type before using this function.
---
--- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
-tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
--- Defined here to avoid module loops between Unify and TcType.
-tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe ty                         = repSplitTyConApp_maybe ty
-
--- tcIsConstraintKind stuf only makes sense in the typechecker
--- After that Constraint = Type
--- See Note [coreView vs tcView]
--- Defined here because it is used in isPredTy and tcRepSplitAppTy_maybe (sigh)
-tcIsConstraintKind :: Kind -> Bool
-tcIsConstraintKind ty
-  | Just (tc, args) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
-  , isConstraintKindCon tc
-  = ASSERT2( null args, ppr ty ) True
-
-  | otherwise
-  = False
-
--- | Is this kind equivalent to @*@?
---
--- This considers 'Constraint' to be distinct from @*@. For a version that
--- treats them as the same type, see 'isLiftedTypeKind'.
-tcIsLiftedTypeKind :: Kind -> Bool
-tcIsLiftedTypeKind ty
-  | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
-  , tc `hasKey` tYPETyConKey
-  = isLiftedRuntimeRep arg
-  | otherwise
-  = False
-
--- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
---
--- This considers 'Constraint' to be distinct from @*@.
-tcIsRuntimeTypeKind :: Kind -> Bool
-tcIsRuntimeTypeKind ty
-  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
-  , tc `hasKey` tYPETyConKey
-  = True
-  | otherwise
-  = False
-
-tcReturnsConstraintKind :: Kind -> Bool
--- True <=> the Kind ultimately returns a Constraint
---   E.g.  * -> Constraint
---         forall k. k -> Constraint
-tcReturnsConstraintKind kind
-  | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
-tcReturnsConstraintKind (ForAllTy _ ty)         = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (FunTy { ft_res = ty }) = tcReturnsConstraintKind ty
-tcReturnsConstraintKind (TyConApp tc _)         = isConstraintKindCon tc
-tcReturnsConstraintKind _                       = False
-
-isEvVarType :: Type -> Bool
--- True of (a) predicates, of kind Constraint, such as (Eq a), and (a ~ b)
---         (b) coercion types, such as (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence]
--- See Note [Evidence for quantified constraints]
-isEvVarType ty = isCoVarType ty || isPredTy ty
-
--- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or representational
---    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence]
-isCoVarType :: Type -> Bool
-isCoVarType ty = isEqPrimPred ty
-
-isEqPredClass :: Class -> Bool
--- True of (~) and (~~)
-isEqPredClass cls =  cls `hasKey` eqTyConKey
-                  || cls `hasKey` heqTyConKey
-
-isClassPred, isEqPred, isEqPrimPred, isIPPred :: PredType -> Bool
-isClassPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon | isClassTyCon tyCon -> True
-    _                               -> False
-
-isEqPred ty  -- True of (a ~ b) and (a ~~ b)
-             -- ToDo: should we check saturation?
-  | Just tc <- tyConAppTyCon_maybe ty
-  , Just cls <- tyConClass_maybe tc
-  = isEqPredClass cls
-  | otherwise
-  = False
-
-isEqPrimPred ty  -- True of (a ~# b) (a ~R# b)
-             -- ToDo: should we check saturation?
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
-
-isIPPred ty = case tyConAppTyCon_maybe ty of
-    Just tc -> isIPTyCon tc
-    _       -> False
-
-isIPTyCon :: TyCon -> Bool
-isIPTyCon tc = tc `hasKey` ipClassKey
-  -- Class and its corresponding TyCon have the same Unique
-
-isIPClass :: Class -> Bool
-isIPClass cls = cls `hasKey` ipClassKey
-
-isCTupleClass :: Class -> Bool
-isCTupleClass cls = isTupleTyCon (classTyCon cls)
-
-isIPPred_maybe :: Type -> Maybe (FastString, Type)
-isIPPred_maybe ty =
-  do (tc,[t1,t2]) <- splitTyConApp_maybe ty
-     guard (isIPTyCon tc)
-     x <- isStrLitTy t1
-     return (x,t2)
-
-{-
-Make PredTypes
-
---------------------- Equality types ---------------------------------
--}
-
--- | Makes a lifted equality predicate at the given role
-mkPrimEqPredRole :: Role -> Type -> Type -> PredType
-mkPrimEqPredRole Nominal          = mkPrimEqPred
-mkPrimEqPredRole Representational = mkReprPrimEqPred
-mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
-
--- | Creates a primitive type equality predicate.
--- Invariant: the types are not Coercions
-mkPrimEqPred :: Type -> Type -> Type
-mkPrimEqPred ty1 ty2
-  = TyConApp eqPrimTyCon [k1, k2, ty1, ty2]
-  where
-    k1 = typeKind ty1
-    k2 = typeKind ty2
-
--- | Creates a primite type equality predicate with explicit kinds
-mkHeteroPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
-mkHeteroPrimEqPred k1 k2 ty1 ty2 = TyConApp eqPrimTyCon [k1, k2, ty1, ty2]
-
--- | Creates a primitive representational type equality predicate
--- with explicit kinds
-mkHeteroReprPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
-mkHeteroReprPrimEqPred k1 k2 ty1 ty2
-  = TyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
-
--- | Try to split up a coercion type into the types that it coerces
-splitCoercionType_maybe :: Type -> Maybe (Type, Type)
-splitCoercionType_maybe ty
-  = do { (tc, [_, _, ty1, ty2]) <- splitTyConApp_maybe ty
-       ; guard $ tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-       ; return (ty1, ty2) }
-
-mkReprPrimEqPred :: Type -> Type -> Type
-mkReprPrimEqPred ty1  ty2
-  = TyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
-  where
-    k1 = typeKind ty1
-    k2 = typeKind ty2
-
-equalityTyCon :: Role -> TyCon
-equalityTyCon Nominal          = eqPrimTyCon
-equalityTyCon Representational = eqReprPrimTyCon
-equalityTyCon Phantom          = eqPhantPrimTyCon
-
--- --------------------- Dictionary types ---------------------------------
-
-mkClassPred :: Class -> [Type] -> PredType
-mkClassPred clas tys = TyConApp (classTyCon clas) tys
-
-isDictTy :: Type -> Bool
-isDictTy = isClassPred
-
-isDictLikeTy :: Type -> Bool
--- Note [Dictionary-like types]
-isDictLikeTy ty | Just ty' <- coreView ty = isDictLikeTy ty'
-isDictLikeTy ty = case splitTyConApp_maybe ty of
-        Just (tc, tys) | isClassTyCon tc -> True
-                       | isTupleTyCon tc -> all isDictLikeTy tys
-        _other                           -> False
-
-{- Note [Dictionary-like types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Being "dictionary-like" means either a dictionary type or a tuple thereof.
-In GHC 6.10 we build implication constraints which construct such tuples,
-and if we land up with a binding
-    t :: (C [a], Eq [a])
-    t = blah
-then we want to treat t as cheap under "-fdicts-cheap" for example.
-(Implication constraints are normally inlined, but sadly not if the
-occurrence is itself inside an INLINE function!  Until we revise the
-handling of implication constraints, that is.)  This turned out to
-be important in getting good arities in DPH code.  Example:
-
-    class C a
-    class D a where { foo :: a -> a }
-    instance C a => D (Maybe a) where { foo x = x }
-
-    bar :: (C a, C b) => a -> b -> (Maybe a, Maybe b)
-    {-# INLINE bar #-}
-    bar x y = (foo (Just x), foo (Just y))
-
-Then 'bar' should jolly well have arity 4 (two dicts, two args), but
-we ended up with something like
-   bar = __inline_me__ (\d1,d2. let t :: (D (Maybe a), D (Maybe b)) = ...
-                                in \x,y. <blah>)
-
-This is all a bit ad-hoc; eg it relies on knowing that implication
-constraints build tuples.
-
-ToDo: it would be far easier just to use isPredTy.
--}
-
--- | A choice of equality relation. This is separate from the type 'Role'
--- because 'Phantom' does not define a (non-trivial) equality relation.
-data EqRel = NomEq | ReprEq
-  deriving (Eq, Ord)
-
-instance Outputable EqRel where
-  ppr NomEq  = text "nominal equality"
-  ppr ReprEq = text "representational equality"
-
-eqRelRole :: EqRel -> Role
-eqRelRole NomEq  = Nominal
-eqRelRole ReprEq = Representational
-
-data PredTree
-  = ClassPred Class [Type]
-  | EqPred EqRel Type Type
-  | IrredPred PredType
-  | ForAllPred [TyCoVarBinder] [PredType] PredType
-     -- ForAllPred: see Note [Quantified constraints] in TcCanonical
-  -- NB: There is no TuplePred case
-  --     Tuple predicates like (Eq a, Ord b) are just treated
-  --     as ClassPred, as if we had a tuple class with two superclasses
-  --        class (c1, c2) => (%,%) c1 c2
-
-classifyPredType :: PredType -> PredTree
-classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
-    Just (tc, [_, _, ty1, ty2])
-      | tc `hasKey` eqReprPrimTyConKey -> EqPred ReprEq ty1 ty2
-      | tc `hasKey` eqPrimTyConKey     -> EqPred NomEq ty1 ty2
-
-    Just (tc, tys)
-      | Just clas <- tyConClass_maybe tc
-      -> ClassPred clas tys
-
-    _ | (tvs, rho) <- splitForAllVarBndrs ev_ty
-      , (theta, pred) <- splitFunTys rho
-      , not (null tvs && null theta)
-      -> ForAllPred tvs theta pred
-
-      | otherwise
-      -> IrredPred ev_ty
-
-getClassPredTys :: HasDebugCallStack => PredType -> (Class, [Type])
-getClassPredTys ty = case getClassPredTys_maybe ty of
-        Just (clas, tys) -> (clas, tys)
-        Nothing          -> pprPanic "getClassPredTys" (ppr ty)
-
-getClassPredTys_maybe :: PredType -> Maybe (Class, [Type])
-getClassPredTys_maybe ty = case splitTyConApp_maybe ty of
-        Just (tc, tys) | Just clas <- tyConClass_maybe tc -> Just (clas, tys)
-        _ -> Nothing
-
-getEqPredTys :: PredType -> (Type, Type)
-getEqPredTys ty
-  = case splitTyConApp_maybe ty of
-      Just (tc, [_, _, ty1, ty2])
-        |  tc `hasKey` eqPrimTyConKey
-        || tc `hasKey` eqReprPrimTyConKey
-        -> (ty1, ty2)
-      _ -> pprPanic "getEqPredTys" (ppr ty)
-
-getEqPredTys_maybe :: PredType -> Maybe (Role, Type, Type)
-getEqPredTys_maybe ty
-  = case splitTyConApp_maybe ty of
-      Just (tc, [_, _, ty1, ty2])
-        | tc `hasKey` eqPrimTyConKey     -> Just (Nominal, ty1, ty2)
-        | tc `hasKey` eqReprPrimTyConKey -> Just (Representational, ty1, ty2)
-      _ -> Nothing
-
-getEqPredRole :: PredType -> Role
-getEqPredRole ty = eqRelRole (predTypeEqRel ty)
-
--- | Get the equality relation relevant for a pred type.
-predTypeEqRel :: PredType -> EqRel
-predTypeEqRel ty
-  | Just (tc, _) <- splitTyConApp_maybe ty
-  , tc `hasKey` eqReprPrimTyConKey
-  = ReprEq
-  | otherwise
-  = NomEq
-
 ------------- Closing over kinds -----------------
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
@@ -2193,6 +1869,19 @@ isFamFreeTy (FunTy _ a b)     = isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
+
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or representational
+--    (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence] in TyCoRep
+isCoVarType :: Type -> Bool
+  -- ToDo: should we check saturation?
+isCoVarType ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
+
 
 {-
 ************************************************************************
@@ -2713,7 +2402,10 @@ typeKind ty@(ForAllTy {})
     (tvs, body) = splitTyVarForAllTys ty
     body_kind   = typeKind body
 
------------------------------
+---------------------------------------------
+-- Utilities to be used in Unify, which uses "tc" functions
+---------------------------------------------
+
 tcTypeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
@@ -2756,8 +2448,55 @@ tcTypeKind ty@(ForAllTy {})
 
 
 isPredTy :: HasDebugCallStack => Type -> Bool
--- See Note [Types for coercions, predicates, and evidence]
+-- See Note [Types for coercions, predicates, and evidence] in TyCoRep
 isPredTy ty = tcIsConstraintKind (tcTypeKind ty)
+
+-- tcIsConstraintKind stuf only makes sense in the typechecker
+-- After that Constraint = Type
+-- See Note [coreView vs tcView]
+-- Defined here because it is used in isPredTy and tcRepSplitAppTy_maybe (sigh)
+tcIsConstraintKind :: Kind -> Bool
+tcIsConstraintKind ty
+  | Just (tc, args) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , isConstraintKindCon tc
+  = ASSERT2( null args, ppr ty ) True
+
+  | otherwise
+  = False
+
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be distinct from @*@. For a version that
+-- treats them as the same type, see 'isLiftedTypeKind'.
+tcIsLiftedTypeKind :: Kind -> Bool
+tcIsLiftedTypeKind ty
+  | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = isLiftedRuntimeRep arg
+  | otherwise
+  = False
+
+-- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
+--
+-- This considers 'Constraint' to be distinct from @*@.
+tcIsRuntimeTypeKind :: Kind -> Bool
+tcIsRuntimeTypeKind ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = True
+  | otherwise
+  = False
+
+tcReturnsConstraintKind :: Kind -> Bool
+-- True <=> the Kind ultimately returns a Constraint
+--   E.g.  * -> Constraint
+--         forall k. k -> Constraint
+tcReturnsConstraintKind kind
+  | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
+tcReturnsConstraintKind (ForAllTy _ ty)         = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (FunTy { ft_res = ty }) = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (TyConApp tc _)         = isConstraintKindCon tc
+tcReturnsConstraintKind _                       = False
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind

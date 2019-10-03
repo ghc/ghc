@@ -18,6 +18,8 @@ import GhcPrelude
 
 import TcRnTypes
 import TcRnMonad
+import Constraint
+import Origin
 import TcMType
 import TcEvidence
 import TcType

@@ -30,6 +30,7 @@ import Literal          ( absentLiteralOf, rubbishLit )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
+import Predicate        ( isClassPred )
 import RepType          ( isVoidTy, typePrimRep )
 import Coercion
 import FamInstEnv

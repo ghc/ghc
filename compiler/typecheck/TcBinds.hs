@@ -29,6 +29,7 @@ import GHC.Hs
 import HscTypes( isHsBootOrSig )
 import TcSigs
 import TcRnMonad
+import Origin
 import TcEnv
 import TcUnify
 import TcSimplify

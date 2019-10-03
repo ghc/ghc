@@ -29,7 +29,7 @@ import TcType     ( TcType, tcEqType )
 import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                   , Injectivity(..) )
 import Coercion   ( Role(..) )
-import TcRnTypes  ( Xi )
+import Constraint ( Xi )
 import CoAxiom    ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import Name       ( Name, BuiltInSyntax(..) )
 import TysWiredIn
