@@ -2884,7 +2884,10 @@ commonly used commands.
 .. ghci-cmd:: :steplocal
 
     Enable only breakpoints in the current top-level binding and resume
-    evaluation at the last breakpoint.
+    evaluation at the last breakpoint. Continuation with
+    :ghci-cmd:`:steplocal` is not possible if this last breakpoint was
+    hit by an error (:ghc-flag:`-fbreak-on-error`) or an
+    exception (:ghc-flag:`-fbreak-on-exception`).
 
 .. ghci-cmd:: :stepmodule
 
