@@ -16,8 +16,8 @@
 #include "BeginPrivate.h"
 
 /*
-   Definition of a Task
-   --------------------
+   Note [Definition of a Task]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
    A task is an OSThread that runs Haskell code.  Every OSThread that
    runs inside the RTS, whether as a worker created by the RTS or via
@@ -33,8 +33,8 @@
    Haskell code simultaneously. A task relinquishes its Capability
    when it is asked to evaluate an external (C) call.
 
-   Ownership of Task
-   -----------------
+   Note [Ownership of Task]
+   ~~~~~~~~~~~~~~~~~~~~~~~~
 
    Task ownership is a little tricky.  The default situation is that
    the Task is an OS-thread-local structure that is owned by the OS
