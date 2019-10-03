@@ -660,6 +660,9 @@ static Capability * waitForWorkerCapability (Task *task)
         ACQUIRE_LOCK(&task->lock);
         // task->lock held, cap->lock not held
         if (!task->wakeup) waitCondition(&task->cond, &task->lock);
+        // The happens-after matches the happens-before in
+        // schedulePushWork, which does owns 'task' when it sets 'task->cap'.
+        TSAN_ANNOTATE_HAPPENS_AFTER(&task->cap);
         cap = task->cap;
         task->wakeup = false;
         RELEASE_LOCK(&task->lock);
