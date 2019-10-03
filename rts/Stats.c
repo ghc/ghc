@@ -1051,6 +1051,8 @@ stat_exit (void)
 {
     RTSSummaryStats sum;
     init_RTSSummaryStats(&sum);
+    // We'll need to refer to task counters later
+    ACQUIRE_LOCK(&all_tasks_mutex);
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
         // First we tidy the times in stats, and populate the times in sum.
@@ -1266,6 +1268,8 @@ stat_exit (void)
       stgFree(GC_coll_max_pause);
       GC_coll_max_pause = NULL;
     }
+
+    RELEASE_LOCK(&all_tasks_mutex);
 }
 
 /* Note [Work Balance]
