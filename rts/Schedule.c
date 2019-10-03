@@ -845,7 +845,11 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
                 if (t->bound) {
                     // N.B. we typically would need to hold 't->bound->task->lock' to change 'cap'
-                    // but this is safe because TODO.
+                    // but this is safe because the Task lives on our run queue. See
+                    // Note [Ownership of Task].
+                    TSAN_ANNOTATE_HAPPENS_BEFORE(&t->bound->task->cap);
+                        // The happens-before matches the happens-after in
+                        // waitForWorkerCapability
                     RELAXED_STORE(&t->bound->task->cap, free_caps[i]);
                 }
                 t->cap = free_caps[i];
