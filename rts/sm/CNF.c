@@ -542,9 +542,9 @@ insertCompactHash (Capability *cap,
                    StgClosure *p, StgClosure *to)
 {
     insertHashTable(str->hash, (StgWord)p, (const void*)to);
-    const StgInfoTable *strinfo = str->header.info;
-    if (strinfo == &stg_COMPACT_NFDATA_CLEAN_info) {
-        strinfo = &stg_COMPACT_NFDATA_DIRTY_info;
+    const StgInfoTable **strinfo = &str->header.info;
+    if (*strinfo == &stg_COMPACT_NFDATA_CLEAN_info) {
+        *strinfo = &stg_COMPACT_NFDATA_DIRTY_info;
         recordClosureMutated(cap, (StgClosure*)str);
     }
 }
