@@ -1,0 +1,16 @@
+
+T17267a.hs:18:12: error:
+    • Reduction stack overflow; size = 201
+      When simplifying the following type: C a b
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
+    • In the expression: op x
+      In an equation for ‘oops’: oops x = op x
+      In an equation for ‘uc’:
+          uc
+            = oops
+            where
+                oops :: (C a b => C a b) => a -> b
+                oops x = op x
