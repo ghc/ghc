@@ -21,4 +21,7 @@ void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
 
 void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p);
 
+// Note that RTS code should not condition on this directly by rather
+// use the IF_NONMOVING_WRITE_BARRIER_ENABLED macro to ensure that
+// the barrier is eliminated in the non-threaded RTS.
 extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);
