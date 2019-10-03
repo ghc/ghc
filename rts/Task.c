@@ -30,6 +30,7 @@
 Task *all_tasks = NULL;
 
 // current number of bound tasks + total number of worker tasks.
+// Locks required: all_tasks_mutex.
 uint32_t taskCount;
 uint32_t workerCount;
 uint32_t currentWorkerCount;
