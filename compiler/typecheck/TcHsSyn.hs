@@ -51,6 +51,7 @@ import GhcPrelude
 import GHC.Hs
 import Id
 import IdInfo
+import Predicate
 import TcRnMonad
 import PrelNames
 import BuildTyCl ( TcMethInfo, MethInfo )

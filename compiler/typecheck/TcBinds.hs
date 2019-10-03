@@ -27,6 +27,7 @@ import FastString
 import GHC.Hs
 import TcSigs
 import TcRnMonad
+import TcOrigin
 import TcEnv
 import TcUnify
 import TcSimplify

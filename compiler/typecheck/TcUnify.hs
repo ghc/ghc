@@ -48,6 +48,9 @@ import TcType
 import Type
 import Coercion
 import TcEvidence
+import Constraint
+import Predicate
+import TcOrigin
 import Name( isSystemName )
 import Inst
 import TyCon
@@ -1208,7 +1211,7 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
   , isNothing m_telescope || skol_tvs `lengthAtMost` 1
     -- If m_telescope is (Just d), we must do the bad-telescope check,
     -- so we must /not/ discard the implication even if there are no
-    -- wanted constraints. See Note [Checking telescopes] in TcRnTypes.
+    -- wanted constraints. See Note [Checking telescopes] in Constraint.
     -- Lacking this check led to #16247
   = return ()
 

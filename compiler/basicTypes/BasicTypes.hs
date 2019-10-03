@@ -106,7 +106,9 @@ module BasicTypes(
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
-        SpliceExplicitFlag(..)
+        SpliceExplicitFlag(..),
+
+        TypeOrKind(..), isTypeLevel, isKindLevel
    ) where
 
 import GhcPrelude
@@ -1644,3 +1646,25 @@ data SpliceExplicitFlag
           = ExplicitSplice | -- ^ <=> $(f x y)
             ImplicitSplice   -- ^ <=> f x y,  i.e. a naked top level expression
     deriving Data
+
+{- *********************************************************************
+*                                                                      *
+                        Types vs Kinds
+*                                                                      *
+********************************************************************* -}
+
+-- | Flag to see whether we're type-checking terms or kind-checking types
+data TypeOrKind = TypeLevel | KindLevel
+  deriving Eq
+
+instance Outputable TypeOrKind where
+  ppr TypeLevel = text "TypeLevel"
+  ppr KindLevel = text "KindLevel"
+
+isTypeLevel :: TypeOrKind -> Bool
+isTypeLevel TypeLevel = True
+isTypeLevel KindLevel = False
+
+isKindLevel :: TypeOrKind -> Bool
+isKindLevel TypeLevel = False
+isKindLevel KindLevel = True

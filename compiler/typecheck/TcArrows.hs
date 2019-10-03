@@ -24,6 +24,7 @@ import TcPat
 import TcUnify
 import TcRnMonad
 import TcEnv
+import TcOrigin
 import TcEvidence
 import Id( mkLocalId )
 import Inst

@@ -52,7 +52,7 @@ import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( pprRuleName )
+import BasicTypes       ( pprRuleName, TypeOrKind(..) )
 import FastString
 import SrcLoc
 import DynFlags

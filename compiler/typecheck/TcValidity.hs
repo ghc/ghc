@@ -38,6 +38,8 @@ import Coercion
 import CoAxiom
 import Class
 import TyCon
+import Predicate
+import TcOrigin
 
 -- others:
 import IfaceType( pprIfaceType, pprIfaceTypeApp )

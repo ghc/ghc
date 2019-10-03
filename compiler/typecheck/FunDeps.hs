@@ -24,6 +24,7 @@ import GhcPrelude
 import Name
 import Var
 import Class
+import Predicate
 import Type
 import TcType( transSuperClasses )
 import CoAxiom( TypeEqn )
