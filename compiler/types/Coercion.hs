@@ -37,11 +37,13 @@ module Coercion (
         mkPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
         mkAxiomInstCo, mkProofIrrelCo,
-        downgradeRole, maybeSubCo, mkAxiomRuleCo,
+        downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo, castCoercionKind, castCoercionKindI,
 
         mkHeteroCoercionType,
+        mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
+        mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
 
         -- ** Decomposition
         instNewTyCon_maybe,
@@ -138,7 +140,7 @@ import Unique
 import Pair
 import SrcLoc
 import PrelNames
-import TysPrim          ( eqPhantPrimTyCon )
+import TysPrim
 import ListSetOps
 import Maybes
 import UniqFM
@@ -505,22 +507,6 @@ coVarRole cv
     tc = case tyConAppTyCon_maybe (varType cv) of
            Just tc0 -> tc0
            Nothing  -> pprPanic "coVarRole: not tyconapp" (ppr cv)
-
--- | Makes a coercion type from two types: the types whose equality
--- is proven by the relevant 'Coercion'
-mkCoercionType :: Role -> Type -> Type -> Type
-mkCoercionType Nominal          = mkPrimEqPred
-mkCoercionType Representational = mkReprPrimEqPred
-mkCoercionType Phantom          = \ty1 ty2 ->
-  let ki1 = typeKind ty1
-      ki2 = typeKind ty2
-  in
-  TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
-
-mkHeteroCoercionType :: Role -> Kind -> Kind -> Type -> Type -> Type
-mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
-mkHeteroCoercionType Representational = mkHeteroReprPrimEqPred
-mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 
 -- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
 -- produce a coercion @rep_co :: r1 ~ r2@.
@@ -1231,13 +1217,6 @@ downgradeRole r1 r2 co
   = case downgradeRole_maybe r1 r2 co of
       Just co' -> co'
       Nothing  -> pprPanic "downgradeRole" (ppr co)
-
--- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
--- Note that the input coercion should always be nominal.
-maybeSubCo :: EqRel -> Coercion -> Coercion
-maybeSubCo NomEq  = id
-maybeSubCo ReprEq = mkSubCo
-
 
 mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 mkAxiomRuleCo = AxiomRuleCo
@@ -2356,6 +2335,54 @@ So it's very important to do the substitution simultaneously;
 cf Type.piResultTys (which in fact we call here).
 
 -}
+
+-- | Makes a coercion type from two types: the types whose equality
+-- is proven by the relevant 'Coercion'
+mkCoercionType :: Role -> Type -> Type -> Type
+mkCoercionType Nominal          = mkPrimEqPred
+mkCoercionType Representational = mkReprPrimEqPred
+mkCoercionType Phantom          = \ty1 ty2 ->
+  let ki1 = typeKind ty1
+      ki2 = typeKind ty2
+  in
+  TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
+
+mkHeteroCoercionType :: Role -> Kind -> Kind -> Type -> Type -> Type
+mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
+mkHeteroCoercionType Representational = mkHeteroReprPrimEqPred
+mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
+
+-- | Creates a primitive type equality predicate.
+-- Invariant: the types are not Coercions
+mkPrimEqPred :: Type -> Type -> Type
+mkPrimEqPred ty1 ty2
+  = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
+  where
+    k1 = typeKind ty1
+    k2 = typeKind ty2
+
+-- | Makes a lifted equality predicate at the given role
+mkPrimEqPredRole :: Role -> Type -> Type -> PredType
+mkPrimEqPredRole Nominal          = mkPrimEqPred
+mkPrimEqPredRole Representational = mkReprPrimEqPred
+mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
+
+-- | Creates a primite type equality predicate with explicit kinds
+mkHeteroPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
+mkHeteroPrimEqPred k1 k2 ty1 ty2 = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
+
+-- | Creates a primitive representational type equality predicate
+-- with explicit kinds
+mkHeteroReprPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
+mkHeteroReprPrimEqPred k1 k2 ty1 ty2
+  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
+
+mkReprPrimEqPred :: Type -> Type -> Type
+mkReprPrimEqPred ty1  ty2
+  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
+  where
+    k1 = typeKind ty1
+    k2 = typeKind ty2
 
 -- | Assuming that two types are the same, ignoring coercions, find
 -- a nominal coercion between the types. This is useful when optimizing

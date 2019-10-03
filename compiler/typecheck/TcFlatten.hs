@@ -12,6 +12,8 @@ module TcFlatten(
 import GhcPrelude
 
 import TcRnTypes
+import Constraint
+import Predicate
 import TcType
 import Type
 import TcEvidence
@@ -1362,7 +1364,7 @@ flatten_exact_fam_app_fully tc tys
                            ; let xi  = fsk_xi `mkCastTy` kind_co
                                  co' = mkTcCoherenceLeftCo role fsk_xi kind_co fsk_co
                                        `mkTransCo`
-                                       maybeSubCo eq_rel (mkSymCo co)
+                                       maybeTcSubCo eq_rel (mkSymCo co)
                                        `mkTransCo` ret_co
                            ; return (xi, co')
                            }
@@ -1397,7 +1399,7 @@ flatten_exact_fam_app_fully tc tys
                                  --     the xis are flattened
                                  ; let fsk_ty = mkTyVarTy fsk
                                        xi = fsk_ty `mkCastTy` kind_co
-                                       co' = mkTcCoherenceLeftCo role fsk_ty kind_co (maybeSubCo eq_rel (mkSymCo co))
+                                       co' = mkTcCoherenceLeftCo role fsk_ty kind_co (maybeTcSubCo eq_rel (mkSymCo co))
                                              `mkTransCo` ret_co
                                  ; return (xi, co')
                                  }
@@ -1435,7 +1437,7 @@ flatten_exact_fam_app_fully tc tys
                               ]
                        ; (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
-                       ; let co = maybeSubCo eq_rel norm_co
+                       ; let co = maybeTcSubCo eq_rel norm_co
                                    `mkTransCo` mkSymCo final_co
                        ; flavour <- getFlavour
                            -- NB: only extend cache with nominal equalities
@@ -1461,7 +1463,7 @@ flatten_exact_fam_app_fully tc tys
                Just (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
-                       ; let co  = mkSymCo (maybeSubCo eq_rel norm_co
+                       ; let co  = mkSymCo (maybeTcSubCo eq_rel norm_co
                                             `mkTransCo` mkSymCo final_co)
                        ; return $ Just (xi, co) }
                Nothing -> pure Nothing }

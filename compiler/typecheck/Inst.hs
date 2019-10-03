@@ -42,6 +42,9 @@ import FastString
 import GHC.Hs
 import TcHsSyn
 import TcRnMonad
+import Constraint
+import Predicate
+import TcOrigin
 import TcEnv
 import TcEvidence
 import InstEnv
@@ -66,6 +69,7 @@ import SrcLoc
 import DynFlags
 import Util
 import Outputable
+import BasicTypes ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad( unless )

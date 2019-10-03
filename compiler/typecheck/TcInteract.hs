@@ -35,6 +35,9 @@ import TcEvidence
 import Outputable
 
 import TcRnTypes
+import Constraint
+import Predicate
+import TcOrigin
 import TcSMonad
 import Bag
 import MonadUtils ( concatMapM, foldlM )
@@ -1181,8 +1184,12 @@ addFunDepWork inerts work_ev cls
         inert_loc  = ctEvLoc inert_ev
         derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
                                               ctl_depth inert_loc
-                               , ctl_origin = FunDepOrigin1 work_pred  work_loc
-                                                            inert_pred inert_loc }
+                               , ctl_origin = FunDepOrigin1 work_pred
+                                                            (ctLocOrigin work_loc)
+                                                            (ctLocSpan work_loc)
+                                                            inert_pred
+                                                            (ctLocOrigin inert_loc)
+                                                            (ctLocSpan inert_loc) }
 
 {-
 **********************************************************************
@@ -1860,7 +1867,7 @@ selection. This avoids having to support quantified constraints whose
 kind is not Constraint, such as (forall a. F a ~# b)
 
 See
- * Note [Evidence for quantified constraints] in Type
+ * Note [Evidence for quantified constraints] in Predicate
  * Note [Equality superclasses in quantified constraints]
    in TcCanonical
 -}
@@ -2610,4 +2617,3 @@ matchLocalInst pred loc
         qtv_set = mkVarSet qtvs
         this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst qcis
-

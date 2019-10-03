@@ -164,6 +164,9 @@ import Bag
 import UniqSupply
 import Util
 import TcRnTypes
+import TcOrigin
+import Constraint
+import Predicate
 
 import Unique
 import UniqFM
@@ -1043,7 +1046,7 @@ instance Outputable InertCans where
 Note [The improvement story and derived shadows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Because Wanteds cannot rewrite Wanteds (see Note [Wanteds do not
-rewrite Wanteds] in TcRnTypes), we may miss some opportunities for
+rewrite Wanteds] in Constraint), we may miss some opportunities for
 solving.  Here's a classic example (indexed-types/should_fail/T4093a)
 
     Ambiguity check for f: (Foo e ~ Maybe e) => Foo e
@@ -2872,7 +2875,7 @@ checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
 
        ; unless (null wanteds) $
          do { ev_binds_var <- TcM.newNoTcEvBinds
-            ; imp <- newImplication
+            ; imp <- TcM.newImplication
             ; let wc = emptyWC { wc_simple = wanteds }
                   imp' = imp { ic_tclvl  = new_tclvl
                              , ic_skols  = skol_tvs
@@ -2911,7 +2914,7 @@ checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
                                         thing_inside new_tcs_env
 
        ; ev_binds_var <- TcM.newTcEvBinds
-       ; imp <- newImplication
+       ; imp <- TcM.newImplication
        ; let wc = emptyWC { wc_simple = wanteds }
              imp' = imp { ic_tclvl  = new_tclvl
                         , ic_skols  = skol_tvs
@@ -3381,7 +3384,7 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
--- See Note [Bind new Givens immediately] in TcRnTypes
+-- See Note [Bind new Givens immediately] in Constraint
 newGivenEvVar loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc }) }
