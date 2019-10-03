@@ -61,8 +61,8 @@ ghc-linters:
     - "echo Linting changes between $base..$CI_COMMIT_SHA"
     #    - validate-commit-msg .git $(git rev-list $base..$CI_COMMIT_SHA)
     - validate-whitespace .git $(git rev-list $base..$CI_COMMIT_SHA)
-    - .gitlab/linters/check-makefiles.py $base $CI_COMMIT_SHA
-    - .gitlab/linters/check-cpp.py $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-makefiles.py commits $base $CI_COMMIT_SHA
+    - .gitlab/linters/check-cpp.py commits $base $CI_COMMIT_SHA
     - .gitlab/linters/check-version-number.sh
     - python3 utils/checkUniques/check-uniques.py .
   dependencies: []
