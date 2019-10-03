@@ -44,6 +44,7 @@ import SrcLoc
 import TcGenDeriv
 import TcGenFunctor
 import TcGenGenerics
+import TcOrigin
 import TcRnMonad
 import TcType
 import THNames (liftClassKey)

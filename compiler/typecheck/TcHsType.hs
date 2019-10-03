@@ -71,6 +71,9 @@ import GhcPrelude
 
 import GHC.Hs
 import TcRnMonad
+import TcOrigin
+import Predicate
+import Constraint
 import TcEvidence
 import TcEnv
 import TcMType
@@ -1674,7 +1677,7 @@ is correct, choosing ImplicationStatus IC_BadTelescope if they aren't.
 Then, in TcErrors, we report if there is a bad telescope. This way,
 we can report a suggested ordering to the user if there is a problem.
 
-See also Note [Checking telescopes] in TcRnTypes
+See also Note [Checking telescopes] in Constraint
 
 Note [Keeping scoped variables in order: Implicit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
