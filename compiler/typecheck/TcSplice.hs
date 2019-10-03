@@ -1479,13 +1479,11 @@ reifyAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
   = do { tvs' <- reifyTyVarsToMaybe tvs
        ; let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
        ; lhs' <- reifyTypes lhs_types_only
-       ; annot_th_lhs <- zipWith3M annotThType (mkIsPolyTvs fam_tvs)
+       ; annot_th_lhs <- zipWith3M annotThType (tyConArgsPolyKinded fam_tc)
                                    lhs_types_only lhs'
        ; let lhs_type = mkThAppTs (TH.ConT $ reifyName fam_tc) annot_th_lhs
        ; rhs'  <- reifyType rhs
        ; return (TH.TySynEqn tvs' lhs_type rhs') }
-  where
-    fam_tvs = tyConVisibleTyVars fam_tc
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
@@ -1714,7 +1712,8 @@ reifyClass cls
 -- | Annotate (with TH.SigT) a type if the first parameter is True
 -- and if the type contains a free variable.
 -- This is used to annotate type patterns for poly-kinded tyvars in
--- reifying class and type instances. See #8953 and th/T8953.
+-- reifying class and type instances.
+-- See @Note [Reified instances and explicit kind signatures]@.
 annotThType :: Bool   -- True <=> annotate
             -> TyCoRep.Type -> TH.Type -> TcM TH.Type
   -- tiny optimization: if the type is annotated, don't annotate again.
@@ -1726,24 +1725,116 @@ annotThType True ty th_ty
        ; return (TH.SigT th_ty th_ki) }
 annotThType _    _ th_ty = return th_ty
 
--- | For every type variable in the input,
--- report whether or not the tv is poly-kinded. This is used to eventually
--- feed into 'annotThType'.
-mkIsPolyTvs :: [TyVar] -> [Bool]
-mkIsPolyTvs = map is_poly_tv
+-- | For every argument type that a type constructor accepts,
+-- report whether or not the argument is poly-kinded. This is used to
+-- eventually feed into 'annotThType'.
+-- See @Note [Reified instances and explicit kind signatures]@.
+tyConArgsPolyKinded :: TyCon -> [Bool]
+tyConArgsPolyKinded tc =
+     map (is_poly_ty . tyVarKind)      tc_vis_tvs
+     -- See "Wrinkle: Oversaturated data family instances" in
+     -- @Note [Reified instances and explicit kind signatures]@
+  ++ map (is_poly_ty . tyCoBinderType) tc_res_kind_vis_bndrs -- (1) in Wrinkle
+  ++ repeat True                                             -- (2) in Wrinkle
   where
-    is_poly_tv tv = not $
+    is_poly_ty :: Type -> Bool
+    is_poly_ty ty = not $
                     isEmptyVarSet $
                     filterVarSet isTyVar $
-                    tyCoVarsOfType $
-                    tyVarKind tv
+                    tyCoVarsOfType ty
+
+    tc_vis_tvs :: [TyVar]
+    tc_vis_tvs = tyConVisibleTyVars tc
+
+    tc_res_kind_vis_bndrs :: [TyCoBinder]
+    tc_res_kind_vis_bndrs = filter isVisibleBinder $ fst $ splitPiTys $ tyConResKind tc
+
+{-
+Note [Reified instances and explicit kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reified class instances and type family instances often include extra kind
+information to disambiguate instances. Here is one such example that
+illustrates this (#8953):
+
+    type family Poly (a :: k) :: Type
+    type instance Poly (x :: Bool)    = Int
+    type instance Poly (x :: Maybe k) = Double
+
+If you're not careful, reifying these instances might yield this:
+
+    type instance Poly x = Int
+    type instance Poly x = Double
+
+To avoid this, we go through some care to annotate things with extra kind
+information. Some functions which accomplish this feat include:
+
+* annotThType: This annotates a type with a kind signature if the type contains
+  a free variable.
+* tyConArgsPolyKinded: This checks every argument that a type constructor can
+  accept and reports if the type of the argument is poly-kinded. This
+  information is ultimately fed into annotThType.
+
+-----
+-- Wrinkle: Oversaturated data family instances
+-----
+
+What constitutes an argument to a type constructor in the definition of
+tyConArgsPolyKinded? For most type constructors, it's simply the visible
+type variable binders (i.e., tyConVisibleTyVars). There is one corner case
+we must keep in mind, however: data family instances can appear oversaturated
+(#17296). For instance:
+
+    data family   Foo :: Type -> Type
+    data instance Foo x
+
+    data family Bar :: k
+    data family Bar x
+
+For these sorts of data family instances, tyConVisibleTyVars isn't enough,
+as they won't give you the kinds of the oversaturated arguments. We must
+also consult:
+
+1. The kinds of the arguments in the result kind (i.e., the tyConResKind).
+   This will tell us, e.g., the kind of `x` in `Foo x` above.
+2. If we go beyond the number of arguments in the result kind (like the
+   `x` in `Bar x`), then we conservatively assume that the argument's
+   kind is poly-kinded.
+
+-----
+-- Wrinkle: data family instances with return kinds
+-----
+
+Another squirrelly corner case is this:
+
+    data family Foo (a :: k)
+    data instance Foo :: Bool -> Type
+    data instance Foo :: Char -> Type
+
+If you're not careful, reifying these instances might yield this:
+
+    data instance Foo
+    data instance Foo
+
+We can fix this ambiguity by reifying the instances' explicit return kinds. We
+should only do this if necessary (see
+Note [When does a tycon application need an explicit kind signature?] in Type),
+but more importantly, we *only* do this if either of the following are true:
+
+1. The data family instance has no constructors.
+2. The data family instance is declared with GADT syntax.
+
+If neither of these are true, then reifying the return kind would yield
+something like this:
+
+    data instance (Bar a :: Type) = MkBar a
+
+Which is not valid syntax.
+-}
 
 ------------------------------
 reifyClassInstances :: Class -> [ClsInst] -> TcM [TH.Dec]
 reifyClassInstances cls insts
-  = mapM (reifyClassInstance (mkIsPolyTvs tvs)) insts
-  where
-    tvs = tyConVisibleTyVars (classTyCon cls)
+  = mapM (reifyClassInstance (tyConArgsPolyKinded (classTyCon cls))) insts
 
 reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1769,9 +1860,7 @@ reifyClassInstance is_poly_tvs i
 ------------------------------
 reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]
 reifyFamilyInstances fam_tc fam_insts
-  = mapM (reifyFamilyInstance (mkIsPolyTvs fam_tvs)) fam_insts
-  where
-    fam_tvs = tyConVisibleTyVars fam_tc
+  = mapM (reifyFamilyInstance (tyConArgsPolyKinded fam_tc)) fam_insts
 
 reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1808,10 +1897,19 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
            ; let lhs_type = mkThAppTs (TH.ConT fam') annot_th_tys
+           ; mb_sig <-
+               -- See "Wrinkle: data family instances with return kinds" in
+               -- Note [Reified instances and explicit kind signatures]
+               if (null cons || isGadtSyntaxTyCon rep_tc)
+                     && tyConAppNeedsKindSig False fam_tc (length ee_lhs)
+               then do { let full_kind = tcTypeKind (mkTyConApp fam_tc ee_lhs)
+                       ; th_full_kind <- reifyKind full_kind
+                       ; pure $ Just th_full_kind }
+               else pure Nothing
            ; return $
                if isNewTyCon rep_tc
-               then TH.NewtypeInstD [] th_tvs lhs_type Nothing (head cons) []
-               else TH.DataInstD    [] th_tvs lhs_type Nothing       cons  []
+               then TH.NewtypeInstD [] th_tvs lhs_type mb_sig (head cons) []
+               else TH.DataInstD    [] th_tvs lhs_type mb_sig       cons  []
            }
 
 ------------------------------

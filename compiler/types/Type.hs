@@ -1772,7 +1772,6 @@ tyCoBinderVar_maybe (Named tv) = Just $ binderVar tv
 tyCoBinderVar_maybe _          = Nothing
 
 tyCoBinderType :: TyCoBinder -> Type
--- Barely used
 tyCoBinderType (Named tvb) = binderType tvb
 tyCoBinderType (Anon _ ty) = ty
 
