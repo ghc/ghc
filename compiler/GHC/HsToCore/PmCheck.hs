@@ -42,7 +42,6 @@ import SrcLoc
 import Util
 import Outputable
 import DataCon
-import BasicTypes (Boxity(..))
 import Var (EvVar)
 import Coercion
 import TcEvidence
@@ -85,14 +84,13 @@ The algorithm is based on the paper:
 -}
 
 data PmGrd
-  = -- | @PmCon x K tys tvs dicts args@ corresponds to a
-    -- @K tys tvs dicts args <- x@ guard. The @tvs@ and @args@ are bound
-    -- in this construct, the @x@ is just a use.
+  = -- | @PmCon x K tvs dicts args@ corresponds to a
+    -- @K tvs dicts args <- x@ guard. The @tvs@ and @args@ are bound in this
+    -- construct, the @x@ is just a use.
     -- For the arguments' meaning see 'GHC.Hs.Pat.ConPatOut'.
     PmCon {
       pm_id          :: !Id,
       pm_con_con     :: !PmAltCon,
-      pm_con_arg_tys :: ![Type],
       pm_con_tvs     :: ![TyVar],
       pm_con_dicts   :: ![EvVar],
       pm_con_args    :: ![Id]
@@ -112,7 +110,7 @@ data PmGrd
 
 -- | Should not be user-facing.
 instance Outputable PmGrd where
-  ppr (PmCon x alt _arg_tys _con_tvs _con_dicts con_args)
+  ppr (PmCon x alt _con_tvs _con_dicts con_args)
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
   ppr (PmBang x) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
@@ -419,12 +417,11 @@ mkPmLet :: Id -> CoreExpr -> GrdVec
 mkPmLet x (Var y) | x == y = []
 mkPmLet x rhs              = [PmLet x rhs]
 
-vanillaConGrd :: Id -> DataCon -> [Type] -> [Id] -> PmGrd
+vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
 -- ADT constructor pattern => no existentials, no local constraints
-vanillaConGrd scrut con arg_tys arg_ids =
+vanillaConGrd scrut con arg_ids =
   PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
-        , pm_con_arg_tys = arg_tys, pm_con_tvs = []
-        , pm_con_dicts = [], pm_con_args = arg_ids }
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
 
 -- | Creates a 'PmPat' representing a match against a list of the given type,
 -- where list fields are matched against the given 'PatVec'.
@@ -434,13 +431,12 @@ vanillaConGrd scrut con arg_tys arg_ids =
 --   (x:b) <- a, True <- x, (y:c) <- b, seq y True, [] <- c
 -- where a,b,c are freshly allocated in @mkListPat@ and a is the Id hint coming
 -- from the call site.
-mkListPat :: Id -> Type -> [Id] -> DsM GrdVec
-mkListPat a elem_ty []     = pure $ [vanillaConGrd a nilDataCon [elem_ty] []]
-mkListPat a elem_ty (x:xs) = do
-  let list_ty = mkListTy elem_ty
-  b <- mkPmId list_ty
-  tail_grds <- mkListPat b elem_ty xs
-  pure $ vanillaConGrd a consDataCon [elem_ty] [x, b] : tail_grds
+mkListPat :: Id -> [Id] -> DsM GrdVec
+mkListPat a []     = pure [vanillaConGrd a nilDataCon []]
+mkListPat a (x:xs) = do
+  b <- mkPmId (idType a)
+  tail_grds <- mkListPat b xs
+  pure $ vanillaConGrd a consDataCon [x, b] : tail_grds
 
 -- | Create a 'PmLit' pattern
 mkPmLitPat :: Id -> PmLit -> DsM GrdVec
@@ -453,11 +449,10 @@ mkPmLitPat x (PmLit _ (PmLitString s)) = do
   vars <- traverse mkPmId (take (lengthFS s) (repeat charTy))
   let mk_char_lit y c = mkPmLitPat y (PmLit charTy (PmLitChar c))
   char_grdss <- zipWithM mk_char_lit vars (unpackFS s)
-  (++ concat char_grdss) <$> mkListPat x charTy vars
+  (++ concat char_grdss) <$> mkListPat x vars
 mkPmLitPat x lit = do
   let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
-                  , pm_con_arg_tys = []
                   , pm_con_tvs = []
                   , pm_con_dicts = []
                   , pm_con_args = [] }
@@ -503,7 +498,7 @@ translatePat fam_insts x pat = case pat of
   -- (n + k)  ===>   x | let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (dL->L _ n) k1 k2 ge minus -> do
     b <- mkPmId boolTy
-    let grd_b = vanillaConGrd b trueDataCon [] []
+    let grd_b = vanillaConGrd b trueDataCon []
     [ke1, ke2] <- traverse dsOverLit [unLoc k1, k2]
     rhs_b <- dsSyntaxExpr ge    [Var x, ke1]
     rhs_n <- dsSyntaxExpr minus [Var x, ke2]
@@ -518,20 +513,20 @@ translatePat fam_insts x pat = case pat of
     pure $ mkPmLet y (App fun (Var x)) ++ grds
 
   -- list
-  ListPat (ListPatTc elem_ty Nothing) ps ->
-    translateListPat fam_insts x elem_ty ps
+  ListPat (ListPatTc _elem_ty Nothing) ps ->
+    translateListPat fam_insts x ps
 
   -- overloaded list
-  ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) lpats -> do
+  ListPat (ListPatTc _elem_ty (Just (pat_ty, to_list))) lpats -> do
     dflags <- getDynFlags
     case splitListTyConApp_maybe pat_ty of
-      Just e_ty
+      Just _e_ty
         | not (xopt LangExt.RebindableSyntax dflags)
         -- Just translate it as a regular ListPat
-        -> translateListPat fam_insts x e_ty lpats
+        -> translateListPat fam_insts x lpats
       _ -> do
         y <- mkPmId (hsPatType pat)
-        grds <- translateListPat fam_insts y elem_ty lpats
+        grds <- translateListPat fam_insts y lpats
         rhs_y <- dsSyntaxExpr to_list [Var x]
         pure $ mkPmLet y rhs_y ++ grds
 
@@ -585,36 +580,31 @@ translatePat fam_insts x pat = case pat of
     let lit = expectJust "failed to detect Lit" (coreExprAsPmLit core_expr)
     mkPmLitPat x lit
 
-  TuplePat tys lpats boxity -> do
+  TuplePat _tys lpats boxity -> do
     let pats = map unLoc lpats
     vars <- selectMatchVars pats
     grds <- translatePatVec fam_insts vars pats
     let tuple_con = tupleDataCon boxity (length vars)
-        tys' = case boxity of
-                Boxed -> tys
-                -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-                Unboxed -> map getRuntimeRep tys ++ tys
-    pure $ vanillaConGrd x tuple_con tys' vars : grds
+    pure $ vanillaConGrd x tuple_con vars : grds
 
-  SumPat ty p alt arity -> do
+  SumPat _ty p alt arity -> do
     y <- selectMatchVar p
     grds <- translatePat fam_insts y (unLoc p)
     let sum_con = sumDataCon alt arity
-        tys     = map getRuntimeRep ty ++ ty
     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-    pure $ vanillaConGrd x sum_con tys [y] : grds
+    pure $ vanillaConGrd x sum_con [y] : grds
 
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: Sp licePat"
 
-translateListPat :: FamInstEnvs -> Id -> Type -> [LPat GhcTc] -> DsM GrdVec
-translateListPat fam_insts x elem_ty lpats = do
+translateListPat :: FamInstEnvs -> Id -> [LPat GhcTc] -> DsM GrdVec
+translateListPat fam_insts x lpats = do
   let pats = map unLoc lpats
   vars <- selectMatchVars pats
   grds <- translatePatVec fam_insts vars pats
-  (++ grds) <$> mkListPat x elem_ty vars
+  (++ grds) <$> mkListPat x vars
 
 -- | Translate a list of patterns
 translatePatVec :: FamInstEnvs -> [Id] -> [Pat GhcTc] -> DsM GrdVec
@@ -663,7 +653,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 1. the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
-      let con_grd = PmCon x (PmAltConLike con) univ_tys ex_tvs dicts arg_ids
+      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
@@ -741,7 +731,7 @@ translateBoolGuard e
       x <- case rhs of
         Var y -> pure y
         _     -> mkPmId boolTy
-      pure $ mkPmLet x rhs ++ [vanillaConGrd x trueDataCon [] []]
+      pure $ mkPmLet x rhs ++ [vanillaConGrd x trueDataCon []]
 
 {- Note [Field match order for RecCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
