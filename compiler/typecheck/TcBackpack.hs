@@ -19,7 +19,7 @@ module TcBackpack (
 
 import GhcPrelude
 
-import BasicTypes (defaultFixity)
+import BasicTypes (defaultFixity, TypeOrKind(..))
 import Packages
 import TcRnExports
 import DynFlags
@@ -34,6 +34,8 @@ import TcIface
 import TcMType
 import TcType
 import TcSimplify
+import Constraint
+import TcOrigin
 import LoadIface
 import RnNames
 import ErrUtils

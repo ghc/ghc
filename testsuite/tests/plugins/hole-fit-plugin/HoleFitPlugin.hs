@@ -7,7 +7,7 @@ import TcHoleErrors
 
 import Data.List (stripPrefix, sortOn)
 
-import TcRnTypes
+import Constraint
 
 import TcRnMonad
 
