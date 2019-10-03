@@ -13,7 +13,9 @@ module TcCanonical(
 
 import GhcPrelude
 
-import TcRnTypes
+import Constraint
+import Predicate
+import TcOrigin
 import TcUnify( swapOverTyVars, metaTyVarUpdateOK )
 import TcType
 import Type
@@ -284,7 +286,7 @@ So here's the plan:
    Note [Eagerly expand given superclasses].
 
 3. If we have any remaining unsolved wanteds
-        (see Note [When superclasses help] in TcRnTypes)
+        (see Note [When superclasses help] in Constraint)
    try harder: take both the Givens and Wanteds, and expand
    superclasses again.  See the calls to expandSuperClasses in
    TcSimplify.simpl_loop and solveWanteds.
@@ -617,7 +619,7 @@ case.  Instead we have a special case in TcInteract.doTopReactOther,
 which looks for primitive equalities specially in the quantified
 constraints.
 
-See also Note [Evidence for quantified constraints] in Type.
+See also Note [Evidence for quantified constraints] in Predicate.
 
 
 ************************************************************************
@@ -702,7 +704,7 @@ Here are the moving parts
   * checkValidType gets some changes to accept forall-constraints
     only in the right places.
 
-  * Type.PredTree gets a new constructor ForAllPred, and
+  * Predicate.Pred gets a new constructor ForAllPred, and
     and classifyPredType analyses a PredType to decompose
     the new forall-constraints
 
@@ -2114,7 +2116,7 @@ Int ~ Int. The user thus sees that GHC can't solve Int ~ Int, which
 is embarrassing. See #11198 for more tales of destruction.
 
 The reason for this odd behavior is much the same as
-Note [Wanteds do not rewrite Wanteds] in TcRnTypes: note that the
+Note [Wanteds do not rewrite Wanteds] in Constraint: note that the
 new `co` is a Wanted.
 
 The solution is then not to use `co` to "rewrite" -- that is, cast -- `w`, but

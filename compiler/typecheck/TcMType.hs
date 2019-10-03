@@ -48,6 +48,8 @@ module TcMType (
   unpackCoercionHole, unpackCoercionHole_maybe,
   checkCoercionHole,
 
+  newImplication,
+
   --------------------------------
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
@@ -98,9 +100,12 @@ import TyCon
 import Coercion
 import Class
 import Var
+import Predicate
+import TcOrigin
 
 -- others:
 import TcRnMonad        -- TcType, amongst others
+import Constraint
 import TcEvidence
 import Id
 import Name
@@ -116,7 +121,9 @@ import FastString
 import Bag
 import Pair
 import UniqSet
+import DynFlags
 import qualified GHC.LanguageExtensions as LangExt
+import BasicTypes ( TypeOrKind(..) )
 
 import Control.Monad
 import Maybes
@@ -286,6 +293,22 @@ predTypeOccName ty = case classifyPredType ty of
     EqPred {}       -> mkVarOccFS (fsLit "co")
     IrredPred {}    -> mkVarOccFS (fsLit "irred")
     ForAllPred {}   -> mkVarOccFS (fsLit "df")
+
+-- | Create a new 'Implication' with as many sensible defaults for its fields
+-- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do
+-- /not/ have sensible defaults, so they are initialized with lazy thunks that
+-- will 'panic' if forced, so one should take care to initialize these fields
+-- after creation.
+--
+-- This is monadic to look up the 'TcLclEnv', which is used to initialize
+-- 'ic_env', and to set the -Winaccessible-code flag. See
+-- Note [Avoid -Winaccessible-code when deriving] in TcInstDcls.
+newImplication :: TcM Implication
+newImplication
+  = do env <- getLclEnv
+       warn_inaccessible <- woptM Opt_WarnInaccessibleCode
+       return (implicationPrototype { ic_env = env
+                                    , ic_warn_inaccessible = warn_inaccessible })
 
 {-
 ************************************************************************
@@ -2211,10 +2234,10 @@ zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
                              Nothing  -> return (env1, Nothing)
        ; (env3, orig')  <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' m_ty2' orig' t_or_k) }
-zonkTidyOrigin env (FunDepOrigin1 p1 l1 p2 l2)
+zonkTidyOrigin env (FunDepOrigin1 p1 o1 l1 p2 o2 l2)
   = do { (env1, p1') <- zonkTidyTcType env  p1
        ; (env2, p2') <- zonkTidyTcType env1 p2
-       ; return (env2, FunDepOrigin1 p1' l1 p2' l2) }
+       ; return (env2, FunDepOrigin1 p1' o1 l1 p2' o2 l2) }
 zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
   = do { (env1, p1') <- zonkTidyTcType env  p1
        ; (env2, p2') <- zonkTidyTcType env1 p2
@@ -2257,7 +2280,7 @@ tidySkolemInfo _   info                   = info
 tidySigSkol :: TidyEnv -> UserTypeCtxt
             -> TcType -> [(Name,TcTyVar)] -> SkolemInfo
 -- We need to take special care when tidying SigSkol
--- See Note [SigSkol SkolemInfo] in TcRnTypes
+-- See Note [SigSkol SkolemInfo] in Origin
 tidySigSkol env cx ty tv_prs
   = SigSkol cx (tidy_ty env ty) tv_prs'
   where

@@ -45,6 +45,9 @@ import TcCanonical   ( makeSuperClasses, solveCallStack )
 import TcMType   as TcM
 import TcRnMonad as TcM
 import TcSMonad  as TcS
+import Constraint
+import Predicate
+import TcOrigin
 import TcType
 import Type
 import TysWiredIn    ( liftedRepTy )
@@ -835,7 +838,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                            | psig_theta_var <- psig_theta_vars ]
 
        -- Now construct the residual constraint
-       ; residual_wanted <- mkResidualConstraints rhs_tclvl tc_env ev_binds_var
+       ; residual_wanted <- mkResidualConstraints rhs_tclvl ev_binds_var
                                  name_taus co_vars qtvs bound_theta_vars
                                  (wanted_transformed `andWC` mkSimpleWC psig_wanted)
 
@@ -854,13 +857,13 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
     partial_sigs = filter isPartialSig sigs
 
 --------------------
-mkResidualConstraints :: TcLevel -> Env TcGblEnv TcLclEnv -> EvBindsVar
+mkResidualConstraints :: TcLevel -> EvBindsVar
                       -> [(Name, TcTauType)]
                       -> VarSet -> [TcTyVar] -> [EvVar]
                       -> WantedConstraints -> TcM WantedConstraints
 -- Emit the remaining constraints from the RHS.
 -- See Note [Emitting the residual implication in simplifyInfer]
-mkResidualConstraints rhs_tclvl tc_env ev_binds_var
+mkResidualConstraints rhs_tclvl ev_binds_var
                         name_taus co_vars qtvs full_theta_vars wanteds
   | isEmptyWC wanteds
   = return wanteds
@@ -873,23 +876,22 @@ mkResidualConstraints rhs_tclvl tc_env ev_binds_var
         ; _ <- promoteTyVarSet (tyCoVarsOfCts outer_simple)
 
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
-        ; return (WC { wc_simple = outer_simple
-                     , wc_impl   = mk_implic inner_wanted })}
-  where
-    mk_implic inner_wanted
-      | isEmptyWC inner_wanted
-      = emptyBag
-      | otherwise
-      = unitBag (implicationPrototype { ic_tclvl  = rhs_tclvl
-                                      , ic_skols  = qtvs
-                                      , ic_telescope = Nothing
-                                      , ic_given  = full_theta_vars
-                                      , ic_wanted = inner_wanted
-                                      , ic_binds  = ev_binds_var
-                                      , ic_no_eqs = False
-                                      , ic_info   = skol_info
-                                      , ic_env    = tc_env })
+        ; implics <- if isEmptyWC inner_wanted
+                     then return emptyBag
+                     else do implic1 <- newImplication
+                             return $ unitBag $
+                                      implic1  { ic_tclvl  = rhs_tclvl
+                                               , ic_skols  = qtvs
+                                               , ic_telescope = Nothing
+                                               , ic_given  = full_theta_vars
+                                               , ic_wanted = inner_wanted
+                                               , ic_binds  = ev_binds_var
+                                               , ic_no_eqs = False
+                                               , ic_info   = skol_info }
 
+        ; return (WC { wc_simple = outer_simple
+                     , wc_impl   = implics })}
+  where
     full_theta = map idType full_theta_vars
     skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
                            | (name, ty) <- name_taus ]
@@ -1663,7 +1665,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
             <- nestImplicTcS ev_binds_var tclvl $
-               do { let loc    = mkGivenLoc tclvl info (implicLclEnv imp)
+               do { let loc    = mkGivenLoc tclvl info (ic_env imp)
                         givens = mkGivens loc given_ids
                   ; solveSimpleGivens givens
 

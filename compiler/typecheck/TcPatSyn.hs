@@ -40,10 +40,11 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
-import Type( PredTree(..), EqRel(..), classifyPredType )
+import Predicate
 import TysWiredIn
 import TcType
 import TcEvidence
+import TcOrigin
 import BuildTyCl
 import VarSet
 import MkId
@@ -300,7 +301,7 @@ have type
   $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
 
 and that is bad because (a ~# Maybe b) is not a predicate type
-(see Note [Types for coercions, predicates, and evidence] in Type)
+(see Note [Types for coercions, predicates, and evidence] in TyCoRep
 and is not implicitly instantiated.
 
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
@@ -405,7 +406,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
-                         -- See TcRnTypes Note [Skolem info for pattern synonyms]
+                         -- See Note [Skolem info for pattern synonyms] in Origin
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,

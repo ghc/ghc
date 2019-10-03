@@ -63,6 +63,9 @@ import TyCon
 import Type             hiding( typeKind )
 import RepType
 import TcType
+import Constraint
+import TcOrigin
+import Predicate
 import Var
 import Id
 import Name             hiding ( varName )

@@ -61,14 +61,14 @@ import qualified IfaceEnv
 import qualified Finder
 
 import FamInstEnv ( FamInstEnv )
-import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
+import TcRnMonad  ( TcGblEnv, TcLclEnv, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
+import Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )
-import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
 
 import Module
@@ -158,7 +158,7 @@ zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 -- | Create a new wanted constraint.
 newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
 newWanted loc pty
-  = unsafeTcPluginTcM (TcM.newWanted (TcM.ctLocOrigin loc) Nothing pty)
+  = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
 
 -- | Create a new derived constraint.
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence

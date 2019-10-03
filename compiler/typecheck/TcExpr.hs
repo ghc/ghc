@@ -25,6 +25,7 @@ import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket
 import THNames( liftStringName, liftName )
 
 import GHC.Hs
+import Constraint       ( HoleSort(..) )
 import TcHsSyn
 import TcRnMonad
 import TcUnify
@@ -44,6 +45,7 @@ import TcHsType
 import TcPatSyn( tcPatSynBuilderOcc, nonBidirectionalErr )
 import TcPat
 import TcMType
+import TcOrigin
 import TcType
 import Id
 import IdInfo

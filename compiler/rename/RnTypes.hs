@@ -57,8 +57,9 @@ import FieldLabel
 
 import Util
 import ListSetOps       ( deleteBys )
-import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
-                          Fixity(..), FixityDirection(..), LexicalFixity(..) )
+import BasicTypes       ( compareFixity, funTyFixity, negateFixity
+                        , Fixity(..), FixityDirection(..), LexicalFixity(..)
+                        , TypeOrKind(..) )
 import Outputable
 import FastString
 import Maybes

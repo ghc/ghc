@@ -15,10 +15,13 @@ import GhcPrelude
 
 import TcRnTypes
 import TcRnMonad
+import Constraint
+import Predicate
 import TcMType
 import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
+import TcOrigin
 import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
@@ -415,7 +418,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
          warnRedundantConstraints ctxt' tcl_env info' dead_givens
        ; when bad_telescope $ reportBadTelescope ctxt tcl_env m_telescope tvs }
   where
-    tcl_env      = implicLclEnv implic
+    tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status
     (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) tvs
     info'        = tidySkolemInfo env1 info
@@ -580,7 +583,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
-      is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
+      is_equality, is_ip, is_irred :: Ct -> Pred -> Bool
 
     is_given_eq ct pred
        | EqPred {} <- pred = arisesFromGivens ct
@@ -639,7 +642,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     has_gadt_match (implic : implics)
       | PatSkol {} <- ic_info implic
       , not (ic_no_eqs implic)
-      , wopt Opt_WarnInaccessibleCode (implicDynFlags implic)
+      , ic_warn_inaccessible implic
           -- Don't bother doing this if -Winaccessible-code isn't enabled.
           -- See Note [Avoid -Winaccessible-code when deriving] in TcInstDcls.
       = True
@@ -672,7 +675,7 @@ type Reporter
   = ReportErrCtxt -> [Ct] -> TcM ()
 type ReporterSpec
   = ( String                     -- Name
-    , Ct -> PredTree -> Bool     -- Pick these ones
+    , Ct -> Pred -> Bool         -- Pick these ones
     , Bool                       -- True <=> suppress subsequent reporters
     , Reporter)                  -- The reporter itself
 
@@ -720,7 +723,7 @@ mkGivenErrorReporter ctxt cts
        ; dflags <- getDynFlags
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenErrorReporter is called
-             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (implicLclEnv implic))
+             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
                    -- For given constraints we overwrite the env (and hence src-loc)
                    -- with one from the immediately-enclosing implication.
                    -- See Note [Inaccessible code]
@@ -1218,7 +1221,7 @@ givenConstraintsMsg ctxt =
         constraints =
           do { implic@Implic{ ic_given = given } <- cec_encl ctxt
              ; constraint <- given
-             ; return (varType constraint, tcl_loc (implicLclEnv implic)) }
+             ; return (varType constraint, tcl_loc (ic_env implic)) }
 
         pprConstraint (constraint, loc) =
           ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
@@ -1571,7 +1574,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                                <+> text "bound by"
                              , nest 2 $ ppr skol_info
                              , nest 2 $ text "at" <+>
-                               ppr (tcl_loc (implicLclEnv implic)) ] ]
+                               ppr (tcl_loc (ic_env implic)) ] ]
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
@@ -1590,7 +1593,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                       , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
                       , nest 2 $ text "bound by" <+> ppr skol_info
                       , nest 2 $ text "at" <+>
-                        ppr (tcl_loc (implicLclEnv implic)) ]
+                        ppr (tcl_loc (ic_env implic)) ]
              tv_extra = important $ extraTyVarEqInfo ctxt tv1 ty2
              add_sig  = important $ suggestAddSig ctxt ty1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1685,7 +1688,7 @@ pp_givens givens
              -- See Note [Suppress redundant givens during error reporting]
              -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr (tcl_loc (implicLclEnv implic)) ])
+                       , text "at" <+> ppr (tcl_loc (ic_env implic)) ])
 
 {-
 Note [Suppress redundant givens during error reporting]
@@ -2433,7 +2436,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
              _  -> Just $ hang (pprTheta ev_vars_matching)
                             2 (sep [ text "bound by" <+> ppr skol_info
                                    , text "at" <+>
-                                     ppr (tcl_loc (implicLclEnv implic)) ])
+                                     ppr (tcl_loc (ic_env implic)) ])
         where ev_vars_matching = [ pred
                                  | ev_var <- evvars
                                  , let pred = evVarPred ev_var
