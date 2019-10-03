@@ -3,7 +3,7 @@
 module ClsInst (
      matchGlobalInst,
      ClsInstResult(..),
-     InstanceWhat(..), safeOverlap,
+     InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated
   ) where
 
@@ -31,7 +31,7 @@ import Id
 import Type
 import MkCore ( mkStringExprFS, mkNaturalExpr )
 
-import Name   ( Name )
+import Name   ( Name, pprDefinedAt )
 import VarEnv ( VarEnv )
 import DataCon
 import TyCon
@@ -91,6 +91,8 @@ data ClsInstResult
 
 data InstanceWhat
   = BuiltinInstance
+  | BuiltinEqInstance   -- A built-in "equality instance"; see the
+                        -- TcSMonad Note [Solved dictionaries]
   | LocalInstance
   | TopLevInstance { iw_dfun_id   :: DFunId
                    , iw_safe_over :: SafeOverlapping }
@@ -103,14 +105,23 @@ instance Outputable ClsInstResult where
     = text "OneInst" <+> vcat [ppr ev, ppr what]
 
 instance Outputable InstanceWhat where
-  ppr BuiltinInstance = text "built-in instance"
-  ppr LocalInstance   = text "locally-quantified instance"
-  ppr (TopLevInstance { iw_safe_over = so })
-     = text "top-level instance" <+> (text $ if so then "[safe]" else "[unsafe]")
+  ppr BuiltinInstance   = text "a built-in instance"
+  ppr BuiltinEqInstance = text "a built-in equality instance"
+  ppr LocalInstance     = text "a locally-quantified instance"
+  ppr (TopLevInstance { iw_dfun_id = dfun })
+      = hang (text "instance" <+> pprSigmaType (idType dfun))
+           2 (text "--" <+> pprDefinedAt (idName dfun))
 
 safeOverlap :: InstanceWhat -> Bool
 safeOverlap (TopLevInstance { iw_safe_over = so }) = so
 safeOverlap _                                      = True
+
+instanceReturnsDictCon :: InstanceWhat -> Bool
+-- See Note [Solved dictionaries] in TcSMonad
+instanceReturnsDictCon (TopLevInstance {}) = True
+instanceReturnsDictCon BuiltinInstance     = True
+instanceReturnsDictCon BuiltinEqInstance   = False
+instanceReturnsDictCon LocalInstance       = False
 
 matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
@@ -561,14 +572,14 @@ matchHeteroEquality :: [Type] -> TcM ClsInstResult
 matchHeteroEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
                     , cir_mk_ev     = evDataConApp heqDataCon args
-                    , cir_what      = BuiltinInstance })
+                    , cir_what      = BuiltinEqInstance })
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~ t2)
 matchHomoEquality args@[k,t1,t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
                     , cir_mk_ev     = evDataConApp eqDataCon args
-                    , cir_what      = BuiltinInstance })
+                    , cir_what      = BuiltinEqInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
 -- See also Note [The equality types story] in TysPrim
@@ -576,7 +587,7 @@ matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
                     , cir_mk_ev     = evDataConApp coercibleDataCon args
-                    , cir_what      = BuiltinInstance })
+                    , cir_what      = BuiltinEqInstance })
   where
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)

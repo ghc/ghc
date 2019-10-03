@@ -139,7 +139,7 @@ import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
-import ClsInst( InstanceWhat(..) )
+import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import Kind
 import TcType
 import DynFlags
@@ -483,6 +483,63 @@ Now 'd1' goes in inert_solved_dicts, and we can solve d2 directly from d1.
     d2 = d1
 
 See Note [Example of recursive dictionaries]
+
+VERY IMPORTANT INVARIANT:
+
+ (Solved Dictionary Invariant)
+    Every member of the inert_solved_dicts is the result
+    of applying an instance declaration that "takes a step"
+
+    An instance "takes a step" if it has the form
+        dfunDList d1 d2 = MkD (...) (...) (...)
+    That is, the dfun is lazy in its arguments, and guarantees to
+    immediately return a dictionary constructor.  NB: all dictionary
+    data constructors are lazy in their arguments.
+
+    This property is crucial to ensure that all dictionaries are
+    non-bottom, which in turn ensures that the whole "recursive
+    dictionary" idea works at all, even if we get something like
+        rec { d = dfunDList d dx }
+    See Note [Recursive superclasses] in TcInstDcls.
+
+ Reason:
+   - All instances, except two exceptions listed below, "take a step"
+     in the above sense
+
+   - Exception 1: local quantified constraints have no such guarantee;
+     indeed, adding a "solved dictionary" when appling a quantified
+     constraint led to the ability to define unsafeCoerce
+     in #17267.
+
+   - Exception 2: the magic built-in instace for (~) has no
+     such guarantee.  It behaves as if we had
+         class    (a ~# b) => (a ~ b) where {}
+         instance (a ~# b) => (a ~ b) where {}
+     The "dfun" for the instance is strict in the coercion.
+     Anyway there's no point in recording a "solved dict" for
+     (t1 ~ t2); it's not going to allow a recursive dictionary
+     to be constructed.  Ditto (~~) and Coercible.
+
+THEREFORE we only add a "solved dictionary"
+  - when applying an instance declaration
+  - subject to Exceptions 1 and 2 above
+
+In implementation terms
+  - TcSMonad.addSolvedDict adds a new solved dictionary,
+    conditional on the kind of instance
+
+  - It is only called when applying an instance decl,
+    in TcInteract.doTopReactDict
+
+  - ClsInst.InstanceWhat says what kind of instance was
+    used to solve the constraint.  In particular
+      * LocalInstance identifies quantified constraints
+      * BuiltinEqInstance identifies the strange built-in
+        instances for equality.
+
+  - ClsInst.instanceReturnsDictCon says which kind of
+    instance guarantees to return a dictionary constructor
+
 Other notes about solved dictionaries
 
 * See also Note [Do not add superclasses of solved dictionaries]
@@ -490,7 +547,7 @@ Other notes about solved dictionaries
 * The inert_solved_dicts field is not rewritten by equalities,
   so it may get out of date.
 
-* THe inert_solved_dicts are all Wanteds, never givens
+* The inert_solved_dicts are all Wanteds, never givens
 
 * We only cache dictionaries from top-level instances, not from
   local quantified constraints.  Reason: if we cached the latter
@@ -500,8 +557,8 @@ Other notes about solved dictionaries
 
 Note [Do not add superclasses of solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Every member of inert_solved_dicts is the result of applying a dictionary
-function, NOT of applying superclass selection to anything.
+Every member of inert_solved_dicts is the result of applying a
+dictionary function, NOT of applying superclass selection to anything.
 Consider
 
         class Ord a => C a where
@@ -1834,10 +1891,11 @@ addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
 addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
 
-insertSafeOverlapFailureTcS :: Ct -> TcS ()
+insertSafeOverlapFailureTcS :: InstanceWhat -> Ct -> TcS ()
 -- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
-insertSafeOverlapFailureTcS item
-  = updInertCans (\ics -> addInertSafehask ics item)
+insertSafeOverlapFailureTcS what item
+  | safeOverlap what = return ()
+  | otherwise        = updInertCans (\ics -> addInertSafehask ics item)
 
 getSafeOverlapFailures :: TcS Cts
 -- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
@@ -1846,16 +1904,17 @@ getSafeOverlapFailures
       ; return $ foldDicts consCts safehask emptyCts }
 
 --------------
-addSolvedDict :: CtEvidence -> Class -> [Type] -> TcS ()
--- Add a new item in the solved set of the monad
+addSolvedDict :: InstanceWhat -> CtEvidence -> Class -> [Type] -> TcS ()
+-- Conditionally add a new item in the solved set of the monad
 -- See Note [Solved dictionaries]
-addSolvedDict item cls tys
-  | isIPPred (ctEvPred item)    -- Never cache "solved" implicit parameters (not sure why!)
-  = return ()
-  | otherwise
+addSolvedDict what item cls tys
+  | isWanted item
+  , instanceReturnsDictCon what
   = do { traceTcS "updSolvedSetTcs:" $ ppr item
        ; updInertTcS $ \ ics ->
              ics { inert_solved_dicts = addDict (inert_solved_dicts ics) cls tys item } }
+  | otherwise
+  = return ()
 
 getSolvedDicts :: TcS (DictMap CtEvidence)
 getSolvedDicts = do { ics <- getTcSInerts; return (inert_solved_dicts ics) }
