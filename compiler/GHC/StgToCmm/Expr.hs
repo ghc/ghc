@@ -684,9 +684,11 @@ cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
 
 -- Note [double switching for big families]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- Generally, switching on big family alternatives now
--- is done by two nested switch statements. The outer
+-- Generally, switching on big family alternatives
+-- is done by two nested switch statements. According to
+-- note [tagging big families], the outer switch
 -- looks at the pointer tag and the inner dereferences the
 -- pointer and switches on the info table tag.
 --
@@ -698,41 +700,50 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- alternatives lie in 1..mAX_PTR_TAG-1, in which case we can
 -- switch on the ptr tag only, just like in the small family case.
 --
--- There are two intricacies with a nested switch:
--- a) Both should branch to the same default alternative, and as such
---    avoid duplicate codegen of potentially heavy code. The outer
---    switch generates the actual code with a prepended fresh label,
---    while the inner one only generates a jump to that label.
--- b) Where to codegen the inner switch's code? It would be nice to
---    leave the codegen to the mAX_PTR_TAG-numbered branch of the
---    outer switch, but we don't have a c-- statement for this purpose.
---    So we just emit a branch to a fresh label, and pass the
---    code-emission action to the outer switch's emitter as
---    pre-join-label code. What we end up with is:
+-- There is a single intricacy with a nested switch:
+-- Both should branch to the same default alternative, and as such
+-- avoid duplicate codegen of potentially heavy code. The outer
+-- switch generates the actual code with a prepended fresh label,
+-- while the inner one only generates a jump to that label.
 --
---        switch [1..7] (R1 & 7) -- on ptr tag
---          1 --> lbl0
---          2 --> lbl1
---          ...
---          6 --> lbl5
---          7 --> fallbackLbl_info
+-- Consider the following data type
+---    data Big = T0 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8
+--   Ptr tag:      1    2    3    4    5    6    7    7    7
 --
---        <pre-join insertion comes here>
---        fallbackLbl_info:
---        switch [6..20] (R1->infoTag)
---          6 --> lbl6
---          7 --> lbl7
---          ...
---          19 --> lbl19
---        </pre-join insertion>
---
---        joinLbl:  -- lbl0 .. lbl19 all finally branch here
---          <continuation>
---
---    Note that the joinLbl is internal to the 'emitSwitch',
---    so we now have a tail argument to 'emitSwitch' which generates
---    some custom code before that label. One can pass 'pure ()' to
---    avoid this.
+-- Then     \case T2 -> True; T8 -> True; _ -> False
+-- will result in following code (slightly cleaned-up and
+-- commented -ddump-cmm-from-stg):
+{-
+           R1 = _sqI::P64;  -- scrutinee
+           if (R1 & 7 != 0) goto cqO; else goto cqP;
+       cqP: // global       -- enter
+           call (I64[R1])(R1) returns to cqO, args: 8, res: 8, upd: 8;
+       cqO: // global       -- already WHNF
+           _sqJ::P64 = R1;
+           _cqX::P64 = _sqJ::P64 & 7;  -- extract pointer tag
+           switch [1 .. 7] _cqX::P64 {
+               case 3 : goto cqW;
+               case 7 : goto cqR;
+               default: {goto cqS;}
+           }
+       cqR: // global
+           _cr2 = I32[I64[_sqJ::P64 & (-8)] - 4]; -- tag from info pointer
+           switch [6 .. 8] _cr2::I64 {
+               case 8 : goto cr1;
+               default: {goto cr0;}
+           }
+       cr1: // global
+           R1 = GHC.Types.True_closure+2;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       cr0: // global     -- technically necessary label
+           goto cqS;
+       cqW: // global
+           R1 = GHC.Types.True_closure+2;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+       cqS: // global
+           R1 = GHC.Types.False_closure+1;
+           call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
+-}
 
 
 -- Note [alg-alt heap check]
@@ -757,24 +768,29 @@ cgAlts _ _ _ _ = panic "cgAlts"
 
 
 -- Note [tagging big families]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- Previously, only the small constructor families were tagged.
--- This penalised greater unions which overflow the tag space
--- of TAG_BITS (i.e. 3 on 32 resp. 7 constructors on 64 bit).
--- But there is a clever way of combining pointer and info-table
--- tagging. We now use 1..{2,6} as pointer-resident tags while
--- {3,7} signifies we have to fall back and get the tag from the
+-- Now both the big and the small constructor families were tagged,
+-- that is, greater unions which overflow the tag space of TAG_BITS
+-- (i.e. 3 on 32 resp. 7 constructors on 64 bit archs).
+--
+-- We employ a clever way of combining pointer and info-table
+-- tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
+-- the tags in the pointer and the info table are in a one-to-one
+-- relation, whereas tag MAX_PTR_TAG is used as "spill over", signifying
+-- we have to fall back and get the precise constructor tag from the
 -- info-table.
+--
 -- Consequently we now cascade switches, because we have to check
--- the tag first and when it is MAX_PTR_TAG then get the precise
--- tag from the info table and switch on that. The only technically
+-- the pointer tag first, and when it is MAX_PTR_TAG, fetch the precise
+-- tag from the info table, and switch on that. The only technically
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
 -- the second switch. This avoids duplicated codegen. See Trac #14373.
--- See Note [double switching for big families] for the mechanics
+-- See note [double switching for big families] for the mechanics
 -- involved.
 --
--- Also see Note [Data constructor dynamic tags]
+-- Also see note [Data constructor dynamic tags]
 
 
 -------------------
