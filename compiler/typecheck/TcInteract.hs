@@ -27,7 +27,7 @@ import Class
 import TyCon
 import FunDeps
 import FamInst
-import ClsInst( InstanceWhat(..), safeOverlap )
+import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import FamInstEnv
 import Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
@@ -2252,9 +2252,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
         ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_res of
                OneInst { cir_what = what }
-                  -> do { unless (safeOverlap what) $
-                          insertSafeOverlapFailureTcS work_item
-                        ; when (isWanted ev) $ addSolvedDict ev cls xis
+                  -> do { insertSafeOverlapFailureTcS what work_item
+                        ; addSolvedDict what ev cls xis
                         ; chooseInstance work_item lkup_res }
                _  ->  -- NoInstance or NotSure
                      do { when (isImprovable ev) $
