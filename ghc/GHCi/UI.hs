@@ -3460,6 +3460,10 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
       mb_span <- getCurrentBreakSpan
       case mb_span of
         Nothing  -> stepCmd []
+        Just (UnhelpfulSpan _) -> liftIO $ putStrLn (            -- #14690
+           ":steplocal is not possible." ++
+           "\nCannot determine current top-level binding after " ++
+           "a break on error / exception.\nUse :stepmodule.")
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
