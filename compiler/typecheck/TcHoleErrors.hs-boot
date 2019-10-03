@@ -4,7 +4,8 @@
 -- + which calls 'TcSimplify.simpl_top'
 module TcHoleErrors where
 
-import TcRnTypes  ( TcM, Ct, Implication )
+import TcRnTypes  ( TcM )
+import Constraint ( Ct, Implication )
 import Outputable ( SDoc )
 import VarEnv     ( TidyEnv )
 

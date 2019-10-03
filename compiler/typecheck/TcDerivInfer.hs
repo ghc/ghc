@@ -31,6 +31,9 @@ import TcGenFunctor
 import TcGenGenerics
 import TcMType
 import TcRnMonad
+import TcOrigin
+import Constraint
+import Predicate
 import TcType
 import TyCon
 import Type
