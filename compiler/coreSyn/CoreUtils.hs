@@ -77,6 +77,7 @@ import Id
 import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
+import Predicate
 import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
 import TyCon

@@ -44,6 +44,8 @@ import TcHsType
 import TcPatSyn( tcPatSynBuilderOcc, nonBidirectionalErr )
 import TcPat
 import TcMType
+import TcOrigin
+import Constraint ( Hole(..) )
 import TcType
 import Id
 import IdInfo

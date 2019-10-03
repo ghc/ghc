@@ -39,6 +39,7 @@ import TcUnify
 import TcHsType
 import TysWiredIn
 import TcEvidence
+import TcOrigin
 import TyCon
 import DataCon
 import PatSyn

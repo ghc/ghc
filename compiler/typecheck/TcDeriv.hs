@@ -20,6 +20,8 @@ import DynFlags
 
 import TcRnMonad
 import FamInst
+import TcOrigin
+import Predicate
 import TcDerivInfer
 import TcDerivUtils
 import TcValidity( allDistinctTyVars )
@@ -63,6 +65,7 @@ import Bag
 import Pair
 import FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
+import BasicTypes ( TypeOrKind(..) )
 
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -643,7 +646,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; let ctxt = TcType.InstDeclCtxt True
+       ; let ctxt = TcOrigin.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
