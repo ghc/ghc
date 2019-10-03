@@ -100,9 +100,9 @@ config.way_flags = {
     'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
     'ghci-ext-prof'    : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '-prof', '+RTS', '-I0.1', '-RTS'],
     'ext-interp'   : ['-fexternal-interpreter'],
-    'nonmoving'    : ['-debug'],
-    'nonmoving_thr': ['-threaded', '-debug'],
-    'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded', '-debug'],
+    'nonmoving'    : [''],
+    'nonmoving_thr': ['-threaded'],
+    'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
    }
 
 config.way_rts_flags = {
@@ -141,9 +141,9 @@ config.way_rts_flags = {
     'ghci-ext'         : [],
     'ghci-ext-prof'    : [],
     'ext-interp'       : [],
-    'nonmoving'        : ['-DS', '-xn'],
-    'nonmoving_thr'    : ['-DS', '-xn', '-N2'],
-    'nonmoving_thr_ghc': ['-DS', '-xn', '-N2'],
+    'nonmoving'        : ['-xn'],
+    'nonmoving_thr'    : ['-xn', '-N2'],
+    'nonmoving_thr_ghc': ['-xn', '-N2'],
    }
 
 # Useful classes of ways that can be used with only_ways(), omit_ways() and
