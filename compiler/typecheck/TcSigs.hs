@@ -31,6 +31,7 @@ import GHC.Hs
 import TcHsType
 import TcRnTypes
 import TcRnMonad
+import TcOrigin
 import TcType
 import TcMType
 import TcValidity ( checkValidType )
