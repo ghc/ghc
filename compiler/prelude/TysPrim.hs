@@ -81,6 +81,7 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
         eqReprPrimTyCon,        -- ty1 ~R# ty2  (at role Representational)
         eqPhantPrimTyCon,       -- ty1 ~P# ty2  (at role Phantom)
+        equalityTyCon,
 
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
@@ -918,6 +919,12 @@ eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
     res_kind = unboxedTupleKind []
     roles    = [Nominal, Nominal, Phantom, Phantom]
+
+-- | Given a Role, what TyCon is the type of equality predicates at that role?
+equalityTyCon :: Role -> TyCon
+equalityTyCon Nominal          = eqPrimTyCon
+equalityTyCon Representational = eqReprPrimTyCon
+equalityTyCon Phantom          = eqPhantPrimTyCon
 
 {- *********************************************************************
 *                                                                      *

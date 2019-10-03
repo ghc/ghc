@@ -8,6 +8,7 @@ module TcHoleFitTypes (
 import GhcPrelude
 
 import TcRnTypes
+import Constraint
 import TcType
 
 import RdrName

@@ -29,6 +29,8 @@ import TcValidity
 import TcHsSyn
 import TcMType
 import TcType
+import Constraint
+import TcOrigin
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
@@ -1660,10 +1662,8 @@ Instead, we take the much simpler approach of always disabling
 
 1. In tcMethods (which typechecks method bindings), disable
    -Winaccessible-code.
-2. When creating Implications during typechecking, record the Env
-   (through ic_env) at the time of creation. Since the Env also stores
-   DynFlags, this will remember that -Winaccessible-code was disabled over
-   the scope of that implication.
+2. When creating Implications during typechecking, record this flag
+   (in ic_warn_inaccessible) at the time of creation.
 3. After typechecking comes error reporting, where GHC must decide how to
    report inaccessible code to the user, on an Implication-by-Implication
    basis. If an Implication's DynFlags indicate that -Winaccessible-code was

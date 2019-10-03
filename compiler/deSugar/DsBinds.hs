@@ -41,6 +41,7 @@ import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
 import Digraph
+import Predicate
 
 import PrelNames
 import TyCon

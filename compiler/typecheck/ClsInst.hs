@@ -17,6 +17,7 @@ import TcType
 import TcTypeable
 import TcMType
 import TcEvidence
+import Predicate
 import RnEnv( addUsedGRE )
 import RdrName( lookupGRE_FieldLabel )
 import InstEnv
