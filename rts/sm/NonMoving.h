@@ -38,13 +38,21 @@ struct NonmovingSegment {
     struct NonmovingSegment *link;     // for linking together segments into lists
     struct NonmovingSegment *todo_link; // NULL when not in todo list
     nonmoving_block_idx next_free;      // index of the next unallocated block
-    nonmoving_block_idx next_free_snap; // snapshot of next_free
-    uint8_t block_size;                 // log2 of block size in bytes
     uint8_t bitmap[];                   // liveness bitmap
     // After the liveness bitmap comes the data blocks. Note that we need to
     // ensure that the size of this struct (including the bitmap) is a multiple
     // of the word size since GHC assumes that all object pointers are
     // so-aligned.
+
+    // N.B. There are also bits of information which are stored in the
+    // NonmovingBlockInfo stored in the segment's block descriptor. Namely:
+    //
+    //  * the block size can be found in nonmovingBlockInfo(seg)->log_block_size.
+    //  * the next_free snapshot can be found in
+    //    nonmovingBlockInfo(seg)->next_free_snap.
+    //
+    // This allows us to mark a nonmoving closure without bringing the
+    // NonmovingSegment header into cache.
 };
 
 // This is how we mark end of todo lists. Not NULL because todo_link == NULL
@@ -121,11 +129,20 @@ void *nonmovingAllocate(Capability *cap, StgWord sz);
 void nonmovingAddCapabilities(uint32_t new_n_caps);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
 
+
+INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {
+    return &Bdescr((StgPtr) seg)->nonmoving_segment;
+}
+
+INLINE_HEADER uint8_t nonmovingSegmentLogBlockSize(struct NonmovingSegment *seg) {
+    return nonmovingSegmentInfo(seg)->log_block_size;
+}
+
 // Add a segment to the appropriate active list.
 INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
-        nonmovingHeap.allocators[seg->block_size - NONMOVING_ALLOCA0];
+        nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     while (true) {
         struct NonmovingSegment *current_active = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->active);
         seg->link = current_active;
@@ -139,7 +156,7 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
-        nonmovingHeap.allocators[seg->block_size - NONMOVING_ALLOCA0];
+        nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     while (true) {
         struct NonmovingSegment *current_filled = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->filled);
         seg->link = current_filled;
@@ -160,7 +177,7 @@ void assert_in_nonmoving_heap(StgPtr p);
 // The block size of a given segment in bytes.
 INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *seg)
 {
-    return 1 << seg->block_size;
+    return 1 << nonmovingSegmentLogBlockSize(seg);
 }
 
 // How many blocks does a segment with the given block size have?
@@ -178,7 +195,7 @@ unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size);
 // How many blocks does the given segment contain? Also the size of the bitmap.
 INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *seg)
 {
-  return nonmovingBlockCountFromSize(seg->block_size);
+  return nonmovingBlockCountFromSize(nonmovingSegmentLogBlockSize(seg));
 }
 
 // Get a pointer to the given block index assuming that the block size is as
@@ -186,7 +203,7 @@ INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *s
 // available). The log_block_size argument must be equal to seg->block_size.
 INLINE_HEADER void *nonmovingSegmentGetBlock_(struct NonmovingSegment *seg, uint8_t log_block_size, nonmoving_block_idx i)
 {
-  ASSERT(log_block_size == seg->block_size);
+  ASSERT(log_block_size == nonmovingSegmentLogBlockSize(seg));
   // Block size in bytes
   unsigned int blk_size = 1 << log_block_size;
   // Bitmap size in bytes
@@ -202,7 +219,7 @@ INLINE_HEADER void *nonmovingSegmentGetBlock_(struct NonmovingSegment *seg, uint
 // Get a pointer to the given block index.
 INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
-  return nonmovingSegmentGetBlock_(seg, seg->block_size, i);
+  return nonmovingSegmentGetBlock_(seg, nonmovingSegmentLogBlockSize(seg), i);
 }
 
 // Get the segment which a closure resides in. Assumes that pointer points into
@@ -225,7 +242,7 @@ INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
     struct NonmovingSegment *seg = nonmovingGetSegment(p);
     ptrdiff_t blk0 = (ptrdiff_t)nonmovingSegmentGetBlock(seg, 0);
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
-    return (nonmoving_block_idx) (offset >> seg->block_size);
+    return (nonmoving_block_idx) (offset >> nonmovingSegmentLogBlockSize(seg));
 }
 
 // TODO: Eliminate this
@@ -266,8 +283,9 @@ INLINE_HEADER bool nonmovingClosureMarked(StgPtr p)
 // segment is in the set of segments that will be swept this collection cycle.
 INLINE_HEADER bool nonmovingSegmentBeingSwept(struct NonmovingSegment *seg)
 {
-    unsigned int n = nonmovingSegmentBlockCount(seg);
-    return seg->next_free_snap >= n;
+    struct NonmovingSegmentInfo *seginfo = nonmovingSegmentInfo(seg);
+    unsigned int n = nonmovingBlockCountFromSize(seginfo->log_block_size);
+    return seginfo->next_free_snap >= n;
 }
 
 // Can be called during a major collection to determine whether a particular
