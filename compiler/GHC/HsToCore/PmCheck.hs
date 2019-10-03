@@ -478,7 +478,7 @@ translatePat fam_insts x pat = case pat of
   -- (x@pat)   =>   Just translate pat with x as Id hint and handle the
   --                impedance mismatch
   AsPat _ (dL->L _ y) p ->
-    (mkPmLet x (Var y) ++) <$> translatePat fam_insts y (unLoc p)
+    (mkPmLet y (Var x) ++) <$> translatePat fam_insts y (unLoc p)
 
   SigPat _ p _ty -> translatePat fam_insts x (unLoc p)
 
@@ -1031,10 +1031,11 @@ pmCheck' (PmLet { pm_id = x, pm_let_expr = e } : ps) guards n delta = do
 
 -- Bang x: Add x /~ _|_ to the oracle
 pmCheck' (PmBang x : ps) guards n delta = do
+  tracePm "PmBang" (ppr x)
   pr <- pmCheckM ps guards n (addTmCt delta (TmVarNonVoid x))
   pure (forceIfCanDiverge delta x pr)
 
--- ConVar
+-- Con
 pmCheck' (p : ps) guards n delta
   | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
          , pm_con_dicts = dicts } <- p = do
@@ -1055,7 +1056,7 @@ pmCheck' (p : ps) guards n delta
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
 
-  tracePm "ConVar" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
+  tracePm "PmCon" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
 
   -- Combine both into a single PartialResult
   let pr = mkUnion pr_pos' pr_neg
