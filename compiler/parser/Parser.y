@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 0 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -775,7 +775,7 @@ maybedocheader :: { Maybe LHsDocString }
         | {- empty -}             { Nothing }
 
 missing_module_keyword :: { () }
-        : {- empty -}                           {% pushModuleContext }
+        : {- empty -} %shift                    {% pushModuleContext }
 
 implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
@@ -1665,7 +1665,7 @@ rule    :: { LRuleDecl GhcPs }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
 rule_activation :: { ([AddAnn],Maybe Activation) }
-        : {- empty -}                           { ([],Nothing) }
+        : {- empty -} %shift                    { ([],Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
 
 rule_explicit_activation :: { ([AddAnn]
@@ -1684,9 +1684,9 @@ rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr GhcPs], [LRuleBndr GhcPs]) }
                                                               >> return ([mu AnnForall $1,mj AnnDot $3,
                                                                           mu AnnForall $4,mj AnnDot $6],
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { ([mu AnnForall $1,mj AnnDot $3],
+        | 'forall' rule_vars '.' %shift                    { ([mu AnnForall $1,mj AnnDot $3],
                                                               Nothing, mkRuleBndrs $2) }
-        | {- empty -}                                      { ([], Nothing, []) }
+        | {- empty -}            %shift                    { ([], Nothing, []) }
 
 rule_vars :: { [LRuleTyTmVar] }
         : rule_var rule_vars                    { $1 : $2 }
@@ -1964,7 +1964,7 @@ is connected to the first type too.
 -}
 
 type :: { LHsType GhcPs }
-        : btype                        { $1 }
+        : btype %shift                 { $1 }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
                                               [mu AnnRarrow $2] }
@@ -2005,7 +2005,7 @@ constr_tyapp :: { Located TyEl }
         | docprev                       { sL1 $1 $ TyElDocPrev (unLoc $1) }
 
 btype :: { LHsType GhcPs }
-        : tyapps                        {% mergeOps $1 }
+        : tyapps %shift                 {% mergeOps $1 }
 
 tyapps :: { [Located TyEl] } -- NB: This list is reversed
         : tyapp                         { [$1] }
@@ -2026,7 +2026,7 @@ tyapp :: { Located TyEl }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
+        | tyvar %shift                   { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -2584,7 +2584,7 @@ exp   :: { ECP }
                                    ams (sLL $1 $> $ HsCmdArrApp noExtField $3 $1
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
-        | infixexp              { $1 }
+        | infixexp %shift       { $1 }
 
 infixexp :: { ECP }
         : exp10 { $1 }
@@ -2609,7 +2609,7 @@ infixexp_top :: { ECP }
                                               [mj AnnVal $2] }
 
 exp10_top :: { ECP }
-        : '-' fexp                      { ECP $
+        : '-' fexp %shift               { ECP $
                                            runECP_PV $2 >>= \ $2 ->
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
@@ -2627,7 +2627,7 @@ exp10_top :: { ECP }
                                               [mo $1,mj AnnVal $2
                                               ,mc $3] }
                                           -- hdaume: core annotation
-        | fexp                         { $1 }
+        | fexp %shift                  { $1 }
 
 exp10 :: { ECP }
         : exp10_top            { $1 }
@@ -2775,7 +2775,7 @@ aexp1   :: { ECP }
 aexp2   :: { ECP }
         : qvar                          { ECP $ mkHsVarPV $! $1 }
         | qcon                          { ECP $ mkHsVarPV $! $1 }
-        | ipvar                         { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
+        | ipvar %shift                  { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
         | overloaded_label              { ecpFromExp $ sL1 $1 (HsOverLabel noExtField Nothing $! unLoc $1) }
         | literal                       { ECP $ mkHsLitPV $! $1 }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
@@ -2817,7 +2817,7 @@ aexp2   :: { ECP }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
+        | TH_TY_QUOTE %shift    {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runECP_P $2 >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
@@ -2958,7 +2958,7 @@ tup_tail :: { forall b. DisambECP b => PV [Located (Maybe (Located b))] }
                                    return ((cL (gl $1) (Just $1)) : snd $2) }
           | texp                 { runECP_PV $1 >>= \ $1 ->
                                    return [cL (gl $1) (Just $1)] }
-          | {- empty -}          { return [noLoc Nothing] }
+          | {- empty -} %shift   { return [noLoc Nothing] }
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -3477,7 +3477,7 @@ child.
 -}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
-        : qtyconsym                     { $1 }
+        : qtyconsym %shift              { $1 }
         | '`' qtycon '`'                {% ams (sLL $1 $> (unLoc $2))
                                                [mj AnnBackquote $1,mj AnnVal $2
                                                ,mj AnnBackquote $3] }
@@ -3649,7 +3649,7 @@ special_id
         | 'capi'                { sL1 $1 (fsLit "capi") }
         | 'prim'                { sL1 $1 (fsLit "prim") }
         | 'javascript'          { sL1 $1 (fsLit "javascript") }
-        | 'group'               { sL1 $1 (fsLit "group") }
+        | 'group' %shift        { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
         | 'via'                 { sL1 $1 (fsLit "via") }
@@ -3756,7 +3756,7 @@ moduleheader :: { Maybe LHsDocString }
 
 maybe_docprev :: { Maybe LHsDocString }
         : docprev                       { Just $1 }
-        | {- empty -}                   { Nothing }
+        | {- empty -} %shift            { Nothing }
 
 maybe_docnext :: { Maybe LHsDocString }
         : docnext                       { Just $1 }
