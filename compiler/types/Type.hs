@@ -90,7 +90,7 @@ module Type (
         mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
         mkClassPred,
         isClassPred, isEqPrimPred, isEqPred, isEqPredClass,
-        isIPPred, isIPPred_maybe, isIPTyCon, isIPClass,
+        isIPPred, isIPTyCon, isIPClass,
         isCTupleClass,
 
         -- Deconstructing predicate types
@@ -1924,13 +1924,6 @@ isIPClass cls = cls `hasKey` ipClassKey
 
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)
-
-isIPPred_maybe :: Type -> Maybe (FastString, Type)
-isIPPred_maybe ty =
-  do (tc,[t1,t2]) <- splitTyConApp_maybe ty
-     guard (isIPTyCon tc)
-     x <- isStrLitTy t1
-     return (x,t2)
 
 {-
 Make PredTypes
