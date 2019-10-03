@@ -662,6 +662,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       -- 3. guards from field selector patterns
       let arg_grds = concat arg_grdss
 
+      -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
       -- Store the guards in exactly that order
       pure (con_grd : bang_grds ++ arg_grds)
 
@@ -714,8 +715,8 @@ translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
 translateBind fam_insts (dL->L _ p) e = do
   rhs <- dsLExpr e
   x <- case rhs of
-    Var y -> pure y -- RHS is a variable, so that will allow us to omit the let
-    _     -> selectMatchVar p
+    Var y | Nothing <- isDataConId_maybe y -> pure y -- RHS is a variable, so that will allow us to omit the let
+    _                                      -> selectMatchVar p
   (mkPmLet x rhs ++) <$> translatePat fam_insts x p
 
 -- | Translate a boolean guard
@@ -729,8 +730,8 @@ translateBoolGuard e
   | otherwise = do
       rhs <- dsLExpr e
       x <- case rhs of
-        Var y -> pure y
-        _     -> mkPmId boolTy
+        Var y | Nothing <- isDataConId_maybe y -> pure y
+        _                                      -> mkPmId boolTy
       pure $ mkPmLet x rhs ++ [vanillaConGrd x trueDataCon []]
 
 {- Note [Field match order for RecCon]
