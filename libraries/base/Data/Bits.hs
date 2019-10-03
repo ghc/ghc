@@ -58,7 +58,6 @@ module Data.Bits (
 #include "MachDeps.h"
 
 import Data.Maybe
-import GHC.Enum
 import GHC.Num
 import GHC.Base
 import GHC.Real
@@ -495,8 +494,7 @@ instance Bits Word where
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
-    complement (W# x#)       = W# (x# `xor#` mb#)
-        where !(W# mb#) = maxBound
+    complement (W# x#)       = W# (not# x#)
     (W# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
         | otherwise                = W# (x# `shiftRL#` negateInt# i#)
