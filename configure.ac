@@ -1249,13 +1249,23 @@ AC_ARG_WITH([libdw-libs],
   [AC_HELP_STRING([--with-libdw-libs=ARG],
     [Find libraries for libdw in ARG [default=system default]])
   ],
-  [LIBDW_LDFLAGS="-L$withval"])
+  [
+    LibdwLibDir="$withval"
+    LIBDW_LDFLAGS="-L$withval"
+  ])
+
+AC_SUBST(LibdwLibDir)
 
 AC_ARG_WITH([libdw-includes],
   [AC_HELP_STRING([--with-libdw-includes=ARG],
     [Find includes for libdw in ARG [default=system default]])
   ],
-  [LIBDW_CFLAGS="-I$withval"])
+  [
+    LibdwIncludeDir="$withval"
+    LIBDW_CFLAGS="-I$withval"
+  ])
+
+AC_SUBST(LibdwIncludeDir)
 
 UseLibdw=NO
 USE_LIBDW=0

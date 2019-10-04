@@ -44,6 +44,8 @@ data Setting = BuildArch
              | HostVendor
              | IconvIncludeDir
              | IconvLibDir
+             | LibdwIncludeDir
+             | LibdwLibDir
              | LlvmTarget
              | ProjectGitCommitId
              | ProjectName
@@ -128,6 +130,8 @@ setting key = lookupValueOrError configFile $ case key of
     HostVendor         -> "host-vendor"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
+    LibdwIncludeDir    -> "libdw-include-dir"
+    LibdwLibDir        -> "libdw-lib-dir"
     LlvmTarget         -> "llvm-target"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"

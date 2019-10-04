@@ -60,6 +60,11 @@ Flag integer-gmp
     Manual: True
     Default: False
 
+Flag libdw
+    Description: Include libdw-based stack unwinding support.
+    Manual: True
+    Default: False
+
 Library
     Default-Language: Haskell2010
     Exposed: False

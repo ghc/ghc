@@ -204,11 +204,14 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
+    libdwIncludeDir   <- getSetting LibdwIncludeDir
+    libdwLibraryDir   <- getSetting LibdwLibDir
     let cArgs = mconcat
           [ arg "-Irts"
           , rtsWarnings
           , arg $ "-I" ++ path
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLidw ? arg ("-I" ++ libdwIncludeDir)
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
@@ -312,7 +315,8 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ]
+          , "-DFFI_LIB="         ++ show libffiName
+          , "-DLIBDW_LIB_DIR="     ++ show libdwLibraryDir ]
 
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
 
