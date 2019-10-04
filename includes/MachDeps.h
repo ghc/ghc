@@ -38,7 +38,6 @@
  *
  * Hence we hide these macros from GHC_STAGE=1
  */
-#if !defined(GHC_STAGE) || GHC_STAGE >= 2
 
 /* Sizes of C types come from here... */
 #include "ghcautoconf.h"
@@ -120,4 +119,3 @@
 
 #define TAG_MASK ((1 << TAG_BITS) - 1)
 
-#endif /* !defined(GHC_STAGE) || GHC_STAGE >= 2 */
