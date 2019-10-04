@@ -58,7 +58,7 @@ import Hooks
 
 import Control.Monad     ( when, unless )
 import Data.Maybe        ( mapMaybe )
-import GHC.Exts          ( unsafeCoerce# )
+import Unsafe.Coerce     ( unsafeCoerce )
 
 #else
 
@@ -243,7 +243,7 @@ lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
 lessUnsafeCoerce dflags context what = do
     debugTraceMsg dflags 3 $ (text "Coercing a value in") <+> (text context) <>
                              (text "...")
-    output <- evaluate (unsafeCoerce# what)
+    output <- evaluate (unsafeCoerce what)
     debugTraceMsg dflags 3 (text "Successfully evaluated coercion")
     return output
 
