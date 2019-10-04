@@ -257,6 +257,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
+                                 , liftedTypeKindTyCon
                                  , constraintKind )
 import PrelNames
 import CoAxiom
@@ -1128,11 +1129,18 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
   = FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
-    -- The FunTyCon (->) is always a visible one
-
+  -- See #17282, special case so that `TyConApp liftedTypeKindTyCon []` is
+  -- shared
+  | tycon == liftedTypeKindTyCon
+  = liftedTypeKindTyConApp
   | otherwise
   = TyConApp tycon tys
+
+-- Defined here so it is only allocated once. See #17292
+liftedTypeKindTyConApp :: Type
+liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
 
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications

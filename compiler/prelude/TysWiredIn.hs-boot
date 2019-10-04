@@ -12,6 +12,8 @@ coercibleTyCon, heqTyCon :: TyCon
 unitTy :: Type
 
 liftedTypeKind :: Kind
+liftedTypeKindTyCon :: TyCon
+
 constraintKind :: Kind
 
 runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
