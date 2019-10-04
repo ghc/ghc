@@ -508,6 +508,13 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
     {-# SPECIALIZE instance RealFrac Rational #-}
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
                           where (q,r) = quotRem x y
+    round r =
+      let (n, f) = properFraction r
+      in case (compare (abs f) 0.5, odd n) of
+        (LT, _) -> n
+        (EQ, False) -> n
+        (EQ, True) -> n + signum n
+        (GT, _) -> n + signum n
 
 -- | @since 2.0.1
 instance  (Show a)  => Show (Ratio a)  where
