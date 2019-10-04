@@ -1593,9 +1593,28 @@ There are wrinkles, of course:
    those two bs are entirely unrelated, and so we should certainly
    not flatten the two calls F b to the same variable. Instead, they
    must be treated separately. We thus carry a substitution that
-   freshens variables; we must apply this substitution before looking
-   up an application in the environment. Note that the range of
-   the substitution contains only TyVars, never anything else.
+   freshens variables; we must apply this substitution (in
+   `coreFlattenTyFamApp`) before looking up an application in the environment.
+   Note that the range of the substitution contains only TyVars, never anything
+   else.
+
+   For the sake of efficiency, we only apply this substitution when absolutely
+   necessary. Namely:
+
+   * We do not perform the substitution at all if it is empty.
+   * We only need to worry about the arguments of a type family that are within
+     the arity of said type family, so we can get away with not applying the
+     substitution to any oversaturated type family arguments.
+   * Importantly, we do /not/ achieve this substitution by recursively
+     flattening the arguments, as this would be wrong. Consider `F (G a)`,
+     where F and G are type families. We might decide that `F (G a)` flattens
+     to `beta`. Later, the substitution is non-empty (but does not map `a`) and
+     do we flatten `G a` to `gamma` and try to flatten `F gamma`. Of course,
+     `F gamma` is unknown, and so we flatten it to `delta`, but it really
+     should have been `beta`! Argh!
+
+     Moral of the story: instead of flattening the arguments, just substitute
+     them directly.
 
 2. There are two different reasons we might add a variable
    to the in-scope set as we work:
@@ -1711,11 +1730,7 @@ coreFlattenTy subst = go
          -- NB: Don't just check if isFamilyTyCon: this catches *data* families,
          -- which are generative and thus can be preserved during flattening
       | not (isGenerativeTyCon tc Nominal)
-      = -- Recursively flatten the arguments, since we must apply the
-        -- substitution before looking up an application in the environment.
-        -- See Note [Flattening], wrinkle 1.
-        let (env', tys') = coreFlattenTys subst env tys in
-        coreFlattenTyFamApp env' tc tys'
+      = coreFlattenTyFamApp subst env tc tys
 
       | otherwise
       = let (env', tys') = coreFlattenTys subst env tys in
@@ -1768,11 +1783,11 @@ coreFlattenVarBndr subst env tv
     subst'        = extendVarEnv subst tv (mkTyVarTy tv')
     env2          = updateInScopeSet env1 (flip extendInScopeSet tv')
 
-coreFlattenTyFamApp :: FlattenEnv
+coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> TyCon         -- type family tycon
                     -> [Type]        -- args, already flattened
                     -> (FlattenEnv, Type)
-coreFlattenTyFamApp env fam_tc fam_args
+coreFlattenTyFamApp tv_subst env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
       Just tv -> (env, mkAppTys (mkTyVarTy tv) leftover_args)
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
@@ -1785,12 +1800,18 @@ coreFlattenTyFamApp env fam_tc fam_args
                  in (env', ty')
   where
     arity = tyConArity fam_tc
+    tcv_subst = TCvSubst in_scope tv_subst emptyVarEnv
     (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
                                     splitAt arity fam_args
+    -- Apply the substitution before looking up an application in the
+    -- environment. See Note [Flattening], wrinkle 1.
+    sat_fam_args'
+      | isEmptyVarEnv tv_subst = sat_fam_args
+      | otherwise              = map (substTy tcv_subst) sat_fam_args
     -- `fam_tc` may be over-applied to `fam_args` (see Note [Flattening],
     -- wrinkle 3), so we split it into the arguments needed to saturate it
-    -- (sat_fam_args) and the rest (leftover_args)
-    fam_ty = mkTyConApp fam_tc sat_fam_args
+    -- (sat_fam_args') and the rest (leftover_args)
+    fam_ty = mkTyConApp fam_tc sat_fam_args'
     FlattenEnv { fe_type_map = type_map
                , fe_in_scope = in_scope } = env
 
