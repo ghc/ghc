@@ -1134,6 +1134,7 @@ mkTyConApp tycon tys
   -- See #17282, special case so that `TyConApp liftedTypeKindTyCon []` is
   -- shared
   | tycon == liftedTypeKindTyCon
+  , [] <- tys
   = liftedTypeKindTyConApp
   | otherwise
   = TyConApp tycon tys
