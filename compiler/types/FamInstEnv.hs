@@ -1609,7 +1609,7 @@ There are wrinkles, of course:
      flattening the arguments, as this would be wrong. Consider `F (G a)`,
      where F and G are type families. We might decide that `F (G a)` flattens
      to `beta`. Later, the substitution is non-empty (but does not map `a`) and
-     do we flatten `G a` to `gamma` and try to flatten `F gamma`. Of course,
+     so we flatten `G a` to `gamma` and try to flatten `F gamma`. Of course,
      `F gamma` is unknown, and so we flatten it to `delta`, but it really
      should have been `beta`! Argh!
 
@@ -1789,31 +1789,30 @@ coreFlattenTyFamApp :: TvSubstEnv -> FlattenEnv
                     -> (FlattenEnv, Type)
 coreFlattenTyFamApp tv_subst env fam_tc fam_args
   = case lookupTypeMap type_map fam_ty of
-      Just tv -> (env, mkAppTys (mkTyVarTy tv) leftover_args)
+      Just tv -> (env', mkAppTys (mkTyVarTy tv) leftover_args')
       Nothing -> let tyvar_name = mkFlattenFreshTyName fam_tc
                      tv         = uniqAway in_scope $
                                   mkTyVar tyvar_name (typeKind fam_ty)
 
-                     ty'  = mkAppTys (mkTyVarTy tv) leftover_args
-                     env' = env { fe_type_map = extendTypeMap type_map fam_ty tv
-                                , fe_in_scope = extendInScopeSet in_scope tv }
-                 in (env', ty')
+                     ty'   = mkAppTys (mkTyVarTy tv) leftover_args'
+                     env'' = env' { fe_type_map = extendTypeMap type_map fam_ty tv
+                                  , fe_in_scope = extendInScopeSet in_scope tv }
+                 in (env'', ty')
   where
     arity = tyConArity fam_tc
-    tcv_subst = TCvSubst in_scope tv_subst emptyVarEnv
+    tcv_subst = TCvSubst (fe_in_scope env) tv_subst emptyVarEnv
     (sat_fam_args, leftover_args) = ASSERT( arity <= length fam_args )
                                     splitAt arity fam_args
     -- Apply the substitution before looking up an application in the
     -- environment. See Note [Flattening], wrinkle 1.
-    sat_fam_args'
-      | isEmptyVarEnv tv_subst = sat_fam_args
-      | otherwise              = map (substTy tcv_subst) sat_fam_args
+    sat_fam_args' = substTys tcv_subst sat_fam_args
+    (env', leftover_args') = coreFlattenTys tv_subst env leftover_args
     -- `fam_tc` may be over-applied to `fam_args` (see Note [Flattening],
     -- wrinkle 3), so we split it into the arguments needed to saturate it
-    -- (sat_fam_args') and the rest (leftover_args)
+    -- (sat_fam_args') and the rest (leftover_args')
     fam_ty = mkTyConApp fam_tc sat_fam_args'
     FlattenEnv { fe_type_map = type_map
-               , fe_in_scope = in_scope } = env
+               , fe_in_scope = in_scope } = env'
 
 mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq
