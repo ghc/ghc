@@ -577,15 +577,22 @@ class ExtensionPrintDirective(Directive):
 
 ### Additional processing
 
-# Convert every flagprint node into its output format
 def process_print_nodes(app, doctree, fromdocname):
 
+    # Convert every flagprint node into its output format
     for node in doctree.traverse(flagprint):
         node.generate_output(app, fromdocname)
 
     for node in doctree.traverse(extensionprint):
         node.generate_output(app, fromdocname)
 
+    # Write out file listing all documented flags
+    with open(os.path.join(app.outdir, 'ghc-flags.txt'), 'w') as f:
+        flag_names = {name
+                      for flag in env.all_flags
+                      for name in flag.names }
+
+        f.write('\n'.join(flag_names))
 
 # To avoid creating duplicates in the serialized environment, clear all
 # flags originating from a file before re-reading it.
