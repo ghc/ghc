@@ -243,6 +243,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
+                                 , liftedTypeKindTyCon
                                  , constraintKind )
 import Name( Name )
 import PrelNames
@@ -1176,6 +1177,30 @@ So again we must instantiate.
 
 The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
 
+--------------------------------------
+Note [mkTyConApp and Type]
+
+Whilst benchmarking it was observed in #17292 that GHC allocated a lot
+of `TyConApp` constructors. Upon further inspection a large number of these
+TyConApp constructors were all duplicates of `Type` applied to no arguments.
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
+only one `TyConApp 'Type []` closure is allocated during the course of
+compilation. In order to avoid a potentially expensive series of checks in
+`mkTyConApp` only this egregious case is special cased at the moment.
+
 
 ---------------------------------------------------------------------
                                 TyConApp
@@ -1188,11 +1213,20 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [_rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
   = FunTy { ft_af = VisArg, ft_arg = ty1, ft_res = ty2 }
-    -- The FunTyCon (->) is always a visible one
-
+  -- Note [mkTyConApp and Type]
+  | tycon == liftedTypeKindTyCon
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    liftedTypeKindTyConApp
   | otherwise
   = TyConApp tycon tys
+
+-- This is a single, global definition of the type `Type`
+-- Defined here so it is only allocated once.
+-- See Note [mkTyConApp and Type]
+liftedTypeKindTyConApp :: Type
+liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
 
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
