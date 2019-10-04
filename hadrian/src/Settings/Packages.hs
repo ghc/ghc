@@ -211,7 +211,7 @@ rtsPackageArgs = package rts ? do
           , rtsWarnings
           , arg $ "-I" ++ path
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag WithLidw ? arg ("-I" ++ libdwIncludeDir)
+          , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"

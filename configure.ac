@@ -1279,7 +1279,7 @@ if test "$enable_dwarf_unwind" = "yes" ; then
   LDFLAGS="$LIBDW_LDFLAGS $LDFLAGS"
 
   AC_CHECK_LIB(dw, dwfl_attach_state,
-      [AC_CHECK_HEADERS([dw.h], [dwfl_attach_state], [])
+      [AC_CHECK_HEADERS([elfutils/libdw.h], [break], [])
        UseLibdw=YES],
       [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
 
