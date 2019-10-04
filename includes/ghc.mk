@@ -71,27 +71,27 @@ define includesHeaderVersion
 $$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo "Creating $$@..."
-	@echo "#if !defined(__GHCVERSION_H__)"  > $$@
-	@echo "#define __GHCVERSION_H__" >> $$@
-	@echo >> $$@
-	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)" >> $$@
-	@echo >> $$@
+	@echo "#if !defined(__GHCVERSION_H__)"                                   > $$@
+	@echo "#define __GHCVERSION_H__"                                        >> $$@
+	@echo                                                                   >> $$@
+	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)"               >> $$@
+	@echo                                                                   >> $$@
 	@if [ -n "$$(ProjectPatchLevel1)" ]; then \
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL1__ $$(ProjectPatchLevel1)" >> $$@; \
 	fi
 	@if [ -n "$$(ProjectPatchLevel2)" ]; then \
 	  echo "#define __GLASGOW_HASKELL_PATCHLEVEL2__ $$(ProjectPatchLevel2)" >> $$@; \
 	fi
-	@echo >> $$@
-	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'      >> $$@
-	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'             >> $$@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $$@
-	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \' >> $$@
-	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'             >> $$@
-	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'    >> $$@
-	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'    >> $$@
-	@echo >> $$@
-	@echo "#endif /* __GHCVERSION_H__ */"          >> $$@
+	@echo                                                                   >> $$@
+	@echo '#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\'           >> $$@
+	@echo '   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \'                  >> $$@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'                  >> $$@
+	@echo '          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \'      >> $$@
+	@echo '   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \'                  >> $$@
+	@echo '          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \'         >> $$@
+	@echo '          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )'         >> $$@
+	@echo                                                                   >> $$@
+	@echo "#endif /* __GHCVERSION_H__ */"                                   >> $$@
 	@echo "Done."
 
 endef
@@ -176,35 +176,35 @@ define includesHeaderPlatform
 $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	@echo "Creating $$@..."
-	@echo "#if !defined(__GHCPLATFORM_H__)"  > $$@
-	@echo "#define __GHCPLATFORM_H__" >> $$@
-	@echo >> $$@
+	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
+	@echo "#define __GHCPLATFORM_H__"                           >> $$@
+	@echo                                                       >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
-	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)" >> $$@
-	@echo >> $$@
-	@echo "#define $(BuildPlatform_$1_CPP)_BUILD  1" >> $$@
-	@echo "#define $(HostPlatform_$1_CPP)_HOST  1" >> $$@
-	@echo >> $$@
-	@echo "#define $(BuildArch_$1_CPP)_BUILD_ARCH  1" >> $$@
-	@echo "#define $(HostArch_$1_CPP)_HOST_ARCH  1" >> $$@
-	@echo "#define BUILD_ARCH  \"$(BuildArch_$1_CPP)\"" >> $$@
-	@echo "#define HOST_ARCH  \"$(HostArch_$1_CPP)\"" >> $$@
-	@echo >> $$@
-	@echo "#define $(BuildOS_$1_CPP)_BUILD_OS  1" >> $$@
-	@echo "#define $(HostOS_$1_CPP)_HOST_OS  1" >> $$@
-	@echo "#define BUILD_OS  \"$(BuildOS_$1_CPP)\"" >> $$@
-	@echo "#define HOST_OS  \"$(HostOS_$1_CPP)\"" >> $$@
-	@echo >> $$@
-	@echo "#define $(BuildVendor_$1_CPP)_BUILD_VENDOR  1" >> $$@
-	@echo "#define $(HostVendor_$1_CPP)_HOST_VENDOR  1" >> $$@
-	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\"" >> $$@
-	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\"" >> $$@
-	@echo >> $$@
+	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)"  >> $$@
+	@echo                                                       >> $$@
+	@echo "#define $(BuildPlatform_$1_CPP)_BUILD  1"            >> $$@
+	@echo "#define $(HostPlatform_$1_CPP)_HOST  1"              >> $$@
+	@echo                                                       >> $$@
+	@echo "#define $(BuildArch_$1_CPP)_BUILD_ARCH  1"           >> $$@
+	@echo "#define $(HostArch_$1_CPP)_HOST_ARCH  1"             >> $$@
+	@echo "#define BUILD_ARCH  \"$(BuildArch_$1_CPP)\""         >> $$@
+	@echo "#define HOST_ARCH  \"$(HostArch_$1_CPP)\""           >> $$@
+	@echo                                                       >> $$@
+	@echo "#define $(BuildOS_$1_CPP)_BUILD_OS  1"               >> $$@
+	@echo "#define $(HostOS_$1_CPP)_HOST_OS  1"                 >> $$@
+	@echo "#define BUILD_OS  \"$(BuildOS_$1_CPP)\""             >> $$@
+	@echo "#define HOST_OS  \"$(HostOS_$1_CPP)\""               >> $$@
+	@echo                                                       >> $$@
+	@echo "#define $(BuildVendor_$1_CPP)_BUILD_VENDOR  1"       >> $$@
+	@echo "#define $(HostVendor_$1_CPP)_HOST_VENDOR  1"         >> $$@
+	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\""     >> $$@
+	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\""       >> $$@
+	@echo                                                       >> $$@
 ifeq "$$(GhcUnregisterised)" "YES"
-	@echo "#define UnregisterisedCompiler 1" >> $$@
+	@echo "#define UnregisterisedCompiler 1"                    >> $$@
 endif
-	@echo >> $$@
-	@echo "#endif /* __GHCPLATFORM_H__ */" >> $$@
+	@echo                                                       >> $$@
+	@echo "#endif /* __GHCPLATFORM_H__ */"                      >> $$@
 	@echo "Done."
 endef
 
