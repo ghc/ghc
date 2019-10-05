@@ -577,17 +577,15 @@ tc_mkRepTy gk_ tycon k =
         mkS mlbl su ss ib a = mkTyConApp s1 [k, metaSelTy mlbl su ss ib, a]
 
         -- Sums and products are done in the same way for both Rep and Rep1
-        sumP [] = mkTyConApp v1 [k]
-        sumP l  = foldBal mkSum' . map mkC  $ l
+        sumP l = foldBal mkSum' (mkTyConApp v1 [k]) . map mkC $ l
         -- The Bool is True if this constructor has labelled fields
         prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
-        prod [] _  _  _  = mkTyConApp u1 [k]
-        prod l  sb ib fl = foldBal mkProd
-                                   [ ASSERT(null fl || lengthExceeds fl j)
-                                     arg t sb' ib' (if null fl
-                                                       then Nothing
-                                                       else Just (fl !! j))
-                                   | (t,sb',ib',j) <- zip4 l sb ib [0..] ]
+        prod l sb ib fl = foldBal mkProd (mkTyConApp u1 [k])
+                                  [ ASSERT(null fl || lengthExceeds fl j)
+                                    arg t sb' ib' (if null fl
+                                                      then Nothing
+                                                      else Just (fl !! j))
+                                  | (t,sb',ib',j) <- zip4 l sb ib [0..] ]
 
         arg :: Type -> HsSrcBang -> HsImplBang -> Maybe FieldLabel -> Type
         arg t (HsSrcBang _ su ss) ib fl = mkS fl su ss ib $ case gk_ of
@@ -739,14 +737,13 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
 
     datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) argTys
     datacon_vars = map fst datacon_varTys
-    us'          = us + n_args
 
     datacon_rdr  = getRdrName datacon
 
     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
-    from_alt_rhs = genLR_E i n (mkProd_E gk_ us' datacon_varTys)
+    from_alt_rhs = genLR_E i n (mkProd_E gk_ datacon_varTys)
 
-    to_alt     = ( genLR_P i n (mkProd_P gk us' datacon_varTys)
+    to_alt     = ( genLR_P i n (mkProd_P gk datacon_varTys)
                  , to_alt_rhs
                  ) -- These M1s are meta-information for the datatype
     to_alt_rhs = case gk_ of
@@ -788,13 +785,11 @@ genLR_E i n e
 
 -- Build a product expression
 mkProd_E :: GenericKind_DC    -- Generic or Generic1?
-         -> US                -- Base for unique names
          -> [(RdrName, Type)]
                        -- List of variables matched on the lhs and their types
          -> LHsExpr GhcPs   -- Resulting product expression
-mkProd_E _   _ []     = mkM1_E (nlHsVar u1DataCon_RDR)
-mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
-                     -- These M1s are meta-information for the constructor
+mkProd_E gk_ varTys = mkM1_E (foldBal prod (nlHsVar u1DataCon_RDR) appVars)
+                      -- These M1s are meta-information for the constructor
   where
     appVars = map (wrapArg_E gk_) varTys
     prod a b = prodDataCon_RDR `nlHsApps` [a,b]
@@ -833,12 +828,10 @@ unboxedRepRDRs ty
 
 -- Build a product pattern
 mkProd_P :: GenericKind       -- Gen0 or Gen1
-         -> US                -- Base for unique names
          -> [(RdrName, Type)] -- List of variables to match,
                               --   along with their types
          -> LPat GhcPs      -- Resulting product pattern
-mkProd_P _  _ []     = mkM1_P (nlNullaryConPat u1DataCon_RDR)
-mkProd_P gk _ varTys = mkM1_P (foldBal prod appVars)
+mkProd_P gk varTys = mkM1_P (foldBal prod (nlNullaryConPat u1DataCon_RDR) appVars)
                      -- These M1s are meta-information for the constructor
   where
     appVars = unzipWith (wrapArg_P gk) varTys
@@ -870,15 +863,12 @@ mkM1_P p = nlParPat $ m1DataCon_RDR `nlConPat` [p]
 nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
--- | Variant of foldr1 for producing balanced lists
-foldBal :: (a -> a -> a) -> [a] -> a
-foldBal op = foldBal' op (error "foldBal: empty list")
-
-foldBal' :: (a -> a -> a) -> a -> [a] -> a
-foldBal' _  x []  = x
-foldBal' _  _ [y] = y
-foldBal' op x l   = let (a,b) = splitAt (length l `div` 2) l
-                    in foldBal' op x a `op` foldBal' op x b
+-- | Variant of foldr for producing balanced lists
+foldBal :: (a -> a -> a) -> a -> [a] -> a
+foldBal _  x []  = x
+foldBal _  _ [y] = y
+foldBal op x l   = let (a,b) = splitAt (length l `div` 2) l
+                   in foldBal op x a `op` foldBal op x b
 
 {-
 Note [Generics and unlifted types]
