@@ -1,5 +1,5 @@
 #include <assert.h>
-#include "Rts.h"
+#include <Rts.h>
 #include "Unique.h"
 
 static HsInt GenSymCounter = 0;

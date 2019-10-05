@@ -3,9 +3,9 @@ These utility routines are used various
 places in the GHC library.
 */
 
-#include "Rts.h"
+#include <Rts.h>
 
-#include "HsFFI.h"
+#include <HsFFI.h>
 
 void
 enableTimingStats( void )       /* called from the driver */
