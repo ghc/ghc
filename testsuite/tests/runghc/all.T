@@ -9,6 +9,11 @@ test('T11247', [req_interp, expect_broken(11247)], run_command,
 
 test('T6132', [when(opsys('darwin'), expect_broken(6132))], compile, [''])
 
+test('T17171a', [req_interp, exit_code(1)], run_command,
+     ['{compiler} --interactive -e "" -ignore-dot-ghci T17171a.hs'])
+test('T17171b', req_interp, run_command,
+     ['{compiler} --interactive -e :main -ignore-dot-ghci -Wall T17171b.hs'])
+
 test('T-signals-child',
      [ when(opsys('mingw32'), skip), req_interp
      , only_ways(['threaded1', 'threaded2'])
