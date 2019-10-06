@@ -68,8 +68,15 @@ Context-free syntax
                  ps <- mapM process args
                  mapM print ps
 
-   This behaviour is controlled by the ``NondecreasingIndentation``
+   This behaviour is controlled by the :extension:`NondecreasingIndentation`
    extension.
+
+.. extension:: NondecreasingIndentation
+    :shortdesc: Allow nested contexts to be at the same indentation level as
+      its enclosing context.
+
+    Allow nested contexts to be at the same indentation level as
+    its enclosing context.
 
 -  GHC doesn't do the fixity resolution in expressions during parsing as
    required by Haskell 98 (but not by Haskell 2010). For example,
