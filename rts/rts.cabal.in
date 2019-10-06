@@ -3,29 +3,21 @@ name: rts
 version: 1.0
 license: BSD-3-Clause
 maintainer: glasgow-haskell-users@haskell.org
-build-type: Simple
+build-type: Configure
+description:
+    The run-time system for code produced by GHC.
+
 flag libm
-  default: @CabalHaveLibm@
 flag librt
-  default: @CabalHaveLibrt@
 flag libdl
-  default: @CabalHaveLibdl@
 flag ffi
-  default: @CabalHaveLibffi@
 flag need-pthread
-  default: @CabalNeedLibpthread@
 flag libbfd
-  default: @CabalHaveLibbfd@
 flag mingwex
-  default: @CabalMingwex@
 flag libdw
-  default: @CabalHaveLibdw@
 flag libnuma
-  default: @CabalHaveLibNuma@
 flag 64bit
-  default: @Cabal64bit@
 flag leading-underscore
-  default: @CabalLeadingUnderscore@
 flag smp
   default: True
 flag find-ptr
@@ -43,6 +35,14 @@ flag logging
   default: False
 flag dynamic
   default: False
+
+extra-tmp-files:
+  .buildinfo
+  settings
+
+extra-source-files:
+  .buildinfo.in
+  settings.in
 
 library
     -- rts is a wired in package and
