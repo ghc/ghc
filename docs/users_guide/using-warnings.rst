@@ -318,8 +318,8 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wpartial-type-signatures
     :shortdesc: warn about holes in partial type signatures when
-        :ghc-flag:`-XPartialTypeSignatures` is enabled. Not applicable when
-        :ghc-flag:`-XPartialTypesignatures` is not enabled, in which case
+        :extension:`PartialTypeSignatures` is enabled. Not applicable when
+        :extension:`PartialTypesignatures` is not enabled, in which case
         errors are generated for such holes. See
         :ref:`partial-type-signatures`.
     :type: dynamic
@@ -328,7 +328,7 @@ of ``-W(no-)*``.
 
     Determines whether the compiler reports holes in partial type
     signatures as warnings. Has no effect unless
-    :ghc-flag:`-XPartialTypeSignatures` is enabled, which controls whether
+    :extension:`PartialTypeSignatures` is enabled, which controls whether
     errors should be generated for holes in types or not. See
     :ref:`partial-type-signatures`.
 
@@ -768,11 +768,11 @@ of ``-W(no-)*``.
     Have the compiler warn if the Prelude is implicitly imported. This happens
     unless either the Prelude module is explicitly imported with an ``import
     ... Prelude ...`` line, or this implicit import is disabled (either by
-    :ghc-flag:`-XNoImplicitPrelude` or a ``LANGUAGE NoImplicitPrelude``
+    :extension:`NoImplicitPrelude` or a ``LANGUAGE NoImplicitPrelude``
     pragma).
 
     Note that no warning is given for syntax that implicitly refers to the
-    Prelude, even if :ghc-flag:`-XNoImplicitPrelude` would change whether it
+    Prelude, even if :extension:`NoImplicitPrelude` would change whether it
     refers to the Prelude. For example, no warning is given when ``368`` means
     ``Prelude.fromInteger (368::Prelude.Integer)`` (where ``Prelude`` refers
     to the actual Prelude module, regardless of the imports of the module
@@ -1190,11 +1190,11 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wstar-binder
      :shortdesc: warn about binding the ``(*)`` type operator despite
-         :ghc-flag:`-XStarIsType`
+         :extension:`StarIsType`
      :type: dynamic
      :reverse: -Wno-star-binder
 
-     Under :ghc-flag:`-XStarIsType`, a ``*`` in types is not an operator nor
+     Under :extension:`StarIsType`, a ``*`` in types is not an operator nor
      even a name, it is special syntax that stands for ``Data.Kind.Type``. This
      means that an expression like ``Either * Char`` is parsed as ``Either (*)
      Char`` and not ``(*) Either Char``.
@@ -1249,7 +1249,7 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wspace-after-bang
      :shortdesc: warn for missing space before the second argument
         of an infix definition of ``(!)`` when
-        :ghc-flag:`-XBangPatterns` are not enabled
+        :extension:`BangPatterns` are not enabled
      :type: dynamic
      :reverse: -Wno-missing-space-after-bang
 .. ghc-flag:: -Wtabs
