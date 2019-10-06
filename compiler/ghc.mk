@@ -93,7 +93,7 @@ compiler/stage$1/build/Config.hs : mk/config.mk mk/project.mk | $$$$(dir $$$$@)/
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $$@
 	@echo                                                               >> $$@
 	@echo 'cStage                :: String'                             >> $$@
-	@echo 'cStage                = show (STAGE :: Int)'                 >> $$@
+	@echo 'cStage                = show ($1 :: Int)'                    >> $$@
 	@echo done.
 endef
 
@@ -269,11 +269,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif
 
 compiler_stage3_CONFIGURE_OPTS := $(compiler_stage2_CONFIGURE_OPTS)
-
-compiler_stage1_CONFIGURE_OPTS += --ghc-option=-DSTAGE=1
-compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DSTAGE=2
-compiler_stage3_CONFIGURE_OPTS += --ghc-option=-DSTAGE=3
-compiler_stage2_HADDOCK_OPTS += --optghc=-DSTAGE=2
 
 compiler/stage1/package-data.mk : compiler/ghc.mk
 compiler/stage2/package-data.mk : compiler/ghc.mk
