@@ -212,8 +212,10 @@ class Flag(GenericFlag):
         # Manually create references
         name_string = ", ".join([':ghc-flag:`'+n+'`' for n in self.names])
         reverse_string = ''
-        if 'reverse' in self.options and self.options['reverse'] != '':
-            reverse_string = ':ghc-flag:`' + self.options['reverse'] + '`'
+        reverse = self.options.get('reverse')
+        if reverse is not None and reverse != '':
+            reverse_string = ':ghc-flag:`' + reverse + '`'
+            self.names += [reverse]
 
         self.register_flag(
             self.names,
@@ -222,6 +224,17 @@ class Flag(GenericFlag):
             self.options['shortdesc'],
             self.options['type'],
             reverse_string)
+
+    # Add additional targets
+    def add_target_and_index(self, name, sig, signode):
+
+        GenericFlag.add_target_and_index(self, name, sig, signode)
+
+        reverse = self.options.get('reverse')
+        if reverse is not None and reverse != '':
+            # Make this also addressable via the reverse flag
+            self.env.domaindata['std']['objects']['ghc-flag', reverse] = \
+                self.env.docname, 'ghc-flag-%s' % name
 
 # This class inherits from Sphinx's internal GenericObject, which drives
 # the add_object_type() utility function. We want to keep that tooling,
