@@ -801,19 +801,24 @@ reverseFB c = \con nil -> oneShot (\z -> nil (c con z))
 
 {- Note [Fusing reverse]
 ~~~~~~~~~~~~~~~~~~~~~~
-In order to fuse reverse, a logical step would be to use the report version
-of reverse, since it is already a fold and thus a good consumer.
-Wrapped in a buid expression, reverse would also be a good producer.
-In most cases this works fine, but problems arise when the produced list
-is again consumed by a left fold, for example
-    length (reverse xs).
-If xs is not a good producer, such an expression would perform worse
-than an implementation of reverse without fusion, as ghc cannot optimize
-two consecutive left folds expressed as right folds that well.
-We thus keep reverse in an explicit recursion to prevent this regression
-and fuse it manually to make it a good consumer.
-If reverse gets fused with its input, only then we will use functions
-to describe a left fold using a right fold.
+In order to fuse reverse, a logical step would be to use the report version of
+reverse, since it is already a fold and thus a good consumer. Wrapped in a
+build expression, reverse would also be a good producer. Writing the left fold
+as a right fold, we end up with rules looking like
+
+    forall xs. reverse xs = build (\c n -> foldr (reverseFB c) id xs n)
+    forall xs. foldr (reverseFB (:)) id xs [] = reverse xs
+
+In most cases these rules works fine, but problems arise given a program like
+
+    main = print . length . reverse $ large_list_that_cant_fuse
+
+In this case, we can measure an increase in the total amount of allocated
+memory compared to a version of reverse without any rules.
+This regression does not appear however, if the input list does fuse.
+As a workaround, we keep reverse in its original form, wrapped in build,
+as this will not introduce a regression. If the input list does allow fusion,
+we use the functions to describe it as a right fold and fuse accordingly.
 See Note [Left folds via right fold].
 -}
 #endif

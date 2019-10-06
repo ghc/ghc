@@ -1,3 +1,11 @@
+{-
+This test measures the total amount of allocated memory used by reverse.
+A first attempt at fusing reverse lead to an increase in memory consumption
+in some cases, so it might be better to keep track of that, in case
+anybody wants to change these rules.
+See Note [Fusing reverse] in libraries/base/GHC/List.hs
+-}
+
 module Main where
 
 main :: IO ()
