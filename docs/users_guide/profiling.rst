@@ -658,7 +658,7 @@ To generate a heap profile from your program:
    :rts-flag:`-h` for a basic producer profile). This generates the file
    :file:`{prog}.hp`.
 
-   If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l`
+   If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l ⟨flags⟩`
    runtime system flag) heap samples will additionally be emitted to the GHC
    event log (see :ref:`heap-profiler-events` for details about event format).
 
