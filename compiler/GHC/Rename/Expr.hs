@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnExpr]{Renaming of expressions}
+Renaming of expressions
 
 Basically dependency analysis.
 
@@ -16,7 +16,7 @@ free variables.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module RnExpr (
+module GHC.Rename.Expr (
         rnLExpr, rnExpr, rnStmts
    ) where
 
@@ -24,23 +24,23 @@ module RnExpr (
 
 import GhcPrelude
 
-import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
-                   rnMatchGroup, rnGRHS, makeMiniFixityEnv)
+import GHC.Rename.Binds ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
+                        , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import GHC.Hs
 import TcEnv            ( isBrackStage )
 import TcRnMonad
 import Module           ( getModule )
-import RnEnv
-import RnFixity
-import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
+import GHC.Rename.Env
+import GHC.Rename.Fixity
+import GHC.Rename.Utils ( HsDocContext(..), bindLocalNamesFV, checkDupNames
                         , bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard )
-import RnUnbound        ( reportUnboundName )
-import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
-import RnTypes
-import RnPat
+import GHC.Rename.Unbound ( reportUnboundName )
+import GHC.Rename.Splice  ( rnBracket, rnSpliceExpr, checkThLocalName )
+import GHC.Rename.Types
+import GHC.Rename.Pat
 import DynFlags
 import PrelNames
 

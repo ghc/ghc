@@ -1,6 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
-module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
+module GHC.Rename.Doc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
 import GhcPrelude
 

@@ -33,11 +33,11 @@ import FamInstEnv
 import TcHsType
 import TyCoRep
 
-import RnNames( extendGlobalRdrEnvRn )
-import RnBinds
-import RnEnv
-import RnUtils    ( bindLocalNamesFV )
-import RnSource   ( addTcgDUs )
+import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
+import GHC.Rename.Binds
+import GHC.Rename.Env
+import GHC.Rename.Utils  ( bindLocalNamesFV )
+import GHC.Rename.Source ( addTcgDUs )
 import Avail
 
 import Unify( tcUnifyTy )
