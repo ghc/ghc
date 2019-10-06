@@ -35,7 +35,7 @@ import Name
 import Outputable ( showPpr, showSDoc )
 import RdrName
 import EnumSet
-import RnEnv (dataTcOccs)
+import GHC.Rename.Env (dataTcOccs)
 
 processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
