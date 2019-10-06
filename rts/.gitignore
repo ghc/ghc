@@ -15,7 +15,7 @@
 /config.status
 /configure
 /dist-install/
-/ghc.mk
-/include/EventConfig.h
-/include/HsBaseConfig.h
-/include/HsBaseConfig.h.in
+/settings
+/includes/ghcautoconf.h
+/includes/ghcautoconf.h.in
+
