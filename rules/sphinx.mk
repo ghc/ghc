@@ -40,7 +40,7 @@ html : html_$1
 
 ifneq "$$(BINDIST)" "YES"
 $1/build-html/$2/index.html: $1/conf.py $$($1_RST_SOURCES)
-	$(SPHINXBUILD) -b html -d $1/.doctrees-html $(SPHINXOPTS) $1 $1/build-html/$2
+	$(SPHINXBUILD) -b html -d $1/.doctrees-html -w $1/.log -n $(SPHINXOPTS) $1 $1/build-html/$2
 endif
 
 
@@ -62,7 +62,7 @@ ifneq "$$(BINDIST)" "YES"
 # besides the last to fail.
 
 $1/$2.pdf: $1/conf.py $$($1_RST_SOURCES)
-	$(SPHINXBUILD) -b latex -d $1/.doctrees-pdf $(SPHINXOPTS) $1 $1/build-pdf/$2
+	$(SPHINXBUILD) -b latex -d $1/.doctrees-pdf -w $1/.log -n $(SPHINXOPTS) $1 $1/build-pdf/$2
 	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; xelatex -halt-on-error $2.tex 2>/dev/null >/dev/null || true

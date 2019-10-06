@@ -114,6 +114,16 @@ documentationRules = do
     where archiveTarget "libraries"   = Haddocks
           archiveTarget _             = SphinxHTML
 
+-- | Check Sphinx log for undefined reference target errors. Ideally we would
+-- use sphinx's @-W@ flag here but unfortunately it also turns syntax
+-- highlighting warnings into errors which is undesirable.
+checkSphinxWarnings :: FilePath  -- ^ output directory
+                    -> Action ()
+checkSphinxWarnings out = do
+    log <- liftIO $ readFile (out -/- ".log")
+    when ("reference target not found" `isInfixOf` log)
+      $ fail "Undefined reference targets found in Sphinx log."
+
 
 ------------------------------------- HTML -------------------------------------
 
@@ -147,6 +157,7 @@ buildSphinxHtml path = do
         rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
         need (map (rstFilesDir -/-) rstFiles)
         build $ target docContext (Sphinx Html) [pathPath path] [dest]
+        checkSphinxWarnings dest
 
 ------------------------------------ Haddock -----------------------------------
 
@@ -259,6 +270,7 @@ buildSphinxPdf path = do
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Latex) [pathPath path] [dir]
+            checkSphinxWarnings dir
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
 
@@ -275,6 +287,7 @@ buildSphinxInfoGuide = do
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Info) [pathPath path] [dir]
+            checkSphinxWarnings dir
             -- Sphinx outputs texinfo source and a makefile, the
             -- default target of which actually produces the target
             -- for this build rule.
@@ -306,6 +319,7 @@ buildManPage = do
         need ["docs/users_guide/ghc.rst"]
         withTempDir $ \dir -> do
             build $ target docContext (Sphinx Man) ["docs/users_guide"] [dir]
+            checkSphinxWarnings dir
             copyFileUntracked (dir -/- "ghc.1") file
 
 -- | Find the Haddock files for the dependencies of the current library.
