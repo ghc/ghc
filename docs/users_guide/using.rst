@@ -714,13 +714,13 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-unicode-syntax
     :shortdesc: Use unicode syntax when printing expressions, types and kinds.
-        See also :ghc-flag:`-XUnicodeSyntax`
+        See also :extension:`UnicodeSyntax`
     :type: dynamic
     :reverse: -fno-print-unicode-syntax
     :category: verbosity
 
     When enabled GHC prints type signatures using the unicode symbols from the
-    :ghc-flag:`-XUnicodeSyntax` extension. For instance,
+    :extension:`UnicodeSyntax` extension. For instance,
 
     .. code-block:: none
 
@@ -732,7 +732,7 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-explicit-foralls
     :shortdesc: Print explicit ``forall`` quantification in types.
-        See also :ghc-flag:`-XExplicitForAll`
+        See also :extension:`ExplicitForAll`
     :type: dynamic
     :reverse: -fno-print-explicit-foralls
     :category: verbosity
@@ -776,7 +776,7 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
-        See also :ghc-flag:`-XKindSignatures`
+        See also :extension:`KindSignatures`
     :type: dynamic
     :reverse: -fno-print-explicit-kinds
     :category: verbosity
