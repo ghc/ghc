@@ -216,7 +216,7 @@ type family a == b where
 
 {-# NOINLINE unsafeEqualityProof #-}
 unsafeEqualityProof :: forall a b . a :~: b
-unsafeEqualityProof = error "unsafeEqualityProof evaluated"
+unsafeEqualityProof = case unsafeEqualityProof @a @b of Refl -> Refl
 
 {-# NOINLINE unsafeHeteroEqualityProof #-}
 unsafeHeteroEqualityProof :: forall a b . a :~~: b
