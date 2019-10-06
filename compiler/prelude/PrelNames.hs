@@ -463,6 +463,7 @@ basicKnownKeyNames
         , typeErrorShowTypeDataConName
 
         -- Unsafe coercion proofs
+        , reflTyConName -- Data.Type.Equality.(:~:)
         , unsafeEqualityProofName
         , unsafeHeteroEqualityProofName
     ]
@@ -1326,6 +1327,9 @@ unsafeEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeEqualityProof
                                   unsafeEqualityProofIdKey
 unsafeHeteroEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeHeteroEqualityProof")
                                         unsafeHeteroEqualityProofIdKey
+
+reflTyConName :: Name
+reflTyConName = tcQual dATA_TYPE_EQUALITY (fsLit ":~:") reflTyConKey
 
 -- Dynamic
 toDynName :: Name
@@ -2419,6 +2423,9 @@ wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 unsafeEqualityProofIdKey, unsafeHeteroEqualityProofIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeHeteroEqualityProofIdKey = mkPreludeMiscIdUnique 571
+
+reflTyConKey :: Unique
+reflTyConKey = mkPreludeMiscIdUnique 572
 
 {-
 ************************************************************************

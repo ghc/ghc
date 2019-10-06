@@ -30,6 +30,7 @@ module MkId (
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
         coerceName,
+        unsafeEqualityProofId,
 
         -- Re-export error Ids
         module PrelRules
@@ -1446,6 +1447,32 @@ coerceId = pcMiscPrelId coerceName ty info
     rhs = mkLams (bndrs ++ [eqR, x]) $
           mkWildCase (Var eqR) eqRTy b $
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
+
+unsafeEqualityProofId :: Id
+unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+                       `setUnfoldingInfo` evaldUnfolding
+
+    -- forall k (a :: k) (b :: k) . a :~: b
+    [a, b] = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep1Ty]
+    ty = mkSpecForAllTys [runtimeRep1TyVar, a, b] (mkTyConApp reflTyCon [mkTyVarTy a, mkTyVarTy b])
+
+-- :~:
+reflTyCon :: TyCon
+reflTyCon =
+  mkAlgTyCon
+    reflTyConName -- name
+    (mkAnonTyConBinders VisArg tyvars) -- binders
+    liftedTypeKind -- result kind
+    (map (const Representational) tyvars) -- roles
+    Nothing -- ctype
+    [] -- stupid theta
+    AbstractTyCon -- RHS info, I think it's fine to keep this abstract
+    (VanillaAlgTyCon undefined) -- flavour; not sure about this
+    True -- GADT syntax?
+  where
+    tyvars = [alphaTyVar, betaTyVar]
 
 {-
 Note [Unsafe coerce magic]
