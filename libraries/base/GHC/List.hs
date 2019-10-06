@@ -796,7 +796,7 @@ rev c n = \lst -> -- Write as a lambda, so it inlines properly
 -- See Note [Inline FB functions] and Note [Fusing reverse].
 reverseFB :: (a -> b -> b) -> a -> (b -> b) -> b -> b
 reverseFB c = \con nil -> oneShot (\z -> nil (c con z))
-{-# INLINE reverseFold #-}
+{-# INLINE reverseFB #-}
 
 
 {- Note [Fusing reverse]
