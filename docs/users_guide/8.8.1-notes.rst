@@ -138,7 +138,7 @@ Runtime system
   See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
 
 - The output filename used for :ref:`eventlog output <rts-eventlog>` can now be
-  specified with the :rts-flag:`-ol` flag.
+  specified with the :rts-flag:`-ol ⟨filename⟩` flag.
 
 - Add support for generating a new type of output: extended interfaces files.
   Generation of these files, which sport a ``.hie`` suffix, is enabled via the

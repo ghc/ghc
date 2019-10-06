@@ -2307,7 +2307,9 @@ Changes to the grammar
 
 The Haskell report `defines
 <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-220003>`_
-the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)::
+the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)
+
+.. code-block:: none
 
     lexp  →  \ apat1 … apatn -> exp            (lambda abstraction, n ≥ 1)  *
           |  let decls in exp                  (let expression)             *
@@ -2327,7 +2329,9 @@ the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)::
           |  …
 
 The :extension:`BlockArguments` extension moves these production rules under
-``aexp``::
+``aexp``
+
+.. code-block:: none
 
     lexp  →  fexp
 
@@ -3962,12 +3966,9 @@ GHC extends this mechanism along several axes:
 Deriving instances for empty data types
 ---------------------------------------
 
-.. ghc-flag:: -XEmptyDataDeriving
+.. extension:: EmptyDataDeriving
     :shortdesc: Allow deriving instances of standard type classes for
                 empty data types.
-    :type: dynamic
-    :reverse: -XNoEmptyDataDeriving
-    :category:
 
     :since: 8.4.1
 
@@ -4617,8 +4618,8 @@ Deriving ``Data`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveDataTypeable
-    :shortdesc: Enable deriving for the Data class.
-       Implied by (deprecated) :extension:`AutoDeriveTypeable`.
+    :shortdesc: Enable deriving for the ``Data`` class.
+       Implied by (deprecated) ``AutoDeriveTypeable``.
 
     :since: 6.8.1
 
@@ -10446,7 +10447,7 @@ The ``context =>`` part is optional.  That is the only syntactic change to the l
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParamTypeClasses` the syntax becomes
 
   .. code-block:: none
 
@@ -11246,7 +11247,7 @@ assumptions", and a related `blog post
 
 The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
 and :extension:`GADTs`. You can switch it off again with
-:extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
+:extension:`NoMonoLocalBinds <MonoLocalBinds>` but type inference becomes
 less predictable if you do so. (Read the papers!)
 
 .. _visible-type-application:
@@ -11704,11 +11705,9 @@ monomorphic. This is important because by default GHC will not
 instantiate type variables to a polymorphic type
 (:ref:`impredicative-polymorphism`).
 
-The obsolete language options :extension:`PolymorphicComponents` and
-:extension:`Rank2Types` are synonyms for :extension:`RankNTypes`. They used to
-specify finer distinctions that GHC no longer makes. (They should really elicit
-a deprecation warning, but they don't, purely to avoid the need to library
-authors to change their old flags specifications.)
+The obsolete language option :extension:`Rank2Types` is a synonym for
+:extension:`RankNTypes`. They used to specify finer distinctions that GHC no
+longer makes.
 
 .. _univ:
 
@@ -12493,6 +12492,7 @@ Sorting can be toggled with :ghc-flag:`-fsort-valid-hole-fits`
     :shortdesc: Disables the sorting of the list of valid hole fits for typed holes
         in type error messages.
     :type: dynamic
+    :reverse: -fsort-valid-hole-fits
     :category: verbosity
 
     :default: off
@@ -12957,8 +12957,8 @@ Enabling deferring of type errors
 
 The flag :ghc-flag:`-fdefer-type-errors` controls whether type errors are
 deferred to runtime. Type errors will still be emitted as warnings, but
-will not prevent compilation. You can use :ghc-flag:`-Wno-type-errors
-<-Wtype-errors>` to suppress these warnings.
+will not prevent compilation. You can use :ghc-flag:`-Wno-deferred-type-errors`
+to suppress these warnings.
 
 This flag implies the :ghc-flag:`-fdefer-typed-holes` and
 :ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this behaviour
@@ -15264,7 +15264,7 @@ used if you want your code to be portable).
     Instructs GHC to consider a value to be especially cheap to inline.
 
 An :pragma:`INLINE` or :pragma:`NOINLINE` pragma may have a :pragma:`CONLIKE` modifier, which affects
-matching in :pragma:`RULE`\s (only). See :ref:`conlike`.
+matching in :pragma:`RULE <RULES>`\s (only). See :ref:`conlike`.
 
 .. _phase-control:
 
@@ -15316,7 +15316,7 @@ arguments etc). Another way to understand the semantics is this:
    body look small, so that when inlining is allowed it is very likely
    to happen.
 
-The same phase-numbering control is available for :pragma:`RULE`\s
+The same phase-numbering control is available for :pragma:`RULE <RULES>`\s
 (:ref:`rewrite-rules`).
 
 .. _line-pragma:
@@ -15521,9 +15521,9 @@ fire the first specialisation, whose body is also inlined. The result is
 a type-based unrolling of the indexing function.
 
 You can add explicit phase control (:ref:`phase-control`) to
-``SPECIALISE INLINE`` pragma, just like on an :pragma:`INLINE` pragma; if you do
-so, the same phase is used for the rewrite rule and the INLINE control of the
-specialised function.
+``SPECIALISE INLINE`` pragma, just like on an :pragma:`INLINE` pragma; if
+you do so, the same phase is used for the rewrite rule and the INLINE control
+of the specialised function.
 
 .. warning:: You can make GHC diverge by using ``SPECIALISE INLINE`` on an
              ordinarily-recursive function.
@@ -15935,12 +15935,12 @@ From a syntactic point of view:
    then C's rules are in force when compiling A.) The situation is very
    similar to that for instance declarations.
 
--  Inside a :pragma:`RULE` "``forall``" is treated as a keyword, regardless of any
-   other flag settings. Furthermore, inside a RULE, the language
+-  Inside a :pragma:`RULES` "``forall``" is treated as a keyword, regardless of any
+   other flag settings. Furthermore, inside a :pragma:`RULES`, the language
    extension :extension:`ScopedTypeVariables` is automatically enabled; see
    :ref:`scoped-type-variables`.
 
--  Like other pragmas, :pragma:`RULE` pragmas are always checked for scope errors,
+-  Like other pragmas, :pragma:`RULES` pragmas are always checked for scope errors,
    and are typechecked. Typechecking means that the LHS and RHS of a
    rule are typechecked, and must have the same type. However, rules are
    only *enabled* if the :ghc-flag:`-fenable-rewrite-rules` flag is on (see
@@ -16029,13 +16029,13 @@ give ::
 
     g y = y
 
-Now ``g`` is inlined into ``h``, but ``f``\'s :pragma:`RULE` has no chance to
+Now ``g`` is inlined into ``h``, but ``f``\'s RULE has no chance to
 fire. If instead GHC had first inlined ``g`` into ``h`` then there would have
-been a better chance that ``f``\'s :pragma:`RULE` might fire.
+been a better chance that ``f``\'s :pragma:`RULES` might fire.
 
 The way to get predictable behaviour is to use a :pragma:`NOINLINE` pragma, or an
-INLINE[⟨phase⟩] pragma, on ``f``, to ensure that it is not inlined until
-its RULEs have had a chance to fire. The warning flag
+``INLINE[⟨phase⟩]`` pragma, on ``f``, to ensure that it is not inlined until
+its :pragma:`RULES` have had a chance to fire. The warning flag
 :ghc-flag:`-Winline-rule-shadowing` (see :ref:`options-sanity`) warns about
 this situation.
 
