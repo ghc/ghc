@@ -344,7 +344,7 @@ instance Ord RdrName where
 -- (@let@, @where@, lambda, @case@).
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
--- Reason: see Note [Splicing Exact names] in RnEnv
+-- Reason: see Note [Splicing Exact names] in GHC.Rename.Env
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
@@ -416,7 +416,7 @@ Note [Local bindings with Exact Names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With Template Haskell we can make local bindings that have Exact Names.
 Computing shadowing etc may use elemLocalRdrEnv (at least it certainly
-does so in RnTpes.bindHsQTyVars), so for an Exact Name we must consult
+does so in GHC.Rename.Types.bindHsQTyVars), so for an Exact Name we must consult
 the in-scope-name-set.
 
 
@@ -444,7 +444,7 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 -- INVARIANT 2: Imported provenance => Name is an ExternalName
 --              However LocalDefs can have an InternalName.  This
 --              happens only when type-checking a [d| ... |] Template
---              Haskell quotation; see this note in RnNames
+--              Haskell quotation; see this note in GHC.Rename.Names
 --              Note [Top-level Names in Template Haskell decl quotes]
 --
 -- INVARIANT 3: If the GlobalRdrEnv maps [occ -> gre], then
@@ -928,7 +928,7 @@ pickGREsModExp :: ModuleName -> [GlobalRdrElt] -> [(GlobalRdrElt,GlobalRdrElt)]
 -- it is in scope qualified an unqualified respectively
 --
 -- Used only for the 'module M' item in export list;
---   see RnNames.exports_from_avail
+--   see GHC.Rename.Names.exports_from_avail
 pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
 
 pickBothGRE :: ModuleName -> GlobalRdrElt -> Maybe (GlobalRdrElt, GlobalRdrElt)
@@ -1039,7 +1039,7 @@ There are two reasons for shadowing:
     'T' to mean the newly-declared 'T', not an old one.
 
 * Nested Template Haskell declaration brackets
-  See Note [Top-level Names in Template Haskell decl quotes] in RnNames
+  See Note [Top-level Names in Template Haskell decl quotes] in GHC.Rename.Names
 
   Consider a TH decl quote:
       module M where
@@ -1234,7 +1234,7 @@ and are warned about. More precisely:
 
 3. After processing all the RdrNames, bleat about any
    import-items that are unused.
-   This is done in RnNames.warnUnusedImportDecls.
+   This is done in GHC.Rename.Names.warnUnusedImportDecls.
 
 The function 'bestImport' returns the dominant import among the
 ImportSpecs it is given, implementing Step 2.  We say import-item A

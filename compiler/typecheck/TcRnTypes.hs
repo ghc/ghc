@@ -393,7 +393,7 @@ data FrontendResult
 --        should never be loaded into the EPS).  However, if a
 --        hole module <A> is requested, we look for A.hi
 --        in the home library we are compiling.  (See GHC.Iface.Load.)
---        Similarly, in RnNames we check for self-imports using
+--        Similarly, in GHC.Rename.Names we check for self-imports using
 --        identity modules, to allow signatures to import their implementor.
 --
 --      - For recompilation avoidance, you want the identity module,
@@ -650,7 +650,7 @@ data SelfBootInfo
        { sb_mds :: ModDetails   -- There was a hi-boot file,
        , sb_tcs :: NameSet }    -- defining these TyCons,
 -- What is sb_tcs used for?  See Note [Extra dependencies from .hs-boot files]
--- in RnSource
+-- in GHC.Rename.Source
 
 
 {- Note [Tracking unused binding and imports]
@@ -664,7 +664,7 @@ We gather three sorts of usage information
           and *used*    Names (local or imported)
 
       Used (a) to report "defined but not used"
-               (see RnNames.reportUnusedNames)
+               (see GHC.Rename.Names.reportUnusedNames)
            (b) to generate version-tracking usage info in interface
                files (see GHC.Iface.Utils.mkUsedNames)
    This usage info is mainly gathered by the renamer's
@@ -697,7 +697,7 @@ We gather three sorts of usage information
 
       (c) Top-level variables appearing free in a TH bracket
           See Note [Keeping things alive for Template Haskell]
-          in RnSplice
+          in GHC.Rename.Splice
 
       (d) The data constructor of a newtype that is used
           to solve a Coercible instance (e.g. #10347). Example
@@ -719,8 +719,8 @@ We gather three sorts of usage information
         simplifier does not discard them as dead code, and so that they are
         exposed in the interface file (but not to export to the user).
 
-      * RnNames.reportUnusedNames.  Where newtype data constructors like (d)
-        are imported, we don't want to report them as unused.
+      * GHC.Rename.Names.reportUnusedNames.  Where newtype data constructors
+        like (d) are imported, we don't want to report them as unused.
 
 
 ************************************************************************
@@ -925,7 +925,7 @@ data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
       --
       -- 'addModFinalizer' inserts finalizers here, and from here they are taken
       -- to construct an @HsSpliced@ annotation for untyped splices. See Note
-      -- [Delaying modFinalizers in untyped splices] in "RnSplice".
+      -- [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
       --
       -- For typed splices, the typechecker takes finalizers from here and
       -- inserts them in the list of finalizers in the global environment.
@@ -1349,13 +1349,13 @@ data ImportAvails
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
-          -- See Note [RnNames . Tracking Trust Transitively]
+          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
 
         imp_trust_own_pkg :: Bool,
           -- ^ Do we require that our own package is trusted?
           -- This is to handle efficiently the case where a Safe module imports
           -- a Trustworthy module that resides in the same package as it.
-          -- See Note [RnNames . Trust Own Package]
+          -- See Note [Trust Own Package] in GHC.Rename.Names
 
         imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including

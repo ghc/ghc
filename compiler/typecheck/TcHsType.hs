@@ -634,7 +634,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType' to communicate
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType' to communicate
 -- the splice location to the typechecker. Here we skip over it in order to have
 -- the same kind inferred for a given expression whether it was produced from
 -- splices or not.
@@ -686,7 +686,7 @@ tc_hs_type _ ty@(HsRecTy {})      _
       -- signatures) should have been removed by now
     = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType'.
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
 -- while capturing the local environment.
 --
@@ -2507,7 +2507,7 @@ What should be the kind of `T` in the following example? (#15591)
   class C (a :: Type) where
     type T (x :: f a)
 
-As per Note [Ordering of implicit variables] in RnTypes, we want to quantify
+As per Note [Ordering of implicit variables] in GHC.Rename.Types, we want to quantify
 the kind variables in left-to-right order of first occurrence in order to
 support visible kind application. But we cannot perform this analysis on just
 T alone, since its variable `a` actually occurs /before/ `f` if you consider
@@ -2752,7 +2752,7 @@ zonkAndScopedSort spec_tkvs
           -- Use zonkAndSkolemise because a skol_tv might be a TyVarTv
 
        -- Do a stable topological sort, following
-       -- Note [Ordering of implicit variables] in RnTypes
+       -- Note [Ordering of implicit variables] in GHC.Rename.Types
        ; return (scopedSort spec_tkvs) }
 
 -- | Generalize some of the free variables in the given type.

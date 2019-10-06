@@ -22,7 +22,7 @@ import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import TcOrigin
-import RnUnbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
 import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
