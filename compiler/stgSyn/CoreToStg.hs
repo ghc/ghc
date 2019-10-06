@@ -47,6 +47,7 @@ import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
+import PrelNames        ( unsafeEqualityProofName, unsafeHeteroEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -432,11 +433,39 @@ coreToStgExpr (Case scrut _ _ [])
     -- runtime system error function.
 
 
-coreToStgExpr (Case scrut bndr _ alts) = do
+coreToStgExpr e0@(Case scrut bndr _ alts) = do
     alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
     scrut2 <- coreToStgExpr scrut
-    return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2)
+    let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
+    case scrut2 of
+      StgApp id []
+        | idName id == unsafeEqualityProofName ||
+          idName id == unsafeHeteroEqualityProofName ->
+            case alts2 of
+              [(_, _, rhs)] ->
+                -- TODO(osa): When compiling this Core (when compiling
+                -- Unsafe.Coerce)
+                --
+                --     case unsafeEqualityProof @ * @ a_agB @ b_agC of
+                --       Refl co_agU -> x_suE `cast` (Sub (Sym co_agU) :: a_agB ~R# b_agC)
+                --
+                -- STG we get
+                --
+                --     case unsafeEqualityProof of Refl co_agU -> x_suE
+                --
+                -- Note that there's binder in the pattern. I think this may be
+                -- a bug somewhere else in the compiler?
+                --
+                -- As a workaround we don't match on the argument list here.
+                --
+                return rhs
+              _ ->
+                pprPanic "coreToStgExpr" $
+                  text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
+                  text "STG:" $$ ppr stg
+      _ -> return stg
   where
+    vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
     vars_alt (con, binders, rhs)
       | DataAlt c <- con, c == unboxedUnitDataCon
       = -- This case is a bit smelly.
