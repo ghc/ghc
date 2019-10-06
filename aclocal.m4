@@ -27,10 +27,10 @@ AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
     esac
 ])
 
-# FPTOOLS_SET_PLATFORM_VARS
+# FPTOOLS_SET_PLATFORMS_VARS
 # ----------------------------------
-# Set the platform variables
-AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
+# Set the platform variable for on of build, host, or target
+AC_DEFUN([FPTOOLS_SET_PLATFORMS_VARS],
 [
     # If no argument was given for a configuration variable, then discard
     # the guessed canonical system and use the configuration of the
@@ -42,141 +42,77 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     # In bindists, we haven't called AC_CANONICAL_{BUILD,HOST,TARGET}
     # so this justs uses $bootstrap_target.
 
-    if test "$build_alias" = ""
+    # default target off host
+    if test "$target_alias" = "" && test "$host_alias" != ""
     then
-        if test "$bootstrap_target" != ""
-        then
-            build=$bootstrap_target
-            echo "Build platform inferred as: $build"
-        else
-            echo "Can't work out build platform"
-            exit 1
-        fi
-
-        BuildArch=`echo "$build" | sed 's/-.*//'`
-        BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
-        BuildOS=`echo "$build" | sed 's/.*-//'`
-    else
-        GHC_CONVERT_CPU([$build_cpu], [BuildArch])
-        GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
-        GHC_CONVERT_OS([$build_os], [$BuildArch], [BuildOS])
+        target_cpu=$host_cpu
+        target_vendor=$host_vendor
+        target_os=$host_os
+        target_alias=$host_alias
     fi
 
-    if test "$host_alias" = ""
-    then
-        if test "$bootstrap_target" != ""
-        then
-            host=$bootstrap_target
-            echo "Host platform inferred as: $host"
-        else
-            echo "Can't work out host platform"
-            exit 1
-        fi
+    FPTOOLS_SET_PLATFORM_VARS([build],[Build])
+    FPTOOLS_SET_PLATFORM_VARS([host],[Host])
+    FPTOOLS_SET_PLATFORM_VARS([target],[Target])
 
-        HostArch=`echo "$host" | sed 's/-.*//'`
-        HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
-        HostOS=`echo "$host" | sed 's/.*-//'`
-    else
-        GHC_CONVERT_CPU([$host_cpu], [HostArch])
-        GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
-        GHC_CONVERT_OS([$host_os], [$HostArch], [HostOS])
-    fi
-
-    if test "$target_alias" = ""
-    then
-        if test "$host_alias" != ""
-        then
-            GHC_CONVERT_CPU([$host_cpu], [TargetArch])
-            GHC_CONVERT_VENDOR([$host_vendor], [TargetVendor])
-            GHC_CONVERT_OS([$host_os], [$TargetArch],[TargetOS])
-        else
-            if test "$bootstrap_target" != ""
-            then
-                target=$bootstrap_target
-                echo "Target platform inferred as: $target"
-            else
-                echo "Can't work out target platform"
-                exit 1
-            fi
-
-            TargetArch=`echo "$target" | sed 's/-.*//'`
-            TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
-            TargetOS=`echo "$target" | sed 's/.*-//'`
-        fi
-    else
-        GHC_CONVERT_CPU([$target_cpu], [TargetArch])
-        GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
-        GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
-    fi
-
-    GHC_LLVM_TARGET([$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
-
-    GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
-    GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
     case $host in
     *-unknown-mingw32)
         windows=YES
         ;;
     esac
-
-    BuildPlatform="$BuildArch-$BuildVendor-$BuildOS"
-    BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    BuildOS_CPP=`      echo "$BuildOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    HostPlatform="$HostArch-$HostVendor-$HostOS"
-    HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    HostOS_CPP=`      echo "$HostOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    TargetPlatform="$TargetArch-$TargetVendor-$TargetOS"
-    TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-    TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
-
-    # we intend to pass trough --targets to llvm as is.
-    LLVMTarget_CPP=`    echo "$LlvmTarget"`
-
-    echo "GHC build  : $BuildPlatform"
-    echo "GHC host   : $HostPlatform"
-    echo "GHC target : $TargetPlatform"
-    echo "LLVM target: $LlvmTarget"
-
-    AC_SUBST(BuildPlatform)
-    AC_SUBST(HostPlatform)
-    AC_SUBST(TargetPlatform)
-    AC_SUBST(HostPlatform_CPP)
-    AC_SUBST(BuildPlatform_CPP)
-    AC_SUBST(TargetPlatform_CPP)
-
-    AC_SUBST(HostArch_CPP)
-    AC_SUBST(BuildArch_CPP)
-    AC_SUBST(TargetArch_CPP)
-
-    AC_SUBST(HostOS_CPP)
-    AC_SUBST(BuildOS_CPP)
-    AC_SUBST(TargetOS_CPP)
-    AC_SUBST(LLVMTarget_CPP)
-
-    AC_SUBST(HostVendor_CPP)
-    AC_SUBST(BuildVendor_CPP)
-    AC_SUBST(TargetVendor_CPP)
-
-    AC_SUBST(exeext_host)
-    AC_SUBST(exeext_target)
-    AC_SUBST(soext_host)
-    AC_SUBST(soext_target)
 ])
 
-
-# FPTOOLS_SET_HASKELL_PLATFORM_VARS
+# FPTOOLS_SET_PLATFORM_VAR
 # ----------------------------------
-# Set the Haskell platform variables
-AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
+# Set all the platform variables
+AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
+[
+    if test "[$]$1_alias" = ""
+    then
+        if test "$bootstrap_target" != ""
+        then
+            $1=$bootstrap_target
+            echo "$1 platform inferred as: [$]$1"
+        else
+            echo "Can't work out $1 platform"
+            exit 1
+        fi
+
+        $2[Arch]=`echo "[$]$1" | sed 's/-.*//'`
+        $2[Vendor]=`echo "[$]$1" | sed -e 's/.*-\(.*\)-.*/\1/'`
+        $2[OS]=`echo "[$]$1" | sed 's/.*-//'`
+    else
+        GHC_CONVERT_CPU([$]$1[_cpu], $2[Arch])
+        GHC_CONVERT_VENDOR([$]$1[_vendor], $2[Vendor])
+        GHC_CONVERT_OS([$]$1[_os], [$]$2[Arch], $[OS])
+    fi
+
+    $2Platform="[$]$2Arch-[$]$2Vendor-[$]$2OS"
+    $2Platform_CPP=`echo "[$]$2Platform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2Arch_CPP=`    echo "[$]$2Arch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2Vendor_CPP=`  echo "[$]$2Vendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+    $2OS_CPP=`      echo "[$]$2OS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+
+    echo "GHC $1  : [$]$2Platform"
+
+    AC_SUBST($2Platform)
+    AC_SUBST($2Platform_CPP)
+
+    AC_SUBST($2Arch_CPP)
+    AC_SUBST($2OS_CPP)
+    AC_SUBST($2Vendor_CPP)
+
+    GHC_SELECT_FILE_EXTENSIONS([$]$1, [exeext_]$1, [soext_]$1)
+
+    AC_SUBST(exeext_$1)
+    AC_SUBST(soext_$1)
+])
+
+# FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS
+# ----------------------------------
+# Drop in shell functions used by FPTOOLS_SET_HASKELL_PLATFORM_VARS
+AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
 [
     checkArch() {
         case [$]1 in
@@ -287,104 +223,17 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         esac
     }
+])
 
-    dnl Note [autoconf assembler checks and -flto]
-    dnl ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    dnl
-    dnl Autoconf's AC_COMPILE_IFELSE macro is fragile in the case of checks
-    dnl which require that the assembler is run. Specifically, GCC does not run
-    dnl the assembler if invoked with `-c -flto`; it merely dumps its internal
-    dnl AST to the object file, to be compiled and assembled during the final
-    dnl link.
-    dnl
-    dnl This can cause configure checks like that for the
-    dnl .subsections_via_symbols directive to pass unexpected (see #16440),
-    dnl leading the build system to incorrectly conclude that the directive is
-    dnl supported.
-    dnl
-    dnl For this reason, it is important that configure checks that rely on the
-    dnl assembler failing use AC_LINK_IFELSE rather than AC_COMPILE_IFELSE,
-    dnl ensuring that the assembler sees the check.
-    dnl
-
-    dnl ** check for Apple-style dead-stripping support
-    dnl    (.subsections-via-symbols assembler directive)
-
-    AC_MSG_CHECKING(for .subsections_via_symbols)
-    dnl See Note [autoconf assembler checks and -flto]
-    AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
-        [AC_MSG_RESULT(yes)
-         TargetHasSubsectionsViaSymbols=YES
-         AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
-                   [Define to 1 if Apple-style dead-stripping is supported.])
-        ],
-        [TargetHasSubsectionsViaSymbols=NO
-         AC_MSG_RESULT(no)])
-
-    dnl ** check for .ident assembler directive
-
-    AC_MSG_CHECKING(whether your assembler supports .ident directive)
-    dnl See Note [autoconf assembler checks and -flto]
-    AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM([__asm__ (".ident \"GHC x.y.z\"");], [])],
-        [AC_MSG_RESULT(yes)
-         TargetHasIdentDirective=YES],
-        [AC_MSG_RESULT(no)
-         TargetHasIdentDirective=NO])
-
-    dnl *** check for GNU non-executable stack note support (ELF only)
-    dnl     (.section .note.GNU-stack,"",@progbits)
-
-    dnl This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
-    dnl     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
-    dnl so we empty CFLAGS while running this test
-    CFLAGS2="$CFLAGS"
-    CFLAGS=
-    case $TargetArch in
-      arm)
-        dnl See #13937.
-        progbits="%progbits"
-        ;;
-      *)
-        progbits="@progbits"
-        ;;
-    esac
-    AC_MSG_CHECKING(for GNU non-executable stack support)
-    dnl See Note [autoconf assembler checks and -flto]
-    AC_LINK_IFELSE(
-       dnl the `main` function is placed after the .note.GNU-stack directive
-       dnl so we need to ensure that the active segment is correctly set,
-       dnl otherwise `main` will be placed in the wrong segment.
-        [AC_LANG_PROGRAM([
-           __asm__ (".section .note.GNU-stack,\"\",$progbits");
-           __asm__ (".section .text");
-         ], [0])],
-        [AC_MSG_RESULT(yes)
-         TargetHasGnuNonexecStack=YES],
-        [AC_MSG_RESULT(no)
-         TargetHasGnuNonexecStack=NO])
-    CFLAGS="$CFLAGS2"
-
-    checkArch "$BuildArch" "HaskellBuildArch"
-    checkVendor "$BuildVendor"
-    checkOS "$BuildOS" ""
-
-    checkArch "$HostArch" "HaskellHostArch"
-    checkVendor "$HostVendor"
-    checkOS "$HostOS" "HaskellHostOs"
-
-    checkArch "$TargetArch" "HaskellTargetArch"
-    checkVendor "$TargetVendor"
-    checkOS "$TargetOS" "HaskellTargetOs"
-
-    AC_SUBST(HaskellHostArch)
-    AC_SUBST(HaskellHostOs)
-    AC_SUBST(HaskellTargetArch)
-    AC_SUBST(HaskellTargetOs)
-    AC_SUBST(TargetHasSubsectionsViaSymbols)
-    AC_SUBST(TargetHasIdentDirective)
-    AC_SUBST(TargetHasGnuNonexecStack)
+# FPTOOLS_SET_HASKELL_PLATFORM_VARS
+# ----------------------------------
+# Set the Haskell platform variables
+AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
+[
+    AC_REQUIRE([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS])
+    checkArch "[$]$1Arch" "Haskell$1Arch"
+    checkVendor "[$]$1Vendor"
+    checkOS "[$]$1OS" "Haskell$1Os"
 ])
 
 
@@ -1944,40 +1793,6 @@ case "$1" in
     ;;
   esac
 ])
-
-# GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
-# --------------------------------
-# converts the canonicalized target into someting llvm can understand
-AC_DEFUN([GHC_LLVM_TARGET], [
-  case "$2-$3" in
-    *-freebsd*-gnueabihf)
-      llvm_target_vendor="unknown"
-      llvm_target_os="freebsd-gnueabihf"
-      ;;
-    hardfloat-*eabi)
-      llvm_target_vendor="unknown"
-      llvm_target_os="$3""hf"
-      ;;
-    *-mingw32|*-mingw64|*-msys)
-      llvm_target_vendor="unknown"
-      llvm_target_os="windows"
-      ;;
-    # retain any android and gnueabi linux flavours
-    # for the LLVM Target. Otherwise these would be
-    # turned into just `-linux` and fail to be found
-    # in the `llvm-targets` file.
-    *-android*|*-gnueabi*|*-musleabi*)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      llvm_target_os="$3"
-      ;;
-    *)
-      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
-      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
-      ;;
-  esac
-  $4="$1-$llvm_target_vendor-$llvm_target_os"
-])
-
 
 # GHC_CONVERT_VENDOR(vendor, target_var)
 # --------------------------------

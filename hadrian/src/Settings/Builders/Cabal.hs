@@ -110,6 +110,7 @@ configureArgs = do
                            , getStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ libPath
                            -- See https://github.com/snowleopard/hadrian/issues/523
+                           -- TODO remove these now that we pass `--srcdir`
                            , arg $ "-iquote"
                            , arg $ top -/- pkgPath pkg
                            , arg $ "-I" ++ top -/- "includes" ]
@@ -128,6 +129,7 @@ configureArgs = do
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
         , flag CrossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
+        , conf "--srcdir" $ arg $ top -/- pkgPath pkg
         , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH stage))]
 
 bootPackageConstraints :: Args

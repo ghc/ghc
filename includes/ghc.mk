@@ -101,24 +101,6 @@ $(eval $(call includesHeaderVersion,1))
 
 ifneq "$(BINDIST)" "YES"
 
-define includesHeaderConfig
-# $1 = stage
-$$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$$$(dir $$$$@)/.
-	$$(call removeFiles,$$@)
-	@echo "Creating $$@..."
-	@echo "#if !defined(__GHCAUTOCONF_H__)"  > $$@
-	@echo "#define __GHCAUTOCONF_H__" >> $$@
-#
-#	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
-#	"blah"' into '/* #undef PACKAGE_FOO */' to avoid clashes.
-#
-	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' mk/config.h >> $$@
-#
-	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
-	@echo "Done."
-
-endef
-
 $(eval $(call includesHeaderConfig,0))
 $(eval $(call includesHeaderConfig,1))
 
@@ -154,10 +136,6 @@ HostVendor_0_CPP = $(HostVendor_CPP)
 HostVendor_1_CPP = $(TargetVendor_CPP)
 HostVendor_2_CPP = $(TargetVendor_CPP)
 
-define includesHeaderPlatform
-# $1 = stage
-$$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)/.
-	$$(call removeFiles,$$@)
 	@echo "Creating $$@..."
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
 	@echo "#define __GHCPLATFORM_H__"                           >> $$@
@@ -191,9 +169,6 @@ endif
 	@echo                                                       >> $$@
 	@echo "#endif /* __GHCPLATFORM_H__ */"                      >> $$@
 	@echo "Done."
-endef
-
-endif
 
 $(eval $(call includesHeaderPlatform,0))
 $(eval $(call includesHeaderPlatform,1))

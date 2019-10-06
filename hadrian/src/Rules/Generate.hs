@@ -7,11 +7,7 @@ module Rules.Generate (
 import Data.Foldable (for_)
 
 import Base
-import qualified Context
 import Expression
-import Flavour
-import Hadrian.Oracles.TextFile (lookupValueOrError)
-import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Packages
@@ -134,8 +130,6 @@ generatePackageCode context@(Context stage pkg _) = do
             build $ target context GenApply [] [file]
         -- TODO: This should be fixed properly, e.g. generated here on demand.
         (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ stageLibPath stage
-        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ stageLibPath stage
-        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ stageLibPath stage
         (root -/- "**" -/- dir -/- "ghcversion.h") <~ stageLibPath stage
  where
     pattern <~ mdir = pattern %> \file -> do
@@ -178,9 +172,6 @@ generateRules = do
     forM_ [Stage0 ..] $ \stage -> do
         let prefix = root -/- stageString stage -/- "lib"
             go gen file = generate file (semiEmptyTarget stage) gen
-        (prefix -/- "ghcplatform.h") %> go generateGhcPlatformH
-        (prefix -/- "settings") %> go generateSettings
-        (prefix -/- "ghcautoconf.h") %> go generateGhcAutoconfH
         (prefix -/- "ghcversion.h") %> go generateGhcVersionH
         -- TODO: simplify, get rid of fake rts context
         for_ (fst <$> deriveConstantsPairs) $ \constantsFile ->
@@ -214,124 +205,6 @@ ghcWrapper stage  = do
     return $ unwords $ map show $ [ ghcPath ]
                                ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
                                ++ [ "$@" ]
-
--- | Given a 'String' replace charaters '.' and '-' by underscores ('_') so that
--- the resulting 'String' is a valid C preprocessor identifier.
-cppify :: String -> String
-cppify = replaceEq '-' '_' . replaceEq '.' '_'
-
--- | Generate @ghcplatform.h@ header.
-generateGhcPlatformH :: Expr String
-generateGhcPlatformH = do
-    trackGenerateHs
-    stage    <- getStage
-    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
-    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
-    buildArch      <- chooseSetting BuildArch     HostArch
-    buildOs        <- chooseSetting BuildOs       HostOs
-    buildVendor    <- chooseSetting BuildVendor   HostVendor
-    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
-    hostArch       <- chooseSetting HostArch      TargetArch
-    hostOs         <- chooseSetting HostOs        TargetOs
-    hostVendor     <- chooseSetting HostVendor    TargetVendor
-    ghcUnreg       <- getFlag    GhcUnregisterised
-    return . unlines $
-        [ "#if !defined(__GHCPLATFORM_H__)"
-        , "#define __GHCPLATFORM_H__"
-        , ""
-        , "#define GHC_STAGE " ++ show (fromEnum stage + 1)
-        , ""
-        , "#define BuildPlatform_TYPE  " ++ cppify buildPlatform
-        , "#define HostPlatform_TYPE   " ++ cppify hostPlatform
-        , ""
-        , "#define " ++ cppify buildPlatform   ++ "_BUILD 1"
-        , "#define " ++ cppify hostPlatform ++ "_HOST 1"
-        , ""
-        , "#define " ++ buildArch   ++ "_BUILD_ARCH 1"
-        , "#define " ++ hostArch ++ "_HOST_ARCH 1"
-        , "#define BUILD_ARCH " ++ show buildArch
-        , "#define HOST_ARCH "  ++ show hostArch
-        , ""
-        , "#define " ++ buildOs   ++ "_BUILD_OS 1"
-        , "#define " ++ hostOs ++ "_HOST_OS 1"
-        , "#define BUILD_OS " ++ show buildOs
-        , "#define HOST_OS "  ++ show hostOs
-        , ""
-        , "#define " ++ buildVendor   ++ "_BUILD_VENDOR 1"
-        , "#define " ++ hostVendor ++ "_HOST_VENDOR 1"
-        , "#define BUILD_VENDOR " ++ show buildVendor
-        , "#define HOST_VENDOR "  ++ show hostVendor
-        , ""
-        ]
-        ++
-        [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
-        ++
-        [ ""
-        , "#endif /* __GHCPLATFORM_H__ */"
-        ]
-
-generateSettings :: Expr String
-generateSettings = do
-    ctx <- getContext
-    settings <- traverse sequence $
-        [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
-        , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
-        , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
-        , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
-        , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
-        , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
-        , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
-        , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
-        , ("ld command", expr $ settingsFileSetting SettingsFileSetting_LdCommand)
-        , ("ld flags", expr $ settingsFileSetting SettingsFileSetting_LdFlags)
-        , ("ld supports compact unwind", expr $ lookupValueOrError configFile "ld-has-no-compact-unwind")
-        , ("ld supports build-id", expr $ lookupValueOrError configFile "ld-has-build-id")
-        , ("ld supports filelist", expr $ lookupValueOrError configFile "ld-has-filelist")
-        , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
-        , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
-        , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
-        , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
-        , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
-        , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
-        , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
-        , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
-        , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
-        , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
-        , ("target platform string", getSetting TargetPlatform)
-        , ("target os", getSetting TargetOsHaskell)
-        , ("target arch", getSetting TargetArchHaskell)
-        , ("target word size", expr $ lookupValueOrError configFile "target-word-size")
-        , ("target has GNU nonexec stack", expr $ lookupValueOrError configFile "target-has-gnu-nonexec-stack")
-        , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
-        , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
-        , ("target has RTS linker", expr $ lookupValueOrError configFile "target-has-rts-linker")
-        , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
-        , ("LLVM target", getSetting LlvmTarget)
-        , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
-        , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
-        , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
-
-        , ("integer library", pkgName <$> getIntegerPackage)
-        , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
-        , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
-        , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
-        , ("RTS ways", unwords . map show <$> getRtsWays)
-        , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
-        , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
-        , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
-        , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
-        , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
-        , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
-        ]
-    let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
-    pure $ case settings of
-        [] -> "[]"
-        s : ss -> unlines $
-            ("[" ++ showTuple s)
-            : ((\s' -> "," ++ showTuple s') <$> ss)
-            ++ ["]"]
-
 
 -- | Generate @Config.hs@ files.
 generateConfigHs :: Expr String
@@ -373,22 +246,6 @@ generateConfigHs = do
         , "cStage                :: String"
         , "cStage                = show (" ++ show (fromEnum stage + 1) ++ " :: Int)"
         ]
-
--- | Generate @ghcautoconf.h@ header.
-generateGhcAutoconfH :: Expr String
-generateGhcAutoconfH = do
-    trackGenerateHs
-    configHContents  <- expr $ map undefinePackage <$> readFileLines configH
-    return . unlines $
-        [ "#if !defined(__GHCAUTOCONF_H__)"
-        , "#define __GHCAUTOCONF_H__" ]
-        ++ configHContents ++
-        [ "#endif /* __GHCAUTOCONF_H__ */" ]
-  where
-    undefinePackage s
-        | "#define PACKAGE_" `isPrefixOf` s
-            = "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
-        | otherwise = s
 
 -- | Generate @ghcversion.h@ header.
 generateGhcVersionH :: Expr String

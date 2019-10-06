@@ -34,7 +34,8 @@ cIncludeArgs = do
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
-            , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+            , ((&&) (pkg == integerGmp) <$> flag UseSystemFfi) ? arg ("-I" ++ gmpIncludeDir)
+            , ((&&) (pkg == rts) <$> flag UseSystemFfi) ? arg ("-I" ++ ffiIncludeDir)
             -- Add @incDirs@ in the build directory, since some files generated
             -- with @autoconf@ may end up in the build directory.
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]

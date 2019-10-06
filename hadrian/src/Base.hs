@@ -19,7 +19,7 @@ module Base (
     module Way,
 
     -- * Files
-    configH, ghcVersionH,
+    ghcVersionH,
 
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
@@ -62,11 +62,6 @@ configFile = configPath -/- "system.config"
 -- @sourcePath -/- "Base.hs"@. We use this to track some of the source files.
 sourcePath :: FilePath
 sourcePath = hadrianPath -/- "src"
-
--- TODO: Change @mk/config.h@ to @shake-build/cfg/config.h@.
--- | Path to the generated @mk/config.h@ file.
-configH :: FilePath
-configH = "mk/config.h"
 
 ghcVersionH :: Stage -> Action FilePath
 ghcVersionH stage = stageLibPath stage <&> (-/- "ghcversion.h")

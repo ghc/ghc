@@ -169,7 +169,7 @@ def autoreconf():
     else:
         reconf_cmd = 'autoreconf'
 
-    for dir_ in ['.'] + glob.glob('libraries/*/'):
+    for dir_ in ['.', 'rts'] + glob.glob('libraries/*/'):
         if os.path.isfile(os.path.join(dir_, 'configure.ac')):
             print("Booting %s" % dir_)
             processes[dir_] = subprocess.Popen(['sh', '-c', reconf_cmd], cwd=dir_)
