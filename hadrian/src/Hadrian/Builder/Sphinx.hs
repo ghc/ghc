@@ -30,6 +30,8 @@ args mode = do
     outPath <- getOutput
     mconcat [ arg "-b", arg modeString
             , arg "-d", arg $ outPath -/- (".doctrees-" ++ modeString)
+            , arg "-n" -- nit-picky mode to ensure missing references are caught
+            , arg "-w", arg $ outPath -/- ".log" -- dump warnings to log file
             , arg =<< getInput
             , arg outPath ]
   where
