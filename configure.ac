@@ -31,8 +31,6 @@ if test ! -f mk/config.h.in; then
    exit 1
 fi
 
-AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
-
 dnl this makes sure `./configure --target=<cross-compile-target>`
 dnl works as expected, since we're slightly modifying how Autoconf
 dnl interprets build/host/target and how this interacts with $CC tests

@@ -9,11 +9,6 @@ you will screw up the layout where they are used in case expressions!
 
 #endif
 
-/* Pull in the autoconf defines (HAVE_FOO), and all the platform defines
- * for this build (foo_HOST_ARCH etc.)
- */
-#include "ghcconfig.h"
-
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \
 name :: IORef (ty);                \
