@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module RnSplice (
+module GHC.Rename.Splice (
         rnTopSpliceDecls,
         rnSpliceType, rnSpliceExpr, rnSplicePat, rnSpliceDecl,
         rnBracket,
@@ -20,20 +20,20 @@ import GHC.Hs
 import RdrName
 import TcRnMonad
 
-import RnEnv
-import RnUtils          ( HsDocContext(..), newLocalBndrRn )
-import RnUnbound        ( isUnboundName )
-import RnSource         ( rnSrcDecls, findSplice )
-import RnPat            ( rnPat )
+import GHC.Rename.Env
+import GHC.Rename.Utils   ( HsDocContext(..), newLocalBndrRn )
+import GHC.Rename.Unbound ( isUnboundName )
+import GHC.Rename.Source  ( rnSrcDecls, findSplice )
+import GHC.Rename.Pat     ( rnPat )
 import BasicTypes       ( TopLevelFlag, isTopLevel, SourceText(..) )
 import Outputable
 import Module
 import SrcLoc
-import RnTypes          ( rnLHsType )
+import GHC.Rename.Types ( rnLHsType )
 
 import Control.Monad    ( unless, when )
 
-import {-# SOURCE #-} RnExpr   ( rnLExpr )
+import {-# SOURCE #-} GHC.Rename.Expr   ( rnLExpr )
 
 import TcEnv            ( checkWellStaged )
 import THNames          ( liftName )
@@ -584,7 +584,7 @@ are given names during renaming. These names are collected right after
 renaming. The names generated for anonymous wild cards in TH type splices will
 thus be collected as well.
 
-For more details about renaming wild cards, see RnTypes.rnHsSigWcType
+For more details about renaming wild cards, see GHC.Rename.Types.rnHsSigWcType
 
 Note that partial type signatures are fully supported in TH declaration
 splices, e.g.:
@@ -685,10 +685,10 @@ Note [rnSplicePat]
 Renaming a pattern splice is a bit tricky, because we need the variables
 bound in the pattern to be in scope in the RHS of the pattern. This scope
 management is effectively done by using continuation-passing style in
-RnPat, through the CpsRn monad. We don't wish to be in that monad here
+GHC.Rename.Pat, through the CpsRn monad. We don't wish to be in that monad here
 (it would create import cycles and generally conflict with renaming other
 splices), so we really want to return a (Pat RdrName) -- the result of
-running the splice -- which can then be further renamed in RnPat, in
+running the splice -- which can then be further renamed in GHC.Rename.Pat, in
 the CpsRn monad.
 
 The problem is that if we're renaming a splice within a bracket, we

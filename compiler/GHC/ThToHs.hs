@@ -1074,7 +1074,7 @@ the trees to reflect the fixities of the underlying operators:
   UInfixE x * (UInfixE y + z) ---> (x * y) + z
 
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
-@mkHsOpTyRn@ in RnTypes), which expects that the input will be completely
+@mkHsOpTyRn@ in GHC.Rename.Types), which expects that the input will be completely
 right-biased for types and left-biased for everything else. So we left-bias the
 trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
 
@@ -1966,7 +1966,7 @@ usually want to print the name with the unique, and that is indeed
 the way System Names are printed.
 
 There's a small complication of course; see Note [Looking up Exact
-RdrNames] in RnEnv.
+RdrNames] in GHC.Rename.Env.
 -}
 
 {-

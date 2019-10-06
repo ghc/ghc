@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnPat]{Renaming of patterns}
+Renaming of patterns
 
 Basically dependency analysis.
 
@@ -18,7 +18,7 @@ free variables.
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 
-module RnPat (-- main entry points
+module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
@@ -43,22 +43,22 @@ module RnPat (-- main entry points
 
 import GhcPrelude
 
-import {-# SOURCE #-} RnExpr ( rnLExpr )
-import {-# SOURCE #-} RnSplice ( rnSplicePat )
+import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
+import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
 #include "HsVersions.h"
 
 import GHC.Hs
 import TcRnMonad
 import TcHsSyn             ( hsOverLitName )
-import RnEnv
-import RnFixity
-import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
+import GHC.Rename.Env
+import GHC.Rename.Fixity
+import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
-import RnTypes
+import GHC.Rename.Types
 import PrelNames
 import Name
 import NameSet
@@ -246,7 +246,7 @@ newPatName (LetMk is_top fix_env) rdr_name
     --       however, this binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see RnSource.hs).
+    --       before going on to the RHSes (see GHC.Rename.Source).
 
 {-
 Note [View pattern usage]
@@ -498,7 +498,7 @@ rnPatAndThen mk (SplicePat x (HsSpliced x2 mfs (HsSplicedPat pat)))
 
 rnPatAndThen mk (SplicePat _ splice)
   = do { eith <- liftCpsFV $ rnSplicePat splice
-       ; case eith of   -- See Note [rnSplicePat] in RnSplice
+       ; case eith of   -- See Note [rnSplicePat] in GHC.Rename.Splice
            Left  not_yet_renamed -> rnPatAndThen mk not_yet_renamed
            Right already_renamed -> return already_renamed }
 

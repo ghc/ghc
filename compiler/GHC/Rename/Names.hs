@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnNames]{Extracting imported and top-level names in scope}
+Extracting imported and top-level names in scope
 -}
 
 {-# LANGUAGE CPP, NondecreasingIndentation, MultiWayIf, NamedFieldPuns #-}
@@ -10,7 +10,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module RnNames (
+module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordSelector,
         extendGlobalRdrEnvRn,
         gresFromAvails,
@@ -35,9 +35,9 @@ import DynFlags
 import TyCoPpr
 import GHC.Hs
 import TcEnv
-import RnEnv
-import RnFixity
-import RnUtils          ( warnUnusedTopBinds, mkFieldEnv )
+import GHC.Rename.Env
+import GHC.Rename.Fixity
+import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
 import TcRnMonad
 import PrelNames
@@ -504,7 +504,7 @@ created by its bindings.
 Note [Top-level Names in Template Haskell decl quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also: Note [Interactively-bound Ids in GHCi] in HscTypes
-          Note [Looking up Exact RdrNames] in RnEnv
+          Note [Looking up Exact RdrNames] in GHC.Rename.Env
 
 Consider a Template Haskell declaration quotation like this:
       module M where
@@ -513,7 +513,7 @@ When renaming the declarations inside [d| ...|], we treat the
 top level binders specially in two ways
 
 1.  We give them an Internal Name, not (as usual) an External one.
-    This is done by RnEnv.newTopSrcBinder.
+    This is done by GHC.Rename.Env.newTopSrcBinder.
 
 2.  We make them *shadow* the outer bindings.
     See Note [GlobalRdrEnv shadowing]
@@ -797,7 +797,7 @@ newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
               -- sites. This is needed to correctly support record
               -- selectors in Template Haskell. See Note [Binders in
               -- Template Haskell] in Convert.hs and Note [Looking up
-              -- Exact RdrNames] in RnEnv.hs.
+              -- Exact RdrNames] in GHC.Rename.Env.
           | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
 
 {-

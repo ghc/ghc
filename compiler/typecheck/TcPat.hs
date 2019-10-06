@@ -608,10 +608,10 @@ tc_pat penv (NPlusKPat _ (L nm_loc name)
                                ge' minus''
         ; return (pat', res) }
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSplicePat'.
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSplicePat'.
 -- Here we get rid of it and add the finalizers to the global environment.
 --
--- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
+-- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tc_pat penv (SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)))
             pat_ty thing_inside
   = do addModFinalizersWithLclEnv mod_finalizers

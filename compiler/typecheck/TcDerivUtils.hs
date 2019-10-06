@@ -644,7 +644,7 @@ getDataConFixityFun :: TyCon -> TcM (Name -> Fixity)
 -- If the TyCon is locally defined, we want the local fixity env;
 -- but if it is imported (which happens for standalone deriving)
 -- we need to get the fixity env from the interface file
--- c.f. RnEnv.lookupFixity, and #9830
+-- c.f. GHC.Rename.Env.lookupFixity, and #9830
 getDataConFixityFun tc
   = do { this_mod <- getModule
        ; if nameIsLocalOrFrom this_mod name

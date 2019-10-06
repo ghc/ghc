@@ -37,7 +37,7 @@ import TcSimplify
 import Constraint
 import TcOrigin
 import GHC.Iface.Load
-import RnNames
+import GHC.Rename.Names
 import ErrUtils
 import Id
 import Module
@@ -50,7 +50,7 @@ import HscTypes
 import Outputable
 import Type
 import FastString
-import RnFixity ( lookupFixityRn )
+import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
 import TcEnv
 import Var

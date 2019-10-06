@@ -1,4 +1,4 @@
-module RnExpr where
+module GHC.Rename.Expr where
 import Name
 import GHC.Hs
 import NameSet     ( FreeVars )

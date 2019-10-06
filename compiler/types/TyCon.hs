@@ -400,7 +400,7 @@ must be True.
 
 See also:
  * [Injectivity annotation] in GHC.Hs.Decls
- * [Renaming injectivity annotation] in RnSource
+ * [Renaming injectivity annotation] in GHC.Rename.Source
  * [Verifying injectivity annotation] in FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
 
