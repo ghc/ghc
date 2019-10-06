@@ -811,7 +811,7 @@ types/kinds are fully settled and zonked.
 --
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in RnTypes
+-- See also Note [Ordering of implicit variables] in GHC.Rename.Types
 
 scopedSort :: [TyCoVar] -> [TyCoVar]
 scopedSort = go [] []

@@ -4,15 +4,18 @@ This module contains helper functions for reporting and creating
 unbound variables.
 
 -}
-module RnUnbound ( mkUnboundName
-                 , mkUnboundNameRdr
-                 , isUnboundName
-                 , reportUnboundName
-                 , unknownNameSuggestions
-                 , WhereLooking(..)
-                 , unboundName
-                 , unboundNameX
-                 , notInScopeErr ) where
+module GHC.Rename.Unbound
+   ( mkUnboundName
+   , mkUnboundNameRdr
+   , isUnboundName
+   , reportUnboundName
+   , unknownNameSuggestions
+   , WhereLooking(..)
+   , unboundName
+   , unboundNameX
+   , notInScopeErr
+   )
+where
 
 import GhcPrelude
 

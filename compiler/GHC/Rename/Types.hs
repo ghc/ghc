@@ -1,7 +1,6 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnSource]{Main pass of renamer}
 -}
 
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,7 +8,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module RnTypes (
+module GHC.Rename.Types (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
@@ -35,17 +34,17 @@ module RnTypes (
 
 import GhcPrelude
 
-import {-# SOURCE #-} RnSplice( rnSpliceType )
+import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
 import DynFlags
 import GHC.Hs
-import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
-import RnEnv
-import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
-                        , pprHsDocContext, bindLocalNamesFV, typeAppErr
-                        , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
-import RnFixity         ( lookupFieldFixityRn, lookupFixityRn
-                        , lookupTyFixityRn )
+import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
+import GHC.Rename.Env
+import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
+                         , pprHsDocContext, bindLocalNamesFV, typeAppErr
+                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
+import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
+                         , lookupTyFixityRn )
 import TcRnMonad
 import RdrName
 import PrelNames
@@ -71,7 +70,7 @@ import Control.Monad      ( unless, when )
 #include "HsVersions.h"
 
 {-
-These type renamers are in a separate module, rather than in (say) RnSource,
+These type renamers are in a separate module, rather than in (say) GHC.Rename.Source,
 to break several loop.
 
 *********************************************************
@@ -1026,13 +1025,13 @@ newTyVarNameRn mb_assoc (L loc rdr)
 When renaming a ConDeclField, we have to find the FieldLabel
 associated with each field.  But we already have all the FieldLabels
 available (since they were brought into scope by
-RnNames.getLocalNonValBinders), so we just take the list as an
+GHC.Rename.Names.getLocalNonValBinders), so we just take the list as an
 argument, build a map and look them up.
 -}
 
 rnConDeclFields :: HsDocContext -> [FieldLabel] -> [LConDeclField GhcPs]
                 -> RnM ([LConDeclField GhcRn], FreeVars)
--- Also called from RnSource
+-- Also called from GHC.Rename.Source
 -- No wildcards can appear in record fields
 rnConDeclFields ctxt fls fields
    = mapFvRn (rnField fl_env env) fields
@@ -1189,7 +1188,7 @@ instance Outputable OpName where
 
 get_op :: LHsExpr GhcRn -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
--- See RnExpr.rnUnboundVar
+-- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
 get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
 get_op (L _ (HsRecFld _ fld))    = RecFldOp fld
