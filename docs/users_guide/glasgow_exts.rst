@@ -67,6 +67,45 @@ a large swath of the extensions supported by GHC at once.
     to move away from this portmanteau flag, and towards enabling features
     individually.
 
+
+.. extension:: Haskell2010
+    :shortdesc: Use the Haskell 2010 language variant.
+
+    Compile Haskell 2010 language variant. Enables the
+    following language extensions:
+
+    .. hlist::
+
+     * :extension:`ImplicitPrelude`
+     * :extension:`StarIsType`
+     * :extension:`CUSKs`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`DatatypeContexts`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`EmptyDataDecls`
+     * :extension:`ForeignFunctionInterface`
+     * :extension:`PatternGuards`
+     * :extension:`DoAndIfThenElse`
+     * :extension:`RelaxedPolyRec`
+
+
+.. extension:: Haskell98
+    :shortdesc: Use the Haskell 2010 language variant.
+
+    Compile using Haskell 98 language variant. Enables the
+    following language extensions:
+
+    .. hlist::
+
+     * :extension:`ImplicitPrelude`
+     * :extension:`StarIsType`
+     * :extension:`CUSKs`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`NPlusKPatterns`
+     * :extension:`DatatypeContexts`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`NondecreasingIndentation`
+
 .. _primitives:
 
 Unboxed types and primitive operations
