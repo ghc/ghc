@@ -706,14 +706,6 @@ dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
 dnl --------------------------------------------------------------
 
-if test "$TargetOS" = "mingw32"
-then
-    GhcLibsWithUnix=NO
-else
-    GhcLibsWithUnix=YES
-fi
-AC_SUBST([GhcLibsWithUnix])
-
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
