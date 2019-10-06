@@ -831,7 +831,7 @@ SPHINXBUILD              = @SPHINXBUILD@
 BUILD_MAN                = @BUILD_MAN@
 BUILD_SPHINX_HTML        = @BUILD_SPHINX_HTML@
 BUILD_SPHINX_PDF         = @BUILD_SPHINX_PDF@
-SPHINXOPTS               = -D latex_paper_size=letter
+SPHINXOPTS               = -D latex_paper_size=letter --keep-going -n
 XELATEX                  = @XELATEX@
 
 #-----------------------------------------------------------------------------

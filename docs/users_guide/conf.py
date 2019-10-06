@@ -24,6 +24,29 @@ source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
+nitpick_ignore = [
+    ("envvar", "EDITOR"),
+    ("envvar", "HOME"),
+    ("envvar", "LD_LIBRARY_PATH"),
+    ("envvar", "LIBRARY_PATH"),
+    ("envvar", "PATH"),
+    ("envvar", "RPATH"),
+    ("envvar", "RUNPATH"),
+    ("envvar", "TMPDIR"),
+
+    ("c:type", "bool"),
+
+    # See #17314
+    ("ghc-flag", "-pgmo ⟨port⟩"),
+    ("ghc-flag", "-pgmo ⟨option⟩"),
+
+    ("extension", "DoAndIfThenElse"),
+    ("extension", "RelaxedPolyRec"),
+
+    # See #16629
+    ("extension", "UnliftedFFITypes"),
+]
+
 rst_prolog = """
 .. |llvm-version| replace:: {llvm_version}
 """.format(llvm_version=ghc_config.llvm_version)
