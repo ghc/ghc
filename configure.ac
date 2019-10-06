@@ -166,9 +166,6 @@ then
     fi
 fi
 
-GHC_PACKAGE_DB_FLAG=package-db
-AC_SUBST(GHC_PACKAGE_DB_FLAG)
-
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then
