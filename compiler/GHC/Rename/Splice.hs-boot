@@ -1,4 +1,4 @@
-module RnSplice where
+module GHC.Rename.Splice where
 
 import GhcPrelude
 import GHC.Hs

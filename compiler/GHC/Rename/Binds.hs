@@ -4,7 +4,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnBinds]{Renaming and dependency analysis of bindings}
+Renaming and dependency analysis of bindings
 
 This module does renaming and dependency analysis on value bindings in
 the abstract syntax.  It does {\em not} do cycle-checks on class or
@@ -12,7 +12,7 @@ type-synonym declarations; those cannot be done at this stage because
 they may be affected by renaming (which isn't fully worked out yet).
 -}
 
-module RnBinds (
+module GHC.Rename.Binds (
    -- Renaming top-level bindings
    rnTopBindsLHS, rnTopBindsBoot, rnValBindsRHS,
 
@@ -28,18 +28,18 @@ module RnBinds (
 
 import GhcPrelude
 
-import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
+import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr, rnStmts )
 
 import GHC.Hs
 import TcRnMonad
-import RnTypes
-import RnPat
-import RnNames
-import RnEnv
-import RnFixity
-import RnUtils          ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
-                        , checkDupRdrNames, warnUnusedLocalBinds,
-                        checkUnusedRecordWildcard
+import GHC.Rename.Types
+import GHC.Rename.Pat
+import GHC.Rename.Names
+import GHC.Rename.Env
+import GHC.Rename.Fixity
+import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
+                        , checkDupRdrNames, warnUnusedLocalBinds
+                        , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV )
 import DynFlags
 import Module

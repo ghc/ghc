@@ -19,7 +19,7 @@ import TcMType
 import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
-import RnUnbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
 import Unify            ( tcMatchTys )

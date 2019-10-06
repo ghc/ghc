@@ -33,7 +33,7 @@ import RdrName          ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                         , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                         , gre_name, mkRdrQual )
 import OccName          ( OccName, mkVarOcc )
-import RnNames          ( gresFromAvails )
+import GHC.Rename.Names ( gresFromAvails )
 import Plugins
 import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 

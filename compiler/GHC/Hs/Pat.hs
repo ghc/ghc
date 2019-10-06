@@ -245,7 +245,7 @@ data Pat p
                      -- a new hs-boot file. Not worth it.
 
                     (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
-                    (SyntaxExpr p)   -- Name of '-' (see RnEnv.lookupSyntaxName)
+                    (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntaxName)
   -- ^ n+k pattern
 
         ------------ Pattern type signatures ---------------

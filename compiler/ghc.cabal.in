@@ -199,7 +199,6 @@ Library
         DriverBkp
         BkpSyn
         NameShape
-        RnModIface
         Avail
         AsmUtils
         BasicTypes
@@ -427,24 +426,25 @@ Library
         CostCentre
         CostCentreState
         ProfInit
-        RnBinds
-        RnEnv
-        RnExpr
-        RnHsDoc
-        RnNames
-        RnPat
-        RnSource
-        RnSplice
-        RnTypes
-        RnFixity
-        RnUtils
-        RnUnbound
+        GHC.Rename.Binds
+        GHC.Rename.Env
+        GHC.Rename.Expr
+        GHC.Rename.Doc
+        GHC.Rename.Names
+        GHC.Rename.Pat
+        GHC.Rename.Source
+        GHC.Rename.Splice
+        GHC.Rename.Types
+        GHC.Rename.Fixity
+        GHC.Rename.Utils
+        GHC.Rename.Unbound
         CoreMonad
         CSE
         FloatIn
         FloatOut
         LiberateCase
         OccurAnal
+        RnModIface
         SAT
         SetLevels
         SimplCore
