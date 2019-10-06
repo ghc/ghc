@@ -548,5 +548,5 @@ Using literate or pre-processed source
 
 Since Haddock uses GHC internally, both plain and literate Haskell
 sources are accepted without the need for the user to do anything. To
-use the C pre-processor, however, the user must pass the the :option:`-cpp`
+use the C pre-processor, however, the user must pass the ``-cpp``
 option to GHC using :option:`--optghc`.

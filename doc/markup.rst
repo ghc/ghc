@@ -8,7 +8,7 @@ will just generate documentation that contains the type signatures, data
 type declarations, and class declarations exported by each of the
 modules being processed.
 
-.. _top-level-declaration
+.. _top-level-declaration:
 
 Documenting a Top-Level Declaration
 -----------------------------------
