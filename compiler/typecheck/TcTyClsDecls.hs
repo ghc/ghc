@@ -43,7 +43,7 @@ import ClsInst( AssocInstInfo(..) )
 import TcMType
 import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
-import RnEnv( lookupConstructorFields )
+import GHC.Rename.Env( lookupConstructorFields )
 import FamInst
 import FamInstEnv
 import Coercion
@@ -1715,7 +1715,7 @@ the H98 syntax doesn't permit a kind signature on the newtype itself.
 
 There's also a change in the renamer:
 
-* In RnSource.rnTyClDecl, enabling UnliftedNewtypes changes what is means
+* In GHC.RenameSource.rnTyClDecl, enabling UnliftedNewtypes changes what is means
   for a newtype to have a CUSK. This is necessary since UnliftedNewtypes
   means that, for newtypes without kind signatures, we must use the field
   inside the data constructor to determine the result kind.
@@ -2516,7 +2516,7 @@ tcFamTyPats fam_tc hs_pats
        ; (fam_app, res_kind) <- unsetWOptM Opt_WarnPartialTypeSignatures $
                                 setXOptM LangExt.PartialTypeSignatures $
                                 -- See Note [Wildcards in family instances] in
-                                -- RnSource.hs
+                                -- GHC.Rename.Source
                                 tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
 
        ; traceTc "End tcFamTyPats }" $

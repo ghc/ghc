@@ -49,17 +49,17 @@ module TcRnDriver (
 import GhcPrelude
 
 import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
-import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
-import GHC.Iface.Env( externaliseName )
+import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
+import GHC.Iface.Env     ( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
-import RnTypes
-import RnExpr
-import RnUtils ( HsDocContext(..) )
-import RnFixity ( lookupFixityRn )
+import GHC.Rename.Types
+import GHC.Rename.Expr
+import GHC.Rename.Utils  ( HsDocContext(..) )
+import GHC.Rename.Fixity ( lookupFixityRn )
 import MkId
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
@@ -102,9 +102,9 @@ import TcTyClsDecls
 import TcTypeable ( mkTypeableBinds )
 import TcBackpack
 import GHC.Iface.Load
-import RnNames
-import RnEnv
-import RnSource
+import GHC.Rename.Names
+import GHC.Rename.Env
+import GHC.Rename.Source
 import ErrUtils
 import Id
 import IdInfo( IdDetails(..) )
@@ -633,7 +633,7 @@ tcRnHsBootDecls hsc_src decls
               <- rnTopSrcDecls first_group
 
         -- The empty list is for extra dependencies coming from .hs-boot files
-        -- See Note [Extra dependencies from .hs-boot files] in RnSource
+        -- See Note [Extra dependencies from .hs-boot files] in GHC.Rename.Source
 
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
               -- NB: setGblEnv **before** captureTopConstraints so that

@@ -239,7 +239,7 @@ nlParPat p = noLoc (ParPat noExtField p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
--- See RnEnv.lookupSyntaxName
+-- See GHC.Rename.Env.lookupSyntaxName
 
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs

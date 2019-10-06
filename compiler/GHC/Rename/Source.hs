@@ -1,7 +1,7 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[RnSource]{Main pass of renamer}
+Main pass of renamer
 -}
 
 {-# LANGUAGE CPP #-}
@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module RnSource (
+module GHC.Rename.Source (
         rnSrcDecls, addTcgDUs, findSplice
     ) where
 
@@ -18,23 +18,23 @@ module RnSource (
 
 import GhcPrelude
 
-import {-# SOURCE #-} RnExpr( rnLExpr )
-import {-# SOURCE #-} RnSplice ( rnSpliceDecl, rnTopSpliceDecls )
+import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
+import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
 import FieldLabel
 import RdrName
-import RnTypes
-import RnBinds
-import RnEnv
-import RnUtils          ( HsDocContext(..), mapFvRn, bindLocalNames
+import GHC.Rename.Types
+import GHC.Rename.Binds
+import GHC.Rename.Env
+import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
                         , withHsDocContext )
-import RnUnbound        ( mkUnboundName, notInScopeErr )
-import RnNames
-import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
+import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
+import GHC.Rename.Names
+import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )
 import TcRnMonad
 
@@ -1634,7 +1634,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; (at_defs', fv_at_defs) <- rnList (rnTyFamDefltDecl cls') at_defs
 
         -- No need to check for duplicate associated type decls
-        -- since that is done by RnNames.extendGlobalRdrEnvRn
+        -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
 
         -- Check the signatures
         -- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
@@ -1658,7 +1658,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; (mbinds', sigs', meth_fvs)
             <- rnMethodBinds True cls' (hsAllLTyVarNames tyvars') mbinds sigs
                 -- No need to check for duplicate method signatures
-                -- since that is done by RnNames.extendGlobalRdrEnvRn
+                -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
 
   -- Haddock docs
@@ -1736,7 +1736,7 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                             | otherwise = setLocalRdrEnv emptyLocalRdrEnv }
         ; (condecls', con_fvs) <- zap_lcl_env $ rnConDecls condecls
            -- No need to check for duplicate constructor decls
-           -- since that is done by RnNames.extendGlobalRdrEnvRn
+           -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
 
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
@@ -2179,7 +2179,7 @@ rnConDeclDetails con doc (RecCon (L l fields))
   = do  { fls <- lookupConstructorFields con
         ; (new_fields, fvs) <- rnConDeclFields doc fls fields
                 -- No need to check for duplicate fields
-                -- since that is done by RnNames.extendGlobalRdrEnvRn
+                -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }
 
 -------------------------------------------------
