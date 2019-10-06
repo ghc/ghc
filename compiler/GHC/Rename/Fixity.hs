@@ -6,10 +6,15 @@ This module contains code which maintains and manipulates the
 fixity environment during renaming.
 
 -}
-module RnFixity ( MiniFixityEnv,
-                  addLocalFixities,
-  lookupFixityRn, lookupFixityRn_help,
-  lookupFieldFixityRn, lookupTyFixityRn ) where
+module GHC.Rename.Fixity
+   ( MiniFixityEnv
+   , addLocalFixities
+   , lookupFixityRn
+   , lookupFixityRn_help
+   , lookupFieldFixityRn
+   , lookupTyFixityRn
+   )
+where
 
 import GhcPrelude
 
@@ -28,7 +33,7 @@ import Outputable
 import Maybes
 import Data.List
 import Data.Function    ( on )
-import RnUnbound
+import GHC.Rename.Unbound
 
 {-
 *********************************************************
@@ -97,7 +102,7 @@ lookupFixity is a bit strange.
 * Top-level fixity decls in this module may be for Names that are
     either  Global         (constructors, class operations)
     or      Local/Exported (everything else)
-  (See notes with RnNames.getLocalDeclBinders for why we have this split.)
+  (See notes with GHC.Rename.Names.getLocalDeclBinders for why we have this split.)
   We put them all in the local fixity environment
 -}
 

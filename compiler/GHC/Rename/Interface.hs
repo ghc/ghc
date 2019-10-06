@@ -6,7 +6,7 @@
 -- are doing indefinite typechecking and need instantiations
 -- of modules which do not necessarily exist yet.
 
-module RnModIface(
+module GHC.Rename.Interface(
     rnModIface,
     rnModExports,
     tcRnModIface,

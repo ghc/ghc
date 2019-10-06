@@ -155,7 +155,7 @@ import TcErrors   ( solverDepthErrorTcS )
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
-import qualified RnEnv as TcM
+import qualified GHC.Rename.Env as TcM
 import Var
 import VarEnv
 import VarSet

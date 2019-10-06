@@ -38,7 +38,7 @@ import System.FilePath
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-RnNames.calculateAvails asserts the invariant that a module must not occur in
+GHC.Rename.Names.calculateAvails asserts the invariant that a module must not occur in
 its own dep_orphs or dep_finsts. However, if we aren't careful this can occur
 in the presence of hs-boot files: Consider that we have two modules, A and B,
 both with hs-boot files,
@@ -88,7 +88,7 @@ mkDependencies iuid pluginModules
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
-          -- See Note [RnNames . Tracking Trust Transitively]
+          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
           sorted_pkgs = sort (Set.toList pkgs)
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs

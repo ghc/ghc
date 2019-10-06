@@ -76,7 +76,7 @@ import FastString
 import Fingerprint
 import Hooks
 import FieldLabel
-import RnModIface
+import GHC.Rename.Interface
 import UniqDSet
 import Plugins
 

@@ -15,9 +15,9 @@ import RdrName
 import TcRnMonad
 import TcEnv
 import TcType
-import RnNames
-import RnEnv
-import RnUnbound ( reportUnboundName )
+import GHC.Rename.Names
+import GHC.Rename.Env
+import GHC.Rename.Unbound ( reportUnboundName )
 import ErrUtils
 import Id
 import IdInfo
@@ -40,7 +40,7 @@ import FastString (fsLit)
 
 import Control.Monad
 import DynFlags
-import RnHsDoc          ( rnHsDoc )
+import GHC.Rename.HsDoc ( rnHsDoc )
 import RdrHsSyn        ( setRdrNameSpace )
 import Data.Either      ( partitionEithers )
 

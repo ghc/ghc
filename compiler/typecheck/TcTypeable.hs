@@ -83,7 +83,7 @@ The overall plan is this:
    to use for these M.$tcT "tycon rep names". Note that these must be
    treated as "never exported" names by Backpack (see
    Note [Handling never-exported TyThings under Backpack]). Consequently
-   they get slightly special treatment in RnModIface.rnIfaceDecl.
+   they get slightly special treatment in GHC.Rename.Interface.rnIfaceDecl.
 
 3. Record the TyConRepName in T's TyCon, including for promoted
    data and type constructors, and kinds like * and #.
