@@ -38,4 +38,4 @@ import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import Data.Type.Equality
 
 unsafeCoerce :: forall a b . a -> b
-unsafeCoerce x = case unsafeEqualityProof @_ @a @b of Refl -> x
+unsafeCoerce x = case unsafeEqualityProof @a @b of Refl -> x

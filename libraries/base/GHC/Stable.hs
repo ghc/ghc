@@ -94,7 +94,7 @@ foreign import ccall unsafe "hs_free_stable_ptr" freeStablePtr :: StablePtr a ->
 --
 castStablePtrToPtr :: forall a . StablePtr a -> Ptr ()
 castStablePtrToPtr (StablePtr s) =
-    Ptr (castAddrRepWith (unsafeEqualityProof @_ @(StablePtr# a) @Addr#) s)
+    Ptr (castAddrRepWith (unsafeEqualityProof @(StablePtr# a) @Addr#) s)
 
 castAddrRepWith :: forall (a :: TYPE AddrRep) (b :: TYPE AddrRep) . (a :~: b) -> a -> b
 castAddrRepWith Refl x = x
@@ -111,7 +111,7 @@ castAddrRepWith Refl x = x
 --
 castPtrToStablePtr :: forall a . Ptr () -> StablePtr a
 castPtrToStablePtr (Ptr a) =
-    StablePtr (castAddrRepWith (unsafeEqualityProof @_ @Addr# @(StablePtr# a)) a)
+    StablePtr (castAddrRepWith (unsafeEqualityProof @Addr# @(StablePtr# a)) a)
 
 -- | @since 2.01
 instance Eq (StablePtr a) where

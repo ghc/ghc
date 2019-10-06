@@ -72,7 +72,7 @@ createBCO arr bco
                   return (HValue final_bco) }
 
 castBCOToAny :: BCO# -> Any
-castBCOToAny x = castUnliftedToLiftedWith (unsafeHeteroEqualityProof @_ @_ @BCO# @Any) x
+castBCOToAny x = castUnliftedToLiftedWith (unsafeHeteroEqualityProof @BCO# @Any) x
 
 castUnliftedToLiftedWith :: forall (a :: TYPE UnliftedRep) (b :: TYPE LiftedRep) . (a :~~: b) -> a -> b
 castUnliftedToLiftedWith HRefl x = x

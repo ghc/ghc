@@ -184,7 +184,7 @@ castByteArrayWith Refl x = x
 
 unsafeFreezeByteArray :: MutableByteArray# RealWorld -> ByteArray#
 unsafeFreezeByteArray x =
-    castByteArrayWith (unsafeEqualityProof @_ @(MutableByteArray# RealWorld) @ByteArray#) x
+    castByteArrayWith (unsafeEqualityProof @(MutableByteArray# RealWorld) @ByteArray#) x
 
 -- | This function is similar to 'mallocForeignPtr', except that the
 -- size of the memory required is given explicitly as a number of bytes.

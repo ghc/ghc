@@ -14,6 +14,7 @@
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE TypeApplications       #-}
 {-# LANGUAGE Trustworthy            #-}
 
 -----------------------------------------------------------------------------
@@ -214,9 +215,13 @@ type family a == b where
 -- finally to `n == m`.
 
 {-# NOINLINE unsafeEqualityProof #-}
-unsafeEqualityProof :: forall k (a :: k) (b :: k) . a :~: b
+unsafeEqualityProof :: forall a b . a :~: b
 unsafeEqualityProof = error "unsafeEqualityProof evaluated"
 
 {-# NOINLINE unsafeHeteroEqualityProof #-}
-unsafeHeteroEqualityProof :: forall k1 k2 (a :: k1) (b :: k2) . a :~~: b
-unsafeHeteroEqualityProof = error "unsafeHeteroEqualityProof evaluated"
+unsafeHeteroEqualityProof :: forall a b . a :~~: b
+unsafeHeteroEqualityProof =
+  (case unsafeEqualityProof @k1 @k2 of
+    Refl -> case unsafeEqualityProof @a @b of
+      Refl -> HRefl)
+        :: forall k1 k2 (a :: k1) (b :: k2). a :~~: b
