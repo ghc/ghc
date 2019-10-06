@@ -319,9 +319,8 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wpartial-type-signatures
     :shortdesc: warn about holes in partial type signatures when
         :extension:`PartialTypeSignatures` is enabled. Not applicable when
-        :extension:`PartialTypesignatures` is not enabled, in which case
-        errors are generated for such holes. See
-        :ref:`partial-type-signatures`.
+        :extension:`PartialTypeSignatures` is not enabled, in which case
+        errors are generated for such holes.
     :type: dynamic
     :reverse: -Wno-partial-type-signatures
     :category:
@@ -643,15 +642,15 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wderiving-defaults
     :shortdesc: warn about default deriving when using both
-        DeriveAnyClass and GeneralizedNewtypeDeriving
+        :extension:`DeriveAnyClass` and :extension:`GeneralizedNewtypeDeriving`
     :type: dynamic
     :reverse: -Wno-deriving-defaults
     :category:
 
     :since: 8.10
 
-    Causes a warning when both :ref:`DeriveAnyClass` and
-    :ref:`GeneralizedNewtypeDeriving` are enabled and no explicit
+    Causes a warning when both :extension:`DeriveAnyClass` and
+    :extension:`GeneralizedNewtypeDeriving` are enabled and no explicit
     deriving strategy is in use.  For example, this would result a
     warning: ::
 
@@ -756,6 +755,24 @@ of ``-W(no-)*``.
     probably no-ops and can be omitted. The functions checked for are:
     ``toInteger``, ``toRational``, ``fromIntegral``, and ``realToFrac``.
 
+.. ghc-flag:: -Wimplicit-kind-vars
+    :shortdesc: warn when kind variables are implicitly quantified over.
+    :type: dynamic
+    :reverse: -Wno-implicit-kind-vars
+    :category:
+
+    .. index::
+       single: implicit prelude, warning
+
+    Have the compiler warn if a kind variable is not explicitly quantified
+    over. For instance, the following would produce a warning: ::
+
+        f :: forall (a :: k). Proxy a
+
+    This can be fixed by explicitly quantifying over ``k``: ::
+
+        f :: forall k (a :: k). Proxy a
+
 .. ghc-flag:: -Wimplicit-prelude
     :shortdesc: warn when the Prelude is implicitly imported
     :type: dynamic
@@ -835,7 +852,7 @@ of ``-W(no-)*``.
     ``Just y`` but ``y`` is not ``4``.
 
     This can be exponential in the arity of the pattern and in the number of
-    guards in some cases. The :ghc-flag:`-fmax-pmcheck-models` limit makes sure
+    guards in some cases. The :ghc-flag:`-fmax-pmcheck-models=⟨n⟩` limit makes sure
     we scale polynomially in the number of patterns, by forgetting refined
     information gained from a partially successful match. For the above example,
     if we had a limit of 1, we would continue checking the next clause with the
@@ -1705,8 +1722,9 @@ of ``-W(no-)*``.
     :since: 8.8
 
     The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
-    command line via :ghc-flag:`-package` or :ghc-flag:`-package-id`, but were not
-    loaded during compication. Usually it means that you have an unused dependency.
+    command line via :ghc-flag:`-package ⟨pkg⟩` or
+    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compication.
+    Usually it means that you have an unused dependency.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
     in order to get reliable results.

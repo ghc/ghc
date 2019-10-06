@@ -50,9 +50,9 @@ Setting RTS options on the command line
    single: -RTS
    single: --RTS
 
-If you set the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` flag appropriately when
-linking (see :ref:`options-linker`), you can give RTS options on the command
-line when running your program.
+If you set the :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` flag
+appropriately when linking (see :ref:`options-linker`), you can give RTS
+options on the command line when running your program.
 
 When your Haskell program starts up, the RTS extracts command-line
 arguments bracketed between ``+RTS`` and ``-RTS`` as its own. For example:
@@ -177,8 +177,8 @@ e.g., on stack overflow. The hooks for these are as follows:
 Event log output
 ################
 
-Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l`) is
-written through a custom :c:type:`EventLogWriter`:
+Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
+⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
 
 .. c:type:: EventLogWriter
 
@@ -415,10 +415,10 @@ performance.
     The compaction algorithm is slower than the copying algorithm, but
     the savings in memory use can be considerable.
 
-    For a given heap size (using the :ghc-flag:`-H ⟨size⟩` option), compaction
-    can in fact reduce the GC cost by allowing fewer GCs to be performed. This
-    is more likely when the ratio of live data to heap size is high, say
-    greater than 30%.
+    For a given heap size (using the :rts-flag:`-H [⟨size⟩]` option),
+    compaction can in fact reduce the GC cost by allowing fewer GCs to be
+    performed. This is more likely when the ratio of live data to heap size is
+    high, say greater than 30%.
 
     .. note::
        Compaction doesn't currently work when a single generation is
@@ -1104,7 +1104,8 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     :default: :file:`<program>.eventlog`
     :since: 8.8
 
-    Sets the destination for the eventlog produced with the :rts-flag:`-l` flag.
+    Sets the destination for the eventlog produced with the
+    :rts-flag:`-l ⟨flags⟩` flag.
 
 .. rts-flag:: -v [⟨flags⟩]
 
@@ -1173,8 +1174,8 @@ recommended for everyday use!
 .. rts-flag::  -DC  DEBUG: compact
 
     Debug messages will be sent to the binary event log file instead of
-    stdout if the :rts-flag:`-l` option is added. This might be useful for
-    reducing the overhead of debug tracing.
+    stdout if the :rts-flag:`-l ⟨flags⟩` option is added. This might be useful
+    for reducing the overhead of debug tracing.
 
     To figure out what exactly they do, the least bad way is to grep the rts/ directory in
     the ghc code for macros like ``DEBUG(scheduler`` or ``DEBUG_scheduler``.

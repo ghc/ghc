@@ -424,9 +424,10 @@ reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
 
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
 slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags (see
-:ref:`options-linker`), and the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
-link-time flag overrides this. However, :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
-has no effect when :ghc-flag:`-no-hs-main` is in use (and the same goes for
+:ref:`options-linker`), and the :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]`
+link-time flag overrides this. However,
+:ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` has no effect when
+:ghc-flag:`-no-hs-main` is in use (and the same goes for
 :ghc-flag:`-with-rtsopts=⟨opts⟩`). To set these options we have to call a
 GHC-specific API instead of ``hs_init()``:
 

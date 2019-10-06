@@ -1434,9 +1434,14 @@ triggered (see :ref:`nested-breakpoints`). Rather than forcing thunks,
 :ghci-cmd:`:print` binds each thunk to a fresh variable beginning with an
 underscore, in this case ``_t1``.
 
-The flag :ghc-flag:`-fprint-evld-with-show` instructs :ghci-cmd:`:print` to reuse
-available ``Show`` instances when possible. This happens only when the
-contents of the variable being inspected are completely evaluated.
+.. ghc-flag:: -fprint-evld-with-show
+    :shortdesc: Instruct :ghci-cmd:`:print` to use ``Show`` instances where possible.
+    :category: interactive
+    :type: dynamic
+
+    The flag :ghc-flag:`-fprint-evld-with-show` instructs :ghci-cmd:`:print` to reuse
+    available ``Show`` instances when possible. This happens only when the
+    contents of the variable being inspected are completely evaluated.
 
 If we aren't concerned about preserving the evaluatedness of a variable, we can
 use :ghci-cmd:`:force` instead of :ghci-cmd:`:print`. The :ghci-cmd:`:force`
@@ -2572,7 +2577,7 @@ commonly used commands.
     The command will match ⟨type⟩ with the first parameter of every
     instance and then check that all constraints are satisfiable.
 
-    When combined with ``-XPartialTypeSignatures``, a user can insert
+    When combined with :extension:`PartialTypeSignatures`, a user can insert
     wildcards into a query and learn the constraints required of each
     wildcard for ⟨type⟩ match with an instance.
 
@@ -3399,13 +3404,14 @@ providing it with a temporary folder (where it will copy the
 necessary libraries to load to) and port it will listen for
 the proxy to connect.
 
-Providing :ghc-flag:`-pgmi /path/to/iserv-proxy`, :ghc-flag:`-pgmo ⟨option⟩`
-and :ghc-flag:`-pgmo ⟨port⟩` in addition to :ghc-flag:`-fexternal-interpreter`
-will then make ghc go through the proxy instead.
+Providing :ghc-flag:`-pgmi /path/to/iserv-proxy <-pgmi ⟨cmd⟩>`,
+:ghc-flag:`-pgmo ⟨option⟩` and :ghc-flag:`-pgmo ⟨port⟩` in addition to
+:ghc-flag:`-fexternal-interpreter` will then make ghc go through the proxy
+instead.
 
 There are some limitations when using this. File and process IO
-will be executed on the target. As such packages like git-embed,
-file-embed and others might not behave as expected if the target
+will be executed on the target. As such packages like ``git-embed``,
+``file-embed`` and others might not behave as expected if the target
 and host do not share the same filesystem.
 
 .. _ghci-faq:
