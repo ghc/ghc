@@ -2296,6 +2296,9 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
           f (Off f) flags = EnumSet.delete f flags
           defaultExtensionFlags = EnumSet.fromList (languageExtensions ml)
 
+-- | The language extensions implied by the various language variants.
+-- When updating this be sure to update the flag documentation in
+-- @docs/users-guide/glasgow_exts.rst@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 languageExtensions Nothing
