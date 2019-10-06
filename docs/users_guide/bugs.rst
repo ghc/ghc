@@ -26,8 +26,8 @@ Divergence from Haskell 98 and Haskell 2010
 
 By default, GHC mainly aims to behave (mostly) like a Haskell 2010
 compiler, although you can tell it to try to behave like a particular
-version of the language with the :ghc-flag:`-XHaskell98` and
-:ghc-flag:`-XHaskell2010` flags. The known deviations from the standards are
+version of the language with the :extension:`Haskell98` and
+:extension:`Haskell2010` flags. The known deviations from the standards are
 described below. Unless otherwise stated, the deviation applies in Haskell 98,
 Haskell 2010 and the default modes.
 
@@ -45,7 +45,7 @@ Lexical syntax
 -  ``forall`` is always a reserved keyword at the type level, contrary
    to the Haskell Report, which allows type variables to be named ``forall``.
    Note that this does not imply that GHC always enables the
-   :ghc-flag:`-XExplicitForAll` extension. Even without this extension enabled,
+   :extension:`ExplicitForAll` extension. Even without this extension enabled,
    reserving ``forall`` as a keyword has significance. For instance, GHC will
    not parse the type signature ``foo :: forall x``.
 
@@ -277,7 +277,7 @@ Numbers, basic types, and built-in classes
 ``Read`` class methods
     The ``Read`` class has two extra methods, ``readPrec`` and
     ``readListPrec``, that are not found in the Haskell 2010 since they rely
-    on the ``ReadPrec`` data type, which requires the :ghc-flag:`-XRankNTypes`
+    on the ``ReadPrec`` data type, which requires the :extension:`RankNTypes`
     extension. GHC also derives ``Read`` instances by implementing ``readPrec``
     instead of ``readsPrec``, and relies on a default implementation of
     ``readsPrec`` that is defined in terms of ``readPrec``. GHC adds these two
