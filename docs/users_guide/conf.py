@@ -147,14 +147,16 @@ def parse_ghci_cmd(env, sig, signode):
     return name
 
 def parse_pragma(env, sig, signode):
+    # Collect a prefix of alphabetical tokens to use as the pragma name
     parts = sig.split(' ')
-    idx = parts[0]
+    idx_parts = []
+    for part in parts:
+        if all(c.isalpha() or c == "_" for c in part):
+            idx_parts.append(part)
+        else:
+            break
+    idx = '-'.join(idx_parts)
 
-    # To avoid re-using the same HTTP anchor #pragma-SPECIALIZE in multiple
-    # places, we disambiguate the anchor by adding the second word after it (if
-    # one exists).
-    if idx == "SPECIALIZE" and 1 in parts and parts[1].isalpha():
-        idx += "-" + parts[1]
     name = '{-# ' + sig + ' #-}'
     signode += addnodes.desc_name(name, name)
     return idx
