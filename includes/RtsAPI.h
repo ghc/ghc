@@ -275,11 +275,11 @@ extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
                          RtsConfig rts_config);      // RTS configuration
 
 extern void shutdownHaskellAndExit (int exitCode, int fastExit)
-    GNUC3_ATTRIBUTE(__noreturn__);
+    GNU_ATTRIBUTE(__noreturn__);
 
 #if !defined(mingw32_HOST_OS)
 extern void shutdownHaskellAndSignal (int sig, int fastExit)
-     GNUC3_ATTRIBUTE(__noreturn__);
+     GNU_ATTRIBUTE(__noreturn__);
 #endif
 
 extern void getProgArgv            ( int *argc, char **argv[] );

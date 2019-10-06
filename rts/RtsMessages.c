@@ -315,7 +315,7 @@ rtsDebugMsgFn(const char *s, va_list ap)
 
 
 // Used in stg_badAlignment_entry defined in StgStartup.cmm.
-void rtsBadAlignmentBarf(void) GNUC3_ATTRIBUTE(__noreturn__);
+void rtsBadAlignmentBarf(void) GNU_ATTRIBUTE(__noreturn__);
 
 void
 rtsBadAlignmentBarf()

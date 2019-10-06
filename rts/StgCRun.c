@@ -161,7 +161,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  * for stg_stop_thread in StgStartup.cmm.
  */
 
-static void GNUC3_ATTRIBUTE(used)
+static void GNU_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
@@ -364,7 +364,7 @@ stack unwinding.
 */
 
 
-static void GNUC3_ATTRIBUTE(used)
+static void GNU_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
@@ -642,7 +642,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 
 // This version is for PowerPC Linux.
 
-static void GNUC3_ATTRIBUTE(used)
+static void GNU_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
         __asm__ volatile (
@@ -719,7 +719,7 @@ StgRunIsImplementedInAssembler(void)
 
 #if defined(powerpc64_HOST_ARCH)
 
-static void GNUC3_ATTRIBUTE(used)
+static void GNU_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
         // r0 volatile

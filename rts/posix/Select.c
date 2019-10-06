@@ -115,7 +115,7 @@ static bool wakeUpSleepingThreads (LowResTime now)
     return flag;
 }
 
-static void GNUC3_ATTRIBUTE(__noreturn__)
+static void GNU_ATTRIBUTE(__noreturn__)
 fdOutOfRange (int fd)
 {
     errorBelch("file descriptor %d out of range for select (0--%d).\n"

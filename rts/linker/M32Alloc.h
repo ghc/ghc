@@ -23,7 +23,7 @@
 #if RTS_LINKER_USE_MMAP
 #define M32_NO_RETURN    /* Nothing */
 #else
-#define M32_NO_RETURN    GNUC3_ATTRIBUTE(__noreturn__)
+#define M32_NO_RETURN    GNU_ATTRIBUTE(__noreturn__)
 #endif
 
 void m32_allocator_init(void) M32_NO_RETURN;

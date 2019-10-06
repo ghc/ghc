@@ -40,15 +40,15 @@
  * expected to return.
  */
 void barf(const char *s, ...)
-   GNUC3_ATTRIBUTE(__noreturn__)
-   GNUC3_ATTRIBUTE(format(PRINTF, 1, 2));
+   GNU_ATTRIBUTE(__noreturn__)
+   GNU_ATTRIBUTE(format(PRINTF, 1, 2));
 
 void vbarf(const char *s, va_list ap)
-   GNUC3_ATTRIBUTE(__noreturn__);
+   GNU_ATTRIBUTE(__noreturn__);
 
 // declared in Rts.h:
 // extern void _assertFail(const char *filename, unsigned int linenum)
-//    GNUC3_ATTRIBUTE(__noreturn__);
+//    GNU_ATTRIBUTE(__noreturn__);
 
 /*
  * An error condition which is caused by and/or can be corrected by
@@ -57,7 +57,7 @@ void vbarf(const char *s, va_list ap)
  * errorBelch() invokes (*errorMsgFn)().
  */
 void errorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   GNU_ATTRIBUTE(format (PRINTF, 1, 2));
 
 void verrorBelch(const char *s, va_list ap);
 
@@ -71,7 +71,7 @@ void verrorBelch(const char *s, va_list ap);
  * sysErrorBelch() invokes (*sysErrorMsgFn)().
  */
 void sysErrorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   GNU_ATTRIBUTE(format (PRINTF, 1, 2));
 
 void vsysErrorBelch(const char *s, va_list ap);
 
@@ -83,7 +83,7 @@ void vsysErrorBelch(const char *s, va_list ap);
  * debugBelch() invokes (*debugMsgFn)().
  */
 void debugBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+   GNU_ATTRIBUTE(format (PRINTF, 1, 2));
 
 void vdebugBelch(const char *s, va_list ap);
 

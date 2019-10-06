@@ -212,7 +212,7 @@ createAdjustor (int cconv,
   returning in some static piece of memory and arrange
   to return to it before tail jumping from the adjustor thunk.
 */
-static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
+static void GNU_ATTRIBUTE(used) obscure_ccall_wrapper(void)
 {
   __asm__ (
    ".globl " UNDERSCORE "obscure_ccall_ret_code\n"

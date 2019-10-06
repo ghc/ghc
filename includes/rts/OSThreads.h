@@ -163,7 +163,7 @@ typedef HANDLE Mutex;
 // General thread operations
 //
 extern OSThreadId osThreadId      ( void );
-extern void shutdownThread        ( void )   GNUC3_ATTRIBUTE(__noreturn__);
+extern void shutdownThread        ( void )   GNU_ATTRIBUTE(__noreturn__);
 extern void yieldThread           ( void );
 
 typedef void* OSThreadProcAttr OSThreadProc(void *);

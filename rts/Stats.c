@@ -64,7 +64,7 @@ static Time *GC_coll_cpu = NULL;
 static Time *GC_coll_elapsed = NULL;
 static Time *GC_coll_max_pause = NULL;
 
-static void statsPrintf( char *s, ... ) GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
+static void statsPrintf( char *s, ... ) GNU_ATTRIBUTE(format (PRINTF, 1, 2));
 static void statsFlush( void );
 static void statsClose( void );
 

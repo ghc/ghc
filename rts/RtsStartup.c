@@ -566,7 +566,7 @@ shutdownHaskellAndExit(int n, int fastExit)
 }
 
 #if !defined(mingw32_HOST_OS)
-static void exitBySignal(int sig) GNUC3_ATTRIBUTE(__noreturn__);
+static void exitBySignal(int sig) GNU_ATTRIBUTE(__noreturn__);
 
 void
 shutdownHaskellAndSignal(int sig, int fastExit)

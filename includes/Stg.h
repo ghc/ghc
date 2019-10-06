@@ -190,12 +190,6 @@
 #define GNU_ATTRIBUTE(at)
 #endif
 
-#if __GNUC__ >= 3
-#define GNUC3_ATTRIBUTE(at) __attribute__((at))
-#else
-#define GNUC3_ATTRIBUTE(at)
-#endif
-
 /* Used to mark a switch case that falls-through */
 #if (defined(__GNUC__) && __GNUC__ >= 7)
 // N.B. Don't enable fallthrough annotations when compiling with Clang.
@@ -213,7 +207,7 @@
 #define GNUC_ATTR_HOT /* nothing */
 #endif
 
-#define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
+#define STG_UNUSED    GNU_ATTRIBUTE(__unused__)
 
 /* Prevent functions from being optimized.
    See Note [Windows Stack allocations] */
@@ -256,7 +250,7 @@ typedef StgFunPtr       F_;
 #define ERO_(X)   extern const StgWordArray (X)
 #define IRO_(X)   static const StgWordArray (X)
 /* stg-native functions: */
-#define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
+#define IF_(f)    static StgFunPtr GNU_ATTRIBUTE(used) f(void)
 #define FN_(f)           StgFunPtr f(void)
 #define EF_(f)           StgFunPtr f(void) /* External Cmm functions */
 /* foreign functions: */

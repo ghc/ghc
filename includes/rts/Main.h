@@ -15,4 +15,4 @@
 int hs_main (int argc, char *argv[],     // program args
              StgClosure *main_closure,   // closure for Main.main
              RtsConfig rts_config)       // RTS configuration
-   GNUC3_ATTRIBUTE(__noreturn__);
+   GNU_ATTRIBUTE(__noreturn__);
