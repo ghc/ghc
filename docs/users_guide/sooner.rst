@@ -31,10 +31,10 @@ Use more memory:
        single: -H; RTS option
 
     If it says you're using more than 20% of total time in garbage collecting,
-    then more memory might help: use the ``-H⟨size⟩`` (see :rts-flag:`-H
-    [⟨size⟩]`) option. Increasing the default allocation area size used by the
-    compiler's RTS might also help: use the ``+RTS -A⟨size⟩ -RTS`` option (see
-    :rts-flag:`-A ⟨size⟩`).
+    then more memory might help: use the ``-H⟨size⟩`` (see
+    :rts-flag:`-H [⟨size⟩]`) option. Increasing the default allocation area
+    size used by the compiler's RTS might also help: use the ``+RTS -A⟨size⟩
+    -RTS`` option (see :rts-flag:`-A ⟨size⟩`).
 
     .. index::
        single: -A⟨size⟩; RTS option
@@ -305,11 +305,12 @@ Use unboxed arrays (``UArray``)
 Use a bigger heap!
     If your program's GC stats (:rts-flag:`-S [⟨file⟩]` RTS option) indicate
     that it's doing lots of garbage-collection (say, more than 20% of execution
-    time), more memory might help — with the :rts-flag:`-H⟨size⟩` or :rts-flag:`-A⟨size⟩` RTS
-    options (see :ref:`rts-options-gc`). As a rule of thumb, try setting
-    :rts-flag:`-H ⟨size⟩` to the amount of memory you're willing to let your process
-    consume, or perhaps try passing :ghc-flag:`-H ⟨size⟩` without any argument
-    to let GHC calculate a value based on the amount of live data.
+    time), more memory might help — with the :rts-flag:`-H [⟨size⟩]` or
+    :rts-flag:`-A ⟨size⟩` RTS options (see :ref:`rts-options-gc`). As a rule
+    of thumb, try setting :rts-flag:`-H [⟨size⟩]` to the amount of memory
+    you're willing to let your process consume, or perhaps try passing
+    :rts-flag:`-H [⟨size⟩]` without any argument to let GHC calculate a value
+    based on the amount of live data.
 
 Compact your data:
     The :ghc-compact-ref:`GHC.Compact.` module
@@ -350,7 +351,7 @@ Thriftier: producing a program that gobbles less heap space
 
 "I think I have a space leak..."
 
-Re-run your program with :ghc-flag:`+RTS -S <-S [⟨file⟩]>`, and remove all
+Re-run your program with :rts-flag:`+RTS -S <-S [⟨file⟩]>`, and remove all
 doubt! (You'll see the heap usage get bigger and bigger...) (Hmmm... this might
 be even easier with the :rts-flag:`-G1 <-G ⟨generations⟩>` RTS option; so...
 ``./a.out +RTS -S -G1``)
