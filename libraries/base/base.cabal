@@ -1,4 +1,4 @@
-cabal-version:  2.2
+cabal-version:  3.0
 name:           base
 version:        4.13.0.0
 -- NOTE: Don't forget to update ./changelog.md
