@@ -10,6 +10,14 @@ fail() {
   exit 1
 }
 
+# If a METRICS_FILE exists and can be read, dump its contents.
+if [ ${METRICS_FILE+"$METRICS_FILE"} -a -r $METRICS_FILE ]
+then
+  echo "v====== Metrics Dump ======v"
+  cat $METRICS_FILE
+  echo "^====== Metrics Dump ======^"
+fi
+
 # Check that private key is available (Set on all GitLab protected branches).
 if [ -z ${PERF_NOTE_KEY+"$PERF_NOTE_KEY"} ]
 then
