@@ -576,7 +576,7 @@ isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args
     dflags <- getDynFlags
     -- See Note [Inlining out-of-line primops and heap checks]
-    return $! isJust $ shouldInlinePrimOp dflags op arg_exprs
+    return $! shouldInlinePrimOp dflags op arg_exprs
 isSimpleOp (StgPrimCallOp _) _                           = return False
 
 -----------------
