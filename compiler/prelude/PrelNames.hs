@@ -464,7 +464,6 @@ basicKnownKeyNames
 
         -- Unsafe coercion proofs
         , unsafeEqualityProofName
-        , unsafeHeteroEqualityProofName
     ]
 
 genericTyConNames :: [Name]
@@ -513,7 +512,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE, gHC_TYPELITS, gHC_TYPENATS, dATA_TYPE_EQUALITY,
-    dATA_COERCE, dEBUG_TRACE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -575,6 +574,7 @@ gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
+uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
 
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
@@ -1321,11 +1321,8 @@ typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
-unsafeEqualityProofName, unsafeHeteroEqualityProofName :: Name
-unsafeEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeEqualityProof")
-                                  unsafeEqualityProofIdKey
-unsafeHeteroEqualityProofName = varQual dATA_TYPE_EQUALITY (fsLit "unsafeHeteroEqualityProof")
-                                        unsafeHeteroEqualityProofIdKey
+unsafeEqualityProofName :: Name
+unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
 
 -- Dynamic
 toDynName :: Name

@@ -1,6 +1,7 @@
-{-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
-             ScopedTypeVariables  #-}
+{-# OPTIONS_GHC -fno-strictness #-}
+
+{-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
+             ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,7 +32,15 @@
 --
 -----------------------------------------------------------------------------
 
-module Unsafe.Coerce (unsafeCoerce) where
+module Unsafe.Coerce
+  ( unsafeCoerce
+  , unsafeEqualityProof
+  , unsafeHeteroEqualityProof
+  -- Users of unsafeEqualityProof/unsafeHeteroEqualityProof will need these too
+  , (:~:)(..)
+  , (:~~:)(..)
+  , castWith
+  ) where
 
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
@@ -39,3 +48,15 @@ import Data.Type.Equality
 
 unsafeCoerce :: forall a b . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of Refl -> x
+
+{-# NOINLINE unsafeEqualityProof #-}
+unsafeEqualityProof :: forall a b . a :~: b
+unsafeEqualityProof = case unsafeEqualityProof @a @b of Refl -> Refl
+
+{-# NOINLINE unsafeHeteroEqualityProof #-}
+unsafeHeteroEqualityProof :: forall a b . a :~~: b
+unsafeHeteroEqualityProof =
+  (case unsafeEqualityProof @k1 @k2 of
+    Refl -> case unsafeEqualityProof @a' @b' of
+      Refl -> HRefl)
+        :: forall k1 k2 (a' :: k1) (b' :: k2). a' :~~: b'

@@ -37,7 +37,7 @@ module GHC.Stable (
 import GHC.Ptr
 import GHC.Base
 import GHC.Prim
-import Data.Type.Equality
+import Unsafe.Coerce
 
 -----------------------------------------------------------------------------
 -- Stable Pointers
