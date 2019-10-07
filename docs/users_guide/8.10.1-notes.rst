@@ -171,6 +171,10 @@ Template Haskell
   :extension:`DeriveLift` has been simplified to take advantage of expression
   quotations.
 
+- Explicit boxed 1-tuples from `HsSyn` are now treated as actual 1-tuples,
+  without flattening. In most of the cases these will be obtained using
+  Template Haskell since it is uncommon to deal with 1-tuples in the source.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

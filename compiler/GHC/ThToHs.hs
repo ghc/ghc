@@ -1368,12 +1368,7 @@ cvtTypeKind ty_str ty
            TupleT n
             | Just normals <- m_normals
             , normals `lengthIs` n         -- Saturated
-               -> if n==1 then return (head normals) -- Singleton tuples treated
-                                                     -- like nothing (ie just parens)
-                          else returnL (HsTupleTy noExtField
-                                        HsBoxedOrConstraintTuple normals)
-            | n == 1
-               -> failWith (ptext (sLit ("Illegal 1-tuple " ++ ty_str ++ " constructor")))
+            -> returnL (HsTupleTy noExtField HsBoxedOrConstraintTuple normals)
             | otherwise
             -> mk_apps
                (HsTyVar noExtField NotPromoted (noLoc (getRdrName (tupleTyCon Boxed n))))
@@ -1491,8 +1486,6 @@ cvtTypeKind ty_str ty
                  -- Promoted data constructor; hence cName
 
            PromotedTupleT n
-              | n == 1
-              -> failWith (ptext (sLit ("Illegal promoted 1-tuple " ++ ty_str)))
               | Just normals <- m_normals
               , normals `lengthIs` n   -- Saturated
               -> returnL (HsExplicitTupleTy noExtField normals)
