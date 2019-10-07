@@ -6,10 +6,16 @@ module ShouldCompile where
 
 import Language.Haskell.TH
 
-foo = $( sigE (appsE [conE (tupleDataName 2),
+tp2 = $( sigE (appsE [conE (tupleDataName 2),
                      litE (integerL 1),
                      litE (integerL 2)])
               (appT (appT (conT (tupleTypeName 2))
                           (conT ''Integer))
+                    (conT ''Integer))
+        )
+
+tp1 = $( sigE (appsE [conE (tupleDataName 1),
+                     litE (integerL 1)])
+              (appT (conT (tupleTypeName 1))
                     (conT ''Integer))
         )

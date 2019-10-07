@@ -1,4 +1,3 @@
 
-TH_Promoted1Tuple.hs:7:3:
-    Illegal promoted 1-tuple type
-    When splicing a TH declaration: type F = '(GHC.Types.Int)
+TH_Promoted1Tuple.hs:7:3: error:
+    Illegal type: ‘'(Int)’ Perhaps you intended to use DataKinds
