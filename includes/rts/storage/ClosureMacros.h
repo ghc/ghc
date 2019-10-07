@@ -256,8 +256,8 @@ INLINE_HEADER bool LOOKS_LIKE_INFO_PTR (StgWord p)
 
 INLINE_HEADER bool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
-    StgWord info = RELAXED_LOAD((StgWord*) &UNTAG_CONST_CLOSURE((const StgClosure *) (p))->header.info);
-    return LOOKS_LIKE_INFO_PTR(info);
+    const StgInfoTable *info = RELAXED_LOAD(&UNTAG_CONST_CLOSURE((const StgClosure *) (p))->header.info);
+    return LOOKS_LIKE_INFO_PTR((StgWord) info);
 }
 
 /* -----------------------------------------------------------------------------
