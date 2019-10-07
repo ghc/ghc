@@ -102,7 +102,7 @@ type PrintedType = String
 -- >       hieAst
 --
 -- However, this is very inefficient (both in time and space) because the
--- mutliple calls to 'recoverFullType' don't share intermediate results. This
+-- multiple calls to 'recoverFullType' don't share intermediate results. This
 -- function fixes that.
 recoverFullIfaceTypes
   :: DynFlags

@@ -18,12 +18,13 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
-import HieTypes       ( HieFile(..), HieASTs(..) )
+import HieTypes       ( HieFile(..), HieASTs(..), HieAST(..), NodeInfo(..) )
 import HieBin         ( readHieFile, hie_file_result)
 import Data.Map as M
 import FastString     ( mkFastString )
 import Module         ( Module, moduleName )
 import NameCache      ( initNameCache )
+import SrcLoc         ( mkRealSrcLoc, realSrcLocSpan )
 import UniqSupply     ( mkSplitUniqSupply )
 
 
@@ -65,26 +66,37 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile
                  <$> (readHieFile (initNameCache u []) hfp)
 
         -- Get the AST and tokens corresponding to the source file we want
-        let mast | M.size asts == 1 = snd <$> M.lookupMin asts
-                 | otherwise        = M.lookup (mkFastString file) asts
+        let fileFs = mkFastString file
+            mast | M.size asts == 1 = snd <$> M.lookupMin asts
+                 | otherwise        = M.lookup fileFs asts
+            ast = fromMaybe (emptyHieAst fileFs) mast
+            fullAst = recoverFullIfaceTypes df types ast
             tokens = parse df file rawSrc
 
+        -- Warn if we didn't find an AST, but there were still ASTs
+        if M.null asts
+          then pure ()
+          else out verbosity verbose $ unwords [ "couldn't find ast for"
+                                               , file, show (M.keys asts) ]
+
         -- Produce and write out the hyperlinked sources
-        case mast of
-          Just ast ->
-              let fullAst = recoverFullIfaceTypes df types ast
-              in writeUtf8File path . renderToString pretty . render' fullAst $ tokens
-          Nothing
-            | M.size asts == 0 -> return ()
-            | otherwise -> do
-                out verbosity verbose $ unwords [ "couldn't find ast for"
-                                                , file, show (M.keys asts) ]
-                return ()
+        writeUtf8File path . renderToString pretty . render' fullAst $ tokens
     Nothing -> return ()
   where
     df = ifaceDynFlags iface
     render' = render (Just srcCssFile) (Just highlightScript) srcs
     path = srcdir </> hypSrcModuleFile (ifaceMod iface)
+
+    emptyNodeInfo = NodeInfo
+      { nodeAnnotations = mempty
+      , nodeType = []
+      , nodeIdentifiers = mempty
+      }
+    emptyHieAst fileFs = Node
+      { nodeInfo = emptyNodeInfo
+      , nodeSpan = realSrcLocSpan (mkRealSrcLoc fileFs 1 0)
+      , nodeChildren = []
+      }
 
 -- | Name of CSS file in output directory.
 srcCssFile :: FilePath
