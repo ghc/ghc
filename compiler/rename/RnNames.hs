@@ -1774,7 +1774,10 @@ packageImportErr
 -- from interface files, which always print in prefix form
 
 checkConName :: RdrName -> TcRn ()
-checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
+checkConName name = checkErr (isRdrDataCon name && is_okay) (badDataCon name)
+  where
+    -- Don't allow binding of built-in names (#16999)
+    is_okay = isNothing $ isBuiltInOcc_maybe $ rdrNameOcc name
 
 badDataCon :: RdrName -> SDoc
 badDataCon name
