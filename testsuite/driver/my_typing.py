@@ -44,7 +44,7 @@ GitRef = NewType("GitRef", str)
 TestEnv = NewType("TestEnv", str)
 MetricName = NewType("MetricName", str)
 
-MetricBaselineOracle = Callable[[WayName, GitHash], Optional[float]]
-MetricDeviationOracle = Callable[[WayName, GitHash], Optional[float]]
+MetricBaselineOracle = Callable[[WayName, GitHash], Optional[Any]]
+MetricDeviationOracle = Callable[[WayName, GitHash], Optional[Any]]
 MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
                                              ("deviation", MetricDeviationOracle)])
