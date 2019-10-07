@@ -1,5 +1,8 @@
 #pragma once
 
+-- For GHC_STAGE
+#include "ghcplatform.h"
+
 #if 0
 
 IMPORTANT!  If you put extra tabs/spaces in these macro definitions,
