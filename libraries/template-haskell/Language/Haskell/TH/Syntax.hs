@@ -1534,19 +1534,16 @@ tupleDataName :: Int -> Name
 -- | Tuple type constructor
 tupleTypeName :: Int -> Name
 
-tupleDataName 0 = mk_tup_name 0 DataName
-tupleDataName 1 = error "tupleDataName 1"
-tupleDataName n = mk_tup_name (n-1) DataName
-
-tupleTypeName 0 = mk_tup_name 0 TcClsName
-tupleTypeName 1 = error "tupleTypeName 1"
-tupleTypeName n = mk_tup_name (n-1) TcClsName
+tupleDataName n = mk_tup_name n DataName
+tupleTypeName n = mk_tup_name n TcClsName
 
 mk_tup_name :: Int -> NameSpace -> Name
-mk_tup_name n_commas space
-  = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
+mk_tup_name n space
+  = Name (mkOccName tup_occ) (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
-    occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
+    tup_occ | n == 1    = "Unit" -- See Note [One-tuples] in TysWiredIn
+            | otherwise = "(" ++ replicate n_commas ',' ++ ")"
+    n_commas = n - 1
     tup_mod = mkModName "GHC.Tuple"
 
 -- Unboxed tuple data and type constructors
