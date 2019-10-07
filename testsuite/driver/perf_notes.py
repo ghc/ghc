@@ -81,6 +81,11 @@ AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                 ('opts', Dict[str, str])
                                 ])
 
+MetricBaselineOracle = Callable[[WayName, GitHash], Baseline]
+MetricDeviationOracle = Callable[[WayName, GitHash], Optional[float]]
+MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
+                                             ("deviation", MetricDeviationOracle)])
+
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
     return PerfStat(*field_vals) # type: ignore
@@ -183,7 +188,7 @@ def parse_allowed_perf_changes(commitMsg: str
 # Calculates a suggested string to append to the git commit in order to accept the
 # given changes.
 # changes: [(MetricChange, PerfStat)]
-def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
+def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat, Any]]
                          ) -> str:
     Dec = MetricChange.Decrease
     Inc = MetricChange.Increase
@@ -193,7 +198,7 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
 
     # Map tests to a map from change direction to metrics.
     test_to_dir_to_metrics = {} # type: Dict[TestName, Dict[MetricChange, List[MetricName]]]
-    for (change, perf_stat) in changes:
+    for (change, perf_stat, _baseline) in changes:
         change_dir_to_metrics = test_to_dir_to_metrics.setdefault(perf_stat.test, { Inc: [], Dec: [] })
         change_dir_to_metrics[change].append(perf_stat.metric)
 
@@ -246,12 +251,12 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
     return '\n\n'.join(msgs)
 
 # Formats a list of metrics into a string. Used e.g. to save metrics to a file or git note.
-def format_perf_stat(stats: Union[PerfStat, List[PerfStat]]) -> str:
+def format_perf_stat(stats: Union[PerfStat, List[PerfStat]], delimitor: str = "\t") -> str:
     # If a single stat, convert to a singleton list.
     if not isinstance(stats, list):
         stats = [stats]
 
-    return "\n".join(["\t".join([str(stat_val) for stat_val in stat]) for stat in stats])
+    return "\n".join([delimitor.join([str(stat_val) for stat_val in stat]) for stat in stats])
 
 # Appends a list of metrics to the git note of the given commit.
 # Tries up to max_tries times to write to git notes should it fail for some reason.
@@ -514,7 +519,8 @@ def get_commit_metric(gitNoteRef,
 # force_print: Print stats even if the test stat was in the tolerance range.
 # Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are withing the expected value ranges.
 def check_stats_change(actual: PerfStat,
-                       baseline, tolerance_dev,
+                       baseline: Baseline,
+                       tolerance_dev,
                        allowed_perf_changes: Dict[TestName, List[AllowedPerfChange]] = {},
                        force_print = False
                        ) -> Tuple[MetricChange, Any]:
