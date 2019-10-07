@@ -47,7 +47,7 @@ import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
-import PrelNames        ( unsafeEqualityProofName, unsafeHeteroEqualityProofName )
+import PrelNames        ( unsafeEqualityProofName )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -438,16 +438,14 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     scrut2 <- coreToStgExpr scrut
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
     case scrut2 of
-      StgApp id []
-        | idName id == unsafeEqualityProofName ||
-          idName id == unsafeHeteroEqualityProofName ->
-            case alts2 of
-              [(_, [_co], rhs)] ->
-                return rhs
-              _ ->
-                pprPanic "coreToStgExpr" $
-                  text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
-                  text "STG:" $$ ppr stg
+      StgApp id [] | idName id == unsafeEqualityProofName ->
+        case alts2 of
+          [(_, [_co], rhs)] ->
+            return rhs
+          _ ->
+            pprPanic "coreToStgExpr" $
+              text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
+              text "STG:" $$ ppr stg
       _ -> return stg
   where
     vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)
