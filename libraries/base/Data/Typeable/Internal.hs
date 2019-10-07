@@ -90,7 +90,7 @@ import GHC.Word
 import GHC.Show
 import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
 import GHC.TypeNats ( KnownNat, natVal' )
-import Unsafe.Coerce ( unsafeCoerce )
+import Unsafe.Coerce
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint
