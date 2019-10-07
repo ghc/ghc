@@ -1,5 +1,7 @@
 
-TH_1tuple.hs:11:7:
-    Illegal 1-tuple type constructor
-    When splicing a TH expression: 1 :: ()
-    In the untyped splice: $(sigE [| 1 |] (tupleT 1))
+TH_1tuple.hs:11:7: error:
+    • Expecting one more argument to ‘Unit’
+      Expected a type, but ‘Unit’ has kind ‘* -> *’
+    • In an expression type signature: Unit
+      In the expression: (1 :: Unit)
+      In an equation for ‘y’: y = (1 :: Unit)
