@@ -279,7 +279,7 @@ hadrian-ghc-in-ghci:
       make binary-dist TAR_COMP_OPTS="-1"
     - |
       # Prepare to push git notes.
-      METRICS_FILE=$(mktemp)
+      METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
     - |
@@ -296,6 +296,7 @@ hadrian-ghc-in-ghci:
     paths:
       - ghc-*.tar.xz
       - junit.xml
+      - performance-metrics.tsv
 
 #################################
 # x86_64-darwin

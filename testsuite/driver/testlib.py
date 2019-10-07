@@ -26,7 +26,7 @@ from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
-from perf_notes import MetricChange
+from perf_notes import MetricChange, PerfStat, MetricOracles
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
@@ -1317,7 +1317,7 @@ def static_stats( name, way, stats_file ):
     opts = getTestOpts()
     return check_stats(name, way, in_statsdir(stats_file), opts.stats_range_fields)
 
-def metric_dict(name, way, metric, value):
+def metric_dict(name, way, metric, value) -> PerfStat:
     return Perf.PerfStat(
         test_env = config.test_env,
         test     = name,
@@ -1380,7 +1380,7 @@ def check_stats(name: TestName,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append((change, perf_stat))
+                t.metrics.append((change, perf_stat, baseline))
 
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
