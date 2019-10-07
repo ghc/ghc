@@ -426,17 +426,19 @@ vanillaConGrd scrut con arg_ids =
 -- | Creates a 'PmPat' representing a match against a list of the given type,
 -- where list fields are matched against the given 'PatVec'.
 -- Example, translates
---   [(x | True <- x),(y | !y)]
+--   [(x, True <- x),(y, !y)]
 -- to
 --   (x:b) <- a, True <- x, (y:c) <- b, seq y True, [] <- c
--- where a,b,c are freshly allocated in @mkListPat@ and a is the Id hint coming
+-- where b,c are freshly allocated in @mkListPat@ and a is the Id hint coming
 -- from the call site.
-mkListPat :: Id -> [Id] -> DsM GrdVec
-mkListPat a []     = pure [vanillaConGrd a nilDataCon []]
-mkListPat a (x:xs) = do
+mkListPat :: Id -> [(Id, GrdVec)] -> DsM GrdVec
+-- See Note [Order of guards matter] for why we need to intertwine guards
+-- on list elements.
+mkListPat a []                  = pure [vanillaConGrd a nilDataCon []]
+mkListPat a ((x, head_grds):xs) = do
   b <- mkPmId (idType a)
   tail_grds <- mkListPat b xs
-  pure $ vanillaConGrd a consDataCon [x, b] : tail_grds
+  pure $ vanillaConGrd a consDataCon [x, b] : head_grds ++ tail_grds
 
 -- | Create a 'PmLit' pattern
 mkPmLitPat :: Id -> PmLit -> DsM GrdVec
@@ -449,7 +451,7 @@ mkPmLitPat x (PmLit _ (PmLitString s)) = do
   vars <- traverse mkPmId (take (lengthFS s) (repeat charTy))
   let mk_char_lit y c = mkPmLitPat y (PmLit charTy (PmLitChar c))
   char_grdss <- zipWithM mk_char_lit vars (unpackFS s)
-  (++ concat char_grdss) <$> mkListPat x vars
+  mkListPat x (zip vars char_grdss)
 mkPmLitPat x lit = do
   let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
@@ -583,7 +585,7 @@ translatePat fam_insts x pat = case pat of
   TuplePat _tys lpats boxity -> do
     let pats = map unLoc lpats
     vars <- selectMatchVars pats
-    grds <- translatePatVec fam_insts vars pats
+    grds <- concat <$> translatePatVec fam_insts vars pats
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars : grds
 
@@ -604,12 +606,11 @@ translateListPat fam_insts x lpats = do
   let pats = map unLoc lpats
   vars <- selectMatchVars pats
   grds <- translatePatVec fam_insts vars pats
-  (++ grds) <$> mkListPat x vars
+  mkListPat x (zip vars grds)
 
 -- | Translate a list of patterns
-translatePatVec :: FamInstEnvs -> [Id] -> [Pat GhcTc] -> DsM GrdVec
-translatePatVec fam_insts vars ps =
-  concat <$> zipWithM (translatePat fam_insts) vars ps
+translatePatVec :: FamInstEnvs -> [Id] -> [Pat GhcTc] -> DsM [GrdVec]
+translatePatVec fam_insts vars ps = zipWithM (translatePat fam_insts) vars ps
 
 -- | Translate a constructor pattern
 translateConPatOut :: FamInstEnvs -> Id -> ConLike -> [Type] -> [TyVar]
@@ -671,7 +672,7 @@ translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM (GrdVec, [GrdVec])
 translateMatch fam_insts vars (dL->L _ (Match { m_pats = lpats, m_grhss = grhss }))
   = do
-      pats'   <- translatePatVec fam_insts vars pats
+      pats'   <- concat <$> translatePatVec fam_insts vars pats
       guards' <- mapM (translateGuards fam_insts) guards
       -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
       return (pats', guards')
@@ -756,6 +757,26 @@ right order. As a result, we get the PatVec @[T !_ b c, 42 <- c, 'b' <- b]@.
 
 Of course, when the labels occur in the order they are defined, we can just use
 the simpler desugaring.
+
+Note [Order of guards matters]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similar to Note [Field match order for RecCon], the order in which the guards
+for a pattern match appear matter. Consider a situation similar to T5117:
+
+  f (0:_)  = ()
+  f (0:[]) = ()
+
+The latter clause is clearly redundant. Yet if we translate the second clause as
+
+  [x:xs' <- xs, [] <- xs', 0 <- x]
+
+We will say that the second clause only has an inaccessible RHS. That's because
+we force the tail of the list before comparing its head! So the correct
+translation would have been
+
+  [x:xs' <- xs, 0 <- x, [] <- xs']
+
+And we have to take in the guards on list cells into @mkListPat@.
 
 Note [Countering exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1165,7 +1186,7 @@ addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
 -- discards).
 addPatTmCs ps xs k = do
   fam_insts <- dsGetFamInstEnvs
-  grds <- translatePatVec fam_insts xs ps
+  grds <- concat <$> translatePatVec fam_insts xs ps
   locallyExtendPmDelta (\delta -> computeCovered grds delta) k
 
 -- | A dead simple version of 'pmCheck' that only computes the Covered set.
