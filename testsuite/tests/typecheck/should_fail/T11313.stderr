@@ -1,5 +1,5 @@
 
-T11313.hs:5:13: error:
+T11313.hs:5:12: error:
     • Expected kind ‘* -> *’, but ‘*’ has kind ‘*’
     • In the type ‘(*)’
       In the expression: fmap @(*)

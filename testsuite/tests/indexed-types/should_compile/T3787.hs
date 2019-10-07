@@ -76,7 +76,7 @@ data TrampolineState s m r =
    -- | Trampoline computation is finished with final value /r/.
    Done r
    -- | Computation is suspended, its remainder is embedded in the functor /s/.
- | Suspend! (s (Trampoline s m r))
+ | Suspend !(s (Trampoline s m r))
 
 instance (Functor s, Monad m) => Functor (Trampoline s m) where
    fmap = liftM
@@ -101,11 +101,11 @@ instance (Functor s, ParallelizableMonad m) => ParallelizableMonad (Trampoline s
 instance Functor s => MonadTrans (Trampoline s) where
    lift = Trampoline . liftM Done
 
-data Yield x y = Yield! x y
+data Yield x y = Yield !x y
 instance Functor (Yield x) where
    fmap f (Yield x y) = Yield x (f y)
 
-data Await x y = Await! (x -> y)
+data Await x y = Await !(x -> y)
 instance Functor (Await x) where
    fmap f (Await g) = Await (f . g)
 
