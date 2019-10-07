@@ -1534,20 +1534,8 @@ tupleDataName :: Int -> Name
 -- | Tuple type constructor
 tupleTypeName :: Int -> Name
 
-tupleDataName 0 = mk_tup_name 0 DataName
-tupleDataName 1 = error "tupleDataName 1"
-tupleDataName n = mk_tup_name (n-1) DataName
-
-tupleTypeName 0 = mk_tup_name 0 TcClsName
-tupleTypeName 1 = error "tupleTypeName 1"
-tupleTypeName n = mk_tup_name (n-1) TcClsName
-
-mk_tup_name :: Int -> NameSpace -> Name
-mk_tup_name n_commas space
-  = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
-  where
-    occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
-    tup_mod = mkModName "GHC.Tuple"
+tupleDataName n = mk_tup_name n DataName  True
+tupleTypeName n = mk_tup_name n TcClsName True
 
 -- Unboxed tuple data and type constructors
 -- | Unboxed tuple data constructor
@@ -1555,15 +1543,18 @@ unboxedTupleDataName :: Int -> Name
 -- | Unboxed tuple type constructor
 unboxedTupleTypeName :: Int -> Name
 
-unboxedTupleDataName n = mk_unboxed_tup_name n DataName
-unboxedTupleTypeName n = mk_unboxed_tup_name n TcClsName
+unboxedTupleDataName n = mk_tup_name n DataName  False
+unboxedTupleTypeName n = mk_tup_name n TcClsName False
 
-mk_unboxed_tup_name :: Int -> NameSpace -> Name
-mk_unboxed_tup_name n space
+mk_tup_name :: Int -> NameSpace -> Bool -> Name
+mk_tup_name n space boxed
   = Name (mkOccName tup_occ) (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
-    tup_occ | n == 1    = "Unit#" -- See Note [One-tuples] in TysWiredIn
-            | otherwise = "(#" ++ replicate n_commas ',' ++ "#)"
+    withParens thing
+      | boxed     = "("  ++ thing ++ ")"
+      | otherwise = "(#" ++ thing ++ "#)"
+    tup_occ | n == 1    = if boxed then "Unit" else "Unit#"
+            | otherwise = withParens (replicate n_commas ',')
     n_commas = n - 1
     tup_mod  = mkModName "GHC.Tuple"
 

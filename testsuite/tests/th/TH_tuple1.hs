@@ -1,15 +1,9 @@
-{-# LANGUAGE TemplateHaskell #-}
-
--- Test the use of tupleDataName, tupleTypeName
-
-module ShouldCompile where
+module Main where
 
 import Language.Haskell.TH
+import TH_tuple1a
 
-foo = $( sigE (appsE [conE (tupleDataName 2),
-                     litE (integerL 1),
-                     litE (integerL 2)])
-              (appT (appT (conT (tupleTypeName 2))
-                          (conT ''Integer))
-                    (conT ''Integer))
-        )
+main :: IO ()
+main = do
+ let pprQ = \a -> print a >> (putStrLn $ pprint a)
+ mapM_ (\q -> runQ q >>= pprQ) [tp2, tp1, tp2u, tp1u]
