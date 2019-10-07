@@ -106,7 +106,7 @@ import Foreign.C
 
 import Data.Typeable
 import Data.Maybe
-import Data.Type.Equality
+import Unsafe.Coerce
 
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )

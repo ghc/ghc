@@ -29,7 +29,6 @@ import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO
 import Control.Exception ( ErrorCall(..) )
-import Data.Type.Equality
 import Unsafe.Coerce
 
 createBCOs :: [ResolvedBCO] -> IO [HValueRef]

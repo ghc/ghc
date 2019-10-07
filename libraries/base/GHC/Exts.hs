@@ -106,7 +106,7 @@ import Data.OldList
 import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
-import Data.Type.Equality
+import Unsafe.Coerce
 import qualified Debug.Trace
 
 -- XXX This should really be in Data.Tuple, where the definitions are
