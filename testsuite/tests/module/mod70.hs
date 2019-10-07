@@ -1,3 +1,3 @@
 -- !!! Illegal ~ in expression
 module M where
-f x = x~1
+f x = x ~1

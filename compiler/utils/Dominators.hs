@@ -364,11 +364,11 @@ domM = fetch domE
 rootM :: Dom s Node
 rootM = gets rootE
 succsM :: Node -> Dom s [Node]
-succsM i = gets (IS.toList . (!i) . succE)
+succsM i = gets (IS.toList . (! i) . succE)
 predsM :: Node -> Dom s [Node]
-predsM i = gets (IS.toList . (!i) . predE)
+predsM i = gets (IS.toList . (! i) . predE)
 bucketM :: Node -> Dom s [Node]
-bucketM i = gets (IS.toList . (!i) . bucketE)
+bucketM i = gets (IS.toList . (! i) . bucketE)
 sizeM :: Node -> Dom s Int
 sizeM = fetch sizeE
 sdnoM :: Node -> Dom s Int
