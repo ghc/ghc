@@ -2413,9 +2413,8 @@ naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
 -- Unsafe coercion proofs
-unsafeEqualityProofIdKey, unsafeHeteroEqualityProofIdKey :: Unique
+unsafeEqualityProofIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
-unsafeHeteroEqualityProofIdKey = mkPreludeMiscIdUnique 571
 
 {-
 ************************************************************************
