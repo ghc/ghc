@@ -46,6 +46,7 @@ extra-source-files:
   html-test/src/*.hs
   html-test/ref/*.html
   hypsrc-test/src/*.hs
+  hypsrc-test/src/*.h
   hypsrc-test/ref/src/*.html
   latex-test/src/**/*.hs
   latex-test/ref/**/*.tex
