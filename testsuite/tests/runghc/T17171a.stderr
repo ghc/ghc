@@ -1,5 +1,6 @@
-Main.hs:1:1: error:
+T17171a.hs:1:1:
     The IO action ‘main’ is not exported by module ‘Main’
   |
 1 | module Main () where
   | ^
+make: *** [T17171a] Error 1
