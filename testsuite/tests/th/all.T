@@ -102,7 +102,8 @@ test('TH_spliceE3', normal, compile, ['-v0'])
 test('TH_spliceE4', normal, compile_and_run, [''])
 
 test('TH_class1', normal, compile, ['-v0'])
-test('TH_tuple1', normal, compile, ['-v0'])
+test('TH_tuple1', [], multimod_compile_and_run,
+    ['TH_tuple1', '-v0 ' + config.ghc_th_way_flags])
 test('TH_genEx', [], multimod_compile,
      ['TH_genEx', '-v0 ' + config.ghc_th_way_flags])
 
