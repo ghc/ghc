@@ -31,8 +31,6 @@ if test ! -f mk/config.h.in; then
    exit 1
 fi
 
-AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
-
 dnl this makes sure `./configure --target=<cross-compile-target>`
 dnl works as expected, since we're slightly modifying how Autoconf
 dnl interprets build/host/target and how this interacts with $CC tests
@@ -93,10 +91,6 @@ AC_ARG_WITH([ghc],
         AS_HELP_STRING([--with-ghc=ARG], [Use ARG as the path to ghc (obsolete, use GHC=ARG instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
-
-dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
-AC_SUBST(OSTYPE)
 
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
@@ -171,9 +165,6 @@ then
      or 'GHC=' to specify a different GHC to use.])
     fi
 fi
-
-GHC_PACKAGE_DB_FLAG=package-db
-AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -1317,8 +1308,14 @@ AC_SUBST(BUILD_MAN)
 AC_SUBST(BUILD_SPHINX_HTML)
 AC_SUBST(BUILD_SPHINX_PDF)
 
+dnl ** Determine library versions
+dnl The packages below should include all packages needed by
+dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
+LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(parallel)
+LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
