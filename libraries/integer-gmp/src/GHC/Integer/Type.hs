@@ -478,10 +478,9 @@ timesInteger x       (S# 1#) = x
 timesInteger (S# 1#) y       = y
 timesInteger x      (S# -1#) = negateInteger x
 timesInteger (S# -1#) y      = negateInteger y
-timesInteger (S# x#) (S# y#)
-  = case mulIntMayOflo# x# y# of
-    0# -> S# (x# *# y#)
-    _  -> timesInt2Integer x# y#
+timesInteger (S# x#) (S# y#) = case timesInt2# x# y# of
+                                 (# 0#, _h, l #) -> S# l
+                                 (# _ ,  h, l #) -> int2ToInteger h l
 timesInteger x@(S# _) y      = timesInteger y x
 -- no S# as first arg from here on
 timesInteger (Jp# x) (Jp# y) = Jp# (timesBigNat x y)
@@ -503,6 +502,22 @@ sqrInteger (S# j#) | isTrue# (absI# j# <=# SQRT_INT_MAXBOUND#) = S# (j# *# j#)
 sqrInteger (S# j#) = timesInt2Integer j# j#
 sqrInteger (Jp# bn) = Jp# (sqrBigNat bn)
 sqrInteger (Jn# bn) = Jp# (sqrBigNat bn)
+
+-- | Convert two Int# (resp. high and low bits of a double-word Int#) into an
+-- Integer
+--
+-- Warning: currently it doesn't handle the case where high=minBound and low=0
+-- (i.e. high:low = 100......00 = minBound for a double-word Int)
+int2ToInteger :: Int# -> Int# -> Integer
+int2ToInteger h l
+  | isTrue# (h <# 0#) =
+      case addWordC# (not# (int2Word# l)) 1## of -- two's complement...
+         (# lw,c #) -> Jn# (wordToBigNat2
+                              -- add the carry to the high word
+                              (int2Word# c `plusWord#` not# (int2Word# h))
+                              lw
+                          )
+  | True = Jp# (wordToBigNat2 (int2Word# h) (int2Word# l))
 
 -- | Construct 'Integer' from the product of two 'Int#'s
 timesInt2Integer :: Int# -> Int# -> Integer
