@@ -11,7 +11,7 @@ import Oracles.Setting
 
 data Flag = ArSupportsAtFile
           | CrossCompiling
-          | GccIsClang
+          | CcLlvmBackend
           | GhcUnregisterised
           | TablesNextToCode
           | GmpInTree
@@ -23,13 +23,13 @@ data Flag = ArSupportsAtFile
           | UseSystemFfi
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
--- fragile, but some flags do behave like this, e.g. GccIsClang.
+-- fragile, but some flags do behave like this.
 flag :: Flag -> Action Bool
 flag f = do
     let key = case f of
             ArSupportsAtFile   -> "ar-supports-at-file"
             CrossCompiling     -> "cross-compiling"
-            GccIsClang         -> "gcc-is-clang"
+            CcLlvmBackend      -> "cc-llvm-backend"
             GhcUnregisterised  -> "ghc-unregisterised"
             TablesNextToCode   -> "tables-next-to-code"
             GmpInTree          -> "intree-gmp"

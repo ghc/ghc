@@ -106,7 +106,7 @@ packageArgs = do
         , package ghcPrim ? mconcat
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
-          , builder (Cc CompileC) ? (not <$> flag GccIsClang) ?
+          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
@@ -278,10 +278,10 @@ rtsPackageArgs = package rts ? do
             -- any warnings in the module. See:
             -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag GccIsClang) ?
+            , (not <$> flag CcLlvmBackend) ?
               inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "**/RetainerProfile.c" ? flag GccIsClang ?
+            , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
             , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 

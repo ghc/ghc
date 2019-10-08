@@ -527,7 +527,9 @@ GccVersion            = @GccVersion@
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
 GccLT46         = @GccLT46@
-GccIsClang      = @GccIsClang@
+
+# Do we have a C compiler using an LLVM back end?
+CcLlvmBackend   = @CcLlvmBackend@
 
 CC              = @CC@
 CC_STAGE0       = @CC_STAGE0@

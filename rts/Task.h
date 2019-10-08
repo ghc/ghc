@@ -271,7 +271,7 @@ extern uint32_t peakWorkerCount;
 #if ((defined(linux_HOST_OS) && \
      (defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH))) || \
     (defined(mingw32_HOST_OS) && __GNUC__ >= 4 && __GNUC_MINOR__ >= 4)) && \
-    (!defined(llvm_CC_FLAVOR))
+    (!defined(CC_LLVM_BACKEND))
 #define MYTASK_USE_TLV
 extern __thread Task *my_task;
 #else

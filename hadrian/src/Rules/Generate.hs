@@ -379,20 +379,10 @@ generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
     trackGenerateHs
     configHContents  <- expr $ map undefinePackage <$> readFileLines configH
-    tablesNextToCode <- getFlag    TablesNextToCode
-    ghcUnreg         <- getFlag    GhcUnregisterised
-    ccLlvmBackend    <- getSetting CcLlvmBackend
-    ccClangBackend   <- getSetting CcClangBackend
     return . unlines $
         [ "#if !defined(__GHCAUTOCONF_H__)"
         , "#define __GHCAUTOCONF_H__" ]
         ++ configHContents ++
-        [ "\n#define TABLES_NEXT_TO_CODE 1" | tablesNextToCode && not ghcUnreg ]
-        ++
-        [ "\n#define llvm_CC_FLAVOR 1"      | ccLlvmBackend == "1" ]
-        ++
-        [ "\n#define clang_CC_FLAVOR 1"     | ccClangBackend == "1" ]
-        ++
         [ "#endif /* __GHCAUTOCONF_H__ */" ]
   where
     undefinePackage s
