@@ -30,6 +30,7 @@ import SMRep
 import UniqSupply
 import CostCentre
 import GHC.StgToCmm.Heap
+import ErrUtils
 
 import Control.Monad
 import Data.Map (Map)
@@ -785,7 +786,11 @@ doSRTs dflags moduleSRTInfo tops = do
             oneSRT dflags staticFuns [BlockLabel l] [cafLbl] True{-is a CAF-} cafs static_data
           return (nonCAFs ++ cAFs)
 
-      (declss, pairs, funSRTs) = unzip3 result
+      (srt_declss, pairs, funSRTs) = unzip3 result
+      srt_decls = concat srt_declss
+
+  unless (null srt_decls) $
+    dumpIfSet_dyn dflags Opt_D_dump_srts "SRTs" (ppr srt_decls)
 
   -- Next, update the info tables with the SRTs
   let
@@ -793,7 +798,7 @@ doSRTs dflags moduleSRTInfo tops = do
     funSRTMap = mapFromList (concat funSRTs)
     decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap) decls
 
-  return (moduleSRTInfo', concat declss ++ decls')
+  return (moduleSRTInfo', srt_decls ++ decls')
 
 
 -- | Build the SRT for a strongly-connected component of blocks
