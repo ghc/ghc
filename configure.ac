@@ -241,25 +241,27 @@ AC_SUBST(SOLARIS_BROKEN_SHLD)
 
 dnl ** Do an unregisterised build?
 dnl --------------------------------------------------------------
+
+AC_MSG_CHECKING(whether target supports a registerised ABI)
 case "$TargetArch" in
     i386|x86_64|powerpc|powerpc64|powerpc64le|arm|aarch64)
         UnregisterisedDefault=NO
+        AC_MSG_RESULT([yes])
         ;;
     *)
         UnregisterisedDefault=YES
+        AC_MSG_RESULT([no])
         ;;
 esac
-AC_ARG_ENABLE(unregisterised,
-[AC_HELP_STRING([--enable-unregisterised],
-[Build an unregisterised compiler (enabled by default on platforms without registerised support) [default="$UnregisterisedDefault"]])],
-[ if test x"$enableval" = x"yes"; then
-        Unregisterised=YES
-  else
-        Unregisterised=NO
-  fi
-],
-[Unregisterised="$UnregisterisedDefault"]
-)
+FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
+  [unregisterised],
+  [unregisterised],
+  [registerised],
+  [Unregisterised],
+  [Build a toolchain with the unregisterised ABI (disabled by default on platforms with registerised support)],
+  [NO],
+  [YES],
+  [no])
 AC_SUBST(Unregisterised)
 
 dnl ** Do a build with tables next to code?
@@ -272,43 +274,35 @@ dnl decided by options to the compiler later.
 dnl
 dnl See https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code
 dnl --------------------------------------------------------------
+
+AC_MSG_CHECKING(whether target supports tables next to code)
 case "$Unregisterised" in
     NO)
         case "$TargetArch" in
             ia64|powerpc64|powerpc64le)
                 TablesNextToCodeDefault=NO
+                AC_MSG_RESULT([no])
                 ;;
             *)
                 TablesNextToCodeDefault=YES
+                AC_MSG_RESULT([yes])
                 ;;
         esac
         ;;
     YES)
         TablesNextToCodeDefault=NO
+        AC_MSG_RESULT([no])
         ;;
 esac
-AC_ARG_ENABLE(tables-next-to-code,
-[AC_HELP_STRING([--enable-tables-next-to-code],
-[Build an tables-next-to-code compiler (enabled by default on platforms without registerised support) [default="$TablesNextToCodeDefault"]])],
-[ if test x"$enableval" = x"yes"; then
-        TablesNextToCode=YES
-  else
-        TablesNextToCode=NO
-  fi
-],
-[TablesNextToCode="$TablesNextToCodeDefault"]
-)
-
-fail() {
-    echo >&2
-    echo "$1" >&2
-    exit 1
-}
-
-if test "$TablesNextToCodeDefault" = "NO" && test "$TablesNextToCode" = "YES"; then
-    fail "Error: tables next to code was requested but is not supported"
+FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
+  [tables-next-to-code],
+  [tables next to code],
+  [tables apart from code],
+  [TablesNextToCode],
+  [Build a tool chain with info tables layed out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
+if test x"$TablesNextToCode" = xYES; then
+   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are layed out next to code])
 fi
-
 AC_SUBST(TablesNextToCode)
 
 dnl ** Does target have runtime linker support?
@@ -389,7 +383,7 @@ set_up_tarballs() {
         find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
         rm ".MTREE" &&
         rm ".PKGINFO" &&
-        cd .. ) || fail "Error: Could not extract Windows toolchains."
+        cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
 
         mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
         touch inplace/mingw
@@ -1373,11 +1367,7 @@ echo "\
 "
 
 if test "x$CC_LLVM_BACKEND" = "x1"; then
-    if test "x$CC_CLANG_BACKEND" = "x1"; then
-        CompilerName="clang        "
-    else
-        CompilerName="llvm-gcc     "
-    fi
+    CompilerName="clang        "
 else
     CompilerName="gcc          "
 fi

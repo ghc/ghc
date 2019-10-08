@@ -523,7 +523,7 @@ rts/win32/ThrIOManager_CC_OPTS += -w
 # for details
 
 # Without this, thread_obj will not be inlined (at least on x86 with GCC 4.1.0)
-ifneq "$(CC_CLANG_BACKEND)" "1"
+ifneq "$(CcLlvmBackend)" "YES"
 rts/sm/Compact_CC_OPTS += -finline-limit=2500
 endif
 

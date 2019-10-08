@@ -25,8 +25,6 @@ data Setting = BuildArch
              | BuildOs
              | BuildPlatform
              | BuildVendor
-             | CcClangBackend
-             | CcLlvmBackend
              | CursesLibDir
              | DynamicExtension
              | FfiIncludeDir
@@ -113,8 +111,6 @@ setting key = lookupValueOrError configFile $ case key of
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
     BuildVendor        -> "build-vendor"
-    CcClangBackend     -> "cc-clang-backend"
-    CcLlvmBackend      -> "cc-llvm-backend"
     CursesLibDir       -> "curses-lib-dir"
     DynamicExtension   -> "dynamic-extension"
     FfiIncludeDir      -> "ffi-include-dir"
