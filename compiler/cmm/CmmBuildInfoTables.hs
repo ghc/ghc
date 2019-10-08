@@ -922,7 +922,9 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
         let newSRTMap = Map.fromList
               [ (cafLbl, srtEntry)
               | cafLbl@(CAFLabel clbl) <- caf_lbls
-              , not (elem clbl static_data)
+                -- Only map static data to Nothing (== not CAFFY). For CAFFY
+                -- statics we refer to the static itself instead of a SRT.
+              , not (elem clbl static_data) || isNothing srtEntry
               ]
         srtTrace2 "newSRTMap" (ppr newSRTMap) $
           modify' (\state -> state{ moduleSRTMap = Map.union newSRTMap (moduleSRTMap state) })
