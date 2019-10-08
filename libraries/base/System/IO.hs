@@ -60,6 +60,7 @@ module System.IO (
     -- | These functions are also exported by the "Prelude".
 
     readFile,
+    readFile',
     writeFile,
     appendFile,
 
@@ -123,6 +124,7 @@ module System.IO (
     hGetLine,
     hLookAhead,
     hGetContents,
+    hGetContents',
 
     -- ** Text output
 
@@ -143,6 +145,7 @@ module System.IO (
     getChar,
     getLine,
     getContents,
+    getContents',
     readIO,
     readLn,
 
@@ -305,6 +308,15 @@ getLine         =  hGetLine stdin
 getContents     :: IO String
 getContents     =  hGetContents stdin
 
+-- | The 'getContents'' operation returns all user input as a single string,
+-- which is fully read before being returned
+-- (same as 'hGetContents'' 'stdin').
+--
+-- @since 4.14.0.0
+
+getContents'    :: IO String
+getContents'    =  hGetContents' stdin
+
 -- | The 'interact' function takes a function of type @String->String@
 -- as its argument.  The entire input from the standard input device is
 -- passed to this function as its argument, and the resulting string is
@@ -320,6 +332,15 @@ interact f      =   do s <- getContents
 
 readFile        :: FilePath -> IO String
 readFile name   =  openFile name ReadMode >>= hGetContents
+
+-- | The 'readFile'' function reads a file and
+-- returns the contents of the file as a string.
+-- The file is fully read before being returned, as with 'getContents''.
+--
+-- @since 4.14.0.0
+
+readFile'       :: FilePath -> IO String
+readFile' name  =  openFile name ReadMode >>= hGetContents'
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.

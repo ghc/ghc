@@ -28,7 +28,7 @@ module GHC.IO.Handle.Text (
         hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
         commitBuffer',       -- hack, see below
         hGetBuf, hGetBufSome, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking,
-        memcpy, hPutStrLn,
+        memcpy, hPutStrLn, hGetContents',
     ) where
 
 import GHC.IO
@@ -48,6 +48,7 @@ import Foreign.C
 import qualified Control.Exception as Exception
 import Data.Typeable
 import System.IO.Error
+import Data.Either (Either(..))
 import Data.Maybe
 
 import GHC.IORef
@@ -452,6 +453,90 @@ getSomeCharacters handle_@Handle__{..} buf@Buffer{..} =
     -- buffer has some chars in it already: just return it
     _otherwise ->
       return buf
+
+-- -----------------------------------------------------------------------------
+-- hGetContents'
+
+-- We read everything into a list of CharBuffer chunks, and convert it lazily
+-- to a string, which minimizes memory usage.
+-- In the worst case, space usage is at most that of the complete String,
+-- as the chunks can be garbage collected progressively.
+-- For streaming consumers, space usage is at most that of the list of chunks.
+
+-- | The 'hGetContents'' operation reads all input on the given handle
+-- before returning it as a 'String' and closing the handle.
+--
+-- @since 4.14.0.0
+
+hGetContents' :: Handle -> IO String
+hGetContents' handle = do
+    es <- wantReadableHandle "hGetContents'" handle (strictRead handle)
+    case es of
+      Right s -> return s
+      Left e ->
+          case fromException e of
+            Just ioe -> throwIO (augmentIOError ioe "hGetContents'" handle)
+            Nothing -> throwIO e
+
+strictRead :: Handle -> Handle__ -> IO (Handle__, Either SomeException String)
+strictRead h handle_@Handle__{..} = do
+    cbuf <- readIORef haCharBuffer
+    cbufs <- strictReadLoop' handle_ [] cbuf
+    (handle_', me) <- hClose_help handle_
+    case me of
+      Just e -> return (handle_', Left e)
+      Nothing -> do
+        s <- lazyBuffersToString haInputNL cbufs ""
+        return (handle_', Right s)
+
+strictReadLoop :: Handle__ -> [CharBuffer] -> CharBuffer -> IO [CharBuffer]
+strictReadLoop handle_ cbufs cbuf0 = do
+    mcbuf <- Exception.catch
+        (do r <- readTextDevice handle_ cbuf0
+            return (Just r))
+        (\e -> if isEOFError e
+                  then return Nothing
+                  else throw e)
+    case mcbuf of
+      Nothing -> return (cbuf0 : cbufs)
+      Just cbuf1 -> strictReadLoop' handle_ cbufs cbuf1
+
+-- If 'cbuf' is full, allocate a new buffer.
+strictReadLoop' :: Handle__ -> [CharBuffer] -> CharBuffer -> IO [CharBuffer]
+strictReadLoop' handle_ cbufs cbuf
+    | isFullCharBuffer cbuf = do
+        cbuf' <- newCharBuffer dEFAULT_CHAR_BUFFER_SIZE ReadBuffer
+        strictReadLoop handle_ (cbuf : cbufs) cbuf'
+    | otherwise = strictReadLoop handle_ cbufs cbuf
+
+-- Lazily convert a list of buffers to a String. The buffers are
+-- in reverse order: the first buffer is the end of the String.
+lazyBuffersToString :: Newline -> [CharBuffer] -> String -> IO String
+lazyBuffersToString LF = loop where
+    loop [] s = return s
+    loop (Buffer{..} : cbufs) s = do
+        s' <- unsafeInterleaveIO (unpack bufRaw bufL bufR s)
+        loop cbufs s'
+lazyBuffersToString CRLF = loop '\0' where
+    loop before [] s = return s
+    loop before (Buffer{..} : cbufs) s
+        | bufL == bufR = loop before cbufs s  -- skip empty buffers
+        | otherwise = do
+            -- When a CRLF is broken across two buffers, we already have a newline
+            -- from decoding the LF, so we ignore the CR in the current buffer.
+            s1 <- if before == '\n'
+                     then return s
+                     else do
+                       -- We restore trailing CR not followed by LF.
+                       c <- peekCharBuf bufRaw (bufR - 1)
+                       if c == '\r'
+                          then return ('\r' : s)
+                          else return s
+            s2 <- unsafeInterleaveIO (do
+                (s2, _) <- unpack_nl bufRaw bufL bufR s1
+                return s2)
+            c0 <- peekCharBuf bufRaw bufL
+            loop c0 cbufs s2
 
 -- ---------------------------------------------------------------------------
 -- hPutChar

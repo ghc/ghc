@@ -45,7 +45,7 @@ module GHC.IO.Handle (
 
    hShow,
 
-   hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
+   hWaitForInput, hGetChar, hGetLine, hGetContents, hGetContents', hPutChar, hPutStr,
 
    hGetBuf, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking
  ) where

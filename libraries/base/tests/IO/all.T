@@ -20,6 +20,7 @@ test('hGetBuffering001',
 	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')], 
 	compile_and_run, [''])
 
+test('hGetContentsS001', normal, compile_and_run, [''])
 test('hGetChar001', normal, compile_and_run, [''])
 test('hGetLine001', set_stdin('hGetLine001.hs'), compile_and_run, ['-cpp'])
 test('hGetLine002', normal, compile_and_run, [''])

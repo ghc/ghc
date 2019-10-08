@@ -122,6 +122,7 @@
 /IO/hFlush001.out
 /IO/hGetBuf001
 /IO/hGetBuffering001
+/IO/hGetContentsS001
 /IO/hGetChar001
 /IO/hGetLine001
 /IO/hGetLine002
