@@ -51,6 +51,9 @@
 
   * Add `IsList` instance for `ZipList`.
 
+  * Add `hGetContents'`, `getContents'`, and `readFile'` in `System.IO`:
+    Strict IO variants of `hGetContents`, `getContents`, and `readFile`.
+
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
 
