@@ -106,6 +106,7 @@ data Arch
         | ArchPPC_64
           { ppc_64ABI :: PPC_64ABI
           }
+        | ArchS390X
         | ArchSPARC
         | ArchSPARC64
         | ArchARM
@@ -145,6 +146,7 @@ stringEncodeArch = \case
   ArchPPC_64 { ppc_64ABI = abi } -> case abi of
     ELF_V1 -> "powerpc64"
     ELF_V2 -> "powerpc64le"
+  ArchS390X -> "s390x"
   ArchSPARC -> "sparc"
   ArchSPARC64 -> "sparc64"
   ArchARM { armISA = isa, armISAExt = _, armABI = _ } -> "arm" ++ vsuf

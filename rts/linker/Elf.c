@@ -391,6 +391,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                      oc->fileName);
           return 0;
 #endif
+#if defined(EM_S390)
+      case EM_S390:  IF_DEBUG(linker,debugBelch( "s390" ));
+          errorBelch("%s: RTS linker not implemented on s390",
+                     oc->fileName);
+          return 0;
+#endif
 #if defined(EM_X86_64)
       case EM_X86_64: IF_DEBUG(linker,debugBelch( "x86_64" )); break;
 #elif defined(EM_AMD64)

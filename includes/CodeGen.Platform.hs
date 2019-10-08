@@ -344,6 +344,42 @@ import Reg
 # define f30 62
 # define f31 63
 
+#elif defined(MACHREGS_s390x)
+
+# define r0   0
+# define r1   1
+# define r2   2
+# define r3   3
+# define r4   4
+# define r5   5
+# define r6   6
+# define r7   7
+# define r8   8
+# define r9   9
+# define r10 10
+# define r11 11
+# define r12 12
+# define r13 13
+# define r14 14
+# define r15 15
+
+# define f0  16
+# define f1  17
+# define f2  18
+# define f3  19
+# define f4  20
+# define f5  21
+# define f6  22
+# define f7  23
+# define f8  24
+# define f9  25
+# define f10 26
+# define f11 27
+# define f12 28
+# define f13 29
+# define f14 30
+# define f15 31
+
 #endif
 
 callerSaves :: GlobalReg -> Bool
@@ -630,7 +666,8 @@ haveRegBase = False
 globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
-    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64)
+    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
+    || defined(MACHREGS_s390x)
 # if defined(REG_Base)
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif

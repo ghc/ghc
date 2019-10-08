@@ -160,7 +160,9 @@ struct Capability_ {
 } // typedef Capability is defined in RtsAPI.h
   // We never want a Capability to overlap a cache line with anything
   // else, so round it up to a cache line size:
-#if !defined(mingw32_HOST_OS)
+#if defined(s390x_HOST_ARCH)
+  ATTRIBUTE_ALIGNED(256)
+#elif !defined(mingw32_HOST_OS)
   ATTRIBUTE_ALIGNED(64)
 #endif
   ;

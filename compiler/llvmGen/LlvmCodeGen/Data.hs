@@ -71,6 +71,7 @@ genLlvmData (sec, Statics lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
     lmsec <- llvmSection sec
+    platform <- getLlvmPlatform
     let types   = map getStatType static
 
         strucTy = LMStruct types
@@ -79,7 +80,8 @@ genLlvmData (sec, Statics lbl xs) = do
         struct         = Just $ LMStaticStruc static tyAlias
         link           = linkage lbl
         align          = case sec of
-                            Section CString _ -> Just 1
+                            Section CString _ -> if (platformArch platform == ArchS390X)
+                                                    then Just 2 else Just 1
                             _                 -> Nothing
         const          = if isSecConstant sec then Constant else Global
         varDef         = LMGlobalVar label tyAlias link lmsec align const

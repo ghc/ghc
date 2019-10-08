@@ -33,6 +33,7 @@
 ,("powerpc64le-unknown-linux-gnu", ("e-m:e-i64:64-n32:64", "ppc64le", ""))
 ,("powerpc64le-unknown-linux-musl", ("e-m:e-i64:64-n32:64", "ppc64le", ""))
 ,("powerpc64le-unknown-linux", ("e-m:e-i64:64-n32:64", "ppc64le", ""))
+,("s390x-ibm-linux", ("E-m:e-i1:8:16-i8:8:16-i64:64-f128:64-a:8:16-n32:64", "z10", ""))
 ,("i386-apple-darwin", ("e-m:o-p:32:32-f64:32:64-f80:128-n8:16:32-S128", "yonah", ""))
 ,("x86_64-apple-darwin", ("e-m:o-i64:64-f80:128-n8:16:32:64-S128", "core2", ""))
 ,("armv7-apple-ios", ("e-m:o-p:32:32-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32", "generic", ""))
