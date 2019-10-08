@@ -76,6 +76,7 @@ data Arch = ArchSPARC
           | ArchARM64
           | ArchPPC64
           | ArchPPC64LE
+          | ArchS390X
           | ArchUnknown
  deriving Show
 
@@ -99,6 +100,8 @@ platform =
        ArchPPC64
 #elif defined(powerpc64le_HOST_ARCH)
        ArchPPC64LE
+#elif defined(s390x_HOST_ARCH)
+       ArchS390X
 #else
 #    if defined(TABLES_NEXT_TO_CODE)
 #        error Unimplemented architecture
@@ -267,6 +270,20 @@ mkJumpToAddr a = case platform of
         in Right [ 0x3D800000 .|. hi16 w32,
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
+
+    ArchS390X ->
+        -- Let 0xAABBCCDDEEFFGGHH be the address to jump to.
+        -- The following code loads the address into scratch
+        -- register r1 and jumps to it.
+        --
+        --    0:   C0 1E AA BB CC DD       llihf   %r1,0xAABBCCDD
+        --    6:   C0 19 EE FF GG HH       iilf    %r1,0xEEFFGGHH
+        --   12:   07 F1                   br      %r1
+
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
+        in Left [ 0xC0, 0x1E, byte7 w64, byte6 w64, byte5 w64, byte4 w64,
+                  0xC0, 0x19, byte3 w64, byte2 w64, byte1 w64, byte0 w64,
+                  0x07, 0xF1 ]
 
     -- This code must not be called. You either need to
     -- add your architecture as a distinct case or

@@ -75,6 +75,7 @@ maxSpillSlots dflags
                 ArchX86       -> X86.Instr.maxSpillSlots dflags
                 ArchX86_64    -> X86.Instr.maxSpillSlots dflags
                 ArchPPC       -> PPC.Instr.maxSpillSlots dflags
+                ArchS390X     -> panic "maxSpillSlots ArchS390X"
                 ArchSPARC     -> SPARC.Instr.maxSpillSlots dflags
                 ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
                 ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"

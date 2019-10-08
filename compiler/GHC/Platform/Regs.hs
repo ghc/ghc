@@ -12,6 +12,7 @@ import Reg
 import qualified GHC.Platform.ARM        as ARM
 import qualified GHC.Platform.ARM64      as ARM64
 import qualified GHC.Platform.PPC        as PPC
+import qualified GHC.Platform.S390X      as S390X
 import qualified GHC.Platform.SPARC      as SPARC
 import qualified GHC.Platform.X86        as X86
 import qualified GHC.Platform.X86_64     as X86_64
@@ -27,6 +28,7 @@ callerSaves platform
  = case platformArch platform of
    ArchX86    -> X86.callerSaves
    ArchX86_64 -> X86_64.callerSaves
+   ArchS390X  -> S390X.callerSaves
    ArchSPARC  -> SPARC.callerSaves
    ArchARM {} -> ARM.callerSaves
    ArchARM64  -> ARM64.callerSaves
@@ -48,6 +50,7 @@ activeStgRegs platform
  = case platformArch platform of
    ArchX86    -> X86.activeStgRegs
    ArchX86_64 -> X86_64.activeStgRegs
+   ArchS390X  -> S390X.activeStgRegs
    ArchSPARC  -> SPARC.activeStgRegs
    ArchARM {} -> ARM.activeStgRegs
    ArchARM64  -> ARM64.activeStgRegs
@@ -64,6 +67,7 @@ haveRegBase platform
  = case platformArch platform of
    ArchX86    -> X86.haveRegBase
    ArchX86_64 -> X86_64.haveRegBase
+   ArchS390X  -> S390X.haveRegBase
    ArchSPARC  -> SPARC.haveRegBase
    ArchARM {} -> ARM.haveRegBase
    ArchARM64  -> ARM64.haveRegBase
@@ -80,6 +84,7 @@ globalRegMaybe platform
  = case platformArch platform of
    ArchX86    -> X86.globalRegMaybe
    ArchX86_64 -> X86_64.globalRegMaybe
+   ArchS390X  -> S390X.globalRegMaybe
    ArchSPARC  -> SPARC.globalRegMaybe
    ArchARM {} -> ARM.globalRegMaybe
    ArchARM64  -> ARM64.globalRegMaybe
@@ -96,6 +101,7 @@ freeReg platform
  = case platformArch platform of
    ArchX86    -> X86.freeReg
    ArchX86_64 -> X86_64.freeReg
+   ArchS390X  -> S390X.freeReg
    ArchSPARC  -> SPARC.freeReg
    ArchARM {} -> ARM.freeReg
    ArchARM64  -> ARM64.freeReg
