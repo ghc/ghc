@@ -410,6 +410,8 @@ validate-x86_64-darwin:
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-aarch64-linux-deb9.tar.xz"
     # Inexplicably makeindex fails
     BUILD_SPHINX_PDF: "NO"
+    # Work around #16912
+    EXTRA_BUILD_MK: "GhcStage1HcOpts += -Wno-unsupported-llvm-version"
   cache:
     key: linux-aarch64-deb9
   tags:

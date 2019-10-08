@@ -31,6 +31,7 @@ ifneq "\$(BuildFlavour)" ""
 include mk/flavours/\$(BuildFlavour).mk
 endif
 GhcLibHcOpts+=-haddock
+$EXTRA_BUILD_MK
 EOF
 
 case "$(uname)" in
