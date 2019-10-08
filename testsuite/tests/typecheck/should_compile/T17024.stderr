@@ -1,0 +1,8 @@
+
+T17024.hs:18:42: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘c’
+      Where: ‘c’ is a rigid type variable bound by
+               the inferred type of foo :: (a -> b -> c) -> HList '[a, b] -> c
+               at T17024.hs:18:1-42
+    • In the type ‘(a -> b -> c) -> HList '[a, b] -> _’
+      In the type signature: foo :: (a -> b -> c) -> HList '[a, b] -> _
