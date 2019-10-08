@@ -853,6 +853,10 @@ anyRewritableTyVar :: Bool    -- Ignore casts and coercions
 anyRewritableTyVar ignore_cos role pred ty
   = go role emptyVarSet ty
   where
+    -- NB: No need to expand synonyms, because we can find
+    -- all free variables of a synonym by looking at its
+    -- arguments
+
     go_tv rl bvs tv | tv `elemVarSet` bvs = False
                     | otherwise           = pred rl tv
 
@@ -860,7 +864,10 @@ anyRewritableTyVar ignore_cos role pred ty
     go _ _     (LitTy {})        = False
     go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy _ arg res)  = go rl bvs arg || go rl bvs res
+    go rl bvs (FunTy _ arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
+                                   go rl bvs arg || go rl bvs res
+      where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
+            res_rep = getRuntimeRep res
     go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)     = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)    = go_co rl bvs co  -- ToDo: check
