@@ -296,6 +296,8 @@ hadrian-ghc-in-ghci:
 
 .validate-linux:
   extends: .validate
+  variables:
+    EXTRA_BUILD_MK: ""
   tags:
     - x86_64-linux
   before_script:
@@ -415,6 +417,8 @@ validate-x86_64-darwin:
     BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-aarch64-linux-deb9.tar.xz"
     # Inexplicably makeindex fails
     BUILD_SPHINX_PDF: "NO"
+    # Work around #16912
+    EXTRA_BUILD_MK: "SRC_HC_OPTS_STAGE0 += -Wno-unsupported-llvm-version"
   cache:
     key: linux-aarch64-deb9
   tags:
