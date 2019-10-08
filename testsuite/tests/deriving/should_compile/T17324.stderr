@@ -1,0 +1,4 @@
+
+T17324.hs:8:1: warning: [-Wunused-imports (in -Wextra)]
+    The import of ‘Dual, Product, Sum’
+    from module ‘Data.Monoid’ is redundant
