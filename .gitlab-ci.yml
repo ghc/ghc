@@ -290,6 +290,33 @@ hadrian-ghc-in-ghci:
       - ghc-*.tar.xz
       - junit.xml
 
+.validate-linux:
+  extends: .validate
+  tags:
+    - x86_64-linux
+  before_script:
+    - git clean -xdf && git submodule foreach git clean -xdf
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+      # Build hyperlinked sources for documentation when building releases
+    - |
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+        echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
+      fi
+
+    - .gitlab/prepare-system.sh
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: linux
+    paths:
+      - cabal-cache
+      - toolchain
+
 #################################
 # x86_64-darwin
 #################################
@@ -368,33 +395,6 @@ validate-x86_64-darwin:
     paths:
       - ghc.tar.xz
       - junit.xml
-
-.validate-linux:
-  extends: .validate
-  tags:
-    - x86_64-linux
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-      # Build hyperlinked sources for documentation when building releases
-    - |
-      if [[ -n "$CI_COMMIT_TAG" ]]; then
-        echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
-      fi
-
-    - .gitlab/prepare-system.sh
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-  after_script:
-    - cp -Rf $HOME/.cabal cabal-cache
-  cache:
-    key: linux
-    paths:
-      - cabal-cache
-      - toolchain
 
 #################################
 # aarch64-linux-deb9
