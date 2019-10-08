@@ -311,6 +311,8 @@ hadrian-ghc-in-ghci:
 
 .validate-linux:
   extends: .validate
+  variables:
+    EXTRA_BUILD_MK: ""
   tags:
     - x86_64-linux
   before_script:
@@ -430,6 +432,8 @@ validate-x86_64-darwin:
   variables:
     TEST_ENV: "aarch64-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb9.tar.xz"
+    # Work around #16912
+    EXTRA_BUILD_MK: "SRC_HC_OPTS_STAGE0 += -Wno-unsupported-llvm-version"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -464,6 +468,8 @@ nightly-aarch64-linux-deb9:
     TEST_ENV: "armv7-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
     CONFIGURE_ARGS: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
+    # Work around #16912
+    EXTRA_BUILD_MK: "SRC_HC_OPTS_STAGE0 += -Wno-unsupported-llvm-version"
   cache:
     key: linux-armv7-deb9
   tags:

@@ -13,6 +13,7 @@ if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
 if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
 if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
 if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
+if [[ -z ${EXTRA_BUILD_MK:-} ]]; then EXTRA_BUILD_MK=""; fi
 
 cat > mk/build.mk <<EOF
 V=1
@@ -32,6 +33,7 @@ ifneq "\$(BuildFlavour)" ""
 include mk/flavours/\$(BuildFlavour).mk
 endif
 GhcLibHcOpts+=-haddock
+$EXTRA_BUILD_MK
 EOF
 
 case "$(uname)" in
