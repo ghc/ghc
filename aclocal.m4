@@ -842,6 +842,44 @@ AC_DEFUN([FP_CHECK_SIZEOF_AND_ALIGNMENT],
 FP_CHECK_ALIGNMENT([$1])
 ])# FP_CHECK_SIZEOF_AND_ALIGNMENT
 
+# FP_DEFAULT_CHOICE_OVERRIDE_CHECK
+# --------------------------------
+# Helper for when there is a automatic detection and an explicit flag for the
+# user to override disable a feature, but not override enable a feature.
+#
+# $1 = flag of feature
+# $1 = name of feature
+# $2 = name of anti feature
+# $3 = name of variable
+# $4 = when true
+# $5 = when false
+$ $6 = help string
+AC_DEFUN([FP_DEFAULT_CHOICE_OVERRIDE_CHECK],
+[
+    AC_ARG_ENABLE($1,[
+        AC_HELP_STRING(
+            [--enable-$1],
+            $7 [default="$]$4[Default"])
+    ],
+    [
+        if test x"$enableval" = x"yes"; then
+            if test x"[$]$4Default" = x"$5"; then
+                AC_MSG_NOTICE([user chose $2 matching default for platform])
+            else
+                AC_MSG_FAILURE([user chose $2 overriding only supported option for platform])
+            fi
+            $4=$5
+        else
+            if test x"[$]$4Default" = x"$5"; then
+                AC_MSG_NOTICE([user chose $3 overriding for platform])
+            else
+                AC_MSG_NOTICE([user chose $3 matching default for platform])
+            fi
+            $4=$6
+        fi
+    ],
+    $4[="$]$4[Default"])
+])
 
 # FP_LEADING_UNDERSCORE
 # ---------------------
@@ -1293,30 +1331,19 @@ AC_SUBST(GccLT46)
 
 dnl Check to see if the C compiler is clang or llvm-gcc
 dnl
-GccIsClang=NO
 AC_DEFUN([FP_CC_LLVM_BACKEND],
 [AC_REQUIRE([AC_PROG_CC])
-AC_MSG_CHECKING([whether C compiler is clang])
+AC_MSG_CHECKING([whether C compiler has an LLVM back end])
 $CC -x c /dev/null -dM -E > conftest.txt 2>&1
-if grep "__clang__" conftest.txt >/dev/null 2>&1; then
-  AC_SUBST([CC_CLANG_BACKEND], [1])
-  AC_SUBST([CC_LLVM_BACKEND], [1])
-  GccIsClang=YES
+if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
+  AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])
+  CcLlvmBackend=YES
   AC_MSG_RESULT([yes])
 else
+  CcLlvmBackend=NO
   AC_MSG_RESULT([no])
-  AC_MSG_CHECKING([whether C compiler has an LLVM back end])
-  if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
-    AC_SUBST([CC_CLANG_BACKEND], [0])
-    AC_SUBST([CC_LLVM_BACKEND], [1])
-    AC_MSG_RESULT([yes])
-  else
-    AC_SUBST([CC_CLANG_BACKEND], [0])
-    AC_SUBST([CC_LLVM_BACKEND], [0])
-    AC_MSG_RESULT([no])
-  fi
 fi
-AC_SUBST(GccIsClang)
+AC_SUBST(CcLlvmBackend)
 
 rm -f conftest.txt
 ])
