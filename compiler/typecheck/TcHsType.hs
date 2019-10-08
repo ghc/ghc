@@ -1293,7 +1293,7 @@ The calls to mkAppTyM is the other place we are very careful.
 
 Note [mkAppTyM]
 ~~~~~~~~~~~~~~~
-mkAppTyM is trying to guaranteed the Purely Kinded Type Invariant
+mkAppTyM is trying to guarantee the Purely Kinded Type Invariant
 (PKTI) for its result type (fun arg).  There are two ways it can go wrong:
 
 * Nasty case 1: forall types (polykinds/T14174a)

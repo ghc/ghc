@@ -815,7 +815,7 @@ Because flattening zonks and the returned coercion ("co" above) is also
 zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
 we can rely on this fact:
 
-  (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
+  (F0) co :: xi ~ zonk(ty)
 
 Note that the left-hand type of co is *always* precisely xi. The right-hand
 type may or may not be ty, however: if ty has unzonked filled-in metavariables,
@@ -1535,7 +1535,7 @@ flattenTyVar tv
                    ; return (ty2, co2 `mkTransCo` co1) }
 
            FTRNotFollowed   -- Done, but make sure the kind is zonked
-                            -- Note [Flattening] invariant (F1)
+                            -- Note [Flattening] invariant (F0) and (F1)
              -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                    ; role <- getRole
                    ; let ty' = mkTyVarTy tv'
