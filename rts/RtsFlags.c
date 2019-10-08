@@ -1777,16 +1777,30 @@ openStatsFile (char *filename,           // filename, or NULL
  * and the arguments it was invoked with.
 -------------------------------------------------------------------------- */
 
+// stats_fprintf augmented with Bash-compatible escaping. See #13676
+static void stats_fprintf_escape (FILE *f, char*s)
+{
+  stats_fprintf(f, "'");
+  while (*s != '\0') {
+    switch (*s) {
+      case '\'': stats_fprintf(f, "'\\''");  break;
+      default:   stats_fprintf(f, "%c", *s); break;
+    }
+    ++s;
+  }
+  stats_fprintf(f, "' ");
+}
+
 static void initStatsFile (FILE *f)
 {
     /* Write prog_argv and rts_argv into start of stats file */
     int count;
     for (count = 0; count < prog_argc; count++) {
-        stats_fprintf(f, "%s ", prog_argv[count]);
+        stats_fprintf_escape(f, prog_argv[count]);
     }
     stats_fprintf(f, "+RTS ");
     for (count = 0; count < rts_argc; count++)
-        stats_fprintf(f, "%s ", rts_argv[count]);
+        stats_fprintf_escape(f, rts_argv[count]);
     stats_fprintf(f, "\n");
 }
 
