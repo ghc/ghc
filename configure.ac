@@ -289,9 +289,10 @@ case "$Unregisterised" in
 esac
 AC_ARG_ENABLE(tables-next-to-code,
 [AC_HELP_STRING([--enable-tables-next-to-code],
-[Build an tables-next-to-code compiler (enabled by default on platforms without registerised support) [default="$TablesNextToCodeDefault"]])],
+[Build a tables-next-to-code compiler (enabled by default on platforms without registerised support) [default="$TablesNextToCodeDefault"]])],
 [ if test x"$enableval" = x"yes"; then
         TablesNextToCode=YES
+        AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are layed out next to code])
   else
         TablesNextToCode=NO
   fi
@@ -1373,11 +1374,7 @@ echo "\
 "
 
 if test "x$CC_LLVM_BACKEND" = "x1"; then
-    if test "x$CC_CLANG_BACKEND" = "x1"; then
-        CompilerName="clang        "
-    else
-        CompilerName="llvm-gcc     "
-    fi
+    CompilerName="clang        "
 else
     CompilerName="gcc          "
 fi
