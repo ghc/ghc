@@ -112,11 +112,13 @@ allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
 -- (object files built from C, C-- and sometimes other things).
 nonHsObjects :: Context -> Action [FilePath]
 nonHsObjects context = do
+    asmSrcs <- interpretInContext context (getContextData asmSrcs)
+    asmObjs <- mapM (objectPath context) asmSrcs
     cObjs   <- cObjects context
     cmmSrcs <- interpretInContext context (getContextData cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
-    return $ cObjs ++ cmmObjs ++ eObjs
+    return $ asmObjs ++ cObjs ++ cmmObjs ++ eObjs
 
 -- | Return all the C object files needed to build the given library context.
 cObjects :: Context -> Action [FilePath]

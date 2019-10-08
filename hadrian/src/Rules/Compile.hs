@@ -41,6 +41,9 @@ compilePackage rs = do
       [ root -/- "**/build/s/**/*." ++ wayPat ++ "o"
         | wayPat <- wayPats] |%> compileNonHsObject rs Asm
 
+      [ root -/- "**/build/S/**/*." ++ wayPat ++ "o"
+        | wayPat <- wayPats] |%> compileNonHsObject rs Asm
+
       -- All else is haskell.
       -- This comes last as it overlaps with the above rules' file patterns.
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->

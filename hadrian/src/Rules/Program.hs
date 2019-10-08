@@ -114,10 +114,12 @@ buildBinary rs bin context@Context {..} = do
     when (stage > Stage0) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
         needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
-    cSrcs  <- interpretInContext context (getContextData cSrcs)
-    cObjs  <- mapM (objectPath context) cSrcs
-    hsObjs <- hsObjects context
-    let binDeps = cObjs ++ hsObjs
+    asmSrcs <- interpretInContext context (getContextData asmSrcs)
+    asmObjs <- mapM (objectPath context) asmSrcs
+    cSrcs   <- interpretInContext context (getContextData cSrcs)
+    cObjs   <- mapM (objectPath context) cSrcs
+    hsObjs  <- hsObjects context
+    let binDeps = asmObjs ++ cObjs ++ hsObjs
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- pkgSynopsis package
