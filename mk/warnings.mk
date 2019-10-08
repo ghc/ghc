@@ -17,7 +17,7 @@ GhcRtsHcOpts    += -Wcpp-undef
 GhcStage1HcOpts += -Wcpp-undef
 GhcStage2HcOpts += -Wcpp-undef
 
-ifneq "$(GccIsClang)" "YES"
+ifneq "$(CcLlvmBackend)" "YES"
 
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
