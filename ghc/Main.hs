@@ -387,7 +387,7 @@ checkOptions mode dflags srcs objs = do
            "the option -C is only available with an unregisterised GHC"
       StopBefore (As False) | ghcLink dflags == NoLink
         -> throwGhcException $ UsageError $
-           "the options -S and -fno-code are not compatible. Please omit -S"
+           "the options -S and -fno-code are incompatible. Please omit -S"
            
       _ -> return ()
 
