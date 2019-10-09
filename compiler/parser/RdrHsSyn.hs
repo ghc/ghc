@@ -1841,7 +1841,7 @@ class DisambInfixOp b where
   mkHsInfixHolePV :: SrcSpan -> PV (Located b)
   mkHsExtInfixHolePV :: SrcSpan
                      -> Located (Maybe FastString)
-                     -> ExtHoleContent GhcPs
+                     -> ExtendedHoleContent GhcPs
                      -> PV (Located b)
 
 instance p ~ GhcPs => DisambInfixOp (HsExpr p) where
@@ -1911,7 +1911,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | An extended hole _(...), _$(...) or _$$(...)
   mkHsExtHolePV :: SrcSpan
                 -> Located (Maybe FastString)
-                -> ExtHoleContent GhcPs
+                -> ExtendedHoleContent GhcPs
                 -> PV (Located b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV :: SrcSpan -> Located b -> LHsType GhcPs -> PV (Located b)
@@ -2011,9 +2011,11 @@ instance p ~ GhcPs => DisambECP (HsCmd p) where
   mkHsExtHolePV l hid cont = cmdFail l (text "_"  <+> prc <+> prHid)
     where prHid = maybe empty ppr $ unLoc hid
           prc = case cont of
-                  ExtHNoContent -> text "()"
-                  ExtHRawExpr p -> text "(" <+> ppr p <+> text ")"
-                  ExtHTHSplice spl -> ppr spl
+                  EHCNothing -> text "()"
+                  EHCExpr p -> text "(" <+> ppr p <+> text ")"
+                  EHCSplice spl -> ppr spl
+                  EHCRunSplice e ->
+                    pprPanic "hsExtHoleExpr:Already run splice in extended hole!" $ ppr e
   mkHsTySigPV l a sig = cmdFail l (ppr a <+> text "::" <+> ppr sig)
   mkHsExplicitListPV l xs = cmdFail l $
     brackets (fsep (punctuate comma (map ppr xs)))
@@ -2101,15 +2103,17 @@ hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
 
 -- See Note [Extended Typed-Holes]
 hsExtHoleExpr :: Located (Maybe FastString)
-              -> ExtHoleContent GhcPs
+              -> ExtendedHoleContent GhcPs
               -> HsExpr GhcPs
 hsExtHoleExpr hid cont =
-      HsExtendedHole noExtField (ExtendedHole (mkVarOcc (pat ++ i)) cont)
+      HsExtendedHole noExtField (ExtendedHoleE (mkVarOcc (pat ++ i)) cont)
   where i = maybe "" unpackFS $ unLoc hid
         pat = case cont of
-                  ExtHNoContent -> "_()"
-                  ExtHRawExpr _ -> "_(...)"
-                  ExtHTHSplice (L _ spl) ->
+                  EHCNothing   -> "_()"
+                  EHCExpr _ -> "_(...)"
+                  EHCRunSplice e ->
+                    pprPanic "hsExtHoleExpr:Already run splice in extended hole!" $ ppr e
+                  EHCSplice (L _ spl) ->
                     case spl of
                         HsUntypedSplice {} -> "_$(...)"
                         HsTypedSplice {} -> "_$$(...)"
@@ -2173,9 +2177,11 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
     text "(" <+> rep <+> text ")-syntax in pattern"
       where rep = text $
               case cont of
-                ExtHNoContent -> "_()"
-                ExtHRawExpr _ -> "_(...)"
-                ExtHTHSplice (L _ spl) ->
+                EHCNothing   -> "_()"
+                EHCExpr _ -> "_(...)"
+                EHCRunSplice e ->
+                  pprPanic "hsExtHoleExpr:Already run splice in extended hole!" $ ppr e
+                EHCSplice (L _ spl) ->
                   case spl of
                     HsUntypedSplice{} -> "_$(...)"
                     HsTypedSplice{} -> "_$$(...)"

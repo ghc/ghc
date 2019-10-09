@@ -641,20 +641,20 @@ tcExpr (HsStatic fvs expr) res_ty
                                          (L loc $ mkHsWrap wrap fromStaticPtr)
                                          (L loc (HsStatic fvs expr'))
         }
-tcExpr e@(HsExtendedHole _ (ExtendedHole occ cont)) res_ty
+tcExpr e@(HsExtendedHole _ (ExtendedHoleE occ cont)) res_ty
   = do { ty <- newOpenFlexiTyVarTy
        ; name <- newSysName occ
-       ; (mbTy, tEh) <- case cont of
-                  ExtHNoContent ->
-                    return (Nothing, ExtendedHole occ ExtHNoContent)
-                  ExtHRawExpr exp -> tcRunExtHExpr exp
-                  ExtHTHSplice spl ->
-                    pprPanic "Un-run splice in ExtendedHole!" $ ppr spl
        ; let ev = mkLocalId name ty
-       ; can <- newHoleCt (ExtendedExprHole tEh mbTy) ev ty
+       ; ext_hole_res <- case cont of
+                  EHCNothing -> return EHRNothing
+                  EHCExpr e -> return (EHRExpr e)
+                  EHCRunSplice lexpr -> tcRunEHSplice lexpr
+                  EHCSplice spl ->
+                    pprPanic "tcExpr: un-run splice in tcExpr!" $ ppr spl
+       ; can <- newHoleCt (ExtendedExprHole occ ext_hole_res) ev ty
        ; emitInsoluble can
        ; tcWrapResultO HoleOrigin e (HsVar noExtField (noLoc ev)) ty res_ty }
-  where tcRunExtHExpr lexpr =
+  where tcRunEHSplice lexpr =
             checkNoErrs $ -- We don't want any errors
             unsetGOptM Opt_DeferTypeErrors $ -- We're very likley going to run
                                              -- the code, so we don't want
@@ -669,11 +669,11 @@ tcExpr e@(HsExtendedHole _ (ExtendedHole occ cont)) res_ty
                  ; nt <- newInferExpTypeNoInst
                  -- We need to solve type class constraint (and report
                  -- typeclass errors here.
-                 ; (tcE', wanted) <- captureConstraints $ tcExpr expr nt
+                 ; (tcE, wanted) <- captureConstraints $ tcExpr expr nt
                  ; const_binds <- simplifyTop wanted
-                 ; ltcE' <- zonkTopLExpr (mkHsDictLet (EvBinds const_binds) (L l tcE'))
-                 ; et <- readExpType_maybe nt
-                 ; return (et, ExtendedHole occ $ ExtHRawExpr ltcE') }
+                 ; zte <- zonkTopLExpr (mkHsDictLet (EvBinds const_binds) (L l tcE))
+                 ; return $ EHRSplice zte }
+
         wrapInDyn lexpr@(L loc _) =
           mkHsApp (L loc $ HsVar noExtField $ L loc toDynName) lexpr
 

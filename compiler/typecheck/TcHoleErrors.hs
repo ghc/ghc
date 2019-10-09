@@ -15,9 +15,9 @@ module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , HoleFitPlugin (..), HoleFitPluginR (..)
 
                     -- Re-exported from HsSyn
-                    , ExtendedHole (..)
+                    , ExtendedHoleResult (..)
                     -- Facilities to extract values from extended holes.
-                    , runExtHExpr
+                    , runEHRExpr, runEHRExprDyn, runEHSplice
                     ) where
 
 import GhcPrelude
@@ -30,8 +30,9 @@ import TcType
 import Type
 import DataCon
 import Name
-import RdrName ( pprNameProvenance , GlobalRdrElt (..), globalRdrEnvElts )
-import PrelNames ( gHC_ERR )
+import RdrName ( pprNameProvenance , GlobalRdrElt (..)
+               , globalRdrEnvElts, getRdrName )
+import PrelNames ( gHC_ERR, toDynName )
 import Id
 import VarSet
 import VarEnv
@@ -54,8 +55,13 @@ import GHCi     ( wormhole )
 import DsExpr   ( dsLExpr )
 import DsMonad  ( initDsTc )
 import GHC.Exts ( unsafeCoerce# )
+import RnExpr   ( rnLExpr )
+import TcExpr   ( tcMonoExprNC )
+import TcHsSyn  ( zonkTopLExpr )
+import GHC      ( HValue, mkHsApp, mkHsDictLet, GenLocated (..) )
+import Control.Exception ( throwIO )
 
-import HsExpr (ExtendedHole(..), LHsExpr )
+import HsExpr (ExtendedHoleResult(..), LHsExpr, HsExpr (..) )
 
 import Control.Arrow ( (&&&) )
 
@@ -64,16 +70,19 @@ import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
 
-import TcSimplify    ( simpl_top, runTcSDeriveds )
+import TcSimplify    ( simpl_top, runTcSDeriveds, simplifyTop )
 import TcUnify       ( tcSubType_NC )
 
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import HsDoc           ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface(..) )
+import HscTypes        ( ModIface(..), HscEnv(..) )
+import Data.IORef      ( newIORef, modifyIORef, readIORef )
+import ErrUtils        ( Severity (..), MsgDoc )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
+
 
 import TcHoleFitTypes
 
@@ -561,9 +570,7 @@ findValidHoleFits :: TidyEnv        -- ^ The tidy_env for zonking
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
      ; traceTc "Hole is extended by: " $  case ct of
-        (CHoleCan { cc_hole = hole@(ExtendedExprHole eh _)}) ->
-          case eh of
-            ExtendedHole _ cont -> ppr cont <+> text "with" <+> ppr hole
+        CHoleCan { cc_hole = (ExtendedExprHole _ eh)} -> ppr eh
         _ -> text "Nothing"
      ; lclBinds <- getLocalBindings tidy_env ct
      ; maxVSubs <- maxValidHoleFits <$> getDynFlags
@@ -1023,27 +1030,79 @@ fromPureHFPlugin plug =
                  , hfPluginStop = const $ return () }
 
 
--- | Takes a Haskell expression that evaluates to Dynamic and runs it,
---   returning a Dynamic that resolves to the value of the given type.
---   when passed to fromDyn.
-runExtHExpr :: LHsExpr GhcTc -> TcM Dynamic
-runExtHExpr lexpr =
+
+-- | Takes a Haskell expression and runs it interactively, returning the HValue
+--   it evaluates to. Note that this HValue can then be coerced with
+--   `(unsafeCoerce# hv :: a)`, if the result type `a` is known. Note that when
+--   multiple plugins are at play, this might not be the case, and the more
+--   conservative `runEHRExprDyn` should be used, albeit with the additional
+--   constraint that the HValue is Typeable.
+runEHRExpr :: LHsExpr GhcPs -> TcM HValue
+runEHRExpr parsed_expr@(L loc _) =
+    setSrcSpan loc $
+    checkNoErrs $ -- We don't want any errors
+    unsetGOptM Opt_DeferTypeErrors $ -- We're running the code, so we don't
+                                     -- want any deferrals!
+    do { -- We will get some free-vars here, but if they were truly unbound,
+         -- they will result in a unsolvealbe wanted constraint.
+         (rn_expr, _) <- rnLExpr parsed_expr
+       ; expr_ty <- newInferExpTypeNoInst
+       ; (tc_expr, wanted) <- captureConstraints $ tcMonoExprNC rn_expr expr_ty
+       ; const_binds <- simplifyTop wanted
+       ; zte <- zonkTopLExpr (mkHsDictLet (EvBinds const_binds) tc_expr)
+       ; shadowFatal $ run_lhs_expr zte }
+
+-- | Runs the given expression, but as a Dynamic requires the expression to be
+--   Typeable, otherwise the call to `toDyn` will fail.
+runEHRExprDyn :: LHsExpr GhcPs -> TcM Dynamic
+runEHRExprDyn lexpr@(L loc _) =
+  setSrcSpan loc $
+  do { dv <- runEHRExpr (wrapInDyn lexpr)
+     ; return (unsafeCoerce# dv :: Dynamic) }
+ where wrapInDyn :: LHsExpr GhcPs -> LHsExpr GhcPs
+       wrapInDyn lexp@(L loc _) =
+         mkHsApp (L loc $ HsVar noExtField $ L loc $ getRdrName toDynName) lexp
+
+
+-- | Takes a Haskell expression that evaluates to `Dynamic` and trys to run it,
+--   returning a `Dynamic` that resolves to the value of the given type passed
+--   to `fromDynamic`.
+runEHSplice :: LHsExpr GhcTc -> TcM Dynamic
+runEHSplice lexpr@(L loc _) =
+ setSrcSpan loc $
+  do { dv <- shadowFatal $ run_lhs_expr lexpr
+       -- The unsafeCoerce# is safe here, since any expression contained in an
+       -- ExtendedExprHole is wrapped by `toDyn`
+     ; return (unsafeCoerce# dv :: Dynamic) }
+
+
+-- | `shadowFatal act` turns all SevFatal messages in act
+shadowFatal ::  TcM a -> TcM a
+shadowFatal action
+ = do { msg_ref <- liftIO $ newIORef []
+      ; log_act <- log_action <$> getDynFlags
+      ; e_res <- tryM $ updTopEnv (shadow msg_ref log_act) $ action
+      ; fmsgs <- liftIO $ readIORef msg_ref
+      ; addErrsTc $ reverse fmsgs
+      ; case e_res of
+          Left exn -> liftIO $ throwIO exn
+          Right res -> return res }
+  where shadow msg_ref log_act top@(HscEnv { hsc_dflags = df}) =
+          top { hsc_dflags = df { log_action = toRef msg_ref log_act} }
+        toRef :: IORef [MsgDoc] -> LogAction -> LogAction
+        toRef ref _ _ _ SevFatal _ _ msg = modifyIORef ref (msg:)
+        toRef _ def_action df re sv sr st ms = def_action df re sv sr st ms
+
+-- Simply runs the pipeline and returns the value. Similar to what template
+-- haskell does. Might throw an exception, so make sure to run with tryM.
+run_lhs_expr :: LHsExpr GhcTc -> TcM HValue
+run_lhs_expr lexpr =
   do { hsc_env <- getTopEnv
      ; dflags <- getDynFlags
-     -- De-sugar the expression
-     ; ds_expr <- initDsTc (dsLExpr lexpr)
      ; src_span <- getSrcSpanM
-     -- We should assert that `zonkTcType (exprType ds_expr)` is Dynamic!
-     -- Otherwise the unsafeCoerce# later might fail.
-     ; either_hval <- tryM $ liftIO $
-        hscCompileCoreExpr hsc_env src_span ds_expr
-     ; case either_hval of
-        Left exn -> error $ show exn
-        Right fhv -> do { hv <- liftIO $ wormhole dflags fhv
-                        -- My lord... is that legal?
-                        -- I will make it legal.
-                        -- Actually safe here, since any expression
-                        -- contained in ExtendedExprHole is wrapped
-                        -- by `toDyn`.
-                        ; return (unsafeCoerce# hv :: Dynamic) } }
-
+     -- De-sugar the expression
+     -- We need to change the log action here,
+     -- since failIfM always outputs its message.
+     ; ds_expr <- initDsTc (dsLExpr lexpr)
+     ; liftIO $ do { fhv <- hscCompileCoreExpr hsc_env src_span ds_expr
+                   ; wormhole dflags fhv } }

@@ -2852,19 +2852,19 @@ aexp2   :: { ECP }
                                                            Nothing (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 
-extended_typed_hole :: { (Located (Maybe FastString), Located (ExtHoleContent GhcPs)) }
+extended_typed_hole :: { (Located (Maybe FastString), Located (ExtendedHoleContent GhcPs)) }
         : '_('   exp hole_close   {% runECP_P $2
-                                     >>= \ $2 -> fmap ExtHRawExpr (ams (sLL $1 $> $ unLoc $2)
+                                     >>= \ $2 -> fmap EHCExpr (ams (sLL $1 $> $ unLoc $2)
                                                   [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3])
                                      >>= \ $2 -> return ($3, sLL $1 $> $2) }
-        | '_('   {- empty -} hole_close  { ($2, sLL $1 $> ExtHNoContent) }
+        | '_('   {- empty -} hole_close  { ($2, sLL $1 $> EHCNothing) }
         | '_$('  exp hole_close   {% runECP_P $2
-                                     >>= \ $2 -> fmap ExtHTHSplice (ams (sLL $1 $> $
+                                     >>= \ $2 -> fmap EHCSplice (ams (sLL $1 $> $
                                                         mkUntypedSplice HasParens $2)
                                                    [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3])
                                      >>= \ $2 -> return ($3, sLL $1 $> $2) }
         | '_$$(' exp hole_close   {% runECP_P $2
-                                     >>= \ $2 -> fmap ExtHTHSplice (ams (sLL $1 $> $
+                                     >>= \ $2 -> fmap EHCSplice (ams (sLL $1 $> $
                                                       mkTypedSplice HasParens $2)
                                                  [mj AnnOpenHolePE $1,mj AnnCloseHoleP $3])
                                      >>= \ $2 -> return ($3, sLL $1 $> $2) }
