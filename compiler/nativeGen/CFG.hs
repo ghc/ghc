@@ -856,7 +856,7 @@ revPostorderFrom cfg root =
         BN (bid,getSuccessors cfg $ bid)
 
 
--- | We take in a CFG which has on it's edges weights which are
+-- | We take in a CFG which has on its edges weights which are
 --   relative only to other edges originating from the same node.
 --
 --   We return a CFG for which each edge represents a GLOBAL weight.
