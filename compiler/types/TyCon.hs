@@ -127,7 +127,7 @@ module TyCon(
 
         -- * Recursion breaking
         RecTcChecker, initRecTc, defaultRecTcMaxBound,
-        setRecTcMaxBound, checkRecTc
+        setRecTcMaxBound, checkRecTc, lookupRecTc
 
 ) where
 
@@ -2713,6 +2713,7 @@ The function that manages all this is checkRecTc.
 data RecTcChecker = RC !Int (NameEnv Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
+  -- Invariant: if there's an entry for T in the NameEnv, then it is at least 1.
 
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
@@ -2732,11 +2733,18 @@ setRecTcMaxBound new_bound (RC _old_bound rec_nts) = RC new_bound rec_nts
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
-checkRecTc (RC bound rec_nts) tc
+checkRecTc rc@(RC bound rec_nts) tc
+  = case lookupRecTc rc tc of
+      n | n >= bound -> Nothing
+      n              -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
+  where
+    tc_name = tyConName tc
+
+lookupRecTc :: RecTcChecker -> TyCon -> Int
+lookupRecTc (RC _bound rec_nts) tc
   = case lookupNameEnv rec_nts tc_name of
-      Just n | n >= bound -> Nothing
-             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
-      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
+      Just n  -> n
+      Nothing -> 0
   where
     tc_name = tyConName tc
 
