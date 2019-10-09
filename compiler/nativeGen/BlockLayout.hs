@@ -101,48 +101,76 @@ import Control.Monad (foldM)
   been placed in the same chain.
 
   -----------------------------------------------------------------------------
-     1) First try to create a lists of good chains.
+     1) First try to create a list of good chains.
   -----------------------------------------------------------------------------
 
-  We do so by looking at edges in order of frequency taken. Ignoring
-  certain edges (edges across calls, edges jumping over info tables).
+  Good chains are these which allow us to eliminate jump instructions.
+  Which further eliminate often executed jumps first.
 
-  *)  If source and target have not been placed build a new chain from them.
+  We do so by:
 
-  *)  If source and target have been placed, and are ends of differing chains
-      try to merge the two chains.
+  *)  Ignore edges which represent instructions which can not be replaced
+      by fall through control flow. Primarily calls and edges to blocks which
+      are prefixed by a info table we have to jump across.
 
-  *)  If one side of the edge is a end/front of a chain, add the other block of
-      to edge to the same chain
+  *)  Then process remaining edges in order of frequency taken and:
 
-      Eg if we look at edge (B -> C) and already have the chain (A -> B)
-      then we extend the chain to (A -> B -> C).
+    +)  If source and target have not been placed build a new chain from them.
 
-  We process edges by their taken frequency, this means if two edges compete
-  for fall through on the same target block, the one taken more often will
-  automatically win out.
+    +)  If source and target have been placed, and are ends of differing chains
+        try to merge the two chains.
 
-  At the end we build up singleton chains from any blocks not having been placed.
-  These mostly result from blocks only connected via edges we ignore because of
-  eg info tables.
+    +)  If one side of the edge is a end/front of a chain, add the other block of
+        to edge to the same chain
+
+        Eg if we look at edge (B -> C) and already have the chain (A -> B)
+        then we extend the chain to (A -> B -> C).
+
+    +)  If the edge was used to modify or build a new chain remove the edge from
+        our working list.
+
+  *) If there any blocks not being placed into a chain after these steps we place
+     them into a chain consisting of only this block.
+
+  Ranking edges by their taken frequency, if
+  two edges compete for fall through on the same target block, the one taken
+  more often will automatically win out. Resulting in fewer instructions being
+  executed.
+
+  Creating singleton chains is required for situations where we have code of the
+  form:
+
+    A: goto B:
+    <infoTable>
+    B: goto C:
+    <infoTable>
+    C: ...
+
+  As the code in block B is only connected to the rest of the program via edges
+  which will be ignored in this step we make sure that B still ends up in a chain
+  this way.
 
   -----------------------------------------------------------------------------
      2) We also try to fuse chains.
   -----------------------------------------------------------------------------
 
   As a result from the above step we still end up with multiple chains which
-  represent sequential control flow but haven't been combined because they are
-  crossing calls or are sperarated by info tables.
+  represent sequential control flow chunks. But they are not yet suitable for
+  code layout as we need to place *all* blocks into a single sequence.
 
-  We take care of these cases by fusing chains which are connected by an
-  edge.
+  In this step we combine chains result from the above step via these steps:
 
-  We do so by looking at the list of all edges sorted by weight.
-  Given the edge (C -> D) we try to find two chains such that:
-      * C is at the end of chain one.
-      * D is in front of chain two.
-      * If two such chains exist we fuse them.
-  We then remove the edge and repeat the process for the rest of the edges.
+  *)  Look at the ranked list of *all* edges, including calls/jumps across info tables
+      and the like.
+
+  *)  Look at each edge and
+
+    +) Given an edge (A -> B) try to find two chains for which
+      * Block A is at the end of one chain
+      * Block B is at the front of the other chain.
+    +) If we find such a chain we "fuse" them into a single chain, remove the
+       edge from working set and continue.
+    +) If we can't find such chains we skip the edge and continue.
 
   -----------------------------------------------------------------------------
      3) Place indirect successors (neighbours) after each other
@@ -239,7 +267,8 @@ instance Eq BlockChain where
 -- in the chain.
 instance Ord (BlockChain) where
    (BlockChain lbls1) `compare` (BlockChain lbls2)
-       = strictlyOrdOL lbls1 lbls2
+       = ASSERT(b1 /= b2 || b1 `strictEqOL` b2)
+         strictlyOrdOL lbls1 lbls2
 
 instance Outputable (BlockChain) where
     ppr (BlockChain blks) =
@@ -258,10 +287,6 @@ noDups chains =
 inFront :: BlockId -> BlockChain -> Bool
 inFront bid (BlockChain seq)
   = headOL seq == bid
-
--- chainMember :: BlockId -> BlockChain -> Bool
--- chainMember bid chain
---   = elem bid $ fromOL . chainBlocks $ chain
 
 chainSingleton :: BlockId -> BlockChain
 chainSingleton lbl
@@ -338,8 +363,12 @@ takeL n (BlockChain blks) =
 
 -- | For a given list of chains and edges try to combine chains with strong
 --   edges between them.
-combineNeighbourhood :: [CfgEdge] -> [BlockChain]
-                     -> ([BlockChain], Set.Set (BlockId,BlockId))
+combineNeighbourhood  :: [CfgEdge] -- ^ Edges to consider
+                      -> [BlockChain] -- ^ Current chains of blocks
+                      -> ([BlockChain], Set.Set (BlockId,BlockId))
+                      -- ^ Resulting list of block chains, and a set of edges which
+                      -- were used to fuse chains and as such no longer need to be
+                      -- considered.
 combineNeighbourhood edges chains
     = -- pprTraceIt "Neigbours" $
     --   pprTrace "combineNeighbours" (ppr edges) $
@@ -409,7 +438,7 @@ combineNeighbourhood edges chains
 -- In the last stop we combine all chains into a single one.
 -- Trying to place chains with strong edges next to each other.
 mergeChains :: [CfgEdge] -> [BlockChain]
-                     -> (BlockChain)
+            -> (BlockChain)
 mergeChains edges chains
     = -- pprTrace "combine" (ppr edges) $
       runST $ do
@@ -419,7 +448,7 @@ mergeChains edges chains
         chainMap' <- foldM (\m0 c -> addChain m0 c) mapEmpty chains
         merge edges chainMap'
     where
-        -- We keep a list from ALL blocks to their respective chain (sigh)
+        -- We keep a map from ALL blocks to their respective chain (sigh)
         -- This is required since when looking at an edge we need to find
         -- the associated chains quickly.
         -- We use a map of STRefs, maintaining a invariant of one STRef per chain.
@@ -428,7 +457,7 @@ mergeChains edges chains
         -- We then overwrite the STRefs for the other chain so there is again only
         -- a single STRef for the combined chain.
         -- The difference in terms of allocations saved is ~0.2% with -O so actually
-        -- significant.
+        -- significant compared to using a regular map.
 
         merge :: forall s. [CfgEdge] -> LabelMap (STRef s BlockChain) -> ST s BlockChain
         merge [] chains = do
@@ -471,10 +500,10 @@ buildChains :: [CfgEdge] -> [BlockId]
 buildChains edges blocks
   = runST $ buildNext setEmpty mapEmpty mapEmpty edges Set.empty
   where
-    -- buildNext builds up chains from one edge of a time.
+    -- buildNext builds up chains from edges one at a time.
 
     -- We keep a map from the ends of chains to the chains.
-    -- This we we can easily check if an block should be appened to an
+    -- This we we can easily check if an block should be appended to an
     -- existing chain!
     -- We store them using STRefs so we don't have to rebuild the spine of both
     -- maps every time we update a chain.
@@ -591,17 +620,13 @@ buildChains edges blocks
             buildNext (setInsert block placed) (mapInsert block ref chainStarts)
                       (mapInsert block ref chainEnds) todo (linked)
 
--- -- We make the CFG a Hoopl Graph, so we can reuse revPostOrder.
--- newtype BlockNode e x = BN (BlockId,[BlockId])
--- instance NonLocal (BlockNode) where
---   entryLabel (BN (lbl,_))   = lbl
---   successors (BN (_,succs)) = succs
-
--- fromNode :: BlockNode C C -> BlockId
--- fromNode (BN x) = fst x
-
-sequenceChain :: forall a i. (Instruction i, Outputable i) => LabelMap a -> CFG
-            -> [GenBasicBlock i] -> [GenBasicBlock i]
+-- | Place basic blocks based on the given CFG.
+-- See Note [Chain based CFG serialization]
+sequenceChain :: forall a i. (Instruction i, Outputable i)
+              => LabelMap a -- ^ Keys indicate an info table on the block.
+              -> CFG -- ^ Control flow graph and some meta data.
+              -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
+              -> [GenBasicBlock i] -- ^ Blocks placed in sequence.
 sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
@@ -629,7 +654,7 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
                 = Nothing
                 | mapMember to info
                 , w <- edgeWeight edgeInfo
-                -- The payoff is small of we jump over an info table
+                -- The payoff is small if we jump over an info table
                 = Just (CfgEdge from to edgeInfo { edgeWeight = w/8 })
                 | otherwise
                 = Just edge
@@ -639,11 +664,6 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
             = foldl' (\m blk@(BasicBlock lbl _ins) ->
                         mapInsert lbl blk m)
                      mapEmpty blocks
-
-        -- toNode :: BlockId -> BlockNode C C
-        -- toNode bid =
-        --     -- sorted such that heavier successors come first.
-        --     BN (bid,map fst . getSuccEdgesSorted weights' $ bid)
 
         (builtChains, builtEdges)
             = {-# SCC "buildChains" #-}
@@ -721,6 +741,8 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
         dropJumps info $ map getBlock placedBlocks
 
 {-# SCC dropJumps #-}
+-- | Remove redundant jumps between blocks when we can rely on
+-- fall through.
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []
