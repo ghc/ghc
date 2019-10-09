@@ -134,3 +134,33 @@ A variable-length event encoding a heap sample broken down by,
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``String``: type or closure description, or module name
+
+.. _time-profiler-events:
+
+Time profiler event log output
+------------------------------
+
+The time profiling mode enabled by ``-p`` also emits sample events to the eventlog.
+At the start of profiling the tick interval is emitted to the eventlog and then
+on each tick the current cost centre stack is emitted. Together these enable
+a user to construct an approximate track of the executation of their program.
+
+Profile begin event
+^^^^^^^^^^^^^^^^^^^
+
+ * ``EVENT_PROF_BEGIN``
+
+   * ``Word64``: Tick interval, in nanoseconds
+
+
+Tick sample event
+^^^^^^^^^^^^^^^^^^
+
+A variable-length packet encoding a profile sample.
+
+* ``EVENT_PROF_SAMPLE_COST_CENTRE``
+
+  * ``Word32``: Capability
+  * ``Word64``: Current profiling tick
+  * ``Word8``: stack depth
+  * ``Word32[]``: cost centre stack starting with inner-most (cost centre numbers)

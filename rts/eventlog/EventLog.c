@@ -107,6 +107,8 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
+  [EVENT_PROF_SAMPLE_COST_CENTRE] = "Time profile cost-centre stack",
+  [EVENT_PROF_BEGIN] = "Start of a time profile",
   [EVENT_USER_BINARY_MSG]     = "User binary message"
 };
 
@@ -440,6 +442,14 @@ init_event_types(void)
 
         case EVENT_HEAP_PROF_SAMPLE_COST_CENTRE:
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_PROF_SAMPLE_COST_CENTRE:
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_PROF_BEGIN:
+            eventTypes[t].size = 8;
             break;
 
         case EVENT_USER_BINARY_MSG:
@@ -1310,6 +1320,44 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
          depth>0 && ccs != NULL && ccs != CCS_MAIN;
          ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+
+void postProfSampleCostCentre(Capability *cap,
+                              CostCentreStack *stack,
+                              StgWord64 tick)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    StgWord depth = 0;
+    CostCentreStack *ccs;
+    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
+        depth++;
+    if (depth > 0xff) depth = 0xff;
+
+    StgWord len = 4+8+1+depth*4;
+    ensureRoomForVariableEvent(&eventBuf, len);
+    postEventHeader(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE);
+    postPayloadSize(&eventBuf, len);
+    postWord32(&eventBuf, cap->no);
+    postWord64(&eventBuf, tick);
+    postWord8(&eventBuf, depth);
+    for (ccs = stack;
+         depth>0 && ccs != NULL && ccs != CCS_MAIN;
+         ccs = ccs->prevStack, depth--)
+        postWord32(&eventBuf, ccs->cc->ccID);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+// This event is output at the start of profiling so the tick interval can
+// be reported. Once the tick interval is reported the total executation time
+// can be calculuated from how many samples there are.
+void postProfBegin(void)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_PROF_BEGIN);
+    // The interval that each tick was sampled, in nanoseconds
+    postWord64(&eventBuf, TimeToNS(RtsFlags.MiscFlags.tickInterval));
     RELEASE_LOCK(&eventBufMutex);
 }
 #endif /* PROFILING */
