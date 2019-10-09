@@ -164,7 +164,7 @@ normaliseFfiType' env ty0 = go initRecTc ty0
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 
         | isFamilyTyCon tc              -- Expand open tycons
-        , (co, ty) <- normaliseTcApp env Representational tc tys
+        , Just (co, ty) <- normaliseTcApp env Representational tc tys
         , not (isReflexiveCo co)
         = do (co', ty', gres) <- go rec_nts ty
              return (mkTransCo co co', ty', gres)
