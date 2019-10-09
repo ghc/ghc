@@ -278,4 +278,4 @@ test('T16737',
       expect_broken_for(16541, ['ghci'])],
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
 
-test('T1895', normal, compile_fail, ['-S -fno-code'])
+test('T17143', normal, compile_fail, ['-S -fno-code'])
