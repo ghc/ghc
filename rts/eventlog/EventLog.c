@@ -107,6 +107,7 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
+  [EVENT_PROF_SAMPLE_COST_CENTRE] = "Time profile cost-centre stack",
   [EVENT_USER_BINARY_MSG]     = "User binary message"
 };
 
@@ -439,6 +440,10 @@ init_event_types(void)
             break;
 
         case EVENT_HEAP_PROF_SAMPLE_COST_CENTRE:
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_PROF_SAMPLE_COST_CENTRE:
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
             break;
 
@@ -1305,6 +1310,32 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
     postPayloadSize(&eventBuf, len);
     postWord8(&eventBuf, profile_id);
     postWord64(&eventBuf, residency);
+    postWord8(&eventBuf, depth);
+    for (ccs = stack;
+         depth>0 && ccs != NULL && ccs != CCS_MAIN;
+         ccs = ccs->prevStack, depth--)
+        postWord32(&eventBuf, ccs->cc->ccID);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+
+void postProfSampleCostCentre(Capability *cap,
+                              CostCentreStack *stack,
+                              StgWord64 tick)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    StgWord depth = 0;
+    CostCentreStack *ccs;
+    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
+        depth++;
+    if (depth > 0xff) depth = 0xff;
+
+    StgWord len = 4+8+1+depth*4;
+    ensureRoomForVariableEvent(&eventBuf, len);
+    postEventHeader(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE);
+    postPayloadSize(&eventBuf, len);
+    postWord32(&eventBuf, cap->no);
+    postWord64(&eventBuf, tick);
     postWord8(&eventBuf, depth);
     for (ccs = stack;
          depth>0 && ccs != NULL && ccs != CCS_MAIN;

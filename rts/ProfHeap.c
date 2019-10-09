@@ -341,18 +341,6 @@ printSample(bool beginSample, StgDouble sampleValue)
     }
 }
 
-static void
-dumpCostCentresToEventLog(void)
-{
-#if defined(PROFILING)
-    CostCentre *cc, *next;
-    for (cc = CC_LIST; cc != NULL; cc = next) {
-        next = cc->link;
-        traceHeapProfCostCentre(cc->ccID, cc->label, cc->module,
-                                cc->srcloc, cc->is_caf);
-    }
-#endif
-}
 
 void freeHeapProfiling (void)
 {
@@ -466,7 +454,6 @@ initHeapProfiling(void)
 #endif
 
     traceHeapProfBegin(0);
-    dumpCostCentresToEventLog();
 }
 
 void
