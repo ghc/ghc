@@ -656,11 +656,27 @@ void traceHeapProfCostCentre(StgWord32 ccID,
     }
 }
 
+// This one is for .hp samples
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency)
 {
     if (eventlog_enabled) {
         postHeapProfSampleCostCentre(profile_id, stack, residency);
+    }
+}
+
+// This one is for .prof samples
+void traceProfSampleCostCentre(Capability *cap,
+                               CostCentreStack *stack, StgWord tick)
+{
+    if (eventlog_enabled) {
+        postProfSampleCostCentre(cap, stack, tick);
+    }
+}
+void traceProfBegin(void)
+{
+    if (eventlog_enabled) {
+        postProfBegin();
     }
 }
 #endif

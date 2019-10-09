@@ -166,6 +166,9 @@ Compiler
   the sample start event contains a timestamp of when the census occurred.
   The retainer profiling events are emitted using the standard events.
 
+- The eventlog now logs the cost centre stack on each sample. This enables
+  the `.prof` file to be partially reconstructed from the eventlog.
+
 - Add new flag :ghc-flag:`-fkeep-going` which makes the compiler
   continue as far as it can despite errors.
 

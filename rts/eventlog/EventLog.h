@@ -157,6 +157,11 @@ void postHeapProfCostCentre(StgWord32 ccID,
 void postHeapProfSampleCostCentre(StgWord8 profile_id,
                                   CostCentreStack *stack,
                                   StgWord64 residency);
+
+void postProfSampleCostCentre(Capability *cap,
+                              CostCentreStack *stack,
+                              StgWord64 ticks);
+void postProfBegin(void);
 #endif /* PROFILING */
 
 #else /* !TRACING */

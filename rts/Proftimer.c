@@ -12,6 +12,7 @@
 #include "Profiling.h"
 #include "Proftimer.h"
 #include "Capability.h"
+#include "Trace.h"
 
 #if defined(PROFILING)
 static bool do_prof_ticks = false;       // enable profiling ticks
@@ -77,6 +78,7 @@ handleProfTick(void)
         uint32_t n;
         for (n=0; n < n_capabilities; n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
+            traceProfSampleCostCentre(capabilities[n], capabilities[n]->r.rCCCS, total_ticks);
         }
     }
 #endif
