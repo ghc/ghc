@@ -2409,8 +2409,11 @@ tcRnExpr hsc_env mode rdr_expr
     -- #10321 for further discussion.
     fam_envs <- tcGetFamInstEnvs ;
     -- normaliseType returns a coercion which we discard, so the Role is
-    -- irrelevant
-    return (snd (normaliseType fam_envs Nominal ty))
+    -- irrelevant; if normaliseType fails because of unbounded recursion,
+    -- just don't normalise the type.
+    return $ case normaliseType fam_envs Nominal ty of
+               Just (_co, ty') -> ty'
+               Nothing         -> ty
     }
   where
     -- See Note [TcRnExprMode]
@@ -2473,12 +2476,16 @@ tcRnType hsc_env flexi normalise rdr_type
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
-                        ; let (_, ty')
-                                = normaliseType fam_envs Nominal ty
-                        ; return ty' }
+                        ; case normaliseType fam_envs Nominal ty of
+                            Just (_co, ty') -> return ty'
+                            Nothing         -> failWithTc $
+                                               unbounded_recursion ty }
                 else return ty ;
 
        ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
+  where
+    unbounded_recursion ty = hang (text "Unbounded recursion detected while reducing")
+                                2 (quotes (ppr ty))
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~

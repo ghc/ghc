@@ -1,0 +1,3 @@
+
+<interactive>:1:1: error:
+    Unbounded recursion detected while reducing ‘F’

@@ -893,7 +893,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
                    -- a duplicate ambiguity error.  There is a similar
                    -- checkNoErrs for complete type signatures too.
     do { fam_envs <- tcGetFamInstEnvs
-       ; let (_co, mono_ty') = normaliseType fam_envs Nominal mono_ty
+
                -- Unification may not have normalised the type,
                -- (see Note [Lazy flattening] in TcFlatten) so do it
                -- here to make it as uncomplicated as possible.
@@ -902,6 +902,13 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
                --
                -- We can discard the coercion _co, because we'll reconstruct
                -- it in the call to tcSubType below
+
+       ; let mono_ty'
+               | Just (_co, ty) <- normaliseType fam_envs Nominal mono_ty
+               = ty
+
+               | otherwise  -- unbounded recursion; just keep the original type
+               = mono_ty
 
        ; (binders, theta') <- chooseInferredQuantifiers inferred_theta
                                 (tyCoVarsOfType mono_ty') qtvs mb_sig_inst

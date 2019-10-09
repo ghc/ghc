@@ -148,6 +148,7 @@ import UniqFM
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
 import Data.Char( isDigit )
+import Data.Functor.Identity
 
 {-
 %************************************************************************
@@ -1969,15 +1970,16 @@ liftCoSubstCoVarBndrUsing:
 liftCoSubstVarBndr :: LiftingContext -> TyCoVar
                    -> (LiftingContext, TyCoVar, Coercion)
 liftCoSubstVarBndr lc tv
-  = let (lc', tv', h, _) = liftCoSubstVarBndrUsing callback lc tv in
+  = let (lc', tv', h, _) = runIdentity $ liftCoSubstVarBndrUsing callback lc tv in
     (lc', tv', h)
   where
-    callback lc' ty' = (ty_co_subst lc' Nominal ty', ())
+    callback lc' ty' = return (ty_co_subst lc' Nominal ty', ())
 
 -- the callback must produce a nominal coercion
-liftCoSubstVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyCoVar
-                           -> (LiftingContext, TyCoVar, CoercionN, a)
+liftCoSubstVarBndrUsing :: Monad m
+                        => (LiftingContext -> Type -> m (CoercionN, a))
+                        -> LiftingContext -> TyCoVar
+                        -> m (LiftingContext, TyCoVar, CoercionN, a)
 liftCoSubstVarBndrUsing fun lc old_var
   | isTyVar old_var
   = liftCoSubstTyVarBndrUsing fun lc old_var
@@ -1985,59 +1987,63 @@ liftCoSubstVarBndrUsing fun lc old_var
   = liftCoSubstCoVarBndrUsing fun lc old_var
 
 -- Works for tyvar binder
-liftCoSubstTyVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> TyVar
-                           -> (LiftingContext, TyVar, CoercionN, a)
+liftCoSubstTyVarBndrUsing :: Monad m
+                          => (LiftingContext -> Type -> m (CoercionN, a))
+                          -> LiftingContext -> TyVar
+                          -> m (LiftingContext, TyVar, CoercionN, a)
 liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
   = ASSERT( isTyVar old_var )
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, eta, stuff )
+    do { (eta, stuff) <- fun lc old_kind
+       ; let k1       = coercionLKind eta
+             new_var  = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+
+             lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
+               -- :: new_var ~ new_var |> eta
+             new_cenv = extendVarEnv cenv old_var lifted
+
+       ; return ( LC (subst `extendTCvInScope` new_var) new_cenv
+                , new_var, eta, stuff ) }
   where
     old_kind     = tyVarKind old_var
-    (eta, stuff) = fun lc old_kind
-    k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
-
-    lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
-               -- :: new_var ~ new_var |> eta
-    new_cenv = extendVarEnv cenv old_var lifted
 
 -- Works for covar binder
-liftCoSubstCoVarBndrUsing :: (LiftingContext -> Type -> (CoercionN, a))
-                           -> LiftingContext -> CoVar
-                           -> (LiftingContext, CoVar, CoercionN, a)
+liftCoSubstCoVarBndrUsing :: Monad m
+                          => (LiftingContext -> Type -> m (CoercionN, a))
+                          -> LiftingContext -> CoVar
+                          -> m (LiftingContext, CoVar, CoercionN, a)
 liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
   = ASSERT( isCoVar old_var )
-    ( LC (subst `extendTCvInScope` new_var) new_cenv
-    , new_var, kind_co, stuff )
+    do { (eta, stuff) <- fun lc old_kind
+       ; let k1      = coercionLKind eta
+             new_var = uniqAway (getTCvInScope subst) (setVarType old_var k1)
+
+             -- old_var :: s1  ~r s2
+             -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
+             -- eta1    :: s1' ~r t1
+             -- eta2    :: s2' ~r t2
+             -- co1     :: s1' ~r s2'
+             -- co2     :: t1  ~r t2
+             -- kind_co :: (s1' ~r s2') ~N (t1 ~r t2)
+             -- lifted  :: co1 ~N co2
+
+             eta'   = downgradeRole role Nominal eta
+             eta1   = mkNthCo role 2 eta'
+             eta2   = mkNthCo role 3 eta'
+
+             co1     = mkCoVarCo new_var
+             co2     = mkSymCo eta1 `mkTransCo` co1 `mkTransCo` eta2
+             kind_co = mkTyConAppCo Nominal (equalityTyCon role)
+                                    [ mkKindCo co1, mkKindCo co2
+                                    , co1         , co2          ]
+             lifted  = mkProofIrrelCo Nominal kind_co co1 co2
+
+             new_cenv = extendVarEnv cenv old_var lifted
+
+       ; return ( LC (subst `extendTCvInScope` new_var) new_cenv
+                , new_var, kind_co, stuff ) }
   where
-    old_kind     = coVarKind old_var
-    (eta, stuff) = fun lc old_kind
-    k1           = coercionLKind eta
-    new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
-
-    -- old_var :: s1  ~r s2
-    -- eta     :: (s1' ~r s2') ~N (t1 ~r t2)
-    -- eta1    :: s1' ~r t1
-    -- eta2    :: s2' ~r t2
-    -- co1     :: s1' ~r s2'
-    -- co2     :: t1  ~r t2
-    -- kind_co :: (s1' ~r s2') ~N (t1 ~r t2)
-    -- lifted  :: co1 ~N co2
-
-    role   = coVarRole old_var
-    eta'   = downgradeRole role Nominal eta
-    eta1   = mkNthCo role 2 eta'
-    eta2   = mkNthCo role 3 eta'
-
-    co1     = mkCoVarCo new_var
-    co2     = mkSymCo eta1 `mkTransCo` co1 `mkTransCo` eta2
-    kind_co = mkTyConAppCo Nominal (equalityTyCon role)
-                           [ mkKindCo co1, mkKindCo co2
-                           , co1         , co2          ]
-    lifted  = mkProofIrrelCo Nominal kind_co co1 co2
-
-    new_cenv = extendVarEnv cenv old_var lifted
+    old_kind = coVarKind old_var
+    role     = coVarRole old_var
 
 -- | Is a var in the domain of a lifting context?
 isMappedByLC :: TyCoVar -> LiftingContext -> Bool
