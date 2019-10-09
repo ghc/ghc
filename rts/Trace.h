@@ -301,6 +301,9 @@ void traceHeapProfCostCentre(StgWord32 ccID,
                              StgBool is_caf);
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency);
+
+void traceProfSampleCostCentre(Capability *cap,
+                               CostCentreStack *stack, StgWord ticks);
 #endif /* PROFILING */
 
 void flushTrace(void);
