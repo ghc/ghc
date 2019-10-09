@@ -1050,7 +1050,7 @@ runEHRExpr parsed_expr@(L loc _) =
        ; (tc_expr, wanted) <- captureConstraints $ tcMonoExprNC rn_expr expr_ty
        ; const_binds <- simplifyTop wanted
        ; zte <- zonkTopLExpr (mkHsDictLet (EvBinds const_binds) tc_expr)
-       ; shadowFatal $ run_lhs_expr zte }
+       ; shadow_fatal $ run_lhs_expr zte }
 
 -- | Runs the given expression, but as a Dynamic requires the expression to be
 --   Typeable, otherwise the call to `toDyn` will fail.
@@ -1070,15 +1070,15 @@ runEHRExprDyn lexpr@(L loc _) =
 runEHSplice :: LHsExpr GhcTc -> TcM Dynamic
 runEHSplice lexpr@(L loc _) =
  setSrcSpan loc $
-  do { dv <- shadowFatal $ run_lhs_expr lexpr
+  do { dv <- shadow_fatal $ run_lhs_expr lexpr
        -- The unsafeCoerce# is safe here, since any expression contained in an
        -- ExtendedExprHole is wrapped by `toDyn`
      ; return (unsafeCoerce# dv :: Dynamic) }
 
 
--- | `shadowFatal act` turns all SevFatal messages in act
-shadowFatal ::  TcM a -> TcM a
-shadowFatal action
+-- | `shadow_fatal act` turns all SevFatal messages in act
+shadow_fatal ::  TcM a -> TcM a
+shadow_fatal action
  = do { msg_ref <- liftIO $ newIORef []
       ; log_act <- log_action <$> getDynFlags
       ; e_res <- tryM $ updTopEnv (shadow msg_ref log_act) $ action
