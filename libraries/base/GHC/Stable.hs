@@ -96,8 +96,8 @@ castStablePtrToPtr :: forall a . StablePtr a -> Ptr ()
 castStablePtrToPtr (StablePtr s) =
     Ptr (castAddrRepWith (unsafeEqualityProof @(StablePtr# a) @Addr#) s)
 
-castAddrRepWith :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . (a :~: b) -> a -> b
-castAddrRepWith Refl x = x
+castAddrRepWith :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . UnsafeEquality a b -> a -> b
+castAddrRepWith UnsafeRefl x = x
 
 -- |
 -- The inverse of 'castStablePtrToPtr', i.e., we have the identity

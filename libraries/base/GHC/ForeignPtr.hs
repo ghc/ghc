@@ -179,8 +179,8 @@ mallocForeignPtr = doMalloc undefined
             where !(I# size)  = sizeOf a
                   !(I# align) = alignment a
 
-castByteArrayWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . (a :~: b) -> a -> b
-castByteArrayWith Refl x = x
+castByteArrayWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . UnsafeEquality a b -> a -> b
+castByteArrayWith UnsafeRefl x = x
 
 unsafeFreezeByteArray :: MutableByteArray# RealWorld -> ByteArray#
 unsafeFreezeByteArray x =
@@ -365,7 +365,7 @@ ensureCFinalizerWeak ref@(IORef (STRef r#)) value = do
       CFinalizers weak -> return (MyWeak weak)
       HaskellFinalizers{} -> noMixingError
       NoFinalizers -> IO $ \s ->
-          case mkWeakNoFinalizer# r# (castWith unsafeEqualityProof value) s of { (# s1, w #) ->
+          case mkWeakNoFinalizer# r# (unsafeCastWith unsafeEqualityProof value) s of { (# s1, w #) ->
              -- See Note [MallocPtr finalizers] (#10904)
           case atomicModifyMutVar2# r# (update w) s1 of
               { (# s2, _, (_, (weak, needKill )) #) ->

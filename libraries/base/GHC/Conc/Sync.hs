@@ -638,8 +638,8 @@ newStablePtrPrimMVar (MVar m) = IO $ \s0 ->
   case makeStablePtr# (castUnliftedToLiftedWith unsafeHeteroEqualityProof m :: PrimMVar) s0 of
     (# s1, sp #) -> (# s1, StablePtr sp #)
 
-castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . (a :~~: b) -> a -> b
-castUnliftedToLiftedWith HRefl x = x
+castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . UnsafeHeteroEquality a b -> a -> b
+castUnliftedToLiftedWith UnsafeHRefl x = x
 
 -----------------------------------------------------------------------------
 -- Transactional heap operations
