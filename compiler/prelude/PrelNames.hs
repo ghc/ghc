@@ -2118,11 +2118,10 @@ divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
 absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique 9
 
-unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
+concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
-unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
