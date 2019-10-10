@@ -478,9 +478,6 @@ instance HasLoc (HsDataDefn GhcRn) where
     -- Most probably the rest will be unhelpful anyway
   loc _ = noSrcSpan
 
-instance HasLoc (Pat (GhcPass a)) where
-  loc (dL -> L l _) = l
-
 {- Note [Real DataCon Name]
 The typechecker subtitutes the conLikeWrapId for the name, but we don't want
 this showing up in the hieFile, so we replace the name in the Id with the
@@ -581,10 +578,10 @@ instance HasType (LHsBind GhcTc) where
       FunBind{fun_id = name} -> makeTypeNode bind spn (varType $ unLoc name)
       _ -> makeNode bind spn
 
-instance HasType (LPat GhcRn) where
+instance HasType (Located (Pat GhcRn)) where
   getTypeNode (dL -> L spn pat) = makeNode pat spn
 
-instance HasType (LPat GhcTc) where
+instance HasType (Located (Pat GhcTc)) where
   getTypeNode (dL -> L spn opat) = makeTypeNode opat spn (hsPatType opat)
 
 instance HasType (LHsExpr GhcRn) where
@@ -768,7 +765,7 @@ instance ( a ~ GhcPass p
          , ToHie (TScoped (ProtectedSig a))
          , HasType (LPat a)
          , Data (HsSplice a)
-         ) => ToHie (PScoped (LPat (GhcPass p))) where
+         ) => ToHie (PScoped (Located (Pat (GhcPass p)))) where
   toHie (PS rsp scope pscope lpat@(dL -> L ospan opat)) =
     concatM $ getTypeNode lpat : case opat of
       WildPat _ ->

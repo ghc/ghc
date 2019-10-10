@@ -7,6 +7,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -142,6 +143,12 @@ type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
 type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
 type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+-- | GHC's L prefixed variants wrap their vanilla variant in this type family,
+-- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
+-- interested in location information can define this instance as @f p@.
+type family XRec p (f :: * -> *) = r | r -> p f
+type instance XRec (GhcPass p) f = Located (f (GhcPass p))
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p

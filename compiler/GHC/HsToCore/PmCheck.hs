@@ -470,20 +470,18 @@ translatePat :: FamInstEnvs -> Id -> Pat GhcTc -> DsM GrdVec
 translatePat fam_insts x pat = case pat of
   WildPat  _ty -> pure []
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
-  -- XPat wraps a Located (Pat GhcTc) in GhcTc. The Located part is important
-  XPat     p   -> translatePat fam_insts x (unLoc p)
-  ParPat _ p   -> translatePat fam_insts x p
+  ParPat _ p   -> translateLPat fam_insts x p
   LazyPat _ _  -> pure [] -- like a wildcard
   BangPat _ p  ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
-    (PmBang x :) <$> translatePat fam_insts x p
+    (PmBang x :) <$> translateLPat fam_insts x p
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (dL->L _ y) p -> (mkPmLetVar y x ++) <$> translatePat fam_insts y p
+  AsPat _ (dL->L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
 
-  SigPat _ p _ty -> translatePat fam_insts x p
+  SigPat _ p _ty -> translateLPat fam_insts x p
 
   -- See Note [Translate CoPats]
   -- Generally the translation is
@@ -507,7 +505,7 @@ translatePat fam_insts x pat = case pat of
 
   -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
   ViewPat _arg_ty lexpr pat -> do
-    (y, grds) <- translatePatV fam_insts pat
+    (y, grds) <- translateLPatV fam_insts pat
     fun <- dsLExpr lexpr
     pure $ PmLet y (App fun (Var x)) : grds
 
@@ -576,12 +574,12 @@ translatePat fam_insts x pat = case pat of
     mkPmLitGrds x lit
 
   TuplePat _tys pats boxity -> do
-    (vars, grdss) <- mapAndUnzipM (translatePatV fam_insts) pats
+    (vars, grdss) <- mapAndUnzipM (translateLPatV fam_insts) pats
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars : concat grdss
 
   SumPat _ty p alt arity -> do
-    (y, grds) <- translatePatV fam_insts p
+    (y, grds) <- translateLPatV fam_insts p
     let sum_con = sumDataCon alt arity
     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
     pure $ vanillaConGrd x sum_con [y] : grds
@@ -590,6 +588,7 @@ translatePat fam_insts x pat = case pat of
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
+  XPat      n  -> noExtCon n
 
 -- | 'translatePat', but also select and return a new match var.
 translatePatV :: FamInstEnvs -> Pat GhcTc -> DsM (Id, GrdVec)
@@ -598,12 +597,19 @@ translatePatV fam_insts pat = do
   grds <- translatePat fam_insts x pat
   pure (x, grds)
 
+translateLPat :: FamInstEnvs -> Id -> LPat GhcTc -> DsM GrdVec
+translateLPat fam_insts x = translatePat fam_insts x . unLoc
+
+-- | 'translateLPat', but also select and return a new match var.
+translateLPatV :: FamInstEnvs -> LPat GhcTc -> DsM (Id, GrdVec)
+translateLPatV fam_insts = translatePatV fam_insts . unLoc
+
 -- | @translateListPat _ x [p1, ..., pn]@ is basically
 --   @translateConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
 -- constructing the 'ConPatOut's.
-translateListPat :: FamInstEnvs -> Id -> [Pat GhcTc] -> DsM GrdVec
+translateListPat :: FamInstEnvs -> Id -> [LPat GhcTc] -> DsM GrdVec
 translateListPat fam_insts x pats = do
-  vars_and_grdss <- traverse (translatePatV fam_insts) pats
+  vars_and_grdss <- traverse (translateLPatV fam_insts) pats
   mkListGrds x vars_and_grdss
 
 -- | Translate a constructor pattern
@@ -637,7 +643,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       -- Translate the mentioned field patterns. We're doing this first to get
       -- the Ids for pm_con_args.
       let trans_pat (n, pat) = do
-            (var, pvec) <- translatePatV fam_insts pat
+            (var, pvec) <- translateLPatV fam_insts pat
             pure ((n, var), pvec)
       (tagged_vars, arg_grdss) <- mapAndUnzipM trans_pat tagged_pats
 
@@ -667,7 +673,7 @@ translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM (GrdVec, [GrdVec])
 translateMatch fam_insts vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
   = do
-      pats'   <- concat <$> zipWithM (translatePat fam_insts) vars pats
+      pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
       guards' <- mapM (translateGuards fam_insts) guards
       -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
       return (pats', guards')
@@ -706,15 +712,15 @@ translateLet _binds = return []
 
 -- | Translate a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
-translateBind :: FamInstEnvs -> Pat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
+translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
 translateBind fam_insts p e = dsLExpr e >>= \case
   Var y
     | Nothing <- isDataConId_maybe y
     -- RHS is a variable, so that will allow us to omit the let
-    -> translatePat fam_insts y p
+    -> translateLPat fam_insts y p
   rhs -> do
-    x <- selectMatchVar p
-    (PmLet x rhs :) <$> translatePat fam_insts x p
+    (x, grds) <- translateLPatV fam_insts p
+    pure (PmLet x rhs : grds)
 
 -- | Translate a boolean guard
 --   @e ==>  let x = e; True <- x@
