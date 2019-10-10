@@ -256,6 +256,6 @@ atomicModifyMutVar# mv f s =
 castTupleRepWith
   :: forall (a :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep]))
             (b :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep])) .
-     (a :~~: b) -> a -> b
-castTupleRepWith HRefl x = x
+     UnsafeHeteroEquality a b -> a -> b
+castTupleRepWith UnsafeHRefl x = x
 

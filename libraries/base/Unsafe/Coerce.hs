@@ -1,62 +1,47 @@
 {-# OPTIONS_GHC -fno-strictness #-}
 
 {-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
-             ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds  #-}
-
------------------------------------------------------------------------------
--- |
--- Module      :  Unsafe.Coerce
--- Copyright   :  Malcolm Wallace 2006
--- License     :  BSD-style (see the LICENSE file in the distribution)
---
--- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
--- Portability :  portable
---
--- The highly unsafe primitive 'unsafeCoerce' converts a value from any
--- type to any other type.  Needless to say, if you use this function,
--- it is your responsibility to ensure that the old and new types have
--- identical internal representations, in order to prevent runtime corruption.
---
--- The types for which 'unsafeCoerce' is representation-safe may differ
--- from compiler to compiler (and version to version).
---
---   * Documentation for correct usage in GHC will be found under
---     'unsafeCoerce#' in "GHC.Base" (around which 'unsafeCoerce' is just a
---     trivial wrapper).
---
---   * In nhc98, the only representation-safe coercions are between
---     'Prelude.Enum' types with the same range (e.g. 'Prelude.Int',
---     'Data.Int.Int32', 'Prelude.Char', 'Data.Word.Word32'), or between a
---     newtype and the type that it wraps.
---
------------------------------------------------------------------------------
+             ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds,
+             StandaloneKindSignatures #-}
 
 module Unsafe.Coerce
   ( unsafeCoerce
   , unsafeEqualityProof
   , unsafeHeteroEqualityProof
-  -- Users of unsafeEqualityProof/unsafeHeteroEqualityProof will need these too
-  , (:~:)(..)
-  , (:~~:)(..)
-  , castWith
+  , unsafeCastWith
+  , UnsafeEquality (..)
+  , UnsafeHeteroEquality (..)
   ) where
 
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import Data.Type.Equality
+import GHC.Base
 
+{-# INLINE unsafeCoerce #-}
 unsafeCoerce :: forall a b . a -> b
-unsafeCoerce x = case unsafeEqualityProof @a @b of Refl -> x
+unsafeCoerce x = unsafeCastWith (unsafeEqualityProof @a @b) x
+
+data UnsafeEquality a b where
+  UnsafeRefl :: UnsafeEquality a a
 
 {-# NOINLINE unsafeEqualityProof #-}
-unsafeEqualityProof :: forall a b . a :~: b
-unsafeEqualityProof = case unsafeEqualityProof @a @b of Refl -> Refl
+unsafeEqualityProof :: forall a b . UnsafeEquality a b
+unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
+
+{-# INLINE unsafeCastWith #-}
+unsafeCastWith :: UnsafeEquality a b -> a -> b
+unsafeCastWith UnsafeRefl x = x
+
+type UnsafeHeteroEquality :: k1 -> k2 -> Type
+
+data UnsafeHeteroEquality a b where
+  UnsafeHRefl :: UnsafeHeteroEquality a a
 
 {-# NOINLINE unsafeHeteroEqualityProof #-}
-unsafeHeteroEqualityProof :: forall a b . a :~~: b
+unsafeHeteroEqualityProof :: forall a b . UnsafeHeteroEquality a b
 unsafeHeteroEqualityProof =
   (case unsafeEqualityProof @k1 @k2 of
-    Refl -> case unsafeEqualityProof @a' @b' of
-      Refl -> HRefl)
-        :: forall k1 k2 (a' :: k1) (b' :: k2). a' :~~: b'
+    UnsafeRefl -> case unsafeEqualityProof @a' @b' of
+      UnsafeRefl -> UnsafeHRefl)
+        :: forall k1 k2 (a' :: k1) (b' :: k2) . UnsafeHeteroEquality a' b'
