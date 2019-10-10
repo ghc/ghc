@@ -1320,7 +1320,7 @@ mk_originative_eqn mechanism
            inst_tys = cls_tys ++ [inst_ty]
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
-       dfun_name <- lift $ newDFunName' cls tc
+       dfun_name <- lift $ newDFunName cls inst_tys loc
        case deriv_ctxt of
         InferContext wildcard ->
           do { (inferred_constraints, tvs', inst_tys')
@@ -1413,8 +1413,8 @@ mk_coerce_based_eqn mk_mechanism coerced_ty
        let mechanism = mk_mechanism coerced_ty
        atf_coerce_based_error_checks mechanism cls
        doDerivInstErrorChecks1 mechanism
-       dfun_name <- lift $ newDFunName' cls tycon
        loc       <- lift getSrcSpanM
+       dfun_name <- lift $ newDFunName cls inst_tys loc
        case deriv_ctxt of
         SupplyContext theta -> return $ GivenTheta $ DS
             { ds_loc = loc
