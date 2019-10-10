@@ -7,6 +7,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -142,6 +143,17 @@ type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
 type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
 type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+-- | GHC's L prefixed variants wrap their vanilla variant in this type family,
+-- to add 'SrcLoc' info via 'Located'. For passes other than 'GhcPass', this
+-- family will just reduce to the regular syntactic variant without the
+-- 'Located' wrapper.
+type family WrapL p (f :: * -> *) = r | r -> p f where
+  WrapL (GhcPass p) f = Located (f (GhcPass p))
+  -- This bogus instance is unfortunate, but needed for injectivity and thus
+  -- type inference.
+  WrapL p           Located = Located (Located p)
+  WrapL p           f =          f p
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
