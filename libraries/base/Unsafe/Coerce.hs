@@ -15,7 +15,6 @@ module Unsafe.Coerce
 
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
-import Data.Type.Equality
 import GHC.Base
 
 {-# INLINE unsafeCoerce #-}
