@@ -466,6 +466,7 @@ basicKnownKeyNames
         , unsafeEqualityProofName
         , unsafeReflDataConName
         , unsafeHReflDataConName
+        , unsafeCoerceName
     ]
 
 genericTyConNames :: [Name]
@@ -1327,6 +1328,10 @@ unsafeEqualityProofName, unsafeReflDataConName, unsafeHReflDataConName :: Name
 unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
 unsafeReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl") unsafeReflDataConKey
 unsafeHReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeHRefl") unsafeHReflDataConKey
+
+-- Unsafe coerce
+unsafeCoerceName :: Name
+unsafeCoerceName = varQual uNSAFE_COERCE (fsLit "unsafeCoerce") unsafeCoerceIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -2420,6 +2425,9 @@ unsafeEqualityProofIdKey, unsafeReflDataConKey, unsafeHReflDataConKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeReflDataConKey = mkPreludeMiscIdUnique 571
 unsafeHReflDataConKey = mkPreludeMiscIdUnique 572
+
+unsafeCoerceIdKey :: Unique
+unsafeCoerceIdKey = mkPreludeMiscIdUnique 573
 
 {-
 ************************************************************************
