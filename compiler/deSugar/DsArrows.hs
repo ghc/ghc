@@ -327,7 +327,7 @@ dsProcExpr pat (dL->L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     fail_expr <- mkFailExpr ProcExpr env_stk_ty
     var <- selectSimpleMatchVarL pat
     match_code <- matchSimply (Var var) ProcExpr pat env_stk_expr fail_expr
-    let pat_ty = hsPatType pat
+    let pat_ty = hsLPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
                     (Lam var match_code)
                     core_cmd
@@ -868,7 +868,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
 -- but that's likely to be defined in terms of first.
 
 dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
-    let pat_ty = hsPatType pat
+    let pat_ty = hsLPatType pat
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
     let
