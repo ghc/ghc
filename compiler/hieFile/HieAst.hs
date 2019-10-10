@@ -478,7 +478,7 @@ instance HasLoc (HsDataDefn GhcRn) where
     -- Most probably the rest will be unhelpful anyway
   loc _ = noSrcSpan
 
-instance HasLoc (Pat (GhcPass a)) where
+instance HasLoc (LPat (GhcPass a)) where
   loc (dL -> L l _) = l
 
 {- Note [Real DataCon Name]

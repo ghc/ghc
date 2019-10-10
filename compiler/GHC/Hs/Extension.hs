@@ -163,6 +163,11 @@ type family NoGhcTcPass (p :: Pass) :: Pass where
   NoGhcTcPass 'Typechecked = 'Renamed
   NoGhcTcPass other        = other
 
+-- | A TTG mixin for adding 'SrcLoc's to the AST.
+data Loc p
+
+type instance IdP (Loc p) = IdP p
+
 -- =====================================================================
 -- Type families for the HsBinds extension points
 
