@@ -103,7 +103,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import StringBuffer (stringToStringBuffer)
 import Control.Monad
-import GHC.Exts
 import Data.Array
 import Exception
 import Unsafe.Coerce
