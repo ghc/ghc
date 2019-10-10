@@ -388,7 +388,6 @@ checkOptions mode dflags srcs objs = do
       StopBefore (As False) | ghcLink dflags == NoLink
         -> throwGhcException $ UsageError $
            "the options -S and -fno-code are incompatible. Please omit -S"
-
       _ -> return ()
 
      -- Verify that output files point somewhere sensible.
