@@ -68,8 +68,8 @@ createBCO arr bco
 castBCOToAny :: BCO# -> Any
 castBCOToAny x = castUnliftedToLiftedWith (unsafeHeteroEqualityProof @BCO# @Any) x
 
-castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . (a :~~: b) -> a -> b
-castUnliftedToLiftedWith HRefl x = x
+castUnliftedToLiftedWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'LiftedRep) . UnsafeHeteroEquality a b -> a -> b
+castUnliftedToLiftedWith UnsafeHRefl x = x
 
 toWordArray :: UArray Int Word64 -> UArray Int Word
 toWordArray = amap fromIntegral
