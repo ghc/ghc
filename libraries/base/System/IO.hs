@@ -315,13 +315,6 @@ getContents     =  hGetContents stdin
 getContents'    :: IO String
 getContents'    =  hGetContents' stdin
 
--- | The 'hGetContents'' operation reads all input on the given handle
--- before returning it as a string.
-
-hGetContents'   :: Handle -> IO String
-hGetContents' h =  do s <- hGetContents h
-                      foldr (\_ r -> r) (return s) s
-
 -- | The 'interact' function takes a function of type @String->String@
 -- as its argument.  The entire input from the standard input device is
 -- passed to this function as its argument, and the resulting string is
