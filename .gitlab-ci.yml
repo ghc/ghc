@@ -18,6 +18,7 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
+  - windows
   - lint       # Source linting
   - build      # A quick smoke-test to weed out broken commits
   - full-build # Build all the things
@@ -701,7 +702,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows-hadrian:
   extends: .build-windows
-  stage: full-build
+  stage: windows
   variables:
     GHC_VERSION: "8.6.5"
   # due to #16574 this currently fails
@@ -745,7 +746,7 @@ nightly-i386-windows-hadrian:
 
 .build-windows-make:
   extends: .build-windows
-  stage: full-build
+  stage: windows
   # due to #16084
   allow_failure: true
   variables:
@@ -783,7 +784,7 @@ validate-x86_64-windows:
 
 nightly-x86_64-windows:
   extends: .build-windows-make
-  stage: full-build
+  stage: windows
   variables:
     BUILD_FLAVOUR: "validate"
     MSYSTEM: MINGW64
