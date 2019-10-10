@@ -1321,8 +1321,10 @@ typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
-unsafeEqualityProofName :: Name
+unsafeEqualityProofName, unsafeReflDataConName, unsafeHReflDataConName :: Name
 unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
+unsafeReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl") unsafeReflDataConKey
+unsafeHReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeHRefl") unsafeHReflDataConKey
 
 -- Dynamic
 toDynName :: Name
@@ -2413,8 +2415,10 @@ naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
 -- Unsafe coercion proofs
-unsafeEqualityProofIdKey :: Unique
+unsafeEqualityProofIdKey, unsafeReflDataConKey, unsafeHReflDataConKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
+unsafeReflDataConKey = mkPreludeMiscIdUnique 571
+unsafeHReflDataConKey = mkPreludeMiscIdUnique 572
 
 {-
 ************************************************************************
