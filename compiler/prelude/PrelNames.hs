@@ -464,6 +464,8 @@ basicKnownKeyNames
 
         -- Unsafe coercion proofs
         , unsafeEqualityProofName
+        , unsafeReflDataConName
+        , unsafeHReflDataConName
     ]
 
 genericTyConNames :: [Name]
