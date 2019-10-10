@@ -2265,6 +2265,7 @@ tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
         ret_id  <- tcLookupId returnIOName ;            -- return @ IO
+        unsafe_coerce_id <- tcLookupId unsafeCoerceName ;
         let {
             ret_ty      = mkListTy unitTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
@@ -2299,15 +2300,8 @@ tcGhciStmts stmts
                 -- get their *polymorphic* values.  (And we'd get ambiguity errs
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing
-                                                            (map mk_item ids)) ;
-            mk_item id =
-                         {-
-                         let ty_args = [idType id, unitTy] in
-                         nlHsApp (nlHsTyApp unsafeCoerceId
-                                   (map getRuntimeRep ty_args ++ ty_args))
-                         -}
-                                 (nlHsVar id) ;
+                       (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
+            mk_item id = nlHsApp (nlHsTyApp unsafe_coerce_id [idType id, unitTy]) (nlHsVar id) ;
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
