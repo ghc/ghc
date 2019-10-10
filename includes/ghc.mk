@@ -114,23 +114,6 @@ $$(includes_$1_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$$$(dir $
 #
 	@sed 's,^\([	 ]*\)#[	 ]*define[	 ][	 ]*\(PACKAGE_[A-Z]*\)[	 ][ 	]*".*".*$$$$,\1/* #undef \2 */,' mk/config.h >> $$@
 #
-#	Tack on some extra config information from the build system
-#
-ifeq "$$(TablesNextToCode)" "YES"
-	@echo >> $$@
-	@echo "#define TABLES_NEXT_TO_CODE 1" >> $$@
-endif
-#
-ifeq "$$(CC_LLVM_BACKEND)" "1"
-	@echo >> $$@
-	@echo "#define llvm_CC_FLAVOR 1" >> $$@
-endif
-#
-ifeq "$$(CC_CLANG_BACKEND)" "1"
-	@echo >> $$@
-	@echo "#define clang_CC_FLAVOR 1" >> $$@
-endif
-#
 	@echo "#endif /* __GHCAUTOCONF_H__ */"          >> $$@
 	@echo "Done."
 
