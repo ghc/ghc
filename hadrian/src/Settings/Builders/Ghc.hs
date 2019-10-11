@@ -37,7 +37,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
 
     mconcat [ arg "-Wall"
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
-              platformSupportsSharedLibs ? arg "-dynamic-too"
+              platformSupportsSharedLibs ? way (wayFromUnits []) ? arg "-dynamic-too"
             -- , builder (Ghc CompileHs) ? platformSupportsSharedLibs ? arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
