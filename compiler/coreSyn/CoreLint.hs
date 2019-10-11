@@ -2776,11 +2776,16 @@ withoutAnnots pass guts = do
   dflags <- getDynFlags
   let removeFlag env = env{ hsc_dflags = dflags{ debugLevel = 0} }
       withoutFlag corem =
-        liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
-                                getUniqueSupplyM <*> getModule <*>
-                                getVisibleOrphanMods <*>
-                                getPrintUnqualified <*> getSrcSpanM <*>
-                                pure corem
+          -- TODO: supply tag here as well ?
+        liftIO =<< runCoreM <$> fmap removeFlag getHscEnv
+                            <*> getRuleBase
+                            <*> getUniqueSupplyM
+                            <*> getUniqMask
+                            <*> getModule
+                            <*> getVisibleOrphanMods
+                            <*> getPrintUnqualified
+                            <*> getSrcSpanM
+                            <*> pure corem
   -- Nuke existing ticks in module.
   -- TODO: Ticks in unfoldings. Maybe change unfolding so it removes
   -- them in absence of debugLevel > 0.
