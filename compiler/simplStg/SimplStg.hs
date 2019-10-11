@@ -32,15 +32,17 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict
 
-newtype StgM a = StgM { _unStgM :: StateT UniqSupply IO a }
+newtype StgM a = StgM { _unStgM :: StateT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadUnique StgM where
-  getUniqueSupplyM = StgM (state splitUniqSupply)
-  getUniqueM = StgM (state takeUniqFromSupply)
+  getUniqueSupplyM = StgM $ do { mask <- get
+                               ; liftIO $! mkSplitUniqSupply mask}
+  getUniqueM = StgM $ do { mask <- get
+                         ; liftIO $! uniqFromMask mask}
 
-runStgM :: UniqSupply -> StgM a -> IO a
-runStgM us (StgM m) = evalStateT m us
+runStgM :: Char -> StgM a -> IO a
+runStgM mask (StgM m) = evalStateT m mask
 
 stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module being compiled
@@ -50,10 +52,8 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
 stg2stg dflags this_mod binds
   = do  { dump_when Opt_D_dump_stg "STG:" binds
         ; showPass dflags "Stg2Stg"
-        ; us <- mkSplitUniqSupply 'g'
-
         -- Do the main business!
-        ; binds' <- runStgM us $
+        ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)
 
         ; dump_when Opt_D_dump_stg_final "Final STG:" binds'

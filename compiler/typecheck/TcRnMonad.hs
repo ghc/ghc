@@ -397,17 +397,14 @@ an actual crash (attempting to look up the Integer type).
 ************************************************************************
 -}
 
-initTcRnIf :: Char              -- Tag for unique supply
+initTcRnIf :: Char              -- ^ Mask for unique supply
            -> HscEnv
            -> gbl -> lcl
            -> TcRnIf gbl lcl a
            -> IO a
-initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
-   = do { us     <- mkSplitUniqSupply uniq_tag ;
-        ; us_var <- newIORef us ;
-
-        ; let { env = Env { env_top = hsc_env,
-                            env_us  = us_var,
+initTcRnIf uniq_mask hsc_env gbl_env lcl_env thing_inside
+   = do { let { env = Env { env_top = hsc_env,
+                            env_um  = uniq_mask,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
 
@@ -595,27 +592,15 @@ escapeArrowScope
 
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
- = do { env <- getEnv ;
-        let { u_var = env_us env } ;
-        us <- readMutVar u_var ;
-        case takeUniqFromSupply us of { (uniq, us') -> do {
-        writeMutVar u_var us' ;
-        return $! uniq }}}
-   -- NOTE 1: we strictly split the supply, to avoid the possibility of leaving
-   -- a chain of unevaluated supplies behind.
-   -- NOTE 2: we use the uniq in the supply from the MutVar directly, and
-   -- throw away one half of the new split supply.  This is safe because this
-   -- is the only place we use that unique.  Using the other half of the split
-   -- supply is safer, but slower.
+ = do { env <- getEnv
+      ; let mask = env_um env
+      ; liftIO $! uniqFromMask mask }
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
- = do { env <- getEnv ;
-        let { u_var = env_us env } ;
-        us <- readMutVar u_var ;
-        case splitUniqSupply us of { (us1,us2) -> do {
-        writeMutVar u_var us1 ;
-        return us2 }}}
+ = do { env <- getEnv
+      ; let mask = env_um env
+      ; liftIO $! mkSplitUniqSupply mask }
 
 cloneLocalName :: Name -> TcM Name
 -- Make a fresh Internal name with the same OccName and SrcSpan
@@ -1944,12 +1929,8 @@ forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 -- signatures, which is pretty benign
 
 forkM_maybe doc thing_inside
- -- NB: Don't share the mutable env_us with the interleaved thread since env_us
- --     does not get updated atomically (e.g. in newUnique and newUniqueSupply).
- = do { child_us <- newUniqueSupply
-      ; child_env_us <- newMutVar child_us
-        -- see Note [Masking exceptions in forkM_maybe]
-      ; unsafeInterleaveM $ uninterruptibleMaskM_ $ updEnv (\env -> env { env_us = child_env_us }) $
+ = do { -- see Note [Masking exceptions in forkM_maybe]
+      ; unsafeInterleaveM $ uninterruptibleMaskM_ $
         do { traceIf (text "Starting fork {" <+> doc)
            ; mb_res <- tryM $
                        updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $
