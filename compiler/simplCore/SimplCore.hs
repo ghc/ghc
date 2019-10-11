@@ -72,13 +72,13 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { us <- mkSplitUniqSupply 's'
-       -- make sure all plugins are loaded
+  = do { -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
+             uniq_mask = 's'
        ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
                               ; dflags' <- liftIO $ initializePlugins hsc_env'

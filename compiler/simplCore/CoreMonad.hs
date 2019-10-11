@@ -28,7 +28,7 @@ module CoreMonad (
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
-    getVisibleOrphanMods,
+    getVisibleOrphanMods, getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
     -- ** Writing to the monad
@@ -546,10 +546,6 @@ cmpEqTick _                             _                               = EQ
 ************************************************************************
 -}
 
-newtype CoreState = CoreState {
-        cs_uniq_supply :: UniqSupply
-}
-
 data CoreReader = CoreReader {
         cr_hsc_env             :: HscEnv,
         cr_rule_base           :: RuleBase,
@@ -557,7 +553,8 @@ data CoreReader = CoreReader {
         cr_print_unqual        :: PrintUnqualified,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_visible_orphan_mods :: !ModuleSet
+        cr_visible_orphan_mods :: !ModuleSet,
+        cr_uniq_mask           :: !Char      -- Mask for creating unique values
 }
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
@@ -579,55 +576,51 @@ plusWriter w1 w2 = CoreWriter {
 
 type CoreIOEnv = IOEnv CoreReader
 
--- | The monad used by Core-to-Core passes to access common state, register simplification
--- statistics and so on
-newtype CoreM a = CoreM { unCoreM :: CoreState -> CoreIOEnv (a, CoreState, CoreWriter) }
+-- | The monad used by Core-to-Core passes to register simplification statistics.
+--  Also used to have common state (in the form of UniqueSupply) for generating Uniques.
+newtype CoreM a = CoreM { unCoreM :: CoreIOEnv (a, CoreWriter) }
     deriving (Functor)
 
 instance Monad CoreM where
-    mx >>= f = CoreM $ \s -> do
-            (x, s', w1) <- unCoreM mx s
-            (y, s'', w2) <- unCoreM (f x) s'
+    mx >>= f = CoreM $ do
+            (x, w1) <- unCoreM mx
+            (y, w2) <- unCoreM (f x)
             let w = w1 `plusWriter` w2
-            return $ seq w (y, s'', w)
+            return $ seq w (y, w)
             -- forcing w before building the tuple avoids a space leak
             -- (#7702)
 
 instance Applicative CoreM where
-    pure x = CoreM $ \s -> nop s x
+    pure x = CoreM $ nop x
     (<*>) = ap
     m *> k = m >>= \_ -> k
 
 instance Alternative CoreM where
-    empty   = CoreM (const Control.Applicative.empty)
-    m <|> n = CoreM (\rs -> unCoreM m rs <|> unCoreM n rs)
+    empty   = CoreM Control.Applicative.empty
+    m <|> n = CoreM (unCoreM m <|> unCoreM n)
 
 instance MonadPlus CoreM
 
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
-        us <- getS cs_uniq_supply
-        let (us1, us2) = splitUniqSupply us
-        modifyS (\s -> s { cs_uniq_supply = us2 })
-        return us1
+        mask <- read cr_uniq_mask
+        liftIO $! mkSplitUniqSupply mask
 
     getUniqueM = do
-        us <- getS cs_uniq_supply
-        let (u,us') = takeUniqFromSupply us
-        modifyS (\s -> s { cs_uniq_supply = us' })
-        return u
+        mask <- read cr_uniq_mask
+        liftIO $! uniqFromMask mask
 
 runCoreM :: HscEnv
          -> RuleBase
-         -> UniqSupply
+         -> Char -- ^ Mask
          -> Module
          -> ModuleSet
          -> PrintUnqualified
          -> SrcSpan
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base us mod orph_imps print_unqual loc m
-  = liftM extract $ runIOEnv reader $ unCoreM m state
+runCoreM hsc_env rule_base mask mod orph_imps print_unqual loc m
+  = liftM extract $ runIOEnv reader $ unCoreM m
   where
     reader = CoreReader {
             cr_hsc_env = hsc_env,
@@ -635,14 +628,12 @@ runCoreM hsc_env rule_base us mod orph_imps print_unqual loc m
             cr_module = mod,
             cr_visible_orphan_mods = orph_imps,
             cr_print_unqual = print_unqual,
-            cr_loc = loc
-        }
-    state = CoreState {
-            cs_uniq_supply = us
+            cr_loc = loc,
+            cr_uniq_mask = mask
         }
 
-    extract :: (a, CoreState, CoreWriter) -> (a, SimplCount)
-    extract (value, _, writer) = (value, cw_simpl_count writer)
+    extract :: (a, CoreWriter) -> (a, SimplCount)
+    extract (value, writer) = (value, cw_simpl_count writer)
 
 {-
 ************************************************************************
@@ -652,28 +643,22 @@ runCoreM hsc_env rule_base us mod orph_imps print_unqual loc m
 ************************************************************************
 -}
 
-nop :: CoreState -> a -> CoreIOEnv (a, CoreState, CoreWriter)
-nop s x = do
+nop :: a -> CoreIOEnv (a, CoreWriter)
+nop x = do
     r <- getEnv
-    return (x, s, emptyWriter $ (hsc_dflags . cr_hsc_env) r)
+    return (x, emptyWriter $ (hsc_dflags . cr_hsc_env) r)
 
 read :: (CoreReader -> a) -> CoreM a
-read f = CoreM (\s -> getEnv >>= (\r -> nop s (f r)))
-
-getS :: (CoreState -> a) -> CoreM a
-getS f = CoreM (\s -> nop s (f s))
-
-modifyS :: (CoreState -> CoreState) -> CoreM ()
-modifyS f = CoreM (\s -> nop (f s) ())
+read f = CoreM $ getEnv >>= (\r -> nop (f r))
 
 write :: CoreWriter -> CoreM ()
-write w = CoreM (\s -> return ((), s, w))
+write w = CoreM $ return ((), w)
 
 -- \subsection{Lifting IO into the monad}
 
 -- | Lift an 'IOEnv' operation into 'CoreM'
 liftIOEnv :: CoreIOEnv a -> CoreM a
-liftIOEnv mx = CoreM (\s -> mx >>= (\x -> nop s x))
+liftIOEnv mx = CoreM (mx >>= (\x -> nop x))
 
 instance MonadIO CoreM where
     liftIO = liftIOEnv . IOEnv.liftIO
@@ -707,6 +692,9 @@ getSrcSpanM = read cr_loc
 
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
+
+getUniqMask :: CoreM Char
+getUniqMask = read cr_uniq_mask
 
 -- Convenience accessors for useful fields of HscEnv
 

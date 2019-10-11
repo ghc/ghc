@@ -176,11 +176,9 @@ outputAsm dflags this_mod location filenm cmm_stream
 
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
 outputLlvm dflags filenm cmm_stream
-  = do ncg_uniqs <- mkSplitUniqSupply 'n'
-
-       {-# SCC "llvm_output" #-} doOutput filenm $
+  = do {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f ncg_uniqs cmm_stream
+                 llvmCodeGen dflags f cmm_stream
 
 {-
 ************************************************************************
@@ -262,4 +260,3 @@ outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
-

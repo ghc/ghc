@@ -218,7 +218,7 @@ data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
-  , envUniq :: UniqSupply          -- ^ Supply of unique values
+  , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
@@ -249,16 +249,12 @@ instance HasDynFlags LlvmM where
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
-        us <- getEnv envUniq
-        let (us1, us2) = splitUniqSupply us
-        modifyEnv (\s -> s { envUniq = us2 })
-        return us1
+        mask <- getEnv envMask
+        liftIO $! mkSplitUniqSupply mask
 
     getUniqueM = do
-        us <- getEnv envUniq
-        let (u,us') = takeUniqFromSupply us
-        modifyEnv (\s -> s { envUniq = us' })
-        return u
+        mask <- getEnv envMask
+        liftIO $! uniqFromMask mask
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
@@ -266,8 +262,8 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM a -> IO a
-runLlvm dflags ver out us m = do
+runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm dflags ver out m = do
     (a, _) <- runLlvmM m env
     return a
   where env = LlvmEnv { envFunMap = emptyUFM
@@ -278,7 +274,7 @@ runLlvm dflags ver out us m = do
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
-                      , envUniq = us
+                      , envMask = 'n'
                       , envFreshMeta = MetaId 0
                       , envUniqMeta = emptyUFM
                       }

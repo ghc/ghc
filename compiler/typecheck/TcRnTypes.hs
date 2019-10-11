@@ -113,7 +113,6 @@ import SrcLoc
 import VarSet
 import ErrUtils
 import UniqFM
-import UniqSupply
 import BasicTypes
 import Bag
 import DynFlags
@@ -209,8 +208,7 @@ data Env gbl lcl
                              -- Includes all info about imported things
                              -- BangPattern is to fix leak, see #15111
 
-        env_us   :: {-# UNPACK #-} !(IORef UniqSupply),
-                             -- Unique supply for local variables
+        env_um   :: !Char,   -- Mask for Uniques
 
         env_gbl  :: gbl,     -- Info about things defined at the top level
                              -- of the module being compiled
