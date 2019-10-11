@@ -41,10 +41,8 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> Handle -> UniqSupply
-               -> Stream.Stream IO RawCmmGroup a
-               -> IO a
-llvmCodeGen dflags h us cmm_stream
+llvmCodeGen :: DynFlags -> Handle -> Stream.Stream IO RawCmmGroup a -> IO a
+llvmCodeGen dflags h cmm_stream
   = withTiming (pure dflags) (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
@@ -66,7 +64,7 @@ llvmCodeGen dflags h us cmm_stream
            "We will try though..."
 
        -- run code generation
-       a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh us $
+       a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh $
          llvmCodeGen' (liftStream cmm_stream)
 
        bFlush bufh

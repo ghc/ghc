@@ -28,7 +28,7 @@ module CoreMonad (
     -- ** Reading from the monad
     getHscEnv, getRuleBase, getModule,
     getDynFlags, getOrigNameCache, getPackageFamInstEnv,
-    getVisibleOrphanMods,
+    getVisibleOrphanMods, getUniqMask,
     getPrintUnqualified, getSrcSpanM,
 
     -- ** Writing to the monad
@@ -557,7 +557,8 @@ data CoreReader = CoreReader {
         cr_print_unqual        :: PrintUnqualified,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_visible_orphan_mods :: !ModuleSet
+        cr_visible_orphan_mods :: !ModuleSet,
+        cr_uniq_mask           :: !Char
 }
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
@@ -606,27 +607,24 @@ instance MonadPlus CoreM
 
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
-        us <- getS cs_uniq_supply
-        let (us1, us2) = splitUniqSupply us
-        modifyS (\s -> s { cs_uniq_supply = us2 })
-        return us1
+        mask <- getUniqMask
+        liftIO $! mkSplitUniqSupply mask
 
     getUniqueM = do
-        us <- getS cs_uniq_supply
-        let (u,us') = takeUniqFromSupply us
-        modifyS (\s -> s { cs_uniq_supply = us' })
-        return u
+        mask <- getUniqMask
+        liftIO $! newUnique' mask
 
 runCoreM :: HscEnv
          -> RuleBase
          -> UniqSupply
+         -> Char -- ^ Mask
          -> Module
          -> ModuleSet
          -> PrintUnqualified
          -> SrcSpan
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base us mod orph_imps print_unqual loc m
+runCoreM hsc_env rule_base us mask mod orph_imps print_unqual loc m
   = liftM extract $ runIOEnv reader $ unCoreM m state
   where
     reader = CoreReader {
@@ -635,7 +633,8 @@ runCoreM hsc_env rule_base us mod orph_imps print_unqual loc m
             cr_module = mod,
             cr_visible_orphan_mods = orph_imps,
             cr_print_unqual = print_unqual,
-            cr_loc = loc
+            cr_loc = loc,
+            cr_uniq_mask = mask
         }
     state = CoreState {
             cs_uniq_supply = us
@@ -707,6 +706,9 @@ getSrcSpanM = read cr_loc
 
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
+
+getUniqMask :: CoreM Char
+getUniqMask = read cr_uniq_mask
 
 -- Convenience accessors for useful fields of HscEnv
 
