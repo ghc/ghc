@@ -22,9 +22,11 @@ import DataCon
 import ErrUtils
 import Inst
 import Outputable
+import Pair
 import PrelNames
 import TcDerivUtils
 import TcEnv
+import TcGenDeriv
 import TcGenFunctor
 import TcGenGenerics
 import TcMType
@@ -35,6 +37,7 @@ import Type
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor, checkConstraints)
+import TysWiredIn (typeToTypeKind)
 import Unify (tcUnifyTy)
 import Util
 import Var
@@ -71,10 +74,12 @@ inferConstraints mechanism
                   , denv_cls         = main_cls
                   , denv_cls_tys     = cls_tys } <- ask
        ; wildcard <- isStandaloneWildcardDeriv
-       ; let is_anyclass = isDerivSpecAnyClass mechanism
-             infer_constraints
-               | is_anyclass = inferConstraintsDAC inst_tys
-               | otherwise   = inferConstraintsDataConArgs inst_ty inst_tys
+       ; let infer_constraints =
+               case mechanism of
+                 DerivSpecStock{}        -> inferConstraintsStock inst_ty inst_tys
+                 DerivSpecAnyClass       -> inferConstraintsAnyclass inst_tys
+                 DerivSpecNewtype rep_ty -> inferConstraintsCoerceBased rep_ty
+                 DerivSpecVia     via_ty -> inferConstraintsCoerceBased via_ty
 
              inst_ty  = mkTyConApp tc tc_args
              inst_tys = cls_tys ++ [inst_ty]
@@ -98,12 +103,12 @@ inferConstraints mechanism
        ; return ( sc_constraints ++ inferred_constraints
                 , tvs', inst_tys' ) }
 
--- | Like 'inferConstraints', but used only in the case of deriving strategies
--- where the constraints are inferred by inspecting the fields of each data
--- constructor (i.e., stock- and newtype-deriving).
-inferConstraintsDataConArgs :: TcType -> [TcType]
-                            -> DerivM ([ThetaOrigin], [TyVar], [TcType])
-inferConstraintsDataConArgs inst_ty inst_tys
+-- | Like 'inferConstraints', but used only in the case of the @stock@ deriving
+-- strategy. The constraints are inferred by inspecting the fields of each data
+-- constructor.
+inferConstraintsStock :: TcType -> [TcType]
+                      -> DerivM ([ThetaOrigin], [TyVar], [TcType])
+inferConstraintsStock inst_ty inst_tys
   = do DerivEnv { denv_tvs         = tvs
                 , denv_rep_tc      = rep_tc
                 , denv_rep_tc_args = rep_tc_args
@@ -272,16 +277,13 @@ inferConstraintsDataConArgs inst_ty inst_tys
                        $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args )
                 do { let (arg_constraints, tvs', inst_tys')
                            = con_arg_constraints get_std_constrained_tys
-                   ; lift $ traceTc "inferConstraintsDataConArgs" $ vcat
+                   ; lift $ traceTc "inferConstraintsStock" $ vcat
                           [ ppr main_cls <+> ppr inst_tys'
                           , ppr arg_constraints
                           ]
                    ; return ( stupid_constraints ++ extra_constraints
                                                  ++ arg_constraints
                             , tvs', inst_tys') }
-
-typeToTypeKind :: Kind
-typeToTypeKind = liftedTypeKind `mkVisFunTy` liftedTypeKind
 
 -- | Like 'inferConstraints', but used only in the case of @DeriveAnyClass@,
 -- which gathers its constraints based on the type signatures of the class's
@@ -290,8 +292,8 @@ typeToTypeKind = liftedTypeKind `mkVisFunTy` liftedTypeKind
 -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
 -- for an explanation of how these constraints are used to determine the
 -- derived instance context.
-inferConstraintsDAC :: [TcType] -> DerivM ([ThetaOrigin], [TyVar], [TcType])
-inferConstraintsDAC inst_tys
+inferConstraintsAnyclass :: [TcType] -> DerivM ([ThetaOrigin], [TyVar], [TcType])
+inferConstraintsAnyclass inst_tys
   = do { DerivEnv { denv_tvs = tvs
                   , denv_cls = cls } <- ask
        ; wildcard <- isStandaloneWildcardDeriv
@@ -322,6 +324,56 @@ inferConstraintsDAC inst_tys
        ; theta_origins <- lift $ mapM do_one_meth gen_dms
        ; return (theta_origins, tvs, inst_tys) }
 
+-- Like 'inferConstraints', but used only for @GeneralizedNewtypeDeriving@ and
+-- @DerivingVia@. Since both strategies generate code involving 'coerce', the
+-- inferred constraints set up the scaffolding needed to typecheck those uses
+-- of 'coerce'.
+inferConstraintsCoerceBased :: Type
+                            -> DerivM ([ThetaOrigin], [TyVar], [TcType])
+inferConstraintsCoerceBased rep_ty = do
+  DerivEnv { denv_tvs     = tvs
+           , denv_tc      = tycon
+           , denv_tc_args = tc_args
+           , denv_cls     = cls
+           , denv_cls_tys = cls_tys } <- ask
+  sa_wildcard <- isStandaloneWildcardDeriv
+  let -- The following functions are polymorphic over the representation
+      -- type, since we might either give it the underlying type of a
+      -- newtype (for GeneralizedNewtypeDeriving) or a @via@ type
+      -- (for DerivingVia).
+      rep_tys ty  = cls_tys ++ [ty]
+      rep_pred ty = mkClassPred cls (rep_tys ty)
+      rep_pred_o ty = mkPredOrigin deriv_origin TypeLevel (rep_pred ty)
+              -- rep_pred is the representation dictionary, from where
+              -- we are going to get all the methods for the final
+              -- dictionary
+      inst_ty    = mkTyConApp tycon tc_args
+      inst_tys   = cls_tys ++ [inst_ty]
+      deriv_origin = mkDerivOrigin sa_wildcard
+
+      -- Next we collect constraints for the class methods
+      -- If there are no methods, we don't need any constraints
+      -- Otherwise we need (C rep_ty), for the representation methods,
+      -- and constraints to coerce each individual method
+      meth_preds :: Type -> [PredOrigin]
+      meth_preds ty
+        | null meths = [] -- No methods => no constraints
+                          -- (#12814)
+        | otherwise = rep_pred_o ty : coercible_constraints ty
+      meths = classMethods cls
+      coercible_constraints ty
+        = [ mkPredOrigin (DerivOriginCoerce meth t1 t2 sa_wildcard)
+                         TypeLevel (mkReprPrimEqPred t1 t2)
+          | meth <- meths
+          , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
+                                       inst_tys ty meth ]
+
+      all_thetas :: Type -> [ThetaOrigin]
+      all_thetas ty = [mkThetaOriginFromPreds $ meth_preds ty]
+
+  -- NB: The tvs and inst_tys are passed through unchanged
+  pure (all_thetas rep_ty, tvs, inst_tys)
+
 {- Note [Inferring the instance context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are two sorts of 'deriving', as represented by the two constructors
@@ -346,7 +398,7 @@ for DerivContext:
     the instance context (theta) is user-supplied
 
 For the InferContext case, we must figure out the
-instance context (inferConstraintsDataConArgs). Suppose we are inferring
+instance context (inferConstraintsStock). Suppose we are inferring
 the instance context for
     C t1 .. tn (T s1 .. sm)
 There are two cases
@@ -456,7 +508,7 @@ Let's call the context reqd for the T instance of class C at types
         Eq (T a b) = (Ping a, Pong b, ...)
 
 Now we can get a (recursive) equation from the data decl.  This part
-is done by inferConstraintsDataConArgs.
+is done by inferConstraintsStock.
 
         Eq (T a b) = Eq (Foo a) u Eq (Bar b)    -- From C1
                    u Eq (T b a) u Eq Int        -- From C2
