@@ -61,3 +61,9 @@ test('T15155l', when(unregisterised(), skip),
      makefile_test, [])
 
 test('T16449_1', normal, compile, [''])
+
+# Verify that we keep the CFG in sync on x86
+test('T17334', [ unless(have_ncg() and (arch('x86_64') or arch('i386')), skip)
+               , only_ways(['normal'])
+               ], compile, ['-O'])
+
