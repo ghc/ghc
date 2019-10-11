@@ -156,7 +156,7 @@ basicBlockCodeGen block = do
             return $ unitOL $ LOCATION fileId line col name
     _ -> return nilOL
   mid_instrs <- stmtsToInstrs id stmts
-  (tail_instrs,_) <- stmtToInstrs id tail
+  (!tail_instrs,_) <- stmtToInstrs id tail
   let instrs = loc_instrs `appOL` mid_instrs `appOL` tail_instrs
   instrs' <- fold <$> traverse addSpUnwindings instrs
   -- code generation may introduce new basic block boundaries, which
@@ -188,7 +188,7 @@ addSpUnwindings instr@(DELTA d) = do
 addSpUnwindings instr = return $ unitOL instr
 
 {- Note [Keeping track of the current block]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When generating instructions for Cmm we sometimes require
 the current block for things like retry loops.
@@ -240,9 +240,19 @@ we construct as a separate data type and the actual control flow graph in the co
 Instead we now return the new basic block if a statement causes a change
 in the current block and use the block for all following statements.
 
+For this reason genCCall is also split into two parts.
+One for calls which *won't* change the basic blocks in
+which successive instructions will be placed.
+A different one for calls which *are* known to change the
+basic block.
+
 -}
 
-stmtsToInstrs :: BlockId -> [CmmNode e x] -> NatM InstrBlock
+-- See Note [Keeping track of the current block] for why
+-- we pass the BlockId.
+stmtsToInstrs :: BlockId -- ^ Basic block these statement will start to be placed in.
+              -> [CmmNode e x] -- ^ Cmm Statement
+              -> NatM InstrBlock -- ^ Resulting instruction
 stmtsToInstrs bid stmts =
     go bid stmts nilOL
   where
@@ -255,11 +265,12 @@ stmtsToInstrs bid stmts =
 
 -- | `bid` refers to the current block and is used to update the CFG
 --   if new blocks are inserted in the control flow.
-stmtToInstrs :: BlockId
+-- See Note [Keeping track of the current block] for more details.
+stmtToInstrs :: BlockId -- ^ Basic block this statement will start to be placed in.
              -> CmmNode e x
              -> NatM (InstrBlock, Maybe BlockId)
              -- ^ Instructions, and bid of new block if successive
-             -- statements are placed in a different one.
+             -- statements are placed in a different basic block.
 stmtToInstrs bid stmt = do
   dflags <- getDynFlags
   is32Bit <- is32BitPlatform
@@ -1820,6 +1831,9 @@ genCondBranch' _ bid id false bool = do
 --
 -- (If applicable) Do not fill the delay slots here; you will confuse the
 -- register allocator.
+--
+-- See Note [Keeping track of the current block] for information why we need
+-- to take/return a block id.
 
 genCCall
     :: DynFlags

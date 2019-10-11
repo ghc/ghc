@@ -551,21 +551,12 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         let cmmCfg = {-# SCC "getCFG" #-}
                      getCfgProc (cfgWeightInfo dflags) opt_cmm
 
-        pprTraceM "cmmOpt" $ ppr opt_cmm
-        pprTraceM "cmmCfg" $ pprEdgeWeights cmmCfg
-        pprTraceM "cmmCfgWeights" $ ppr cmmCfg
-
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
                 initUs us $ genMachCode dflags this_mod modLoc
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
-
-        pprTraceM "native" $ ppr native
-        pprTraceM "nativeCfg" $ pprEdgeWeights nativeCfgWeights
-        -- pprTraceM "cmmCfgWeights" $ ppr cmmCfg
-
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_native "Native code"
@@ -686,8 +677,6 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         let cfgRegAllocUpdates :: [(BlockId,BlockId,BlockId)]
             cfgRegAllocUpdates = (concatMap Linear.ra_fixupList raStats)
 
-        pprTraceM "RegAllocUpdates" (ppr cfgRegAllocUpdates)
-
         let cfgWithFixupBlks =
                 (\cfg -> addNodesBetween cfg cfgRegAllocUpdates) <$> livenessCfg
 
@@ -718,7 +707,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         maybe   (return ())
                 (dumpIfSet_dyn dflags Opt_D_dump_cfg_weights "CFG Final Weights" . pprEdgeWeights)
-                (optimizedCFG)
+                optimizedCFG
 
         --TODO: Partially check validity of the cfg.
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks

@@ -231,8 +231,7 @@ addNodeBetweenNat from between to
 --   block -> X to `succ` -> X
 addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
 addImmediateSuccessorNat block succ
-        = pprTraceM "Adding succ:" (ppr (block,succ)) >>
-          updateCfgNat (addImmediateSuccessor block succ)
+        = updateCfgNat (addImmediateSuccessor block succ)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat

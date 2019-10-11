@@ -653,16 +653,12 @@ sequenceTop dflags ncgImpl edgeWeights
                             sequenceChain info cfg blocks )
   | otherwise
   --Use old algorithm
-  = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                            sequenceBlocks cfgForOld info blocks)
+  = let cfg = if dontUseCfg then Nothing else edgeWeights
+    in  CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
+                                sequenceBlocks cfgForOld info blocks)
   where
-    cfgForOld
-      | (gopt Opt_WeightlessBlocklayout dflags) ||
-        (not $ backendMaintainsCfg dflags)
-      -- Don't make use of cfg in the old algorithm
-      = Nothing
-      -- Use cfg in the old algorithm if possible
-      | otherwise = edgeWeights
+    dontUseCfg = gopt Opt_WeightlessBlocklayout dflags ||
+                 (not $ backendMaintainsCfg dflags)
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of
