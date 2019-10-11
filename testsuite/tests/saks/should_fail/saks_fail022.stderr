@@ -1,0 +1,4 @@
+
+saks_fail022.hs:10:1: error:
+    • Expected kind ‘k’, but ‘a’ has kind ‘(x, y)’
+    • In the class declaration for ‘C’

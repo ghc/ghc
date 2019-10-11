@@ -6,13 +6,13 @@ import Data.Maybe (isJust)
 import Plugins
 import HscTypes
 import TcRnTypes
-import HsExtension
+import GHC.Hs.Extension
 import Avail
-import HsExpr
+import GHC.Hs.Expr
 import Outputable
-import HsImpExp
-import HsDecls
-import HsDoc
+import GHC.Hs.ImpExp
+import GHC.Hs.Decls
+import GHC.Hs.Doc
 
 plugin :: Plugin
 plugin = defaultPlugin { parsedResultAction = parsedPlugin

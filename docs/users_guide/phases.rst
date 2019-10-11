@@ -81,11 +81,11 @@ given compilation phase:
     Use ⟨cmd⟩ as the DLL generator.
 
 .. ghc-flag:: -pgmF ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the pre-processor (with ``-F`` only)
+    :shortdesc: Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only)
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the pre-processor (with ``-F`` only).
+    Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only).
 
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the program for embedding manifests on Windows.
@@ -98,20 +98,20 @@ given compilation phase:
     :ref:`options-linker`.
 
 .. ghc-flag:: -pgmlibtool ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the command for libtool (with ``-staticlib`` only).
+    :shortdesc: Use ⟨cmd⟩ as the command for libtool (with :ghc-flag:`-staticlib` only).
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the libtool command (when using ``-staticlib`` only).
+    Use ⟨cmd⟩ as the libtool command (when using :ghc-flag:`-staticlib` only).
 
 .. ghc-flag:: -pgmi ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the external interpreter command.
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the external interpreter command (see:
+    Use ⟨cmd⟩ as the external interpreter command (see
     :ref:`external-interpreter`).  Default: ``ghc-iserv-prof`` if
-    ``-prof`` is enabled, ``ghc-iserv-dyn`` if ``-dynamic`` is
+    :ghc-flag:`-prof` is enabled, ``ghc-iserv-dyn`` if :ghc-flag:`-dynamic` is
     enabled, or ``ghc-iserv`` otherwise.
 
 .. _forcing-options-through:

@@ -18,7 +18,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import CoreSyn
 import MkCore

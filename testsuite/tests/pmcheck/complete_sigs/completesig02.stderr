@@ -1,4 +1,4 @@
 
 completesig02.hs:10:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘a’: Patterns not matched: _
+    In an equation for ‘a’: Patterns not matched: ()

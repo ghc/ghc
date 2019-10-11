@@ -1,0 +1,5 @@
+:set -fprint-explicit-kinds -fprint-explicit-foralls -XNoStarIsType
+:load T16724.hs
+:info T1
+:info T2
+   -- must have the same arity!

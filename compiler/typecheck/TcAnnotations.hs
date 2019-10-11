@@ -18,7 +18,7 @@ import Module
 import DynFlags
 import Control.Monad ( when )
 
-import HsSyn
+import GHC.Hs
 import Name
 import Annotations
 import TcRnMonad

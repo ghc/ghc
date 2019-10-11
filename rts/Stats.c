@@ -515,10 +515,7 @@ stat_startRP(void)
 void
 stat_endRP(
   uint32_t retainerGeneration,
-#if defined(DEBUG_RETAINER)
-  uint32_t maxCStackSize,
   int maxStackSize,
-#endif
   double averageNumVisit)
 {
     Time user, elapsed;
@@ -529,10 +526,7 @@ stat_endRP(
 
     fprintf(prof_file, "Retainer Profiling: %d, at %f seconds\n",
       retainerGeneration, mut_user_time_during_RP());
-#if defined(DEBUG_RETAINER)
-    fprintf(prof_file, "\tMax C stack size = %u\n", maxCStackSize);
     fprintf(prof_file, "\tMax auxiliary stack size = %u\n", maxStackSize);
-#endif
     fprintf(prof_file, "\tAverage number of visits per object = %f\n",
             averageNumVisit);
 }

@@ -41,6 +41,7 @@ module TyCon(
         mkFamilyTyCon,
         mkPromotedDataCon,
         mkTcTyCon,
+        noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon,
@@ -398,7 +399,7 @@ invariant that if `famTcInj` is a Just then at least one element in the list
 must be True.
 
 See also:
- * [Injectivity annotation] in HsDecls
+ * [Injectivity annotation] in GHC.Hs.Decls
  * [Renaming injectivity annotation] in RnSource
  * [Verifying injectivity annotation] in FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
@@ -477,6 +478,8 @@ isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
 
+-- Build the 'tyConKind' from the binders and the result kind.
+-- Keep in sync with 'mkTyConKind' in iface/IfaceType.
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
@@ -1701,6 +1704,10 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tcTyConScopedTyVars = scoped_tvs
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
+
+-- | No scoped type variables (to be used with mkTcTyCon).
+noTcTyConScopedTyVars :: [(Name, TcTyVar)]
+noTcTyConScopedTyVars = []
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]

@@ -1,8 +1,8 @@
 module DsExpr where
-import HsSyn       ( HsExpr, LHsExpr, LHsLocalBinds, SyntaxExpr )
+import GHC.Hs      ( HsExpr, LHsExpr, LHsLocalBinds, SyntaxExpr )
 import DsMonad     ( DsM )
 import CoreSyn     ( CoreExpr )
-import HsExtension ( GhcTc)
+import GHC.Hs.Extension ( GhcTc)
 
 dsExpr  :: HsExpr GhcTc -> DsM CoreExpr
 dsLExpr, dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr

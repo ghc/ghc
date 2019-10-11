@@ -61,4 +61,4 @@ module Data.Ix
 
     ) where
 
-import GHC.Arr
+import GHC.Ix

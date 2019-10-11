@@ -2604,8 +2604,9 @@ Then we do the process described in Note [simplifyArgsWorker].
 2. Lifting k gives us co1, so the second argument becomes (Proxy |> co |> sym co1).
    This is not a dependent argument, so we don't extend the lifting context.
 
-Now we need to deal with argument (3). After flattening, should we tack on a homogenizing
-coercion? The way we normally tell is to lift the kind of the binder.
+Now we need to deal with argument (3).
+The way we normally proceed is to lift the kind of the binder, to see whether
+it's dependent.
 But here, the remainder of the kind of `a` that we're left with
 after processing two arguments is just `k`.
 
@@ -2712,6 +2713,19 @@ as desired.
 
 Whew.
 
+Historical note: I (Richard E) once thought that the final part of the kind
+had to be a variable k (as in the example above). But it might not be: it could
+be an application of a variable. Here is the example:
+
+  let f :: forall (a :: Type) (b :: a -> Type). b (Any @a)
+      k :: Type
+      x :: k
+
+  flatten (f @Type @((->) k) x)
+
+After instantiating [a |-> Type, b |-> ((->) k)], we see that `b (Any @a)`
+is `k -> Any @a`, and thus the third argument of `x :: k` is well-kinded.
+
 -}
 
 
@@ -2786,9 +2800,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
 
       -- See Note [Last case in simplifyArgsWorker]
     go acc_xis acc_cos lc [] inner_ki roles args
-      | Just k   <- getTyVar_maybe inner_ki
-      , Just co1 <- liftCoSubstTyVar lc Nominal k
-      = let co1_kind              = coercionKind co1
+      = let co1 = liftCoSubst Nominal lc inner_ki
+            co1_kind              = coercionKind co1
             unflattened_tys       = map (pSnd . coercionKind . snd) args
             (arg_cos, res_co)     = decomposePiCos co1 co1_kind unflattened_tys
             casted_args           = ASSERT2( equalLength args arg_cos

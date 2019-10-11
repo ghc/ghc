@@ -19,7 +19,7 @@ import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Env
-import GHC.StgToCmm.Con
+import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Prof (saveCurrentCostCentre, restoreCurrentCostCentre, emitSetCCC)
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Prim
@@ -576,7 +576,7 @@ isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args
     dflags <- getDynFlags
     -- See Note [Inlining out-of-line primops and heap checks]
-    return $! isJust $ shouldInlinePrimOp dflags op arg_exprs
+    return $! shouldInlinePrimOp dflags op arg_exprs
 isSimpleOp (StgPrimCallOp _) _                           = return False
 
 -----------------

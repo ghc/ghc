@@ -12,7 +12,7 @@ cabal-version:       >=1.10
 
 source-repository head
     type:     git
-    location: https://github.com/snowleopard/hadrian
+    location: https://gitlab.haskell.org/ghc/ghc
 
 executable hadrian
     main-is:             Main.hs
@@ -48,6 +48,7 @@ executable hadrian
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag
+                       , Oracles.Flavour
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Oracles.TestSettings
@@ -100,8 +101,10 @@ executable hadrian
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
                        , Settings.Flavours.GhcInGhci
+                       , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Parser
+                       , Settings.Program
                        , Settings.Warnings
                        , Stage
                        , Target

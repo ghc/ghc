@@ -165,6 +165,10 @@ libffiRules = do
         -- Note this build needs the Makefile, triggering the rules bellow.
         build $ target context (Make libffiPath) [] []
 
+        -- Produces all install files.
+        produces =<< (\\ topLevelTargets)
+                 <$> liftIO (getDirectoryFilesIO "." [libffiPath -/- "inst//*"])
+
         -- Find dynamic libraries.
         dynLibFiles <- do
             let libfilesDir = libffiPath -/-

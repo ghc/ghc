@@ -341,6 +341,7 @@ ppr_dec _ (InstanceD o ctxt i ds) =
         text "instance" <+> maybe empty ppr_overlap o <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
 ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
+ppr_dec _ (KiSigD f k)  = text "type" <+> pprPrefixOcc f <+> dcolon <+> ppr k
 ppr_dec _ (ForeignD f)  = ppr f
 ppr_dec _ (InfixD fx n) = pprFixity n fx
 ppr_dec _ (PragmaD p)   = ppr p

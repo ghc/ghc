@@ -1,8 +1,10 @@
+type Foo :: *
 data Foo
   = Foo {foo1 :: Int,
          foo2 :: !Int,
          foo3 :: Maybe Int,
          foo4 :: !(Maybe Int)}
   	-- Defined at T13699.hs:3:1
+type Bar :: *
 data Bar = Bar Int !Int (Maybe Int) !(Maybe Int)
   	-- Defined at T13699.hs:10:1

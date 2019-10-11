@@ -22,11 +22,6 @@ Flag ghci
     Default: False
     Manual: True
 
-Flag ext-interp
-    Description: Build external interpreter support
-    Default: True
-    Manual: True
-
 source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc.git
@@ -60,12 +55,6 @@ library
             GHCi.ObjLink
             GHCi.Signals
             GHCi.TH
-
-    if flag(ext-interp)
-        CPP-Options: -DHAVE_EXTERNAL_INTERPRETER
-
-    if flag(ghci) || flag(ext-interp)
-        CPP-Options: -DHAVE_INTERPRETER
 
     include-dirs: @FFIIncludeDir@
 

@@ -1250,6 +1250,17 @@ by saying ``-fno-wombat``.
     determines if a function definition will be kept around at all for
     potential inlining.
 
+.. ghc-flag:: -fworker-wrapper
+    :shortdesc: Enable the worker-wrapper transformation.
+    :type: dynamic
+    :category:
+
+    Enable the worker-wrapper transformation after a strictness
+    analysis pass. Implied by :ghc-flag:`-O`, and by :ghc-flag:`-fstrictness`.
+    Disabled by :ghc-flag:`-fno-strictness`. Enabling :ghc-flag:`-fworker-wrapper`
+    while strictness analysis is disabled (by :ghc-flag:`-fno-strictness`)
+    has no effect.
+
 .. ghc-flag:: -fbinary-blob-threshold=⟨n⟩
     :shortdesc: *default: 500K.* Tweak assembly generator for binary blobs.
     :type: dynamic

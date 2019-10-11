@@ -14,6 +14,9 @@ module Util (
         ghciTablesNextToCode,
         isWindowsHost, isDarwinHost,
 
+        -- * Miscellaneous higher-order functions
+        applyWhen, nTimes,
+
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith, zipWithAndUnzip, zipAndUnzip,
@@ -56,9 +59,6 @@ module Util (
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
         dropTail, capitalise,
-
-        -- * For loop
-        nTimes,
 
         -- * Sorting
         sortWith, minWith, nubSort, ordNub,
@@ -222,12 +222,17 @@ isDarwinHost = False
 {-
 ************************************************************************
 *                                                                      *
-\subsection{A for loop}
+\subsection{Miscellaneous higher-order functions}
 *                                                                      *
 ************************************************************************
 -}
 
--- | Compose a function with itself n times.  (nth rather than twice)
+-- | Apply a function iff some condition is met.
+applyWhen :: Bool -> (a -> a) -> a -> a
+applyWhen True f x = f x
+applyWhen _    _ x = x
+
+-- | A for loop: Compose a function with itself n times.  (nth rather than twice)
 nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f

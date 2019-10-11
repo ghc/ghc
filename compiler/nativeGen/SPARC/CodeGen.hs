@@ -18,8 +18,6 @@ module SPARC.CodeGen (
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
-#include "../includes/MachDeps.h"
 
 -- NCG stuff:
 import GhcPrelude

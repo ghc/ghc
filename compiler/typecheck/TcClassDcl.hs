@@ -22,7 +22,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcEnv
 import TcSigs
 import TcEvidence ( idHsWrapper )

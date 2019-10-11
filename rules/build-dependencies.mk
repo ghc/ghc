@@ -30,7 +30,7 @@ ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 
 # Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
 # indirectly) include the generated includes files.
-$$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+$$($1_$2_depfile_haskell) : $$(includes_$3_H_CONFIG) $$(includes_$3_H_PLATFORM)
 
 $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
@@ -65,7 +65,7 @@ endif
              $$@.tmp2 > $$@
 # Some of the C files (directly or indirectly) include the generated
 # includes files.
-$$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+$$($1_$2_depfile_c_asm) : $$(includes_$3_H_CONFIG) $$(includes_$3_H_PLATFORM)
 
 $$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) $$($1_$2_CMM_FILES) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)

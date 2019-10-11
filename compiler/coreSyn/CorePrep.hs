@@ -1274,7 +1274,7 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
+    mk_bind (FloatCase bndr rhs _) body = mkDefaultCase rhs bndr body
     mk_bind (FloatLet bind)        body = Let bind body
     mk_bind (FloatTick tickish)    body = mkTick tickish body
 

@@ -53,7 +53,7 @@ import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
 import qualified TcRnTypes
 import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import TcHoleFitTypes ( HoleFitPluginR )
-import HsSyn
+import GHC.Hs
 import DynFlags
 import HscTypes
 import GhcMonad

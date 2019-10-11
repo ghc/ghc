@@ -435,6 +435,9 @@ instanceWithOverlapD o ctxt ty decs =
 sigD :: Name -> TypeQ -> DecQ
 sigD fun ty = liftM (SigD fun) $ ty
 
+kiSigD :: Name -> KindQ -> DecQ
+kiSigD fun ki = liftM (KiSigD fun) $ ki
+
 forImpD :: Callconv -> Safety -> String -> Name -> TypeQ -> DecQ
 forImpD cc s str n ty
  = do ty' <- ty

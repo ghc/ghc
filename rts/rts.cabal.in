@@ -1,4 +1,4 @@
-cabal-version: 2.5
+cabal-version: 3.0
 name: rts
 version: 1.0
 license: BSD-3-Clause
@@ -168,12 +168,11 @@ library
                       rts/storage/MBlock.h
                       rts/storage/TSO.h
                       stg/DLL.h
-                      stg/HaskellMachRegs.h
                       stg/MachRegs.h
+                      stg/MachRegsForHost.h
                       stg/MiscClosures.h
                       stg/Prim.h
                       stg/Regs.h
-                      stg/RtsMachRegs.h
                       stg/SMP.h
                       stg/Ticky.h
                       stg/Types.h
@@ -431,6 +430,7 @@ library
                Timer.c
                TopHandler.c
                Trace.c
+               TraverseHeap.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c

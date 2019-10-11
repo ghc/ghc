@@ -1,4 +1,12 @@
 
+completesig10.hs:15:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘m1’: m1 C = ...
+
+completesig10.hs:16:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘m1’: m1 D = ...
+
 completesig10.hs:20:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘m2’: Patterns not matched: A

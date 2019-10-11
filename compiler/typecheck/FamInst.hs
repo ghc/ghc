@@ -319,7 +319,7 @@ checkFamInstConsistency directlyImpMods
                -- Note [Checking family instance optimization]
              ; modConsistent :: Module -> [Module]
              ; modConsistent mod =
-                 if mi_finsts (modIface mod) then mod:deps else deps
+                 if mi_finsts (mi_final_exts (modIface mod)) then mod:deps else deps
                  where
                  deps = dep_finsts . mi_deps . modIface $ mod
 

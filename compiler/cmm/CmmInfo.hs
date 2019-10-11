@@ -48,7 +48,7 @@ import Hoopl.Collections
 import GHC.Platform
 import Maybes
 import DynFlags
-import ErrUtils (withTiming)
+import ErrUtils (withTimingSilent)
 import Panic
 import UniqSupply
 import MonadUtils
@@ -74,7 +74,8 @@ cmmToRawCmm dflags cmms
        ; let do_one :: UniqSupply -> [CmmDecl] -> IO (UniqSupply, [RawCmmDecl])
              do_one uniqs cmm =
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-               withTiming (return dflags) (text "Cmm -> Raw Cmm") forceRes $
+               withTimingSilent (return dflags) (text "Cmm -> Raw Cmm")
+                                forceRes $
                  case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                    (b,uniqs') -> return (uniqs',b)
        ; return (snd <$> Stream.mapAccumL_ do_one uniqs cmms)

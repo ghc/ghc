@@ -85,7 +85,7 @@ module GHC (
         lookupGlobalName,
         findGlobalAnns,
         mkPrintUnqualifiedForModule,
-        ModIface(..),
+        ModIface, ModIface_(..),
         SafeHaskellMode(..),
 
         -- * Querying the environment
@@ -227,7 +227,7 @@ module GHC (
         TyThing(..),
 
         -- ** Syntax
-        module HsSyn, -- ToDo: remove extraneous bits
+        module GHC.Hs, -- ToDo: remove extraneous bits
 
         -- ** Fixities
         FixityDirection(..),
@@ -314,7 +314,7 @@ import TcRnTypes
 import Packages
 import NameSet
 import RdrName
-import HsSyn
+import GHC.Hs
 import Type     hiding( typeKind )
 import TcType
 import Id
@@ -505,7 +505,7 @@ initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { top_dir <- findTopDir mb_top_dir
                    ; mySettings <- initSysTools top_dir
-                   ; myLlvmConfig <- initLlvmConfig top_dir
+                   ; myLlvmConfig <- lazyInitLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags

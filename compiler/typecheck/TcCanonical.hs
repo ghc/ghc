@@ -32,11 +32,12 @@ import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
 import VarSet( delVarSetList )
+import OccName ( OccName )
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
 import RdrName
-import HsTypes( HsIPName(..) )
+import GHC.Hs.Types( HsIPName(..) )
 
 import Pair
 import Util
@@ -48,6 +49,7 @@ import Data.List  ( zip4 )
 import BasicTypes
 
 import Data.Bifunctor ( bimap )
+import Data.Foldable ( traverse_ )
 
 {-
 ************************************************************************
@@ -133,8 +135,8 @@ canonicalize (CFunEqCan { cc_ev = ev
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
 
-canonicalize (CHoleCan { cc_ev = ev, cc_hole = hole })
-  = canHole ev hole
+canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
+  = canHole ev occ hole
 
 {-
 ************************************************************************
@@ -639,13 +641,14 @@ canIrred ev
            _                     -> continueWith $
                                     mkIrredCt new_ev } }
 
-canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
-canHole ev hole
+canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
+canHole ev occ hole_sort
   = do { let pred = ctEvPred ev
        ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
     do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
-                                             , cc_hole = hole }))
+                                             , cc_occ = occ
+                                             , cc_hole = hole_sort }))
        ; stopWith new_ev "Emit insoluble hole" } }
 
 
@@ -1267,13 +1270,22 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
          -- check for blowing our stack:
          -- See Note [Newtypes can blow the stack]
        ; checkReductionDepth (ctEvLoc ev) ty1
-       ; addUsedGREs (bagToList gres)
-           -- we have actually used the newtype constructor here, so
-           -- make sure we don't warn about importing it!
+
+         -- Next, we record uses of newtype constructors, since coercing
+         -- through newtypes is tantamount to using their constructors.
+       ; addUsedGREs gre_list
+         -- If a newtype constructor was imported, don't warn about not
+         -- importing it...
+       ; traverse_ keepAlive $ map gre_name gre_list
+         -- ...and similarly, if a newtype constructor was defined in the same
+         -- module, don't warn about it being unused.
+         -- See Note [Tracking unused binding and imports] in TcRnTypes.
 
        ; new_ev <- rewriteEqEvidence ev swapped ty1' ps_ty2
                                      (mkTcSymCo co) (mkTcReflCo Representational ps_ty2)
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
+  where
+    gre_list = bagToList gres
 
 ---------
 -- ^ Decompose a type application.

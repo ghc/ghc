@@ -89,7 +89,7 @@ test('T7970', normal, compile_and_run, [''])
 test('AtomicPrimops', normal, compile_and_run, [''])
 
 # test uses 2 threads and yield, scheduling can vary with threaded2
-test('threadstatus-9333', [fragile_for(16555, ['ghci']), omit_ways(concurrent_ways)], compile_and_run, [''])
+test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_ways(concurrent_ways)], compile_and_run, [''])
 
 test('T9379', normal, compile_and_run, [''])
 
@@ -274,7 +274,8 @@ test('hs_try_putmvar003',
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
      only_ways(['threaded1','threaded2']),
      extra_clean(['hs_try_putmvar003_c.o']),
-     extra_run_opts('1 16 32 100')
+     extra_run_opts('1 16 32 100'),
+     fragile_for(16361, ['threaded1'])
      ],
      compile_and_run,
      ['hs_try_putmvar003_c.c'])

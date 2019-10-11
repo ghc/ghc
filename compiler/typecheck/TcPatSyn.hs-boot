@@ -1,10 +1,10 @@
 module TcPatSyn where
 
-import HsSyn     ( PatSynBind, LHsBinds )
+import GHC.Hs    ( PatSynBind, LHsBinds )
 import TcRnTypes ( TcM, TcSigInfo )
 import TcRnMonad ( TcGblEnv)
 import Outputable ( Outputable )
-import HsExtension ( GhcRn, GhcTc )
+import GHC.Hs.Extension ( GhcRn, GhcTc )
 import Data.Maybe  ( Maybe )
 
 tcPatSynDecl :: PatSynBind GhcRn GhcRn

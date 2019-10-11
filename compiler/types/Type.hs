@@ -42,7 +42,8 @@ module Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInvForAllTy, mkInvForAllTys,
-        splitForAllTys, splitForAllTysSameVis, splitForAllVarBndrs,
+        splitForAllTys, splitForAllTysSameVis,
+        splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
         splitForAllTy_ty_maybe, splitForAllTy_co_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
@@ -2214,7 +2215,9 @@ isLiftedType_maybe ty = go (getRuntimeRep ty)
           | otherwise              = Nothing     -- levity polymorphic
 
 -- | See "Type#type_classification" for what an unlifted type is.
--- Panics on levity polymorphic types.
+-- Panics on levity polymorphic types; See 'mightBeUnliftedType' for
+-- a more approximate predicate that behaves better in the presence of
+-- levity polymorphism.
 isUnliftedType :: HasDebugCallStack => Type -> Bool
         -- isUnliftedType returns True for forall'd unlifted types:
         --      x :: forall a. Int#
@@ -2823,6 +2826,10 @@ occCheckExpand :: [Var] -> Type -> Maybe Type
 -- of the given type variable.  If the type is already syntactically
 -- free of the variable, then the same type is returned.
 occCheckExpand vs_to_avoid ty
+  | null vs_to_avoid  -- Efficient shortcut
+  = Just ty           -- Can happen, eg. CoreUtils.mkSingleAltCase
+
+  | otherwise
   = go (mkVarSet vs_to_avoid, emptyVarEnv) ty
   where
     go :: (VarSet, VarEnv TyCoVar) -> Type -> Maybe Type
@@ -3129,7 +3136,7 @@ There are a couple of places in GHC where we convert Core Types into forms that
 more closely resemble user-written syntax. These include:
 
 1. Template Haskell Type reification (see, for instance, TcSplice.reify_tc_app)
-2. Converting Types to LHsTypes (in HsUtils.typeToLHsType, or in Haddock)
+2. Converting Types to LHsTypes (in GHC.Hs.Utils.typeToLHsType, or in Haddock)
 
 This conversion presents a challenge: how do we ensure that the resulting type
 has enough kind information so as not to be ambiguous? To better motivate this
@@ -3169,7 +3176,7 @@ require a kind signature? It might require it when we need to fill in any of
 T's omitted arguments. By "omitted argument", we mean one that is dropped when
 reifying ty_1 ... ty_n. Sometimes, the omitted arguments are inferred and
 specified arguments (e.g., TH reification in TcSplice), and sometimes the
-omitted arguments are only the inferred ones (e.g., in HsUtils.typeToLHsType,
+omitted arguments are only the inferred ones (e.g., in GHC.Hs.Utils.typeToLHsType,
 which reifies specified arguments through visible kind application).
 Regardless, the key idea is that _some_ arguments are going to be omitted after
 reification, and the only mechanism we have at our disposal for filling them in
@@ -3267,7 +3274,7 @@ each form of tycon binder:
     injective_vars_of_binder(forall a. ...) = {a}.)
 
     There are some situations where using visible kind application is appropriate
-    (e.g., HsUtils.typeToLHsType) and others where it is not (e.g., TH
+    (e.g., GHC.Hs.Utils.typeToLHsType) and others where it is not (e.g., TH
     reification), so the `injective_vars_of_binder` function is parametrized by
     a Bool which decides if specified binders should be counted towards
     injective positions or not.

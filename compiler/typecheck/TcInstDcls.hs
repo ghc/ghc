@@ -16,7 +16,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcBinds
 import TcTyClsDecls
 import TcTyDecls ( addTyConsToGblEnv )
@@ -746,6 +746,7 @@ tcDataFamInstDecl mb_clsinfo
                L _ []    -> Nothing
                L _ preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars rep_tc)
                                   , di_clauses = preds
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
@@ -820,7 +821,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+       ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs

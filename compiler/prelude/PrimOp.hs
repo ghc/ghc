@@ -6,9 +6,6 @@
 
 {-# LANGUAGE CPP #-}
 
--- The default is a bit too low for the quite large primOpInfo definition
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-
 module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
         primOpType, primOpSig,

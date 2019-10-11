@@ -474,8 +474,6 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
-GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
-
 #-----------------------------------------------------------------------------
 # Settings
 
@@ -486,6 +484,8 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 GccExtraViaCOpts = @GccExtraViaCOpts@
 LdHasFilelist = @LdHasFilelist@
 ArArgs = @ArArgs@
+HaskellHostOs = @HaskellHostOs@
+HaskellHostArch = @HaskellHostArch@
 HaskellTargetOs = @HaskellTargetOs@
 HaskellTargetArch = @HaskellTargetArch@
 TargetWordSize = @TargetWordSize@
@@ -874,14 +874,6 @@ endif
 
 # Build and install the "extra" packages (see ./packages)?
 BUILD_EXTRA_PKGS = NO
-
-################################################################################
-#
-#    Library configure arguments
-#
-################################################################################
-
-CONFIGURE_ARGS = @CONFIGURE_ARGS@
 
 ################################################################################
 #

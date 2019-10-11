@@ -111,22 +111,23 @@ instance NFData   HaddockMode
 data Builder = Alex
              | Ar ArMode Stage
              | Autoreconf FilePath
-             | DeriveConstants
              | Cabal ConfigurationInfo Stage
              | Cc CcMode Stage
              | Configure FilePath
+             | DeriveConstants
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
              | GhcPkg GhcPkgMode Stage
              | Haddock HaddockMode
              | Happy
-             | Hpc
              | Hp2Ps
+             | Hpc
              | HsCpp
              | Hsc2Hs Stage
              | Ld Stage
              | Make FilePath
+             | Makeinfo
              | Nm
              | Objdump
              | Patch
@@ -175,12 +176,12 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> generatedGhcDependencies Stage0
+        Ghc _ Stage0 -> includesDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
-            ghcgens <- generatedGhcDependencies stage
+            ghcgens <- includesDependencies stage
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
@@ -241,6 +242,7 @@ instance H.Builder Builder where
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
                 Autoreconf dir -> cmd echo [Cwd dir] ["sh", path] buildArgs
+
                 Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
@@ -248,23 +250,12 @@ instance H.Builder Builder where
                     let env = AddEnv "CONFIG_SHELL" bash
                     cmd echo env [Cwd dir] ["sh", path] buildOptions buildArgs
 
-                HsCpp    -> captureStdout
                 GenApply -> captureStdout
 
                 GenPrimopCode -> do
                     stdin <- readFile' input
                     Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
                     writeFileChanged output stdout
-
-                Make dir -> cmd echo path ["-C", dir] buildArgs
-
-                Xelatex -> do
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
-                    unit $ cmd [Cwd output] [path]        buildArgs
-                    unit $ cmd [Cwd output] [path]        buildArgs
 
                 GhcPkg Copy _ -> do
                     Stdout pkgDesc <- cmd [path]
@@ -278,6 +269,21 @@ instance H.Builder Builder where
                 GhcPkg Unregister _ -> do
                     Exit _ <- cmd echo [path] (buildArgs ++ [input])
                     return ()
+
+                HsCpp    -> captureStdout
+
+                Make dir -> cmd echo path ["-C", dir] buildArgs
+
+                Makeinfo -> do
+                  cmd echo [path] "--no-split" [ "-o", output] [input]
+
+                Xelatex -> do
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
 
                 _  -> cmd echo [path] buildArgs
 
@@ -307,6 +313,7 @@ systemBuilderPath builder = case builder of
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
     Make _          -> fromKey "make"
+    Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromKey "nm"
     Objdump         -> fromKey "objdump"
     Patch           -> fromKey "patch"

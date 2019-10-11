@@ -94,11 +94,17 @@ llvmCodeGen' cmm_stream
     header :: SDoc
     header = sdocWithDynFlags $ \dflags ->
       let target = platformMisc_llvmTarget $ platformMisc dflags
-          layout = case lookup target (llvmTargets dflags) of
-            Just (LlvmTarget dl _ _) -> dl
-            Nothing -> error $ "Failed to lookup the datalayout for " ++ target ++ "; available targets: " ++ show (map fst $ llvmTargets dflags)
-      in     text ("target datalayout = \"" ++ layout ++ "\"")
+      in     text ("target datalayout = \"" ++ getDataLayout dflags target ++ "\"")
          $+$ text ("target triple = \"" ++ target ++ "\"")
+
+    getDataLayout :: DynFlags -> String -> String
+    getDataLayout dflags target =
+      case lookup target (llvmTargets $ llvmConfig dflags) of
+        Just (LlvmTarget {lDataLayout=dl}) -> dl
+        Nothing -> pprPanic "Failed to lookup LLVM data layout" $
+                   text "Target:" <+> text target $$
+                   hang (text "Available targets:") 4
+                        (vcat $ map (text . fst) $ llvmTargets $ llvmConfig dflags)
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do

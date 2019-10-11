@@ -143,7 +143,7 @@ Compiler
 ~~~~~~~~
 
 - GHC now no longer adds the current file's directory as a general include path
-  calling the C compiler. Instead we use :ghc-flag:`-iquote` to only add it as
+  calling the C compiler. Instead we use ``-iquote`` to only add it as
   an include path for `#include ""`. See :ghc-ticket:`14312`.
 
 - GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.

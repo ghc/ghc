@@ -3,7 +3,7 @@
 import Data.List
 import SrcLoc
 import GHC hiding (moduleName)
-import HsDumpAst
+import GHC.Hs.Dump
 import DynFlags
 import Outputable hiding (space)
 import System.Environment( getArgs )

@@ -15,6 +15,9 @@
 #
 # Add missing targets to the list below to have them included in
 # llvm-targets file.
+#
+# See Note [LLVM Configuration] in SysTools for the whole story regarding LLVM
+# configuration data.
 
 # Target sets for which to generate the llvm-targets file
 TARGETS=(
@@ -33,19 +36,30 @@ TARGETS=(
 
     # Linux ARM
     "arm-unknown-linux-gnueabihf"
+    "arm-unknown-linux-musleabihf"
     "armv6-unknown-linux-gnueabihf"
+    "armv6-unknown-linux-musleabihf"
     "armv6l-unknown-linux-gnueabihf"
+    "armv6l-unknown-linux-musleabihf"
     "armv7-unknown-linux-gnueabihf"
+    "armv7-unknown-linux-musleabihf"
     "armv7a-unknown-linux-gnueabi"
+    "armv7a-unknown-linux-musleabi"
     "armv7a-unknown-linux-gnueabihf"
+    "armv7a-unknown-linux-musleabihf"
     "armv7l-unknown-linux-gnueabi"
+    "armv7l-unknown-linux-musleabi"
     "armv7l-unknown-linux-gnueabihf"
+    "armv7l-unknown-linux-musleabihf"
     "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-musl"
     "aarch64-unknown-linux"
     # Linux x86
     "i386-unknown-linux-gnu"
+    "i386-unknown-linux-musl"
     "i386-unknown-linux"
     "x86_64-unknown-linux-gnu"
+    "x86_64-unknown-linux-musl"
     "x86_64-unknown-linux"
     # Linux Android
     "x86_64-unknown-linux-android"
@@ -53,6 +67,8 @@ TARGETS=(
     "aarch64-unknown-linux-android"
     "armv7a-unknown-linux-androideabi"
     # Linux ppc64le
+    "powerpc64le-unknown-linux-gnu"
+    "powerpc64le-unknown-linux-musl"
     "powerpc64le-unknown-linux"
 
     #########################

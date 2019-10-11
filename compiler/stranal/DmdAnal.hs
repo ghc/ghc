@@ -333,10 +333,7 @@ io_hack_reqd scrut con bndrs
   | (bndr:_) <- bndrs
   , con == tupleDataCon Unboxed 2
   , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
+  = not (exprOkForSpeculation scrut)
   | otherwise
   = False
 
@@ -387,15 +384,18 @@ getMaskingState# is not going to diverge or throw an exception!  This
 situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
 (on an MVar not an Int), and made a material difference.
 
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
+So if the scrutinee is ok-for-speculation, we *don't* apply the state hack,
+because we are free to push evaluation of the scrutinee after evaluation of
+expressions from the (single) case alternative.
+
+A few examples for different scrutinees:
   - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
+    applying the hack would be over-conservative.
+  - If the primop is raise# then it returns bottom (so not ok-for-speculation),
+    but the result from the case alternatives are discarded anyway.
   - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
+    divide by zero (so not ok-for-speculation), then we are also bottoming out
+    anyway and don't mind evaluating 'x' first.
 
 Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

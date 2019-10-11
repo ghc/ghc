@@ -31,8 +31,6 @@ if test ! -f mk/config.h.in; then
    exit 1
 fi
 
-AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
-
 dnl this makes sure `./configure --target=<cross-compile-target>`
 dnl works as expected, since we're slightly modifying how Autoconf
 dnl interprets build/host/target and how this interacts with $CC tests
@@ -94,10 +92,6 @@ AC_ARG_WITH([ghc],
         AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
 
-dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
-AC_SUBST(OSTYPE)
-
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
@@ -157,8 +151,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.4],
-    [AC_MSG_ERROR([GHC version 8.4 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.6],
+    [AC_MSG_ERROR([GHC version 8.6 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -171,9 +165,6 @@ then
      or 'GHC=' to specify a different GHC to use.])
     fi
 fi
-
-GHC_PACKAGE_DB_FLAG=package-db
-AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -715,14 +706,6 @@ dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
 dnl --------------------------------------------------------------
 
-if test "$TargetOS" = "mingw32"
-then
-    GhcLibsWithUnix=NO
-else
-    GhcLibsWithUnix=YES
-fi
-AC_SUBST([GhcLibsWithUnix])
-
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
@@ -866,6 +849,9 @@ FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
+
+dnl ** check for makeinfo
+AC_PATH_PROG(MAKEINFO,makeinfo)
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -1299,17 +1285,29 @@ if test -n "$SPHINXBUILD"; then
     else
         BUILD_SPHINX_PDF=NO
     fi
+    if test -n "$MAKEINFO"; then
+        BUILD_SPHINX_INFO=YES
+    else
+        BUILD_SPHINX_INFO=NO
+    fi
 else
     BUILD_MAN=NO
     BUILD_SPHINX_HTML=NO
     BUILD_SPHINX_PDF=NO
+    BUILD_SPHINX_INFO=NO
 fi
 AC_SUBST(BUILD_MAN)
 AC_SUBST(BUILD_SPHINX_HTML)
 AC_SUBST(BUILD_SPHINX_PDF)
 
+dnl ** Determine library versions
+dnl The packages below should include all packages needed by
+dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
+LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(parallel)
+LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
@@ -1406,6 +1404,7 @@ echo "\
    Alex         : $AlexCmd ($AlexVersion)
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
+   makeinfo     : $MAKEINFO
 
    Using LLVM tools
       clang : $ClangCmd
@@ -1424,7 +1423,8 @@ fi
 
 echo "\
    Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
-   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF
+   Tools to build Sphinx INFO documentation available: $BUILD_SPHINX_INFO"
 
 echo "----------------------------------------------------------------------
 "

@@ -33,7 +33,7 @@ module TcSplice(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Annotations
 import Finder
 import Name
@@ -60,7 +60,7 @@ import HscMain
 import RnSplice( traceSplice, SpliceInfo(..))
 import RdrName
 import HscTypes
-import Convert
+import GHC.ThToHs
 import RnExpr
 import RnEnv
 import RnUtils ( HsDocContext(..) )
@@ -256,7 +256,7 @@ very straightforwardly:
   1. tcTopSpliceExpr: typecheck the body e of the splice $(e)
 
   2. runMetaT: desugar, compile, run it, and convert result back to
-     HsSyn RdrName (of the appropriate flavour, eg HsType RdrName,
+     GHC.Hs syntax RdrName (of the appropriate flavour, eg HsType RdrName,
      HsExpr RdrName etc)
 
   3. treat the result as if that's what you saw in the first place

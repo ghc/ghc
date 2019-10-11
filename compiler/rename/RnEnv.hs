@@ -48,7 +48,7 @@ import GhcPrelude
 
 import LoadIface        ( loadInterfaceForName, loadSrcInterface_maybe )
 import IfaceEnv
-import HsSyn
+import GHC.Hs
 import RdrName
 import HscTypes
 import TcEnv
@@ -1266,10 +1266,10 @@ warnIfDeprecated gre@(GRE { gre_name = name, gre_imp = iss })
 
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
-  = mi_warn_fn iface (greOccName gre) `mplus`  -- Bleat if the thing,
+  = mi_warn_fn (mi_final_exts iface) (greOccName gre) `mplus`  -- Bleat if the thing,
     case gre_par gre of                      -- or its parent, is warn'd
-       ParentIs  p              -> mi_warn_fn iface (nameOccName p)
-       FldParent { par_is = p } -> mi_warn_fn iface (nameOccName p)
+       ParentIs  p              -> mi_warn_fn (mi_final_exts iface) (nameOccName p)
+       FldParent { par_is = p } -> mi_warn_fn (mi_final_exts iface) (nameOccName p)
        NoParent                 -> Nothing
 
 {-

@@ -62,8 +62,6 @@ module GHC.StgToCmm.Closure (
         staticClosureNeedsLink,
     ) where
 
-#include "../includes/MachDeps.h"
-
 #include "HsVersions.h"
 
 import GhcPrelude

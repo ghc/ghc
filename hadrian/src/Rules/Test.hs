@@ -12,6 +12,7 @@ import Packages
 import Settings
 import Settings.Default
 import Settings.Builders.RunTest
+import Settings.Program (programContext)
 import Target
 import Utilities
 

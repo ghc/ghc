@@ -38,7 +38,7 @@ instance Show Bool -- Defined in ‘GHC.Show’
 instance Read Bool -- Defined in ‘GHC.Read’
 instance Bounded Bool -- Defined in ‘GHC.Enum’
 instance GHC.Generics.Generic Bool -- Defined in ‘GHC.Generics’
-instance GHC.Arr.Ix Bool -- Defined in ‘GHC.Arr’
+instance GHC.Ix.Ix Bool -- Defined in ‘GHC.Ix’
 instance GHC.Generics.SingKind Bool -- Defined in ‘GHC.Generics’
 instance Data.Bits.Bits Bool -- Defined in ‘Data.Bits’
 instance Data.Bits.FiniteBits Bool -- Defined in ‘Data.Bits’

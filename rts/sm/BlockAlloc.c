@@ -456,7 +456,7 @@ allocGroupOnNode (uint32_t node, W_ n)
     }
 
 finish:
-    IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     return bd;
 }
@@ -531,7 +531,7 @@ bdescr* allocLargeChunkOnNode (uint32_t node, W_ min, W_ max)
 
     recordAllocatedBlocks(node, bd->blocks);
 
-    IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+    IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
     return bd;
 }
@@ -656,7 +656,7 @@ freeGroup(bdescr *p)
   p->gen = NULL;
   p->gen_no = 0;
   /* fill the block group with garbage if sanity checking is on */
-  IF_DEBUG(sanity,memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
+  IF_DEBUG(zero_on_gc, memset(p->start, 0xaa, (W_)p->blocks * BLOCK_SIZE));
 
   if (p->blocks == 0) barf("freeGroup: block size is zero");
 

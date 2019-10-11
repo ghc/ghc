@@ -40,7 +40,7 @@ module TcGenDeriv (
 import GhcPrelude
 
 import TcRnMonad
-import HsSyn
+import GHC.Hs
 import RdrName
 import BasicTypes
 import DataCon

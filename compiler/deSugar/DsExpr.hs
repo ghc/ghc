@@ -25,12 +25,12 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
-import Check ( checkGuardMatches )
+import GHC.HsToCore.PmCheck ( checkGuardMatches )
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
 import DsMeta
-import HsSyn
+import GHC.Hs
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
@@ -393,6 +393,7 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                 -- The reverse is because foldM goes left-to-right
                       (\(lam_vars, args) -> mkCoreLams lam_vars $
                                             mkCoreTupBoxity boxity args) }
+                        -- See Note [Don't flatten tuples from HsSyn] in MkCore
 
 ds_expr _ (ExplicitSum types alt arity expr)
   = do { dsWhenNoErrs (dsLExprNoLP expr)

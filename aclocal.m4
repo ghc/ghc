@@ -372,12 +372,14 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkArch "$HostArch" "HaskellHostArch"
     checkVendor "$HostVendor"
-    checkOS "$HostOS" ""
+    checkOS "$HostOS" "HaskellHostOs"
 
     checkArch "$TargetArch" "HaskellTargetArch"
     checkVendor "$TargetVendor"
     checkOS "$TargetOS" "HaskellTargetOs"
 
+    AC_SUBST(HaskellHostArch)
+    AC_SUBST(HaskellHostOs)
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
     AC_SUBST(TargetHasSubsectionsViaSymbols)
@@ -984,8 +986,11 @@ else
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
-  [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+if test ! -f compiler/parser/Lexer.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
+      [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
@@ -1972,7 +1977,7 @@ AC_DEFUN([GHC_LLVM_TARGET], [
     # for the LLVM Target. Otherwise these would be
     # turned into just `-linux` and fail to be found
     # in the `llvm-targets` file.
-    *-android*|*-gnueabi*)
+    *-android*|*-gnueabi*|*-musleabi*)
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       llvm_target_os="$3"
       ;;

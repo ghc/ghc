@@ -29,11 +29,11 @@ module DsMonad (
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
-        -- Getting and setting EvVars and term constraints in local environment
-        getDictsDs, addDictsDs, getTmCsDs, addTmCsDs,
+        -- Getting and setting pattern match oracle states
+        getPmDelta, updPmDelta,
 
-        -- Iterations for pm checking
-        incrCheckPmIterDs, resetPmIterDs, dsGetCompleteMatches,
+        -- Get COMPLETE sets of a TyCon
+        dsGetCompleteMatches,
 
         -- Warnings and errors
         DsWarning, warnDs, warnIfSetDs, errDs, errDsCoreExpr,
@@ -59,7 +59,7 @@ import FamInstEnv
 import CoreSyn
 import MkCore    ( unitExpr )
 import CoreUtils ( exprType, isExprLevPoly )
-import HsSyn
+import GHC.Hs
 import TcIface
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames
@@ -70,7 +70,7 @@ import BasicTypes ( Origin )
 import DataCon
 import ConLike
 import TyCon
-import PmExpr
+import GHC.HsToCore.PmCheck.Types
 import Id
 import Module
 import Outputable
@@ -82,7 +82,6 @@ import NameEnv
 import DynFlags
 import ErrUtils
 import FastString
-import Var (EvVar)
 import UniqFM ( lookupWithDefaultUFM )
 import Literal ( mkLitString )
 import CostCentreState
@@ -191,8 +190,7 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   => HscEnv -> IORef Messages -> TcGblEnv
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
-  = do { pm_iter_var <- liftIO $ newIORef 0
-       ; cc_st_var   <- liftIO $ newIORef newCostCentreState
+  = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
        ; let dflags   = hsc_dflags hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -201,7 +199,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env
                                 ++ tcg_complete_matches tcg_env
        ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                           msg_var pm_iter_var cc_st_var complete_matches
+                           msg_var cc_st_var complete_matches
        }
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages, Maybe a)
@@ -220,8 +218,7 @@ runDs hsc_env (ds_gbl, ds_lcl) thing_inside
 -- | Run a 'DsM' action in the context of an existing 'ModGuts'
 initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
-  = do { pm_iter_var <- newIORef 0
-       ; cc_st_var   <- newIORef newCostCentreState
+  = do { cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
        ; let dflags   = hsc_dflags hsc_env
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
@@ -236,8 +233,8 @@ initDsWithModGuts hsc_env guts thing_inside
              ids = concatMap bindsToIds (mg_binds guts)
 
              envs  = mkDsEnvs dflags this_mod rdr_env type_env
-                              fam_inst_env msg_var pm_iter_var
-                              cc_st_var complete_matches
+                              fam_inst_env msg_var cc_st_var
+                              complete_matches
        ; runDs hsc_env envs thing_inside
        }
 
@@ -265,9 +262,9 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef Int -> IORef CostCentreState
-         -> [CompleteMatch] -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar cc_st_var
+         -> IORef Messages -> IORef CostCentreState -> [CompleteMatch]
+         -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
@@ -285,9 +282,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
-                           , dsl_dicts   = emptyBag
-                           , dsl_tm_cs   = emptyBag
-                           , dsl_pm_iter = pmvar
+                           , dsl_delta   = initDelta
                            }
     in (gbl_env, lcl_env)
 
@@ -386,39 +381,14 @@ the @SrcSpan@ being carried around.
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
--- | Get in-scope type constraints (pm check)
-getDictsDs :: DsM (Bag EvVar)
-getDictsDs = do { env <- getLclEnv; return (dsl_dicts env) }
+-- | Get the current pattern match oracle state. See 'dsl_delta'.
+getPmDelta :: DsM Delta
+getPmDelta = do { env <- getLclEnv; return (dsl_delta env) }
 
--- | Add in-scope type constraints (pm check)
-addDictsDs :: Bag EvVar -> DsM a -> DsM a
-addDictsDs ev_vars
-  = updLclEnv (\env -> env { dsl_dicts = unionBags ev_vars (dsl_dicts env) })
-
--- | Get in-scope term constraints (pm check)
-getTmCsDs :: DsM (Bag TmVarCt)
-getTmCsDs = do { env <- getLclEnv; return (dsl_tm_cs env) }
-
--- | Add in-scope term constraints (pm check)
-addTmCsDs :: Bag TmVarCt -> DsM a -> DsM a
-addTmCsDs tm_cs
-  = updLclEnv (\env -> env { dsl_tm_cs = unionBags tm_cs (dsl_tm_cs env) })
-
--- | Increase the counter for elapsed pattern match check iterations.
--- If the current counter is already over the limit, fail
-incrCheckPmIterDs :: DsM Int
-incrCheckPmIterDs = do
-  env <- getLclEnv
-  cnt <- readTcRef (dsl_pm_iter env)
-  max_iters <- maxPmCheckIterations <$> getDynFlags
-  if cnt >= max_iters
-    then failM
-    else updTcRef (dsl_pm_iter env) (+1)
-  return cnt
-
--- | Reset the counter for pattern match check iterations to zero
-resetPmIterDs :: DsM ()
-resetPmIterDs = do { env <- getLclEnv; writeTcRef (dsl_pm_iter env) 0 }
+-- | Set the pattern match oracle state within the scope of the given action.
+-- See 'dsl_delta'.
+updPmDelta :: Delta -> DsM a -> DsM a
+updPmDelta delta = updLclEnv (\env -> env { dsl_delta = delta })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

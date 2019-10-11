@@ -13,8 +13,10 @@
 bkpfail23.bkp:14:9: error:
     • Type constructor ‘F’ has conflicting definitions in the module
       and its hsig file
-      Main module: type F a = ()
+      Main module: type F :: * -> *
+                   type F a = ()
       Hsig file:  type role F phantom
+                  type F :: * -> *
                   data F a
       Illegal parameterized type synonym in implementation of abstract data.
       (Try eta reducing your type synonym so that it is nullary.)

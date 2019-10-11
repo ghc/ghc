@@ -184,6 +184,20 @@ to get the instantiation a := ty.
 This is very unlike DataCons, where univ tyvars match 1-1 the
 arguments of the TyCon.
 
+Side note: I (SG) get the impression that instantiated return types should
+generate a *required* constraint for pattern synonyms, rather than a *provided*
+constraint like it's the case for GADTs. For example, I'd expect these
+declarations to have identical semantics:
+
+    pattern Just42 :: Maybe Int
+    pattern Just42 = Just 42
+
+    pattern Just'42 :: (a ~ Int) => Maybe a
+    pattern Just'42 = Just 42
+
+The latter generates the proper required constraint, the former does not.
+Also rather different to GADTs is the fact that Just42 doesn't have any
+universally quantified type variables, whereas Just'42 or MkS above has.
 
 Note [Pattern synonym representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -18,7 +18,9 @@ bkpfail25.bkp:7:18: warning: [-Wmissing-methods (in -Wdefault)]
 bkpfail25.bkp:12:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
-      Main module: type T a = a
+      Main module: type T :: * -> *
+                   type T a = a
       Hsig file:  type role T nominal
+                  type T :: * -> *
                   data T a
     • while checking that q:H implements signature H in p[H=q:H]

@@ -38,7 +38,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O<br>-H64m<br></td>
     <td>-O2<br>-H64m</td>
     <td></td>
-    <td></td>
+    <td>-haddock</td>
     <td></td>
     <td></td>
     <td></td>
@@ -119,6 +119,28 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O0<br>-DDEBUG</td>
     <td></td>
     <td>-O0<br>-DDEBUG</td>
+  </tr>
+  <tr>
+    <th>validate</td>
+    <td>-O0<br>-H64m</td>
+    <td>-fllvm-fill-undef-with-garbage</td>
+    <td></td>
+    <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
+    <td>-O2<br>-DDEBUG</td>
+    <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
+    <td>-O</td>
+    <td>-O</td>
+  </tr>
+  <tr>
+    <th>validate</td>
+    <td>-O0<br>-H64m</td>
+    <td>-fllvm-fill-undef-with-garbage</td>
+    <td></td>
+    <td>-O<br>-dcore-lint<br>-dno-debug-output</td>
+    <td>-O2<br>-DDEBUG</td>
+    <td>-O<br>-DDEBUG<br>-dcore-lint<br>-dno-debug-output</td>
+    <td>-O</td>
+    <td>-O</td>
   </tr>
 </table>
 

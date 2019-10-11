@@ -789,7 +789,7 @@ And five warning flags:
        single: safe haskell imports, warning
 
     The module ``A`` below is annotated to be explictly ``Safe``, but it imports
-    ``Safe-Inferred`` module.
+    ``Safe-Inferred`` module. ::
 
         {-# LANGUAGE Safe #-}
         module A where

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ghcconfig.h"
 #include <stdio.h>
 
 #if defined(__STDC__)

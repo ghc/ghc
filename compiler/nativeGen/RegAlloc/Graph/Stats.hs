@@ -14,8 +14,6 @@ module RegAlloc.Graph.Stats (
         countSRMs, addSRM
 ) where
 
-#include "nativeGen/NCG.h"
-
 import GhcPrelude
 
 import qualified GraphColor as Color

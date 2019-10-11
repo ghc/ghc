@@ -1,4 +1,5 @@
-type family F a :: * where
+type F :: * -> *
+type family F a where
     F [Int] = Bool
     F [a] = Double
     F (a b) = Char

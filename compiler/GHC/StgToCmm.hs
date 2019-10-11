@@ -19,7 +19,7 @@ import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
-import GHC.StgToCmm.Con
+import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
@@ -71,7 +71,7 @@ codeGen dflags this_mod data_tycons
         ; cgref <- liftIO $ newIORef =<< initC
         ; let cg :: FCode () -> Stream IO CmmGroup ()
               cg fcode = do
-                cmm <- liftIO . withTiming (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
+                cmm <- liftIO . withTimingSilent (return dflags) (text "STG -> Cmm") (`seq` ()) $ do
                          st <- readIORef cgref
                          let (a,st') = runC dflags this_mod st (getCmm fcode)
 

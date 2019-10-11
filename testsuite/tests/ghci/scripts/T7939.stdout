@@ -1,24 +1,32 @@
-class Foo (a :: k) where
-  type family Bar (a :: k) b :: *
+type Foo :: forall k. k -> Constraint
+class Foo a where
+  type Bar :: forall k. k -> * -> *
+  type family Bar a b
   	-- Defined at T7939.hs:6:4
 Bar :: k -> * -> *
-type family F a :: * 	-- Defined at T7939.hs:8:1
+type F :: * -> *
+type family F a
+  	-- Defined at T7939.hs:8:1
 type instance F Int = Bool 	-- Defined at T7939.hs:9:15
 F :: * -> *
-type family G a :: * where
+type G :: * -> *
+type family G a where
     G Int = Bool
   	-- Defined at T7939.hs:11:1
 G :: * -> *
-type family H (a :: Bool) :: Bool where
+type H :: Bool -> Bool
+type family H a where
     H 'False = 'True
   	-- Defined at T7939.hs:14:1
 H :: Bool -> Bool
-type family J (a :: [k]) :: Bool where
+type J :: forall k. [k] -> Bool
+type family J a where
     J '[] = 'False
   forall k (h :: k) (t :: [k]). J (h : t) = 'True
   	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
-type family K (a1 :: [a]) :: Maybe a where
+type K :: forall a. [a] -> Maybe a
+type family K a1 where
     K '[] = 'Nothing
   forall a (h :: a) (t :: [a]). K (h : t) = 'Just h
   	-- Defined at T7939.hs:21:1

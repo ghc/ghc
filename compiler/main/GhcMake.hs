@@ -1357,6 +1357,25 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
  where
   done_holes = emptyUniqSet
 
+  keep_going this_mods old_hpt done mods mod_index nmods uids_to_check done_holes = do
+    let sum_deps ms (AcyclicSCC mod) =
+          if any (flip elem . map (unLoc . snd) $ ms_imps mod) ms
+            then ms_mod_name mod:ms
+            else ms
+        sum_deps ms _ = ms
+        dep_closure = foldl' sum_deps this_mods mods
+        dropped_ms = drop (length this_mods) (reverse dep_closure)
+        prunable (AcyclicSCC mod) = elem (ms_mod_name mod) dep_closure
+        prunable _ = False
+        mods' = filter (not . prunable) mods
+        nmods' = nmods - length dropped_ms
+
+    when (not $ null dropped_ms) $ do
+        dflags <- getSessionDynFlags
+        liftIO $ fatalErrorMsg dflags (keepGoingPruneErr dropped_ms)
+    (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods' uids_to_check done_holes
+    return (Failed, done')
+
   upsweep'
     :: GhcMonad m
     => HomePackageTable
@@ -1374,10 +1393,13 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         return (Succeeded, done)
 
   upsweep' _old_hpt done
-     (CyclicSCC ms:_) _ _ _ _
+     (CyclicSCC ms:mods) mod_index nmods uids_to_check done_holes
    = do dflags <- getSessionDynFlags
         liftIO $ fatalErrorMsg dflags (cyclicModuleErr ms)
-        return (Failed, done)
+        if gopt Opt_KeepGoing dflags
+          then keep_going (map ms_mod_name ms) old_hpt done mods mod_index nmods
+                          uids_to_check done_holes
+          else return (Failed, done)
 
   upsweep' old_hpt done
      (AcyclicSCC mod:mods) mod_index nmods uids_to_check done_holes
@@ -1426,7 +1448,12 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                  return (Just mod_info)
 
         case mb_mod_info of
-          Nothing -> return (Failed, done)
+          Nothing -> do
+                dflags <- getSessionDynFlags
+                if gopt Opt_KeepGoing dflags
+                  then keep_going [ms_mod_name mod] old_hpt done mods mod_index nmods
+                                  uids_to_check done_holes
+                  else return (Failed, done)
           Just mod_info -> do
                 let this_mod = ms_mod_name mod
 
@@ -2051,7 +2078,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
            (defaultObjectTarget dflags)
            map0
          else if hscTarget dflags == HscInterpreted
-           then enableCodeGenForUnboxedTuples
+           then enableCodeGenForUnboxedTuplesOrSums
              (defaultObjectTarget dflags)
              map0
            else return map0
@@ -2149,16 +2176,19 @@ enableCodeGenForTH =
 -- and .o file locations to be temporary files.
 --
 -- This is used used in order to load code that uses unboxed tuples
--- into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuples :: HscTarget
+-- or sums into GHCi while still allowing some code to be interpreted.
+enableCodeGenForUnboxedTuplesOrSums :: HscTarget
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenForUnboxedTuples =
+enableCodeGenForUnboxedTuplesOrSums =
   enableCodeGenWhen condition should_modify TFL_GhcSession TFL_CurrentModule
   where
     condition ms =
-      xopt LangExt.UnboxedTuples (ms_hspp_opts ms) &&
+      unboxed_tuples_or_sums (ms_hspp_opts ms) &&
+      not (gopt Opt_ByteCode (ms_hspp_opts ms)) &&
       not (isBootSummary ms)
+    unboxed_tuples_or_sums d =
+      xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
       hscTarget dflags == HscInterpreted
 
@@ -2651,6 +2681,12 @@ multiRootsErr dflags summs@(summ1:_)
   where
     mod = ms_mod summ1
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
+
+keepGoingPruneErr :: [ModuleName] -> SDoc
+keepGoingPruneErr ms
+  = vcat (( text "-fkeep-going in use, removing the following" <+>
+            text "dependencies and continuing:"):
+          map (nest 6 . ppr) ms )
 
 cyclicModuleErr :: [ModSummary] -> SDoc
 -- From a strongly connected component we find

@@ -28,9 +28,9 @@ import GhcPrelude
 import DynFlags
 import PipelineMonad
 import HscTypes
-import HsDecls
-import HsBinds
-import HsExpr
+import GHC.Hs.Decls
+import GHC.Hs.Binds
+import GHC.Hs.Expr
 import OrdList
 import TcRnTypes
 import Bag
@@ -43,7 +43,7 @@ import SrcLoc
 import Type
 import System.Process
 import BasicTypes
-import HsExtension
+import GHC.Hs.Extension
 
 import Data.Maybe
 

@@ -20,11 +20,11 @@ import Match
 import DsUtils
 import DsMonad
 
-import HsSyn    hiding (collectPatBinders, collectPatsBinders,
+import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
                         collectLStmtsBinders, collectLStmtBinders,
                         collectStmtBinders )
 import TcHsSyn
-import qualified HsUtils
+import qualified GHC.Hs.Utils as HsUtils
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types (newtypes etc), and sometimes not
@@ -62,7 +62,7 @@ data DsCmdEnv = DsCmdEnv {
     }
 
 mkCmdEnv :: CmdSyntaxTable GhcTc -> DsM ([CoreBind], DsCmdEnv)
--- See Note [CmdSyntaxTable] in HsExpr
+-- See Note [CmdSyntaxTable] in GHC.Hs.Expr
 mkCmdEnv tc_meths
   = do { (meth_binds, prs) <- mapAndUnzipM mk_bind tc_meths
 
@@ -1191,10 +1191,10 @@ foldb f xs = foldb f (fold_pairs xs)
     fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
 
 {-
-Note [Dictionary binders in ConPatOut] See also same Note in HsUtils
+Note [Dictionary binders in ConPatOut] See also same Note in GHC.Hs.Utils
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following functions to collect value variables from patterns are
-copied from HsUtils, with one change: we also collect the dictionary
+copied from GHC.Hs.Utils, with one change: we also collect the dictionary
 bindings (pat_binds) from ConPatOut.  We need them for cases like
 
 h :: Arrow a => Int -> a (Int,Int) Int
@@ -1208,7 +1208,7 @@ The type checker turns the case into
 
 Here p77 is a local binding for the (+) operation.
 
-See comments in HsUtils for why the other version does not include
+See comments in GHC.Hs.Utils for why the other version does not include
 these bindings.
 -}
 

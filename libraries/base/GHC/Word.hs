@@ -57,7 +57,7 @@ import GHC.Base
 import GHC.Enum
 import GHC.Num
 import GHC.Real
-import GHC.Arr
+import GHC.Ix
 import GHC.Show
 
 ------------------------------------------------------------------------

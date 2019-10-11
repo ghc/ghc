@@ -650,7 +650,7 @@ resetNurseries (void)
             ASSERT(bd->gen_no == 0);
             ASSERT(bd->gen == g0);
             ASSERT(bd->node == capNoToNumaNode(n));
-            IF_DEBUG(sanity, memset(bd->start, 0xaa, BLOCK_SIZE));
+            IF_DEBUG(zero_on_gc, memset(bd->start, 0xaa, BLOCK_SIZE));
         }
     }
 #endif

@@ -1434,9 +1434,14 @@ triggered (see :ref:`nested-breakpoints`). Rather than forcing thunks,
 :ghci-cmd:`:print` binds each thunk to a fresh variable beginning with an
 underscore, in this case ``_t1``.
 
-The flag :ghc-flag:`-fprint-evld-with-show` instructs :ghci-cmd:`:print` to reuse
-available ``Show`` instances when possible. This happens only when the
-contents of the variable being inspected are completely evaluated.
+.. ghc-flag:: -fprint-evld-with-show
+    :shortdesc: Instruct :ghci-cmd:`:print` to use ``Show`` instances where possible.
+    :category: interactive
+    :type: dynamic
+
+    The flag :ghc-flag:`-fprint-evld-with-show` instructs :ghci-cmd:`:print` to reuse
+    available ``Show`` instances when possible. This happens only when the
+    contents of the variable being inspected are completely evaluated.
 
 If we aren't concerned about preserving the evaluatedness of a variable, we can
 use :ghci-cmd:`:force` instead of :ghci-cmd:`:print`. The :ghci-cmd:`:force`
@@ -2566,13 +2571,13 @@ commonly used commands.
 
     The ``:loc-at`` command requires :ghci-cmd:`:set +c` to be set.
 
-.. ghci-cmd:: :instances ⟨type⟩
+.. ghci-cmd:: :instances; ⟨type⟩
 
     Displays all the class instances available to the argument ⟨type⟩.
     The command will match ⟨type⟩ with the first parameter of every
     instance and then check that all constraints are satisfiable.
 
-    When combined with ``-XPartialTypeSignatures``, a user can insert
+    When combined with :extension:`PartialTypeSignatures`, a user can insert
     wildcards into a query and learn the constraints required of each
     wildcard for ⟨type⟩ match with an instance.
 
@@ -3399,13 +3404,14 @@ providing it with a temporary folder (where it will copy the
 necessary libraries to load to) and port it will listen for
 the proxy to connect.
 
-Providing :ghc-flag:`-pgmi /path/to/iserv-proxy`, :ghc-flag:`-pgmo ⟨option⟩`
-and :ghc-flag:`-pgmo ⟨port⟩` in addition to :ghc-flag:`-fexternal-interpreter`
-will then make ghc go through the proxy instead.
+Providing :ghc-flag:`-pgmi /path/to/iserv-proxy <-pgmi ⟨cmd⟩>`,
+:ghc-flag:`-pgmo ⟨option⟩` and :ghc-flag:`-pgmo ⟨port⟩` in addition to
+:ghc-flag:`-fexternal-interpreter` will then make ghc go through the proxy
+instead.
 
 There are some limitations when using this. File and process IO
-will be executed on the target. As such packages like git-embed,
-file-embed and others might not behave as expected if the target
+will be executed on the target. As such packages like ``git-embed``,
+``file-embed`` and others might not behave as expected if the target
 and host do not share the same filesystem.
 
 .. _ghci-faq:
@@ -3429,14 +3435,29 @@ The interpreter can't load modules with foreign export declarations!
     need to go fast, rather than interpreting them with optimisation
     turned on.
 
-Modules using unboxed tuples will automatically enable `-fobject-code`
-    The interpreter doesn't support unboxed tuples, so GHCi will
-    automatically compile these modules, and all modules they depend
-    on, to object code instead of bytecode.
+Modules using unboxed tuples or sums will automatically enable :ghc-flag:`-fobject-code`
+
+    .. index::
+       single: unboxed tuples, sums; and GHCi
+
+    The bytecode interpreter doesn't support most uses of unboxed tuples or
+    sums, so GHCi will automatically compile these modules, and all modules
+    they depend on, to object code instead of bytecode.
+
+    GHCi checks for the presence of unboxed tuples and sums in a somewhat
+    conservative fashion: it simply checks to see if a module enables the
+    :extension:`UnboxedTuples` or :extension:`UnboxedSums` language extensions.
+    It is not always the case that code which enables :extension:`UnboxedTuples`
+    or :extension:`UnboxedSums` requires :ghc-flag:`-fobject-code`, so if you
+    *really* want to compile
+    :extension:`UnboxedTuples`/:extension:`UnboxedSums`-using code to
+    bytecode, you can do so explicitly by enabling the :ghc-flag:`-fbyte-code`
+    flag. If you do this, do note that bytecode interpreter will throw an error
+    if it encounters unboxed tuple/sum–related code that it cannot handle.
 
     Incidentally, the previous point, that :ghc-flag:`-O` is
     incompatible with GHCi, is because the bytecode compiler can't
-    deal with unboxed tuples.
+    deal with unboxed tuples or sums.
 
 Concurrent threads don't carry on running when GHCi is waiting for input.
     This should work, as long as your GHCi was built with the

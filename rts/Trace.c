@@ -615,6 +615,12 @@ void traceHeapProfBegin(StgWord8 profile_id)
         postHeapProfBegin(profile_id);
     }
 }
+void traceHeapBioProfSampleBegin(StgInt era, StgWord64 time)
+{
+    if (eventlog_enabled) {
+        postHeapBioProfSampleBegin(era, time);
+    }
+}
 
 void traceHeapProfSampleBegin(StgInt era)
 {

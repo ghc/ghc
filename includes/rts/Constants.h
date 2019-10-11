@@ -22,9 +22,11 @@
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
 
-   This is the minimum number of words in the payload of a
-   heap-allocated closure, so that the closure has enough room to be
-   overwritten with a forwarding pointer during garbage collection.
+   This is the minimum number of words in the payload of a heap-allocated
+   closure, so that the closure has two bits in the bitmap for mark-compact
+   collection.
+
+   See Note [Mark bits in mark-compact collector] in rts/sm/Compact.h
    -------------------------------------------------------------------------- */
 
 #define MIN_PAYLOAD_SIZE 1

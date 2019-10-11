@@ -48,7 +48,7 @@ module TcHsSyn (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Id
 import IdInfo
 import TcRnMonad
@@ -110,7 +110,8 @@ hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
 hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
 hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
-hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
+hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
+                  -- See Note [Don't flatten tuples from HsSyn] in MkCore
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
 hsPatType (ConPatOut { pat_con = lcon
                      , pat_arg_tys = tys })
@@ -959,7 +960,8 @@ zonkExpr env (HsWrap x co_fn expr)
        new_expr <- zonkExpr env1 expr
        return (HsWrap x new_co_fn new_expr)
 
-zonkExpr _ e@(HsUnboundVar {}) = return e
+zonkExpr _ e@(HsUnboundVar {})
+  = return e
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 

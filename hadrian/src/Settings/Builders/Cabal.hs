@@ -99,15 +99,16 @@ libraryArgs = do
 configureArgs :: Args
 configureArgs = do
     top  <- expr topDirectory
-    root <- getBuildRoot
     pkg  <- getPackage
+    stage <- getStage
+    libPath <- expr $ stageLibPath stage
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , getStagedSettingList ConfCcArgs
-                           , arg $ "-I" ++ top -/- root -/- generatedDir
+                           , arg $ "-I" ++ libPath
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
                            , arg $ top -/- pkgPath pkg
@@ -127,7 +128,7 @@ configureArgs = do
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
         , flag CrossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
-        , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH))]
+        , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH stage))]
 
 bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
@@ -140,8 +141,9 @@ bootPackageConstraints = stage0 ? do
 
 cppArgs :: Args
 cppArgs = do
-    root <- getBuildRoot
-    arg $ "-I" ++ root -/- generatedDir
+    stage <- getStage
+    libPath <- expr $ stageLibPath stage
+    arg $ "-I" ++ libPath
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of

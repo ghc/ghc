@@ -48,7 +48,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( exprType, mkCast )
+import CoreUtils        ( mkCast, mkDefaultCase )
 import CoreUnfold
 import Literal
 import TyCon
@@ -463,8 +463,8 @@ mkDictSelRhs clas val_index
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
-             | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
-                                [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
+             | otherwise = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
+                                           arg_ids (varToCoreExpr the_arg_id)
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
@@ -987,7 +987,7 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
 
 ------------------------
 seqUnboxer :: Unboxer
-seqUnboxer v = return ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
+seqUnboxer v = return ([v], mkDefaultCase (Var v) v)
 
 unitUnboxer :: Unboxer
 unitUnboxer v = return ([v], \e -> e)
@@ -1014,8 +1014,8 @@ dataConArgUnpack arg_ty
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
           ; let unbox_fn body
-                  = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, rep_ids, body)]
+                  = mkSingleAltCase (Var arg_id) arg_id
+                             (DataAlt con) rep_ids body
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys

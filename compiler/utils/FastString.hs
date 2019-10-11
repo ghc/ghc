@@ -124,7 +124,7 @@ import GHC.IO
 
 import Foreign
 
-#if STAGE >= 2
+#if GHC_STAGE >= 2
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
@@ -223,6 +223,9 @@ instance Data FastString where
   toConstr _   = abstractConstr "FastString"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "FastString"
+
+instance NFData FastString where
+  rnf fs = seq fs ()
 
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS f1@(FastString u1 _ _ _) f2@(FastString u2 _ _ _) =
@@ -330,12 +333,12 @@ stringTable = unsafePerformIO $ do
 
   -- use the support wired into the RTS to share this CAF among all images of
   -- libHSghc
-#if STAGE < 2
+#if GHC_STAGE < 2
   return tab
 #else
   sharedCAF tab getOrSetLibHSghcFastStringTable
 
--- from the RTS; thus we cannot use this mechanism when STAGE<2; the previous
+-- from the RTS; thus we cannot use this mechanism when GHC_STAGE<2; the previous
 -- RTS might not have this symbol
 foreign import ccall unsafe "getOrSetLibHSghcFastStringTable"
   getOrSetLibHSghcFastStringTable :: Ptr a -> IO (Ptr a)

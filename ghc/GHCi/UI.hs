@@ -52,8 +52,8 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              GetDocsFailure(..),
              getModuleGraph, handleSourceError )
 import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
-import HsImpExp
-import HsSyn
+import GHC.Hs.ImpExp
+import GHC.Hs
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
                   hsc_dynLinker )
@@ -308,6 +308,7 @@ defFullHelpText =
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++
+  "   :instances <type>           display the class instances available for <type>\n" ++
   "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
   "   :kind[!] <type>             show the kind of <type>\n" ++
   "                               (!: also print the normalised type)\n" ++
@@ -2774,9 +2775,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
-        default_dflags = defaultDynFlags (settings dflags) llvmConfig
+        default_dflags = defaultDynFlags (settings dflags) (llvmConfig dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -3228,10 +3227,8 @@ showLanguages' show_all dflags =
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-   llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
    default_dflags =
-       defaultDynFlags (settings dflags) llvmConfig `lang_set`
+       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set`
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other

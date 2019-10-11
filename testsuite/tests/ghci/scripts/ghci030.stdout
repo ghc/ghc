@@ -1,2 +1,6 @@
-data D = forall a. C (Int -> a) Char 	-- Defined at ghci030.hs:8:1
-data D = forall a. C (Int -> a) Char 	-- Defined at ghci030.hs:8:10
+type D :: *
+data D = forall a. C (Int -> a) Char
+  	-- Defined at ghci030.hs:8:1
+type D :: *
+data D = forall a. C (Int -> a) Char
+  	-- Defined at ghci030.hs:8:10
