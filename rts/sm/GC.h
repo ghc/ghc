@@ -17,9 +17,12 @@
 
 #include "HeapAlloc.h"
 
-void GarbageCollect (uint32_t force_major_gc,
+void GarbageCollect (uint32_t collect_gen,
                      bool do_heap_census,
-                     uint32_t gc_type, Capability *cap, bool idle_cap[]);
+                     bool deadlock_detect,
+                     uint32_t gc_type,
+                     Capability *cap,
+                     bool idle_cap[]);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 
@@ -30,6 +33,8 @@ bool doIdleGCWork(Capability *cap, bool all);
 
 extern uint32_t N;
 extern bool major_gc;
+/* See Note [Deadlock detection under nonmoving collector]. */
+extern bool deadlock_detect_gc;
 
 extern bdescr *mark_stack_bd;
 extern bdescr *mark_stack_top_bd;
