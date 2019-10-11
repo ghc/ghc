@@ -167,13 +167,8 @@ commonGhcArgs :: Args
 commonGhcArgs = do
     way  <- getWay
     path <- getBuildPath
-<<<<<<< HEAD
-    ghcVersion <- expr ghcVersionH
-
-=======
     stage <- getStage
     ghcVersion <- expr $ ghcVersionH stage
->>>>>>> origin/master
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
