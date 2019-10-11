@@ -616,16 +616,15 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                          , trS_by = by, trS_using = using, trS_form = form
                          , trS_ret = return_op, trS_bind = bind_op
                          , trS_fmap = fmap_op }) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
-       ; m1_ty   <- newFlexiTyVarTy star_star_kind
-       ; m2_ty   <- newFlexiTyVarTy star_star_kind
+  = do { m1_ty   <- newFlexiTyVarTy typeToTypeKind
+       ; m2_ty   <- newFlexiTyVarTy typeToTypeKind
        ; tup_ty  <- newFlexiTyVarTy liftedTypeKind
        ; by_e_ty <- newFlexiTyVarTy liftedTypeKind  -- The type of the 'by' expression (if any)
 
          -- n_app :: Type -> Type   -- Wraps a 'ty' into '(n ty)' for GroupForm
        ; n_app <- case form of
                     ThenForm -> return (\ty -> ty)
-                    _        -> do { n_ty <- newFlexiTyVarTy star_star_kind
+                    _        -> do { n_ty <- newFlexiTyVarTy typeToTypeKind
                                    ; return (n_ty `mkAppTy`) }
        ; let by_arrow :: Type -> Type
              -- (by_arrow res) produces ((alpha->e_ty) -> res)     ('by' present)
@@ -741,8 +740,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> m (st1, (st2, st3))
 --
 tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
-       ; m_ty   <- newFlexiTyVarTy star_star_kind
+  = do { m_ty   <- newFlexiTyVarTy typeToTypeKind
 
        ; let mzip_ty  = mkInvForAllTys [alphaTyVar, betaTyVar] $
                         (m_ty `mkAppTy` alphaTy)
