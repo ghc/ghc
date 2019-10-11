@@ -58,7 +58,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
-				 -O0 \
+	       -O0 \
 	       -hide-all-packages \
 	       $(addprefix -package , $(CABAL_BUILD_DEPS)) \
 	       --make utils/ghc-cabal/Main.hs -o $@ \
@@ -80,6 +80,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -Ilibraries/text/include \
 	       -ilibraries/parsec/src \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
+	       $(SRC_HC_OPTS_STAGE0) \
 	       $(EXTRA_HC_OPTS)
 	"$(TOUCH_CMD)" $@
 endif
