@@ -224,8 +224,8 @@ This function (shortcutWeightMap) takes the same mapping and
 applies the mapping to the CFG in the way layed out above.
 
 -}
-shortcutWeightMap :: CFG -> LabelMap (Maybe BlockId) -> CFG
-shortcutWeightMap cfg cuts =
+shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
+shortcutWeightMap cuts cfg =
   foldl' applyMapping cfg $ mapToList cuts
     where
 -- takes the tuple (B,C) from the notation in [Updating the CFG during shortcutting]
@@ -422,7 +422,8 @@ addNodesBetween m updates =
         | otherwise
         = pprPanic "Can't find weight for edge that should have one" (
             text "triple" <+> ppr (from,between,old) $$
-            text "updates" <+> ppr updates )
+            text "updates" <+> ppr updates $$
+            text "cfg:" <+> ppr m )
       updateWeight :: CFG -> (BlockId,BlockId,BlockId,EdgeInfo) -> CFG
       updateWeight m (from,between,old,edgeInfo)
         = addEdge from between edgeInfo .

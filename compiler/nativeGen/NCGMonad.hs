@@ -88,7 +88,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in Debug
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: Maybe CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
     -- when possible.
