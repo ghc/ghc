@@ -1179,6 +1179,8 @@ heapCensusChain( Census *census, bdescr *bd )
     }
 }
 
+// Time is process CPU time of beginning of current GC and is used to compute
+// the MUT CPU time when we should report that the census happened.
 void heapCensus (Time t)
 {
   uint32_t g, n;
