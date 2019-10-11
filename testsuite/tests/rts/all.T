@@ -394,4 +394,6 @@ test('keep-cafs',
 test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
-test('T13676', [extra_files(['T13676.hs'])], ghci_script, ['T13676.script'])
+test('T13676', [when(opsys('darwin'), skip), # skip on Darwin due to CI issues
+                extra_files(['T13676.hs'])],
+     ghci_script, ['T13676.script'])
