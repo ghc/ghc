@@ -169,7 +169,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
         rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
      --
-     return (top_decls, (lbl, Statics info_lbl $ map CmmStaticLit $
+     return (top_decls, (lbl, RawCmmStatics info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
 
 -----------------------------------------------------
@@ -423,7 +423,7 @@ mkProfLits _ (ProfilingInfo td cd)
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
+newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl RawCmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueM
        ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }

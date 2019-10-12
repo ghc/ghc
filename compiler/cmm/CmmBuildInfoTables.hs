@@ -457,10 +457,10 @@ addCAF l s
   = s
 
 cafAnalData
-  :: CmmStatics
+  :: RawCmmStatics
   -> CAFSet
 
-cafAnalData (Statics _lbl statics) =
+cafAnalData (RawCmmStatics _lbl statics) =
     foldl' analyzeStatic Set.empty statics
   where
     analyzeStatic s CmmUninitialised{} =
@@ -621,7 +621,7 @@ getBlockLabels = mapMaybe getBlockLabel
 --   - the info label for a continuation or dynamic closure
 --   - the closure label for a top-level function (not a CAF)
 getLabelledBlocks :: CmmDecl -> [(SomeLabel, CAFLabel)]
-getLabelledBlocks (CmmData _ (Statics lbl _))
+getLabelledBlocks (CmmData _ (RawCmmStatics lbl _))
   | Just _ <- hasHaskellName lbl -- just to rule out StringLitLabels (TODO find a better way?)
   = [ (DeclLabel lbl, mkCAFLabel lbl) ]
   | otherwise
@@ -741,7 +741,7 @@ doSRTs dflags moduleSRTInfo tops = do
 
       static_data_env :: Map CLabel CAFSet
       static_data_env =
-        Map.fromList $ flip map data_ $ \(set, CmmData _ (Statics lbl _)) -> (lbl, set)
+        Map.fromList $ flip map data_ $ \(set, CmmData _ (RawCmmStatics lbl _)) -> (lbl, set)
 
       static_data :: [CLabel]
       static_data = Map.keys static_data_env

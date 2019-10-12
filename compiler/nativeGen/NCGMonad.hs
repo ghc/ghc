@@ -64,7 +64,7 @@ import Control.Monad    ( ap )
 
 import Instruction
 import Outputable (SDoc, pprPanic, ppr)
-import Cmm (RawCmmDecl, CmmStatics)
+import Cmm (RawCmmDecl, RawCmmStatics)
 import CFG
 
 data NcgImpl statics instr jumpDest = NcgImpl {
@@ -82,13 +82,13 @@ data NcgImpl statics instr jumpDest = NcgImpl {
                               -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)]),
     -- ^ The list of block ids records the redirected jumps to allow us to update
     -- the CFG.
-    ncgMakeFarBranches        :: LabelMap CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr],
+    ncgMakeFarBranches        :: LabelMap RawCmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr],
     extractUnwindPoints       :: [instr] -> [UnwindPoint],
     -- ^ given the instruction sequence of a block, produce a list of
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in Debug
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
     -- when possible.

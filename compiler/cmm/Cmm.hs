@@ -8,7 +8,7 @@ module Cmm (
      CmmGraph, GenCmmGraph(..),
      CmmBlock,
      RawCmmDecl, RawCmmGroup,
-     Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
+     Section(..), SectionType(..), RawCmmStatics(..), CmmStatic(..),
      isSecConstant,
 
      -- ** Blocks containing lists
@@ -56,8 +56,8 @@ import Data.ByteString (ByteString)
 type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
-type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
-type RawCmmGroup = GenCmmGroup CmmStatics (LabelMap CmmStatics) CmmGraph
+type CmmGroup = GenCmmGroup RawCmmStatics CmmTopInfo CmmGraph
+type RawCmmGroup = GenCmmGroup RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -89,12 +89,12 @@ data GenCmmDecl d h g
         Section
         d
 
-type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
+type CmmDecl = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 
 type RawCmmDecl
    = GenCmmDecl
-        CmmStatics
-        (LabelMap CmmStatics)
+        RawCmmStatics
+        (LabelMap RawCmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -197,8 +197,8 @@ data CmmStatic
   | CmmString ByteString
         -- string of 8-bit values only, not zero terminated.
 
-data CmmStatics
-   = Statics
+data RawCmmStatics
+   = RawCmmStatics
        CLabel      -- Label of statics
        [CmmStatic] -- The static data itself
 
