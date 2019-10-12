@@ -457,17 +457,16 @@ addCAF l s
   = s
 
 cafAnalData
-  :: RawCmmStatics
+  :: CmmStatics
   -> CAFSet
 
-cafAnalData (RawCmmStatics _lbl statics) =
-    foldl' analyzeStatic Set.empty statics
+cafAnalData (CmmStaticsRaw _lbl _data) =
+    Set.empty
+
+cafAnalData (CmmStatics _lbl _itbl _ccs payload) =
+    foldl' analyzeStatic Set.empty payload
   where
-    analyzeStatic s CmmUninitialised{} =
-      s
-    analyzeStatic s CmmString{} =
-      s
-    analyzeStatic s (CmmStaticLit lit) =
+    analyzeStatic s lit =
       case lit of
         CmmLabel c -> addCAF c s
         CmmLabelOff c _ -> addCAF c s
@@ -621,11 +620,17 @@ getBlockLabels = mapMaybe getBlockLabel
 --   - the info label for a continuation or dynamic closure
 --   - the closure label for a top-level function (not a CAF)
 getLabelledBlocks :: CmmDecl -> [(SomeLabel, CAFLabel)]
+{-
 getLabelledBlocks (CmmData _ (RawCmmStatics lbl _))
   | Just _ <- hasHaskellName lbl -- just to rule out StringLitLabels (TODO find a better way?)
   = [ (DeclLabel lbl, mkCAFLabel lbl) ]
   | otherwise
   = []
+-}
+getLabelledBlocks (CmmData _ (CmmStaticsRaw _ _)) =
+  []
+getLabelledBlocks (CmmData _ (CmmStatics lbl _ _ _)) =
+  [ (DeclLabel lbl, mkCAFLabel lbl) ]
 getLabelledBlocks (CmmProc top_info _ _ _) =
   [ (BlockLabel blockId, mkCAFLabel (cit_lbl info))
   | (blockId, info) <- mapToList (info_tbls top_info)
@@ -728,7 +733,7 @@ doSRTs
   :: DynFlags
   -> ModuleSRTInfo
   -> [Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl)]
-  -> IO (ModuleSRTInfo, [CmmDecl])
+  -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
 doSRTs dflags moduleSRTInfo tops = do
   us <- mkSplitUniqSupply 'u'
@@ -741,7 +746,12 @@ doSRTs dflags moduleSRTInfo tops = do
 
       static_data_env :: Map CLabel CAFSet
       static_data_env =
-        Map.fromList $ flip map data_ $ \(set, CmmData _ (RawCmmStatics lbl _)) -> (lbl, set)
+        Map.fromList $
+        flip mapMaybe data_ $
+        \(set, CmmData _ static) ->
+          case static of
+            CmmStatics lbl _ _ _ -> Just (lbl, set)
+            CmmStaticsRaw _ _ -> Nothing
 
       static_data :: [CLabel]
       static_data = Map.keys static_data_env
@@ -773,7 +783,7 @@ doSRTs dflags moduleSRTInfo tops = do
   -- On each strongly-connected group of decls, construct the SRT
   -- closures and the SRT fields for info tables.
   let result ::
-        [ ( [CmmDecl]              -- generated SRTs
+        [ ( [CmmDeclSRTs]          -- generated SRTs
           , [(Label, CLabel)]      -- SRT fields for info tables
           , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
           ) ]
@@ -808,7 +818,7 @@ doSCC
   -> [CLabel] -- static data
   -> SCC (SomeLabel, CAFLabel, Set CAFLabel)
   -> StateT ModuleSRTInfo UniqSM
-        ( [CmmDecl]              -- generated SRTs
+        ( [CmmDeclSRTs]          -- generated SRTs
         , [(Label, CLabel)]      -- SRT fields for info tables
         , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
         )
@@ -857,7 +867,7 @@ oneSRT
   -> Set CAFLabel               -- SRT for this set
   -> [CLabel]
   -> StateT ModuleSRTInfo UniqSM
-       ( [CmmDecl]                    -- SRT objects we built
+       ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
        )
@@ -1019,8 +1029,8 @@ buildSRTChain
    :: DynFlags
    -> [SRTEntry]
    -> UniqSM
-        ( [CmmDecl]    -- The SRT object(s)
-        , SRTEntry     -- label to use in the info table
+        ( [CmmDeclSRTs] -- The SRT object(s)
+        , SRTEntry      -- label to use in the info table
         )
 buildSRTChain _ [] = panic "buildSRT: empty"
 buildSRTChain dflags cafSet =
@@ -1036,7 +1046,7 @@ buildSRTChain dflags cafSet =
     mAX_SRT_SIZE = 16
 
 
-buildSRT :: DynFlags -> [SRTEntry] -> UniqSM (CmmDecl, SRTEntry)
+buildSRT :: DynFlags -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
 buildSRT dflags refs = do
   id <- getUniqueM
   let
@@ -1050,7 +1060,6 @@ buildSRT dflags refs = do
         [] -- no saved info
   return (mkDataLits (Section Data lbl) lbl fields, SRTEntry lbl)
 
-
 -- | Update info tables with references to their SRTs. Also generate
 -- static closures, splicing in SRT fields as necessary.
 updInfoSRTs
@@ -1058,12 +1067,19 @@ updInfoSRTs
   -> LabelMap CLabel               -- SRT labels for each block
   -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
   -> CmmDecl
-  -> [CmmDecl]
+  -> [CmmDeclSRTs]
+
+updInfoSRTs _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
+  = [CmmData s (RawCmmStatics lbl statics)]
+
+updInfoSRTs dflags srt_env funSRTEnv (CmmData s (CmmStatics lbl itbl ccs payload))
+  = undefined
 
 updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
   | otherwise = [ proc ]
   where
+    proc :: CmmDeclSRTs
     proc = CmmProc top_info { info_tbls = newTopInfo } top_l live g
     newTopInfo = mapMapWithKey updInfoTbl (info_tbls top_info)
     updInfoTbl l info_tbl
@@ -1073,7 +1089,7 @@ updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
     -- Generate static closures [FUN].  Note that this also generates
     -- static closures for thunks (CAFs), because it's easier to treat
     -- them uniformly in the code generator.
-    maybeStaticClosure :: Maybe (CmmInfoTable, CmmDecl)
+    maybeStaticClosure :: Maybe (CmmInfoTable, CmmDeclSRTs)
     maybeStaticClosure
       | Just info_tbl@CmmInfoTable{..} <-
            mapLookup (g_entry g) (info_tbls top_info)
@@ -1098,8 +1114,6 @@ updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
         in
           Just (newInfo, mkDataLits (Section Data lbl) lbl fields)
       | otherwise = Nothing
-
-updInfoSRTs _ _ _ t = [t]
 
 
 srtTrace :: String -> SDoc -> b -> b

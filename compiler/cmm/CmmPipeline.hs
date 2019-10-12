@@ -39,7 +39,7 @@ cmmPipeline
            -- dynamic flags: -dcmm-lint -ddump-cmm-cps
  -> ModuleSRTInfo        -- Info about SRTs generated so far
  -> CmmGroup             -- Input C-- with Procedures
- -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
+ -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
 
 cmmPipeline hsc_env srtInfo prog = withTimingSilent (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env

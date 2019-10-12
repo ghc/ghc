@@ -1542,7 +1542,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup NameSet)
+            -> IO (Stream IO CmmGroupSRTs NameSet)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1569,7 +1569,7 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream :: Stream IO CmmGroup NameSet
+        pipeline_stream :: Stream IO CmmGroupSRTs NameSet
         pipeline_stream =
           {-# SCC "cmmPipeline" #-}
           Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
@@ -1579,10 +1579,7 @@ doCodeGen hsc_env this_mod data_tycons
                         "Output Cmm" (ppr a)
                      return a
 
-        ppr_stream2 = Stream.mapM dump2 pipeline_stream
-
-    return ppr_stream2
-
+    return (Stream.mapM dump2 pipeline_stream)
 
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram

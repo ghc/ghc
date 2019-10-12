@@ -69,8 +69,11 @@ instance (Outputable d, Outputable info, Outputable i)
       => Outputable (GenCmmDecl d info i) where
     ppr t = pprTop t
 
-instance Outputable RawCmmStatics where
+instance Outputable CmmStatics where
     ppr = pprStatics
+
+instance Outputable RawCmmStatics where
+    ppr = pprRawStatics
 
 instance Outputable CmmStatic where
     ppr = pprStatic
@@ -136,8 +139,14 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
-pprStatics :: RawCmmStatics -> SDoc
-pprStatics (RawCmmStatics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
+
+pprStatics :: CmmStatics -> SDoc
+pprStatics (CmmStatics lbl itbl ccs payload) =
+  ppr lbl <> colon <+> ppr itbl <+> ppr ccs <+> ppr payload
+pprStatics (CmmStaticsRaw lbl ds) = pprRawStatics (RawCmmStatics lbl ds)
+
+pprRawStatics :: RawCmmStatics -> SDoc
+pprRawStatics (RawCmmStatics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of

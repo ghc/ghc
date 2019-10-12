@@ -2,7 +2,6 @@
 module CmmInfo (
   mkEmptyContInfoTable,
   cmmToRawCmm,
-  mkInfoTable,
   srtEscape,
 
   -- info table accessors
@@ -67,11 +66,11 @@ mkEmptyContInfoTable info_lbl
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
 
-cmmToRawCmm :: DynFlags -> Stream IO CmmGroup a
+cmmToRawCmm :: DynFlags -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one :: UniqSupply -> [CmmDecl] -> IO (UniqSupply, [RawCmmDecl])
+       ; let do_one :: UniqSupply -> [CmmDeclSRTs] -> IO (UniqSupply, [RawCmmDecl])
              do_one uniqs cmm =
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
                withTimingSilent (return dflags) (text "Cmm -> Raw Cmm")
@@ -117,9 +116,8 @@ cmmToRawCmm dflags cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
-mkInfoTable _ (CmmData sec dat)
-  = return [CmmData sec dat]
+mkInfoTable :: DynFlags -> CmmDeclSRTs -> UniqSM [RawCmmDecl]
+mkInfoTable _ (CmmData sec dat) = return [CmmData sec dat]
 
 mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
   --
