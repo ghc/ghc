@@ -11,6 +11,7 @@ module CmmBuildInfoTables
 import GhcPrelude hiding (succ)
 
 import Id
+import IdInfo
 import BlockId
 import Hoopl.Block
 import Hoopl.Graph
@@ -41,6 +42,7 @@ import Data.Tuple
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 import Data.Either (partitionEithers)
+import Data.List (unzip4)
 
 import NameSet
 
@@ -786,6 +788,7 @@ doSRTs dflags moduleSRTInfo tops = do
         [ ( [CmmDeclSRTs]          -- generated SRTs
           , [(Label, CLabel)]      -- SRT fields for info tables
           , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
+          , Bool
           ) ]
 
       (result, moduleSRTInfo') =
@@ -796,7 +799,7 @@ doSRTs dflags moduleSRTInfo tops = do
             oneSRT dflags staticFuns [BlockLabel l] [cafLbl] True{-is a CAF-} cafs static_data
           return (nonCAFs ++ cAFs)
 
-      (srt_declss, pairs, funSRTs) = unzip3 result
+      (srt_declss, pairs, funSRTs, caffy) = unzip4 result
       srt_decls = concat srt_declss
 
   unless (null srt_decls) $
@@ -806,7 +809,8 @@ doSRTs dflags moduleSRTInfo tops = do
   let
     srtFieldMap = mapFromList (concat pairs)
     funSRTMap = mapFromList (concat funSRTs)
-    decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap) decls
+    caffy' = or caffy
+    decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap caffy') decls
 
   return (moduleSRTInfo', srt_decls ++ decls')
 
@@ -821,6 +825,7 @@ doSCC
         ( [CmmDeclSRTs]          -- generated SRTs
         , [(Label, CLabel)]      -- SRT fields for info tables
         , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
+        , Bool
         )
 
 doSCC dflags staticFuns static_data (AcyclicSCC (l, cafLbl, cafs)) =
@@ -870,6 +875,7 @@ oneSRT
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
+       , Bool
        )
 
 oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
@@ -952,7 +958,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     [] -> do
       srtTrace2 "oneSRT: empty" (ppr caf_lbls) $ return ()
       updateSRTMap Nothing
-      return ([], [], [])
+      return ([], [], [], False)
 
     -- [Inline] - when we have only one entry there is no need to
     -- build an SRT object at all, instead we put the singleton SRT
@@ -976,7 +982,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
         -- recursive group, see Note [recursive SRTs])
         case maybeFunClosure of
           Just (staticFunLbl,staticFunBlock) ->
-              return ([], withLabels, [])
+              return ([], withLabels, [], True)
             where
               withLabels =
                 [ (b, if b == staticFunBlock then lbl else staticFunLbl)
@@ -985,10 +991,10 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
             srtTrace2 "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
                                      text "one:" <+> ppr one) $ return ()
             updateSRTMap (Just one)
-            return ([], map (,lbl) blockids, [])
+            return ([], map (,lbl) blockids, [], True)
 
-    _cafList | allStaticData ->
-      return ([], [], [])
+    cafList | allStaticData ->
+      return ([], [], [], not (null cafList))
 
     cafList ->
       -- Check whether an SRT with the same entries has been emitted already.
@@ -997,7 +1003,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
         Just srtEntry@(SRTEntry srtLbl)  -> do
           srtTrace2 "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl) $ return ()
           updateSRTMap (Just srtEntry)
-          return ([], map (,srtLbl) blockids, [])
+          return ([], map (,srtLbl) blockids, [], True)
         Nothing -> do
           -- No duplicates: we have to build a new SRT object
           (decls, funSRTs, srtEntry) <-
@@ -1020,7 +1026,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                                    text "newDedupSRTs:" <+> ppr newDedupSRTs $$
                                    text "newFlatSRTs:" <+> ppr newFlatSRTs) $ return ()
           let SRTEntry lbl = srtEntry
-          return (decls, map (,lbl) blockids, funSRTs)
+          return (decls, map (,lbl) blockids, funSRTs, True)
 
 
 -- | build a static SRT object (or a chain of objects) from a list of
@@ -1066,20 +1072,23 @@ updInfoSRTs
   :: DynFlags
   -> LabelMap CLabel               -- SRT labels for each block
   -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
+  -> Bool
   -> CmmDecl
   -> [CmmDeclSRTs]
 
-updInfoSRTs _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
+updInfoSRTs _ _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
   = [CmmData s (RawCmmStatics lbl statics)]
 
-updInfoSRTs dflags srt_env funSRTEnv (CmmData s (CmmStatics lbl itbl ccs payload))
-  = undefined
+updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
+  = [CmmData s (RawCmmStatics lbl (map CmmStaticLit (mkStaticClosureFields dflags itbl ccs caf_info {- FIXME -} payload)))]
+  where
+    caf_info = if caffy then MayHaveCafRefs else NoCafRefs
 
-updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
+updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
   | otherwise = [ proc ]
   where
-    proc :: CmmDeclSRTs
+    caf_info = if caffy then MayHaveCafRefs else NoCafRefs
     proc = CmmProc top_info { info_tbls = newTopInfo } top_l live g
     newTopInfo = mapMapWithKey updInfoTbl (info_tbls top_info)
     updInfoTbl l info_tbl
@@ -1104,13 +1113,12 @@ updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
             Just srtEntries -> srtTrace "maybeStaticFun" (ppr res)
               (info_tbl { cit_rep = new_rep }, res)
               where res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
-          fields = mkStaticClosureFields dflags info_tbl ccs (idCafInfo id)
-            srtEntries
+          fields = mkStaticClosureFields dflags info_tbl ccs caf_info srtEntries
           new_rep = case cit_rep of
              HeapRep sta ptrs nptrs ty ->
                HeapRep sta (ptrs + length srtEntries) nptrs ty
              _other -> panic "maybeStaticFun"
-          lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
+          lbl = mkLocalClosureLabel (idName id) caf_info
         in
           Just (newInfo, mkDataLits (Section Data lbl) lbl fields)
       | otherwise = Nothing
