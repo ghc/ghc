@@ -102,8 +102,8 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
-                   partition, sort, sortBy, (\\) )
+import Data.List ( find, group, intercalate, intersperse, isPrefixOf,
+                   isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
@@ -1387,8 +1387,8 @@ lookupCommand' str' = do
           ':' : rest -> (rest, [])     -- "::" selects a builtin command
           _          -> (str', macros) -- otherwise include macros in lookup
 
-      lookupExact  s = find $ (s ==)           . cmdName
-      lookupPrefix s = find $ (s `isPrefixOf`) . cmdName
+      lookupExact  s = find $ (s ==)              . cmdName
+      lookupPrefix s = find $ (s `isPrefixOptOf`) . cmdName
 
       -- hidden commands can only be matched exact
       builtinPfxMatch = lookupPrefix str ghci_cmds_nohide
@@ -1401,6 +1401,15 @@ lookupCommand' str' = do
            (builtinPfxMatch >>= \c -> lookupExact (cmdName c) xcmds) <|>
            builtinPfxMatch <|>
            lookupPrefix str xcmds
+
+-- This predicate is for prefix match with a command-body and
+-- suffix match with an option, such as `!`.
+-- The current implementation assumes only the `!` character
+-- as the option delimiter.
+-- See also #17345
+isPrefixOptOf :: String -> String -> Bool
+isPrefixOptOf s x = let (body, opt) = break (== '!') s
+                    in  (body `isPrefixOf` x) && (opt `isSuffixOf` x)
 
 getCurrentBreakSpan :: GHC.GhcMonad m => m (Maybe SrcSpan)
 getCurrentBreakSpan = do
@@ -3329,7 +3338,7 @@ completeGhciCommand = wrapCompleter " " $ \w -> do
   let{ candidates = case w of
       ':' : ':' : _ -> map (':':) command_names
       _ -> nub $ macro_names ++ command_names }
-  return $ filter (w `isPrefixOf`) candidates
+  return $ filter (w `isPrefixOptOf`) candidates
 
 completeMacro = wrapIdentCompleter $ \w -> do
   cmds <- ghci_macros <$> getGHCiState
