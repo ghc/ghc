@@ -1,0 +1,8 @@
+-- Testing completion with option (`!`)
+
+-- builtin command
+:k! ()
+
+-- macro command
+:def! kind! (\e -> putStrLn "called :kind! macro" >> return "")
+:k! ()
