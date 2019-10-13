@@ -188,8 +188,8 @@ typedef struct gc_thread_ {
     Time gc_start_cpu;             // thread CPU time
     Time gc_end_cpu;               // thread CPU time
     Time gc_sync_start_elapsed;    // start of GC sync
-    Time gc_start_elapsed;         // thread elapsed time
-    Time gc_end_elapsed;
+    Time gc_start_elapsed;         // process elapsed time
+    Time gc_end_elapsed;           // process elapsed time
     W_ gc_start_faults;
 
     // -------------------

@@ -26,8 +26,6 @@
 
 #include <string.h> // for memset
 
-#define TimeToSecondsDbl(t) ((double)(t) / TIME_RESOLUTION)
-
 static Time
     start_init_cpu, start_init_elapsed,
     end_init_cpu,   end_init_elapsed,
