@@ -31,6 +31,9 @@ toolArgs = do
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     mconcat [ arg "-Wall"
+            , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
+              platformSupportsSharedLibs ? way (wayFromUnits []) ?
+              arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs
