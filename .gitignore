@@ -107,6 +107,7 @@ _darcs/
 /distrib/ghc.iss
 /docs/man
 /docs/index.html
+/docs/users_guide/.log
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
 /docs/users_guide/flags.pyc
@@ -227,7 +228,7 @@ ghc.nix/
 .gdbinit
 
 # Tooling - direnv
-.envrc 
+.envrc
 
 # Tooling - vscode
 .vscode
