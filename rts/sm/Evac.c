@@ -85,7 +85,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
         }
     }
 
-    if (RtsFlags.GcFlags.useNonmoving) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
         /* See Note [Deadlock detection under nonmoving collector]. */
         if (deadlock_detect_gc)
             gen_no = oldest_gen->no;
@@ -331,10 +331,10 @@ evacuate_large(StgPtr p)
    */
   new_gen_no = bd->dest_no;
 
-  if (deadlock_detect_gc) {
+  if (RTS_UNLIKELY(deadlock_detect_gc)) {
       /* See Note [Deadlock detection under nonmoving collector]. */
       new_gen_no = oldest_gen->no;
-  } else  if (new_gen_no < gct->evac_gen_no) {
+  } else if (new_gen_no < gct->evac_gen_no) {
       if (gct->eager_promotion) {
           new_gen_no = gct->evac_gen_no;
       } else {
@@ -346,7 +346,7 @@ evacuate_large(StgPtr p)
   new_gen = &generations[new_gen_no];
 
   bd->flags |= BF_EVACUATED;
-  if (RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen) {
+  if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
       bd->flags |= BF_NONMOVING;
   }
   initBdescr(bd, new_gen, new_gen->to);
@@ -500,7 +500,7 @@ evacuate_compact (StgPtr p)
     // for that - the only code touching the generation of the block is
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
-    if (RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen) {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
         bd->flags |= BF_NONMOVING;
     }
     initBdescr(bd, new_gen, new_gen->to);
@@ -642,7 +642,7 @@ loop:
   if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
       // Pointer to non-moving heap. Non-moving heap is collected using
       // mark-sweep so this object should be marked and then retained in sweep.
-      if (bd->flags & BF_NONMOVING) {
+      if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
           // NOTE: large objects in nonmoving heap are also marked with
           // BF_NONMOVING. Those are moved to scavenged_large_objects list in
           // mark phase.
@@ -988,7 +988,7 @@ evacuate_BLACKHOLE(StgClosure **p)
     // blackholes can't be in a compact
     ASSERT((bd->flags & BF_COMPACT) == 0);
 
-    if (bd->flags & BF_NONMOVING) {
+    if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
         if (major_gc && !deadlock_detect_gc)
             markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
         return;
@@ -1144,7 +1144,7 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if ((bd->flags & BF_EVACUATED) || (bd->flags & BF_NONMOVING)) {
+        if (bd->flags & (BF_EVACUATED | BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
