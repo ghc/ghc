@@ -207,6 +207,14 @@ GarbageCollect (uint32_t collect_gen,
   gc_thread *saved_gct;
 #endif
   uint32_t g, n;
+  // the time we should report our heap census as occurring at, if necessary.
+  Time mut_time = 0;
+
+  if (do_heap_census) {
+      RTSStats stats;
+      getRTSStats(&stats);
+      mut_time = stats.mutator_cpu_ns;
+  }
 
   // necessary if we stole a callee-saves register for gct:
 #if defined(THREADED_RTS)
@@ -813,7 +821,7 @@ GarbageCollect (uint32_t collect_gen,
   if (do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
       RELEASE_SM_LOCK;
-      heapCensus(gct->gc_start_cpu);
+      heapCensus(mut_time);
       ACQUIRE_SM_LOCK;
   }
 
