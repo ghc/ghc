@@ -18,13 +18,14 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
-  - lint       # Source linting
-  - build      # A quick smoke-test to weed out broken commits
-  - full-build # Build all the things
-  - cleanup    # See Note [Cleanup after the shell executor]
-  - packaging  # Source distribution, etc.
-  - testing    # head.hackage correctness and compiler performance testing
-  - deploy     # push documentation
+  - lint        # Source linting
+  - quick-build # A very quick smoke-test to weed out broken commits
+  - build       # A quick smoke-test to weed out broken commits
+  - full-build  # Build all the things
+  - cleanup     # See Note [Cleanup after the shell executor]
+  - packaging   # Source distribution, etc.
+  - testing     # head.hackage correctness and compiler performance testing
+  - deploy      # push documentation
 
 # N.B.Don't run on wip/ branches, instead on run on merge requests.
 .only-default: &only-default
@@ -229,7 +230,7 @@ validate-x86_64-linux-deb9-hadrian:
 
 hadrian-ghc-in-ghci:
   <<: *only-default
-  stage: build
+  stage: quick-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
@@ -237,6 +238,8 @@ hadrian-ghc-in-ghci:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
+  variables:
+    GHC_FLAGS: -Werror
   tags:
     - x86_64-linux
   script:
