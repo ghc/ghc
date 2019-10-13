@@ -299,8 +299,9 @@ defFullHelpText =
   "   :complete <dom> [<rng>] <s> list completions for partial input string\n" ++
   "   :ctags[!] [<file>]          create tags file <file> for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
-  "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
+  "   :def[!] <cmd> <expr>        define command :<cmd> (later defined command has\n" ++
   "                               precedence, ::<cmd> is always a builtin command)\n" ++
+  "                               (!: redefine an existing command name)\n" ++
   "   :doc <name>                 display docs for the given name (experimental)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
@@ -326,6 +327,7 @@ defFullHelpText =
   "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
   "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+  "   ::<cmd>                     run the builtin command\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
   " -- Commands for debugging:\n" ++
