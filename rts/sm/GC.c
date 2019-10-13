@@ -193,7 +193,7 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
 void
 GarbageCollect (uint32_t collect_gen,
-                bool do_heap_census,
+                const bool do_heap_census,
                 uint32_t gc_type USED_IF_THREADS,
                 Capability *cap,
                 bool idle_cap[])
