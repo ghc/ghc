@@ -30,7 +30,13 @@ toolArgs = do
 
 compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
+    ways <- getLibraryWays
+    let hasVanilla = elem vanilla ways
+        hasDynamic = elem dynamic ways
     mconcat [ arg "-Wall"
+            , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
+              platformSupportsSharedLibs ? way vanilla ?
+              arg "-dynamic-too"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs
