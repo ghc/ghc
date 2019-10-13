@@ -152,21 +152,26 @@ bindistRules = do
                    , "runghc"]
 
 
-    phony "binary-dist" $ do
+		let buildBinDist :: Compressor -> Action ()
+		    buildBinDist compressor = do
+						need ["binary-dist-dir"]
 
-        need ["binary-dist-dir"]
+						version        <- setting ProjectVersion
+						targetPlatform <- setting TargetPlatformFull
 
-        version        <- setting ProjectVersion
-        targetPlatform <- setting TargetPlatformFull
+						let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
 
-        let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+						-- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
+						tarPath <- builderPath (Tar Create)
+						cmd [Cwd $ root -/- "bindist"] tarPath
+								[ "-c", compressorTarFlag compressor, "-f"
+								, ghcVersionPretty <.> "tar" <.> compressorExtension compressor
+								, ghcVersionPretty ]
 
-        -- Finally, we create the archive <root>/bindist/ghc-X.Y.Z-platform.tar.xz
-        tarPath <- builderPath (Tar Create)
-        cmd [Cwd $ root -/- "bindist"] tarPath
-            [ "-c", "--xz", "-f"
-            , ghcVersionPretty <.> "tar.xz"
-            , ghcVersionPretty ]
+    phony "binary-dist" $ buildBinDist Xz
+    phony "binary-dist-gzip" $ buildBinDist Gzip
+    phony "binary-dist-bzip2" $ buildBinDist Bzip2
+    phony "binary-dist-xz" $ buildBinDist Xz
 
     -- Prepare binary distribution configure script
     -- (generated under <ghc root>/distrib/configure by 'autoreconf')
@@ -200,6 +205,19 @@ bindistRules = do
   where
     fixup f | f `elem` ["INSTALL", "README"] = "distrib" -/- f
             | otherwise                      = f
+
+data Compressor = Gzip | Bzip2 | Xz
+								deriving (Eq, Ord, Show)
+
+-- | Flag to pass to tar to use the given 'Compressor'.
+compressorTarFlag Gzip  = "--gzip"
+compressorTarFlag Xz    = "--xz"
+compressorTarFlag Bzip2 = "--bzip"
+
+-- | File extension to use for archives compressed with the given 'Compressor'.
+compressorExtension Gzip  = "gz"
+compressorExtension Xz    = "xz"
+compressorExtension Bzip2 = "bz2"
 
 -- | A list of files that allow us to support a simple
 -- @./configure [...] && make install@ workflow.
