@@ -114,6 +114,28 @@ Language
     class C a
     newtype T a = MkT a deriving C
 
+- GHC now performs more validity checks on inferred type signatures. One
+  consequence of this change is that some programs that used to be accepted
+  will no longer compile without enabling the required language extensions.
+  For example, in these two modules: ::
+
+    {-# LANGUAGE RankNTypes #-}
+    module A where
+
+      foo :: (forall a. a -> a) -> b -> b
+      foo f x = f x
+
+    module B where
+
+      import A
+
+      bar = foo
+
+  Notice that ``A`` enables :ghc-flag:`RankNTypes`, but ``B`` does not.
+  Previous versions of GHC would allow ``bar`` to typecheck, even though its
+  inferred type is higher-rank. GHC 8.10 will now reject this, as one must now
+  enable :ghc-flag:`RankNTypes` in ``B`` to accept the inferred type signature.
+
 Compiler
 ~~~~~~~~
 
@@ -131,11 +153,11 @@ Compiler
   process, as long as there are no native dependencies that rely on
   global state.
 
-- When loading modules that use :extension:`UnboxedTuples` into GHCi,
-  it will now automatically enable :ghc-flag:`-fobject-code` for
-  these modules and all modules they depend on. Before this change,
-  attempting to load these modules into the interpreter would just
-  fail, and the only convenient workaround was to enable
+- When loading modules that use :extension:`UnboxedTuples` or
+  :extension:`UnboxedSums` into GHCi, it will now automatically enable
+  :ghc-flag:`-fobject-code` for these modules and all modules they depend on.
+  Before this change, attempting to load these modules into the interpreter
+  would just fail, and the only convenient workaround was to enable
   :ghc-flag:`-fobject-code` for all modules. See the
   :ref:`GHCi FAQ <ghci-faq>` for further details.
 
@@ -174,6 +196,38 @@ Template Haskell
 - Explicit boxed 1-tuples from `HsSyn` are now treated as actual 1-tuples,
   without flattening. In most of the cases these will be obtained using
   Template Haskell since it is uncommon to deal with 1-tuples in the source.
+
+- GHC's constraint solver now solves constraints in each top-level group
+  sooner. This has practical consequences for Template Haskell, as TH splices
+  necessarily separate top-level groups. For example, the following program
+  would compile in previous versions of GHC, but not in GHC 8.10: ::
+
+    data T = MkT
+
+    tStr :: String
+    tStr = show MkT
+
+    $(return [])
+
+    instance Show T where
+      show MkT = "MkT"
+
+  This is because each top-level group's constraints are solved before moving
+  on to the next, and since the top-level group for ``tStr`` appears before the
+  top-level group that defines a ``Show T`` instance, GHC 8.10 will throw an
+  error about a missing ``Show T`` instance in the expression ``show MkT``. The
+  issue can be fixed by rearranging the order of declarations. For instance,
+  the following will compile: ::
+
+    data T = MkT
+
+    instance Show T where
+      show MkT = "MkT"
+
+    $(return [])
+
+    tStr :: String
+    tStr = show MkT
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
