@@ -2994,6 +2994,12 @@ commonly used commands.
 
     The :ghci-cmd:`:uses` command requires :ghci-cmd:`:set +c` to be set.
 
+.. ghci-cmd:: :: ⟨builtin-command⟩
+
+    Executes the GHCi built-in command (e.g. ``::type 3``). That is,
+    look up on the list of builtin commands, excluding defined macros.
+    See also: :ghci-cmd:`:def`.
+
 .. ghci-cmd:: :! ⟨command⟩
 
     .. index::
@@ -3296,6 +3302,9 @@ Here are some examples:
 3. You have a macro ``:time`` and a macro ``:type``, and enter ``:t 3``
 
    You get ``:type 3`` with your defined macro.
+
+When giving priority to built-in commands, you can use
+:ghci-cmd:`:: ⟨builtin-command⟩`, like ``::type 3``.
 
 .. _dot-haskeline-file:
 
