@@ -1,4 +1,3 @@
-4607
 test('tcfail001', normal, compile_fail, [''])
 test('tcfail002', normal, compile_fail, [''])
 test('tcfail003', normal, compile_fail, [''])
@@ -513,3 +512,4 @@ test('T16059e', [extra_files(['T16059b.hs'])], multimod_compile_fail,
 test('T16255', normal, compile_fail, [''])
 test('T16204c', normal, compile_fail, [''])
 test('T16517', normal, compile_fail, [''])
+test('T17355', normal, compile_fail, [''])
