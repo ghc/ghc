@@ -91,7 +91,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
             <- tcSkolemiseET (FunSigCtxt fun_name True) exp_ty $ \ exp_rho ->
                   -- Note [Polymorphic expected type for tcMatchesFun]
                do { (matches', wrap_fun)
-                       <- matchExpectedFunTys herald arity exp_rho $
+                       <- matchExpectedFunTys herald (matchesCtOrigin matches) arity exp_rho $
                           \ pat_tys rhs_ty ->
                           tcMatches match_ctxt pat_tys rhs_ty matches
                   ; return (wrap_fun, matches') }
@@ -132,7 +132,7 @@ tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> ExpRhoType   -- deeply skolemised
               -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
 tcMatchLambda herald match_ctxt match res_ty
-  = matchExpectedFunTys herald n_pats res_ty $ \ pat_tys rhs_ty ->
+  = matchExpectedFunTys herald (matchesCtOrigin match) n_pats res_ty $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case

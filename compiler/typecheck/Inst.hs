@@ -10,8 +10,8 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE FlexibleContexts #-}
 
 module Inst (
-       deeplySkolemise,
-       topInstantiate, topInstantiateInferred, deeplyInstantiate,
+       topSkolemise, -- deeplySkolemise,
+       topInstantiate, topInstantiateInferred, -- deeplyInstantiate,
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
@@ -173,6 +173,31 @@ deeplySkolemise ty
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
+
+topSkolemise :: TcSigmaType
+             -> TcM ( HsWrapper
+                    , [(Name,TyVar)]     -- All skolemised variables
+                    , [EvVar]            -- All "given"s
+                    , TcRhoType )
+
+topSkolemise ty
+  | not (null tvs && null theta)
+  = do { -- ids1          <- newSysLocalId (fsLit "dk") rho 
+         (subst, tvs1) <- tcInstSkolTyVarsX init_subst tvs
+       ; ev_vars1      <- newEvVars (substTheta subst theta)
+       ; let tv_prs1 = map tyVarName tvs `zip` tvs1
+       ; return ( -- mkWpLams [ids1]
+                  mkWpTyLams tvs1
+                  <.> mkWpLams ev_vars1
+                  -- <.> mkWpEvVarApps [ids1]
+                , tv_prs1
+                , ev_vars1
+                , substTy subst rho ) }
+  | otherwise
+  = return (idHsWrapper, [], [], ty)
+  where
+    (tvs, theta, rho) = tcSplitSigmaTy ty
+    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
 -- | Instantiate all outer type variables
 -- and any context. Never looks through arrows.

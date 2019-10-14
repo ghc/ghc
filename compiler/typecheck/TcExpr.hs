@@ -1834,7 +1834,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
-               <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
+               <- matchExpectedFunTys herald orig 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
                   do { arg_tc_ty <- expTypeToType arg_ty
                      ; res_tc_ty <- expTypeToType res_ty
@@ -1910,7 +1910,7 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
       = do { result <- thing_inside [res_ty]
            ; return (result, idHsWrapper) }
     tc_syn_arg res_ty SynRho thing_inside
-      = do { (inst_wrap, rho_ty) <- deeplyInstantiate orig res_ty
+      = do { (inst_wrap, rho_ty) <- topInstantiate orig res_ty
                -- inst_wrap :: res_ty "->" rho_ty
            ; result <- thing_inside [rho_ty]
            ; return (result, inst_wrap) }

@@ -140,6 +140,7 @@ passed in.
 -- Use this one when you have an "expected" type.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
+                    -> CtOrigin
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
                     -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
@@ -148,7 +149,7 @@ matchExpectedFunTys :: forall a.
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald arity orig_ty thing_inside
+matchExpectedFunTys herald ct_orig arity orig_ty thing_inside
   = case orig_ty of
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
@@ -156,6 +157,14 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys 0 ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
+
+    go acc_arg_tys n ty
+      | not (null tvs && null theta)
+      = do { (wrap1, rho) <- topInstantiate ct_orig ty
+           ; (result, wrap_res) <- go acc_arg_tys n rho
+           ; return (result, wrap_res <.> wrap1) }
+      where
+        (tvs, theta, _) = tcSplitSigmaTy ty
 
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
@@ -765,7 +774,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
        (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = 
         do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False exp_arg act_arg
-           ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
+           ; res_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False act_res exp_res
+           -- ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
                -- GenSigCtxt: See Note [Setting the argument context]
                -- arg_wrap :: exp_arg ~> act_arg
@@ -795,7 +805,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
          --  a -> forall b. b -> b     <=   alpha beta gamma
          -- where we end up with alpha := (->)
 
-    inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
+    inst_and_unify = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
 
                            -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
@@ -978,7 +988,7 @@ fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
 -- See Note [Deep instantiation of InferResult]
 fillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
   | instantiate_me
-  = do { (wrap, rho) <- deeplyInstantiate orig ty
+  = do { (wrap, rho) <- topInstantiate orig ty
        ; co <- fill_infer_result rho inf_res
        ; return (mkWpCastN co <.> wrap) }
 
@@ -1216,7 +1226,7 @@ tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
+        ; (wrap, tv_prs, given, rho') <- topSkolemise expected_ty
 
         ; lvl <- getTcLevel
         ; when debugIsOn $
