@@ -550,6 +550,10 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let platform = targetPlatform dflags
 
+        let proc_name = case cmm of
+                (CmmProc _ entry_label _ _) -> ppr entry_label
+                _                           -> text "DataChunk"
+
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
@@ -579,12 +583,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_native "Native code"
                 (vcat $ map (pprNatCmmDecl ncgImpl) native)
 
-        dumpIfSet_dyn dflags
-                Opt_D_dump_cfg_weights "CFG Weights"
-                (pprEdgeWeights nativeCfgWeights)
+        maybeDumpCfg dflags (Just nativeCfgWeights) "CFG Weights - Native" proc_name
 
         -- tag instructions with register liveness information
-        -- also drops dead code
+        -- also drops dead code. We don't keep the cfg in sync on
+        -- some backends, so don't use it there.
         let livenessCfg = if (backendMaintainsCfg dflags)
                                 then Just nativeCfgWeights
                                 else Nothing
@@ -697,12 +700,13 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
             cfgRegAllocUpdates = (concatMap Linear.ra_fixupList raStats)
 
         let cfgWithFixupBlks =
-                addNodesBetween nativeCfgWeights cfgRegAllocUpdates
+                pure addNodesBetween <*> livenessCfg <*> pure cfgRegAllocUpdates
 
         -- Insert stack update blocks
-        let postRegCFG =
-                foldl' (\m (from,to) -> addImmediateSuccessor from to m )
-                       cfgWithFixupBlks stack_updt_blks
+        let postRegCFG :: Maybe CFG
+            postRegCFG =
+                pure (foldl' (\m (from,to) -> addImmediateSuccessor from to m )) <*>
+                        cfgWithFixupBlks <*> pure stack_updt_blks
 
         ---- x86fp_kludge.  This pass inserts ffree instructions to clear
         ---- the FPU stack on x86.  The x86 ABI requires that the FPU stack
@@ -729,11 +733,9 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 shortcutBranches dflags ncgImpl tabled postRegCFG
 
         let optimizedCFG =
-                optimizeCFG (cfgWeightInfo dflags) cmm postShortCFG
+                optimizeCFG (cfgWeightInfo dflags) cmm <$> postShortCFG
 
-        dumpIfSet_dyn dflags
-                Opt_D_dump_cfg_weights "CFG Final Weights"
-                ( pprEdgeWeights optimizedCFG )
+        maybeDumpCfg dflags optimizedCFG "CFG Weights - Final" proc_name
 
         --TODO: Partially check validity of the cfg.
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks
@@ -743,8 +745,8 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 (gopt Opt_DoAsmLinting dflags || debugIsOn )) $ do
                 let blocks = concatMap getBlks shorted
                 let labels = setFromList $ fmap blockId blocks :: LabelSet
-                return $! seq (sanityCheckCfg optimizedCFG labels $
-                                text "cfg not in lockstep") ()
+                return $! seq (pure sanityCheckCfg <*> optimizedCFG <*> pure labels <*>
+                                        pure (text "cfg not in lockstep")) ()
 
         ---- sequence blocks
         let sequenced :: [NatCmmDecl statics instr]
@@ -761,6 +763,8 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "invertCondBranches" #-}
                 map invert sequenced
               where
+                invertConds :: LabelMap CmmStatics -> [NatBasicBlock instr]
+                            -> [NatBasicBlock instr]
                 invertConds = (invertCondBranches ncgImpl) optimizedCFG
                 invert top@CmmData {} = top
                 invert (CmmProc info lbl live (ListGraph blocks)) =
@@ -792,6 +796,15 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
                 , unwinds )
+
+maybeDumpCfg :: DynFlags -> Maybe CFG -> String -> SDoc -> IO ()
+maybeDumpCfg _dflags Nothing _ _ = return ()
+maybeDumpCfg dflags (Just cfg) msg proc_name
+        | null cfg = return ()
+        | otherwise
+        = dumpIfSet_dyn
+                dflags Opt_D_dump_cfg_weights msg
+                (proc_name <> char ':' $$ pprEdgeWeights cfg)
 
 -- | Make sure all blocks we want the layout algorithm to place have been placed.
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
@@ -917,13 +930,13 @@ shortcutBranches
         :: forall statics instr jumpDest. (Outputable jumpDest) => DynFlags
         -> NcgImpl statics instr jumpDest
         -> [NatCmmDecl statics instr]
-        -> CFG
-        -> ([NatCmmDecl statics instr],CFG)
+        -> Maybe CFG
+        -> ([NatCmmDecl statics instr],Maybe CFG)
 
 shortcutBranches dflags ncgImpl tops weights
   | gopt Opt_AsmShortcutting dflags
   = ( map (apply_mapping ncgImpl mapping) tops'
-    , shortcutWeightMap weights mappingBid )
+    , shortcutWeightMap mappingBid <$!> weights )
   | otherwise
   = (tops, weights)
   where

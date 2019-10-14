@@ -61,8 +61,6 @@ import qualified DynFlags as D
 
 import Data.List
 
--- import qualified Data.IntMap.Strict as M --TODO: LabelMap
-
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
 
@@ -76,6 +74,13 @@ instance Outputable EdgeWeight where
 type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
 
 -- | A control flow graph where edges have been annotated with a weight.
+-- Implemented as IntMap (IntMap <edgeData>)
+-- We must uphold the invariant that for each edge A -> B we must have:
+-- A entry B in the outer map.
+-- A entry B in the map we get when looking up A.
+-- Maintaining this invariant is useful as any failed lookup now indicates
+-- an actual error in code which might go unnoticed for a while
+-- otherwise.
 type CFG = EdgeInfoMap EdgeInfo
 
 data CfgEdge
@@ -144,11 +149,20 @@ adjustEdgeWeight cfg f from to
   = addEdge from to (info { edgeWeight = f weight}) cfg
   | otherwise = cfg
 
+
 getCfgNodes :: CFG -> LabelSet
 getCfgNodes m = mapFoldMapWithKey (\k v -> setFromList (k:mapKeys v)) m
 
+-- | Is this block part of this graph?
 hasNode :: CFG -> BlockId -> Bool
-hasNode m node = mapMember node m || any (mapMember node) m
+hasNode m node =
+  -- Check the invariant that each node must exist in the first map or not at all.
+  ASSERT( found || not (any (mapMember node) m))
+  found
+    where
+      found = mapMember node m
+
+
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
 --   In a case of a missmatch we panic and show the difference.
@@ -160,7 +174,7 @@ sanityCheckCfg m blockSet msg
         pprPanic "Block list and cfg nodes don't match" (
             text "difference:" <+> ppr diff $$
             text "blocks:" <+> ppr blockSet $$
-            text "cfg:" <+> ppr m $$
+            text "cfg:" <+> pprEdgeWeights m $$
             msg )
             False
     where
@@ -224,8 +238,8 @@ This function (shortcutWeightMap) takes the same mapping and
 applies the mapping to the CFG in the way layed out above.
 
 -}
-shortcutWeightMap :: CFG -> LabelMap (Maybe BlockId) -> CFG
-shortcutWeightMap cfg cuts =
+shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
+shortcutWeightMap cuts cfg =
   foldl' applyMapping cfg $ mapToList cuts
     where
 -- takes the tuple (B,C) from the notation in [Updating the CFG during shortcutting]
@@ -259,7 +273,7 @@ shortcutWeightMap cfg cuts =
 --             \                  \
 --              -> C    =>         -> C
 --
-addImmediateSuccessor :: BlockId -> BlockId -> CFG -> CFG
+addImmediateSuccessor :: HasDebugCallStack => BlockId -> BlockId -> CFG -> CFG
 addImmediateSuccessor node follower cfg
     = updateEdges . addWeightEdge node follower uncondWeight $ cfg
     where
@@ -275,10 +289,16 @@ addImmediateSuccessor node follower cfg
 -- | Adds a new edge, overwrites existing edges if present
 addEdge :: BlockId -> BlockId -> EdgeInfo -> CFG -> CFG
 addEdge from to info cfg =
-    mapAlter addDest from cfg
+    mapAlter addFromToEdge from $
+    mapAlter addDestNode to cfg
     where
-        addDest Nothing = Just $ mapSingleton to info
-        addDest (Just wm) = Just $ mapInsert to info wm
+        -- Simply insert the edge into the edge list.
+        addFromToEdge Nothing = Just $ mapSingleton to info
+        addFromToEdge (Just wm) = Just $ mapInsert to info wm
+        -- We must add the destination node explicitly as well
+        addDestNode Nothing = Just $ mapEmpty
+        addDestNode n@(Just _) = n
+
 
 -- | Adds a edge with the given weight to the cfg
 --   If there already existed an edge it is overwritten.
@@ -304,8 +324,11 @@ getSuccEdgesSorted m bid =
         sortedEdges
 
 -- | Get successors of a given node with edge weights.
-getSuccessorEdges :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
-getSuccessorEdges m bid = maybe [] mapToList $ mapLookup bid m
+getSuccessorEdges :: HasDebugCallStack => CFG -> BlockId -> [(BlockId,EdgeInfo)]
+getSuccessorEdges m bid = maybe lookupError mapToList (mapLookup bid m)
+  where
+    lookupError = pprPanic "getSuccessorEdges: Block does not exist" $
+                    ppr bid $$ text "CFG:" <+> pprEdgeWeights m
 
 getEdgeInfo :: BlockId -> BlockId -> CFG -> Maybe EdgeInfo
 getEdgeInfo from to m
@@ -316,12 +339,13 @@ getEdgeInfo from to m
     = Nothing
 
 reverseEdges :: CFG -> CFG
-reverseEdges cfg = foldr add mapEmpty flatElems
+reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
   where
-    elems = mapToList $ fmap mapToList cfg :: [(BlockId,[(BlockId,EdgeInfo)])]
-    flatElems =
-        concatMap (\(from,ws) -> map (\(to,info) -> (to,from,info)) ws ) elems
-    add (to,from,info) m = addEdge to from info m
+    -- We preserve nodes without outgoing edges!
+    addNode :: CFG -> BlockId -> CFG
+    addNode cfg b = mapInsertWith mapUnion b mapEmpty cfg
+    go :: CFG -> BlockId -> (LabelMap EdgeInfo) -> CFG
+    go cfg from toMap = mapFoldlWithKey (\cfg to info -> addEdge to from info cfg) cfg toMap  :: CFG
 
 -- | Returns a unordered list of all edges with info
 infoEdgeList :: CFG -> [CfgEdge]
@@ -347,11 +371,14 @@ edgeList m =
         mapFoldMapWithKey (\from toMap -> fmap (from,) (mapKeys toMap)) m
 
 -- | Get successors of a given node without edge weights.
-getSuccessors :: CFG -> BlockId -> [BlockId]
+getSuccessors :: HasDebugCallStack => CFG -> BlockId -> [BlockId]
 getSuccessors m bid
     | Just wm <- mapLookup bid m
     = mapKeys wm
-    | otherwise = []
+    | otherwise = lookupError
+    where
+      lookupError = pprPanic "getSuccessors: Block does not exist" $
+                    ppr bid <+> pprEdgeWeights m
 
 pprEdgeWeights :: CFG -> SDoc
 pprEdgeWeights m =
@@ -375,6 +402,7 @@ pprEdgeWeights m =
     text "}\n"
 
 {-# INLINE updateEdgeWeight #-} --Allows eliminating the tuple when possible
+-- | Invariant: The edge **must** exist already in the graph.
 updateEdgeWeight :: (EdgeWeight -> EdgeWeight) -> Edge -> CFG -> CFG
 updateEdgeWeight f (from, to) cfg
     | Just oldInfo <- getEdgeInfo from to cfg
@@ -422,7 +450,8 @@ addNodesBetween m updates =
         | otherwise
         = pprPanic "Can't find weight for edge that should have one" (
             text "triple" <+> ppr (from,between,old) $$
-            text "updates" <+> ppr updates )
+            text "updates" <+> ppr updates $$
+            text "cfg:" <+> pprEdgeWeights m )
       updateWeight :: CFG -> (BlockId,BlockId,BlockId,EdgeInfo) -> CFG
       updateWeight m (from,between,old,edgeInfo)
         = addEdge from between edgeInfo .
@@ -550,7 +579,7 @@ getCfg weights graph =
     blocks = revPostorder graph :: [CmmBlock]
 
 --Find back edges by BFS
-findBackEdges :: BlockId -> CFG -> Edges
+findBackEdges :: HasDebugCallStack => BlockId -> CFG -> Edges
 findBackEdges root cfg =
     --pprTraceIt "Backedges:" $
     map fst .
@@ -562,7 +591,7 @@ findBackEdges root cfg =
       classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
 
 
-optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
+optimizeCFG :: HasDebugCallStack => D.CfgWeights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ (CmmData {}) cfg = cfg
 optimizeCFG weights (CmmProc info _lab _live graph) cfg =
     favourFewerPreds  .
@@ -641,16 +670,17 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
 -- | Determine loop membership of blocks based on SCC analysis
 --   Ideally we would replace this with a variant giving us loop
 --   levels instead but the SCC code will do for now.
-loopMembers :: CFG -> LabelMap Bool
+loopMembers :: HasDebugCallStack => CFG -> LabelMap Bool
 loopMembers cfg =
     foldl' (flip setLevel) mapEmpty sccs
   where
     mkNode :: BlockId -> Node BlockId BlockId
     mkNode bid = DigraphNode bid bid (getSuccessors cfg bid)
-    nodes = map mkNode (setElems $ getCfgNodes cfg)
+    nodes = map mkNode $ setElems (getCfgNodes cfg)
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes
 
     setLevel :: SCC BlockId -> LabelMap Bool -> LabelMap Bool
     setLevel (AcyclicSCC bid) m = mapInsert bid False m
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
+

@@ -639,29 +639,31 @@ dropJumps info ((BasicBlock lbl ins):todo)
 
 sequenceTop
     :: (Instruction instr, Outputable instr)
-    => DynFlags --Use new layout code
-    -> NcgImpl statics instr jumpDest -> CFG
-    -> NatCmmDecl statics instr -> NatCmmDecl statics instr
+    => DynFlags -- Determine which layout algo to use
+    -> NcgImpl statics instr jumpDest
+    -> Maybe CFG -- ^ CFG if we have one.
+    -> NatCmmDecl statics instr -- ^ Function to serialize
+    -> NatCmmDecl statics instr
 
 sequenceTop _     _       _           top@(CmmData _ _) = top
 sequenceTop dflags ncgImpl edgeWeights
             (CmmProc info lbl live (ListGraph blocks))
   | (gopt Opt_CfgBlocklayout dflags) && backendMaintainsCfg dflags
   --Use chain based algorithm
+  , Just cfg <- edgeWeights
   = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                            sequenceChain info edgeWeights blocks )
+                            {-# SCC layoutBlocks #-}
+                            sequenceChain info cfg blocks )
   | otherwise
   --Use old algorithm
-  = CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
-                            sequenceBlocks cfg info blocks)
+  = let cfg = if dontUseCfg then Nothing else edgeWeights
+    in  CmmProc info lbl live ( ListGraph $ ncgMakeFarBranches ncgImpl info $
+                                {-# SCC layoutBlocks #-}
+                                sequenceBlocks cfg info blocks)
   where
-    cfg
-      | (gopt Opt_WeightlessBlocklayout dflags) ||
-        (not $ backendMaintainsCfg dflags)
-      -- Don't make use of cfg in the old algorithm
-      = Nothing
-      -- Use cfg in the old algorithm
-      | otherwise = Just edgeWeights
+    dontUseCfg = gopt Opt_WeightlessBlocklayout dflags ||
+                 (not $ backendMaintainsCfg dflags)
+
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of
