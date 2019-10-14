@@ -535,6 +535,10 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let platform = targetPlatform dflags
 
+        let proc_name = case cmm of
+                (CmmProc _ entry_label _ _) -> ppr entry_label
+                _                           -> text "DataChunk"
+
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
@@ -563,12 +567,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_native "Native code"
                 (vcat $ map (pprNatCmmDecl ncgImpl) native)
 
-        when (not $ null nativeCfgWeights) $ dumpIfSet_dyn dflags
-                Opt_D_dump_cfg_weights "CFG Weights"
-                (pprEdgeWeights nativeCfgWeights)
+        maybeDumpCfg dflags (Just nativeCfgWeights) "CFG Weights - Native" proc_name
 
         -- tag instructions with register liveness information
-        -- also drops dead code
+        -- also drops dead code. We don't keep the cfg in sync on
+        -- some backends, so don't use it there.
         let livenessCfg = if (backendMaintainsCfg dflags)
                                 then Just nativeCfgWeights
                                 else Nothing
@@ -706,10 +709,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
             optimizedCFG =
                 optimizeCFG (cfgWeightInfo dflags) cmm <$!> postShortCFG
 
-        maybe (return ()) (\cfg->
-                dumpIfSet_dyn dflags Opt_D_dump_cfg_weights "CFG Final Weights"
-                ( pprEdgeWeights cfg ))
-                optimizedCFG
+        maybeDumpCfg dflags optimizedCFG "CFG Weights - Final" proc_name
 
         --TODO: Partially check validity of the cfg.
         let getBlks (CmmProc _info _lbl _live (ListGraph blocks)) = blocks
@@ -771,6 +771,15 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 , ppr_raStatsColor
                 , ppr_raStatsLinear
                 , unwinds )
+
+maybeDumpCfg :: DynFlags -> Maybe CFG -> String -> SDoc -> IO ()
+maybeDumpCfg _dflags Nothing _ _ = return ()
+maybeDumpCfg dflags (Just cfg) msg proc_name
+        | null cfg = return ()
+        | otherwise
+        = dumpIfSet_dyn
+                dflags Opt_D_dump_cfg_weights msg
+                (proc_name <> char ':' $$ pprEdgeWeights cfg)
 
 -- | Make sure all blocks we want the layout algorithm to place have been placed.
 checkLayout :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]

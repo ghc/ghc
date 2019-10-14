@@ -292,7 +292,9 @@ data Instr
                       [Maybe JumpDest] -- Targets of the jump table
                       Section   -- Data section jump table should be put in
                       CLabel    -- Label of jump table
-        | CALL        (Either Imm Reg) [Reg]
+        -- | X86 call instruction
+        | CALL        (Either Imm Reg) -- ^ Jump target
+                      [Reg]            -- ^ Arguments (required for register allocation)
 
         -- Other things.
         | CLTD Format            -- sign extend %eax into %edx:%eax
