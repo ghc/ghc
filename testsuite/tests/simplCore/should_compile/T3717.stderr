@@ -6,7 +6,6 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3717.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T3717.$trModule4 = "main"#
@@ -14,7 +13,6 @@ T3717.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3717.$trModule3 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -23,7 +21,6 @@ T3717.$trModule3 = GHC.Types.TrNameS T3717.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3717.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T3717.$trModule2 = "T3717"#
@@ -31,7 +28,6 @@ T3717.$trModule2 = "T3717"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3717.$trModule1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -40,7 +36,6 @@ T3717.$trModule1 = GHC.Types.TrNameS T3717.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T3717.$trModule :: GHC.Types.Module
 [GblId,
- Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
@@ -51,7 +46,7 @@ Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3717.$wfoo [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<S,1*U>, Unf=OtherCon []]
 T3717.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds {
@@ -64,7 +59,6 @@ end Rec }
 foo [InlPrag=NOUSERINLINE[2]] :: Int -> Int
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
  Str=<S(S),1*U(1*U)>m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
