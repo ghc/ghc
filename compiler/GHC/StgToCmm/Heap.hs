@@ -187,30 +187,34 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
     -- same place.  So we use isThunkRep rather than closureUpdReqd
     -- here:
 
-    is_caf = isThunkRep (cit_rep info_tbl)
+    smrep = cit_rep info_tbl
+    is_thunk = isThunkRep smrep
+    is_nocaf_con = isStaticNoCafCon smrep
 
     padding
-        | is_caf && null payload = [mkIntCLit dflags 0]
+        | is_thunk && null payload = [mkIntCLit dflags 0]
         | otherwise = []
 
+    -- See Note [STATIC_LINK fields] in Storage.h
     static_link_field
-        | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
-        = [static_link_value]
+        | is_thunk
+        = -- Thunks have STATIC_LINK regardless of whether they have CAF
+          -- references of not, to be able to link them in dyn_caf_list.
+          -- See Note [dyn_caf_list] in Storage.h
+          [mkIntCLit dflags 0]
+        | is_nocaf_con
+        =  -- Constructor with no pointers in the payload
+          []
+        | mayHaveCafRefs caf_refs
+        = -- Object with CAF references
+          [mkIntCLit dflags 0]
         | otherwise
-        = []
+        = -- Object with no CAF references
+          [mkIntCLit dflags 3]
 
     saved_info_field
-        | is_caf     = [mkIntCLit dflags 0]
+        | is_thunk   = [mkIntCLit dflags 0]
         | otherwise  = []
-
-        -- For a static constructor which has NoCafRefs, we set the
-        -- static link field to a non-zero value so the garbage
-        -- collector will ignore it.
-    static_link_value
-        | mayHaveCafRefs caf_refs  = mkIntCLit dflags 0
-        | otherwise                = mkIntCLit dflags 3  -- No CAF refs
-                                      -- See Note [STATIC_LINK fields]
-                                      -- in rts/sm/Storage.h
 
 mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
