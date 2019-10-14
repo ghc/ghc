@@ -160,16 +160,37 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe NameSet -> IO ModIface
+mkFullIface hsc_env partial_iface mb_non_cafs = do
+    let decls
+          | gopt Opt_OmitInterfacePragmas (hsc_dflags hsc_env)
+          = mi_decls partial_iface
+          | otherwise
+          = updateDeclCafInfos (mi_decls partial_iface) mb_non_cafs
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface
+      addFingerprints hsc_env partial_iface{ mi_decls = decls }
 
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" FormatText (pprModIface full_iface)
 
     return full_iface
+
+updateDeclCafInfos :: [IfaceDecl] -> Maybe NameSet -> [IfaceDecl]
+updateDeclCafInfos decls Nothing = decls
+updateDeclCafInfos decls (Just non_cafs) = map update_decl decls
+  where
+    update_decl decl
+      | IfaceId nm ty details id_info <- decl
+      , elemNameSet nm non_cafs
+      = IfaceId nm ty details $
+        case id_info of
+          NoInfo -> HasInfo [HsNoCafRefs]
+          HasInfo infos -> HasInfo (HsNoCafRefs : infos)
+
+      | otherwise
+      = decl
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -221,7 +242,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
-          mkFullIface hsc_env partial_iface
+          mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv

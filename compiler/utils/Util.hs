@@ -78,7 +78,7 @@ module Util (
         transitiveClosure,
 
         -- * Strictness
-        seqList,
+        seqList, strictMap,
 
         -- * Module names
         looksLikeModuleName,
@@ -1006,6 +1006,14 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
+strictMap :: (a -> b) -> [a] -> [b]
+strictMap _ [] = []
+strictMap f (x : xs) =
+  let
+    !x' = f x
+    !xs' = strictMap f xs
+  in
+    x' : xs'
 
 {-
 ************************************************************************

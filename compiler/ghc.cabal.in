@@ -240,6 +240,7 @@ Library
         SrcLoc
         UniqSupply
         Unique
+        UpdateCafInfos
         Var
         VarEnv
         VarSet
@@ -471,6 +472,7 @@ Library
         StgLint
         StgSyn
         StgFVs
+        StgDepAnal
         CallArity
         DmdAnal
         Exitify
