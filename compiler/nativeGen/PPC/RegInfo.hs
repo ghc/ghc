@@ -47,9 +47,9 @@ shortcutJump _ other = other
 
 
 -- Here because it knows about JumpDest
-shortcutStatics :: (BlockId -> Maybe JumpDest) -> CmmStatics -> CmmStatics
-shortcutStatics fn (Statics lbl statics)
-  = Statics lbl $ map (shortcutStatic fn) statics
+shortcutStatics :: (BlockId -> Maybe JumpDest) -> RawCmmStatics -> RawCmmStatics
+shortcutStatics fn (RawCmmStatics lbl statics)
+  = RawCmmStatics lbl $ map (shortcutStatic fn) statics
   -- we need to get the jump tables, so apply the mapping to the entries
   -- of a CmmData too.
 
