@@ -1,4 +1,4 @@
--- Testing completion with option (`!`)
+-- Testing command name resolution with option (`!`)
 
 -- builtin command
 :k! ()
