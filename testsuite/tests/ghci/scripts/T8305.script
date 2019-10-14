@@ -1,6 +1,6 @@
--- Testing the current algorithm of completion
+-- Testing the current algorithm of command name resolution
 
--- The current algorithm of completion is:
+-- The current algorithm of command name resolution is:
 --   1. First, look up an exact match on the name from the defined macros.
 --   2. Look for the exact match on the name in the built-in command list.
 --   3. Do a prefix lookup on the list of built-in commands
