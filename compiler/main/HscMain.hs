@@ -133,6 +133,7 @@ import CostCentre
 import ProfInit
 import TyCon
 import Name
+import NameSet
 import GHC.Cmm
 import GHC.Cmm.Parser         ( parseCmmFile )
 import GHC.Cmm.Info.Build
@@ -173,6 +174,7 @@ import System.IO (fixIO)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
+import Data.Functor
 import Control.DeepSeq (force)
 
 import GHC.Iface.Ext.Ast    ( mkHieFile )
@@ -1405,7 +1407,7 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], NameSet)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1464,11 +1466,11 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, ())
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+            return (output_filename, stub_c_exists, foreign_fps, caf_infos)
 
 
 hscInteractive :: HscEnv
@@ -1514,7 +1516,16 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
-        (_, cmmgroup) <- cmmPipeline hsc_env (emptySRT cmm_mod) cmm
+
+        -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
+        -- them in SRT analysis.
+        --
+        -- Re-ordering here causes breakage when booting with C backend because
+        -- in C we must declare before use, but SRT algorithm is free to
+        -- re-order [A, B] (B refers to A) when A is not CAFFY and return [B, A]
+        cmmgroup <-
+          concatMapM (\cmm -> snd <$> cmmPipeline hsc_env (emptySRT cmm_mod) [cmm]) cmm
+
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (ppr cmmgroup)
@@ -1535,7 +1546,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroupSRTs NameSet)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1565,18 +1576,15 @@ doCodeGen hsc_env this_mod data_tycons
 
         pipeline_stream =
           {-# SCC "cmmPipeline" #-}
-          let run_pipeline = cmmPipeline hsc_env
-          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+          Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
+            <&> (srtMapNonCAFs . moduleSRTMap)
 
         dump2 a = do
           unless (null a) $
             dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (ppr a)
           return a
 
-        ppr_stream2 = Stream.mapM dump2 pipeline_stream
-
-    return ppr_stream2
-
+    return (Stream.mapM dump2 pipeline_stream)
 
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
