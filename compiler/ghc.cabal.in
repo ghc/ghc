@@ -238,6 +238,7 @@ Library
         SrcLoc
         UniqSupply
         Unique
+        UpdateCafInfos
         Var
         VarEnv
         VarSet
@@ -462,6 +463,7 @@ Library
         GHC.Stg.Lint
         GHC.Stg.Syntax
         GHC.Stg.FVs
+        GHC.Stg.DepAnal
         GHC.CoreToStg
         GHC.CoreToStg.Prep
         GHC.Types.RepType

@@ -19,6 +19,7 @@ import GHC.Stg.Syntax
 
 import GHC.Stg.Lint     ( lintStgTopBindings )
 import GHC.Stg.Stats    ( showStgStats )
+import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
@@ -56,9 +57,10 @@ stg2stg dflags this_mod binds
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)
 
-        ; dump_when Opt_D_dump_stg_final "Final STG:" binds'
+        ; let binds_sorted = depSortStgPgm binds'
+        ; dump_when Opt_D_dump_stg_final "Final STG:" binds_sorted
 
-        ; return binds'
+        ; return binds_sorted
    }
 
   where
