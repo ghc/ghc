@@ -705,8 +705,8 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
         reachable :: LabelSet
         reachable
             | Just cfg <- mcfg
-            -- Our CFG only contains reachable nodes by construction.
-            = getCfgNodes cfg
+            -- Our CFG only contains reachable nodes by construction at this point.
+            = setFromList $ getCfgNodes cfg
             | otherwise
             = setFromList $ [ node_key node | node <- reachablesG g1 roots ]
 

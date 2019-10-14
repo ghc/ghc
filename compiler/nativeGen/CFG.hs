@@ -82,7 +82,6 @@ import PprCmm () -- For Outputable instances
 import qualified DynFlags as D
 
 import Data.List
-
 import Data.STRef.Strict
 import Control.Monad.ST
 
@@ -109,6 +108,13 @@ instance Outputable EdgeWeight where
 type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
 
 -- | A control flow graph where edges have been annotated with a weight.
+-- Implemented as IntMap (IntMap <edgeData>)
+-- We must uphold the invariant that for each edge A -> B we must have:
+-- A entry B in the outer map.
+-- A entry B in the map we get when looking up A.
+-- Maintaining this invariant is useful as any failed lookup now indicates
+-- an actual error in code which might go unnoticed for a while
+-- otherwise.
 type CFG = EdgeInfoMap EdgeInfo
 
 data CfgEdge
@@ -199,13 +205,20 @@ setEdgeWeight cfg !weight from to
   | otherwise = cfg
 
 
-
-getCfgNodes :: CFG -> LabelSet
+getCfgNodes :: CFG -> [BlockId]
 getCfgNodes m =
-    mapFoldlWithKey (\s k toMap -> mapFoldlWithKey (\s k _ -> setInsert k s) (setInsert k s) toMap ) setEmpty m
+    mapKeys m
 
+-- | Is this block part of this graph?
 hasNode :: CFG -> BlockId -> Bool
-hasNode m node = mapMember node m || any (mapMember node) m
+hasNode m node =
+  -- Check the invariant that each node must exist in the first map or not at all.
+  ASSERT( found || not (any (mapMember node) m))
+  found
+    where
+      found = mapMember node m
+
+
 
 -- | Check if the nodes in the cfg and the set of blocks are the same.
 --   In a case of a missmatch we panic and show the difference.
@@ -217,11 +230,11 @@ sanityCheckCfg m blockSet msg
         pprPanic "Block list and cfg nodes don't match" (
             text "difference:" <+> ppr diff $$
             text "blocks:" <+> ppr blockSet $$
-            text "cfg:" <+> ppr m $$
+            text "cfg:" <+> pprEdgeWeights m $$
             msg )
             False
     where
-      cfgNodes = getCfgNodes m :: LabelSet
+      cfgNodes = setFromList $ getCfgNodes m :: LabelSet
       diff = (setUnion cfgNodes blockSet) `setDifference` (setIntersection cfgNodes blockSet) :: LabelSet
 
 -- | Filter the CFG with a custom function f.
@@ -332,10 +345,16 @@ addImmediateSuccessor node follower cfg
 -- | Adds a new edge, overwrites existing edges if present
 addEdge :: BlockId -> BlockId -> EdgeInfo -> CFG -> CFG
 addEdge from to info cfg =
-    mapAlter addDest from cfg
+    mapAlter addFromToEdge from $
+    mapAlter addDestNode to cfg
     where
-        addDest Nothing = Just $ mapSingleton to info
-        addDest (Just wm) = Just $ mapInsert to info wm
+        -- Simply insert the edge into the edge list.
+        addFromToEdge Nothing = Just $ mapSingleton to info
+        addFromToEdge (Just wm) = Just $ mapInsert to info wm
+        -- We must add the destination node explicitly
+        addDestNode Nothing = Just $ mapEmpty
+        addDestNode n@(Just _) = n
+
 
 -- | Adds a edge with the given weight to the cfg
 --   If there already existed an edge it is overwritten.
@@ -366,8 +385,11 @@ getSuccEdgesSorted m bid =
         sortedEdges
 
 -- | Get successors of a given node with edge weights.
-getSuccessorEdges :: CFG -> BlockId -> [(BlockId,EdgeInfo)]
-getSuccessorEdges m bid = maybe [] mapToList $ mapLookup bid m
+getSuccessorEdges :: HasDebugCallStack => CFG -> BlockId -> [(BlockId,EdgeInfo)]
+getSuccessorEdges m bid = maybe lookupError mapToList (mapLookup bid m)
+  where
+    lookupError = pprPanic "getSuccessorEdges: Block does not exist" $
+                    ppr bid <+> pprEdgeWeights m
 
 getEdgeInfo :: BlockId -> BlockId -> CFG -> Maybe EdgeInfo
 getEdgeInfo from to m
@@ -389,7 +411,7 @@ getTransitionSource from to cfg = transitionSource $ expectJust "Source info for
 reverseEdges :: CFG -> CFG
 reverseEdges cfg = mapFoldlWithKey (\cfg from toMap -> go (addNode cfg from) from toMap) mapEmpty cfg
   where
-    -- We preserve nodes without outgoing edges!
+    -- We must preserve nodes without outgoing edges!
     addNode :: CFG -> BlockId -> CFG
     addNode cfg b = mapInsertWith mapUnion b mapEmpty cfg
     go :: CFG -> BlockId -> (LabelMap EdgeInfo) -> CFG
@@ -427,11 +449,14 @@ edgeList m =
       = go' froms from tos ((from,to) : acc)
 
 -- | Get successors of a given node without edge weights.
-getSuccessors :: CFG -> BlockId -> [BlockId]
+getSuccessors :: HasDebugCallStack => CFG -> BlockId -> [BlockId]
 getSuccessors m bid
     | Just wm <- mapLookup bid m
     = mapKeys wm
-    | otherwise = []
+    | otherwise = lookupError
+    where
+      lookupError = pprPanic "getSuccessors: Block does not exist" $
+                    ppr bid <+> pprEdgeWeights m
 
 pprEdgeWeights :: CFG -> SDoc
 pprEdgeWeights m =
@@ -455,6 +480,7 @@ pprEdgeWeights m =
     text "}\n"
 
 {-# INLINE updateEdgeWeight #-} --Allows eliminating the tuple when possible
+-- | Invariant: The edge **must** exist already in the graph.
 updateEdgeWeight :: (EdgeWeight -> EdgeWeight) -> Edge -> CFG -> CFG
 updateEdgeWeight f (from, to) cfg
     | Just oldInfo <- getEdgeInfo from to cfg
@@ -503,7 +529,7 @@ addNodesBetween m updates =
         = pprPanic "Can't find weight for edge that should have one" (
             text "triple" <+> ppr (from,between,old) $$
             text "updates" <+> ppr updates $$
-            text "cfg:" <+> ppr m )
+            text "cfg:" <+> pprEdgeWeights m )
       updateWeight :: CFG -> (BlockId,BlockId,BlockId,EdgeInfo) -> CFG
       updateWeight m (from,between,old,edgeInfo)
         = addEdge from between edgeInfo .
@@ -634,7 +660,7 @@ getCfg weights graph =
     blocks = revPostorder graph :: [CmmBlock]
 
 --Find back edges by BFS
-findBackEdges :: BlockId -> CFG -> Edges
+findBackEdges :: HasDebugCallStack => BlockId -> CFG -> Edges
 findBackEdges root cfg =
     --pprTraceIt "Backedges:" $
     map fst .
@@ -714,7 +740,7 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
                     (adjustEdgeWeight cfg  (+mod1) node s1)
               | otherwise
               = cfg
-        in setFoldl update cfg nodes
+        in foldl' update cfg nodes
       where
         fallthroughTarget :: BlockId -> EdgeInfo -> Bool
         fallthroughTarget to (EdgeInfo source _weight)
@@ -726,13 +752,13 @@ optimizeCFG weights (CmmProc info _lab _live graph) cfg =
 
 -- | Determine loop membership of blocks based on SCC analysis
 --   This is faster but only gives yes/no answers.
-loopMembers :: CFG -> LabelMap Bool
+loopMembers :: HasDebugCallStack => CFG -> LabelMap Bool
 loopMembers cfg =
     foldl' (flip setLevel) mapEmpty sccs
   where
     mkNode :: BlockId -> Node BlockId BlockId
     mkNode bid = DigraphNode bid bid (getSuccessors cfg bid)
-    nodes = map mkNode (setElems $ getCfgNodes cfg)
+    nodes = map mkNode (getCfgNodes cfg)
 
     sccs = stronglyConnCompFromEdgedVerticesOrd nodes
 
@@ -741,7 +767,9 @@ loopMembers cfg =
     setLevel (CyclicSCC bids) m = foldl' (\m k -> mapInsert k True m) m bids
 
 loopLevels :: CFG -> BlockId -> LabelMap Int
-loopLevels cfg root = liLevels $ loopInfo cfg root
+loopLevels cfg root = liLevels loopInfos
+    where
+      loopInfos = loopInfo cfg root
 
 data LoopInfo = LoopInfo
   { liBackEdges :: [(Edge)] -- ^ List of back edges
@@ -754,23 +782,39 @@ instance Outputable LoopInfo where
         text "Loops:(backEdge, bodyNodes)" $$
             (vcat $ map ppr loops)
 
+{-  Note [Determining the loop body]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    Starting with the knowledge that:
+    * head dominates the loop
+    * `tail` -> `head` is a backedge
+
+    We can determine all nodes by:
+    * Deleting the loop head from the graph.
+    * Collect all blocks which are reachable from the `tail`.
+
+    We do so by performing bfs from the tail node towards the head.
+ -}
+
 -- | Determine loop membership of blocks based on Dominator analysis.
 --   This is slower but gives loop levels instead of just loop membership.
 --   However it only detects natural loops. Irreducible control flow is not
 --   recognized even if it loops. But that is rare enough that we don't have
 --   to care about that special case.
-loopInfo :: CFG -> BlockId -> LoopInfo
+loopInfo :: HasDebugCallStack => CFG -> BlockId -> LoopInfo
 loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
                               , liLevels = mapFromList loopCounts
                               , liLoops = loopBodies }
   where
     revCfg = reverseEdges cfg
-    graph = fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+
+    graph = -- pprTrace "CFG - loopInfo" (pprEdgeWeights cfg) $
+            fmap (setFromList . mapKeys ) cfg :: LabelMap LabelSet
+
 
     --TODO - This should be a no op: Export constructors? Use unsafeCoerce? ...
     rooted = ( fromBlockId root
               , toIntMap $ fmap toIntSet graph) :: (Int, IntMap IntSet)
-    -- rooted = unsafeCoerce (root, graph)
     tree = fmap toBlockId $ Dom.domTree rooted :: Tree BlockId
 
     -- Map from Nodes to their dominators
@@ -778,8 +822,8 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     domMap = mkDomMap tree
 
     edges = edgeList cfg :: [(BlockId, BlockId)]
-    -- We can't recompute this from the edges, there might be blocks not connected via edges.
-    nodes = getCfgNodes cfg :: LabelSet
+    -- We can't recompute nodes from edges, there might be blocks not connected via edges.
+    nodes = getCfgNodes cfg :: [BlockId]
 
     -- identify back edges
     isBackEdge (from,to)
@@ -788,22 +832,26 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
       = True
       | otherwise = False
 
-    -- determine the loop body for a back edge
+    -- See Note [Determining the loop body]
+    -- Get the loop body associated with a back edge.
     findBody edge@(tail, head)
       = ( edge, setInsert head $ go (setSingleton tail) (setSingleton tail) )
       where
-        -- The reversed cfg makes it easier to look up predecessors
+        -- See Note [Determining the loop body]
         cfg' = delNode head revCfg
+
         go :: LabelSet -> LabelSet -> LabelSet
         go found current
           | setNull current = found
           | otherwise = go  (setUnion newSuccessors found)
                             newSuccessors
           where
+            -- Really predecessors, since we use the reversed cfg.
             newSuccessors = setFilter (\n -> not $ setMember n found) successors :: LabelSet
             successors = setFromList $ concatMap
                                       (getSuccessors cfg')
-                                      (setElems current) :: LabelSet
+                                      -- we filter head as it's no longer part of the cfg.
+                                      (filter (/= head) $ setElems current) :: LabelSet
 
     backEdges = filter isBackEdge edges
     loopBodies = map findBody backEdges :: [(Edge, LabelSet)]
@@ -812,7 +860,7 @@ loopInfo cfg root = LoopInfo  { liBackEdges = backEdges
     loopCounts =
       let bodies = map (first snd) loopBodies -- [(Header, Body)]
           loopCount n = length $ nub . map fst . filter (setMember n . snd) $ bodies
-      in  map (\n -> (n, loopCount n)) $ setElems nodes :: [(BlockId, Int)]
+      in  map (\n -> (n, loopCount n)) $ nodes :: [(BlockId, Int)]
 
     toIntSet :: LabelSet -> IntSet
     toIntSet s = IS.fromList . map fromBlockId . setElems $ s
@@ -845,12 +893,12 @@ instance G.NonLocal (BlockNode) where
   entryLabel (BN (lbl,_))   = lbl
   successors (BN (_,succs)) = succs
 
-revPostorderFrom :: CFG -> BlockId -> [BlockId]
+revPostorderFrom :: HasDebugCallStack => CFG -> BlockId -> [BlockId]
 revPostorderFrom cfg root =
     map fromNode $ G.revPostorderFrom hooplGraph root
   where
     nodes = getCfgNodes cfg
-    hooplGraph = setFoldl (\m n -> mapInsert n (toNode n) m) mapEmpty nodes
+    hooplGraph = foldl' (\m n -> mapInsert n (toNode n) m) mapEmpty nodes
 
     fromNode :: BlockNode C C -> BlockId
     fromNode (BN x) = fst x
@@ -876,14 +924,13 @@ revPostorderFrom cfg root =
 --
 --   We also apply a few prediction heuristics (based on the same paper)
 
+{-# NOINLINE mkGlobalWeights #-}
 {-# SCC mkGlobalWeights #-}
-mkGlobalWeights :: BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
+mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
 mkGlobalWeights root localCfg
   | null localCfg = panic "Error - Empty CFG"
   | otherwise
-  = --pprTrace "revOrder" (ppr revOrder) $
-    -- undefined --propagate (mapSingleton root 1) (revOrder)
-    (blockFreqs', edgeFreqs')
+  = (blockFreqs', edgeFreqs')
   where
     -- Calculate fixpoints
     (blockFreqs, edgeFreqs) = calcFreqs nodeProbs backEdges' bodies' revOrder'
@@ -894,13 +941,13 @@ mkGlobalWeights root localCfg
     fromVertexMap m = mapFromList . map (first fromVertex) $ IM.toList m
 
     revOrder = revPostorderFrom localCfg root :: [BlockId]
-    loopinfo@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
+    loopResults@(LoopInfo backedges _levels bodies) = loopInfo localCfg root
 
     revOrder' = map toVertex revOrder
     backEdges' = map (bimap toVertex toVertex) backedges
     bodies' = map calcBody bodies
 
-    estimatedCfg = staticBranchPrediction root loopinfo localCfg
+    estimatedCfg = staticBranchPrediction root loopResults localCfg
     -- Normalize the weights to probabilities and apply heuristics
     nodeProbs = cfgEdgeProbabilities estimatedCfg toVertex
 
@@ -965,7 +1012,7 @@ type TargetNodeInfo = (BlockId, EdgeInfo)
 staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
 staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $
-    setFoldl update cfg nodes
+    foldl' update cfg nodes
   where
     nodes = getCfgNodes cfg
     backedges = S.fromList $ l_backEdges
@@ -1248,8 +1295,10 @@ calcFreqs graph backEdges loops revPostOrder = runST $ do
 
     return (freqs', graph')
   where
+    -- How can these lookups fail? Consider the CFG [A -> B]
     predecessors :: Int -> IS.IntSet
     predecessors b = fromMaybe IS.empty $ IM.lookup b revGraph
+    successors :: Int -> [Int]
     successors b = fromMaybe (lookupError "succ" b graph)$ IM.keys <$> IM.lookup b graph
     lookupError s b g = pprPanic ("Lookup error " ++ s) $
                             ( text "node" <+> ppr b $$
