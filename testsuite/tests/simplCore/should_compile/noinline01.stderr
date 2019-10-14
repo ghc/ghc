@@ -2,7 +2,7 @@
 ==================== STG: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall p. p -> GHC.Types.Bool
-[GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
+[GblId, Arity=1, Str=<L,A>, Unf=OtherCon []] =
     \r [eta] GHC.Types.True [];
 
 Noinline01.g :: GHC.Types.Bool
@@ -10,23 +10,23 @@ Noinline01.g :: GHC.Types.Bool
     \u [] Noinline01.f GHC.Types.False;
 
 Noinline01.$trModule4 :: GHC.Prim.Addr#
-[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+[GblId, Unf=OtherCon []] =
     "main"#;
 
 Noinline01.$trModule3 :: GHC.Types.TrName
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+[GblId, Str=m1, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
-[GblId, Caf=NoCafRefs, Unf=OtherCon []] =
+[GblId, Unf=OtherCon []] =
     "Noinline01"#;
 
 Noinline01.$trModule1 :: GHC.Types.TrName
-[GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []] =
+[GblId, Str=m1, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
-[GblId, Caf=NoCafRefs, Str=m, Unf=OtherCon []] =
+[GblId, Str=m, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
 
