@@ -240,7 +240,7 @@ emitTickyCounter cloType name args
 
         ; fun_descr_lit <- newStringCLit $ showSDocDebug dflags ppr_for_ticky_name
         ; arg_descr_lit <- newStringCLit $ map (showTypeCategory . idType . fromNonVoid) args
-        ; emitDataLits ctr_lbl
+        ; emitRawDataLits ctr_lbl
         -- Must match layout of includes/rts/Ticky.h's StgEntCounter
         --
         -- krc: note that all the fields are I32 now; some were I16

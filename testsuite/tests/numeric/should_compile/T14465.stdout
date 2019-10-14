@@ -6,7 +6,6 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 ten = 10
@@ -14,7 +13,6 @@ ten = 10
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule4 = "main"#
@@ -22,7 +20,6 @@ M.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule3 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -31,7 +28,6 @@ M.$trModule3 = GHC.Types.TrNameS M.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule2 = "M"#
@@ -39,7 +35,6 @@ M.$trModule2 = "M"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule1 :: GHC.Types.TrName
 [GblId,
- Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
@@ -48,7 +43,6 @@ M.$trModule1 = GHC.Types.TrNameS M.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 M.$trModule :: GHC.Types.Module
 [GblId,
- Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
@@ -57,7 +51,6 @@ M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.minusOne1 :: Natural
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 M.minusOne1 = 1
@@ -80,7 +73,6 @@ minusOne
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 twoTimesTwo :: Natural
 [GblId,
- Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 twoTimesTwo = 4
@@ -89,7 +81,6 @@ twoTimesTwo = 4
 plusOne :: Natural -> Natural
 [GblId,
  Arity=1,
- Caf=NoCafRefs,
  Str=<S,U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

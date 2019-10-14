@@ -3,7 +3,8 @@
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, RankNTypes #-}
+
 module Hooks ( Hooks
              , emptyHooks
              , lookupHook
@@ -107,8 +108,8 @@ data Hooks = Hooks
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
   , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
                                  -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ())
-  , cmmToRawCmmHook        :: Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroup ()
-                                 -> IO (Stream IO RawCmmGroup ()))
+  , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
+                                 -> IO (Stream IO RawCmmGroup a))
   }
 
 getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a

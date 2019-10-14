@@ -174,7 +174,7 @@ data Instr
         -- some static data spat out during code
         -- generation.  Will be extracted before
         -- pretty-printing.
-        | LDATA   Section (Alignment, CmmStatics)
+        | LDATA   Section (Alignment, RawCmmStatics)
 
         -- start a new basic block.  Useful during
         -- codegen, removed later.  Preceding
@@ -1017,9 +1017,9 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
     shortcutJump' _ _ other = other
 
 -- Here because it knows about JumpDest
-shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, CmmStatics) -> (Alignment, CmmStatics)
-shortcutStatics fn (align, Statics lbl statics)
-  = (align, Statics lbl $ map (shortcutStatic fn) statics)
+shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, RawCmmStatics) -> (Alignment, RawCmmStatics)
+shortcutStatics fn (align, RawCmmStatics lbl statics)
+  = (align, RawCmmStatics lbl $ map (shortcutStatic fn) statics)
   -- we need to get the jump tables, so apply the mapping to the entries
   -- of a CmmData too.
 

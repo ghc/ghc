@@ -122,7 +122,7 @@ sse4_2Enabled = do
 
 cmmTopCodeGen
         :: RawCmmDecl
-        -> NatM [NatCmmDecl (Alignment, CmmStatics) Instr]
+        -> NatM [NatCmmDecl (Alignment, RawCmmStatics) Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph) = do
   let blocks = toBlockListEntryFirst graph
@@ -194,7 +194,7 @@ verifyBasicBlock instrs
 basicBlockCodeGen
         :: CmmBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmDecl (Alignment, CmmStatics) Instr])
+                , [NatCmmDecl (Alignment, RawCmmStatics) Instr])
 
 basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
@@ -1482,7 +1482,7 @@ memConstant align lit = do
                                return (addr, addr_code)
                        else return (ripRel (ImmCLbl lbl), nilOL)
   let code =
-        LDATA rosection (align, Statics lbl [CmmStaticLit lit])
+        LDATA rosection (align, RawCmmStatics lbl [CmmStaticLit lit])
         `consOL` addr_code
   return (Amode addr code)
 
@@ -3305,7 +3305,7 @@ genSwitch dflags expr targets
     (offset, blockIds) = switchTargetsToTable targets
     ids = map (fmap DestBlockId) blockIds
 
-generateJumpTableForInstr :: DynFlags -> Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
+generateJumpTableForInstr :: DynFlags -> Instr -> Maybe (NatCmmDecl (Alignment, RawCmmStatics) Instr)
 generateJumpTableForInstr dflags (JMP_TBL _ ids section lbl)
     = let getBlockId (DestBlockId id) = id
           getBlockId _ = panic "Non-Label target in Jump Table"
@@ -3314,7 +3314,7 @@ generateJumpTableForInstr dflags (JMP_TBL _ ids section lbl)
 generateJumpTableForInstr _ _ = Nothing
 
 createJumpTable :: DynFlags -> [Maybe BlockId] -> Section -> CLabel
-                -> GenCmmDecl (Alignment, CmmStatics) h g
+                -> GenCmmDecl (Alignment, RawCmmStatics) h g
 createJumpTable dflags ids section lbl
     = let jumpTable
             | positionIndependent dflags =
@@ -3326,7 +3326,7 @@ createJumpTable dflags ids section lbl
                           where blockLabel = blockLbl blockid
                   in map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
-      in CmmData section (mkAlignment 1, Statics lbl jumpTable)
+      in CmmData section (mkAlignment 1, RawCmmStatics lbl jumpTable)
 
 extractUnwindPoints :: [Instr] -> [UnwindPoint]
 extractUnwindPoints instrs =

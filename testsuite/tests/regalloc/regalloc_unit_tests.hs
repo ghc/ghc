@@ -98,9 +98,9 @@ compileCmmForRegAllocStats ::
     DynFlags ->
     FilePath ->
     (DynFlags ->
-        NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
+        NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
     UniqSupply ->
-    IO [( Maybe [Color.RegAllocStats (Alignment, CmmStatics) X86.Instr.Instr]
+    IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF dflags

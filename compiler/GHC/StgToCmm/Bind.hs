@@ -87,15 +87,11 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- hole detection from working in that case.  Test
   -- concurrent/should_run/4030 fails, for instance.
   --
-  gen_code dflags _ closure_label
+  gen_code _ _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
     = do
          cg_info <- getCgIdInfo f
-         let closure_rep   = mkStaticClosureFields dflags
-                                    indStaticInfoTable ccs MayHaveCafRefs
-                                    [unLit (idInfoToAmode cg_info)]
-         emitDataLits closure_label closure_rep
-         return ()
+         emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
 
   gen_code dflags lf_info _closure_label
    = do { let name = idName id

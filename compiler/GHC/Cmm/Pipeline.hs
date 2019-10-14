@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Cmm.Pipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
@@ -27,6 +29,7 @@ import HscTypes
 import Control.Monad
 import Outputable
 import GHC.Platform
+import Data.Either (partitionEithers)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -37,14 +40,15 @@ cmmPipeline
            -- dynamic flags: -dcmm-lint -ddump-cmm-cps
  -> ModuleSRTInfo        -- Info about SRTs generated so far
  -> CmmGroup             -- Input C-- with Procedures
- -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
+ -> IO (ModuleSRTInfo, CmmGroupSRTs) -- Output CPS transformed C--
 
 cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
+     let (procs, data_) = partitionEithers tops
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (ppr cmms)
 
      return (srtInfo, cmms)
@@ -54,8 +58,8 @@ cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline")
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
-cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
+cpsTop :: HscEnv -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop _ p@(CmmData _ statics) = return (Right (cafAnalData statics, p))
 cpsTop hsc_env proc =
     do
        ----------- Control-flow optimisations ----------------------------------
@@ -85,7 +89,9 @@ cpsTop hsc_env proc =
        dump Opt_D_dump_cmm_switch "Post switch plan" g
 
        ----------- Proc points -------------------------------------------------
-       let call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
+       let
+         call_pps :: ProcPointSet -- LabelMap
+         call_pps = {-# SCC "callProcPoints" #-} callProcPoints g
        proc_points <-
           if splitting_proc_points
              then do
@@ -144,7 +150,7 @@ cpsTop hsc_env proc =
             -- See Note [unreachable blocks]
        dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
-       return (cafEnv, g)
+       return (Left (cafEnv, g))
 
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags

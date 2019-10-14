@@ -42,7 +42,7 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl :: NatCmmDecl RawCmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
@@ -59,7 +59,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                                      -- so label needed
          vcat (map (pprBasicBlock top_info) blocks)
 
-    Just (Statics info_lbl _) ->
+    Just (RawCmmStatics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
@@ -104,7 +104,7 @@ pprFunctionPrologue lab =  pprGloblDecl lab
                         $$ text "\t.localentry\t" <> ppr lab
                         <> text ",.-" <> ppr lab
 
-pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
     pprLabel (blockLbl blockid) $$
@@ -112,16 +112,16 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
-       Just (Statics info_lbl info) ->
+       Just (RawCmmStatics info_lbl info) ->
            pprAlignForSection Text $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
 
 
-pprDatas :: CmmStatics -> SDoc
+pprDatas :: RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -130,7 +130,7 @@ pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas (RawCmmStatics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)          = pprBytes str

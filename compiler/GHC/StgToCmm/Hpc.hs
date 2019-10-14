@@ -41,7 +41,7 @@ initHpc _ (NoHpcInfo {})
 initHpc this_mod (HpcInfo tickCount _hashNo)
   = do dflags <- getDynFlags
        when (gopt Opt_Hpc dflags) $
-           do emitDataLits (mkHpcTicksLabel this_mod)
+           emitRawDataLits (mkHpcTicksLabel this_mod)
                            [ (CmmInt 0 W64)
                            | _ <- take tickCount [0 :: Int ..]
                            ]

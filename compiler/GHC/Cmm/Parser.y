@@ -394,7 +394,7 @@ cmmdata :: { CmmParse () }
         : 'section' STRING '{' data_label statics '}'
                 { do lbl <- $4;
                      ss <- sequence $5;
-                     code (emitDecl (CmmData (Section (section $2) lbl) (Statics lbl $ concat ss))) }
+                     code (emitDecl (CmmData (Section (section $2) lbl) (CmmStaticsRaw lbl (concat ss)))) }
 
 data_label :: { CmmParse CLabel }
     : NAME ':'
@@ -1175,7 +1175,7 @@ staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
        let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
-       code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
+       code $ emitRawDataLits (mkCmmDataLabel pkg cl_label) lits
 
 foreignCall
         :: String

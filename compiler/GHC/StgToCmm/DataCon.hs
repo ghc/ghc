@@ -104,17 +104,8 @@ cgTopRhsCon dflags id con args =
                 -- NB2: all the amodes should be Lits!
                 --      TODO (osa): Why?
 
-        ; let closure_rep = mkStaticClosureFields
-                             dflags
-                             info_tbl
-                             dontCareCCS                -- Because it's static data
-                             caffy                      -- Has CAF refs
-                             payload
-
                 -- BUILD THE OBJECT
-        ; emitDataLits closure_label closure_rep
-
-        ; return () }
+        ; emitDataCon closure_label info_tbl dontCareCCS payload }
 
 
 ---------------------------------------------------------------

@@ -45,8 +45,8 @@ pprLlvmCmmDecl (CmmData _ lmdata)
 
 pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
   = do let lbl = case mb_info of
-                     Nothing                   -> entry_lbl
-                     Just (Statics info_lbl _) -> info_lbl
+                     Nothing -> entry_lbl
+                     Just (RawCmmStatics info_lbl _) -> info_lbl
            link = if externallyVisibleCLabel lbl
                       then ExternallyVisible
                       else Internal
@@ -62,7 +62,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
        -- generate the info table
        prefix <- case mb_info of
                      Nothing -> return Nothing
-                     Just (Statics _ statics) -> do
+                     Just (RawCmmStatics _ statics) -> do
                        infoStatics <- mapM genData statics
                        let infoTy = LMStruct $ map getStatType infoStatics
                        return $ Just $ LMStaticStruc infoStatics infoTy

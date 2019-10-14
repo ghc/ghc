@@ -74,7 +74,7 @@ import Util
 
 cmmTopCodeGen
         :: RawCmmDecl
-        -> NatM [NatCmmDecl CmmStatics Instr]
+        -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph) = do
   let blocks = toBlockListEntryFirst graph
@@ -115,7 +115,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: Block CmmNode C C
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmDecl CmmStatics Instr])
+                , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
@@ -669,7 +669,7 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
     let format = floatFormat frep
         code dst =
             LDATA (Section ReadOnlyData lbl)
-                  (Statics lbl [CmmStaticLit (CmmFloat f frep)])
+                  (RawCmmStatics lbl [CmmStaticLit (CmmFloat f frep)])
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 
@@ -690,7 +690,7 @@ getRegister' dflags (CmmLit lit)
        let rep = cmmLitType dflags lit
            format = cmmTypeFormat rep
            code dst =
-            LDATA (Section ReadOnlyData lbl) (Statics lbl [CmmStaticLit lit])
+            LDATA (Section ReadOnlyData lbl) (RawCmmStatics lbl [CmmStaticLit lit])
             `consOL` (addr_code `snocOL` LD format dst addr)
        return (Any format code)
 
@@ -2095,7 +2095,7 @@ genSwitch dflags expr targets
   where (offset, ids) = switchTargetsToTable targets
 
 generateJumpTableForInstr :: DynFlags -> Instr
-                          -> Maybe (NatCmmDecl CmmStatics Instr)
+                          -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr dflags (BCTR ids (Just lbl) _) =
     let jumpTable
             | (positionIndependent dflags)
@@ -2108,7 +2108,7 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl) _) =
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0
                                          (wordWidth dflags))
                             where blockLabel = blockLbl blockid
-    in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
+    in Just (CmmData (Section ReadOnlyData lbl) (RawCmmStatics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -2337,7 +2337,7 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
     Amode addr addr_code <- getAmode D dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                LDATA (Section ReadOnlyData lbl) $ Statics lbl
+                LDATA (Section ReadOnlyData lbl) $ RawCmmStatics lbl
                                  [CmmStaticLit (CmmInt 0x43300000 W32),
                                   CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),

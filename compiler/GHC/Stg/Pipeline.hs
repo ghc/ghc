@@ -19,6 +19,7 @@ import GHC.Stg.Syntax
 
 import GHC.Stg.Lint     ( lintStgTopBindings )
 import GHC.Stg.Stats    ( showStgStats )
+import GHC.Stg.DepAnal  ( depSortStgPgm )
 import GHC.Stg.Unarise  ( unarise )
 import GHC.Stg.CSE      ( stgCse )
 import GHC.Stg.Lift     ( stgLiftLams )
@@ -56,9 +57,18 @@ stg2stg dflags this_mod binds
         ; binds' <- runStgM 'g' $
             foldM do_stg_pass binds (getStgToDo dflags)
 
-        ; dump_when Opt_D_dump_stg_final "Final STG:" binds'
+          -- Dependency sort the program as last thing. The program needs to be
+          -- in dependency order for the SRT algorithm to work (see
+          -- CmmBuildInfoTables, which also includes a detailed description of
+          -- the algorithm), and we don't guarantee that the program is already
+          -- sorted at this point. #16192 is for simplifier not preserving
+          -- dependency order. We also don't guarantee that StgLiftLams will
+          -- preserve the order or only create minimal recursive groups, so a
+          -- sorting pass is necessary.
+        ; let binds_sorted = depSortStgPgm binds'
+        ; dump_when Opt_D_dump_stg_final "Final STG:" binds_sorted
 
-        ; return binds'
+        ; return binds_sorted
    }
 
   where

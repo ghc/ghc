@@ -62,7 +62,7 @@ import Control.Monad    ( mapAndUnzipM )
 
 -- | Top level code generation
 cmmTopCodeGen :: RawCmmDecl
-              -> NatM [NatCmmDecl CmmStatics Instr]
+              -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph)
  = do let blocks = toBlockListEntryFirst graph
@@ -84,7 +84,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 --      LDATAs here too.
 basicBlockCodeGen :: CmmBlock
                   -> NatM ( [NatBasicBlock Instr]
-                          , [NatCmmDecl CmmStatics Instr])
+                          , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
@@ -339,10 +339,10 @@ genSwitch dflags expr targets
   where (offset, ids) = switchTargetsToTable targets
 
 generateJumpTableForInstr :: DynFlags -> Instr
-                          -> Maybe (NatCmmDecl CmmStatics Instr)
+                          -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
   let jumpTable = map (jumpTableEntry dflags) ids
-  in Just (CmmData (Section ReadOnlyData label) (Statics label jumpTable))
+  in Just (CmmData (Section ReadOnlyData label) (RawCmmStatics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 

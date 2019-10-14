@@ -192,22 +192,22 @@ mkWordCLit :: DynFlags -> Integer -> CmmLit
 mkWordCLit dflags wd = CmmInt wd (wordWidth dflags)
 
 mkByteStringCLit
-  :: CLabel -> ByteString -> (CmmLit, GenCmmDecl CmmStatics info stmt)
+  :: CLabel -> ByteString -> (CmmLit, GenCmmDecl RawCmmStatics info stmt)
 -- We have to make a top-level decl for the string,
 -- and return a literal pointing to it
 mkByteStringCLit lbl bytes
-  = (CmmLabel lbl, CmmData (Section sec lbl) $ Statics lbl [CmmString bytes])
+  = (CmmLabel lbl, CmmData (Section sec lbl) $ RawCmmStatics lbl [CmmString bytes])
   where
     -- This can not happen for String literals (as there \NUL is replaced by
     -- C0 80). However, it can happen with Addr# literals.
     sec = if 0 `BS.elem` bytes then ReadOnlyData else CString
 
-mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
+mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl RawCmmStatics info stmt
 -- Build a data-segment data block
 mkDataLits section lbl lits
-  = CmmData section (Statics lbl $ map CmmStaticLit lits)
+  = CmmData section (RawCmmStatics lbl $ map CmmStaticLit lits)
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl RawCmmStatics info stmt
 -- Build a read-only data block
 mkRODataLits lbl lits
   = mkDataLits section lbl lits

@@ -69,6 +69,7 @@ import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
 import GHC.Iface.Utils  ( mkFullIface )
+import UpdateCafInfos   ( updateModDetailsCafInfos )
 
 import Exception
 import System.Directory
@@ -228,8 +229,8 @@ compileOne' m_tc_result mHscMessage
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface
-            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash mod_location
+            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface Nothing
+            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
 
@@ -1188,15 +1189,12 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, caf_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface)
-                    -- TODO(osa): ModIface and ModDetails need to be in sync,
-                    -- but we only generate ModIface with the backend info. See
-                    -- !2100 for more discussion on this. This will be fixed
-                    -- with !1304 or !2100.
-                    setIface final_iface mod_details
+                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just caf_infos))
+                    let final_mod_details = updateModDetailsCafInfos caf_infos mod_details
+                    setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo

@@ -23,7 +23,7 @@ import Outputable
 import OrdList
 
 -- | Expand out synthetic instructions in this top level thing
-expandTop :: NatCmmDecl CmmStatics Instr -> NatCmmDecl CmmStatics Instr
+expandTop :: NatCmmDecl RawCmmStatics Instr -> NatCmmDecl RawCmmStatics Instr
 expandTop top@(CmmData{})
         = top
 
