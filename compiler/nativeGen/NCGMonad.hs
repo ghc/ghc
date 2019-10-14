@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -63,7 +64,7 @@ import Module
 import Control.Monad    ( ap )
 
 import Instruction
-import Outputable (SDoc, pprPanic, ppr)
+import Outputable (SDoc, pprPanic, ppr, pprTraceM)
 import Cmm (RawCmmDecl, CmmStatics)
 import CFG
 
@@ -204,7 +205,8 @@ addImportNat imp
 
 updateCfgNat :: (CFG -> CFG) -> NatM ()
 updateCfgNat f
-        = NatM $ \ st -> ((), st { natm_cfg = f (natm_cfg st) })
+        = NatM $ \ st -> let !cfg' = f (natm_cfg st)
+                         in ((), st { natm_cfg = cfg'})
 
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
@@ -231,7 +233,8 @@ addNodeBetweenNat from between to
 --   block -> X to `succ` -> X
 addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
 addImmediateSuccessorNat block succ
-        = updateCfgNat (addImmediateSuccessor block succ)
+        = (pprTraceM "addSucc" $ ppr (block,succ)) >>
+          updateCfgNat (addImmediateSuccessor block succ)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat

@@ -6,6 +6,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module CFG
     ( CFG, CfgEdge(..), EdgeInfo(..), EdgeWeight(..)
@@ -60,8 +61,6 @@ import PprCmm () -- For Outputable instances
 import qualified DynFlags as D
 
 import Data.List
-
--- import qualified Data.IntMap.Strict as M --TODO: LabelMap
 
 type Edge = (BlockId, BlockId)
 type Edges = [Edge]
@@ -160,7 +159,7 @@ sanityCheckCfg m blockSet msg
         pprPanic "Block list and cfg nodes don't match" (
             text "difference:" <+> ppr diff $$
             text "blocks:" <+> ppr blockSet $$
-            text "cfg:" <+> ppr m $$
+            text "cfg:" <+> pprEdgeWeights m $$
             msg )
             False
     where
@@ -423,7 +422,7 @@ addNodesBetween m updates =
         = pprPanic "Can't find weight for edge that should have one" (
             text "triple" <+> ppr (from,between,old) $$
             text "updates" <+> ppr updates $$
-            text "cfg:" <+> ppr m )
+            text "cfg:" <+> pprEdgeWeights m )
       updateWeight :: CFG -> (BlockId,BlockId,BlockId,EdgeInfo) -> CFG
       updateWeight m (from,between,old,edgeInfo)
         = addEdge from between edgeInfo .
