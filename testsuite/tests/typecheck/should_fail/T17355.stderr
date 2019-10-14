@@ -1,0 +1,9 @@
+
+T17355.hs:9:10: error:
+    • Illegal polymorphic type: forall a. a
+    • In the instance declaration for ‘Generic (forall a. a)’
+
+T17355.hs:10:10: error:
+    • Illegal polymorphic type: forall a. a -> a
+    • In the instance declaration for
+        ‘HasField "myPoly" Foo (forall a. a -> a)’
