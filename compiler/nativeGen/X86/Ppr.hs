@@ -73,7 +73,7 @@ pprProcAlignment :: SDoc
 pprProcAlignment = sdocWithDynFlags $ \dflags ->
   (maybe empty (pprAlign . mkAlignment) (cmmProcAlignment dflags))
 
-pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
+pprNatCmmDecl :: NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
@@ -91,7 +91,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl lbl
 
-    Just (Statics info_lbl _) ->
+    Just (RawCmmStatics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       pprProcAlignment $$
@@ -118,7 +118,7 @@ pprSizeDecl lbl
    then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
-pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = sdocWithDynFlags $ \dflags ->
     maybe_infotable dflags $
@@ -130,7 +130,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     asmLbl = blockLbl blockid
     maybe_infotable dflags c = case mapLookup blockid info_env of
        Nothing -> c
-       Just (Statics infoLbl info) ->
+       Just (RawCmmStatics infoLbl info) ->
            pprAlignForSection Text $$
            infoTableLoc $$
            vcat (map pprData info) $$
@@ -145,9 +145,9 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
       _other             -> empty
 
 
-pprDatas :: (Alignment, CmmStatics) -> SDoc
+pprDatas :: (Alignment, RawCmmStatics) -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas (_, RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -157,7 +157,7 @@ pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _]
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 
-pprDatas (align, (Statics lbl dats))
+pprDatas (align, (RawCmmStatics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
