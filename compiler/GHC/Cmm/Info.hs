@@ -2,7 +2,6 @@
 module GHC.Cmm.Info (
   mkEmptyContInfoTable,
   cmmToRawCmm,
-  mkInfoTable,
   srtEscape,
 
   -- info table accessors
@@ -67,11 +66,11 @@ mkEmptyContInfoTable info_lbl
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
 
-cmmToRawCmm :: DynFlags -> Stream IO CmmGroup a
+cmmToRawCmm :: DynFlags -> Stream IO CmmGroupSRTs a
             -> IO (Stream IO RawCmmGroup a)
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one :: UniqSupply -> [CmmDecl] -> IO (UniqSupply, [RawCmmDecl])
+       ; let do_one :: UniqSupply -> [CmmDeclSRTs] -> IO (UniqSupply, [RawCmmDecl])
              do_one uniqs cmm =
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
                withTimingSilent dflags (text "Cmm -> Raw Cmm")
@@ -117,9 +116,8 @@ cmmToRawCmm dflags cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
-mkInfoTable _ (CmmData sec dat)
-  = return [CmmData sec dat]
+mkInfoTable :: DynFlags -> CmmDeclSRTs -> UniqSM [RawCmmDecl]
+mkInfoTable _ (CmmData sec dat) = return [CmmData sec dat]
 
 mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
   --
@@ -169,7 +167,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
         rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
      --
-     return (top_decls, (lbl, Statics info_lbl $ map CmmStaticLit $
+     return (top_decls, (lbl, RawCmmStatics info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
 
 -----------------------------------------------------
@@ -423,7 +421,7 @@ mkProfLits _ (ProfilingInfo td cd)
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
+newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl RawCmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueM
        ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }

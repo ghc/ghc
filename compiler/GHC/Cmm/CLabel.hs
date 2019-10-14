@@ -106,7 +106,8 @@ module GHC.Cmm.CLabel (
 
         pprCLabel,
         isInfoTableLabel,
-        isConInfoTableLabel
+        isConInfoTableLabel,
+        isIdLabel
     ) where
 
 #include "HsVersions.h"
@@ -261,6 +262,10 @@ data CLabel
         {-# UNPACK #-} !Unique
 
   deriving Eq
+
+isIdLabel :: CLabel -> Bool
+isIdLabel IdLabel{} = True
+isIdLabel _ = False
 
 -- This is laborious, but necessary. We can't derive Ord because
 -- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the

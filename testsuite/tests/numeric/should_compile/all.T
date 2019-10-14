@@ -1,6 +1,6 @@
 test('T7116', normal, makefile_test, ['T7116'])
 # These test Core output that depends upon integer-gmp
-test('T14170', reqlib("integer-gmp"), makefile_test, ['T14170'])
+test('T14170', normal, makefile_test, ['T14170'])
 test('T14465', reqlib("integer-gmp"), makefile_test, ['T14465'])
 test('T7895', normal, compile, [''])
 test('T7881', normal, compile, [''])
