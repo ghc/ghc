@@ -19,6 +19,7 @@ import StgSyn
 
 import StgLint          ( lintStgTopBindings )
 import StgStats         ( showStgStats )
+import StgDepAnal       ( depSortStgPgm )
 import UnariseStg       ( unarise )
 import StgCse           ( stgCse )
 import StgLiftLams      ( stgLiftLams )
@@ -56,9 +57,10 @@ stg2stg dflags this_mod binds
         ; binds' <- runStgM us $
             foldM do_stg_pass binds (getStgToDo dflags)
 
-        ; dump_when Opt_D_dump_stg_final "Final STG:" binds'
+        ; let binds_sorted = depSortStgPgm binds'
+        ; dump_when Opt_D_dump_stg_final "Final STG:" binds_sorted
 
-        ; return binds'
+        ; return binds_sorted
    }
 
   where

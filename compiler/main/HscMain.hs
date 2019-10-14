@@ -132,6 +132,7 @@ import CostCentre
 import ProfInit
 import TyCon
 import Name
+import NameSet
 import SimplStg         ( stg2stg )
 import Cmm
 import CmmParse         ( parseCmmFile )
@@ -173,6 +174,7 @@ import System.IO (fixIO)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
+import Data.Functor
 import Control.DeepSeq (force)
 
 import HieAst           ( mkHieFile )
@@ -837,15 +839,15 @@ finish summary tc_result mb_old_hash = do
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          let iface_gen :: IO (ModIface, Bool)
-              iface_gen = do
+          let iface_gen :: Maybe NameSet -> IO (ModIface, Bool)
+              iface_gen mb_non_cafs  = do
                   -- Build a fully instantiated ModIface.
                   -- This has to happen *after* code gen so that the back-end
                   -- info has been set.
                   -- This captures hsc_env, but it seems we keep it alive in other
                   -- ways as well so we don't bother extracting only the relevant parts.
                   dumpIfaceStats hsc_env
-                  final_iface <- mkFullIface hsc_env partial_iface
+                  final_iface <- mkFullIface hsc_env partial_iface mb_non_cafs
                   let no_change = mb_old_hash == Just (mi_iface_hash (mi_final_exts final_iface))
                   return (final_iface, no_change)
 
@@ -1412,7 +1414,7 @@ hscWriteIface dflags iface no_change mod_location = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)], NameSet)
                -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1470,11 +1472,11 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, ())
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps, caf_infos)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
                   foreign_stubs foreign_files dependencies rawcmms1
-            return (output_filename, stub_c_exists, foreign_fps)
+            return (output_filename, stub_c_exists, foreign_fps, caf_infos)
 
 
 hscInteractive :: HscEnv
@@ -1539,7 +1541,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroupSRTs NameSet)
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1559,25 +1561,23 @@ doCodeGen hsc_env this_mod data_tycons
         -- CmmGroup on input may produce many CmmGroups on output due
         -- to proc-point splitting).
 
-    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
+        dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
                        "Cmm produced by codegen" (ppr a)
                      return a
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-        pipeline_stream
-           = {-# SCC "cmmPipeline" #-}
-             let run_pipeline = cmmPipeline hsc_env
-             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
+        pipeline_stream :: Stream IO CmmGroupSRTs NameSet
+        pipeline_stream =
+          {-# SCC "cmmPipeline" #-}
+          Stream.mapAccumL (cmmPipeline hsc_env) (emptySRT this_mod) ppr_stream1
+            <&> (srtMapNonCAFs . moduleSRTMap)
 
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
 
-        ppr_stream2 = Stream.mapM dump2 pipeline_stream
-
-    return ppr_stream2
-
+    return (Stream.mapM dump2 pipeline_stream)
 
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
