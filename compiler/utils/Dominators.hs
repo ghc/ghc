@@ -53,9 +53,12 @@ import Control.Monad
 import Control.Monad.ST.Strict
 
 import Data.Array.ST
-import Data.Array.Base
-  (unsafeNewArray_
-  ,unsafeWrite,unsafeRead)
+import Data.Array.Base hiding ((!))
+  -- (unsafeNewArray_
+  -- ,unsafeWrite,unsafeRead
+  -- ,readArray,writeArray)
+
+import Util (debugIsOn)
 
 -----------------------------------------------------------------------------
 
@@ -399,13 +402,19 @@ infixr 2 .=
 
 (.=) :: (MArray (A s) a (ST s))
      => Arr s a -> a -> Int -> ST s ()
-(v .= x) i = unsafeWrite v i x
+(v .= x) i
+  | debugIsOn = writeArray v i x
+  | otherwise = unsafeWrite v i x
 
 (!:) :: (MArray (A s) a (ST s))
      => A s Int a -> Int -> ST s a
-a !: i = do
-  o <- unsafeRead a i
-  return $! o
+a !: i
+  | debugIsOn = do
+      o <- readArray a i
+      return $! o
+  | otherwise = do
+      o <- unsafeRead a i
+      return $! o
 
 new :: (MArray (A s) a (ST s))
     => Int -> ST s (Arr s a)

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -204,7 +205,8 @@ addImportNat imp
 
 updateCfgNat :: (CFG -> CFG) -> NatM ()
 updateCfgNat f
-        = NatM $ \ st -> ((), st { natm_cfg = f (natm_cfg st) })
+        = NatM $ \ st -> let !cfg' = f (natm_cfg st)
+                         in ((), st { natm_cfg = cfg'})
 
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
