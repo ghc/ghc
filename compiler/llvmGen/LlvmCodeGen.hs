@@ -117,7 +117,7 @@ llvmGroupLlvmGens cmm = do
               -- Set function type
               let l' = case mapLookup (g_entry g) h of
                          Nothing                   -> l
-                         Just (Statics info_lbl _) -> info_lbl
+                         Just (RawCmmStatics info_lbl _) -> info_lbl
               lml <- strCLabel_llvm l'
               funInsert lml =<< llvmFunTy live
               return Nothing
@@ -131,7 +131,7 @@ llvmGroupLlvmGens cmm = do
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
 --
-cmmDataLlvmGens :: [(Section,CmmStatics)] -> LlvmM ()
+cmmDataLlvmGens :: [(Section,RawCmmStatics)] -> LlvmM ()
 
 cmmDataLlvmGens statics
   = do lmdatas <- mapM genLlvmData statics
