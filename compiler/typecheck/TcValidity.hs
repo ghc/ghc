@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, TupleSections, ViewPatterns #-}
+{-# LANGUAGE CPP, MultiWayIf, TupleSections, ViewPatterns #-}
 
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
@@ -1499,57 +1499,59 @@ in hsig files, where `is_sig` is True.
 check_valid_inst_head :: DynFlags -> Bool -> Bool
                       -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args = do
 
-  -- If not in an hs-boot file, abstract classes cannot have instances
-  | isAbstractClass clas
-  , not is_boot
-  = failWithTc abstract_class_msg
+     -- If not in an hs-boot file, abstract classes cannot have instances
+  if |  isAbstractClass clas
+     ,  not is_boot
+     -> failWithTc abstract_class_msg
 
-  -- For Typeable, don't complain about instances for
-  -- standalone deriving; they are no-ops, and we warn about
-  -- it in TcDeriv.deriveStandalone.
-  | clas_nm == typeableClassName
-  , not is_sig
-    -- Note [Instances of built-in classes in signature files]
-  , hand_written_bindings
-  = failWithTc rejected_class_msg
+     -- For Typeable, don't complain about instances for
+     -- standalone deriving; they are no-ops, and we warn about
+     -- it in TcDeriv.deriveStandalone.
+     |  clas_nm == typeableClassName
+     ,  not is_sig
+        -- Note [Instances of built-in classes in signature files]
+     ,  hand_written_bindings
+     -> failWithTc rejected_class_msg
 
-  -- Handwritten instances of KnownNat/KnownSymbol class
-  -- are always forbidden (#12837)
-  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
-  , not is_sig
-    -- Note [Instances of built-in classes in signature files]
-  , hand_written_bindings
-  = failWithTc rejected_class_msg
+     -- Handwritten instances of KnownNat/KnownSymbol class
+     -- are always forbidden (#12837)
+     |  clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+     ,  not is_sig
+        -- Note [Instances of built-in classes in signature files]
+     ,  hand_written_bindings
+     -> failWithTc rejected_class_msg
 
-  -- For the most part we don't allow
-  -- instances for (~), (~~), or Coercible;
-  -- but we DO want to allow them in quantified constraints:
-  --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
-  | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
-  , not quantified_constraint
-  = failWithTc rejected_class_msg
+     -- For the most part we don't allow
+     -- instances for (~), (~~), or Coercible;
+     -- but we DO want to allow them in quantified constraints:
+     --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
+     |  clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
+     ,  not quantified_constraint
+     -> failWithTc rejected_class_msg
 
-  -- Check for hand-written Generic instances (disallowed in Safe Haskell)
-  | clas_nm `elem` genericClassNames
-  , hand_written_bindings
-  =  do { failIfTc (safeLanguageOn dflags) gen_inst_err
-        ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
+     -- Check for hand-written Generic instances (disallowed in Safe Haskell)
+     |  clas_nm `elem` genericClassNames
+     ,  hand_written_bindings
+     -> do { failIfTc (safeLanguageOn dflags) gen_inst_err
+           ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
 
-  | clas_nm == hasFieldClassName
-  = checkHasFieldInst clas cls_args
+     |  clas_nm == hasFieldClassName
+     -> checkHasFieldInst clas cls_args
 
-  | isCTupleClass clas
-  = failWithTc tuple_class_msg
+     |  isCTupleClass clas
+     -> failWithTc tuple_class_msg
 
-  -- Check language restrictions on the args to the class
-  | check_h98_arg_shape
-  , Just msg <- mb_ty_args_msg
-  = failWithTc (instTypeErr clas cls_args msg)
+     -- Check language restrictions on the args to the class
+     |  check_h98_arg_shape
+     ,  Just msg <- mb_ty_args_msg
+     -> failWithTc (instTypeErr clas cls_args msg)
 
-  | otherwise
-  = checkValidTypePats (classTyCon clas) cls_args
+     |  otherwise
+     -> pure ()
+
+  checkValidTypePats (classTyCon clas) cls_args
   where
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
