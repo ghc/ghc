@@ -39,6 +39,7 @@ import GhcPrelude
 import X86.Instr
 import X86.Cond
 import X86.Regs
+import X86.Ppr (  )
 import X86.RegInfo
 
 import GHC.Platform.Regs
@@ -137,6 +138,56 @@ cmmTopCodeGen (CmmProc info lab live graph) = do
 cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec (mkAlignment 1, dat)]  -- no translation, we just use CmmStatic
 
+{- Note [Verifying basic blocks]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   We want to guarantee a few things about the results
+   of instruction selection.
+
+   Namely that each basic blocks consists of:
+    * A (potentially empty) sequence of straight line instructions
+  followed by
+    * A (potentially empty) sequence of jump like instructions.
+
+    We can verify this by going through the instructions and
+    making sure that any non-jumpish instruction can't appear
+    after a jumpish instruction.
+
+    There are gotchas however:
+    * CALLs are strictly speaking control flow but here we care
+      not about them. Hence we treat them as regular instructions.
+
+      It's safe for them to appear inside a basic block
+      as (ignoring side effects inside the call) they will result in
+      straight line code.
+
+    * NEWBLOCK marks the start of a new basic block so can
+      be followed by any instructions.
+-}
+
+-- Verifying basic blocks is cheap, but not cheap enough to enable it unconditionally.
+verifyBasicBlock :: [Instr] -> ()
+verifyBasicBlock instrs
+  | debugIsOn     = go False instrs
+  | otherwise     = ()
+  where
+    go _     [] = ()
+    go atEnd (i:instr)
+        = case i of
+            -- Start a new basic block
+            NEWBLOCK {} -> go False instr
+            -- Calls are not viable block terminators
+            CALL {}     | atEnd -> faultyBlockWith i
+                        | not atEnd -> go atEnd instr
+            -- All instructions ok, check if we reached the end and continue.
+            _ | not atEnd -> go (isJumpishInstr i) instr
+              -- Only jumps allowed at the end of basic blocks.
+              | otherwise -> if isJumpishInstr i
+                                then go True instr
+                                else faultyBlockWith i
+    faultyBlockWith i
+        = pprPanic "Non control flow instructions after end of basic block."
+                   (ppr i <+> text "in:" $$ vcat (map ppr instrs))
 
 basicBlockCodeGen
         :: CmmBlock
@@ -155,9 +206,10 @@ basicBlockCodeGen block = do
             let line = srcSpanStartLine span; col = srcSpanStartCol span
             return $ unitOL $ LOCATION fileId line col name
     _ -> return nilOL
-  mid_instrs <- stmtsToInstrs id stmts
-  (!tail_instrs,_) <- stmtToInstrs id tail
+  (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
+  (!tail_instrs,_) <- stmtToInstrs mid_bid tail
   let instrs = loc_instrs `appOL` mid_instrs `appOL` tail_instrs
+  return $! verifyBasicBlock (fromOL instrs)
   instrs' <- fold <$> traverse addSpUnwindings instrs
   -- code generation may introduce new basic block boundaries, which
   -- are indicated by the NEWBLOCK instruction.  We must split up the
@@ -251,12 +303,12 @@ basic block.
 -- See Note [Keeping track of the current block] for why
 -- we pass the BlockId.
 stmtsToInstrs :: BlockId -- ^ Basic block these statement will start to be placed in.
-              -> [CmmNode e x] -- ^ Cmm Statement
-              -> NatM InstrBlock -- ^ Resulting instruction
+              -> [CmmNode O O] -- ^ Cmm Statement
+              -> NatM (InstrBlock, BlockId) -- ^ Resulting instruction
 stmtsToInstrs bid stmts =
     go bid stmts nilOL
   where
-    go _   []         instr = return instr
+    go bid  []        instrs = return (instrs,bid)
     go bid (s:stmts)  instrs = do
       (instrs',bid') <- stmtToInstrs bid s
       -- If the statement introduced a new block, we use that one
@@ -1822,6 +1874,109 @@ genCondBranch' _ bid id false bool = do
         updateCfgNat (\cfg -> adjustEdgeWeight cfg (+3) bid false)
         return (cond_code `appOL` code)
 
+{-  Note [Introducing cfg edges inside basic blocks]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    During instruction selection a statement `s`
+    in a block B with control of the sort: B -> C
+    will sometimes result in control
+    flow of the sort:
+
+            ┌ < ┐
+            v   ^
+      B ->  B1  ┴ -> C
+
+    as is the case for some atomic operations.
+
+    Now to keep the CFG in sync when introducing B1 we clearly
+    want to insert it between B and C. However there is
+    a catch when we have to deal with self loops.
+
+    We might start with code and a CFG of these forms:
+
+    loop:
+        stmt1               ┌ < ┐
+        ....                v   ^
+        stmtX              loop ┘
+        stmtY
+        ....
+        goto loop:
+
+    Now we introduce B1:
+                            ┌ ─ ─ ─ ─ ─┐
+        loop:               │   ┌ <  ┐ │
+        instrs              v   │    │ ^
+        ....               loop ┴ B1 ┴ ┘
+        instrsFromX
+        stmtY
+        goto loop:
+
+    This is simple, all outgoing edges from loop now simply
+    start from B1 instead and the code generator knows which
+    new edges it introduced for the self loop of B1.
+
+    Disaster strikes if the statement Y follows the same pattern.
+    If we apply the same rule that all outgoing edges change then
+    we end up with:
+
+        loop ─> B1 ─> B2 ┬─┐
+          │      │    └─<┤ │
+          │      └───<───┘ │
+          └───────<────────┘
+
+    This is problematic. The edge B1->B1 is modified as expected.
+    However the modification is wrong!
+
+    The assembly in this case looked like this:
+
+    _loop:
+        <instrs>
+    _B1:
+        ...
+        cmpxchgq ...
+        jne _B1
+        <instrs>
+        <end _B1>
+    _B2:
+        ...
+        cmpxchgq ...
+        jne _B2
+        <instrs>
+        jmp loop
+
+    There is no edge _B2 -> _B1 here. It's still a self loop onto _B1.
+
+    The problem here is that really B1 should be two basic blocks.
+    Otherwise we have control flow in the *middle* of a basic block.
+    A contradiction!
+
+    So to account for this we add yet another basic block marker:
+
+    _B:
+        <instrs>
+    _B1:
+        ...
+        cmpxchgq ...
+        jne _B1
+        jmp _B1'
+    _B1':
+        <instrs>
+        <end _B1>
+    _B2:
+        ...
+
+    Now when inserting B2 we will only look at the outgoing edges of B1' and
+    everything will work out nicely.
+
+    You might also wonder why we don't insert jumps at the end of _B1'. There is
+    no way another block ends up jumping to the labels _B1 or _B2 since they are
+    essentially invisible to other blocks. View them as control flow labels local
+    to the basic block if you'd like.
+
+    Not doing this ultimately caused (part 2 of) #17334.
+-}
+
+
 -- -----------------------------------------------------------------------------
 --  Generating C calls
 
@@ -1889,26 +2044,34 @@ genCCall dflags is32Bit (PrimTarget (MO_AtomicRMW width amop))
         cmpxchg_code :: (Operand -> Operand -> OrdList Instr)
                      -> NatM (OrdList Instr, BlockId)
         cmpxchg_code instrs = do
-            lbl <- getBlockIdNat
+            lbl1 <- getBlockIdNat
+            lbl2 <- getBlockIdNat
             tmp <- getNewRegNat format
 
             --Record inserted blocks
-            addImmediateSuccessorNat bid lbl
-            updateCfgNat (addWeightEdge lbl lbl 0)
+            --  We turn A -> B into A -> A' -> A'' -> B
+            --  with a self loop on A'.
+            addImmediateSuccessorNat bid lbl1
+            addImmediateSuccessorNat lbl1 lbl2
+            updateCfgNat (addWeightEdge lbl1 lbl1 0)
 
             return $ (toOL
                 [ MOV format (OpAddr amode) (OpReg eax)
-                , JXX ALWAYS lbl
-                , NEWBLOCK lbl
+                , JXX ALWAYS lbl1
+                , NEWBLOCK lbl1
                   -- Keep old value so we can return it:
                 , MOV format (OpReg eax) (OpReg dst_r)
                 , MOV format (OpReg eax) (OpReg tmp)
                 ]
                 `appOL` instrs (OpReg arg) (OpReg tmp) `appOL` toOL
                 [ LOCK (CMPXCHG format (OpReg tmp) (OpAddr amode))
-                , JXX NE lbl
+                , JXX NE lbl1
+                -- See Note [Introducing cfg edges inside basic blocks]
+                -- why this basic block is required.
+                , JXX ALWAYS lbl2
+                , NEWBLOCK lbl2
                 ],
-                lbl)
+                lbl2)
     format = intFormat width
 
 genCCall dflags is32Bit (PrimTarget (MO_Ctz width)) [dst] [src] bid
