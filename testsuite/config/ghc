@@ -140,6 +140,8 @@ config.way_rts_flags = {
 # Useful classes of ways that can be used with only_ways(), omit_ways() and
 # expect_broken_for().
 
+all_ways = set(config.way_flags.keys())
+
 prof_ways     = [x[0] for x in config.way_flags.items()
                       if '-prof' in x[1]]
 
