@@ -1241,16 +1241,16 @@ chooseOrphanAnchor local_names
     -- It's OK to use nonDetEltsUFM here, see comments above
 
 instance Binary IsOrphan where
-    put_ bh IsOrphan = putByte bh 0
-    put_ bh (NotOrphan n) = do
-        putByte bh 1
-        put_ bh n
-    get bh = do
-        h <- getByte bh
+    put IsOrphan = putByte 0
+    put (NotOrphan n) = do
+        putByte 1
+        put n
+    get = do
+        h <- getByte
         case h of
             0 -> return IsOrphan
             _ -> do
-                n <- get bh
+                n <- get
                 return $ NotOrphan n
 
 {-

@@ -899,27 +899,20 @@ tidyOccName env occ@(OccName occ_sp fs)
 -}
 
 instance Binary NameSpace where
-    put_ bh VarName = do
-            putByte bh 0
-    put_ bh DataName = do
-            putByte bh 1
-    put_ bh TvName = do
-            putByte bh 2
-    put_ bh TcClsName = do
-            putByte bh 3
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do return VarName
-              1 -> do return DataName
-              2 -> do return TvName
-              _ -> do return TcClsName
+    put VarName   = putByte 0
+    put DataName  = putByte 1
+    put TvName    = putByte 2
+    put TcClsName = putByte 3
+    get = do
+         h <- getByte
+         case h of
+           0 -> return VarName
+           1 -> return DataName
+           2 -> return TvName
+           _ -> return TcClsName
 
 instance Binary OccName where
-    put_ bh (OccName aa ab) = do
-            put_ bh aa
-            put_ bh ab
-    get bh = do
-          aa <- get bh
-          ab <- get bh
-          return (OccName aa ab)
+    put (OccName aa ab) = do
+        put aa
+        put ab
+    get = OccName <$> get <*> get

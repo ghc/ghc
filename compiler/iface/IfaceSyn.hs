@@ -100,15 +100,11 @@ type IfaceTopBndr = Name
   -- We don't serialise the namespace onto the disk though; rather we
   -- drop it when serialising and add it back in when deserialising.
 
-getIfaceTopBndr :: BinHandle -> IO IfaceTopBndr
-getIfaceTopBndr bh = get bh
+getIfaceTopBndr :: Get IfaceTopBndr
+getIfaceTopBndr = get
 
-putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
-putIfaceTopBndr bh name =
-    case getUserData bh of
-      UserData{ ud_put_binding_name = put_binding_name } ->
-          --pprTrace "putIfaceTopBndr" (ppr name) $
-          put_binding_name bh name
+putIfaceTopBndr :: IfaceTopBndr -> Put ()
+putIfaceTopBndr = putBindingName
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -1766,43 +1762,43 @@ details.
 -}
 
 instance Binary IfaceDecl where
-    put_ bh (IfaceId name ty details idinfo) = do
-        putByte bh 0
-        putIfaceTopBndr bh name
-        lazyPut bh (ty, details, idinfo)
+    put (IfaceId name ty details idinfo) = do
+        putByte 0
+        putIfaceTopBndr name
+        lazyPut (ty, details, idinfo)
         -- See Note [Lazy deserialization of IfaceId]
 
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
-        putByte bh 2
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-        put_ bh a8
-        put_ bh a9
+    put (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
+        putByte 2
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+        put a8
+        put a9
 
-    put_ bh (IfaceSynonym a1 a2 a3 a4 a5) = do
-        putByte bh 3
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
+    put (IfaceSynonym a1 a2 a3 a4 a5) = do
+        putByte 3
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
+        put a5
 
-    put_ bh (IfaceFamily a1 a2 a3 a4 a5 a6) = do
-        putByte bh 4
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
+    put (IfaceFamily a1 a2 a3 a4 a5 a6) = do
+        putByte 4
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
 
     -- NB: Written in a funny way to avoid an interface change
-    put_ bh (IfaceClass {
+    put (IfaceClass {
                 ifName    = a2,
                 ifRoles   = a3,
                 ifBinders = a4,
@@ -1813,88 +1809,88 @@ instance Binary IfaceDecl where
                     ifSigs = a7,
                     ifMinDef  = a8
                 }}) = do
-        putByte bh 5
-        put_ bh a1
-        putIfaceTopBndr bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-        put_ bh a8
+        putByte 5
+        put a1
+        putIfaceTopBndr a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+        put a8
 
-    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
-        putByte bh 6
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
+    put (IfaceAxiom a1 a2 a3 a4) = do
+        putByte 6
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
 
-    put_ bh (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
-        putByte bh 7
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-        put_ bh a8
-        put_ bh a9
-        put_ bh a10
-        put_ bh a11
+    put (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+        putByte 7
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+        put a8
+        put a9
+        put a10
+        put a11
 
-    put_ bh (IfaceClass {
+    put (IfaceClass {
                 ifName    = a1,
                 ifRoles   = a2,
                 ifBinders = a3,
                 ifFDs     = a4,
                 ifBody = IfAbstractClass }) = do
-        putByte bh 8
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
+        putByte 8
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
 
-    get bh = do
-        h <- getByte bh
+    get = do
+        h <- getByte
         case h of
-            0 -> do name    <- get bh
-                    ~(ty, details, idinfo) <- lazyGet bh
+            0 -> do name <- get
+                    ~(ty, details, idinfo) <- lazyGet
                     -- See Note [Lazy deserialization of IfaceId]
                     return (IfaceId name ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
-            2 -> do a1  <- getIfaceTopBndr bh
-                    a2  <- get bh
-                    a3  <- get bh
-                    a4  <- get bh
-                    a5  <- get bh
-                    a6  <- get bh
-                    a7  <- get bh
-                    a8  <- get bh
-                    a9  <- get bh
+            2 -> do a1  <- getIfaceTopBndr
+                    a2  <- get
+                    a3  <- get
+                    a4  <- get
+                    a5  <- get
+                    a6  <- get
+                    a7  <- get
+                    a8  <- get
+                    a9  <- get
                     return (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9)
-            3 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
+            3 -> do a1 <- getIfaceTopBndr
+                    a2 <- get
+                    a3 <- get
+                    a4 <- get
+                    a5 <- get
                     return (IfaceSynonym a1 a2 a3 a4 a5)
-            4 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
-                    a6 <- get bh
+            4 -> do a1 <- getIfaceTopBndr
+                    a2 <- get
+                    a3 <- get
+                    a4 <- get
+                    a5 <- get
+                    a6 <- get
                     return (IfaceFamily a1 a2 a3 a4 a5 a6)
-            5 -> do a1 <- get bh
-                    a2 <- getIfaceTopBndr bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
-                    a6 <- get bh
-                    a7 <- get bh
-                    a8 <- get bh
+            5 -> do a1 <- get
+                    a2 <- getIfaceTopBndr
+                    a3 <- get
+                    a4 <- get
+                    a5 <- get
+                    a6 <- get
+                    a7 <- get
+                    a8 <- get
                     return (IfaceClass {
                         ifName    = a2,
                         ifRoles   = a3,
@@ -1904,29 +1900,29 @@ instance Binary IfaceDecl where
                             ifClassCtxt = a1,
                             ifATs  = a6,
                             ifSigs = a7,
-                            ifMinDef  = a8
+                            ifMinDef = a8
                         }})
-            6 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
+            6 -> do a1 <- getIfaceTopBndr
+                    a2 <- get
+                    a3 <- get
+                    a4 <- get
                     return (IfaceAxiom a1 a2 a3 a4)
-            7 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
-                    a5 <- get bh
-                    a6 <- get bh
-                    a7 <- get bh
-                    a8 <- get bh
-                    a9 <- get bh
-                    a10 <- get bh
-                    a11 <- get bh
+            7 -> do a1 <- getIfaceTopBndr
+                    a2 <- get
+                    a3 <- get
+                    a4 <- get
+                    a5 <- get
+                    a6 <- get
+                    a7 <- get
+                    a8 <- get
+                    a9 <- get
+                    a10 <- get
+                    a11 <- get
                     return (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
-            8 -> do a1 <- getIfaceTopBndr bh
-                    a2 <- get bh
-                    a3 <- get bh
-                    a4 <- get bh
+            8 -> do a1 <- getIfaceTopBndr
+                    a2 <- get
+                    a3 <- get
+                    a4 <- get
                     return (IfaceClass {
                         ifName    = a1,
                         ifRoles   = a2,
@@ -1961,462 +1957,462 @@ represent a small proportion of all declarations.
 -}
 
 instance Binary IfaceFamTyConFlav where
-    put_ bh IfaceDataFamilyTyCon              = putByte bh 0
-    put_ bh IfaceOpenSynFamilyTyCon           = putByte bh 1
-    put_ bh (IfaceClosedSynFamilyTyCon mb)    = putByte bh 2 >> put_ bh mb
-    put_ bh IfaceAbstractClosedSynFamilyTyCon = putByte bh 3
-    put_ _ IfaceBuiltInSynFamTyCon
+    put IfaceDataFamilyTyCon              = putByte 0
+    put IfaceOpenSynFamilyTyCon           = putByte 1
+    put (IfaceClosedSynFamilyTyCon mb)    = putByte 2 >> put mb
+    put IfaceAbstractClosedSynFamilyTyCon = putByte 3
+    put IfaceBuiltInSynFamTyCon
         = pprPanic "Cannot serialize IfaceBuiltInSynFamTyCon, used for pretty-printing only" Outputable.empty
 
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> return IfaceDataFamilyTyCon
-                    1 -> return IfaceOpenSynFamilyTyCon
-                    2 -> do { mb <- get bh
-                            ; return (IfaceClosedSynFamilyTyCon mb) }
-                    3 -> return IfaceAbstractClosedSynFamilyTyCon
-                    _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
-                                  (ppr (fromIntegral h :: Int)) }
+    get = do { h <- getByte
+             ; case h of
+                 0 -> return IfaceDataFamilyTyCon
+                 1 -> return IfaceOpenSynFamilyTyCon
+                 2 -> do { mb <- get
+                         ; return (IfaceClosedSynFamilyTyCon mb) }
+                 3 -> return IfaceAbstractClosedSynFamilyTyCon
+                 _ -> pprPanic "Binary.get(IfaceFamTyConFlav): Invalid tag"
+                               (ppr (fromIntegral h :: Int)) }
 
 instance Binary IfaceClassOp where
-    put_ bh (IfaceClassOp n ty def) = do
-        putIfaceTopBndr bh n
-        put_ bh ty
-        put_ bh def
-    get bh = do
-        n   <- getIfaceTopBndr bh
-        ty  <- get bh
-        def <- get bh
+    put (IfaceClassOp n ty def) = do
+        putIfaceTopBndr n
+        put ty
+        put def
+    get = do
+        n   <- getIfaceTopBndr
+        ty  <- get
+        def <- get
         return (IfaceClassOp n ty def)
 
 instance Binary IfaceAT where
-    put_ bh (IfaceAT dec defs) = do
-        put_ bh dec
-        put_ bh defs
-    get bh = do
-        dec  <- get bh
-        defs <- get bh
+    put (IfaceAT dec defs) = do
+        put dec
+        put defs
+    get = do
+        dec  <- get
+        defs <- get
         return (IfaceAT dec defs)
 
 instance Binary IfaceAxBranch where
-    put_ bh (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
-        put_ bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-    get bh = do
-        a1 <- get bh
-        a2 <- get bh
-        a3 <- get bh
-        a4 <- get bh
-        a5 <- get bh
-        a6 <- get bh
-        a7 <- get bh
+    put (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7) = do
+        put a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+    get = do
+        a1 <- get
+        a2 <- get
+        a3 <- get
+        a4 <- get
+        a5 <- get
+        a6 <- get
+        a7 <- get
         return (IfaceAxBranch a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceConDecls where
-    put_ bh IfAbstractTyCon  = putByte bh 0
-    put_ bh (IfDataTyCon cs) = putByte bh 1 >> put_ bh cs
-    put_ bh (IfNewTyCon c)   = putByte bh 2 >> put_ bh c
-    get bh = do
-        h <- getByte bh
+    put IfAbstractTyCon  = putByte 0
+    put (IfDataTyCon cs) = putByte 1 >> put cs
+    put (IfNewTyCon c)   = putByte 2 >> put c
+    get = do
+        h <- getByte
         case h of
             0 -> return IfAbstractTyCon
-            1 -> liftM IfDataTyCon (get bh)
-            2 -> liftM IfNewTyCon (get bh)
+            1 -> liftM IfDataTyCon get
+            2 -> liftM IfNewTyCon get
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
-    put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
-        putIfaceTopBndr bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-        put_ bh a8
-        put_ bh (length a9)
-        mapM_ (put_ bh) a9
-        put_ bh a10
-        put_ bh a11
-    get bh = do
-        a1 <- getIfaceTopBndr bh
-        a2 <- get bh
-        a3 <- get bh
-        a4 <- get bh
-        a5 <- get bh
-        a6 <- get bh
-        a7 <- get bh
-        a8 <- get bh
-        n_fields <- get bh
-        a9 <- replicateM n_fields (get bh)
-        a10 <- get bh
-        a11 <- get bh
+    put (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = do
+        putIfaceTopBndr a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+        put a8
+        put (length a9)
+        mapM_ put a9
+        put a10
+        put a11
+    get = do
+        a1 <- getIfaceTopBndr
+        a2 <- get
+        a3 <- get
+        a4 <- get
+        a5 <- get
+        a6 <- get
+        a7 <- get
+        a8 <- get
+        n_fields <- get
+        a9 <- replicateM n_fields get
+        a10 <- get
+        a11 <- get
         return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
 
 instance Binary IfaceBang where
-    put_ bh IfNoBang        = putByte bh 0
-    put_ bh IfStrict        = putByte bh 1
-    put_ bh IfUnpack        = putByte bh 2
-    put_ bh (IfUnpackCo co) = putByte bh 3 >> put_ bh co
+    put IfNoBang        = putByte 0
+    put IfStrict        = putByte 1
+    put IfUnpack        = putByte 2
+    put (IfUnpackCo co) = putByte 3 >> put co
 
-    get bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
               0 -> do return IfNoBang
               1 -> do return IfStrict
               2 -> do return IfUnpack
-              _ -> do { a <- get bh; return (IfUnpackCo a) }
+              _ -> do { a <- get; return (IfUnpackCo a) }
 
 instance Binary IfaceSrcBang where
-    put_ bh (IfSrcBang a1 a2) =
-      do put_ bh a1
-         put_ bh a2
+    put (IfSrcBang a1 a2) =
+      do put a1
+         put a2
 
-    get bh =
-      do a1 <- get bh
-         a2 <- get bh
+    get =
+      do a1 <- get
+         a2 <- get
          return (IfSrcBang a1 a2)
 
 instance Binary IfaceClsInst where
-    put_ bh (IfaceClsInst cls tys dfun flag orph) = do
-        put_ bh cls
-        put_ bh tys
-        put_ bh dfun
-        put_ bh flag
-        put_ bh orph
-    get bh = do
-        cls  <- get bh
-        tys  <- get bh
-        dfun <- get bh
-        flag <- get bh
-        orph <- get bh
+    put (IfaceClsInst cls tys dfun flag orph) = do
+        put cls
+        put tys
+        put dfun
+        put flag
+        put orph
+    get = do
+        cls  <- get
+        tys  <- get
+        dfun <- get
+        flag <- get
+        orph <- get
         return (IfaceClsInst cls tys dfun flag orph)
 
 instance Binary IfaceFamInst where
-    put_ bh (IfaceFamInst fam tys name orph) = do
-        put_ bh fam
-        put_ bh tys
-        put_ bh name
-        put_ bh orph
-    get bh = do
-        fam      <- get bh
-        tys      <- get bh
-        name     <- get bh
-        orph     <- get bh
+    put (IfaceFamInst fam tys name orph) = do
+        put fam
+        put tys
+        put name
+        put orph
+    get = do
+        fam  <- get
+        tys  <- get
+        name <- get
+        orph <- get
         return (IfaceFamInst fam tys name orph)
 
 instance Binary IfaceRule where
-    put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
-        put_ bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-        put_ bh a6
-        put_ bh a7
-        put_ bh a8
-    get bh = do
-        a1 <- get bh
-        a2 <- get bh
-        a3 <- get bh
-        a4 <- get bh
-        a5 <- get bh
-        a6 <- get bh
-        a7 <- get bh
-        a8 <- get bh
+    put (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
+        put a1
+        put a2
+        put a3
+        put a4
+        put a5
+        put a6
+        put a7
+        put a8
+    get = do
+        a1 <- get
+        a2 <- get
+        a3 <- get
+        a4 <- get
+        a5 <- get
+        a6 <- get
+        a7 <- get
+        a8 <- get
         return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
 
 instance Binary IfaceAnnotation where
-    put_ bh (IfaceAnnotation a1 a2) = do
-        put_ bh a1
-        put_ bh a2
-    get bh = do
-        a1 <- get bh
-        a2 <- get bh
+    put (IfaceAnnotation a1 a2) = do
+        put a1
+        put a2
+    get = do
+        a1 <- get
+        a2 <- get
         return (IfaceAnnotation a1 a2)
 
 instance Binary IfaceIdDetails where
-    put_ bh IfVanillaId      = putByte bh 0
-    put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
-    put_ bh IfDFunId         = putByte bh 2
-    get bh = do
-        h <- getByte bh
+    put IfVanillaId      = putByte 0
+    put (IfRecSelId a b) = putByte 1 >> put a >> put b
+    put IfDFunId         = putByte 2
+    get = do
+        h <- getByte
         case h of
             0 -> return IfVanillaId
-            1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
+            1 -> do { a <- get; b <- get; return (IfRecSelId a b) }
             _ -> return IfDFunId
 
 instance Binary IfaceIdInfo where
-    put_ bh NoInfo      = putByte bh 0
-    put_ bh (HasInfo i) = putByte bh 1 >> lazyPut bh i -- NB lazyPut
+    put NoInfo      = putByte 0
+    put (HasInfo i) = putByte 1 >> lazyPut i -- NB lazyPut
 
-    get bh = do
-        h <- getByte bh
+    get = do
+        h <- getByte
         case h of
             0 -> return NoInfo
-            _ -> liftM HasInfo $ lazyGet bh    -- NB lazyGet
+            _ -> liftM HasInfo $ lazyGet     -- NB lazyGet
 
 instance Binary IfaceInfoItem where
-    put_ bh (HsArity aa)          = putByte bh 0 >> put_ bh aa
-    put_ bh (HsStrictness ab)     = putByte bh 1 >> put_ bh ab
-    put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
-    put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
-    put_ bh HsNoCafRefs           = putByte bh 4
-    put_ bh HsLevity              = putByte bh 5
-    get bh = do
-        h <- getByte bh
+    put (HsArity aa)          = putByte 0 >> put aa
+    put (HsStrictness ab)     = putByte 1 >> put ab
+    put (HsUnfold lb ad)      = putByte 2 >> put lb >> put ad
+    put (HsInline ad)         = putByte 3 >> put ad
+    put HsNoCafRefs           = putByte 4
+    put HsLevity              = putByte 5
+    get = do
+        h <- getByte
         case h of
-            0 -> liftM HsArity $ get bh
-            1 -> liftM HsStrictness $ get bh
-            2 -> do lb <- get bh
-                    ad <- get bh
+            0 -> liftM HsArity $ get
+            1 -> liftM HsStrictness $ get
+            2 -> do lb <- get
+                    ad <- get
                     return (HsUnfold lb ad)
-            3 -> liftM HsInline $ get bh
+            3 -> liftM HsInline $ get
             4 -> return HsNoCafRefs
             _ -> return HsLevity
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold s e) = do
-        putByte bh 0
-        put_ bh s
-        put_ bh e
-    put_ bh (IfInlineRule a b c d) = do
-        putByte bh 1
-        put_ bh a
-        put_ bh b
-        put_ bh c
-        put_ bh d
-    put_ bh (IfDFunUnfold as bs) = do
-        putByte bh 2
-        put_ bh as
-        put_ bh bs
-    put_ bh (IfCompulsory e) = do
-        putByte bh 3
-        put_ bh e
-    get bh = do
-        h <- getByte bh
+    put (IfCoreUnfold s e) = do
+        putByte 0
+        put s
+        put e
+    put (IfInlineRule a b c d) = do
+        putByte 1
+        put a
+        put b
+        put c
+        put d
+    put (IfDFunUnfold as bs) = do
+        putByte 2
+        put as
+        put bs
+    put (IfCompulsory e) = do
+        putByte 3
+        put e
+    get = do
+        h <- getByte
         case h of
-            0 -> do s <- get bh
-                    e <- get bh
+            0 -> do s <- get
+                    e <- get
                     return (IfCoreUnfold s e)
-            1 -> do a <- get bh
-                    b <- get bh
-                    c <- get bh
-                    d <- get bh
+            1 -> do a <- get
+                    b <- get
+                    c <- get
+                    d <- get
                     return (IfInlineRule a b c d)
-            2 -> do as <- get bh
-                    bs <- get bh
+            2 -> do as <- get
+                    bs <- get
                     return (IfDFunUnfold as bs)
-            _ -> do e <- get bh
+            _ -> do e <- get
                     return (IfCompulsory e)
 
 
 instance Binary IfaceExpr where
-    put_ bh (IfaceLcl aa) = do
-        putByte bh 0
-        put_ bh aa
-    put_ bh (IfaceType ab) = do
-        putByte bh 1
-        put_ bh ab
-    put_ bh (IfaceCo ab) = do
-        putByte bh 2
-        put_ bh ab
-    put_ bh (IfaceTuple ac ad) = do
-        putByte bh 3
-        put_ bh ac
-        put_ bh ad
-    put_ bh (IfaceLam (ae, os) af) = do
-        putByte bh 4
-        put_ bh ae
-        put_ bh os
-        put_ bh af
-    put_ bh (IfaceApp ag ah) = do
-        putByte bh 5
-        put_ bh ag
-        put_ bh ah
-    put_ bh (IfaceCase ai aj ak) = do
-        putByte bh 6
-        put_ bh ai
-        put_ bh aj
-        put_ bh ak
-    put_ bh (IfaceLet al am) = do
-        putByte bh 7
-        put_ bh al
-        put_ bh am
-    put_ bh (IfaceTick an ao) = do
-        putByte bh 8
-        put_ bh an
-        put_ bh ao
-    put_ bh (IfaceLit ap) = do
-        putByte bh 9
-        put_ bh ap
-    put_ bh (IfaceFCall as at) = do
-        putByte bh 10
-        put_ bh as
-        put_ bh at
-    put_ bh (IfaceExt aa) = do
-        putByte bh 11
-        put_ bh aa
-    put_ bh (IfaceCast ie ico) = do
-        putByte bh 12
-        put_ bh ie
-        put_ bh ico
-    put_ bh (IfaceECase a b) = do
-        putByte bh 13
-        put_ bh a
-        put_ bh b
-    get bh = do
-        h <- getByte bh
+    put (IfaceLcl aa) = do
+        putByte 0
+        put aa
+    put (IfaceType ab) = do
+        putByte 1
+        put ab
+    put (IfaceCo ab) = do
+        putByte 2
+        put ab
+    put (IfaceTuple ac ad) = do
+        putByte 3
+        put ac
+        put ad
+    put (IfaceLam (ae, os) af) = do
+        putByte 4
+        put ae
+        put os
+        put af
+    put (IfaceApp ag ah) = do
+        putByte 5
+        put ag
+        put ah
+    put (IfaceCase ai aj ak) = do
+        putByte 6
+        put ai
+        put aj
+        put ak
+    put (IfaceLet al am) = do
+        putByte 7
+        put al
+        put am
+    put (IfaceTick an ao) = do
+        putByte 8
+        put an
+        put ao
+    put (IfaceLit ap) = do
+        putByte 9
+        put ap
+    put (IfaceFCall as at) = do
+        putByte 10
+        put as
+        put at
+    put (IfaceExt aa) = do
+        putByte 11
+        put aa
+    put (IfaceCast ie ico) = do
+        putByte 12
+        put ie
+        put ico
+    put (IfaceECase a b) = do
+        putByte 13
+        put a
+        put b
+    get = do
+        h <- getByte
         case h of
-            0 -> do aa <- get bh
+            0 -> do aa <- get
                     return (IfaceLcl aa)
-            1 -> do ab <- get bh
+            1 -> do ab <- get
                     return (IfaceType ab)
-            2 -> do ab <- get bh
+            2 -> do ab <- get
                     return (IfaceCo ab)
-            3 -> do ac <- get bh
-                    ad <- get bh
+            3 -> do ac <- get
+                    ad <- get
                     return (IfaceTuple ac ad)
-            4 -> do ae <- get bh
-                    os <- get bh
-                    af <- get bh
+            4 -> do ae <- get
+                    os <- get
+                    af <- get
                     return (IfaceLam (ae, os) af)
-            5 -> do ag <- get bh
-                    ah <- get bh
+            5 -> do ag <- get
+                    ah <- get
                     return (IfaceApp ag ah)
-            6 -> do ai <- get bh
-                    aj <- get bh
-                    ak <- get bh
+            6 -> do ai <- get
+                    aj <- get
+                    ak <- get
                     return (IfaceCase ai aj ak)
-            7 -> do al <- get bh
-                    am <- get bh
+            7 -> do al <- get
+                    am <- get
                     return (IfaceLet al am)
-            8 -> do an <- get bh
-                    ao <- get bh
+            8 -> do an <- get
+                    ao <- get
                     return (IfaceTick an ao)
-            9 -> do ap <- get bh
+            9 -> do ap <- get
                     return (IfaceLit ap)
-            10 -> do as <- get bh
-                     at <- get bh
+            10 -> do as <- get
+                     at <- get
                      return (IfaceFCall as at)
-            11 -> do aa <- get bh
+            11 -> do aa <- get
                      return (IfaceExt aa)
-            12 -> do ie <- get bh
-                     ico <- get bh
+            12 -> do ie <- get
+                     ico <- get
                      return (IfaceCast ie ico)
-            13 -> do a <- get bh
-                     b <- get bh
+            13 -> do a <- get
+                     b <- get
                      return (IfaceECase a b)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
-    put_ bh (IfaceHpcTick m ix) = do
-        putByte bh 0
-        put_ bh m
-        put_ bh ix
-    put_ bh (IfaceSCC cc tick push) = do
-        putByte bh 1
-        put_ bh cc
-        put_ bh tick
-        put_ bh push
-    put_ bh (IfaceSource src name) = do
-        putByte bh 2
-        put_ bh (srcSpanFile src)
-        put_ bh (srcSpanStartLine src)
-        put_ bh (srcSpanStartCol src)
-        put_ bh (srcSpanEndLine src)
-        put_ bh (srcSpanEndCol src)
-        put_ bh name
+    put (IfaceHpcTick m ix) = do
+        putByte 0
+        put m
+        put ix
+    put (IfaceSCC cc tick push) = do
+        putByte 1
+        put cc
+        put tick
+        put push
+    put (IfaceSource src name) = do
+        putByte 2
+        put (srcSpanFile src)
+        put (srcSpanStartLine src)
+        put (srcSpanStartCol src)
+        put (srcSpanEndLine src)
+        put (srcSpanEndCol src)
+        put name
 
-    get bh = do
-        h <- getByte bh
+    get = do
+        h <- getByte
         case h of
-            0 -> do m <- get bh
-                    ix <- get bh
+            0 -> do m <- get
+                    ix <- get
                     return (IfaceHpcTick m ix)
-            1 -> do cc <- get bh
-                    tick <- get bh
-                    push <- get bh
+            1 -> do cc <- get
+                    tick <- get
+                    push <- get
                     return (IfaceSCC cc tick push)
-            2 -> do file <- get bh
-                    sl <- get bh
-                    sc <- get bh
-                    el <- get bh
-                    ec <- get bh
+            2 -> do file <- get
+                    sl <- get
+                    sc <- get
+                    el <- get
+                    ec <- get
                     let start = mkRealSrcLoc file sl sc
                         end = mkRealSrcLoc file el ec
-                    name <- get bh
+                    name <- get
                     return (IfaceSource (mkRealSrcSpan start end) name)
             _ -> panic ("get IfaceTickish " ++ show h)
 
 instance Binary IfaceConAlt where
-    put_ bh IfaceDefault      = putByte bh 0
-    put_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
-    put_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
-    get bh = do
-        h <- getByte bh
+    put IfaceDefault      = putByte 0
+    put (IfaceDataAlt aa) = putByte 1 >> put aa
+    put (IfaceLitAlt ac)  = putByte 2 >> put ac
+    get = do
+        h <- getByte
         case h of
             0 -> return IfaceDefault
-            1 -> liftM IfaceDataAlt $ get bh
-            _ -> liftM IfaceLitAlt  $ get bh
+            1 -> liftM IfaceDataAlt $ get
+            _ -> liftM IfaceLitAlt  $ get
 
 instance Binary IfaceBinding where
-    put_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
-    put_ bh (IfaceRec ac)       = putByte bh 1 >> put_ bh ac
-    get bh = do
-        h <- getByte bh
+    put (IfaceNonRec aa ab) = putByte 0 >> put aa >> put ab
+    put (IfaceRec ac)       = putByte 1 >> put ac
+    get = do
+        h <- getByte
         case h of
-            0 -> do { aa <- get bh; ab <- get bh; return (IfaceNonRec aa ab) }
-            _ -> do { ac <- get bh; return (IfaceRec ac) }
+            0 -> do { aa <- get; ab <- get; return (IfaceNonRec aa ab) }
+            _ -> do { ac <- get; return (IfaceRec ac) }
 
 instance Binary IfaceLetBndr where
-    put_ bh (IfLetBndr a b c d) = do
-            put_ bh a
-            put_ bh b
-            put_ bh c
-            put_ bh d
-    get bh = do a <- get bh
-                b <- get bh
-                c <- get bh
-                d <- get bh
-                return (IfLetBndr a b c d)
+    put (IfLetBndr a b c d) = do
+            put a
+            put b
+            put c
+            put d
+    get = do a <- get
+             b <- get
+             c <- get
+             d <- get
+             return (IfLetBndr a b c d)
 
 instance Binary IfaceJoinInfo where
-    put_ bh IfaceNotJoinPoint = putByte bh 0
-    put_ bh (IfaceJoinPoint ar) = do
-        putByte bh 1
-        put_ bh ar
-    get bh = do
-        h <- getByte bh
+    put IfaceNotJoinPoint = putByte 0
+    put (IfaceJoinPoint ar) = do
+        putByte 1
+        put ar
+    get = do
+        h <- getByte
         case h of
             0 -> return IfaceNotJoinPoint
-            _ -> liftM IfaceJoinPoint $ get bh
+            _ -> liftM IfaceJoinPoint $ get
 
 instance Binary IfaceTyConParent where
-    put_ bh IfNoParent = putByte bh 0
-    put_ bh (IfDataInstance ax pr ty) = do
-        putByte bh 1
-        put_ bh ax
-        put_ bh pr
-        put_ bh ty
-    get bh = do
-        h <- getByte bh
+    put IfNoParent = putByte 0
+    put (IfDataInstance ax pr ty) = do
+        putByte 1
+        put ax
+        put pr
+        put ty
+    get = do
+        h <- getByte
         case h of
             0 -> return IfNoParent
             _ -> do
-                ax <- get bh
-                pr <- get bh
-                ty <- get bh
+                ax <- get
+                pr <- get
+                ty <- get
                 return $ IfDataInstance ax pr ty
 
 instance Binary IfaceCompleteMatch where
-  put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
-  get bh = IfaceCompleteMatch <$> get bh <*> get bh
+  put (IfaceCompleteMatch cs ts) = put cs >> put ts
+  get = IfaceCompleteMatch <$> get <*> get
 
 
 {-

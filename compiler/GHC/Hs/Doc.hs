@@ -58,8 +58,8 @@ newtype HsDocString = HsDocString ByteString
 type LHsDocString = Located HsDocString
 
 instance Binary HsDocString where
-  put_ bh (HsDocString bs) = put_ bh bs
-  get bh = HsDocString <$> get bh
+  put (HsDocString bs) = put bs
+  get = HsDocString <$> get
 
 instance Outputable HsDocString where
   ppr = doubleQuotes . text . unpackHDS
@@ -118,10 +118,10 @@ concatDocs xs =
 newtype DeclDocMap = DeclDocMap (Map Name HsDocString)
 
 instance Binary DeclDocMap where
-  put_ bh (DeclDocMap m) = put_ bh (Map.toList m)
+  put (DeclDocMap m) = put (Map.toList m)
   -- We can't rely on a deterministic ordering of the `Name`s here.
   -- See the comments on `Name`'s `Ord` instance for context.
-  get bh = DeclDocMap . Map.fromList <$> get bh
+  get = DeclDocMap . Map.fromList <$> get
 
 instance Outputable DeclDocMap where
   ppr (DeclDocMap m) = vcat (map pprPair (Map.toAscList m))
@@ -135,10 +135,10 @@ emptyDeclDocMap = DeclDocMap Map.empty
 newtype ArgDocMap = ArgDocMap (Map Name (Map Int HsDocString))
 
 instance Binary ArgDocMap where
-  put_ bh (ArgDocMap m) = put_ bh (Map.toList (Map.toAscList <$> m))
+  put (ArgDocMap m) = put (Map.toList (Map.toAscList <$> m))
   -- We can't rely on a deterministic ordering of the `Name`s here.
   -- See the comments on `Name`'s `Ord` instance for context.
-  get bh = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromList <$> get bh
+  get = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromList <$> get
 
 instance Outputable ArgDocMap where
   ppr (ArgDocMap m) = vcat (map pprPair (Map.toAscList m))

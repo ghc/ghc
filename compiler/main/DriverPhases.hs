@@ -103,11 +103,11 @@ data HscSource
         -- Ord needed for the finite maps we build in CompManager
 
 instance Binary HscSource where
-    put_ bh HsSrcFile = putByte bh 0
-    put_ bh HsBootFile = putByte bh 1
-    put_ bh HsigFile = putByte bh 2
-    get bh = do
-        h <- getByte bh
+    put HsSrcFile  = putByte 0
+    put HsBootFile = putByte 1
+    put HsigFile   = putByte 2
+    get = do
+        h <- getByte
         case h of
             0 -> return HsSrcFile
             1 -> return HsBootFile

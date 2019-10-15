@@ -267,20 +267,16 @@ pprAvail (AvailTC n ns fs)
                          , fsep (punctuate comma (map (ppr . flLabel) fs))])
 
 instance Binary AvailInfo where
-    put_ bh (Avail aa) = do
-            putByte bh 0
-            put_ bh aa
-    put_ bh (AvailTC ab ac ad) = do
-            putByte bh 1
-            put_ bh ab
-            put_ bh ac
-            put_ bh ad
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do aa <- get bh
-                      return (Avail aa)
-              _ -> do ab <- get bh
-                      ac <- get bh
-                      ad <- get bh
-                      return (AvailTC ab ac ad)
+    put (Avail aa) = do
+         putByte 0
+         put aa
+    put (AvailTC ab ac ad) = do
+         putByte 1
+         put ab
+         put ac
+         put ad
+    get = do
+         h <- getByte
+         case h of
+           0 -> Avail <$> get
+           _ -> AvailTC <$> get <*> get <*> get

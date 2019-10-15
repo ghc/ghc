@@ -22,7 +22,11 @@ newCostCentreState = CostCentreState emptyFsEnv
 
 -- | An index into a given cost centre module,name,flavour set
 newtype CostCentreIndex = CostCentreIndex { unCostCentreIndex :: Int }
-  deriving (Eq, Ord, Data, Binary)
+  deriving (Eq, Ord, Data)
+
+instance Binary CostCentreIndex where
+  put = put . unCostCentreIndex
+  get = CostCentreIndex <$> get
 
 -- | Get a new index for a given cost centre name.
 getCCIndex :: FastString
