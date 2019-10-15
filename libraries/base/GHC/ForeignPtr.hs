@@ -3,12 +3,6 @@
            , BangPatterns
            , MagicHash
            , UnboxedTuples
-           , TypeApplications
-           , ScopedTypeVariables
-           , KindSignatures
-           , DataKinds
-           , TypeOperators
-           , GADTs
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -60,7 +54,6 @@ import GHC.Base
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
-import GHC.Prim
 import Unsafe.Coerce
 
 -- |The type 'ForeignPtr' represents references to objects that are
@@ -173,18 +166,11 @@ mallocForeignPtr = doMalloc undefined
           r <- newIORef NoFinalizers
           IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                                (MallocPtr mbarr# r) #)
             }
             where !(I# size)  = sizeOf a
                   !(I# align) = alignment a
-
-castByteArrayWith :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . UnsafeEquality a b -> a -> b
-castByteArrayWith UnsafeRefl x = x
-
-unsafeFreezeByteArray :: MutableByteArray# RealWorld -> ByteArray#
-unsafeFreezeByteArray x =
-    castByteArrayWith (unsafeEqualityProof @(MutableByteArray# RealWorld) @ByteArray#) x
 
 -- | This function is similar to 'mallocForeignPtr', except that the
 -- size of the memory required is given explicitly as a number of bytes.
@@ -195,7 +181,7 @@ mallocForeignPtrBytes (I# size) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (MallocPtr mbarr# r) #)
      }
 
@@ -209,7 +195,7 @@ mallocForeignPtrAlignedBytes (I# size) (I# align) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (MallocPtr mbarr# r) #)
      }
 
@@ -233,7 +219,7 @@ mallocPlainForeignPtr = doMalloc undefined
           | I# size < 0 = errorWithoutStackTrace "mallocForeignPtr: size must be >= 0"
           | otherwise = IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                                (PlainPtr mbarr#) #)
             }
             where !(I# size)  = sizeOf a
@@ -248,7 +234,7 @@ mallocPlainForeignPtrBytes size | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrBytes: size must be >= 0"
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (PlainPtr mbarr#) #)
      }
 
@@ -261,7 +247,7 @@ mallocPlainForeignPtrAlignedBytes size _align | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrAlignedBytes: size must be >= 0"
 mallocPlainForeignPtrAlignedBytes (I# size) (I# align) = IO $ \s ->
     case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeFreezeByteArray mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (PlainPtr mbarr#) #)
      }
 
