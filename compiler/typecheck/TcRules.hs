@@ -26,7 +26,7 @@ import TcHsType
 import TcExpr
 import TcEnv
 import TcUnify( buildImplicationFor )
-import TcEvidence( mkTcCoVarCo )
+import TcEvidence
 import Type
 import TyCon( isTypeFamilyTyCon )
 import Id

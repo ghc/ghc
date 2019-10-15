@@ -17,6 +17,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Hs.Pat (
         Pat(..), InPat, OutPat, LPat,
@@ -28,8 +30,6 @@ module GHC.Hs.Pat (
         HsRecUpdField, LHsRecUpdField,
         hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
         hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
-
-        mkPrefixConPat, mkCharLitPat, mkNilPat,
 
         looksLazyPatBind,
         isBangedLPat,
@@ -50,11 +50,9 @@ import GHC.Hs.Binds
 import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Types
-import TcEvidence
 import BasicTypes
 -- others:
 import PprCore          ( {- instance OutputableBndr TyVar -} )
-import TysWiredIn
 import Var
 import RdrName ( RdrName )
 import ConLike
@@ -187,9 +185,9 @@ data Pat p
                                         -- One reason for putting coercion variable here, I think,
                                         --      is to ensure their kinds are zonked
 
-        pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
+        pat_binds :: XTcEvBinds,        -- Bindings involving those dictionaries
         pat_args  :: HsConPatDetails p,
-        pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
+        pat_wrap  :: XHsWrapper         -- Extra wrapper to pass to the matcher
                                         -- Only relevant for pattern-synonyms;
                                         --   ignored for data cons
     }
@@ -261,7 +259,7 @@ data Pat p
 
         ------------ Pattern coercions (translation only) ---------------
   | CoPat       (XCoPat p)
-                HsWrapper           -- Coercion Pattern
+                XHsWrapper          -- Coercion Pattern
                                     -- If co :: t1 ~ t2, p :: t2,
                                     -- then (CoPat co p) :: t1
                 (Pat p)             -- Why not LPat?  Ans: existing locn will do
@@ -535,7 +533,7 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -549,8 +547,9 @@ pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
-                                            -> if parens
+pprPat (CoPat _ co pat _)       = pprIfTc @p $
+                                  pprHsWrapper co $ \parens
+                                              -> if parens
                                                  then pprParendPat appPrec pat
                                                  else pprPat pat
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
@@ -571,7 +570,7 @@ pprPat (ConPatOut { pat_con = con
     if gopt Opt_PrintTypecheckerElaboration dflags then
         ppr con
           <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                         , ppr binds])
+                         , pprIfTc @p $ ppr binds ])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
 pprPat (XPat x)               = ppr x
@@ -604,33 +603,6 @@ instance (Outputable p, Outputable arg)
                     hsRecPun = pun })
     = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
 
-
-{-
-************************************************************************
-*                                                                      *
-*              Building patterns
-*                                                                      *
-************************************************************************
--}
-
-mkPrefixConPat :: DataCon ->
-                  [OutPat (GhcPass p)] -> [Type] -> OutPat (GhcPass p)
--- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats tys
-  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc)
-                      , pat_tvs = []
-                      , pat_dicts = []
-                      , pat_binds = emptyTcEvBinds
-                      , pat_args = PrefixCon pats
-                      , pat_arg_tys = tys
-                      , pat_wrap = idHsWrapper }
-
-mkNilPat :: Type -> OutPat (GhcPass p)
-mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
-
-mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
-mkCharLitPat src c = mkPrefixConPat charDataCon
-                          [noLoc $ LitPat noExtField (HsCharPrim src c)] []
 
 {-
 ************************************************************************

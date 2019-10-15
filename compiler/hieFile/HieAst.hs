@@ -643,16 +643,16 @@ instance HasType (LHsExpr GhcTc) where
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before marking more things here as 'False'. See impact on Haddock
       -- performance before marking more things as 'True'.
-      skipDesugaring :: HsExpr a -> Bool
+      skipDesugaring :: HsExpr GhcTc -> Bool
       skipDesugaring e = case e of
-        HsVar{}        -> False
-        HsUnboundVar{} -> False
-        HsConLikeOut{} -> False
-        HsRecFld{}     -> False
-        HsOverLabel{}  -> False
-        HsIPVar{}      -> False
-        HsWrap{}       -> False
-        _              -> True
+        HsVar{}          -> False
+        HsUnboundVar{}   -> False
+        HsConLikeOut{}   -> False
+        HsRecFld{}       -> False
+        HsOverLabel{}    -> False
+        HsIPVar{}        -> False
+        XExpr (HsWrap{}) -> False
+        _                -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
@@ -885,6 +885,7 @@ instance ( a ~ GhcPass p
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
          , (HasRealDataConName a)
+         , IsPass p
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -1003,9 +1004,6 @@ instance ( a ~ GhcPass p
       HsTickPragma _ _ _ _ expr ->
         [ toHie expr
         ]
-      HsWrap _ _ a ->
-        [ toHie $ L mspan a
-        ]
       HsBracket _ b ->
         [ toHie b
         ]
@@ -1020,7 +1018,13 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      XExpr _ -> []
+      XExpr x
+        | GhcTc <- pass @p
+        , HsWrap _ a <- x
+        -> [ toHie $ L mspan a ]
+
+        | otherwise
+        -> []
 
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)
@@ -1250,7 +1254,6 @@ instance ( a ~ GhcPass p
         [ pure $ locOnly ispan
         , toHie $ listScopes NoScope stmts
         ]
-      HsCmdWrap _ _ _ -> []
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where

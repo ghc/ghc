@@ -4,6 +4,7 @@
 -}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Contains a debug function to dump parts of the GHC.Hs AST. It uses a syb
 -- traversal which falls back to displaying based on the constructor name, so
@@ -26,6 +27,7 @@ import Name
 import DataCon
 import SrcLoc
 import GHC.Hs
+import GHC.Hs.Instances
 import OccName hiding (occName)
 import Var
 import Module
@@ -39,7 +41,7 @@ data BlankSrcSpan = BlankSrcSpan | NoBlankSrcSpan
 -- | Show a GHC syntax tree. This parameterised because it is also used for
 -- comparing ASTs in ppr roundtripping tests, where the SrcSpan's are blanked
 -- out, to avoid comparing locations, only structure
-showAstData :: Data a => BlankSrcSpan -> a -> SDoc
+showAstData :: (DataX, Data a) => BlankSrcSpan -> a -> SDoc
 showAstData b a0 = blankLine $$ showAstData' a0
   where
     showAstData' :: Data a => a -> SDoc

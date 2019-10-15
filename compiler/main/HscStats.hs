@@ -14,6 +14,7 @@ import GhcPrelude
 
 import Bag
 import GHC.Hs
+import TcEvidence ()   -- instance for Outputable HsWrapper
 import Outputable
 import SrcLoc
 import Util

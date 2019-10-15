@@ -1465,8 +1465,8 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxOpType
               -> ([TcSigmaType] -> TcM a)
               -> TcM (a, SyntaxExpr GhcTcId)
-tcSyntaxOpGen orig op arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferSigma $ noLoc $ syn_expr op
+tcSyntaxOpGen orig (Just op) arg_tys res_ty thing_inside
+  = do { (expr, sigma) <- tcInferSigma $ noLoc op
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
@@ -1475,6 +1475,7 @@ tcSyntaxOpGen orig op arg_tys res_ty thing_inside
        ; return (result, SyntaxExpr { syn_expr = mkHsWrap expr_wrap $ unLoc expr
                                     , syn_arg_wraps = arg_wraps
                                     , syn_res_wrap  = res_wrap }) }
+tcSyntaxOpGen _ Nothing _ _ _ = panic "tcSyntaxOpGen"
 
 {-
 Note [tcSynArg]

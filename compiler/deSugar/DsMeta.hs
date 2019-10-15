@@ -1818,7 +1818,7 @@ repP (AsPat _ x p)      = do { x' <- lookupLBinder x; p1 <- repLP p
 repP (ParPat _ p)       = repLP p
 repP (ListPat Nothing ps)  = do { qs <- repLPs ps; repPlist qs }
 repP (ListPat (Just e) ps) = do { p <- repP (ListPat Nothing ps)
-                                ; e' <- repE (syn_expr e)
+                                ; e' <- repE (expectJust "repP" e)
                                 ; repPview e' p}
 repP (TuplePat _ ps boxed)
   | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }

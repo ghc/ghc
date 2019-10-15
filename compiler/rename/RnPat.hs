@@ -864,16 +864,14 @@ rnOverLit origLit
             | otherwise       = origLit
           }
         ; let std_name = hsOverLitName val
-        ; (SyntaxExpr { syn_expr = from_thing_name }, fvs1)
-            <- lookupSyntaxName std_name
+        ; (Just from_thing_name, fvs1) <- lookupSyntaxName std_name
         ; let rebindable = case from_thing_name of
                                 HsVar _ lv -> (unLoc lv) /= std_name
                                 _          -> panic "rnOverLit"
         ; let lit' = lit { ol_witness = from_thing_name
                          , ol_ext = rebindable }
         ; if isNegativeZeroOverLit lit'
-          then do { (SyntaxExpr { syn_expr = negate_name }, fvs2)
-                      <- lookupSyntaxName negateName
+          then do { (Just negate_name, fvs2) <- lookupSyntaxName negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)
                                   , fvs1 `plusFV` fvs2) }
           else return ((lit', Nothing), fvs1) }

@@ -17,7 +17,7 @@ module Type (
         TyThing(..), Type, ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
         KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
-        KnotTied,
+        KnotTied, TcType,
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -267,6 +267,10 @@ import Unique ( nonDetCmpUnique )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
+
+type TcType = Type      -- A TcType can have mutable type variables
+-- defined here so that modules can refer to TcType without depending
+-- on the type-checker
 
 -- $type_classification
 -- #type_classification#

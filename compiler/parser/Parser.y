@@ -2422,7 +2422,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                         case r of {
-                                          (FunBind _ n _ _ _) ->
+                                          (FunBind _ n _ _) ->
                                                 amsL l [mj AnnFunId n] >> return () ;
                                           (PatBind _ (dL->L l _) _rhs _) ->
                                                 amsL l [] >> return () } ;
@@ -2437,7 +2437,7 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- a FunBind or PatBind back from checkValDef. See Note
                                         -- [FunBind vs PatBind]
                                         case r of {
-                                          (FunBind _ n _ _ _) ->
+                                          (FunBind _ n _ _) ->
                                                 amsL l (mj AnnFunId n:(fst $2)) >> return () ;
                                           (PatBind _ (dL->L lh _lhs) _rhs _) ->
                                                 amsL lh (fst $2) >> return () } ;
