@@ -37,6 +37,8 @@ module DsUtils (
 
         mkSelectorBinds,
 
+        mkPrefixConPat, mkCharLitPat, mkNilPat,
+
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
         mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang,
         isTrueLHsExpr
@@ -773,6 +775,33 @@ mkBigLHsVarPatTupId bs = mkBigLHsPatTupId (map nlVarPat bs)
 
 mkBigLHsPatTupId :: [LPat GhcTc] -> LPat GhcTc
 mkBigLHsPatTupId = mkChunkified mkLHsPatTup
+
+{-
+************************************************************************
+*                                                                      *
+*              Building patterns
+*                                                                      *
+************************************************************************
+-}
+
+mkPrefixConPat :: DataCon ->
+                  [OutPat (GhcPass p)] -> [Type] -> OutPat (GhcPass p)
+-- Make a vanilla Prefix constructor pattern
+mkPrefixConPat dc pats tys
+  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc)
+                      , pat_tvs = []
+                      , pat_dicts = []
+                      , pat_binds = emptyTcEvBinds
+                      , pat_args = PrefixCon pats
+                      , pat_arg_tys = tys
+                      , pat_wrap = idHsWrapper }
+
+mkNilPat :: Type -> OutPat (GhcPass p)
+mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
+
+mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
+mkCharLitPat src c = mkPrefixConPat charDataCon
+                          [noLoc $ LitPat noExtField (HsCharPrim src c)] []
 
 {-
 ************************************************************************

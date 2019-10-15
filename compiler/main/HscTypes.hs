@@ -163,6 +163,7 @@ import GHC.ForeignSrcLang
 
 import UniqFM
 import GHC.Hs
+import TcEvidence       ()   -- instance for Outputable HsWrapper
 import RdrName
 import Avail
 import Module

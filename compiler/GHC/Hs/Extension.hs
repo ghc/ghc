@@ -12,6 +12,11 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE RankNTypes #-}
 
 module GHC.Hs.Extension where
 
@@ -129,10 +134,20 @@ the strict field changes described above and delete gobs of code involving
 code that consumes unused extension constructors.
 -}
 
--- | Used as a data type index for the hsSyn AST
-data GhcPass (c :: Pass)
-deriving instance Eq (GhcPass c)
-deriving instance Typeable c => Data (GhcPass c)
+-- | Used as a data type index for the hsSyn AST; also serves
+-- as a singleton type for Pass
+data GhcPass (c :: Pass) where
+  GhcPs :: GhcPs
+  GhcRn :: GhcRn
+  GhcTc :: GhcTc
+
+-- This really should never be entered, but the data-deriving machinery
+-- needs the instance to exist.
+instance Typeable p => Data (GhcPass p) where
+  gunfold _ _ _ = panic "instance Data GhcPass"
+  toConstr  _   = panic "instance Data GhcPass"
+  dataTypeOf _  = panic "instance Data GhcPass"
+
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
@@ -142,6 +157,28 @@ type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
 type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
 type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+-- | Allows us to check what phase we're in at GHC's runtime
+class p ~ GhcPass (GetPass p) => IsGhcPass p where
+  type GetPass p :: Pass
+  ghcPass :: GhcPass (GetPass p)
+
+instance IsGhcPass GhcPs where
+  type GetPass GhcPs = 'Parsed
+  ghcPass = GhcPs
+instance IsGhcPass GhcRn where
+  type GetPass GhcRn = 'Renamed
+  ghcPass = GhcRn
+instance IsGhcPass GhcTc where
+  type GetPass GhcTc = 'Typechecked
+  ghcPass = GhcTc
+
+-- | This variant of 'IsGhcPass' is convenient when you have (p :: Pass)
+type IsPass p = IsGhcPass (GhcPass p)
+
+-- | This variant of 'ghcPass' is convenient when you have (p :: Pass)
+pass :: forall p. IsPass p => GhcPass p
+pass = ghcPass @(GhcPass p)
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
@@ -1150,14 +1187,15 @@ type ConvertIdX a b =
 -- will not.
 
 
--- | Provide a summary constraint that gives all am Outputable constraint to
+-- | Provide a summary constraint that gives an Outputable constraint to
 -- extension points needing one
 type OutputableX p = -- See Note [OutputableX]
   ( Outputable (XIPBinds    p)
   , Outputable (XViaStrategy p)
   , Outputable (XViaStrategy GhcRn)
+  , OutputableAbstract p
+  , IsGhcPass p
   )
--- TODO: Should OutputableX be included in OutputableBndrId?
 
 -- ----------------------------------------------------------------------
 
@@ -1172,3 +1210,92 @@ type OutputableBndrId id =
   , OutputableX id
   , OutputableX (NoGhcTc id)
   )
+
+-- useful helper functions:
+pprIfPs :: forall p. IsPass p => (p ~ 'Parsed => SDoc) -> SDoc
+pprIfPs pp = case pass @p of GhcPs -> pp
+                             _     -> empty
+
+pprIfRn :: forall p. IsPass p => (p ~ 'Renamed => SDoc) -> SDoc
+pprIfRn pp = case pass @p of GhcRn -> pp
+                             _     -> empty
+
+pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
+pprIfTc pp = case pass @p of GhcTc -> pp
+                             _     -> empty
+
+{--------------------------------------------------------------------------
+-- Abstract data
+---------------------------------------------------------------------------
+
+These are defined in this module so they can be incoporated into e.g.
+OutputableX.
+
+Note [Abstract data]
+~~~~~~~~~~~~~~~~~~~~
+
+We wish to keep GHC as modular as possible, with an eye to, perhaps, breaking
+it up into several packages some day. To do this, we want to avoid dependencies
+from HsSyn on other seemingly-unrelated parts of the compiler. Specifically,
+the type-checker should depend on HsSyn, not the other way around. Yet we
+need to store type-checker information in the AST in a few places (notably,
+HsWrap).
+
+To allow us to store type-checker datatypes in the HsSyn AST but without
+taking a dependency, we use *nullary families*. The idea is that we
+can define, say
+
+  type family HsWrapper
+
+but leave the (orphan) instance to be defined in the type-checker. No more
+dependency. This works for both type and data families.
+
+The only real challenge is what to do with instances (e.g. Outputable and Data).
+We have two choices:
+
+  1. We can define an instance on a data family, but of course the instance
+     won't have access to any fields or constructors in the structure and so
+     will have to essentially be a dummy instance.
+
+  2. We can abstract over the instance in e.g. OutputableX.
+
+The choice between (1) and (2) is made on a case-by-case basis, preferring (1)
+if the dummy instance is acceptable. In order to use (1), the nullary family
+must be a *data* family. When choosing (2), it may be helpful to
+use a *nullary class* in order to abstract over a custom printing function.
+See OutputableHsWrapper for an example.
+
+-}
+
+-------------------------
+-- | An HsWrapper is, essentially, a Core expression with a hole in it.
+-- They are manufactured by the type-checker, and should appear in expressions
+-- only after type-checking. We thus leave the definition abstract via
+-- the use of a nullary type family.
+-- See Note [Abstract data]
+type family XHsWrapper
+
+class OutputableHsWrapper where
+  -- | With @-fprint-typechecker-elaboration@, print the wrapper
+  --   otherwise just print what's inside
+  -- The pp_thing_inside function takes Bool to say whether
+  --    it's in a position that needs parens for a non-atomic thing
+  pprHsWrapper :: XHsWrapper -> (Bool -> SDoc) -> SDoc
+
+-- | Abstract version of 'TcEvBinds' (used in 'AbsBinds')
+type family XTcEvBinds
+
+-- | Abstract version of 'TcLclEnv' (used for delayed splices)
+-- See Note [Running typed splices in the zonker] in GHC.Hs.Expr
+type family XTcLclEnv
+
+-- | A summary constraint assuming Outputable for abstract types.
+-- Defining this as a type family (and thus allowing us to avoid
+-- the need for XHsWrapper and XTcEvBinds in the GhcPs and GhcRn
+-- cases) means that the parser needn't depend on the type-checker.
+type family OutputableAbstract p :: Constraint
+type instance OutputableAbstract GhcPs = ()
+type instance OutputableAbstract GhcRn = ()
+type instance OutputableAbstract GhcTc = ( Outputable XHsWrapper
+                                         , Outputable XTcEvBinds
+                                         , OutputableHsWrapper )

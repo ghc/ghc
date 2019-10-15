@@ -17,7 +17,7 @@ of the stack mechanism), you should use a TcRef (= IORef) to store them.
 -}
 
 {-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
-             ViewPatterns #-}
+             ViewPatterns, TypeFamilies #-}
 
 module TcRnTypes(
         TcRnIf, TcRn, TcM, RnM, IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -725,6 +725,7 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
         b) used in the ModDetails of this module
 -}
 
+type instance XTcLclEnv = TcLclEnv  -- See Note [Abstract data] in GHC.Hs.Extension
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {

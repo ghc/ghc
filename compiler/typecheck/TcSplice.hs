@@ -93,7 +93,7 @@ import CoAxiom
 import PatSyn
 import ConLike
 import DataCon
-import TcEvidence( TcEvBinds(..) )
+import TcEvidence
 import Id
 import IdInfo
 import DsExpr

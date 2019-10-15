@@ -18,7 +18,7 @@ import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import IfaceEnv( newGlobalBinder )
 import TyCoRep( Type(..), TyLit(..) )
 import TcEnv
-import TcEvidence ( mkWpTyApps )
+import TcEvidence ( mkWpTyApps, mkLHsWrap )
 import TcRnMonad
 import TcType
 import HscTypes ( lookupId )
