@@ -65,7 +65,7 @@ import TcRnMonad  ( TcGblEnv, TcLclEnv, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
 import Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
-import TcMType    ( TcTyVar, TcType )
+import TcMType    ( TcTyVar )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )

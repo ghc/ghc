@@ -1,6 +1,8 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, ViewPatterns, TypeFamilies,
+             MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-orphans #-}  -- OutputableHsWrapper
 
 module TcEvidence (
 
@@ -10,6 +12,10 @@ module TcEvidence (
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
   pprHsWrapper,
+
+  mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
+  mkHsDictLet, mkHsLams, nlHsTyApp, nlHsTyApps, nlHsSyntaxApps,
+  mkHsWrapPat, mkHsWrapPatCo, mkHsCmdWrap, mkLHsCmdWrap,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -68,6 +74,7 @@ import Predicate
 import Name
 import Pair
 
+import GHC.Hs
 import CoreSyn
 import Class ( classSCSelId )
 import CoreFVs ( exprSomeFreeVars )
@@ -189,6 +196,9 @@ maybeTcSubCo ReprEq = mkTcSubCo
 *                                                                      *
 ************************************************************************
 -}
+
+-- See Note [Abstract data] in GHC.Hs.Extension
+type instance XHsWrapper = HsWrapper
 
 data HsWrapper
   = WpHole                      -- The identity coercion
@@ -385,6 +395,80 @@ collectHsWrapBinders wrap = go wrap []
 
     add_lam v (vs,w) = (v:vs, w)
 
+{- *********************************************************************
+*                                                                      *
+    --------- Integrating HsWrapper with HsExpr -------------
+*                                                                      *
+********************************************************************* -}
+
+mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkLHsWrap co_fn (dL->L loc e) = cL loc (mkHsWrap co_fn e)
+
+-- Avoid (HsWrap co (HsWrap co' _)).
+-- See Note [Detecting forced eta expansion] in DsExpr
+mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
+mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
+mkHsWrap co_fn (XExpr (HsWrap co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn e                         = XExpr (HsWrap co_fn e)
+
+mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
+           -> HsExpr GhcTc -> HsExpr GhcTc
+mkHsWrapCo co e = mkHsWrap (mkWpCastN co) e
+
+mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
+            -> HsExpr GhcTc -> HsExpr GhcTc
+mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
+
+mkLHsWrapCo :: TcCoercionN -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkLHsWrapCo co (dL->L loc e) = cL loc (mkHsWrapCo co e)
+
+mkHsCmdWrap :: HsWrapper -> HsCmd GhcTc -> HsCmd GhcTc
+mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
+                  | otherwise       = XCmd (HsWrap w cmd)
+
+mkLHsCmdWrap :: HsWrapper -> LHsCmd GhcTc -> LHsCmd GhcTc
+mkLHsCmdWrap w (dL->L loc c) = cL loc (mkHsCmdWrap w c)
+
+mkHsWrapPat :: HsWrapper -> Pat GhcTc -> Type -> Pat GhcTc
+mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
+                       | otherwise           = CoPat noExtField co_fn p ty
+
+mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
+mkHsWrapPatCo co pat ty | isTcReflCo co = pat
+                        | otherwise    = CoPat noExtField (mkWpCastN co) pat ty
+
+mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
+
+mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
+                                       <.> mkWpLams dicts) expr
+
+nlHsTyApp :: IdP GhcTc -> [Type] -> LHsExpr GhcTc
+nlHsTyApp fun_id tys
+  = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLoc fun_id)))
+
+nlHsTyApps :: IdP GhcTc -> [Type] -> [LHsExpr GhcTc]
+           -> LHsExpr GhcTc
+nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
+
+nlHsSyntaxApps :: SyntaxExprTc -> [LHsExpr GhcTc]
+               -> LHsExpr GhcTc
+nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
+                           , syn_arg_wraps = arg_wraps
+                           , syn_res_wrap  = res_wrap }) args
+  | [] <- arg_wraps   -- in the noSyntaxExpr case
+  = ASSERT( isIdHsWrapper res_wrap )
+    foldl' nlHsApp (noLoc fun) args
+
+  | otherwise
+  = mkLHsWrap res_wrap (foldl' nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
+                                                     mkLHsWrap arg_wraps args))
+nlHsSyntaxApps NoSyntaxExpr args = pprPanic "nlHsSyntaxApps" (ppr args)
+  -- this function should never be called in scenarios where there is no
+  -- rebindable syntax
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -393,6 +477,7 @@ collectHsWrapBinders wrap = go wrap []
 ************************************************************************
 -}
 
+type instance XTcEvBinds = TcEvBinds  -- See Note [Abstract data] in GHC.Hs.Extension
 data TcEvBinds
   = TcEvBinds           -- Mutable evidence bindings
        EvBindsVar       -- Mutable because they are updated "later"
@@ -903,31 +988,33 @@ can just squeeze by.  Here's how.
 instance Outputable HsWrapper where
   ppr co_fn = pprHsWrapper co_fn (no_parens (text "<>"))
 
-pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
--- With -fprint-typechecker-elaboration, print the wrapper
---   otherwise just print what's inside
--- The pp_thing_inside function takes Bool to say whether
---    it's in a position that needs parens for a non-atomic thing
-pprHsWrapper wrap pp_thing_inside
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags
-    then help pp_thing_inside wrap False
-    else pp_thing_inside False
-  where
-    help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
-    -- True  <=> appears in function application position
-    -- False <=> appears as body of let or lambda
-    help it WpHole             = it
-    help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
-                                              help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
-    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
-                                              <+> pprParendCo co)]
-    help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
-    help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
-    help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
-    help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
+-- See Note [Abstract data] in GHC.Hs.Extension
+instance OutputableHsWrapper where
+  -- pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
+  -- With -fprint-typechecker-elaboration, print the wrapper
+  --   otherwise just print what's inside
+  -- The pp_thing_inside function takes Bool to say whether
+  --    it's in a position that needs parens for a non-atomic thing
+  pprHsWrapper wrap pp_thing_inside
+    = sdocWithDynFlags $ \ dflags ->
+      if gopt Opt_PrintTypecheckerElaboration dflags
+      then help pp_thing_inside wrap False
+      else pp_thing_inside False
+    where
+      help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
+      -- True  <=> appears in function application position
+      -- False <=> appears as body of let or lambda
+      help it WpHole             = it
+      help it (WpCompose f1 f2)  = help (help it f2) f1
+      help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+                                                help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
+      help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
+                                                <+> pprParendCo co)]
+      help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
+      help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
+      help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
+      help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
+      help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
 
 pprLamBndr :: Id -> SDoc
 pprLamBndr v = pprBndr LambdaBind v
