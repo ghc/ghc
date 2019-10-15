@@ -50,6 +50,13 @@ def stopNow() -> None:
 def stopping() -> bool:
     return wantToStop
 
+_all_ways = None
+
+def get_all_ways() -> Set[WayName]:
+    global _all_ways
+    if _all_ways is None:
+        _all_ways = set(config.way_flags.keys())
+    return _all_ways
 
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
@@ -234,29 +241,42 @@ def _use_specs( name, opts, specs ):
 
 # -----
 
-def expect_fail_for( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
+def _lint_ways(name: TestName, ways: List[WayName]) -> None:
+    """ Check that all of the ways in a list are valid. """
+    unknown_ways = [way
+                    for way in get_all_ways()
+                    if way not in get_all_ways()
+                    ]
+    if len(unknown_ways) > 0:
+        framework_fail(name, None, 'Unknown ways: %s' % (unknown_ways,))
 
-def _expect_fail_for( name, opts, ways ):
-    opts.expect_fail_for = ways
+def expect_fail_for( ways: List[WayName] ):
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.expect_fail_for = ways
+
+    return helper
+
 
 def expect_broken( bug: IssueNumber ):
-    # This test is a expected not to work due to the indicated trac bug
-    # number.
-    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
+    """
+    This test is a expected not to work due to the indicated issue number.
+    """
+    def helper( name: TestName, opts ):
+        record_broken(name, opts, bug)
+        opts.expect = 'fail';
 
-def _expect_broken( name: TestName, opts, bug: IssueNumber ):
-    record_broken(name, opts, bug)
-    opts.expect = 'fail';
+    return helper
+
 
 def expect_broken_for( bug: IssueNumber, ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        record_broken(name, opts, bug)
+        opts.expect_fail_for = ways
 
-def _expect_broken_for( name: TestName, opts, bug: IssueNumber, ways ):
-    record_broken(name, opts, bug)
-    opts.expect_fail_for = ways
+    return helper
+
 
 def record_broken(name: TestName, opts, bug: IssueNumber):
     me = (bug, opts.testdir, name)
@@ -286,7 +306,8 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     Indicates that failures of this test should be ignored due to fragility in
     the given test ways as documented in the given ticket.
     """
-    def helper( name, opts, bug=bug, ways=ways ):
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
         record_broken(name, opts, bug)
         opts.fragile_ways += ways
 
@@ -295,30 +316,30 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
 # -----
 
 def omit_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _omit_ways( name, opts, w )
+    return lambda name, opts: _omit_ways(name, opts, ways)
 
-def _omit_ways( name, opts, ways ):
-    assert ways.__class__ is list
+def _omit_ways( name: TestName, opts, ways: List[WayName] ):
+    _lint_ways(name, ways)
     opts.omit_ways += ways
 
 # -----
 
 def only_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _only_ways( name, opts, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.only_ways = ways
 
-def _only_ways( name, opts, ways ):
-    opts.only_ways = ways
+    return helper
 
 # -----
 
 def extra_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _extra_ways( name, opts, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.extra_ways = ways
 
-def _extra_ways( name, opts, ways ):
-    opts.extra_ways = ways
+    return helper
+
 
 # -----
 
