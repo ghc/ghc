@@ -28,6 +28,7 @@ from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions,
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
 from junit import junit
 import cpu_features
+from my_typing import *
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
@@ -40,6 +41,10 @@ config = getConfig() # get it from testglobals
 
 def signal_handler(signal, frame):
     stopNow()
+
+def get_all_ways() -> Set[WayName]:
+    """ Overriddden by configuration file. """
+    raise NotImplementedError
 
 def get_compiler_info() -> TestConfig:
     """ Overriddden by configuration file. """
