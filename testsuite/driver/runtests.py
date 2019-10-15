@@ -41,7 +41,7 @@ config = getConfig() # get it from testglobals
 def signal_handler(signal, frame):
     stopNow()
 
-def get_compiler_info() -> TestConfig:
+def get_all_ways() -> Set[WayName]:
     """ Overriddden by configuration file. """
     raise NotImplementedError
 
