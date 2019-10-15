@@ -10,6 +10,9 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+-- This module does a lot of it
+
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive User Interface
