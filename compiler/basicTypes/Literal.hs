@@ -207,52 +207,52 @@ for more details.
 -}
 
 instance Binary LitNumType where
-   put_ bh numTyp = putByte bh (fromIntegral (fromEnum numTyp))
-   get bh = do
-      h <- getByte bh
+   put numTyp = putByte (fromIntegral (fromEnum numTyp))
+   get = do
+      h <- getByte
       return (toEnum (fromIntegral h))
 
 instance Binary Literal where
-    put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
-    put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
-    put_ bh (LitNullAddr)    = do putByte bh 2
-    put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
-    put_ bh (LitDouble ai)   = do putByte bh 4; put_ bh ai
-    put_ bh (LitLabel aj mb fod)
-        = do putByte bh 5
-             put_ bh aj
-             put_ bh mb
-             put_ bh fod
-    put_ bh (LitNumber nt i _)
-        = do putByte bh 6
-             put_ bh nt
-             put_ bh i
-    put_ bh (LitRubbish)     = do putByte bh 7
-    get bh = do
-            h <- getByte bh
+    put (LitChar aa)     = do putByte 0; put aa
+    put (LitString ab)   = do putByte 1; put ab
+    put (LitNullAddr)    = do putByte 2
+    put (LitFloat ah)    = do putByte 3; put ah
+    put (LitDouble ai)   = do putByte 4; put ai
+    put (LitLabel aj mb fod)
+        = do putByte 5
+             put aj
+             put mb
+             put fod
+    put (LitNumber nt i _)
+        = do putByte 6
+             put nt
+             put i
+    put (LitRubbish)     = do putByte 7
+    get = do
+            h <- getByte
             case h of
               0 -> do
-                    aa <- get bh
+                    aa <- get
                     return (LitChar aa)
               1 -> do
-                    ab <- get bh
+                    ab <- get
                     return (LitString ab)
               2 -> do
                     return (LitNullAddr)
               3 -> do
-                    ah <- get bh
+                    ah <- get
                     return (LitFloat ah)
               4 -> do
-                    ai <- get bh
+                    ai <- get
                     return (LitDouble ai)
               5 -> do
-                    aj <- get bh
-                    mb <- get bh
-                    fod <- get bh
+                    aj <- get
+                    mb <- get
+                    fod <- get
                     return (LitLabel aj mb fod)
               6 -> do
-                    nt <- get bh
-                    i  <- get bh
+                    nt <- get
+                    i  <- get
                     -- Note [Types of LitNumbers]
                     let t = case nt of
                             LitNumInt     -> intPrimTy

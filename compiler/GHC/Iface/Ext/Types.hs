@@ -75,21 +75,21 @@ data HieFile = HieFile
     -- ^ Raw bytes of the initial Haskell source
     }
 instance Binary HieFile where
-  put_ bh hf = do
-    put_ bh $ hie_hs_file hf
-    put_ bh $ hie_module hf
-    put_ bh $ hie_types hf
-    put_ bh $ hie_asts hf
-    put_ bh $ hie_exports hf
-    put_ bh $ hie_hs_src hf
+  put hf = do
+    put $ hie_hs_file hf
+    put $ hie_module hf
+    put $ hie_types hf
+    put $ hie_asts hf
+    put $ hie_exports hf
+    put $ hie_hs_src hf
 
-  get bh = HieFile
-    <$> get bh
-    <*> get bh
-    <*> get bh
-    <*> get bh
-    <*> get bh
-    <*> get bh
+  get = HieFile
+    <$> get
+    <*> get
+    <*> get
+    <*> get
+    <*> get
+    <*> get
 
 
 {-
@@ -146,48 +146,48 @@ type HieTypeFlat = HieType TypeIndex
 newtype HieTypeFix = Roll (HieType (HieTypeFix))
 
 instance Binary (HieType TypeIndex) where
-  put_ bh (HTyVarTy n) = do
-    putByte bh 0
-    put_ bh n
-  put_ bh (HAppTy a b) = do
-    putByte bh 1
-    put_ bh a
-    put_ bh b
-  put_ bh (HTyConApp n xs) = do
-    putByte bh 2
-    put_ bh n
-    put_ bh xs
-  put_ bh (HForAllTy bndr a) = do
-    putByte bh 3
-    put_ bh bndr
-    put_ bh a
-  put_ bh (HFunTy a b) = do
-    putByte bh 4
-    put_ bh a
-    put_ bh b
-  put_ bh (HQualTy a b) = do
-    putByte bh 5
-    put_ bh a
-    put_ bh b
-  put_ bh (HLitTy l) = do
-    putByte bh 6
-    put_ bh l
-  put_ bh (HCastTy a) = do
-    putByte bh 7
-    put_ bh a
-  put_ bh (HCoercionTy) = putByte bh 8
+  put (HTyVarTy n) = do
+    putByte 0
+    put n
+  put (HAppTy a b) = do
+    putByte 1
+    put a
+    put b
+  put (HTyConApp n xs) = do
+    putByte 2
+    put n
+    put xs
+  put (HForAllTy bndr a) = do
+    putByte 3
+    put bndr
+    put a
+  put (HFunTy a b) = do
+    putByte 4
+    put a
+    put b
+  put (HQualTy a b) = do
+    putByte 5
+    put a
+    put b
+  put (HLitTy l) = do
+    putByte 6
+    put l
+  put (HCastTy a) = do
+    putByte 7
+    put a
+  put (HCoercionTy) = putByte 8
 
-  get bh = do
-    (t :: Word8) <- get bh
+  get = do
+    (t :: Word8) <- get
     case t of
-      0 -> HTyVarTy <$> get bh
-      1 -> HAppTy <$> get bh <*> get bh
-      2 -> HTyConApp <$> get bh <*> get bh
-      3 -> HForAllTy <$> get bh <*> get bh
-      4 -> HFunTy <$> get bh <*> get bh
-      5 -> HQualTy <$> get bh <*> get bh
-      6 -> HLitTy <$> get bh
-      7 -> HCastTy <$> get bh
+      0 -> HTyVarTy <$> get
+      1 -> HAppTy <$> get <*> get
+      2 -> HTyConApp <$> get <*> get
+      3 -> HForAllTy <$> get <*> get
+      4 -> HFunTy <$> get <*> get
+      5 -> HQualTy <$> get <*> get
+      6 -> HLitTy <$> get
+      7 -> HCastTy <$> get
       8 -> return HCoercionTy
       _ -> panic "Binary (HieArgs Int): invalid tag"
 
@@ -198,8 +198,8 @@ newtype HieArgs a = HieArgs [(Bool,a)]
   deriving (Functor, Foldable, Traversable, Eq)
 
 instance Binary (HieArgs TypeIndex) where
-  put_ bh (HieArgs xs) = put_ bh xs
-  get bh = HieArgs <$> get bh
+  put (HieArgs xs) = put xs
+  get = HieArgs <$> get
 
 -- | Mapping from filepaths (represented using 'FastString') to the
 -- corresponding AST
@@ -207,8 +207,8 @@ newtype HieASTs a = HieASTs { getAsts :: (M.Map FastString (HieAST a)) }
   deriving (Functor, Foldable, Traversable)
 
 instance Binary (HieASTs TypeIndex) where
-  put_ bh asts = put_ bh $ M.toAscList $ getAsts asts
-  get bh = HieASTs <$> fmap M.fromDistinctAscList (get bh)
+  put asts = put $ M.toAscList $ getAsts asts
+  get = HieASTs <$> fmap M.fromDistinctAscList get
 
 
 data HieAST a =
@@ -219,15 +219,15 @@ data HieAST a =
     } deriving (Functor, Foldable, Traversable)
 
 instance Binary (HieAST TypeIndex) where
-  put_ bh ast = do
-    put_ bh $ nodeInfo ast
-    put_ bh $ nodeSpan ast
-    put_ bh $ nodeChildren ast
+  put ast = do
+    put $ nodeInfo ast
+    put $ nodeSpan ast
+    put $ nodeChildren ast
 
-  get bh = Node
-    <$> get bh
-    <*> get bh
-    <*> get bh
+  get = Node
+    <$> get
+    <*> get
+    <*> get
 
 
 -- | The information stored in one AST node.
@@ -246,14 +246,14 @@ data NodeInfo a = NodeInfo
     } deriving (Functor, Foldable, Traversable)
 
 instance Binary (NodeInfo TypeIndex) where
-  put_ bh ni = do
-    put_ bh $ S.toAscList $ nodeAnnotations ni
-    put_ bh $ nodeType ni
-    put_ bh $ M.toList $ nodeIdentifiers ni
-  get bh = NodeInfo
-    <$> fmap (S.fromDistinctAscList) (get bh)
-    <*> get bh
-    <*> fmap (M.fromList) (get bh)
+  put ni = do
+    put $ S.toAscList $ nodeAnnotations ni
+    put $ nodeType ni
+    put $ M.toList $ nodeIdentifiers ni
+  get = NodeInfo
+    <$> fmap (S.fromDistinctAscList) get
+    <*> get
+    <*> fmap (M.fromList) get
 
 type Identifier = Either ModuleName Name
 
@@ -279,12 +279,12 @@ instance Monoid (IdentifierDetails a) where
   mempty = IdentifierDetails Nothing S.empty
 
 instance Binary (IdentifierDetails TypeIndex) where
-  put_ bh dets = do
-    put_ bh $ identType dets
-    put_ bh $ S.toAscList $ identInfo dets
-  get bh =  IdentifierDetails
-    <$> get bh
-    <*> fmap (S.fromDistinctAscList) (get bh)
+  put dets = do
+    put $ identType dets
+    put $ S.toAscList $ identInfo dets
+  get =  IdentifierDetails
+    <$> get
+    <*> fmap (S.fromDistinctAscList) get
 
 
 -- | Different contexts under which identifiers exist
@@ -336,50 +336,50 @@ instance Outputable ContextInfo where
   ppr = text . show
 
 instance Binary ContextInfo where
-  put_ bh Use = putByte bh 0
-  put_ bh (IEThing t) = do
-    putByte bh 1
-    put_ bh t
-  put_ bh TyDecl = putByte bh 2
-  put_ bh (ValBind bt sc msp) = do
-    putByte bh 3
-    put_ bh bt
-    put_ bh sc
-    put_ bh msp
-  put_ bh (PatternBind a b c) = do
-    putByte bh 4
-    put_ bh a
-    put_ bh b
-    put_ bh c
-  put_ bh (ClassTyDecl sp) = do
-    putByte bh 5
-    put_ bh sp
-  put_ bh (Decl a b) = do
-    putByte bh 6
-    put_ bh a
-    put_ bh b
-  put_ bh (TyVarBind a b) = do
-    putByte bh 7
-    put_ bh a
-    put_ bh b
-  put_ bh (RecField a b) = do
-    putByte bh 8
-    put_ bh a
-    put_ bh b
-  put_ bh MatchBind = putByte bh 9
+  put Use = putByte 0
+  put (IEThing t) = do
+    putByte 1
+    put t
+  put TyDecl = putByte 2
+  put (ValBind bt sc msp) = do
+    putByte 3
+    put bt
+    put sc
+    put msp
+  put (PatternBind a b c) = do
+    putByte 4
+    put a
+    put b
+    put c
+  put (ClassTyDecl sp) = do
+    putByte 5
+    put sp
+  put (Decl a b) = do
+    putByte 6
+    put a
+    put b
+  put (TyVarBind a b) = do
+    putByte 7
+    put a
+    put b
+  put (RecField a b) = do
+    putByte 8
+    put a
+    put b
+  put MatchBind = putByte 9
 
-  get bh = do
-    (t :: Word8) <- get bh
+  get = do
+    (t :: Word8) <- get
     case t of
       0 -> return Use
-      1 -> IEThing <$> get bh
+      1 -> IEThing <$> get
       2 -> return TyDecl
-      3 -> ValBind <$> get bh <*> get bh <*> get bh
-      4 -> PatternBind <$> get bh <*> get bh <*> get bh
-      5 -> ClassTyDecl <$> get bh
-      6 -> Decl <$> get bh <*> get bh
-      7 -> TyVarBind <$> get bh <*> get bh
-      8 -> RecField <$> get bh <*> get bh
+      3 -> ValBind <$> get <*> get <*> get
+      4 -> PatternBind <$> get <*> get <*> get
+      5 -> ClassTyDecl <$> get
+      6 -> Decl <$> get <*> get
+      7 -> TyVarBind <$> get <*> get
+      8 -> RecField <$> get <*> get
       9 -> return MatchBind
       _ -> panic "Binary ContextInfo: invalid tag"
 
@@ -393,8 +393,8 @@ data IEType
     deriving (Eq, Enum, Ord, Show)
 
 instance Binary IEType where
-  put_ bh b = putByte bh (fromIntegral (fromEnum b))
-  get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
+  put = putByte . fromIntegral . fromEnum
+  get = do x <- getByte; pure $! (toEnum (fromIntegral x))
 
 
 data RecFieldContext
@@ -405,8 +405,8 @@ data RecFieldContext
     deriving (Eq, Enum, Ord, Show)
 
 instance Binary RecFieldContext where
-  put_ bh b = putByte bh (fromIntegral (fromEnum b))
-  get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
+  put = putByte . fromIntegral . fromEnum
+  get = do x <- getByte; pure $! (toEnum (fromIntegral x))
 
 
 data BindType
@@ -415,8 +415,8 @@ data BindType
     deriving (Eq, Ord, Show, Enum)
 
 instance Binary BindType where
-  put_ bh b = putByte bh (fromIntegral (fromEnum b))
-  get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
+  put = putByte . fromIntegral . fromEnum
+  get = do x <- getByte; pure $! (toEnum (fromIntegral x))
 
 
 data DeclType
@@ -430,8 +430,8 @@ data DeclType
     deriving (Eq, Ord, Show, Enum)
 
 instance Binary DeclType where
-  put_ bh b = putByte bh (fromIntegral (fromEnum b))
-  get bh = do x <- getByte bh; pure $! (toEnum (fromIntegral x))
+  put = putByte . fromIntegral . fromEnum
+  get = do x <- getByte; pure $! (toEnum (fromIntegral x))
 
 
 data Scope
@@ -446,17 +446,17 @@ instance Outputable Scope where
   ppr ModuleScope = text "ModuleScope"
 
 instance Binary Scope where
-  put_ bh NoScope = putByte bh 0
-  put_ bh (LocalScope span) = do
-    putByte bh 1
-    put_ bh span
-  put_ bh ModuleScope = putByte bh 2
+  put NoScope = putByte 0
+  put (LocalScope span) = do
+    putByte 1
+    put span
+  put ModuleScope = putByte 2
 
-  get bh = do
-    (t :: Word8) <- get bh
+  get = do
+    (t :: Word8) <- get
     case t of
       0 -> return NoScope
-      1 -> LocalScope <$> get bh
+      1 -> LocalScope <$> get
       2 -> return ModuleScope
       _ -> panic "Binary Scope: invalid tag"
 
@@ -493,17 +493,17 @@ instance Show TyVarScope where
   show _ = error "UnresolvedScope"
 
 instance Binary TyVarScope where
-  put_ bh (ResolvedScopes xs) = do
-    putByte bh 0
-    put_ bh xs
-  put_ bh (UnresolvedScope ns span) = do
-    putByte bh 1
-    put_ bh ns
-    put_ bh span
+  put (ResolvedScopes xs) = do
+    putByte 0
+    put xs
+  put (UnresolvedScope ns span) = do
+    putByte 1
+    put ns
+    put span
 
-  get bh = do
-    (t :: Word8) <- get bh
+  get = do
+    (t :: Word8) <- get
     case t of
-      0 -> ResolvedScopes <$> get bh
-      1 -> UnresolvedScope <$> get bh <*> get bh
+      0 -> ResolvedScopes <$> get
+      1 -> UnresolvedScope <$> get <*> get
       _ -> panic "Binary TyVarScope: invalid tag"

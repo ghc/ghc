@@ -254,95 +254,69 @@ instance Outputable CType where
 -}
 
 instance Binary ForeignCall where
-    put_ bh (CCall aa) = put_ bh aa
-    get bh = do aa <- get bh; return (CCall aa)
+    put (CCall aa) = put aa
+    get = CCall <$> get
 
 instance Binary Safety where
-    put_ bh PlaySafe = do
-            putByte bh 0
-    put_ bh PlayInterruptible = do
-            putByte bh 1
-    put_ bh PlayRisky = do
-            putByte bh 2
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do return PlaySafe
-              1 -> do return PlayInterruptible
-              _ -> do return PlayRisky
+    put PlaySafe          = putByte 0
+    put PlayInterruptible = putByte 1
+    put PlayRisky         = putByte 2
+    get = do h <- getByte
+             case h of
+               0 -> do return PlaySafe
+               1 -> do return PlayInterruptible
+               _ -> do return PlayRisky
 
 instance Binary CExportSpec where
-    put_ bh (CExportStatic ss aa ab) = do
-            put_ bh ss
-            put_ bh aa
-            put_ bh ab
-    get bh = do
-          ss <- get bh
-          aa <- get bh
-          ab <- get bh
-          return (CExportStatic ss aa ab)
+    put (CExportStatic ss aa ab) = do
+            put ss
+            put aa
+            put ab
+    get = CExportStatic <$> get <*> get <*> get
 
 instance Binary CCallSpec where
-    put_ bh (CCallSpec aa ab ac) = do
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
-    get bh = do
-          aa <- get bh
-          ab <- get bh
-          ac <- get bh
-          return (CCallSpec aa ab ac)
+    put (CCallSpec aa ab ac) = do
+            put aa
+            put ab
+            put ac
+    get = CCallSpec <$> get <*> get <*> get
 
 instance Binary CCallTarget where
-    put_ bh (StaticTarget ss aa ab ac) = do
-            putByte bh 0
-            put_ bh ss
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
-    put_ bh DynamicTarget = do
-            putByte bh 1
-    get bh = do
-            h <- getByte bh
+    put (StaticTarget ss aa ab ac) = do
+            putByte 0
+            put ss
+            put aa
+            put ab
+            put ac
+    put DynamicTarget = do
+            putByte 1
+    get = do
+            h <- getByte
             case h of
-              0 -> do ss <- get bh
-                      aa <- get bh
-                      ab <- get bh
-                      ac <- get bh
-                      return (StaticTarget ss aa ab ac)
-              _ -> do return DynamicTarget
+              0 -> StaticTarget <$> get <*> get <*> get <*> get
+              _ -> return DynamicTarget
 
 instance Binary CCallConv where
-    put_ bh CCallConv = do
-            putByte bh 0
-    put_ bh StdCallConv = do
-            putByte bh 1
-    put_ bh PrimCallConv = do
-            putByte bh 2
-    put_ bh CApiConv = do
-            putByte bh 3
-    put_ bh JavaScriptCallConv = do
-            putByte bh 4
-    get bh = do
-            h <- getByte bh
+    put CCallConv          = putByte 0
+    put StdCallConv        = putByte 1
+    put PrimCallConv       = putByte 2
+    put CApiConv           = putByte 3
+    put JavaScriptCallConv = putByte 4
+    get = do
+            h <- getByte
             case h of
-              0 -> do return CCallConv
-              1 -> do return StdCallConv
-              2 -> do return PrimCallConv
-              3 -> do return CApiConv
-              _ -> do return JavaScriptCallConv
+              0 -> return CCallConv
+              1 -> return StdCallConv
+              2 -> return PrimCallConv
+              3 -> return CApiConv
+              _ -> return JavaScriptCallConv
 
 instance Binary CType where
-    put_ bh (CType s mh fs) = do put_ bh s
-                                 put_ bh mh
-                                 put_ bh fs
-    get bh = do s  <- get bh
-                mh <- get bh
-                fs <- get bh
-                return (CType s mh fs)
+    put (CType s mh fs) = do put s
+                             put mh
+                             put fs
+    get = CType <$> get <*> get <*> get
 
 instance Binary Header where
-    put_ bh (Header s h) = put_ bh s >> put_ bh h
-    get bh = do s <- get bh
-                h <- get bh
-                return (Header s h)
+    put (Header s h) = put s >> put h
+    get = Header <$> get <*> get
