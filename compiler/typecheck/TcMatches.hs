@@ -21,7 +21,7 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho
                               , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
 import BasicTypes (LexicalFixity(..))
@@ -404,7 +404,7 @@ tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
 tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
-  = do  { (rhs', rhs_ty) <- tcInferSigmaNC rhs
+  = do  { (rhs', rhs_ty) <- tcInferRhoNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                     pat (mkCheckExpType rhs_ty) $
@@ -478,7 +478,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              --  passed in to tcStmtsAndThen is never looked at
        ; (stmts', (bndr_ids, by'))
             <- tcStmtsAndThen (TransStmtCtxt ctxt) (tcLcStmt m_tc) stmts unused_ty $ \_ -> do
-               { by' <- traverse tcInferSigma by
+               { by' <- traverse tcInferRho by
                ; bndr_ids <- tcLookupLocalIds bndr_names
                ; return (bndr_ids, by') }
 
