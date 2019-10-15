@@ -13,6 +13,9 @@
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
+{-# OPTIONS -fno-warn-name-shadowing #-}
+-- This module does a lot of it
+
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive User Interface

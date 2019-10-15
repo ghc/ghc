@@ -64,7 +64,6 @@ Executable ghc
             haskeline      == 0.7.*,
             time           >= 1.8 && < 1.10
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
-        GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
             GHCi.Leak
             GHCi.UI
