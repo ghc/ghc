@@ -568,6 +568,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
                                    StgThunk *thunk)
 {
     /* N.B. info->i.type mustn't be WHITEHOLE */
+    MarkQueue *queue = &cap->upd_rem_set.queue;
     switch (info->i.type) {
     case THUNK:
     case THUNK_1_0:
@@ -576,7 +577,6 @@ void updateRemembSetPushThunkEager(Capability *cap,
     case THUNK_1_1:
     case THUNK_0_2:
     {
-        MarkQueue *queue = &cap->upd_rem_set.queue;
         push_thunk_srt(queue, &info->i);
 
         for (StgWord i = 0; i < info->i.layout.payload.ptrs; i++) {
@@ -590,7 +590,6 @@ void updateRemembSetPushThunkEager(Capability *cap,
     }
     case AP:
     {
-        MarkQueue *queue = &cap->upd_rem_set.queue;
         StgAP *ap = (StgAP *) thunk;
         if (check_in_nonmoving_heap(ap->fun)) {
             push_closure(queue, ap->fun, NULL);
@@ -602,6 +601,16 @@ void updateRemembSetPushThunkEager(Capability *cap,
     case BLACKHOLE:
         // TODO: This is right, right?
         break;
+    // The selector optimization performed by the nonmoving mark may have
+    // overwritten a thunk which we are updating with an indirection.
+    case IND:
+    {
+        StgInd *ind = (StgInd *) thunk;
+        if (check_in_nonmoving_heap(ind->indirectee)) {
+            push_closure(queue, ind->indirectee, NULL);
+        }
+        break;
+    }
     default:
         barf("updateRemembSetPushThunk: invalid thunk pushed: p=%p, type=%d",
              thunk, info->i.type);
