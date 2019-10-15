@@ -44,7 +44,7 @@ module Data.Type.Equality (
   TestEquality(..),
 
   -- * Boolean type-level equality
-  type (==),
+  type (==)
   ) where
 
 import Data.Maybe
