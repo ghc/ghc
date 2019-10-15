@@ -2241,8 +2241,13 @@ setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 -- Precondition: The fully-applied TyCon has kind (TYPE blah)
 isTcLevPoly :: TyCon -> Bool
 isTcLevPoly FunTyCon{}           = False
-isTcLevPoly (AlgTyCon { algTcParent = UnboxedAlgTyCon _ }) = True
-isTcLevPoly AlgTyCon{}           = False
+isTcLevPoly (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+  | UnboxedAlgTyCon _ <- parent
+  = True
+  | NewTyCon{} <- rhs
+  = True -- Newtypes can be levity polymorphic with UnliftedNewtypes (#17360)
+  | otherwise
+  = False
 isTcLevPoly SynonymTyCon{}       = True
 isTcLevPoly FamilyTyCon{}        = True
 isTcLevPoly PrimTyCon{}          = False
