@@ -3529,7 +3529,7 @@ invertCondBranches (Just cfg) keep bs =
       , Just edgeInfo2 <- getEdgeInfo lbl1 target2 cfg
       -- Both jumps come from the same cmm statement
       , transitionSource edgeInfo1 == transitionSource edgeInfo2
-      , (CmmSource cmmCondBranch) <- transitionSource edgeInfo1
+      , CmmSource {trans_cmmNode = cmmCondBranch} <- transitionSource edgeInfo1
 
       --Int comparisons are invertable
       , CmmCondBranch (CmmMachOp op _args) _ _ _ <- cmmCondBranch
