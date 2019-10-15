@@ -54,12 +54,14 @@ mkNewTyConRhs tycon_name tycon con
         ; return (NewTyCon { data_con    = con,
                              nt_rhs      = rhs_ty,
                              nt_etad_rhs = (etad_tvs, etad_rhs),
-                             nt_co       = nt_ax } ) }
+                             nt_co       = nt_ax,
+                             nt_lev_poly = isKindLevPoly res_kind } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where
-    tvs    = tyConTyVars tycon
-    roles  = tyConRoles tycon
+    tvs      = tyConTyVars tycon
+    roles    = tyConRoles tycon
+    res_kind = tyConResKind tycon
     con_arg_ty = case dataConRepArgTys con of
                    [arg_ty] -> arg_ty
                    tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
