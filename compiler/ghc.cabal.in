@@ -92,6 +92,16 @@ Library
     if flag(ghci)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
+        Build-Depends:
+            haskeline  == 0.7.*,
+            ghc-prim       >= 0.5.0 && < 0.7
+        Exposed-Modules:
+            GHCi.Leak
+            GHCi.UI
+            GHCi.UI.Info
+            GHCi.UI.Monad
+            GHCi.UI.Tags
+            GHCi.Util
 
     -- sanity-check to ensure not more than one integer flag is set
     if flag(integer-gmp) && flag(integer-simple)
@@ -121,10 +131,13 @@ Library
         FlexibleInstances
         GADTs
         GeneralizedNewtypeDeriving
+        LambdaCase
         MagicHash
         MultiParamTypeClasses
+        MultiWayIf
         NamedFieldPuns
         NondecreasingIndentation
+        OverloadedStrings
         RankNTypes
         RecordWildCards
         ScopedTypeVariables
@@ -135,6 +148,7 @@ Library
         TypeSynonymInstances
         UnboxedTuples
         UndecidableInstances
+        ViewPatterns
 
     Include-Dirs: . parser utils
 
