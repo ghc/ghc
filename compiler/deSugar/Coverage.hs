@@ -1071,7 +1071,7 @@ noFVs = emptyOccEnv
 --   to filter additions to the latter.  This gives us complete control
 --   over what free variables we track.
 
-data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
+newtype TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
     deriving (Functor)
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).
