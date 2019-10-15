@@ -396,3 +396,7 @@ default_testopts = TestOptions()
 # (bug, directory, name) of tests marked broken
 global brokens
 brokens = []  # type: List[Tuple[IssueNumber, str, str]]
+
+def get_all_ways() -> Set[WayName]:
+    """ Overriddden by configuration file. """
+    raise NotImplementedError
